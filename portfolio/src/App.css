@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  /* Frozen Water Palette */
+  --color-frozen-water: #bee9e8;
+  --color-frozen-water-100: #163f3e;
+  --color-frozen-water-200: #2b7e7d;
+  --color-frozen-water-300: #41bdbb;
+  --color-frozen-water-400: #7fd3d2;
+  --color-frozen-water-500: #bee9e8;
+  --color-frozen-water-600: #cbeded;
+  --color-frozen-water-700: #d8f2f1;
+  --color-frozen-water-800: #e5f6f6;
+  --color-frozen-water-900: #f2fbfa;
+
+  /* Pacific Blue Palette */
+  --color-pacific-blue: #62b6cb;
+  --color-pacific-blue-100: #0f272d;
+  --color-pacific-blue-200: #1e4e5a;
+  --color-pacific-blue-300: #2d7587;
+  --color-pacific-blue-400: #3c9cb5;
+  --color-pacific-blue-500: #62b6cb;
+  --color-pacific-blue-600: #82c4d5;
+  --color-pacific-blue-700: #a1d3e0;
+  --color-pacific-blue-800: #c0e2ea;
+  --color-pacific-blue-900: #e0f0f5;
+
+  /* Yale Blue Palette */
+  --color-yale-blue: #1b4965;
+  --color-yale-blue-100: #050e14;
+  --color-yale-blue-200: #0b1d28;
+  --color-yale-blue-300: #102b3c;
+  --color-yale-blue-400: #153a51;
+  --color-yale-blue-500: #1b4965;
+  --color-yale-blue-600: #2b74a1;
+  --color-yale-blue-700: #4a9ccf;
+  --color-yale-blue-800: #86bddf;
+  --color-yale-blue-900: #c3deef;
+
+  /* Pale Sky Palette */
+  --color-pale-sky: #cae9ff;
+  --color-pale-sky-100: #00365c;
+  --color-pale-sky-200: #006bb8;
+  --color-pale-sky-300: #149dff;
+  --color-pale-sky-400: #70c3ff;
+  --color-pale-sky-500: #cae9ff;
+  --color-pale-sky-600: #d6eeff;
+  --color-pale-sky-700: #e0f2ff;
+  --color-pale-sky-800: #ebf7ff;
+  --color-pale-sky-900: #f5fbff;
+
+  /* Fresh Sky Palette */
+  --color-fresh-sky: #5fa8d3;
+  --color-fresh-sky-100: #0d2330;
+  --color-fresh-sky-200: #1a4760;
+  --color-fresh-sky-300: #276a90;
+  --color-fresh-sky-400: #358dc0;
+  --color-fresh-sky-500: #5fa8d3;
+  --color-fresh-sky-600: #7fbadc;
+  --color-fresh-sky-700: #9fcbe5;
+  --color-fresh-sky-800: #bfdced;
+  --color-fresh-sky-900: #dfeef6;
+}
