@@ -44,7 +44,7 @@ function heroSection() {
               {/* Tech Stack Badges */}
               <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
                 <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4">Our Core Stack</p>
-                <div className="grid grid-cols-4 gap-3 opacity-60 grayscale hover:grayscale-0 transition-all">
+                <div className="grid grid-cols-3 gap-3 md:grid-cols-4 opacity-60 grayscale hover:grayscale-0 transition-all">
                   <span className="font-bold dark:text-white">React / Vite</span>
                   <span className="font-bold dark:text-white">FastAPI</span>
                   <span className="font-bold dark:text-white">PostgreSQL</span>
