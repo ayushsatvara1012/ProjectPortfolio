@@ -14,10 +14,10 @@ const Navbar = () => {
   }, [isOpen]);
 
   const navLinks = [
-    { name: 'Home', href: '#' },
-    { name: 'Projects', href: '#projects' },
-    { name: 'Services', href: '#services' },
-    { name: 'Contact', href: '#contact' },
+    { name: 'Home', href: '#', id: 'home' },
+    { name: 'Projects', href: '#projects', id: 'projects' },
+    { name: 'Services', href: '#services', id: 'services' },
+    { name: 'Contact', href: '#contact', id: 'contact' },
   ];
 
   return (
@@ -44,9 +44,15 @@ const Navbar = () => {
               <a
                 key={link.name}
                 href={link.href}
-                className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors font-light hover:border-b hover:border-indigo-600 antialiased"
+                className="relative group text-slate-600 dark:text-slate-300 transition-colors font-light antialiased py-1"
               >
-                {link.name}
+                {/* The Text */}
+                <span className="group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                  {link.name}
+                </span>
+
+                {/* The Animated Underline */}
+                <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-indigo-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-in-out origin-left" />
               </a>
             ))}
           </div>
