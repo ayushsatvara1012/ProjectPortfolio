@@ -33,8 +33,8 @@ const Navbar = () => {
               </svg>
 
             </div>
-            <span className="text-lg font-bold tracking-tight dark:text-white">
-              Web<span className="text-pale-sky-200">VIBE</span>
+            <span className="text-2xl font-bold tracking-tight dark:text-white">
+              Web<span className="text-indigo-600">VIBE</span>
             </span>
           </div>
 
@@ -44,7 +44,7 @@ const Navbar = () => {
               <a
                 key={link.name}
                 href={link.href}
-                className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors font-medium"
+                className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors font-light hover:border-b hover:border-indigo-600 antialiased"
               >
                 {link.name}
               </a>
@@ -77,13 +77,13 @@ const Navbar = () => {
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
                 {link.name}
-                <ArrowRight className="text-pale-sky-100 w-8 h-8" />
+                <ArrowRight className="text-indigo-600 w-8 h-8" />
               </a>
             ))}
           </div>
 
           <div className="mt-auto">
-            <button className="w-full bg-fresh-sky-200 text-white py-5 rounded-2xl text-xl font-bold">
+            <button className="w-full bg-indigo-600 text-white py-5 rounded-2xl text-xl font-bold">
               Let's Build Something
             </button>
             <div className="mt-8 flex gap-6 text-slate-500 text-sm items-center justify-center" >
