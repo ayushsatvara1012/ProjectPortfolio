@@ -1,5 +1,5 @@
 // import Github from '../assets/github-logo.png'
-import { Github, ExternalLink, ArrowRight, Server, Globe, Cpu } from 'lucide-react';
+import { Github,ExternalLink, ArrowRight, Server, Globe, Cpu } from 'lucide-react';
 function projectSection() {
   return (
     <section className="py-24 bg-white dark:bg-slate-950">
