@@ -1,5 +1,17 @@
 // import Github from '../assets/github-logo.png'
 import { Github,ExternalLink, ArrowRight, Server, Globe, Cpu } from 'lucide-react';
+import NoImage from '../assets/icons/no-image.svg'
+import JavascriptIcon from '../assets/icons/javascript.svg'
+import ReactIcon from '../assets/icons/react.svg'
+import MongoDBIcon from '../assets/icons/mongo.svg'
+import NodeIcon from '../assets/icons/node.svg'
+import HTMLIcon from '../assets/icons/html.svg'
+import CSSIcon from '../assets/icons/css.svg'
+import PythonIcon from '../assets/icons/python.svg'
+import TailwindIcon from '../assets/icons/tailwind.svg'
+import PostgreIcon from '../assets/icons/postgre.svg'
+
+
 function projectSection() {
   return (
     <section className="py-24 bg-white dark:bg-slate-950">
@@ -8,11 +20,28 @@ function projectSection() {
         {/* Section Header */}
         <div className="mb-12.5">
           <h2 className="text-3xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4">
-            Selected <span className="text-indigo-600">Architectures.</span>
+            Selected <span className="text-indigo-600">Technologies.</span>
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 max-w-2xl text-lg">
+          <p className="text-slate-600 dark:text-slate-400 max-w-2xl text-lg mb-10">
             A look into the systems we've designed, developed, and deployed. From modular frontends to scalable backends.
           </p>
+           <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
+                <p className="text-md flex items-center justify-center font-semibold text-slate-400 uppercase tracking-widest mb-6">Our Core Stack</p>
+                <div className="w-full grid grid-cols-3 gap-2 place-items-center sm:grid-cols-4 md:grid-cols-5">
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border-2 border-[#307cbb] bg-[#003d6f] rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={PythonIcon} /></div>
+                  <div className="w-20 h-20 p-0.5 flex items-center justify-center sm:w-25 sm:h-25 border-2 border-[#f0e800]  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={JavascriptIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={ReactIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={HTMLIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={CSSIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={NodeIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={MongoDBIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={TailwindIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={MongoDBIcon} /></div>
+                  <div className="w-20 h-20 p-2 flex items-center justify-center sm:w-25 sm:h-25 border border-indigo-300  bg-blue-200/50 rounded-2xl shadow-[3px_3px_0px_0px_#000000]"><img src={PostgreIcon} /></div>
+                  {/* <div className="w-20 h-20 flex items-center justify-center border border-gray-100 rounded-2xl"><img src={Docker} alt='Docker'/></div>
+                  <div className="w-20 h-20 flex items-center justify-center border border-gray-100 rounded-2xl"><img src={Aws} alt='AWS'/></div> */}
+                </div>
+            </div>
         </div>
         {/* Featured Deployment */}
         <section id="projects" className="py-20 rounded-2xl bg-slate-50 dark:bg-slate-950 px-6">

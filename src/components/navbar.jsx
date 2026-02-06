@@ -93,7 +93,7 @@ const Navbar = () => {
               Let's Build Something
             </button>
             <div className="mt-8 flex gap-6 text-slate-500 text-sm items-center justify-center" >
-              <span>Twitter</span>
+              <span>Our Stack</span>
               <span>LinkedIn</span>
               <span>GitHub</span>
             </div>
