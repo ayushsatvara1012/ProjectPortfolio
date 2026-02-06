@@ -1,14 +1,15 @@
-import Projects from '../components/projectSection'
-import HeroSection from '../components/heroSection'
-import Navbar from '../components/navbar'
+import Projects from "../components/projectSection";
+import HeroSection from "../components/heroSection";
+import Services from "../components/services";
+
 function homepage() {
-    return (
-        <>
-            <Navbar />
-            <HeroSection/>
-            <Projects />
-        </>
-    )
+  return (
+    <>
+      <HeroSection />
+      <Projects />
+      <Services />
+    </>
+  );
 }
 
-export default homepage
+export default homepage;
