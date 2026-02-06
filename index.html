@@ -7,6 +7,31 @@
     <title>portfolio</title>
   </head>
   <body>
+    <div id="initial-loader" style="
+    position: fixed; 
+    inset: 0; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    background: #ffffff; 
+    z-index: 9999;">
+  
+  <style>
+    .pulse {
+      width: 40px;
+      height: 40px;
+      background-color: #4f46e5; /* Your Indigo-600 */
+      border-radius: 100%;
+      animation: sk-scaleout 1.0s infinite ease-in-out;
+    }
+    @keyframes sk-scaleout {
+      0% { transform: scale(0); }
+      100% { transform: scale(1.0); opacity: 0; }
+    }
+  </style>
+
+  <div class="pulse"></div>
+</div>
     <div id="root" ></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
