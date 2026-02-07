@@ -16,7 +16,7 @@ import DockerIcon from '../assets/icons/docker.svg'
 
 function projectSection() {
   return (
-    <section className="relative py-24 bg-white dark:bg-slate-950 overflow-hidden">
+    <section id="projects" className="relative py-24 bg-white dark:bg-slate-950 overflow-hidden">
       {/* Background Architectural Grid */}
       <div className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" 
            style={{ backgroundImage: 'linear-gradient(#4f46e5 1px, transparent 1px), linear-gradient(90deg, #4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
@@ -25,7 +25,7 @@ function projectSection() {
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         
         {/* Header & Tech Dashboard Stack */}
-        <div className="grid lg:grid-cols-12 gap-12 items-center mb-16">
+        <div className="grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 mb-6">
               <Boxes size={14} className="text-indigo-600" />
@@ -55,7 +55,7 @@ function projectSection() {
         </div>
 
         {/* Featured Deployments with "Blueprint" Styling */}
-        <div id="projects" className="space-y-12">
+        <div className="space-y-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h2 className="text-4xl font-bold text-slate-900 dark:text-white">

@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet,ScrollRestoration } from "react-router-dom";
 import "./App.css";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
@@ -6,6 +6,7 @@ import Footer from "./components/footer";
 function App() {
   return (
     <div className="flex flex-col">
+      <ScrollRestoration />
       <Navbar />
         <Outlet />
       <Footer />
