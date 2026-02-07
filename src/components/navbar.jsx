@@ -16,7 +16,7 @@ const Navbar = () => {
   }, [isOpen]);
 
   const navLinks = [
-    { name: "Home", href: "/", id: "home" },
+    { name: "Home", href: "#home", id: "home" },
     { name: "Projects", href: "#projects", id: "projects" },
     { name: "Services", href: "#services", id: "services" },
     { name: "Contact", href: "/contact", id: "contact" },

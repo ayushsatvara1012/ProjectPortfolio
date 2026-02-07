@@ -3,7 +3,7 @@ import { ArrowRight, Code, Server, Shield, Zap } from 'lucide-react';
 function heroSection() {
   return (
     <>
-      <div className="relative min-h-screen pt-5 overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <section id="home" className="relative min-h-screen pt-5 overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Background Decorative Element: "The Grid" */}
         <div className="absolute inset-0 z-0 opacity-20 dark:opacity-10 pointer-events-none"
           style={{ backgroundImage: 'radial-gradient(#4f46e5 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}>
@@ -82,7 +82,7 @@ function heroSection() {
 
           </div>
         </main>
-      </div>
+      </section>
     </>
   )
 }
