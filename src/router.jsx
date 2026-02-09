@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
 import Homepage from "./pages/homepage";
+import Apptest from './Apptest'
 
 // 1. Architect the Lazy Imports
 // This tells Vite to create separate chunks for these components
@@ -35,6 +36,10 @@ const router = createBrowserRouter([
             <Contactpage />
           </Suspense>
         ),
+      },
+      {
+        path: "/test",
+        element: <Apptest />,
       },
     ],
   },

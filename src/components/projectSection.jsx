@@ -68,7 +68,7 @@ function projectSection() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             
-            {/* PROJECT 1: DIGITAL BOOK STORE */}
+            {/* PROJECT 1: DIGITAL LIBRARY */}
             <div className="group relative">
               <div className="absolute -inset-2 bg-linear-to-r from-indigo-500 to-violet-500 rounded-[2.5rem] opacity-0 group-hover:opacity-10 transition-opacity blur-2xl"></div>
               
@@ -88,7 +88,7 @@ function projectSection() {
 
                 <div className="p-8">
                   <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 group-hover:translate-x-1 transition-transform">
-                    Digital Book Store
+                    Digital Library
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed font-light">
                     A high-performance e-commerce engine featuring a FastAPI backend. Optimized for sub-second page loads.

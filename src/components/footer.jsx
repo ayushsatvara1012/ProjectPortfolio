@@ -30,7 +30,7 @@ const ModernFooter = () => {
             
             <div className="mt-10 flex flex-wrap gap-4">
               <button className="bg-white text-slate-950 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-indigo-500 hover:text-white transition-all active:scale-95">
-                Start a Project <Zap size={18} fill="currentColor" />
+                Start Project <Zap size={18} fill="currentColor" />
               </button>
               <a href="mailto:hello@startup.io" className="p-3 rounded-full border border-slate-700 text-white hover:bg-slate-800 transition-all">
                 <Mail size={20} />
