@@ -1,18 +1,17 @@
-import './App.css'
-import Homepage from './pages/homepage'
-import Navbar from './components/navbar'
-import Footer from './components/footer'
-function App() {
+import { Outlet,ScrollRestoration } from "react-router-dom";
+import "./App.css";
+import Navbar from "./components/navbar";
+import Footer from "./components/footer";
 
+function App() {
   return (
-    <>
-      <div className='flex flex-col'>
-        <Navbar />
-        <Homepage />
-        <Footer />
-      </div>
-    </>
-  )
+    <div className="flex flex-col">
+      <ScrollRestoration />
+      <Navbar />
+        <Outlet />
+      <Footer />
+    </div>
+  );
 }
 
-export default App
+export default App;

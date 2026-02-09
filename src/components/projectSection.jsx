@@ -1,123 +1,161 @@
 // import Github from '../assets/github-logo.png'
-import { Github,ExternalLink, ArrowRight, Server, Globe, Cpu } from 'lucide-react';
+import { Github,ExternalLink, ArrowRight, Server, Globe, Cpu ,Boxes,Terminal} from 'lucide-react';
+import NoImage from '../assets/icons/no-image.svg'
+import JavascriptIcon from '../assets/icons/javascript.svg'
+import ReactIcon from '../assets/icons/react.svg'
+import MongoDBIcon from '../assets/icons/mongo.svg'
+import NodeIcon from '../assets/icons/node.svg'
+import HTMLIcon from '../assets/icons/html.svg'
+import CSSIcon from '../assets/icons/css.svg'
+import PythonIcon from '../assets/icons/python.svg'
+import TailwindIcon from '../assets/icons/tailwind.svg'
+import PostgreIcon from '../assets/icons/postgre.svg'
+import AWSIcon from '../assets/icons/aws.svg'
+import DockerIcon from '../assets/icons/docker.svg'
+
+
 function projectSection() {
   return (
-    <section className="py-24 bg-white dark:bg-slate-950">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="projects" className="relative py-24 bg-white dark:bg-slate-950 overflow-hidden">
+      {/* Background Architectural Grid */}
+      <div className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" 
+           style={{ backgroundImage: 'linear-gradient(#4f46e5 1px, transparent 1px), linear-gradient(90deg, #4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
+      </div>
 
-        {/* Section Header */}
-        <div className="mb-12.5">
-          <h2 className="text-3xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4">
-            Selected <span className="text-indigo-600">Architectures.</span>
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 max-w-2xl text-lg">
-            A look into the systems we've designed, developed, and deployed. From modular frontends to scalable backends.
-          </p>
-        </div>
-        {/* Featured Deployment */}
-        <section id="projects" className="py-20 rounded-2xl bg-slate-50 dark:bg-slate-950 px-6">
-          <div className="max-w-7xl mx-auto">
-
-            {/* Section Heading */}
-            <div className="mb-12">
-              <h2 className="text-4xl font-bold text-slate-900 dark:text-white">Featured <span className='text-green-600'>Deployments</span></h2>
-              <p className="text-slate-500 mt-2">Manual selection of our most robust architectures.</p>
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
+        
+        {/* Header & Tech Dashboard Stack */}
+        <div className="grid lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-7">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 mb-6">
+              <Boxes size={14} className="text-indigo-600" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Full-Stack Ecosystem</span>
             </div>
+            <h2 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-white mb-6 tracking-tight">
+              Selected <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">Technologies.</span>
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 max-w-xl text-lg leading-relaxed">
+              We leverage a high-performance stack to bridge the gap between complex backend logic and seamless frontend experiences.
+            </p>
+          </div>
 
-            {/* Manual Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-              {/* PROJECT 1: BOOK STORE */}
-              <div className="group relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-all hover:shadow-2xl">
-                {/* Deployment Badge */}
-                <div className="absolute top-5 right-5 z-20">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50/90 dark:bg-emerald-900/20 backdrop-blur-md border border-emerald-200 dark:border-emerald-800">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">Live on AWS</span>
-                  </div>
+          {/* Neo-Brutalist Tech Grid */}
+          <div className="lg:col-span-5">
+            <div className="grid grid-cols-4 gap-3 p-6 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 backdrop-blur-xl shadow-2xl shadow-indigo-500/5">
+              {[PythonIcon, JavascriptIcon, ReactIcon, HTMLIcon, CSSIcon, NodeIcon, TailwindIcon, MongoDBIcon, AWSIcon, PostgreIcon, DockerIcon].map((icon, idx) => (
+                <div key={idx} className="aspect-square flex items-center justify-center p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:scale-110 hover:-rotate-3 transition-all cursor-pointer group">
+                  <img src={icon} alt="tech" className="w-15 h-15 lg:grayscale lg:group-hover:grayscale-0 lg:transition-all" />
                 </div>
-
-                <div className="p-8">
-                  <div className="mb-6 inline-flex p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600">
-                    <Globe size={28} />
-                  </div>
-
-                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-indigo-600 transition-colors">
-                    Digital Book Store
-                  </h3>
-
-                  <p className="text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-                    A high-performance e-commerce engine featuring a FastAPI backend and PostgreSQL. Optimized for sub-second page loads and secure transactions.
-                  </p>
-
-                  {/* Static Tech Stack */}
-                  <div className="flex flex-wrap gap-2 mb-8">
-                    <span className="px-3 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">REACT</span>
-                    <span className="px-3 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">FASTAPI</span>
-                    <span className="px-3 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">POSTGRESQL</span>
-                  </div>
-
-                  <div className="flex items-center justify-around gap-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-                    <a href="https://github.com/your-repo" className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-                      <Github size={18} /> Source Code
-                    </a>
-                    <a href="https://live-demo.com" className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:gap-3 transition-all">
-                      View Project <ArrowRight size={16} />
-                    </a>
-                  </div>
-                </div>
+              ))}
+              <div className="aspect-square flex items-center justify-center p-2 rounded-xl bg-indigo-600 text-white shadow-lg">
+                <Terminal size={20} />
               </div>
-
-              {/* PROJECT 2: PORTFOLIO / STARTUP SITE */}
-              <div className="group relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-all hover:shadow-2xl">
-                {/* Deployment Badge */}
-                <div className="absolute top-5 right-5 z-20">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50/90 dark:bg-blue-900/20 backdrop-blur-md border border-blue-200 dark:border-blue-800">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-400">Deployed: Vercel</span>
-                  </div>
-                </div>
-
-                <div className="p-8">
-                  <div className="mb-6 inline-flex p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600">
-                    <Cpu size={28} />
-                  </div>
-
-                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 transition-colors">
-                    Agency Portfolio
-                  </h3>
-
-                  <p className="text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-                    Our internal startup identity. Built with a mobile-first approach, focusing on performance scores and modern glassmorphic UI patterns.
-                  </p>
-
-                  {/* Static Tech Stack */}
-                  <div className="flex flex-wrap gap-2 mb-8">
-                    <span className="px-3 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">VITE</span>
-                    <span className="px-3 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">TAILWIND</span>
-                    <span className="px-3 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">FRAMER MOTION</span>
-                  </div>
-
-                  <div className="flex items-center justify-around gap-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-                    <a href="https://github.com/your-repo" className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-                      <Github size={18} /> Source Code
-                    </a>
-                    <a href="https://live-demo.com" className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:gap-3 transition-all">
-                      View Project <ArrowRight size={16} />
-                    </a>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </div>
-        </section>
+        </div>
+
+        {/* Featured Deployments with "Blueprint" Styling */}
+        <div className="space-y-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h2 className="text-4xl font-bold text-slate-900 dark:text-white">
+                Featured <span className="italic font-light text-emerald-600">Deployments</span>
+              </h2>
+              <div className="h-1 w-20 bg-indigo-600 mt-2 rounded-full"></div>
+            </div>
+            <p className="text-slate-500 font-mono text-sm tracking-tighter uppercase">/ Architecture_Log_2026</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            
+            {/* PROJECT 1: DIGITAL BOOK STORE */}
+            <div className="group relative">
+              <div className="absolute -inset-2 bg-linear-to-r from-indigo-500 to-violet-500 rounded-[2.5rem] opacity-0 group-hover:opacity-10 transition-opacity blur-2xl"></div>
+              
+              <div className="relative rounded-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                {/* Deployment Header */}
+                <div className="p-8 pb-0 flex justify-between items-start">
+                  <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600">
+                    <Globe size={32} />
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Live on AWS</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 group-hover:translate-x-1 transition-transform">
+                    Digital Book Store
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed font-light">
+                    A high-performance e-commerce engine featuring a FastAPI backend. Optimized for sub-second page loads.
+                  </p>
+
+                  {/* Tech Labels - Architect Style */}
+                  <div className="flex gap-4 mb-8 font-mono text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> REACT_UI</span>
+                    <span className="flex items-center gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> FAST_API</span>
+                    <span className="flex items-center gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> PG_SQL</span>
+                  </div>
+
+                  <div className="flex items-center gap-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                    <a href="#" className="group/link flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+                      <Github size={18} /> <span>SOURCE</span>
+                    </a>
+                    <a href="#" className="flex items-center gap-2 text-sm font-black text-indigo-600">
+                      LAUNCH <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PROJECT 2: AGENCY PORTFOLIO */}
+            <div className="group relative mt-0 md:mt-12"> {/* Asymmetric offset */}
+              <div className="absolute -inset-2 bg-linear-to-r from-blue-500 to-cyan-500 rounded-[2.5rem] opacity-0 group-hover:opacity-10 transition-opacity blur-2xl"></div>
+              
+              <div className="relative rounded-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div className="p-8 pb-0 flex justify-between items-start">
+                  <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600">
+                    <Cpu size={32} />
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Edge: Vercel</span>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 group-hover:translate-x-1 transition-transform">
+                    Agency Identity
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed font-light">
+                    Our internal startup identity. Built with modern glassmorphic UI patterns and high-performance animation.
+                  </p>
+
+                  <div className="flex gap-4 mb-8 font-mono text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full"></div> VITE_JS</span>
+                    <span className="flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full"></div> TAILWIND</span>
+                    <span className="flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full"></div> FRAMER</span>
+                  </div>
+
+                  <div className="flex items-center gap-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                    <a href="#" className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors">
+                      <Github size={18} /> <span>SOURCE</span>
+                    </a>
+                    <a href="#" className="flex items-center gap-2 text-sm font-black text-blue-600">
+                      LAUNCH <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -3,7 +3,7 @@ import { ArrowRight, Code, Server, Shield, Zap } from 'lucide-react';
 function heroSection() {
   return (
     <>
-      <div className="relative min-h-screen pt-5 overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <section id="home" className="relative min-h-screen pt-5 overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Background Decorative Element: "The Grid" */}
         <div className="absolute inset-0 z-0 opacity-20 dark:opacity-10 pointer-events-none"
           style={{ backgroundImage: 'radial-gradient(#4f46e5 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}>
@@ -39,22 +39,6 @@ function heroSection() {
                 <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
                   View Architecture
                 </button>
-              </div>
-
-              {/* Tech Stack Badges */}
-              <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
-                <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4">Our Core Stack</p>
-                <div className="grid grid-cols-3 gap-3 md:grid-cols-4 opacity-60 grayscale hover:grayscale-0 transition-all">
-                  <span className="font-bold dark:text-white">React / Vite</span>
-                  <span className="font-bold dark:text-white">FastAPI</span>
-                  <span className="font-bold dark:text-white">PostgreSQL</span>
-                  <span className="font-bold dark:text-white">Python</span>
-                  <span className="font-bold dark:text-white">HTML5</span>
-                  <span className="font-bold dark:text-white">CSS3</span>
-                  <span className="font-bold dark:text-white">Javascript</span>
-                  <span className="font-bold dark:text-white">MongoDB</span>
-                  <span className="font-bold dark:text-white">REST APIs</span>
-                </div>
               </div>
             </div>
 
@@ -98,7 +82,7 @@ function heroSection() {
 
           </div>
         </main>
-      </div>
+      </section>
     </>
   )
 }

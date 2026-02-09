@@ -1,15 +1,15 @@
-import { ArrowRight, Code, Server, Shield, Zap } from 'lucide-react';
-import Projects from '../components/projectSection'
-import HeroSection from '../components/heroSection'
-import AppTest from '../App.test'
+import Projects from "../components/projectSection";
+import HeroSection from "../components/heroSection";
+import Services from "../components/services";
+
 function homepage() {
-    return (
-        <>
-            <HeroSection/>
-            <Projects />
-            {/* <AppTest /> */}
-        </>
-    )
+  return (
+    <>
+      <HeroSection />
+      <Projects />
+      <Services />
+    </>
+  );
 }
 
-export default homepage
+export default homepage;
