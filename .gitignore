@@ -22,3 +22,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build / Deployment logs
+.vercel
+.amplify
+.output
+
+# Testing and Coverage
+coverage
+.nyc_output
+
+# Temporary / Cache
+.cache
+.parcel-cache
+.turbo
+.eslintcache
+
+# Production secrets
+*.pem
