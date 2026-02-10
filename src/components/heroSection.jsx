@@ -24,8 +24,8 @@ function heroSection() {
                 </span>
               </div>
 
-              <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-                Engineering Digital Excellence from <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">Code to Cloud.</span>
+              <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight  text-slate-900 dark:text-white leading-[1.1]">
+                Engineering Digital Excellence from <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-questrial">Code to Cloud.</span>
               </h1>
 
               <p className="max-w-xl text-lg font-light lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -57,7 +57,7 @@ function heroSection() {
                     <div className="p-2 w-fit rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-600">
                       <Server size={24} />
                     </div>
-                    <h3 className="font-bold dark:text-white">Deployment</h3>
+                    <h3 className="font-bold dark:text-white font-questrial">Deployment</h3>
                     <p className="text-xs text-slate-500">Serverless AWS architecture & CI/CD pipelines.</p>
                   </div>
                   <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3">

@@ -56,8 +56,10 @@ const Navbar = () => {
             <div className="bg-white p-2 rounded-xl border border-slate-200">
               <Terminal className="w-6 h-6 text-indigo-600" />
             </div>
-            <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white">
-              Sa<span className="text-indigo-600">Py</span>
+            <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white font-glook antialiased">
+              Sa
+              <span className="font-glook antialiased">Py</span>
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide antialiased">Base</span>
             </span>
           </div>
 
@@ -68,7 +70,7 @@ const Navbar = () => {
                 key={link.name}
                 href={link.href}
                 onClick={(e) => handleLinkClick(e, link.href)}
-                className="relative group text-slate-600 dark:text-slate-300 transition-colors font-light antialiased py-1"
+                className="relative group text-slate-600 dark:text-slate-300 transition-colors font-questrial antialiased py-1"
               >
                 {/* The Text */}
                 <span className="group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
