@@ -7,7 +7,7 @@ import './index.css'
 function App() {
   return (
     <div className="flex flex-col">
-      {/* <ScrollRestoration /> */}
+      <ScrollRestoration />
       <Navbar />
         <Outlet />
       <Footer />
