@@ -16,7 +16,7 @@ import DockerIcon from '../assets/icons/docker.svg'
 
 function projectSection() {
   return (
-    <section id="projects" className="relative py-24 bg-white dark:bg-slate-950 overflow-hidden">
+    <section id="projects" className="relative py-20 bg-white dark:bg-slate-950 overflow-hidden">
       {/* Background Architectural Grid */}
       <div className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" 
            style={{ backgroundImage: 'linear-gradient(#4f46e5 1px, transparent 1px), linear-gradient(90deg, #4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
@@ -55,8 +55,8 @@ function projectSection() {
         </div>
 
         {/* Featured Deployments with "Blueprint" Styling */}
-        <div className="space-y-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col space-y-12">
+          <div className="flex flex-col mt-10 md:flex-row md:items-end justify-between gap-4">
             <div>
               <h2 className="text-4xl font-bold text-slate-900 dark:text-white">
                 Featured <span className="italic font-light text-emerald-600">Deployments</span>
@@ -81,21 +81,21 @@ function projectSection() {
                   <div className="flex flex-col items-end">
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Live on AWS</span>
+                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Active Development</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-8">
-                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 group-hover:translate-x-1 transition-transform">
-                    Digital Library
+                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 group-hover:translate-x-1 transition-transform">
+                    LuminaLib
                   </h3>
-                  <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed font-light">
-                    A high-performance e-commerce engine featuring a FastAPI backend. Optimized for sub-second page loads.
+                  <p className="text-slate-600 dark:text-slate-400 mb-4 leading-relaxed font-light">
+                    <span className='italic'> Distributed Book Intelligence Engine</span> | A high-performance e-commerce engine featuring a FastAPI backend. Optimized for sub-second page loads.
                   </p>
 
                   {/* Tech Labels - Architect Style */}
-                  <div className="flex gap-4 mb-8 font-mono text-[10px] text-slate-400">
+                  <div className="flex gap-4 mb-4 font-mono text-[10px] text-slate-400">
                     <span className="flex items-center gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> REACT_UI</span>
                     <span className="flex items-center gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> FAST_API</span>
                     <span className="flex items-center gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> PG_SQL</span>
@@ -129,14 +129,14 @@ function projectSection() {
                 </div>
 
                 <div className="p-8">
-                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 group-hover:translate-x-1 transition-transform">
-                    Agency Identity
+                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 group-hover:translate-x-1 transition-transform">
+                    SaPyBase
                   </h3>
-                  <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed font-light">
+                  <p className="text-slate-600 dark:text-slate-400 mb-4 leading-relaxed font-light">
                     Our internal startup identity. Built with modern glassmorphic UI patterns and high-performance animation.
                   </p>
 
-                  <div className="flex gap-4 mb-8 font-mono text-[10px] text-slate-400">
+                  <div className="flex gap-4 mb-4 font-mono text-[10px] text-slate-400">
                     <span className="flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full"></div> VITE_JS</span>
                     <span className="flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full"></div> TAILWIND</span>
                     <span className="flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full"></div> FRAMER</span>
