@@ -3,13 +3,13 @@ import { ArrowRight, Code, Server, Shield, Zap } from 'lucide-react';
 function heroSection() {
   return (
     <>
-      <section id="home" className="relative min-h-screen pt-5 overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <section id="home" className="relative min-h-screen pt-5 overflow-hidden bg-slate-50 dark:bg-slate-950 antialiased">
         {/* Background Decorative Element: "The Grid" */}
         <div className="absolute inset-0 z-0 opacity-20 dark:opacity-10 pointer-events-none"
           style={{ backgroundImage: 'radial-gradient(#4f46e5 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}>
         </div>
 
-        <main className="relative z-10 max-w-7xl mx-auto px-6 pt-16 lg:pt-16 pb-24">
+        <main className="min-h-screen relative z-10 max-w-7xl mx-auto px-6 pt-16 lg:pt-16 pb-24">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
 
             {/* Left Column: The Copy */}
@@ -57,7 +57,7 @@ function heroSection() {
                     <div className="p-2 w-fit rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-600">
                       <Server size={24} />
                     </div>
-                    <h3 className="font-bold dark:text-white font-questrial">Deployment</h3>
+                    <h3 className="font-bold dark:text-white">Deployment</h3>
                     <p className="text-xs text-slate-500">Serverless AWS architecture & CI/CD pipelines.</p>
                   </div>
                   <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3">
