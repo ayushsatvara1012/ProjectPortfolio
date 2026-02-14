@@ -13,6 +13,49 @@
   --font-glook :"Gloock", serif;
 }
 
-html{
+@theme {
+/* --- Brand & Accent Colors --- */
+  --color-brand: var(--color-indigo-600);
+  --color-brand-light: var(--color-indigo-400);
+  --color-brand-dark: var(--color-indigo-700);
+
+  /* --- Light Mode Tokens (Default) --- */
+  --color-bg-main: var(--color-white);
+  --color-bg-surface: var(--color-slate-50);
+  --color-border-subtle: var(--color-slate-100);
+  
+  --color-text-primary: var(--color-slate-900);
+  --color-text-secondary: var(--color-slate-600);
+  --color-text-muted: var(--color-slate-400);
+
+  /* --- Dark Mode Tokens --- */
+  /* These will be applied when the .dark class is on the html/body tag */
+  --color-bg-main-dark: var(--color-slate-950);
+  --color-bg-surface-dark: var(--color-slate-900);
+  --color-border-subtle-dark: var(--color-slate-800);
+  
+  --color-text-primary-dark: var(--color-white);
+  --color-text-secondary-dark: var(--color-slate-300);
+  --color-text-muted-dark: var(--color-slate-500);
+
+  /* --- Functional Colors --- */
+  --color-success: var(--color-emerald-500);
+  --color-warning: var(--color-amber-500);
+  --color-error: var(--color-rose-500);
+
+  /* Animation Timings */
+  --animate-smooth-scroll: scroll-behavior 0.5s ease-in-out;
+}
+
+@layer base {
+  html {
     scroll-behavior: smooth;
+    /* Sets the default background based on mode */
+    @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-white;
+  }
+
+  /* Transition for smooth theme switching */
+  body {
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
 }
