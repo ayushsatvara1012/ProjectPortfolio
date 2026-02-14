@@ -49,17 +49,17 @@ const Navbar = () => {
   return (
     <>
       {/* Mobile-First Header */}
-      <nav className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+      <nav className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 antialiased">
         <div className="px-5 h-16 flex items-center justify-between">
           {/* Logo - Always visible */}
           <div className="flex items-center gap-2">
             <div className="bg-white p-2 rounded-xl border border-slate-200">
               <Terminal className="w-6 h-6 text-indigo-600" />
             </div>
-            <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white font-glook antialiased">
+            <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white font-glook">
               Sa
-              <span className="font-glook antialiased">Py</span>
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide antialiased">Base</span>
+              <span className="font-glook">Py</span>
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
             </span>
           </div>
 
@@ -70,7 +70,7 @@ const Navbar = () => {
                 key={link.name}
                 href={link.href}
                 onClick={(e) => handleLinkClick(e, link.href)}
-                className="relative group text-slate-600 dark:text-slate-300 transition-colors font-questrial antialiased py-1"
+                className="relative group text-slate-600 dark:text-slate-300 transition-colors font-questrial py-1"
               >
                 {/* The Text */}
                 <span className="group-hover:text-slate-900 dark:group-hover:text-white transition-colors">

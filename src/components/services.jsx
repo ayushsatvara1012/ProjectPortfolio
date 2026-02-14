@@ -3,7 +3,7 @@ import { BrainCircuit, Code2, CloudCog, Globe, Terminal, Fingerprint, Activity }
 
 const Services = () => {
   return (
-    <section id="services" className="py-32 bg-slate-950 relative overflow-hidden">
+    <section id="services" className="py-24 bg-slate-950 relative overflow-hidden antialiased">
 
       {/* Background "Neural" Lines */}
       <div className="absolute inset-0 opacity-20 pointer-events-none">

@@ -12,7 +12,7 @@ function ContactPage(){
 
   return (
     <>
-      <section id="contact" className="relative py-12 md:py-20 bg-white overflow-hidden">
+      <section id="contact" className="relative py-12 md:py-20 bg-white overflow-hidden antialiased">
         {/* Background Grid - Scaled for Mobile */}
         <div className="absolute inset-0 opacity-[0.1] pointer-events-none"
           style={{ backgroundImage: 'linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)', backgroundSize: 'clamp(20px, 5vw, 40px) clamp(20px, 5vw, 40px)' }} />
