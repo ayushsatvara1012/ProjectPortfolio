@@ -12,6 +12,7 @@ const PerformanceMetrics = () => {
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
         </svg>
       ),
+      borderClass: "hover:border-emerald-500/30 hover:shadow-emerald-500/10"
     },
     {
       title: "CLS Reduction",
@@ -23,6 +24,7 @@ const PerformanceMetrics = () => {
           <path d="M12 20V10M18 20V4M6 20v-4" />
         </svg>
       ),
+      borderClass: "hover:border-indigo-500/30 hover:shadow-indigo-500/10"
     },
     {
       title: "Rendering Speed",
@@ -34,6 +36,7 @@ const PerformanceMetrics = () => {
           <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
         </svg>
       ),
+      borderClass: "hover:border-amber-500/30 hover:shadow-amber-500/10"
     }
   ];
 
@@ -45,7 +48,7 @@ const PerformanceMetrics = () => {
             <div
               key={index}
               /* Optimized transitions using will-change to hint browser for GPU acceleration */
-              className="group relative p-8 rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-900 hover:shadow-2xl hover:shadow-emerald-500/10 hover:border-emerald-500/20 transition-all duration-300 will-change-transform"
+              className={`group relative p-8 rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-900 hover:shadow-2xl ${metric.borderClass} transition-all duration-300 will-change-transform`}
             >
               <div className="flex flex-row-reverse items-center justify-between md:flex-col md:items-start lg:flex-row-reverse lg:items-center lg:justify-between">
                 {/* Icon Container - Simplified transform for performance */}
@@ -58,6 +61,7 @@ const PerformanceMetrics = () => {
                   <span className="text-5xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
                     {metric.value}
                   </span>
+                
                   {metric.pulse}
                 </div>
               </div>
