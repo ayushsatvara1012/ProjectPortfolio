@@ -126,7 +126,7 @@ function projectSection() {
                     </div>
 
                     <div className="flex items-center gap-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                      <a href="#" className="group/link flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+                      <a href="https://github.com/ayushsatvara1012/book_store_ui.git" className="group/link flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">
                         <Github size={18} /> <span>SOURCE</span>
                       </a>
                       <a href="#" className="flex items-center gap-2 text-sm font-black text-indigo-600">
@@ -167,7 +167,7 @@ function projectSection() {
                     </div>
 
                     <div className="flex items-center gap-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                      <a href="#" className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors">
+                      <a href="https://github.com/ayushsatvara1012/ProjectPortfolio.git" className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors">
                         <Github size={18} /> <span>SOURCE</span>
                       </a>
                       <a href="#" className="flex items-center gap-2 text-sm font-black text-blue-600">

@@ -137,7 +137,7 @@ const Services = () => {
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-600/20 blur-[80px] rounded-full group-hover:bg-emerald-600/40 transition-colors duration-700" />
             <div className="bg-slate-950 w-full h-full rounded-[1.9rem] p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all group-hover:bg-slate-900/30">
               <div className="flex items-center gap-6">
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-all duration-300">
                   <Globe size={32} />
                 </div>
                 <div>
