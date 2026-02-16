@@ -67,8 +67,8 @@ const ModernFooter = () => {
               <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Social</h4>
               <div className="flex gap-4">
                 {[
-                  { Icon: Github, href: "#" },
-                  { Icon: Linkedin, href: "#" },
+                  { Icon: Github, href: "https://github.com/ayushsatvara1012" },
+                  { Icon: Linkedin, href: "ww.linkedin.com/in/ayush-piyushkumar-satvara-39ba66196" },
                   { Icon: Twitter, href: "#" }
                 ].map((social, i) => (
                   <a key={i} href={social.href} className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:border-indigo-400/50 transition-all">
@@ -82,7 +82,7 @@ const ModernFooter = () => {
 
         {/* Bottom Section */}
         <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-slate-900 text-slate-500 text-xs">
-          <p>© 2026 SaPy.IO — Engineered with precision.</p>
+          <p>© 2026 SaPyBase — Engineered with precision.</p>
           <div className="flex gap-6 mt-4 md:mt-0">
             <a href="#" className="hover:text-white transition-colors">Privacy</a>
             <a href="#" className="hover:text-white transition-colors">Terms</a>

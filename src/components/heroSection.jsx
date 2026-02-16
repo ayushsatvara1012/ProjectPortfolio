@@ -15,7 +15,7 @@ function heroSection() {
           }}>
         </div>
 
-        <main className="min-h-screen relative z-10 max-w-7xl mx-auto px-6 pt-16 lg:pt-16 pb-24">
+        <main className="min-h-screen relative z-10 max-w-7xl mx-auto px-6 pt-16 lg:pt-16 pb-12">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
 
             {/* Left Column: The Copy */}
@@ -31,15 +31,15 @@ function heroSection() {
               </div>
 
               {/* LCP Target: Use standard gradient syntax for better browser compatibility */}
-              <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
+              <h1 className="text-5xl sm:text-center lg:text-7xl lg:text-start font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
                 Engineering Digital Excellence from <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-500 font-questrial">Code to Cloud.</span>
               </h1>
 
-              <p className="max-w-xl text-lg font-light lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed">
+              <p className="max-w-xl text-lg font-light sm:max-w-screen sm:text-center lg:text-start lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed">
                 We don't just build websites. We architect, develop, and deploy high-performance web applications tailored for the next generation of startups.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 sm:place-content-center">
                 <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold transition-all active:scale-95">
                   Launch Your Project <ArrowRight size={20} />
                 </button>
@@ -50,10 +50,10 @@ function heroSection() {
             </div>
 
             {/* Right Column: Optimized with Inline SVGs for immediate paint */}
-            <div className="relative hidden lg:block">
+            <div className="relative hidden sm:block lg:block">
 
 
-              <div className="relative z-10 bottom-12.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl">
+              <div className="relative z-10 bottom-12.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl sm:mt-15">
                 {/* background dotted grid */}
                 <div className="absolute z-10 top-5 right-5 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-green-500 "/>
                 <div className="absolute z-10 top-5 right-10 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-yellow-500 "/>

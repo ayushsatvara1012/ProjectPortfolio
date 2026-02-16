@@ -1,8 +1,27 @@
 import React, { useState } from 'react';
 import { Mail, MessageSquare, Send, Zap, ChevronDown, Terminal } from 'lucide-react';
+import Alert from '../components/alert';
+
 
 function ContactPage() {
   const [activeFaq, setActiveFaq] = useState(null);
+  const [alertConfig, setAlertConfig] = useState({open: false, type: 'success', msg: ''});
+
+  const showSuccess = (event) => {
+    event.preventDefault();
+    setAlertConfig({ open: true, type: 'success', msg: 'Operation successfull' })
+    setTimeout(()=>setAlertConfig({open:false}),3000)
+  }
+  const showError = (event) => {
+    event.preventDefault();
+    setAlertConfig({ open: true, type: 'error', msg: 'No Status at the moment' })
+    setTimeout(()=>setAlertConfig({open:false}),3000)
+  }
+  const showDev = (event) => {
+    event.preventDefault();
+    setAlertConfig({ open: true, type: 'development', msg: 'Currently in Development' })
+    setTimeout(()=>setAlertConfig({open:false}),3000)
+  }
 
   const faqs = [
     { q: "Timeline?", a: "MVP architectures deployed in 4-8 weeks." },
@@ -12,7 +31,7 @@ function ContactPage() {
 
   return (
     <>
-      <section id="contact" className="relative py-12 md:py-20 bg-white dark:bg-slate-950 overflow-hidden antialiased">
+      <section id="contact" className="relative py-12 sm:py-20 bg-white dark:bg-slate-950 overflow-hidden antialiased">
         {/* Background Grid - Scaled for Mobile */}
         <div className="absolute inset-0 opacity-[0.2] dark:opacity-[0.1] pointer-events-none"
           style={{ backgroundImage: 'linear-gradient(var(--color-border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px)', backgroundSize: 'clamp(20px, 5vw, 40px) clamp(20px, 5vw, 40px)' }} />
@@ -54,11 +73,11 @@ function ContactPage() {
 
               {/* Contact Pills: Grid for all sizes */}
               <div className="grid grid-cols-2 gap-3">
-                <a href="mailto:hello@startup.io" className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 border border-dashed border-indigo-200 dark:border-indigo-800/40 flex flex-col items-center text-center gap-2 hover:scale-[1.02] transition-transform text-indigo-600 dark:text-indigo-400">
+                <a href="mailto:ayushsatvara2002@gmail.com" className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 border border-dashed border-indigo-200 dark:border-indigo-800/40 flex flex-col items-center text-center gap-2 hover:scale-[1.02] transition-transform text-indigo-600 dark:text-indigo-400">
                   <Mail size={18} />
                   <span className="text-[10px] font-bold uppercase tracking-widest">Email Us</span>
                 </a>
-                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-dashed border-emerald-200 dark:border-emerald-800/40 flex flex-col items-center text-center gap-2 hover:scale-[1.02] transition-transform text-emerald-600 dark:text-emerald-400">
+                <div type='button' onClick={showError} className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-dashed border-emerald-200 dark:border-emerald-800/40 flex flex-col items-center text-center gap-2 hover:scale-[1.02] transition-transform text-emerald-600 dark:text-emerald-400">
                   <MessageSquare size={18} />
                   <span className="text-[10px] font-bold uppercase tracking-widest">Live Status</span>
                 </div>
@@ -93,15 +112,23 @@ function ContactPage() {
                     <textarea rows="3" placeholder="Describe your vision..." className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 outline-none transition-all resize-none"></textarea>
                   </div>
 
-                  <button className="w-full bg-slate-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.97] group text-sm shadow-lg shadow-slate-200/50 dark:shadow-none">
+                  <button onClick={showDev} type='button' className="w-full bg-slate-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.97] group text-sm shadow-lg shadow-slate-200/50 dark:shadow-none">
                     Deploy Message <Send size={16} className="group-hover:translate-x-1 transition-transform" />
                   </button>
+
+
                 </form>
               </div>
             </div>
 
           </div>
         </div>
+        <Alert
+          isOpen={alertConfig.open} 
+        type={alertConfig.type} 
+        message={alertConfig.msg} 
+        onClose={() => setAlertConfig({ ...alertConfig, open: false })}
+        />
       </section>
     </>
   );
