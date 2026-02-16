@@ -133,7 +133,7 @@ const Services = () => {
           </div>
 
           {/* 04. GLOBAL SCALING - The "Scale" Module */}
-          <div className="md:col-span-8 group relative rounded-4xl backdrop-blur-2xl border border-emerald-500/30 hover:border-emerald-400 hover:shadow-[0_0_40px_-10px_rgba(79,70,229,0.3)] p-1 flex items-center overflow-hidden">
+          <div className="md:col-span-8 group relative rounded-4xl backdrop-blur-2xl border border-emerald-500/30 hover:border-emerald-400 hover:shadow-[0_0_40px_-10px_rgba(79,70,229,0.3)] p-1 flex items-center overflow-hidden duration-300">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-600/20 blur-[80px] rounded-full group-hover:bg-emerald-600/40 transition-colors duration-700" />
             <div className="bg-slate-950 w-full h-full rounded-[1.9rem] p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all group-hover:bg-slate-900/30">
               <div className="flex items-center gap-6">

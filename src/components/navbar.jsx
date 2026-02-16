@@ -80,7 +80,7 @@ const Navbar = () => {
                 {/* The Animated Underline */}
                 <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-indigo-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-in-out origin-left" />
               </a>
-            ))}
+			))}
           </div>
 
           {/* Mobile Toggle - Visible on small screens */}
