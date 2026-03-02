@@ -20,6 +20,7 @@ const Navbar = () => {
     { name: "Projects", href: "#projects", id: "projects" },
     { name: "Services", href: "#services", id: "services" },
     { name: "Contact", href: "/contact", id: "contact" },
+    { name: "About", href: "/about", id: "about" },
   ];
 
   const handleLinkClick = (e, href) => {

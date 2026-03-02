@@ -1,20 +1,23 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Cpu, Globe, Rocket, Terminal, Layers, Activity, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Cpu, Globe,ArrowBigRight, Rocket, Terminal, Layers, Activity, ChevronRight } from 'lucide-react';
+import { desc } from 'framer-motion/client';
 
 const Apptest = () => {
   const partners = [
     {
-      name: "Your Name",
-      role: "Systems Architect",
-      image: "https://via.placeholder.com/300x350",
-      skills: ["Python", "AWS", "FastAPI"]
+      name: "Ayush Satvara",
+      role: "Software Developer",
+      image: "/IMG_9145.webp",
+      skills: ["Python", "FastAPI","PostGres", "GenAI"],
+      desc: "AWS Certified Solutions Architect specializes in building high-performance digital ecosystems featuring AI-driven semantic search and projects achieving 99 Lighthouse performance scores.Excelling at optimizing frontend latency and architecting scalable backend ETL pipelines for large-scale datasets. His technical expertise is further validated by specialized certifications in Generative AI, Machine Learning, and Data Science."
     },
     {
-      name: "Partner Name",
-      role: "Infra Engineer",
+      name: "Kathan Pandya",
+      role: "Frontend Developer",
       image: "https://via.placeholder.com/300x350",
-      skills: ["React", "Vite", "GenAI"]
+      skills: ["React", "JS", "RestAPI","Typescript"],
+      desc: "Spearheaded the development of high-performance, scalable web interfaces using Angular, TypeScript, and JavaScript.Architected and implemented responsive, data-intensive dashboards using HTML5 and Advanced CSS/SCSS.Integrate complex REST APIs, optimizing frontend performance and ensuring Type-safe application architecture through TypeScript.Focused on enhancing user experience (UX) maintaining high standards for cross-browser compatibility and mobile responsiveness."
     }
   ];
 
@@ -39,27 +42,28 @@ const Apptest = () => {
             </p>
           </div>
 
-          {/* RIGHT: Informative UI Module (Hidden on Mobile) */}
-          <div className="hidden lg:block lg:col-span-7 bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 relative overflow-hidden h-[500px]">
-            <div className="absolute top-0 right-0 p-6 flex gap-2">
+          {/* RIGHT: Informative UI Module */}
+          <div className="lg:col-span-7 bg-slate-50 rounded-[2.5rem] border border-slate-200 p-6 md:p-8 relative overflow-hidden h-auto min-h-[600px] mt-10 lg:mt-0 pb-12 lg:pb-8">
+            <div className="absolute top-0 right-0 p-6 flex gap-2 z-10">
               <div className="w-2 h-2 rounded-full bg-red-400" />
               <div className="w-2 h-2 rounded-full bg-amber-400" />
               <div className="w-2 h-2 rounded-full bg-emerald-400" />
             </div>
 
-            <div className="grid grid-cols-2 h-full gap-8">
-              {/* Partner Cards (Now smaller to fit screen) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 h-full gap-8 pt-4">
+              {/* Partner Cards */}
               {partners.map((p, i) => (
                 <motion.div 
                   key={i}
                   whileHover={{ y: -5 }}
-                  className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex flex-col"
+                  className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col h-full min-h-[450px]"
                 >
-                  <div className="h-48 overflow-hidden rounded-2xl grayscale mb-4 bg-slate-200">
-                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                  <div className="h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200">
+                    <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale" />
                   </div>
                   <h3 className="font-bold text-lg leading-tight">{p.name}</h3>
                   <p className="text-indigo-600 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
+                  <div className='text-slate-900 text-xs font-quantico mb-4 grow'>{p.desc}</div>
                   <div className="mt-auto flex flex-wrap gap-1">
                     {p.skills.map(s => (
                       <span key={s} className="px-2 py-0.5 rounded-md bg-slate-50 text-[8px] font-bold text-slate-400 border border-slate-100">{s}</span>
@@ -70,7 +74,7 @@ const Apptest = () => {
             </div>
 
             {/* Floating Technical Overlay */}
-            <div className="absolute bottom-6 right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-4">
+            <div className="absolute bottom-4 right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-4">
               <Activity className="text-emerald-400 animate-pulse" size={20} />
               <div className="font-mono text-[9px]">
                 <p className="opacity-50">STACK_READY</p>

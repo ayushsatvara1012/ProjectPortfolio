@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
 import Homepage from "./pages/homepage";
 import Apptest from './Apptest'
+import About from "./pages/aboutpage";
 
 // 1. Architect the Lazy Imports
 // This tells Vite to create separate chunks for these components
@@ -38,8 +39,8 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "/test",
-        element: <Apptest />,
+        path: "/about",
+        element: <About />,
       },
     ],
   },
