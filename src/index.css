@@ -51,7 +51,7 @@
   html {
     scroll-behavior: smooth;
     /* Sets the default background based on mode */
-    @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-white antialiased;
+    @apply bg-white text-slate-900 dark:bg-white dark:text-slate-900 antialiased;
   }
 
   /* Transition for smooth theme switching */

@@ -10,7 +10,7 @@ const ModernFooter = () => {
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-20">
-          
+
           {/* Big CTA Branding Box (The Bento Style) */}
           <div className="lg:col-span-5 p-8 rounded-3xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-500">
             <div>
@@ -27,7 +27,7 @@ const ModernFooter = () => {
                 <span className="text-slate-500 group-hover:text-indigo-400 transition-colors">next digital frontier?</span>
               </h2>
             </div>
-            
+
             <div className="mt-10 flex flex-wrap gap-4">
               <button className="bg-white text-slate-950 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-indigo-500 hover:text-white transition-all active:scale-95">
                 Start Project <Zap size={18} fill="currentColor" />

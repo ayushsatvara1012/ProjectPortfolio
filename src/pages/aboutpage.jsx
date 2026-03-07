@@ -21,7 +21,7 @@ const AboutPage = () => {
     ];
 
     return (
-        <div className="bg-white text-slate-900 overflow-x-hidden">
+        <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-x-hidden transition-colors duration-500">
 
             {/* SECTION 1: Laptop-Optimized Hero & Partners (Fits 100vh) */}
             <section className="min-h-dvh flex flex-col justify-center pt-24 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
@@ -29,12 +29,12 @@ const AboutPage = () => {
 
                     {/* LEFT: Heading & Context */}
                     <div className="lg:col-span-5 space-y-6 flex items-center lg:items-start text-center lg:text-start flex-col">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200">
-                            <Terminal size={12} className="text-indigo-600" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 font-mono">Profile_Registry_v2</span>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            <Terminal size={12} className="text-indigo-600 dark:text-indigo-400" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Profile_Registry_v2</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9]">
-                            THE <span className="text-indigo-600 bg-indigo-100/50">ARCHITECTS</span> <br /> OF CODE.
+                        <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-white">
+                            THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECTS</span> <br /> OF CODE.
                         </h1>
                         <p className="text-base text-slate-500 font-light max-w-md leading-relaxed">
                             We engineer scalable ecosystems that bridge business vision and technical reality.
@@ -42,7 +42,7 @@ const AboutPage = () => {
                     </div>
 
                     {/* RIGHT: Informative UI Module */}
-                    <div className="lg:col-span-7 bg-slate-50 rounded-4xl md:rounded-[2.5rem] border border-slate-200 p-6 md:p-8 relative overflow-hidden h-auto min-h-[500px] lg:min-h-[600px] mt-8 lg:mt-0 pb-12 lg:pb-8">
+                    <div className="lg:col-span-7 bg-slate-50 dark:bg-slate-900/40 rounded-4xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden h-auto min-h-[500px] lg:min-h-[600px] mt-8 lg:mt-0 pb-12 lg:pb-8">
                         <div className="absolute top-0 right-0 p-6 flex gap-2 z-10">
                             <div className="w-2 h-2 rounded-full bg-red-400" />
                             <div className="w-2 h-2 rounded-full bg-amber-400" />
@@ -54,17 +54,17 @@ const AboutPage = () => {
                             {partners.map((p, i) => (
                                 <div
                                     key={i}
-                                    className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col min-h-[420px] md:min-h-[450px] transition-transform duration-300 hover:-translate-y-2"
+                                    className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col min-h-[420px] md:min-h-[450px] transition-transform duration-300 hover:-translate-y-2"
                                 >
-                                    <div className="h-40 md:h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200">
+                                    <div className="h-40 md:h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200 dark:bg-slate-800">
                                         <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
                                     </div>
-                                    <h3 className="font-bold text-lg leading-tight">{p.name}</h3>
-                                    <p className="text-indigo-600 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
-                                    <div className='text-slate-900 text-xs font-quantico mb-4 grow leading-relaxed'>{p.desc}</div>
+                                    <h3 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{p.name}</h3>
+                                    <p className="text-indigo-600 dark:text-indigo-400 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
+                                    <div className='text-slate-900 dark:text-slate-300 text-xs font-quantico mb-4 grow leading-relaxed'>{p.desc}</div>
                                     <div className="mt-auto flex flex-wrap gap-1">
                                         {p.skills.map(s => (
-                                            <span key={s} className="px-2 py-0.5 rounded-md bg-slate-50 text-[10px] font-bold text-slate-400 border border-slate-100">{s}</span>
+                                            <span key={s} className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 text-[10px] font-bold text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700">{s}</span>
                                         ))}
                                     </div>
                                 </div>
@@ -86,7 +86,7 @@ const AboutPage = () => {
             <section><Resume /></section>
 
             {/* SECTION 2: Technical Philosophy & Business (Muted Colors) */}
-            <section className="bg-[#0a0c10] py-20 md:py-32 px-6 rounded-t-[2.5rem] md:rounded-t-[3rem] lg:rounded-t-[5rem] relative">
+            <section className="bg-gray-950 border-t border-t-slate-700 py-20 md:py-32 px-6 rounded-t-[2.5rem] md:rounded-t-[3rem] lg:rounded-t-[5rem] relative">
                 <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 md:gap-16 items-center">
 
                     <div className="space-y-6 md:space-y-8">
