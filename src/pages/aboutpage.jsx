@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ShieldCheck, Cpu, Globe, ArrowBigRight, Rocket, Terminal, Layers, Activity, ChevronRight } from 'lucide-react';
 import Resume from '../components/resume';
 
@@ -22,14 +21,14 @@ const AboutPage = () => {
     ];
 
     return (
-        <div className="bg-white text-slate-900">
+        <div className="bg-white text-slate-900 overflow-x-hidden">
 
             {/* SECTION 1: Laptop-Optimized Hero & Partners (Fits 100vh) */}
-            <section className="min-h-screen flex flex-col justify-center pt-18 py-12 px-6 min-[1440px]:px-12 max-w-[1600px] mx-auto">
-                <div className="grid min-[1440px]:grid-cols-12 gap-5 items-center">
+            <section className="min-h-dvh flex flex-col justify-center pt-24 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
+                <div className="grid lg:grid-cols-12 gap-8 lg:gap-5 items-center">
 
                     {/* LEFT: Heading & Context */}
-                    <div className="min-[1440px]:col-span-5 space-y-6 flex items-center text-center flex-col">
+                    <div className="lg:col-span-5 space-y-6 flex items-center lg:items-start text-center lg:text-start flex-col">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200">
                             <Terminal size={12} className="text-indigo-600" />
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 font-mono">Profile_Registry_v2</span>
@@ -43,23 +42,22 @@ const AboutPage = () => {
                     </div>
 
                     {/* RIGHT: Informative UI Module */}
-                    <div className="min-[1440px]:col-span-7 bg-slate-50 rounded-[2.5rem] border border-slate-200 p-6 md:p-8 relative overflow-hidden h-auto min-h-[600px] mt-10 min-[1440px]:mt-0 pb-12 min-[1440px]:pb-8">
+                    <div className="lg:col-span-7 bg-slate-50 rounded-4xl md:rounded-[2.5rem] border border-slate-200 p-6 md:p-8 relative overflow-hidden h-auto min-h-[500px] lg:min-h-[600px] mt-8 lg:mt-0 pb-12 lg:pb-8">
                         <div className="absolute top-0 right-0 p-6 flex gap-2 z-10">
                             <div className="w-2 h-2 rounded-full bg-red-400" />
                             <div className="w-2 h-2 rounded-full bg-amber-400" />
                             <div className="w-2 h-2 rounded-full bg-emerald-400" />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 pt-4">
                             {/* Partner Cards */}
                             {partners.map((p, i) => (
-                                <motion.div
+                                <div
                                     key={i}
-                                    whileHover={{ y: -5 }}
-                                    className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col min-h-[450px]"
+                                    className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col min-h-[420px] md:min-h-[450px] transition-transform duration-300 hover:-translate-y-2"
                                 >
-                                    <div className="h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200">
-                                        <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale" />
+                                    <div className="h-40 md:h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200">
+                                        <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
                                     </div>
                                     <h3 className="font-bold text-lg leading-tight">{p.name}</h3>
                                     <p className="text-indigo-600 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
@@ -69,15 +67,15 @@ const AboutPage = () => {
                                             <span key={s} className="px-2 py-0.5 rounded-md bg-slate-50 text-[10px] font-bold text-slate-400 border border-slate-100">{s}</span>
                                         ))}
                                     </div>
-                                </motion.div>
+                                </div>
                             ))}
                         </div>
 
                         {/* Floating Technical Overlay */}
-                        <div className="absolute bottom-4 right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-4">
-                            <Activity className="text-emerald-400 animate-pulse" size={20} />
-                            <div className="font-mono text-[9px]">
-                                <p className="opacity-50">STACK_READY</p>
+                        <div className="absolute bottom-4 right-6 bg-slate-900 text-white p-3 md:p-4 rounded-xl md:rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4">
+                            <Activity className="text-emerald-400 animate-pulse" size={18} />
+                            <div className="font-mono text-[8px] md:text-[9px]">
+                                <p className="opacity-50 uppercase">Stack_Ready</p>
                                 <p className="font-bold">UPTIME: 99.98%</p>
                             </div>
                         </div>
@@ -88,14 +86,14 @@ const AboutPage = () => {
             <section><Resume /></section>
 
             {/* SECTION 2: Technical Philosophy & Business (Muted Colors) */}
-            <section className="bg-[#0a0c10] py-24 px-6 rounded-t-[3rem] min-[1440px]:rounded-t-[5rem] relative">
-                <div className="max-w-7xl mx-auto grid min-[1440px]:grid-cols-2 gap-16 items-center">
+            <section className="bg-[#0a0c10] py-20 md:py-32 px-6 rounded-t-[2.5rem] md:rounded-t-[3rem] lg:rounded-t-[5rem] relative">
+                <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 md:gap-16 items-center">
 
-                    <div className="space-y-8">
-                        <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tighter">
-                            Performance-First <br /> <span className="text-slate-500 font-light italic">Solutions.</span>
+                    <div className="space-y-6 md:space-y-8">
+                        <h2 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-tight">
+                            Performance-First <br className="hidden md:block" /> <span className="text-slate-500 font-light italic">Solutions.</span>
                         </h2>
-                        <div className="space-y-4 text-slate-400 font-light text-sm leading-relaxed max-w-lg">
+                        <div className="space-y-4 text-slate-400 font-light text-sm md:text-base leading-relaxed max-w-lg">
                             <p>
                                 Built on <span className="text-indigo-400">Atomic Design Principles</span>, this platform utilizes React 19 and Vite to ensure lightning-fast interaction.
                             </p>
@@ -106,33 +104,33 @@ const AboutPage = () => {
                     </div>
 
                     {/* TONED DOWN Business Card (Deep Indigo/Slate) */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-10 text-white relative group overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-4xl md:rounded-[2.5rem] p-8 md:p-12 text-white relative group overflow-hidden transition-all duration-500 hover:border-slate-700">
+                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity duration-700">
                             <Rocket size={120} />
                         </div>
 
-                        <h3 className="text-2xl font-bold mb-8 flex items-center gap-3">
+                        <h3 className="text-xl md:text-2xl font-bold mb-6 md:mb-8 flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
                                 <div className="w-2 h-2 rounded-full bg-indigo-500" />
                             </div>
                             How we help you?
                         </h3>
 
-                        <ul className="space-y-5 relative z-10">
+                        <ul className="space-y-4 md:space-y-5 relative z-10">
                             {[
                                 "Conversion-Focused Architecture",
                                 "Cloud Cost Optimization",
                                 "Scalable System Integration",
                                 "Customer Retention UX"
                             ].map((item, i) => (
-                                <li key={i} className="flex items-center gap-3 text-sm text-slate-300">
+                                <li key={i} className="flex items-center gap-3 text-xs md:text-sm text-slate-300">
                                     <ChevronRight size={14} className="text-indigo-500" />
                                     {item}
                                 </li>
                             ))}
                         </ul>
 
-                        <button className="mt-10 w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all">
+                        <button className="mt-8 md:mt-10 w-full py-3 md:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all active:scale-95">
                             Initiate Consultation
                         </button>
                     </div>

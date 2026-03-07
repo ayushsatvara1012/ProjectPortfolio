@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react';
 function heroSection() {
   return (
     <>
-      <section id="home" className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 antialiased">
+      <section id="home" className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Optimized Grid: Using a fixed opacity and CSS variable for faster painting */}
         <div className="absolute inset-0 z-0 opacity-15 pointer-events-none will-change-transform"
           style={{
@@ -55,9 +55,9 @@ function heroSection() {
 
               <div className="relative z-10 bottom-12.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl sm:mt-15">
                 {/* background dotted grid */}
-                <div className="absolute z-10 top-5 right-5 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-green-500 "/>
-                <div className="absolute z-10 top-5 right-10 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-yellow-500 "/>
-                <div className="absolute z-10 top-5 right-15 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-red-500 "/>
+                <div className="absolute z-10 top-5 right-5 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-green-500 " />
+                <div className="absolute z-10 top-5 right-10 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-yellow-500 " />
+                <div className="absolute z-10 top-5 right-15 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-red-500 " />
                 <div className="grid grid-cols-2 gap-4">
                   {/* Card 1: Code */}
                   <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3">
@@ -66,42 +66,42 @@ function heroSection() {
                     </div>
                     <h3 className="font-bold dark:text-white">Clean Code</h3>
                     <p className="text-xs text-slate-500">Modular Python & React components built for scale.</p>
-                </div>
-
-                {/* Card 2: Server */}
-                <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3 mt-8">
-                  <div className="p-2 w-fit rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-600">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
                   </div>
-                  <h3 className="font-bold dark:text-white">Deployment</h3>
-                  <p className="text-xs text-slate-500">Serverless AWS architecture & CI/CD pipelines.</p>
-                </div>
 
-                {/* Card 3: Optimization */}
-                <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3">
-                  <div className="p-2 w-fit rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                  {/* Card 2: Server */}
+                  <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3 mt-8">
+                    <div className="p-2 w-fit rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-600">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                    </div>
+                    <h3 className="font-bold dark:text-white">Deployment</h3>
+                    <p className="text-xs text-slate-500">Serverless AWS architecture & CI/CD pipelines.</p>
                   </div>
-                  <h3 className="font-bold dark:text-white">Optimization</h3>
-                  <p className="text-xs text-slate-500">Lightning fast load times & SEO focused.</p>
-                </div>
 
-                {/* Card 4: Security */}
-                <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3 mt-5">
-                  <div className="p-2 w-fit rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                  {/* Card 3: Optimization */}
+                  <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3">
+                    <div className="p-2 w-fit rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                    </div>
+                    <h3 className="font-bold dark:text-white">Optimization</h3>
+                    <p className="text-xs text-slate-500">Lightning fast load times & SEO focused.</p>
                   </div>
-                  <h3 className="font-bold dark:text-white">Security</h3>
-                  <p className="text-xs text-slate-500">Hardened PostgreSQL & IAM security protocols.</p>
+
+                  {/* Card 4: Security */}
+                  <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3 mt-5">
+                    <div className="p-2 w-fit rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    </div>
+                    <h3 className="font-bold dark:text-white">Security</h3>
+                    <p className="text-xs text-slate-500">Hardened PostgreSQL & IAM security protocols.</p>
+                  </div>
                 </div>
               </div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-indigo-500/20 blur-[120px] rounded-full"></div>
             </div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-indigo-500/20 blur-[120px] rounded-full"></div>
-          </div>
 
-        </div>
-      </main>
-    </section >
+          </div>
+        </main>
+      </section >
     </>
   )
 }

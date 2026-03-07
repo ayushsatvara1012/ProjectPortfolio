@@ -5,33 +5,33 @@ import Alert from '../components/alert';
 
 function ContactPage() {
   const [activeFaq, setActiveFaq] = useState(null);
-  const [alertConfig, setAlertConfig] = useState({open: false, type: 'success', msg: ''});
+  const [alertConfig, setAlertConfig] = useState({ open: false, type: 'success', msg: '' });
 
   const showSuccess = (event) => {
     event.preventDefault();
     setAlertConfig({ open: true, type: 'success', msg: 'Operation successfull' })
-    setTimeout(()=>setAlertConfig({open:false}),3000)
+    setTimeout(() => setAlertConfig({ open: false }), 3000)
   }
   const showError = (event) => {
     event.preventDefault();
     setAlertConfig({ open: true, type: 'error', msg: 'No Status at the moment' })
-    setTimeout(()=>setAlertConfig({open:false}),3000)
+    setTimeout(() => setAlertConfig({ open: false }), 3000)
   }
   const showDev = (event) => {
     event.preventDefault();
     setAlertConfig({ open: true, type: 'development', msg: 'Currently in Development' })
-    setTimeout(()=>setAlertConfig({open:false}),3000)
+    setTimeout(() => setAlertConfig({ open: false }), 3000)
   }
 
   const faqs = [
-    { q: "Timeline?", a: "MVP architectures deployed in 4-8 weeks." },
-    { q: "Support?", a: "Yes, 'Cloud-Care' monitoring packages available." },
-    { q: "Stacks?", a: "Python/React specialized, but stack-agnostic." }
+    { q: "What we do?", a: "We build custom web applications for businesses." },
+    { q: "How long it takes?", a: "It depends on the complexity of the project. Basic Websites with 3-5 pages takes 1 week" },
+    { q: "What is your stack?", a: "We use Python, React, and other modern technologies." }
   ];
 
   return (
     <>
-      <section id="contact" className="relative py-12 sm:py-20 bg-white dark:bg-slate-950 overflow-hidden antialiased">
+      <section id="contact" className="relative py-12 sm:py-20 bg-white dark:bg-slate-950 overflow-hidden">
         {/* Background Grid - Scaled for Mobile */}
         <div className="absolute inset-0 opacity-[0.2] dark:opacity-[0.1] pointer-events-none"
           style={{ backgroundImage: 'linear-gradient(var(--color-border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px)', backgroundSize: 'clamp(20px, 5vw, 40px) clamp(20px, 5vw, 40px)' }} />
@@ -124,10 +124,10 @@ function ContactPage() {
           </div>
         </div>
         <Alert
-          isOpen={alertConfig.open} 
-        type={alertConfig.type} 
-        message={alertConfig.msg} 
-        onClose={() => setAlertConfig({ ...alertConfig, open: false })}
+          isOpen={alertConfig.open}
+          type={alertConfig.type}
+          message={alertConfig.msg}
+          onClose={() => setAlertConfig({ ...alertConfig, open: false })}
         />
       </section>
     </>

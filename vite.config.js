@@ -4,11 +4,11 @@ import tailwindcss from "@tailwindcss/vite"
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(),tailwindcss()],
+  plugins: [react(), tailwindcss()],
   base: '/',
   build: {
     // This ensures that the code is minified and optimized for production
-    minify: 'terser', 
+    minify: 'terser',
     terserOptions: {
       compress: {
         drop_console: true, // Removes console.logs for a clean production build
@@ -23,7 +23,6 @@ export default defineConfig({
         // to keep your main initial load as small as possible.
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          animations: ['framer-motion'],
         },
       },
     },

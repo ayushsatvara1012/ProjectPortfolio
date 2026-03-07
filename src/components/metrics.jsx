@@ -41,7 +41,7 @@ const PerformanceMetrics = () => {
   ];
 
   return (
-    <section className="pt-16 pb-2 px-6 w-full bg-white dark:bg-slate-950 antialiased">
+    <section className="p-6 rounded-3xl w-full bg-white dark:bg-slate-950">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {metrics.map((metric, index) => (
@@ -61,7 +61,7 @@ const PerformanceMetrics = () => {
                   <span className="text-5xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
                     {metric.value}
                   </span>
-                
+
                   {metric.pulse}
                 </div>
               </div>

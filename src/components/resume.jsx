@@ -7,9 +7,9 @@ import { GraduationCap, Briefcase, Cpu, Globe, ArrowUpRight, Code2, Shield, Zap 
  * Optimization: Uses CSS transitions over JS animations to protect LCP/FCP.
  */
 const ResumeNode = ({ name, role, education, experience, stack, accentColor }) => (
-  <div className="relative group p-[1px] rounded-[2.5rem] bg-gradient-to-b from-slate-200 to-transparent dark:from-slate-800 dark:to-transparent">
+  <div className="relative group p-px rounded-[2.5rem] bg-linear-to-b from-slate-200 to-transparent dark:from-slate-800 dark:to-transparent">
     <div className="bg-white dark:bg-slate-950 rounded-[2.4rem] p-8 lg:p-10 shadow-2xl transition-all duration-500 hover:shadow-indigo-500/10 border border-slate-100 dark:border-slate-900 overflow-hidden h-full flex flex-col">
-      
+
       {/* 1. IDENTITY BLOCK */}
       <div className="flex justify-between items-start mb-10">
         <div>
@@ -25,7 +25,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-grow">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 grow">
         {/* 2. ACADEMIC FOUNDATION */}
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-slate-400">
@@ -68,7 +68,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
             <div key={i} className="group/item flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 border border-transparent hover:border-slate-100 dark:hover:border-slate-800 transition-all cursor-pointer">
               <div className="flex items-center gap-4">
                 <div className={`p-2 rounded-lg bg-white dark:bg-slate-950 shadow-sm ${accentColor}`}>
-                   <Code2 size={16} />
+                  <Code2 size={16} />
                 </div>
                 <div>
                   <h5 className="font-bold text-slate-900 dark:text-white text-xs">{exp.title}</h5>
@@ -91,9 +91,9 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
 
 const DuoPortfolio = () => {
   return (
-    <section className="py-12 px-6 bg-white dark:bg-slate-950 min-h-screen antialiased overflow-hidden">
+    <section className="py-12 px-6 bg-white dark:bg-slate-950 min-h-dvh overflow-hidden">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* DUO HEADER */}
         <div className="flex flex-col items-center text-center mb-24 space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 mb-2">
@@ -101,24 +101,24 @@ const DuoPortfolio = () => {
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">The Synergy Protocol</span>
           </div>
           <h1 className="text-5xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-            ENGINEER <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-500">NODES.</span>
+            ENGINEER <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">NODES.</span>
           </h1>
           <p className="max-w-2xl text-slate-500 dark:text-slate-400 text-sm md:text-base leading-relaxed">
-            Bridging theoretical computer science with production-grade full-stack engineering. 
+            Bridging theoretical computer science with production-grade full-stack engineering.
             Two nodes, one unified digital ecosystem.
           </p>
         </div>
 
         {/* BENTO GRID DUO */}
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
-          
+
           {/* NODE 01: THE ARCHITECT */}
-          <ResumeNode 
+          <ResumeNode
             name="Ayush P. Satvara"
             role="Software Development Engineer"
             accentColor="text-indigo-600 dark:text-indigo-400"
             education={{ degree: "MS Computer Science", univ: "New York Institute of Technology", gpa: "3.26/4.0" }}
-            stack={["Python", "FastAPI", "AWS", "PostgreSQL", "React 19","Tailwind CSS", "Vite"]}
+            stack={["Python", "FastAPI", "AWS", "PostgreSQL", "React 19", "Tailwind CSS", "Vite"]}
             experience={[
               { title: "SaPyBase Portfolio", tech: "React • Vite • Tailwind v4 • SEO" },
               { title: "LuminaLib AI", tech: "FastAPI • pgvector • RAG" },
@@ -127,7 +127,7 @@ const DuoPortfolio = () => {
           />
 
           {/* NODE 02: THE CREATIVE ENGINEER */}
-          <ResumeNode 
+          <ResumeNode
             name="Kathan Pandya"
             role="Full-Stack Engineer"
             accentColor="text-violet-600 dark:text-violet-400"

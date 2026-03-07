@@ -1,14 +1,9 @@
 import React, { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
-import Homepage from "./pages/homepage";
-import Apptest from './Apptest'
-import About from "./pages/aboutpage";
-
-// 1. Architect the Lazy Imports
-// This tells Vite to create separate chunks for these components
+const Homepage = lazy(() => import("./pages/homepage"));
+const About = lazy(() => import("./pages/aboutpage"));
 const Contactpage = lazy(() => import("./pages/contactpage"));
-
 
 // 2. Create a high-end Loading fallback
 // You can use a simple spinner or a skeleton screen that matches your theme
@@ -28,7 +23,11 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <Homepage />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Homepage />
+          </Suspense>
+        ),
       },
       {
         path: "/contact",
@@ -40,7 +39,11 @@ const router = createBrowserRouter([
       },
       {
         path: "/about",
-        element: <About />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <About />
+          </Suspense>
+        ),
       },
     ],
   },
