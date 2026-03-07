@@ -1,3 +1,11 @@
+# SaPyBase Robots Configuration
 User-agent: *
 Allow: /
-Sitemap: https://projectportfolio-pearl.vercel.app/sitemap.xml
+
+# Sitemaps Location
+Sitemap: https://sapybase.com/sitemap.xml
+
+# Prevent crawling of build artifacts or temporary test routes
+Disallow: /_next/
+Disallow: /static/
+Disallow: /test
