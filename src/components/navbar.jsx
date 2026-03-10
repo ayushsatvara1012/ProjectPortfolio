@@ -159,7 +159,7 @@ const Navbar = () => {
           {/* Mobile Toggle - Visible on small screens */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white active:scale-95 transition-all"
+            className="md:hidden p-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white active:scale-95 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
             aria-label="Toggle Menu"
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -180,7 +180,7 @@ const Navbar = () => {
                   <>
                     <button
                       onClick={() => setIsMobileServicesOpen(!isMobileServicesOpen)}
-                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
+                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-3 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
                         }`}
                       style={{ transitionDelay: `${index * 100}ms` }}
                     >
@@ -215,7 +215,7 @@ const Navbar = () => {
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 ${isOpen
+                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-3 ${isOpen
                       ? "opacity-100 translate-x-0"
                       : "opacity-0 -translate-x-10"
                       }`}
@@ -233,10 +233,10 @@ const Navbar = () => {
             <button className="w-full bg-indigo-600 text-white py-5 rounded-2xl text-xl font-bold">
               Let's Build Something
             </button>
-            <div className="mt-8 flex gap-6 text-slate-500 text-sm items-center justify-center">
-              <span>Our Stack</span>
-              <span>LinkedIn</span>
-              <span>GitHub</span>
+            <div className="mt-8 flex gap-8 text-slate-500 text-sm items-center justify-center">
+              <span className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">Our Stack</span>
+              <span className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">LinkedIn</span>
+              <span className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">GitHub</span>
             </div>
           </div>
         </div>

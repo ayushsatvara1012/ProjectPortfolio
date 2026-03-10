@@ -32,7 +32,7 @@ const ModernFooter = () => {
               <button className="bg-white text-slate-950 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-indigo-500 hover:text-white transition-all active:scale-95">
                 Start Project <Zap size={18} fill="currentColor" />
               </button>
-              <a href="mailto:hello@startup.io" className="p-3 rounded-full border border-slate-700 text-white hover:bg-slate-800 transition-all">
+              <a href="mailto:hello@startup.io" className="w-12 h-12 rounded-full border border-slate-700 text-white hover:bg-slate-800 transition-all flex items-center justify-center">
                 <Mail size={20} />
               </a>
             </div>
@@ -45,7 +45,7 @@ const ModernFooter = () => {
               <ul className="space-y-4">
                 {['Home', 'Projects', 'Services', 'Process'].map((link) => (
                   <li key={link}>
-                    <a href={`#${link.toLowerCase()}`} className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-1 group">
+                    <a href={`#${link.toLowerCase()}`} className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-1 group py-2">
                       {link} <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-all" />
                     </a>
                   </li>
@@ -71,7 +71,7 @@ const ModernFooter = () => {
                   { Icon: Linkedin, href: "ww.linkedin.com/in/ayush-piyushkumar-satvara-39ba66196" },
                   { Icon: Twitter, href: "#" }
                 ].map((social, i) => (
-                  <a key={i} href={social.href} className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:border-indigo-400/50 transition-all">
+                  <a key={i} href={social.href} className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:border-indigo-400/50 transition-all">
                     <social.Icon size={20} />
                   </a>
                 ))}
@@ -84,8 +84,8 @@ const ModernFooter = () => {
         <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-slate-900 text-slate-500 text-xs">
           <p>© 2026 SaPyBase — Engineered with precision.</p>
           <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
+            <a href="#" className="hover:text-white transition-colors py-2 px-1">Privacy</a>
+            <a href="#" className="hover:text-white transition-colors py-2 px-1">Terms</a>
             <span className="text-slate-800">|</span>
             <span className="flex items-center gap-1">
               Status: <span className="text-emerald-500 font-bold">Systems Operational</span>

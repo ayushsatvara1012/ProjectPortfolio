@@ -66,7 +66,7 @@ const Services = () => {
                     <Fingerprint size={18} className="text-violet-400" />
                   </div>
                 </div>
-                <button className="text-xs font-bold text-white flex items-center gap-2 group/btn">
+                <button className="text-xs font-bold text-white flex items-center gap-2 group/btn min-h-[48px] py-2">
                   EXPLORE ARCHITECTURE <Terminal size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -145,7 +145,7 @@ const Services = () => {
                   <p className="text-slate-500 text-sm">CDN-first deployment for global audiences.</p>
                 </div>
               </div>
-              <button className="px-6 py-3 rounded-xl border border-slate-700 text-white text-xs font-bold hover:bg-white hover:text-black transition-all">
+              <button className="px-6 py-4 rounded-xl border border-slate-700 text-white text-xs font-bold hover:bg-white hover:text-black transition-all min-h-[48px]">
                 VIEW DEPLOYMENT LOGS
               </button>
             </div>
