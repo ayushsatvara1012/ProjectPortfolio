@@ -1,7 +1,8 @@
-// Removed icon imports that are "above-the-fold" to prevent render-blocking
 import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 function heroSection() {
+  const navigate = useNavigate();
   return (
     <>
       <section id="home" className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -32,7 +33,7 @@ function heroSection() {
 
               {/* LCP Target: Use standard gradient syntax for better browser compatibility */}
               <h1 className="text-5xl sm:text-center lg:text-7xl lg:text-start font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-                Engineering Digital Excellence from <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-500 font-questrial">Code to Cloud.</span>
+                Engineering Digital Excellence from <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-questrial">Code to Cloud.</span>
               </h1>
 
               <p className="max-w-xl text-lg font-light sm:max-w-screen sm:text-center lg:text-start lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -40,10 +41,13 @@ function heroSection() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 sm:place-content-center">
-                <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold transition-all active:scale-95">
+                <button 
+                  onClick={() => navigate('/services')}
+                  className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
+                >
                   Launch Your Project <ArrowRight size={20} />
                 </button>
-                <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+                <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all">
                   View Architecture
                 </button>
               </div>

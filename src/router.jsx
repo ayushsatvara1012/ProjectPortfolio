@@ -4,6 +4,10 @@ import App from "./App";
 const Homepage = lazy(() => import("./pages/homepage"));
 const About = lazy(() => import("./pages/aboutpage"));
 const Contactpage = lazy(() => import("./pages/contactpage"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
+const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
+import ErrorPage from "./pages/ErrorPage";
 
 // 2. Create a high-end Loading fallback
 // You can use a simple spinner or a skeleton screen that matches your theme
@@ -20,6 +24,7 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
+    errorElement: <ErrorPage />,
     children: [
       {
         path: "/",
@@ -42,6 +47,30 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <About />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/privacy-policy",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <PrivacyPolicy />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/terms-and-conditions",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <TermsAndConditions />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/services",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ServicesCatalog />
           </Suspense>
         ),
       },
