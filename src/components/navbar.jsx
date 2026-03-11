@@ -90,7 +90,7 @@ const Navbar = () => {
   return (
     <>
       {/* Mobile-First Header */}
-      <nav className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+      <header className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
         <div className="px-5 h-16 flex items-center justify-between">
           {/* Logo - Always visible */}
           <div className="flex items-center gap-2">
@@ -112,7 +112,7 @@ const Navbar = () => {
                   <>
                     <button
                       onClick={(e) => handleLinkClick(e, link.href)}
-                      className="flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-1 cursor-pointer group-hover:text-slate-900 dark:group-hover:text-white"
+                      className="flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 cursor-pointer group-hover:text-slate-900 dark:group-hover:text-white"
                     >
                       {link.name}
                       <ChevronDown size={14} className="group-hover:rotate-180 transition-transform duration-300" />
@@ -146,7 +146,7 @@ const Navbar = () => {
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="relative text-slate-600 dark:text-slate-300 transition-colors font-questrial py-1 group-hover:text-slate-900 dark:group-hover:text-white"
+                    className="relative text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 group-hover:text-slate-900 dark:group-hover:text-white"
                   >
                     {link.name}
                     <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-indigo-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-in-out origin-left" />
@@ -165,7 +165,7 @@ const Navbar = () => {
             {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
-      </nav>
+      </header>
 
       {/* Mobile Full-Screen Overlay (Tree of Thought: Mobile UX) */}
       <div
@@ -180,7 +180,7 @@ const Navbar = () => {
                   <>
                     <button
                       onClick={() => setIsMobileServicesOpen(!isMobileServicesOpen)}
-                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-1 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
+                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-3 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
                         }`}
                       style={{ transitionDelay: `${index * 100}ms` }}
                     >
@@ -214,7 +214,7 @@ const Navbar = () => {
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-1 ${isOpen
+                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-3 ${isOpen
                       ? "opacity-100 translate-x-0"
                       : "opacity-0 -translate-x-10"
                       }`}
@@ -240,9 +240,8 @@ const Navbar = () => {
               Let's Build Something
             </button>
             <div className="mt-8 flex gap-8 text-slate-500 text-sm items-center justify-center">
-              <span className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">Our Stack</span>
-              <span className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">LinkedIn</span>
-              <span className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">GitHub</span>
+              <a href="https://www.linkedin.com/in/ayushsatvara/" className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">LinkedIn</a>
+              <a href="https://github.com/ayushsatvara1012" className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">GitHub</a>
             </div>
           </div>
         </div>

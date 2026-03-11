@@ -6,7 +6,7 @@ const AboutPage = () => {
     const partners = [
         {
             name: "Ayush Satvara",
-            role: "Software Developer",
+            role: "Founder & Lead Software Engineer",
             image: "/IMG_9145.webp",
             skills: ["Python", "FastAPI", "PostGres", "GenAI"],
             desc: "AWS Certified Solutions Architect specializes in building high-performance digital ecosystems featuring AI-driven semantic search and projects achieving 99 Lighthouse performance scores. Excelling at optimizing frontend latency and architecting scalable backend ETL pipelines for large-scale datasets. His technical expertise is further validated by specialized certifications in Generative AI, Machine Learning, and Data Science."
@@ -54,12 +54,12 @@ const AboutPage = () => {
                             {partners.map((p, i) => (
                                 <div
                                     key={i}
-                                    className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col min-h-[420px] md:min-h-[450px] transition-transform duration-300 hover:-translate-y-2"
+                                    className="bg-white dark:bg-slate-900 rounded-3xl p-5 inset-shadow-sm inset-shadow-slate-200 dark:inset-shadow-slate-800 border border-slate-100 dark:border-slate-800 flex flex-col min-h-[420px] md:min-h-[450px] transition-transform duration-300 hover:-translate-y-2"
                                 >
                                     <div className="h-40 md:h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200 dark:bg-slate-800">
                                         <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
                                     </div>
-                                    <h3 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{p.name}</h3>
+                                    <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{p.name}</h2>
                                     <p className="text-indigo-600 dark:text-indigo-400 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
                                     <div className='text-slate-900 dark:text-slate-300 text-xs font-quantico mb-4 grow leading-relaxed'>{p.desc}</div>
                                     <div className="mt-auto flex flex-wrap gap-1">

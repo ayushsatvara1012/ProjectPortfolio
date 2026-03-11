@@ -43,9 +43,9 @@ function ContactPage() {
               <Terminal size={12} className="text-indigo-600" />
               <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 font-mono">Terminal_v2.0</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
               Let's <span className="text-indigo-600">Connect.</span>
-            </h2>
+            </h1>
           </div>
 
           {/* Main Content: Flex-col-reverse ensures Form is on top for mobile */}
@@ -54,7 +54,7 @@ function ContactPage() {
             {/* LEFT: FAQ & Contact Nodes (Secondary on Mobile) */}
             <div className="w-full space-y-6">
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center lg:text-left">Frequently Asked Questions</p>
+                <h2 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center lg:text-left">Frequently Asked Questions</h2>
                 {faqs.map((faq, i) => (
                   <div key={i} className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900 overflow-hidden transition-all">
                     <button
@@ -72,14 +72,10 @@ function ContactPage() {
               </div>
 
               {/* Contact Pills: Grid for all sizes */}
-              <div className="grid grid-cols-2 gap-3">
-                <a href="mailto:ayushsatvara2002@gmail.com" className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 border border-dashed border-indigo-200 dark:border-indigo-800/40 flex flex-col items-center text-center gap-2 hover:scale-[1.02] transition-transform text-indigo-600 dark:text-indigo-400">
-                  <Mail size={18} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Email Us</span>
-                </a>
-                <div type='button' onClick={showError} className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-dashed border-emerald-200 dark:border-emerald-800/40 flex flex-col items-center text-center gap-2 hover:scale-[1.02] transition-transform text-emerald-600 dark:text-emerald-400">
+              <div className="grid grid-cols-1">
+                <div type='button' onClick={showError} className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-dashed border-emerald-200 dark:border-emerald-800/40 flex flex-row items-center justify-center text-center gap-2 hover:scale-[1.02] transition-transform text-emerald-600 dark:text-emerald-400">
                   <MessageSquare size={18} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Live Status</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Track Your Project Status</span>
                 </div>
               </div>
             </div>

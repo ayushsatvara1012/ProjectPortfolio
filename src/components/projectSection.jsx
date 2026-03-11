@@ -51,7 +51,7 @@ const projects = [
     tech: ["REACT_UI", "JWT/OAUTH 2.0", "PG_SQL", "SUPABASE", "TAILWIND_V4"],
     github: "https://github.com/ayushsatvara1012/village-community-platform.git",
     launch: "https://village-community-platform.vercel.app/",
-    status: "Deployed: Vercel / Render",
+    status: "Deployed: Vercel",
     accent: "orange",
     icon: <Globe size={24} />
   },
@@ -162,9 +162,9 @@ const ProjectCard = ({ project, index }) => {
 
         {/* Card Body */}
         <div className="p-6 md:p-8 pt-4">
-          <h3 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mb-2 leading-none tracking-tighter transition-all group-hover:translate-x-1">
+          <h4 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mb-2 leading-none tracking-tighter transition-all group-hover:translate-x-1">
             {project.title}
-          </h3>
+          </h4>
           <p className={`text-[10px] font-bold uppercase tracking-widest ${styles.subtitle} mb-4 font-mono`}>
             {project.subtitle}
           </p>
@@ -207,13 +207,22 @@ const ProjectCard = ({ project, index }) => {
 
 const ProjectSection = () => {
   const techIcons = [
-    PythonIcon, JavascriptIcon, ReactIcon, HTMLIcon,
-    CSSIcon, NodeIcon, TailwindIcon, MongoDBIcon,
-    AWSIcon, PostgreIcon, DockerIcon, SupabaseIcon
+    { src: PythonIcon, name: "Python" },
+    { src: JavascriptIcon, name: "JavaScript" },
+    { src: ReactIcon, name: "React" },
+    { src: HTMLIcon, name: "HTML5" },
+    { src: CSSIcon, name: "CSS3" },
+    { src: NodeIcon, name: "Node.js" },
+    { src: TailwindIcon, name: "Tailwind CSS" },
+    { src: MongoDBIcon, name: "MongoDB" },
+    { src: AWSIcon, name: "AWS" },
+    { src: PostgreIcon, name: "PostgreSQL" },
+    { src: DockerIcon, name: "Docker" },
+    { src: SupabaseIcon, name: "Supabase" }
   ];
 
   return (
-    <section id="projects" className="relative py-12 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <section className="relative py-12 bg-slate-50 dark:bg-slate-950 overflow-hidden">
       {/* Architectural Grid Underlay */}
       <div className="absolute inset-0 z-0 opacity-[0.05] pointer-events-none"
         style={{
@@ -244,9 +253,9 @@ const ProjectSection = () => {
 
             {/* Background Layer: Balanced, Vibrant Tech Distribution (No Grayscale) */}
             <div className="absolute inset-0 z-0 opacity-[0.15] dark:opacity-[0.25] grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-8 md:gap-16 p-10 pointer-events-none items-center justify-items-center">
-              {techIcons.map((icon, idx) => (
+              {techIcons.map((tech, idx) => (
                 <div key={idx} className="aspect-square flex items-center justify-center">
-                  <img src={icon} alt="" className="w-12 h-12 md:w-24 md:h-24 object-contain" />
+                  <img src={tech.src} alt={`${tech.name} icon`} className="w-12 h-12 md:w-24 md:h-24 object-contain" />
                 </div>
               ))}
             </div>
@@ -278,11 +287,11 @@ const ProjectSection = () => {
         </div>
 
         {/* 3. FEATURED PROJECTS GRID */}
-        <div className="space-y-8 md:space-y-12">
+        <div id="projects" className="space-y-8 md:space-y-12">
           <div className="flex items-center justify-between pb-6 md:pb-8 border-b border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-4">
               <div className="w-8 md:w-12 h-px bg-indigo-600"></div>
-              <h4 className="text-xs md:text-sm font-mono font-bold tracking-[0.2em] md:tracking-[0.3em] text-slate-400 uppercase">Selected_Deployments</h4>
+              <h3 className="text-xs md:text-sm font-mono font-bold tracking-[0.2em] md:tracking-[0.3em] text-slate-400 uppercase">Selected_Deployments</h3>
             </div>
             <span className="hidden md:block font-mono text-[10px] text-slate-400 opacity-50 tracking-widest">STABLE_RELEASE_V4.2</span>
           </div>

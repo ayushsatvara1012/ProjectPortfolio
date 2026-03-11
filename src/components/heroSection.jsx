@@ -43,7 +43,7 @@ function heroSection() {
               <div className="flex flex-col sm:flex-row gap-4 sm:place-content-center">
                 <button 
                   onClick={() => navigate('/services')}
-                  className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
+                  className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-slate-200 text-white dark:text-indigo-600 px-8 py-4 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
                 >
                   Launch Your Project <ArrowRight size={20} />
                 </button>

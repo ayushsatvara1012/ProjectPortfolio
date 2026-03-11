@@ -96,7 +96,7 @@ const CodeEditor = () => {
             </div>
             <div className="flex gap-4">
               <span className="text-slate-600 select-none text-right w-4">6</span>
-              <span className="text-purple-400">async function</span> <span className="text-emerald-400">buildExcellence</span>(config) &#123;
+              <span className="text-purple-400">async function</span> <span className="text-emerald-400">buildExcellence</span><span className="text-orange-300">(config)&#123;</span> 
             </div>
             <div className="flex gap-4">
               <span className="text-slate-600 select-none text-right w-4">7</span>
@@ -207,9 +207,9 @@ const ServicesCatalog = () => {
               {/* Content */}
               <div className="p-8 space-y-6">
                 <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                     {service.name}
-                  </h3>
+                  </h2>
                   <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-light">
                     {service.description}
                   </p>
@@ -252,7 +252,7 @@ const ServicesCatalog = () => {
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-32 p-12 rounded-4xl bg-white dark:bg-slate-900 dark:border-slate-800 border border-slate-200 relative overflow-hidden text-center shadow-2xl"
+          className="mt-32 p-6 rounded-4xl bg-white dark:bg-slate-900 dark:border-slate-800 border border-slate-200 relative overflow-hidden text-center shadow-2xl"
         >
           {/* Decorative Mesh */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-30 pointer-events-none">
@@ -260,28 +260,28 @@ const ServicesCatalog = () => {
           </div>
           
           <div className="relative z-10 max-w-2xl mx-auto space-y-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold tracking-widest uppercase">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold tracking-widest uppercase">
               <Rocket size={14} /> Ready to Begin
             </div>
             
             <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white leading-tight">
               Ready to Architect Your <br />
-              <span className="text-indigo-400">Digital Future?</span>
+              <span className="bg-linear-to-r from-red-500 to-blue-500 bg-clip-text text-transparent">Digital Future?</span>
             </h2>
             
-            <p className="text-slate-400 text-lg font-light leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-400 text-lg font-light leading-relaxed">
               Schedule a strategy call to discuss your project requirements and get a detailed architectural breakdown.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-5 justify-center pt-4">
-              <button className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
-                <Phone size={20} fill="currentColor" /> Book a Discovery Call
+              <button className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
+                <Phone size={20} fill="currentColor"/> Book a Discovery Call
               </button>
               <button 
                 onClick={() => window.open('https://wa.me/919913146445', '_blank')}
-                className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"
+                className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-green-600 dark:text-green-400 px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"
               >
-                <MessageCircle size={20} fill="currentColor" /> WhatsApp Us
+                <MessageCircle size={20} fill="green" /> Message
               </button>
             </div>
           </div>

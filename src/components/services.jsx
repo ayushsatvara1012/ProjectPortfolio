@@ -120,7 +120,7 @@ const Services = () => {
           {/* 03. CLOUD DEPLOYMENT - The "Core" Module */}
           <div className="md:col-span-4 group relative rounded-4xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 backdrop-blur-xl p-8 hover:bg-slate-100 dark:hover:bg-slate-900/60 transition-all">
             <CloudCog size={32} className="text-indigo-600 dark:text-indigo-500 mb-6 group-hover:rotate-90 transition-transform duration-1000" />
-            <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Cloud Architect</h4>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Cloud Architect</h3>
             <p className="text-slate-600 dark:text-slate-400 text-sm font-light leading-relaxed mb-6">
               AWS infrastructure design using Lambda & Serverless patterns. Scaling without friction.
             </p>
@@ -140,7 +140,7 @@ const Services = () => {
                   <Globe size={32} />
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Global Connectivity</h4>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Global Connectivity</h3>
                   <p className="text-slate-500 dark:text-slate-400 text-sm">CDN-first deployment for global audiences.</p>
                 </div>
               </div>
