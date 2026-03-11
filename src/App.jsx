@@ -1,4 +1,5 @@
 import { Outlet,ScrollRestoration } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 
@@ -12,6 +13,7 @@ function App() {
       <Navbar />
         <Outlet />
       <Footer />
+      <Analytics />
     </div>
   );
 }

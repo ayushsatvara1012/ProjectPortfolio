@@ -14,7 +14,7 @@ const services = [
     id: 'custom-software',
     name: 'Custom Software Development',
     description: 'Bespoke software solutions engineered for scalability and performance. We build robust systems tailored to your unique business logic.',
-    price: 'Starting from $5,000',
+    price: 'Starting from $3,000',
     image: customSoftwareImg,
     features: ['Microservices Architecture', 'Cloud Native', 'API Integration'],
     color: 'from-blue-500 to-indigo-600'
@@ -23,7 +23,7 @@ const services = [
     id: 'full-stack',
     name: 'Full Stack Development',
     description: 'End-to-end web applications built with modern stacks like React, Node.js, and Python. Seamless integration from frontend to database.',
-    price: 'Starting from $3,500',
+    price: 'Starting from $2,500',
     image: fullStackImg,
     features: ['Responsive UI/UX', 'Real-time Features', 'Secure Authentication'],
     color: 'from-emerald-500 to-teal-600'
@@ -32,7 +32,7 @@ const services = [
     id: 'seo-optimization',
     name: 'SEO & Performance',
     description: 'Optimize your digital presence for search engines and lightning-fast load times. We ensure your brand is discovered and ranks high.',
-    price: 'Starting from $1,500',
+    price: 'Starting from $300',
     image: seoOptimizationImg,
     features: ['Core Web Vitals', 'Technical SEO', 'Content Strategy'],
     color: 'from-purple-500 to-fuchsia-600'
@@ -41,7 +41,7 @@ const services = [
     id: 'static-dynamic',
     name: 'Static & Dynamic Websites',
     description: 'High-speed static landing pages or feature-rich dynamic websites. Perfect for portfolios, marketing sites, and CMS-driven platforms.',
-    price: 'Starting from $2,000',
+    price: 'Starting from $400',
     image: webDesignImg,
     features: ['Next.js / Vite', 'Headless CMS', 'Global Edge CDN'],
     color: 'from-orange-500 to-rose-600'
