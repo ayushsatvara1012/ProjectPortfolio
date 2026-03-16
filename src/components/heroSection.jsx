@@ -33,7 +33,12 @@ function heroSection() {
 
               {/* LCP Target: Use standard gradient syntax for better browser compatibility */}
               <h1 className="text-5xl sm:text-center lg:text-7xl lg:text-start font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-                Engineering Digital Excellence from <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-questrial">Code to Cloud.</span>
+                <span className="text-5xl lg:text-7xl font-bold tracking-tight text-smokewhite dark:text-white font-glook">
+                  Sa
+                  <span className="font-glook">Py</span>
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
+                </span>
+                <br />Engineers Digital Excellence from <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-questrial">Code to Cloud.</span>
               </h1>
 
               <p className="max-w-xl text-lg font-light sm:max-w-screen sm:text-center lg:text-start lg:text-xl text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -41,7 +46,7 @@ function heroSection() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 sm:place-content-center">
-                <button 
+                <button
                   onClick={() => navigate('/services')}
                   className="flex items-center justify-center gap-2 bg-slate-900 dark:bg-slate-200 text-white dark:text-indigo-600 px-8 py-4 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
                 >

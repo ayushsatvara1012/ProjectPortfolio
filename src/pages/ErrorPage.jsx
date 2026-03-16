@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRouteError, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { AlertCircle, Home, RotateCcw, Terminal } from 'lucide-react';
+import { AlertCircle, Home, RotateCcw } from 'lucide-react';
 
 const ErrorPage = () => {
   const error = useRouteError();
@@ -37,7 +37,7 @@ const ErrorPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white"
           >
-            Terminal <span className="text-rose-500 underline decoration-rose-500/30 underline-offset-8">Interrupted.</span>
+            Sapybase <span className="text-rose-500 underline decoration-rose-500/30 underline-offset-8">Interrupted.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
@@ -57,7 +57,8 @@ const ErrorPage = () => {
           className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 font-mono text-left max-w-md mx-auto shadow-sm"
         >
           <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-            <Terminal size={14} className="text-slate-400" />
+            <img src="/sb_logo2.svg" className="w-4 h-4 block dark:hidden object-contain" alt="" />
+            <img src="/sb_logo2_dark.svg" className="w-4 h-4 hidden dark:block object-contain" alt="" />
             <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Error_Report</span>
           </div>
           <p className="text-xs text-rose-500/80 dark:text-rose-400 font-medium leading-relaxed">

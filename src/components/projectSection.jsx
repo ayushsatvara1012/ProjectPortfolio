@@ -5,7 +5,6 @@ import {
   Globe,
   Cpu,
   Boxes,
-  Terminal,
   Zap,
   BarChart3,
   Activity,
@@ -77,7 +76,12 @@ const projects = [
     launch: "#",
     status: "Under Development",
     accent: "gray",
-    icon: <Terminal size={24} />
+    icon: (
+      <>
+        <img src="/sb_logo2.svg" className="w-6 h-6 block dark:hidden object-contain" alt="" />
+        <img src="/sb_logo2_dark.svg" className="w-6 h-6 hidden dark:block object-contain" alt="" />
+      </>
+    )
   }
 ];
 

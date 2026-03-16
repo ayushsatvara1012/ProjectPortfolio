@@ -1,5 +1,5 @@
 
-import { Terminal, Github, Linkedin, Twitter, ArrowUpRight, Mail, Zap } from 'lucide-react';
+import { Github, Linkedin, Twitter, ArrowUpRight, Mail, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ModernFooter = () => {
@@ -57,15 +57,24 @@ const ModernFooter = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
 
           {/* Big CTA Branding Box (The Bento Style) */}
-          <div className="lg:col-span-5 p-8 rounded-3xl bg-linear-to-r from-indigo-100 to-violet-100 inset-shadow-sm inset-shadow-indigo-500/50 dark:from-slate-900/50 dark:to-slate-900/50 border border-slate-200 dark:border-slate-800 backdrop-blur-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-500">
-            <div>
+          <div className="lg:col-span-5 p-8 rounded-3xl bg-linear-to-r from-indigo-100 to-violet-100 inset-shadow-sm inset-shadow-indigo-500/50 dark:from-slate-900/50 dark:to-slate-900/50 border border-slate-200 dark:border-slate-800 backdrop-blur-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-500 relative overflow-hidden">
+            {/* Ghost Logo Background */}
+            <div className="absolute -right-16 -bottom-16 pointer-events-none opacity-[0.07] dark:opacity-[0.10] group-hover:scale-110 group-hover:-rotate-12 transition-all duration-700 ease-in-out">
+              <img src="/sb_logo.svg" className="w-[450px] h-auto block dark:hidden" alt="" />
+              <img src="/sb_logo_dark.svg" className="w-[450px] h-auto hidden dark:block" alt="" />
+            </div>
+
+            <div className="relative z-10">
               <div className="flex items-center gap-2 mb-6">
-                <div className="bg-white dark:bg-slate-900/70 dark:border-slate-800 p-2 rounded-xl border border-slate-200">
-                  <Terminal className="w-6 h-6 text-indigo-600" />
-                </div>
-                <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Sapybase<span className="text-indigo-500">.</span>
-                </span>
+                  <img src="/sb_logo.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity block dark:hidden" />
+                  <img src="/sb_logo_dark.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity hidden dark:block" />
+
+                  <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white font-glook">
+                    Sa
+                    <span className="font-glook">Py</span>
+                    <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
+                  </span>
+              
               </div>
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white leading-tight">
                 Ready to architect your <br />
@@ -73,7 +82,7 @@ const ModernFooter = () => {
               </h2>
             </div>
 
-            <div className="mt-10 flex flex-wrap gap-4">
+            <div className="mt-10 flex flex-wrap gap-4 relative z-10">
               <button
                 onClick={() => navigate('/services')}
                 className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-lg shadow-slate-200/50 dark:shadow-none"
@@ -120,20 +129,20 @@ const ModernFooter = () => {
               <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Social</h4>
               <div className="flex gap-4">
                 {[
-                  { 
-                    Icon: Github, 
-                    href: "https://github.com/ayushsatvara1012", 
-                    hover: "hover:text-slate-950 hover:border-slate-950 dark:hover:text-white dark:hover:border-slate-600" 
+                  {
+                    Icon: Github,
+                    href: "https://github.com/ayushsatvara1012",
+                    hover: "hover:text-slate-950 hover:border-slate-950 dark:hover:text-white dark:hover:border-slate-600"
                   },
-                  { 
-                    Icon: Linkedin, 
-                    href: "https://www.linkedin.com/in/ayushsatvara", 
-                    hover: "hover:text-blue-600 hover:border-blue-600 dark:hover:text-blue-400 dark:hover:border-blue-400/50" 
+                  {
+                    Icon: Linkedin,
+                    href: "https://www.linkedin.com/in/ayushsatvara",
+                    hover: "hover:text-blue-600 hover:border-blue-600 dark:hover:text-blue-400 dark:hover:border-blue-400/50"
                   },
                 ].map((social, i) => (
-                  <a 
-                    key={i} 
-                    href={social.href} 
+                  <a
+                    key={i}
+                    href={social.href}
                     className={`w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all shadow-sm ${social.hover}`}
                   >
                     <social.Icon size={20} />

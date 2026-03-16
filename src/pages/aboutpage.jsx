@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Cpu, Globe, ArrowBigRight, Rocket, Terminal, Layers, Activity, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Cpu, Globe, ArrowBigRight, Rocket, Layers, Activity, ChevronRight } from 'lucide-react';
 import Resume from '../components/resume';
 
 const AboutPage = () => {
@@ -30,8 +30,9 @@ const AboutPage = () => {
                     {/* LEFT: Heading & Context */}
                     <div className="lg:col-span-5 space-y-6 flex items-center lg:items-start text-center lg:text-start flex-col">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                            <Terminal size={12} className="text-indigo-600 dark:text-indigo-400" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Profile_Registry_v2</span>
+                            <img src="/sb_logo2.svg" className="w-4 h-4 block dark:hidden object-contain" alt="" />
+                            <img src="/sb_logo2_dark.svg" className="w-4 h-4 hidden dark:block object-contain" alt="" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Sapybase_v2.0</span>
                         </div>
                         <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-white">
                             THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECTS</span> <br /> OF CODE.

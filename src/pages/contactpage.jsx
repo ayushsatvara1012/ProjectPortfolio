@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, MessageSquare, Send, Zap, ChevronDown, Terminal } from 'lucide-react';
+import { Mail, MessageSquare, Send, Zap, ChevronDown } from 'lucide-react';
 import Alert from '../components/alert';
 
 
@@ -40,8 +40,9 @@ function ContactPage() {
           {/* Header - Centered on Mobile, Left-aligned on Desktop */}
           <div className="my-10 text-center sm:mb-10 sm:mt-0 lg:mb-10 lg:mt-0 lg:text-left">
             <div className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
-              <Terminal size={12} className="text-indigo-600" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 font-mono">Terminal_v2.0</span>
+              <img src="/sb_logo2.svg" className="w-4 h-4 block dark:hidden object-contain" alt="" />
+              <img src="/sb_logo2_dark.svg" className="w-4 h-4 hidden dark:block object-contain" alt="" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 font-mono">Sapybase_v2.0</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
               Let's <span className="text-indigo-600">Connect.</span>

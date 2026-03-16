@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Menu, X, ArrowRight, Terminal, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch } from "lucide-react";
+import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -94,14 +95,10 @@ const Navbar = () => {
         <div className="px-5 h-16 flex items-center justify-between">
           {/* Logo - Always visible */}
           <div className="flex items-center gap-2">
-            <div className="bg-white dark:bg-slate-900/70 dark:border-slate-800 p-2 rounded-xl border border-slate-200">
-              <Terminal className="w-6 h-6 text-indigo-600" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white font-glook">
-              Sa
-              <span className="font-glook">Py</span>
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
-            </span>
+            <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} aria-label="SaPyBase Home" className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
+              <img src="/sb_logo.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity block dark:hidden" />
+              <img src="/sb_logo_dark.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity hidden dark:block" />
+            </a>
           </div>
 
           {/* Desktop Links (Hidden by default, shown on md+) */}

@@ -1,4 +1,4 @@
-import { BrainCircuit, Code2, CloudCog, Globe, Terminal, Fingerprint, Activity } from 'lucide-react';
+import { BrainCircuit, Code2, CloudCog, Globe, Terminal, Fingerprint, Activity, ChevronRight } from 'lucide-react';
 
 const Services = () => {
   return (
@@ -66,7 +66,7 @@ const Services = () => {
                   </div>
                 </div>
                 <button className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2 group/btn min-h-[48px] py-2">
-                  EXPLORE ARCHITECTURE <Terminal size={14} className="group-hover:translate-x-1 transition-transform" />
+                  EXPLORE ARCHITECTURE <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </div>
