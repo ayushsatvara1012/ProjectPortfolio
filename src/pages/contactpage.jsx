@@ -31,6 +31,7 @@ function ContactPage() {
 
   return (
     <>
+      <SEO {...seoConfig.contact} />
       <section id="contact" className="relative py-12 sm:py-20 bg-white dark:bg-slate-950 overflow-hidden">
         {/* Background Grid - Scaled for Mobile */}
         <div className="absolute inset-0 opacity-[0.2] dark:opacity-[0.1] pointer-events-none"

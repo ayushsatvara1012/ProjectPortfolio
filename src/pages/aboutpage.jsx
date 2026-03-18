@@ -21,6 +21,8 @@ const AboutPage = () => {
     ];
 
     return (
+        <>
+        <SEO {...seoConfig.about} />
         <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-hidden transition-colors duration-500">
 
             {/* SECTION 1: Laptop-Optimized Hero & Partners (Fits 100vh) */}
@@ -138,6 +140,7 @@ const AboutPage = () => {
                 </div>
             </section>
         </div>
+        </>
     );
 };
 

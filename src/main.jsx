@@ -1,6 +1,7 @@
 import { StrictMode,useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import router from "./router";
 import "./index.css";
 
@@ -20,6 +21,8 @@ const Root = () => {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <Root/>
+    <HelmetProvider>
+      <Root/>
+    </HelmetProvider>
   </StrictMode>
 );

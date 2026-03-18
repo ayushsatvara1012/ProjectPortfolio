@@ -1,9 +1,13 @@
 import React from 'react';
 import { Shield, Lock, Eye, FileText, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/Seo';
+import { seoConfig } from '../seo/seoConfig';
 
 const PrivacyPolicy = () => {
     return (
+        <>
+            <SEO {...seoConfig.privacy} />
         <div className="min-h-screen bg-slate-950 text-slate-300 pt-32 pb-20 px-6">
             <div className="max-w-4xl mx-auto">
                 <Link to="/" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors mb-12 group">
@@ -88,6 +92,7 @@ const PrivacyPolicy = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

@@ -137,6 +137,8 @@ const ServicesCatalog = () => {
   }, []);
 
   return (
+    <>
+      <SEO {...seoConfig.services} />
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-32 pb-20 px-6 overflow-hidden relative">
       {/* Background Decor */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none z-0">
@@ -288,6 +290,7 @@ const ServicesCatalog = () => {
         </motion.div>
       </div>
     </div>
+    </>
   );
 };
 

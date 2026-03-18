@@ -1,5 +1,21 @@
 User-agent: *
 Allow: /
 
-# Sitemaps
+# Block non-public routes
+Disallow: /static/
+
+# AI crawlers (GEO/AEO — let them index you)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+# Sitemap
 Sitemap: https://www.sapybase.com/sitemap.xml
