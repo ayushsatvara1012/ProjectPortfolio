@@ -13,7 +13,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
       {/* 1. IDENTITY BLOCK */}
       <div className="flex justify-between items-start mb-10">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none">
+          <h2 className="text-4xl font-black text-slate-900 dark:text-slate-200 tracking-tighter uppercase leading-none">
             {name}
           </h2>
           <p className={`font-mono text-[10px] tracking-[0.3em] uppercase mt-3 font-bold ${accentColor}`}>
@@ -33,7 +33,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
             <span className="text-[10px] font-bold uppercase tracking-widest">Education</span>
           </div>
           <div className="relative pl-4 border-l-2 border-slate-100 dark:border-slate-800">
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{education.degree}</h4>
+            <h4 className="font-bold text-slate-900 dark:text-slate-200 text-sm leading-tight">{education.degree}</h4>
             <p className="text-xs text-slate-500 mt-1">{education.univ}</p>
             <div className="inline-flex mt-3 px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-900 text-[9px] font-mono text-indigo-500 border border-indigo-500/20">
               GPA: {education.gpa}
@@ -71,7 +71,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
                   <Code2 size={16} />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900 dark:text-white text-xs">{exp.title}</h5>
+                  <h5 className="font-bold text-slate-900 dark:text-slate-200 text-xs">{exp.title}</h5>
                   <p className="text-[9px] text-slate-500 mt-0.5 font-mono uppercase tracking-wider">{exp.tech}</p>
                 </div>
               </div>
@@ -100,7 +100,7 @@ const DuoPortfolio = () => {
             <Zap size={14} className="text-indigo-600" />
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">The Synergy Protocol</span>
           </div>
-          <h1 className="text-5xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+          <h1 className="text-5xl md:text-8xl font-black text-slate-900 dark:text-slate-200 tracking-tighter leading-none">
             ENGINEER <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">NODES.</span>
           </h1>
           <p className="max-w-2xl text-slate-500 dark:text-slate-400 text-sm md:text-base leading-relaxed">

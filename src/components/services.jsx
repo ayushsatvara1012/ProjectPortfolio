@@ -26,7 +26,7 @@ const Services = () => {
               <Activity size={14} className="animate-pulse" />
               Service Modules Available
             </div>
-            <h2 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white leading-none">
+            <h2 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-slate-200 leading-none">
               Engineering <br />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-500 via-violet-500 to-fuchsia-500 dark:from-indigo-400 dark:via-violet-400 dark:to-fuchsia-400">
                 Super-Structures.
@@ -50,7 +50,7 @@ const Services = () => {
             <div className="relative z-20 h-full flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-500 mb-2 block tracking-widest">MODULE_01 // INTELLIGENCE</span>
-                <h3 className="text-4xl font-bold text-slate-900 dark:text-white mb-6">AI & Neural <br />Integration</h3>
+                <h3 className="text-4xl font-bold text-slate-900 dark:text-slate-200 mb-6">AI & Neural <br />Integration</h3>
                 <p className="text-slate-600 dark:text-slate-400 max-w-sm leading-relaxed font-light">
                   Deploying RAG-optimized LLMs and custom machine learning models that evolve with your data. We don't just add AI; we architect intelligence.
                 </p>
@@ -65,7 +65,7 @@ const Services = () => {
                     <Fingerprint size={18} className="text-violet-600 dark:text-violet-400" />
                   </div>
                 </div>
-                <button className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2 group/btn min-h-[48px] py-2">
+                <button className="text-xs font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2 group/btn min-h-[48px] py-2">
                   EXPLORE ARCHITECTURE <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -87,7 +87,7 @@ const Services = () => {
                 <Code2 size={28} strokeWidth={1.5} />
               </div>
 
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-200 tracking-tight">
                 Ultra-Fast <br />
                 <span className="text-indigo-600 dark:text-indigo-400">Web Engines</span>
               </h3>
@@ -120,7 +120,7 @@ const Services = () => {
           {/* 03. CLOUD DEPLOYMENT - The "Core" Module */}
           <div className="md:col-span-4 group relative rounded-4xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 backdrop-blur-xl p-8 hover:bg-slate-100 dark:hover:bg-slate-900/60 transition-all">
             <CloudCog size={32} className="text-indigo-600 dark:text-indigo-500 mb-6 group-hover:rotate-90 transition-transform duration-1000" />
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Cloud Architect</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mb-3">Cloud Architect</h3>
             <p className="text-slate-600 dark:text-slate-400 text-sm font-light leading-relaxed mb-6">
               AWS infrastructure design using Lambda & Serverless patterns. Scaling without friction.
             </p>
@@ -140,11 +140,11 @@ const Services = () => {
                   <Globe size={32} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Global Connectivity</h3>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 tracking-tight">Global Connectivity</h3>
                   <p className="text-slate-500 dark:text-slate-400 text-sm">CDN-first deployment for global audiences.</p>
                 </div>
               </div>
-              <button className="px-6 py-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all min-h-[48px]">
+              <button className="px-6 py-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs font-bold hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all min-h-[48px]">
                 VIEW DEPLOYMENT LOGS
               </button>
             </div>

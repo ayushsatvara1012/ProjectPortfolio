@@ -21,7 +21,7 @@ const AboutPage = () => {
     ];
 
     return (
-        <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-x-hidden transition-colors duration-500">
+        <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-hidden transition-colors duration-500">
 
             {/* SECTION 1: Laptop-Optimized Hero & Partners (Fits 100vh) */}
             <section className="min-h-dvh flex flex-col justify-center pt-24 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
@@ -34,7 +34,7 @@ const AboutPage = () => {
                             <img src="/sb_logo2_dark.svg" className="w-4 h-4 hidden dark:block object-contain" alt="" />
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Sapybase_v2.0</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-white">
+                        <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-slate-200">
                             THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECTS</span> <br /> OF CODE.
                         </h1>
                         <p className="text-base text-slate-500 font-light max-w-md leading-relaxed">
@@ -60,7 +60,7 @@ const AboutPage = () => {
                                     <div className="h-40 md:h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200 dark:bg-slate-800">
                                         <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
                                     </div>
-                                    <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-white">{p.name}</h2>
+                                    <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-slate-200">{p.name}</h2>
                                     <p className="text-indigo-600 dark:text-indigo-400 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
                                     <div className='text-slate-900 dark:text-slate-300 text-xs font-quantico mb-4 grow leading-relaxed'>{p.desc}</div>
                                     <div className="mt-auto flex flex-wrap gap-1">

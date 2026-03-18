@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import Logo from "./Logo";
 
 
 const Navbar = () => {
@@ -93,11 +94,9 @@ const Navbar = () => {
       {/* Mobile-First Header */}
       <header className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
         <div className="px-5 h-16 flex items-center justify-between">
-          {/* Logo - Always visible */}
           <div className="flex items-center gap-2">
             <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} aria-label="SaPyBase Home" className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
-              <img src="/sb_logo.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity block dark:hidden" />
-              <img src="/sb_logo_dark.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity hidden dark:block" />
+              <Logo className="w-auto h-16 md:h-20 md:mb-4 object-cover" />
             </a>
           </div>
 
@@ -129,7 +128,7 @@ const Navbar = () => {
                               <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 group-hover/item:scale-110 transition-transform">
                                 {service.icon}
                               </div>
-                              <span className="font-bold text-sm text-slate-800 dark:text-white">{service.title}</span>
+                              <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{service.title}</span>
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pl-1">
                               {service.desc}
@@ -156,7 +155,7 @@ const Navbar = () => {
           {/* Mobile Toggle - Visible on small screens */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white active:scale-95 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
+            className="md:hidden p-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-200 active:scale-95 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
             aria-label="Toggle Menu"
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -177,7 +176,7 @@ const Navbar = () => {
                   <>
                     <button
                       onClick={() => setIsMobileServicesOpen(!isMobileServicesOpen)}
-                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-3 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
+                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 py-3 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
                         }`}
                       style={{ transitionDelay: `${index * 100}ms` }}
                     >
@@ -200,7 +199,7 @@ const Navbar = () => {
                             {React.cloneElement(service.icon, { size: 16 })}
                           </div>
                           <div>
-                            <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{service.title}</h4>
+                            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200 leading-none mb-1">{service.title}</h4>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{service.desc}</p>
                           </div>
                         </a>
@@ -211,7 +210,7 @@ const Navbar = () => {
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-white transition-all duration-300 py-3 ${isOpen
+                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 py-3 ${isOpen
                       ? "opacity-100 translate-x-0"
                       : "opacity-0 -translate-x-10"
                       }`}

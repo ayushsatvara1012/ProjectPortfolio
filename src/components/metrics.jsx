@@ -59,7 +59,7 @@ const PerformanceMetrics = () => {
 
                 {/* Metric Value */}
                 <div className="flex items-baseline gap-2 mb-3">
-                  <span className="text-5xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter">
+                  <span className="text-5xl md:text-4xl font-black text-slate-900 dark:text-slate-200 tracking-tighter">
                     {metric.value}
                   </span>
 
@@ -68,7 +68,7 @@ const PerformanceMetrics = () => {
               </div>
 
               {/* Content */}
-              <h3 className="text-xl md:text-lg font-bold text-slate-900 dark:text-white mb-4">
+              <h3 className="text-xl md:text-lg font-bold text-slate-900 dark:text-slate-200 mb-4">
                 {metric.title}
               </h3>
 

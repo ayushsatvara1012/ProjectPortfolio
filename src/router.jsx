@@ -9,16 +9,16 @@ const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
 import ErrorPage from "./pages/ErrorPage";
 
-// 2. Create a high-end Loading fallback
-// You can use a simple spinner or a skeleton screen that matches your theme
-const PageLoader = () => (
-  <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-slate-950">
-    <div className="relative flex h-3 w-3">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-      <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-600"></span>
+import Logo from "./components/Logo";
+
+// 2. Create a high-end Loading fallback using the Logo
+const PageLoader = () => {
+  return (
+    <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-slate-950">
+      <Logo className="w-[160px] h-[80px] lg:w-[200px] lg:h-[100px]" />
     </div>
-  </div>
-);
+  );
+};
 
 const router = createBrowserRouter([
   {

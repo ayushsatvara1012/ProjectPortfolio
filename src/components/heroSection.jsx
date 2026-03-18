@@ -32,8 +32,8 @@ function heroSection() {
               </div>
 
               {/* LCP Target: Use standard gradient syntax for better browser compatibility */}
-              <h1 className="text-5xl sm:text-center lg:text-7xl lg:text-start font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-                <span className="text-5xl lg:text-7xl font-bold tracking-tight text-smokewhite dark:text-white font-glook">
+              <h1 className="text-5xl sm:text-center lg:text-7xl lg:text-start font-extrabold tracking-tight text-slate-900 dark:text-slate-200 leading-[1.1]">
+                <span className="text-5xl lg:text-7xl font-bold tracking-tight text-smokewhite dark:text-slate-200 font-glook">
                   Sa
                   <span className="font-glook">Py</span>
                   <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
@@ -73,7 +73,7 @@ function heroSection() {
                     <div className="p-2 w-fit rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     </div>
-                    <h3 className="font-bold dark:text-white">Clean Code</h3>
+                    <h3 className="font-bold dark:text-slate-200">Clean Code</h3>
                     <p className="text-xs text-slate-500">Modular Python & React components built for scale.</p>
                   </div>
 
@@ -82,7 +82,7 @@ function heroSection() {
                     <div className="p-2 w-fit rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-600">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
                     </div>
-                    <h3 className="font-bold dark:text-white">Deployment</h3>
+                    <h3 className="font-bold dark:text-slate-200">Deployment</h3>
                     <p className="text-xs text-slate-500">Serverless AWS architecture & CI/CD pipelines.</p>
                   </div>
 
@@ -91,7 +91,7 @@ function heroSection() {
                     <div className="p-2 w-fit rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
                     </div>
-                    <h3 className="font-bold dark:text-white">Optimization</h3>
+                    <h3 className="font-bold dark:text-slate-200">Optimization</h3>
                     <p className="text-xs text-slate-500">Lightning fast load times & SEO focused.</p>
                   </div>
 
@@ -100,7 +100,7 @@ function heroSection() {
                     <div className="p-2 w-fit rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                     </div>
-                    <h3 className="font-bold dark:text-white">Security</h3>
+                    <h3 className="font-bold dark:text-slate-200">Security</h3>
                     <p className="text-xs text-slate-500">Hardened PostgreSQL & IAM security protocols.</p>
                   </div>
                 </div>

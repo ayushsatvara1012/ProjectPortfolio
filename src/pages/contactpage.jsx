@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, MessageSquare, Send, Zap, ChevronDown } from 'lucide-react';
+import { Mail, MessageSquare, Send, Zap, Terminal, ChevronDown } from 'lucide-react';
 import Alert from '../components/alert';
 
 
@@ -19,14 +19,14 @@ function ContactPage() {
   }
   const showDev = (event) => {
     event.preventDefault();
-    setAlertConfig({ open: true, type: 'development', msg: 'Currently in Development' })
+    setAlertConfig({ open: true, type: 'development', msg: 'Try using our whatsapp' })
     setTimeout(() => setAlertConfig({ open: false }), 3000)
   }
 
   const faqs = [
-    { q: "What we do?", a: "We build custom web applications for businesses." },
+    { q: "What we do?", a: "We build custom web applications and AI solutions for businesses." },
     { q: "How long it takes?", a: "It depends on the complexity of the project. Basic Websites with 3-5 pages takes 1 week" },
-    { q: "What is your stack?", a: "We use Python, React, and other modern technologies." }
+    { q: "What is your stack?", a: "We use Python, React, Next.js, FastAPI, PostgreSQL, Supabase, AWS, Docker and other modern technologies." }
   ];
 
   return (
@@ -40,11 +40,10 @@ function ContactPage() {
           {/* Header - Centered on Mobile, Left-aligned on Desktop */}
           <div className="my-10 text-center sm:mb-10 sm:mt-0 lg:mb-10 lg:mt-0 lg:text-left">
             <div className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
-              <img src="/sb_logo2.svg" className="w-4 h-4 block dark:hidden object-contain" alt="" />
-              <img src="/sb_logo2_dark.svg" className="w-4 h-4 hidden dark:block object-contain" alt="" />
+              <Terminal size={16} className='text-indigo-600' />
               <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 font-mono">Sapybase_v2.0</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-slate-200 tracking-tighter">
               Let's <span className="text-indigo-600">Connect.</span>
             </h1>
           </div>
@@ -89,7 +88,7 @@ function ContactPage() {
               <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-4xl p-6 md:p-8 shadow-lg shadow-slate-200/50 dark:shadow-none lg:shadow-xl dark:lg:shadow-2xl dark:lg:shadow-black/20">
                 <div className="flex items-center gap-3 mb-6">
                   <Zap className="text-indigo-600" size={20} />
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Project Briefing</h3>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200">Project Briefing</h3>
                 </div>
 
                 <form className="space-y-4">

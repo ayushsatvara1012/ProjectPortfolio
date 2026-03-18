@@ -1,6 +1,6 @@
-
 import { Github, Linkedin, Twitter, ArrowUpRight, Mail, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Logo from "./Logo";
 
 const ModernFooter = () => {
   const navigate = useNavigate();
@@ -59,24 +59,21 @@ const ModernFooter = () => {
           {/* Big CTA Branding Box (The Bento Style) */}
           <div className="lg:col-span-5 p-8 rounded-3xl bg-linear-to-r from-indigo-100 to-violet-100 inset-shadow-sm inset-shadow-indigo-500/50 dark:from-slate-900/50 dark:to-slate-900/50 border border-slate-200 dark:border-slate-800 backdrop-blur-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-500 relative overflow-hidden">
             {/* Ghost Logo Background */}
-            <div className="absolute -right-16 -bottom-16 pointer-events-none opacity-[0.07] dark:opacity-[0.10] group-hover:scale-110 group-hover:-rotate-12 transition-all duration-700 ease-in-out">
-              <img src="/sb_logo.svg" className="w-[450px] h-auto block dark:hidden" alt="" />
-              <img src="/sb_logo_dark.svg" className="w-[450px] h-auto hidden dark:block" alt="" />
+            <div className="absolute -right-50 -bottom-6 pointer-events-none opacity-[0.07] dark:opacity-[0.10]">
+              <img src="/SB_loading.svg" className="w-[650px] h-auto block dark:hidden" alt="" />
+              <img src="/SB_loading_dark.svg" className="w-[650px] h-auto hidden dark:block" alt="" />
             </div>
 
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-6">
-                  <img src="/sb_logo.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity block dark:hidden" />
-                  <img src="/sb_logo_dark.svg" alt="SaPyBase Logo" className="w-auto h-10 md:h-12 ml-2 object-contain hover:opacity-90 transition-opacity hidden dark:block" />
-
-                  <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-white font-glook">
+              <div className="flex items-center mb-6">
+                  <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-slate-200 font-glook">
                     Sa
                     <span className="font-glook">Py</span>
                     <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
                   </span>
               
               </div>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white leading-tight">
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-200 leading-tight">
                 Ready to architect your <br />
                 <span className="text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">next digital frontier?</span>
               </h2>
@@ -89,7 +86,7 @@ const ModernFooter = () => {
               >
                 Start Project <Zap size={18} fill="currentColor" />
               </button>
-              <a href="mailto:ayushsatvara2002@gmail.com" className="w-12 h-12 rounded-full border border-indigo-200 dark:border-slate-700 text-slate-600 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center">
+              <a href="mailto:ayushsatvara2002@gmail.com" className="w-12 h-12 rounded-full border border-indigo-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center">
                 <Mail size={20} />
               </a>
             </div>

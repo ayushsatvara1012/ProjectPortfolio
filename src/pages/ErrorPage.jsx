@@ -35,7 +35,7 @@ const ErrorPage = () => {
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white"
+            className="text-4xl md:text-5xl font-black text-slate-900 dark:text-slate-200"
           >
             Sapybase <span className="text-rose-500 underline decoration-rose-500/30 underline-offset-8">Interrupted.</span>
           </motion.h1>

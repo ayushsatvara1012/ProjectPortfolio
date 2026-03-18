@@ -68,20 +68,15 @@ const projects = [
   },
   {
     id: "04",
-    title: "Coming Soon",
+    title: "Ghost SDR",
     subtitle: "Under Development",
-    description: "We are currently architecting a next-generation solution focused on optimizing complex digital workflows. This project is in active development, undergoing rigorous refinement to ensure it delivers a high-performance and scalable experience upon release.",
+    description: "We are currently architecting a next-generation sales development ai solution focused on optimizing complex digital workflows. This project is in active development, undergoing rigorous refinement to ensure it delivers a high-performance and scalable experience upon release.",
     tech: ["VITE_JS", "TAILWIND_V4", "AWS_S3"],
     github: "#",
     launch: "#",
     status: "Under Development",
     accent: "gray",
-    icon: (
-      <>
-        <img src="/sb_logo2.svg" className="w-6 h-6 block dark:hidden object-contain" alt="" />
-        <img src="/sb_logo2_dark.svg" className="w-6 h-6 hidden dark:block object-contain" alt="" />
-      </>
-    )
+    icon: <Cpu size={24} />
   }
 ];
 
@@ -166,7 +161,7 @@ const ProjectCard = ({ project, index }) => {
 
         {/* Card Body */}
         <div className="p-6 md:p-8 pt-4">
-          <h4 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mb-2 leading-none tracking-tighter transition-all group-hover:translate-x-1">
+          <h4 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-200 mb-2 leading-none tracking-tighter transition-all group-hover:translate-x-1">
             {project.title}
           </h4>
           <p className={`text-[10px] font-bold uppercase tracking-widest ${styles.subtitle} mb-4 font-mono`}>
@@ -244,7 +239,7 @@ const ProjectSection = () => {
               <Boxes size={14} className="text-indigo-600" />
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">Enterprise Protocols</span>
             </div>
-            <h2 className="text-3xl sm:text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+            <h2 className="text-3xl sm:text-5xl md:text-7xl font-black text-slate-900 dark:text-slate-200 tracking-tighter leading-none">
               PRODUCTION <br className="hidden sm:block" />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 italic font-light">Ecosystems.</span>
             </h2>
@@ -267,7 +262,7 @@ const ProjectSection = () => {
             {/* Foreground Layer: Content Centerpiece */}
             <div className="relative z-10 text-center space-y-6 max-w-2xl h-full">
               <div className="space-y-3">
-                <h3 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none">
+                <h3 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-slate-200 tracking-tighter uppercase leading-none">
                   Stack_Registry
                 </h3>
                 <div className="h-1 w-12 bg-indigo-600 mx-auto rounded-full"></div>
@@ -322,7 +317,7 @@ const ProjectSection = () => {
                 <div key={i} className="flex flex-col items-center min-w-[80px]">
                   <div className="text-indigo-600 mb-2">{m.icon}</div>
                   <span className="text-[9px] md:text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">{m.label}</span>
-                  <span className="text-xs md:text-sm font-black dark:text-white uppercase tracking-tighter">{m.value}</span>
+                  <span className="text-xs md:text-sm font-black dark:text-slate-200 uppercase tracking-tighter">{m.value}</span>
                 </div>
               ))}
             </div>
