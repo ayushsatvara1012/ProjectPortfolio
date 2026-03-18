@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Zap, Shield, Rocket, Phone, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import SEO from '../components/Seo';
+import seoConfig from '../seo/seoConfig';
 
 // Import generated assets
 import customSoftwareImg from '../assets/custom_software.png';
@@ -276,9 +278,9 @@ const ServicesCatalog = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-5 justify-center pt-4">
-              <button className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
+              <a href="tel:+15626681855" className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
                 <Phone size={20} fill="currentColor" /> Book a Discovery Call
-              </button>
+              </a>
               <button
                 onClick={() => window.open('https://wa.me/15626681855', '_blank')}
                 className="flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-green-600 dark:text-green-400 px-10 py-5 rounded-2xl font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"

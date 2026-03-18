@@ -1,6 +1,9 @@
 import React from 'react';
 import { ShieldCheck, Cpu, Globe, ArrowBigRight, Rocket, Layers, Activity, ChevronRight } from 'lucide-react';
 import Resume from '../components/resume';
+import SEO from '../components/Seo';
+import seoConfig from '../seo/seoConfig';
+
 
 const AboutPage = () => {
     const partners = [

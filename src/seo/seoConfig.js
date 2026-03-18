@@ -36,3 +36,5 @@ export const seoConfig = {
     canonical: "https://www.sapybase.com/terms-and-conditions",
   },
 };
+
+export default seoConfig;

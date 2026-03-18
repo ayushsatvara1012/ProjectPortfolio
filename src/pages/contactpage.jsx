@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Mail, MessageSquare, Send, Zap, Terminal, ChevronDown } from 'lucide-react';
 import Alert from '../components/alert';
+import SEO from '../components/Seo';
+import seoConfig from '../seo/seoConfig';
+
 
 
 function ContactPage() {
