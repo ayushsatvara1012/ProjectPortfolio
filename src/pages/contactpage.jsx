@@ -10,11 +10,11 @@ function ContactPage() {
   const [activeFaq, setActiveFaq] = useState(null);
   const [alertConfig, setAlertConfig] = useState({ open: false, type: 'success', msg: '' });
 
-  const showSuccess = (event) => {
-    event.preventDefault();
-    setAlertConfig({ open: true, type: 'success', msg: 'Operation successfull' })
-    setTimeout(() => setAlertConfig({ open: false }), 3000)
-  }
+  // const showSuccess = (event) => {
+  //   event.preventDefault();
+  //   setAlertConfig({ open: true, type: 'success', msg: 'Operation successfull' })
+  //   setTimeout(() => setAlertConfig({ open: false }), 3000)
+  // }
   const showError = (event) => {
     event.preventDefault();
     setAlertConfig({ open: true, type: 'error', msg: 'No Status at the moment' })
