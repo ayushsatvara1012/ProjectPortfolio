@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-function heroSection() {
+function HeroSection() {
   const navigate = useNavigate();
   return (
     <>
@@ -115,4 +115,4 @@ function heroSection() {
   )
 }
 
-export default heroSection
+export default HeroSection

@@ -6,7 +6,7 @@ import Footer from "./components/footer";
 function App() {
   return (
     <div className="flex flex-col">
-      <ScrollRestoration getKey={(location, matches) => {
+      <ScrollRestoration getKey={(location) => {
           // Standard: Each history entry has its own unique scroll position
           // This is the default behavior if you don't provide getKey
           return location.key;}}/>

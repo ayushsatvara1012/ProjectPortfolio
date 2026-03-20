@@ -1,5 +1,6 @@
 import React from 'react';
 import { useRouteError, useNavigate } from 'react-router-dom';
+/* eslint-disable no-unused-vars */
 import { motion } from 'framer-motion';
 import { AlertCircle, Home, RotateCcw } from 'lucide-react';
 
