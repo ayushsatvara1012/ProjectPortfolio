@@ -4,7 +4,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Kumar+One+Outline&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Gloock&display=swap');
 @import "tailwindcss";
-
+@plugin "@tailwindcss/typography";
 @theme {
   --font-questrial: "Questrial", sans-serif;
   --font-quantico: "Quantico", ui-sans-serif, system-ui, sans-serif;
