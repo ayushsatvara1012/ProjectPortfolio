@@ -55,9 +55,20 @@ const ChatWidget = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:8000/api/chat', {
+            // Call your local FastAPI engine
+            // Read the API key from the website's window object
+            const clientApiKey = window.SaPyBaseConfig?.apiKey;
+            if (!clientApiKey) {
+                console.warn("SaPyBase Widget: Missing API Key. Widget disabled.");
+                return null;
+            }
+
+            const response = await fetch('http://127.0.0.1:8000/api/chat', { // Update this to your deployed backend URL later
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': clientApiKey
+                },
                 body: JSON.stringify({ message: userMessage }),
             });
 
@@ -102,9 +113,14 @@ const ChatWidget = () => {
         hidden: { opacity: 0, y: 10, scale: 0.95 },
         visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 25 } }
     };
+    const LOGO_URL = "https://www.sapybase.com/SB_loading_clean.svg"
+
+    if (!window.SaPyBaseConfig?.apiKey) {
+        return null;
+    }
 
     return (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-[2147483647] font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -112,7 +128,7 @@ const ChatWidget = () => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-purple-900/20 flex flex-col overflow-hidden border-t sm:border border-gray-200/50 z-50 pointer-events-auto origin-bottom-right"
+                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-purple-900/20 flex flex-col overflow-hidden border-t sm:border border-gray-200/50 z-[2147483647] pointer-events-auto origin-bottom-right"
                     >
                         {/* Header */}
                         <div className="bg-white/10 text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center shrink-0 relative z-10 mt-18 sm:mt-0">
@@ -126,7 +142,7 @@ const ChatWidget = () => {
                                     >
                                         <MoreHorizontal size={24} className="text-slate-500" />
                                     </button>
-                                    
+
                                     <button
                                         onClick={() => setIsOpen(false)}
                                         className="p-2 sm:p-1.5 hover:bg-red-50 rounded-full transition-colors group focus:outline-none"
@@ -142,7 +158,7 @@ const ChatWidget = () => {
                                             initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                             animate={{ opacity: 1, scale: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                            className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 overflow-hidden"
+                                            className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[2147483647] overflow-hidden"
                                         >
                                             <button
                                                 onClick={() => {
@@ -177,7 +193,7 @@ const ChatWidget = () => {
                                                     <User size={18} />
                                                 </div>
                                             ) : (
-                                                <img src="/SB_loading_clean.svg" alt="SaPyBase AI" className="w-9 h-9 object-contain pointer-events-none" />
+                                                <img src={LOGO_URL} alt="SaPyBase AI" className="w-9 h-9 object-contain pointer-events-none" />
                                             )}
                                         </div>
 
@@ -247,7 +263,7 @@ const ChatWidget = () => {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 origin-center pointer-events-auto"
+                        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] origin-center pointer-events-auto"
                     >
                         <motion.button
                             whileHover={{ scale: 1.1 }}
@@ -258,7 +274,7 @@ const ChatWidget = () => {
                             aria-expanded={isOpen}
                             className="relative flex items-center justify-center w-20 h-20 sm:w-28 sm:h-28 bg-transparent transition-transform group z-10 focus:outline-none"
                         >
-                            <img src="/SB_loading_clean.svg" alt="SaPyBase" className="w-full h-full relative m-auto z-10 drop-shadow-xl group-hover:drop-shadow-2xl transition-all pointer-events-none" />
+                            <img src={LOGO_URL} alt="SaPyBase" className="w-full h-full relative m-auto z-10 drop-shadow-xl group-hover:drop-shadow-2xl transition-all pointer-events-none" />
                         </motion.button>
                     </motion.div>
                 ) : (
@@ -267,7 +283,7 @@ const ChatWidget = () => {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 origin-center pointer-events-auto"
+                        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] origin-center pointer-events-auto"
                     >
                         <motion.button
                             whileHover={{ scale: 1.1 }}
