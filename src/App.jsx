@@ -2,6 +2,7 @@ import { Outlet,ScrollRestoration } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
+import ChatWidget from './components/chatWidget';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       </main>
       <Footer />
       <Analytics />
+      <ChatWidget />
     </div>
   );
 }

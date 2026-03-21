@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acme Corp - Official Site</title>
+    <link rel="icon" href="data:," />
+    <style>
+        /* Just some basic styling to make it look like a website */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 50px; 
+            background-color: #f8fafc; 
+            color: #334155;
+        }
+        .hero {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            max-width: 600px;
+        }
+        h1 { color: #0f172a; }
+    </style>
+</head>
+<body>
+
+    <div class="hero">
+        <h1>Welcome to Acme Corp! 🚀</h1>
+        <p>We are a totally different company. We don't use React, we just use plain old HTML.</p>
+        <p>However, we hired SaPyBase to handle our customer support. Look at the bottom right corner of this page...</p>
+    </div>
+
+    <script>
+      // 1. Acme Corp provides their unique API key
+      window.SaPyBaseConfig = {
+        apiKey: "sb_test_987654321" 
+      };
+    </script>
+    
+    <script src="./dist-widget/widget.js" defer></script>
+    </body>
+</html>
