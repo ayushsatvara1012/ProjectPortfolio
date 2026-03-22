@@ -62,7 +62,7 @@ def get_company_by_api_key(api_key: str = Security(api_key_header)):
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id, system_prompt, allowed_origin FROM companies WHERE api_key = %s", 
+            "SELECT id, system_prompt, allowed_origin, company_name, company_tone, theme_color FROM companies WHERE api_key = %s", 
             (api_key,)
         )
         company = cursor.fetchone()
@@ -78,7 +78,10 @@ def get_company_by_api_key(api_key: str = Security(api_key_header)):
     return {
         "id": company[0], 
         "system_prompt": company[1] if company[1] else "You are a helpful AI assistant.", 
-        "allowed_origin": company[2]
+        "allowed_origin": company[2],
+        "company_name": company[3] if company[3] else "our company",
+        "company_tone": company[4] if company[4] else "Professional",
+        "theme_color": company[5] if company[5] else "#5730F5"
     }
 
 def retrieve_knowledge(conn, company_id, query_vector, limit=3):
@@ -131,15 +134,16 @@ def chat_endpoint(
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
         sources = list(set([row[1] for row in retrieved_docs]))
 
-        # Step D: Construct the Agentic Prompt
-        augmented_prompt = f"""
-        Here is the official knowledge base for this company:
+        # Step D: Construct the Agentic Prompt (Master System Prompt)
+        master_prompt = f"""
+        Identity: "You are Sapy AI, an elite enterprise AI assistant currently deployed to assist customers of {company['company_name']}."
+        Strict Rule: "Your name is strictly 'Sapy AI'. You must never adopt another name."
+        Tone: "Your conversational tone should be: {company['company_tone']}."
         
+        Here is the official knowledge base for this company:
         --- START KNOWLEDGE BASE ---
         {context_text}
         --- END KNOWLEDGE BASE ---
-        
-        User Question: {user_query}
         
         Instructions: 
         1. Answer the user's question using ONLY the knowledge base provided above.
@@ -147,10 +151,10 @@ def chat_endpoint(
         3. Format your response in clean Markdown.
         """
 
-        # Step E: Call Gemini using the dynamically fetched system prompt
+        # Step E: Call Gemini using the dynamically constructed system prompt
         messages = [
-            SystemMessage(content=company["system_prompt"]),
-            HumanMessage(content=augmented_prompt)
+            SystemMessage(content=master_prompt),
+            HumanMessage(content=user_query)
         ]
         
         ai_response = chat_model.invoke(messages)
