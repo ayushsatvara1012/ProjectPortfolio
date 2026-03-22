@@ -47,3 +47,6 @@ venv/
 env/
 __pycache__/
 *.py[cod]
+
+dist/
+dist-widget/
