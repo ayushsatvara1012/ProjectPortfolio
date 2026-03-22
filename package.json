@@ -3,14 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "start": "npm run dev",
+ "scripts": {
     "dev": "vite",
-    "prebuild": "npm run lint",
     "build": "vite build",
-    "build:widget": "vite build --config vite.widget.config.js",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "build:widget": "vite build --config vite.widget.config.js && cp dist-widget/widget.js public/widget.js && cp dist-widget/style.css public/style.css"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",

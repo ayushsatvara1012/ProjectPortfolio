@@ -63,7 +63,7 @@ const ChatWidget = ({ apiKey }) => {
             // Call your local FastAPI engine
             // Prioritize Prop, then Window Object, then Vite environment variable
             const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
-            
+
             if (!activeApiKey) {
                 console.warn("SaPyBase Widget: Missing API Key. Processing aborted.");
                 setMessages(prev => [...prev, { role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!" }]);
@@ -123,7 +123,7 @@ const ChatWidget = ({ apiKey }) => {
     const LOGO_URL = "https://www.sapybase.com/SB_loading_clean.svg"
 
     const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
-    
+
     // Completely disable rendering in production if no key is found at all
     if (!activeApiKey && !import.meta.env?.DEV) {
         return null;
@@ -138,10 +138,10 @@ const ChatWidget = ({ apiKey }) => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-purple-900/20 flex flex-col overflow-hidden border-t sm:border border-gray-200/50 z-[2147483647] pointer-events-auto origin-bottom-right"
+                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-purple-900/20 flex flex-col overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
                     >
                         {/* Header */}
-                        <div className="bg-white/10 text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center shrink-0 relative z-10 mt-18 sm:mt-0">
+                        <div className="bg-white/10 text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center shrink-0 relative z-10">
                             <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                                 <p className='font-glook pl-5 font-bold' style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
                                 <div className="flex items-center gap-1">
@@ -207,11 +207,11 @@ const ChatWidget = ({ apiKey }) => {
                                             )}
                                         </div>
 
-                                        <div 
+                                        <div
                                             className={`px-4 py-2.5 shadow-sm ${msg.role === 'user'
                                                 ? 'text-white rounded-2xl rounded-br-none'
                                                 : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
-                                            }`}
+                                                }`}
                                             style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                         >
                                             {msg.role === 'user' ? (
