@@ -62,7 +62,7 @@ def get_company_by_api_key(api_key: str = Security(api_key_header)):
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id, system_prompt, allowed_origin, company_name, company_tone, theme_color FROM companies WHERE api_key = %s", 
+            "SELECT id, system_prompt, allowed_origin, company_name, company_tone, theme_color, bot_name, logo_url, initial_message, quick_questions FROM companies WHERE api_key = %s", 
             (api_key,)
         )
         company = cursor.fetchone()
@@ -81,7 +81,11 @@ def get_company_by_api_key(api_key: str = Security(api_key_header)):
         "allowed_origin": company[2],
         "company_name": company[3] if company[3] else "our company",
         "company_tone": company[4] if company[4] else "Professional",
-        "theme_color": company[5] if company[5] else "#5730F5"
+        "theme_color": company[5] if company[5] else "#5730F5",
+        "bot_name": company[6] if company[6] else "Sapy AI",
+        "logo_url": company[7] if company[7] else "/SB_loading_clean.svg",
+        "initial_message": company[8] if company[8] else "Hi! How can I help you today?",
+        "quick_questions": company[9] if company[9] else []
     }
 
 def retrieve_knowledge(conn, company_id, query_vector, limit=3):
@@ -173,6 +177,12 @@ def chat_endpoint(
         # This guarantees the connection goes back to the pool, even if the API fails
         if conn:
             conn.close()
+
+
+@app.get("/api/config")
+def get_config(company: dict = Depends(get_company_by_api_key)):
+    """Returns the full branding and UI configuration for the frontend."""
+    return company
 
 @app.get("/")
 def read_root():

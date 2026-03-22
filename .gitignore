@@ -1,53 +1,56 @@
 # Logs
 logs
 *.log
-.env
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Environment & Secrets (Global)
+**/.env*
+**/*.env.local
+**/.flaskenv
+**/venv/
+**/env/
+**/.venv/
+**/.env/
+*.pem
+*.key
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+dist-widget/
+.vercel
+.amplify
+.output
+
+# Editor & OS
+.vscode/
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.bak
 
-# Build / Deployment logs
-.vercel
-.amplify
-.output
-
-# Testing and Coverage
-coverage
-.nyc_output
-
-# Temporary / Cache
+# Python & Caching
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+.tox/
+.nox/
+.coverage
 .cache
 .parcel-cache
 .turbo
 .eslintcache
 
-# Production secrets
-*.pem
-
-# Python
-venv/
-env/
-__pycache__/
-*.py[cod]
-
-dist/
-dist-widget/
+# Project Specific
 public/widget.js
