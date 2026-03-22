@@ -272,51 +272,55 @@ const ChatWidget = ({ apiKey }) => {
                 )}
             </AnimatePresence>
 
-            {/* FAB Trigger Button */}
-            <AnimatePresence>
-                {!isOpen ? (
-                    <motion.div
-                        key="open-trigger"
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] origin-center pointer-events-auto"
-                    >
-                        <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            onClick={() => setIsOpen(true)}
-                            aria-label="Open AI chat assistant"
-                            aria-expanded={isOpen}
-                            className="relative flex items-center justify-center w-20 h-20 sm:w-28 sm:h-28 bg-transparent transition-transform group z-10 focus:outline-none"
-                            style={{ touchAction: 'manipulation' }}
-                        >
-                            <img src={LOGO_URL} alt="SaPyBase" className="w-full h-full relative m-auto z-10 drop-shadow-xl group-hover:drop-shadow-2xl transition-all pointer-events-none" />
-                        </motion.button>
-                    </motion.div>
-                ) : (
-                    <motion.div
-                        key="close-trigger"
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] origin-center pointer-events-auto"
-                    >
-                        <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                            onClick={() => setIsOpen(false)}
-                            aria-label="Collapse chat"
-                            className="hidden sm:flex items-center justify-center w-14 h-14 bg-white text-gray-500 rounded-full shadow-lg hover:bg-gray-50 transition-colors z-10 focus:outline-none border border-gray-100"
-                            style={{ touchAction: 'manipulation' }}
-                        >
-                            <ChevronDown size={28} />
-                        </motion.button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* FAB Button — always visible, handles open & close */}
+            <motion.div
+                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] origin-center pointer-events-auto flex flex-col items-center gap-0"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+            >
+                <motion.button
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    onClick={() => setIsOpen(prev => !prev)}
+                    aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
+                    aria-expanded={isOpen}
+                    style={{ touchAction: 'manipulation' }}
+                    className={`
+                        relative flex flex-col items-center justify-center focus:outline-none
+                        w-20 h-20 sm:w-28 sm:h-28
+                        rounded-full transition-all duration-300
+                        sm:bg-transparent sm:border-0 sm:shadow-none
+                        ${isOpen
+                            ? 'bg-white border-2 border-violet-200 shadow-lg shadow-violet-100'
+                            : 'bg-white border-2 border-violet-200 shadow-md shadow-violet-50'
+                        }
+                    `}
+                >
+                    <img
+                        src={LOGO_URL}
+                        alt="SaPyBase"
+                        className="w-[70%] h-[70%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
+                    />
+
+                    {/* Down arrow — mobile only, animated in/out when chat opens */}
+                    <AnimatePresence>
+                        {isOpen && (
+                            <motion.span
+                                key="fab-chevron"
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.2 }}
+                                className="flex sm:hidden absolute bottom-1 left-1/2 -translate-x-1/2"
+                            >
+                                <ChevronDown size={14} strokeWidth={2.5} style={{ color: THEME_COLOR }} />
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </motion.button>
+            </motion.div>
+
         </div>
     );
 };
