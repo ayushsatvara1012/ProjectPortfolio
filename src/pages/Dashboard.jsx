@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, Link as LinkIcon, Key, Loader2, FileText, X, BrainCircuit, Sparkles, Database } from 'lucide-react';
+import { UploadCloud, Link as LinkIcon, Key, Loader2, FileText, X, BrainCircuit, Sparkles, Database, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Alert from '../components/alert';
 
 const Dashboard = () => {
     const [apiKey, setApiKey] = useState('');
+    const [showApiKey, setShowApiKey] = useState(false);
     const [url, setUrl] = useState('');
     const [file, setFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -179,14 +180,25 @@ const Dashboard = () => {
                                                 <Key className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                             </div>
                                             <input
-                                                type="password"
+                                                type={showApiKey ? "text" : "password"}
                                                 id="apiKey"
                                                 required
                                                 value={apiKey}
                                                 onChange={(e) => setApiKey(e.target.value)}
-                                                className="block w-full pl-11 pr-4 py-3.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-all bg-slate-50 dark:bg-slate-950/50 text-slate-900 dark:text-white hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900"
+                                                className="block w-full pl-11 pr-12 py-3.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-all bg-slate-50 dark:bg-slate-950/50 text-slate-900 dark:text-white hover:bg-white dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900"
                                                 placeholder="sk_sapy_..."
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowApiKey(!showApiKey)}
+                                                className="absolute inset-y-0 right-0 pr-3.5 flex justify-center items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus:outline-none"
+                                            >
+                                                {showApiKey ? (
+                                                    <EyeOff className="h-5 w-5" />
+                                                ) : (
+                                                    <Eye className="h-5 w-5" />
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
 
