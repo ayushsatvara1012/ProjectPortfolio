@@ -7,9 +7,11 @@ export default defineConfig({
   define: {
     'process.env.NODE_ENV': '"production"',
   },
+  publicDir: false,
   build: {
     // Output the built file to a specific folder
-    outDir: 'dist-widget',
+    outDir: 'public', // <-- Change this from 'dist-widget' to 'public'
+    emptyOutDir: false,
     cssCodeSplit: false,
     lib: {
       entry: 'src/widget-entry.jsx',
