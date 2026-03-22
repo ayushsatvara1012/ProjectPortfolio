@@ -66,7 +66,7 @@ const ChatWidget = ({ apiKey }) => {
                 return;
             }
 
-            const response = await fetch('http://127.0.0.1:8000/api/chat', { // Update this to your deployed backend URL later
+            const response = await fetch('https://sapyai.onrender.com/api/chat', { // Update this to your deployed backend URL later
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
