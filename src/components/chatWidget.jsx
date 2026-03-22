@@ -130,7 +130,7 @@ const ChatWidget = ({ apiKey }) => {
     }
 
     return (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-[2147483647] font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-2147483647 font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -310,7 +310,7 @@ const ChatWidget = ({ apiKey }) => {
                 )}
             </AnimatePresence>
 
-            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] pointer-events-auto">
+            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483647 pointer-events-auto">
                 <motion.button
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -318,13 +318,13 @@ const ChatWidget = ({ apiKey }) => {
                     aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
                     aria-expanded={isOpen}
                     style={{ touchAction: 'manipulation' }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none w-[72px] h-[72px] sm:w-28 sm:h-28 rounded-full sm:bg-transparent sm:border-0 sm:border-none bg-white border-2 border-indigo-200 border-dotted shadow-md sm:shadow-none transition-all"
+                    className="relative flex flex-col items-center justify-center focus:outline-none w-15 h-15 sm:w-20 sm:h-20 rounded-full bg-indigo-50 border border-dashed border-indigo-400 shadow-md sm:shadow-none transition-all"
                 >
-                    {/* Logo */}
+                    {/* Logo - hidden on mobile when open */}
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className="w-[85%] h-[85%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
+                        className={`w-[85%] h-[85%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none ${isOpen ? 'hidden sm:block' : 'block'}`}
                     />
 
                     {/* Chevron — appears below the logo when chat is open */}
