@@ -3,7 +3,11 @@ uvicorn==0.29.0
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 pgvector==0.2.5
-langchain-core==0.1.33
-langchain-text-splitters==0.0.1
-langchain-google-genai==1.0.1
+langchain-core>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-community>=0.3.0
+beautifulsoup4==4.14.3
 gunicorn==21.2.0
+pypdf
+python-multipart

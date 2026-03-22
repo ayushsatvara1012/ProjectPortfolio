@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acme Corp - Official Site</title>
     <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/style.css">
     <style>
         /* Just some basic styling to make it look like a website */
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            padding: 50px; 
-            background-color: #f8fafc; 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 50px;
+            background-color: #f8fafc;
             color: #334155;
         }
+
         .hero {
             background: white;
             padding: 40px;
@@ -20,26 +23,47 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             max-width: 600px;
         }
-        h1 { color: #0f172a; }
+
+        h1 {
+            color: #0f172a;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="hero">
         <h1>Welcome to Acme Corp! 🚀</h1>
         <p>We are a totally different company. We don't use React, we just use plain old HTML.</p>
-        <p>However, we hired SaPyBase to handle our customer support. Look at the bottom right corner of this page...</p>
+        <p>However, we hired SaPyBase to handle our customer support. Look at the bottom right corner of this page...
+        </p>
     </div>
 
     <script>
-      // 1. Acme Corp provides their unique API key and dynamic UI configuration
-      window.SaPyBaseConfig = {
-        apiKey: "sb_test_987654321",
-        themeColor: "#FF0000",
-        botName: "Acme Assistant"
-      };
+        // 1. Acme Corp provides their unique API key and dynamic UI configuration
+        window.SaPyBaseConfig = {
+            apiKey: "sb_test_987654321",
+            themeColor: "#FF0000",
+            botName: "Acme Assistant",
+            welcomeMessage: "Welcome to Acme Corp! How can we help you today?",
+            quickQuestions: [
+                {
+                    label: "🪨 Buy an Anvil",
+                    prompt: "What sizes of heavy-duty anvils do you have in stock?"
+                },
+                {
+                    label: "🚀 Rocket Skates",
+                    prompt: "Are the Acme Rocket Skates safe to use on desert highways?"
+                },
+                {
+                    label: "📦 Shipping Info",
+                    prompt: "How fast can you deliver an anvil to my location?"
+                }
+            ]
+        };
     </script>
-    
-    <script src="./dist-widget/widget.js" defer></script>
-    </body>
+
+    <script src="/widget.js" defer></script>
+</body>
+
 </html>
