@@ -189,8 +189,15 @@ async def chat_endpoint(
         
         ai_response = chat_model.invoke(messages)
 
+        # Gemini sometimes returns a list of blocks instead of a string payload
+        reply_content = ai_response.content
+        if isinstance(reply_content, list):
+            reply_text = "".join([block.get("text", "") for block in reply_content if isinstance(block, dict) and block.get("type") == "text"])
+        else:
+            reply_text = str(reply_content)
+
         return ChatResponse(
-            reply=ai_response.content,
+            reply=reply_text,
             sources=list(set([row[1] for row in retrieved_docs]))
         )
 
