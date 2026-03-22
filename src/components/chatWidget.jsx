@@ -6,23 +6,53 @@ import { MoreHorizontal, Send, User, ChevronDown, X } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 
 const ChatWidget = ({ apiKey }) => {
-    const config = window.SaPyBaseConfig || {};
-    const THEME_COLOR = config.themeColor || '#5730F5';
-    const BOT_NAME = config.botName || 'Sapy AI';
+    const [configData, setConfigData] = useState({
+        theme_color: '#5730F5',
+        bot_name: 'Sapy AI',
+        logo_url: 'https://www.sapybase.com/SB_loading_clean.svg',
+        initial_message: "Hi! I'm the SaPyBase AI Assistant. How can I help you today?",
+        quick_questions: []
+    });
+
+    const THEME_COLOR = configData.theme_color;
+    const BOT_NAME = configData.bot_name;
+    const LOGO_URL = configData.logo_url;
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-    const [messages, setMessages] = useState([
-        { role: 'bot', content: "Hi! I'm the SaPyBase AI Assistant. How can I help you with our engineering services today?" }
-    ]);
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
+    const BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
 
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const menuRef = useRef(null);
 
-    // Click outside handler for dropdown menu
+    // 1. Fetch Configuration on Mount
+    useEffect(() => {
+        const fetchConfig = async () => {
+            if (!activeApiKey) return;
+            try {
+                const response = await fetch(`${BASE_URL}/api/config`, {
+                    headers: { 'x-api-key': activeApiKey }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setConfigData(data);
+                    // Set initial message once config is loaded
+                    setMessages([{ role: 'bot', content: data.initial_message || "Hi! How can I help you today?" }]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch widget config:", error);
+                // Fallback initial message
+                setMessages([{ role: 'bot', content: "Hi! I'm here to help. How can I assist you today?" }]);
+            }
+        };
+        fetchConfig();
+    }, [activeApiKey]);
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -70,7 +100,7 @@ const ChatWidget = ({ apiKey }) => {
                 return;
             }
 
-            const response = await fetch('https://sapyai.onrender.com/api/chat', { // Update this to your deployed backend URL later
+            const response = await fetch(`${BASE_URL}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -120,9 +150,6 @@ const ChatWidget = ({ apiKey }) => {
         hidden: { opacity: 0, y: 10, scale: 0.95 },
         visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 25 } }
     };
-    const LOGO_URL = "https://www.sapybase.com/SB_loading_clean.svg"
-
-    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
 
     // Completely disable rendering in production if no key is found at all
     if (!activeApiKey && !import.meta.env?.DEV) {
@@ -181,7 +208,7 @@ const ChatWidget = ({ apiKey }) => {
                                         >
                                             <button
                                                 onClick={() => {
-                                                    setMessages([{ role: 'bot', content: "Hi! I'm the SaPyBase AI Assistant. How can I help you today?" }]);
+                                                    setMessages([{ role: 'bot', content: configData.initial_message }]);
                                                     setShowMenu(false);
                                                 }}
                                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -253,29 +280,18 @@ const ChatWidget = ({ apiKey }) => {
                         {/* Quick Questions & Input Area */}
                         <div className="bg-white/95 backdrop-blur-2xl border-t border-gray-200/50 shrink-0 z-10 flex flex-col">
                             {/* Quick Questions Area */}
-                            {messages.length === 1 && (
+                            {messages.length === 1 && configData.quick_questions?.length > 0 && (
                                 <div className="px-3 pt-3 pb-1 flex gap-2 overflow-x-auto scrollbar-hide snap-x">
-                                    <button
-                                        onClick={() => { setInput("Can you build a custom web app for my business?"); inputRef.current?.focus(); }}
-                                        className="shrink-0 snap-start px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
-                                        style={{ touchAction: 'manipulation' }}
-                                    >
-                                        🚀 Custom Web App
-                                    </button>
-                                    <button
-                                        onClick={() => { setInput("Do you offer SEO and GEO optimization services?"); inputRef.current?.focus(); }}
-                                        className="shrink-0 snap-start px-3 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
-                                        style={{ touchAction: 'manipulation' }}
-                                    >
-                                        📈 SEO Optimization
-                                    </button>
-                                    <button
-                                        onClick={() => { setInput("How can AI solutions improve my workflow?"); inputRef.current?.focus(); }}
-                                        className="shrink-0 snap-start px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-100 text-pink-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
-                                        style={{ touchAction: 'manipulation' }}
-                                    >
-                                        🤖 AI Integration
-                                    </button>
+                                    {configData.quick_questions.map((q, qidx) => (
+                                        <button
+                                            key={qidx}
+                                            onClick={() => { setInput(q.prompt); inputRef.current?.focus(); }}
+                                            className="shrink-0 snap-start px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
+                                            style={{ touchAction: 'manipulation' }}
+                                        >
+                                            {q.label}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
 
