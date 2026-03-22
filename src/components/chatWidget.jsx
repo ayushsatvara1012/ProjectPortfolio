@@ -6,6 +6,10 @@ import { MoreHorizontal, Send, User, ChevronDown, X } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 
 const ChatWidget = ({ apiKey }) => {
+    const config = window.SaPyBaseConfig || {};
+    const THEME_COLOR = config.themeColor || '#5730F5';
+    const BOT_NAME = config.botName || 'Sapy AI';
+
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [messages, setMessages] = useState([
@@ -139,7 +143,7 @@ const ChatWidget = ({ apiKey }) => {
                         {/* Header */}
                         <div className="bg-white/10 text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center shrink-0 relative z-10 mt-18 sm:mt-0">
                             <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
-                                <p className='font-glook pl-5'>Sapy <span className='text-indigo-600'>AI</span></p>
+                                <p className='font-glook pl-5 font-bold' style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
@@ -195,7 +199,7 @@ const ChatWidget = ({ apiKey }) => {
                                     >
                                         <div className="shrink-0 mt-auto mb-1">
                                             {msg.role === 'user' ? (
-                                                <div className="w-9 h-9 rounded-full bg-[#5730F5] text-white flex items-center justify-center shadow-md">
+                                                <div className="w-9 h-9 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: THEME_COLOR }}>
                                                     <User size={18} />
                                                 </div>
                                             ) : (
@@ -203,10 +207,13 @@ const ChatWidget = ({ apiKey }) => {
                                             )}
                                         </div>
 
-                                        <div className={`px-4 py-2.5 shadow-sm ${msg.role === 'user'
-                                            ? 'bg-[#5730F5] text-white rounded-2xl rounded-br-none'
-                                            : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-a:text-[#5730F5] hover:prose-a:text-[#4320cc] prose-a:transition-colors prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
-                                            }`}>
+                                        <div 
+                                            className={`px-4 py-2.5 shadow-sm ${msg.role === 'user'
+                                                ? 'text-white rounded-2xl rounded-br-none'
+                                                : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
+                                            }`}
+                                            style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
+                                        >
                                             {msg.role === 'user' ? (
                                                 <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
                                             ) : (
@@ -251,7 +258,8 @@ const ChatWidget = ({ apiKey }) => {
                                     type="submit"
                                     disabled={isLoading || !input.trim()}
                                     aria-label="Send message"
-                                    className="p-2 shrink-0 bg-[#5730F5] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-0.5"
+                                    className="p-2 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-0.5"
+                                    style={{ backgroundColor: THEME_COLOR }}
                                 >
                                     <Send size={16} />
                                 </button>
