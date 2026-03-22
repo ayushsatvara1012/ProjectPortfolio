@@ -20,7 +20,7 @@ function App() {
       </main>
       <Footer />
       <Analytics />
-      <ChatWidget />
+      <ChatWidget apiKey={import.meta.env.VITE_SAPYBASE_API_KEY}/>
     </div>
   );
 }

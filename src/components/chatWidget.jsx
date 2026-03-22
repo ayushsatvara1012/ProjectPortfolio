@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MoreHorizontal, Send, User, ChevronDown, X } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 
-const ChatWidget = () => {
+const ChatWidget = ({ apiKey }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [messages, setMessages] = useState([
@@ -56,18 +56,20 @@ const ChatWidget = () => {
 
         try {
             // Call your local FastAPI engine
-            // Read the API key from the website's window object
-            const clientApiKey = window.SaPyBaseConfig?.apiKey;
-            if (!clientApiKey) {
-                console.warn("SaPyBase Widget: Missing API Key. Widget disabled.");
-                return null;
+            // Prioritize Prop, then Window Object, then Vite environment variable
+            const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
+            
+            if (!activeApiKey) {
+                console.warn("SaPyBase Widget: Missing API Key. Processing aborted.");
+                setMessages(prev => [...prev, { role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!" }]);
+                return;
             }
 
             const response = await fetch('http://127.0.0.1:8000/api/chat', { // Update this to your deployed backend URL later
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-api-key': clientApiKey
+                    'x-api-key': activeApiKey
                 },
                 body: JSON.stringify({ message: userMessage }),
             });
@@ -115,7 +117,10 @@ const ChatWidget = () => {
     };
     const LOGO_URL = "https://www.sapybase.com/SB_loading_clean.svg"
 
-    if (!window.SaPyBaseConfig?.apiKey) {
+    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
+    
+    // Completely disable rendering in production if no key is found at all
+    if (!activeApiKey && !import.meta.env?.DEV) {
         return null;
     }
 
