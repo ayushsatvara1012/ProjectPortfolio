@@ -272,12 +272,8 @@ const ChatWidget = ({ apiKey }) => {
                 )}
             </AnimatePresence>
 
-            {/* FAB Button — always visible, handles open & close */}
-            <motion.div
-                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] origin-center pointer-events-auto flex flex-col items-center gap-0"
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-            >
+            {/* FAB — single unified button, always present */}
+            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] pointer-events-auto">
                 <motion.button
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.92 }}
@@ -286,41 +282,32 @@ const ChatWidget = ({ apiKey }) => {
                     aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
                     aria-expanded={isOpen}
                     style={{ touchAction: 'manipulation' }}
-                    className={`
-                        relative flex flex-col items-center justify-center focus:outline-none
-                        w-20 h-20 sm:w-28 sm:h-28
-                        rounded-full transition-all duration-300
-                        sm:bg-transparent sm:border-0 sm:shadow-none
-                        ${isOpen
-                            ? 'bg-white border-2 border-violet-200 shadow-lg shadow-violet-100'
-                            : 'bg-white border-2 border-violet-200 shadow-md shadow-violet-50'
-                        }
-                    `}
+                    className="relative flex flex-col items-center justify-center focus:outline-none w-20 h-20 sm:w-28 sm:h-28 bg-transparent"
                 >
+                    {/* Logo */}
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className="w-[70%] h-[70%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
+                        className="w-full h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
                     />
 
-                    {/* Down arrow — mobile only, animated in/out when chat opens */}
+                    {/* Chevron — appears below the logo when chat is open */}
                     <AnimatePresence>
                         {isOpen && (
                             <motion.span
                                 key="fab-chevron"
-                                initial={{ opacity: 0, y: -4 }}
+                                initial={{ opacity: 0, y: -6 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -4 }}
-                                transition={{ duration: 0.2 }}
-                                className="flex absolute bottom-1 sm:bottom-1.5 left-1/2 -translate-x-1/2"
+                                exit={{ opacity: 0, y: -6 }}
+                                transition={{ duration: 0.18 }}
+                                className="absolute bottom-0.5 left-1/2 -translate-x-1/2 z-20"
                             >
-                                <ChevronDown size={14} strokeWidth={2.5} className="sm:w-4 sm:h-4" style={{ color: THEME_COLOR }} />
+                                <ChevronDown size={16} strokeWidth={2.5} style={{ color: THEME_COLOR }} />
                             </motion.span>
                         )}
                     </AnimatePresence>
                 </motion.button>
-            </motion.div>
-
+            </div>
         </div>
     );
 };
