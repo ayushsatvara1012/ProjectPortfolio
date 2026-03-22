@@ -138,12 +138,12 @@ const ChatWidget = ({ apiKey }) => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-purple-900/20 flex flex-col overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
+                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-xl shadow-indigo-900/20 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
                     >
-                        {/* Header with Animated Gradient Glow */}
-                        <div className="relative shrink-0 overflow-hidden">
+                        {/* Header with Animated Gradient Glow - Removed overflow-hidden to allow menu visibility */}
+                        <div className="relative shrink-0">
                             {/* Animated Background */}
-                            <div className="absolute inset-0 bg-linear-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 animate-gradient-x" style={{ backgroundSize: '200% 200%' }} />
+                            <div className="absolute inset-0 bg-linear-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 animate-gradient-x" style={{ backgroundSize: '150% 150%' }} />
                             
                             <div className="bg-white/40 backdrop-blur-md text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50">
                                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
@@ -177,7 +177,7 @@ const ChatWidget = ({ apiKey }) => {
                                             initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                             animate={{ opacity: 1, scale: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                            className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[2147483647] overflow-hidden"
+                                            className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 py-1 z-2147483647 overflow-hidden"
                                         >
                                             <button
                                                 onClick={() => {
@@ -213,7 +213,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     <User size={18} />
                                                 </div>
                                             ) : (
-                                                <img src={LOGO_URL} alt="SaPyBase AI" className="w-9 h-9 object-contain pointer-events-none" />
+                                                <img src={LOGO_URL} alt="SaPyBase AI" className="w-9 h-9 object-contain pointer-events-none border rounded-full border-indigo-500 bg-indigo-500/10" />
                                             )}
                                         </div>
 
@@ -310,7 +310,7 @@ const ChatWidget = ({ apiKey }) => {
                 )}
             </AnimatePresence>
 
-            <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483647 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
+            <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
                 <motion.button
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -318,7 +318,7 @@ const ChatWidget = ({ apiKey }) => {
                     aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
                     aria-expanded={isOpen}
                     style={{ touchAction: 'manipulation' }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none w-15 h-15 sm:w-20 sm:h-20 rounded-full bg-indigo-50 border border-dashed border-indigo-400 shadow-md sm:shadow-none transition-all"
+                    className="relative flex flex-col items-center justify-center focus:outline-none w-15 h-15 sm:w-20 sm:h-20 rounded-tr-lg rounded-br-lg rounded-bl-lg bg-indigo-50 border border-dashed border-indigo-400 shadow-md sm:shadow-none transition-all"
                 >
                     {/* Logo */}
                     <img
