@@ -14,7 +14,7 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/((?!api|.*\\.(?:js|css|png|jpg|jpeg|gif|svg|webp|ico|json|txt|xml)$).*)$",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
