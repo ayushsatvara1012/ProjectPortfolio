@@ -140,10 +140,17 @@ const ChatWidget = ({ apiKey }) => {
                         exit="exit"
                         className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-purple-900/20 flex flex-col overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
                     >
-                        {/* Header */}
-                        <div className="bg-white/10 text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center shrink-0 relative z-10">
-                            <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
-                                <p className='font-glook pl-5 font-bold' style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
+                        {/* Header with Animated Gradient Glow */}
+                        <div className="relative shrink-0 overflow-hidden">
+                            {/* Animated Background */}
+                            <div className="absolute inset-0 bg-linear-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 animate-gradient-x" style={{ backgroundSize: '200% 200%' }} />
+                            
+                            <div className="bg-white/40 backdrop-blur-md text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50">
+                                <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
+                                    <div className="flex items-center gap-2 pl-4">
+                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                        <p className="font-glook font-bold text-lg" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
+                                    </div>
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
@@ -184,6 +191,7 @@ const ChatWidget = ({ apiKey }) => {
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
+                                </div>
                             </div>
                         </div>
 
@@ -242,53 +250,81 @@ const ChatWidget = ({ apiKey }) => {
                             <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
                         </div>
 
-                        {/* Input Area */}
-                        <div className="p-2 sm:p-2.5 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:pb-3 bg-white/95 backdrop-blur-2xl border-t border-gray-200/50 shrink-0 z-10">
-                            <form onSubmit={handleSend} className="relative flex items-end gap-2 bg-gray-50 border border-gray-200/80 rounded-xl p-1.5 shadow-sm">
-                                <textarea
-                                    ref={inputRef}
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder="Ask anything..."
-                                    className="flex-1 max-h-32 min-h-[48px] bg-transparent resize-none px-2.5 py-2 focus:outline-none text-base leading-tight placeholder-gray-400 disabled:opacity-50"
-                                    style={{ fontSize: '16px' }}
-                                    rows={1}
-                                    disabled={isLoading}
-                                    aria-label="Chat input"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={isLoading || !input.trim()}
-                                    aria-label="Send message"
-                                    className="p-2.5 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center"
-                                    style={{ backgroundColor: THEME_COLOR, touchAction: 'manipulation' }}
-                                >
-                                    <Send size={16} />
-                                </button>
-                            </form>
+                        {/* Quick Questions & Input Area */}
+                        <div className="bg-white/95 backdrop-blur-2xl border-t border-gray-200/50 shrink-0 z-10 flex flex-col">
+                            {/* Quick Questions Area */}
+                            {messages.length === 1 && (
+                                <div className="px-3 pt-3 pb-1 flex gap-2 overflow-x-auto scrollbar-hide snap-x">
+                                    <button
+                                        onClick={() => { setInput("Can you build a custom web app for my business?"); inputRef.current?.focus(); }}
+                                        className="shrink-0 snap-start px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
+                                        style={{ touchAction: 'manipulation' }}
+                                    >
+                                        🚀 Custom Web App
+                                    </button>
+                                    <button
+                                        onClick={() => { setInput("Do you offer SEO and GEO optimization services?"); inputRef.current?.focus(); }}
+                                        className="shrink-0 snap-start px-3 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
+                                        style={{ touchAction: 'manipulation' }}
+                                    >
+                                        📈 SEO Optimization
+                                    </button>
+                                    <button
+                                        onClick={() => { setInput("How can AI solutions improve my workflow?"); inputRef.current?.focus(); }}
+                                        className="shrink-0 snap-start px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-100 text-pink-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
+                                        style={{ touchAction: 'manipulation' }}
+                                    >
+                                        🤖 AI Integration
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Actual Input Box */}
+                            <div className="p-2 sm:p-2.5 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:pb-3 w-full">
+                                <form onSubmit={handleSend} className="relative flex items-end gap-2 bg-gray-50 border border-gray-200/80 rounded-xl p-1.5 shadow-sm">
+                                    <textarea
+                                        ref={inputRef}
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Ask anything..."
+                                        className="flex-1 max-h-32 min-h-[48px] bg-transparent resize-none px-2.5 py-2 focus:outline-none text-base leading-tight placeholder-gray-400 disabled:opacity-50"
+                                        style={{ fontSize: '16px' }}
+                                        rows={1}
+                                        disabled={isLoading}
+                                        aria-label="Chat input"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading || !input.trim()}
+                                        aria-label="Send message"
+                                        className="p-2.5 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                        style={{ backgroundColor: THEME_COLOR, touchAction: 'manipulation' }}
+                                    >
+                                        <Send size={16} />
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* FAB — single unified button, always present */}
             <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483647] pointer-events-auto">
                 <motion.button
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.92 }}
+                    whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     onClick={() => setIsOpen(prev => !prev)}
                     aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
                     aria-expanded={isOpen}
                     style={{ touchAction: 'manipulation' }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none w-20 h-20 sm:w-28 sm:h-28 bg-transparent"
+                    className="relative flex flex-col items-center justify-center focus:outline-none w-[72px] h-[72px] sm:w-28 sm:h-28 rounded-full sm:bg-transparent sm:border-0 sm:border-none bg-white border-2 border-indigo-200 border-dotted shadow-md sm:shadow-none transition-all"
                 >
                     {/* Logo */}
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className="w-full h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
+                        className="w-[85%] h-[85%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
                     />
 
                     {/* Chevron — appears below the logo when chat is open */}
