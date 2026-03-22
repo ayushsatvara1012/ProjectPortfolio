@@ -1,6 +1,7 @@
 import os
 import tempfile
 import psycopg2
+import secrets
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
@@ -32,6 +33,12 @@ app.add_middleware(
 )
 
 # 4. Define Request/Response Models
+class RegisterRequest(BaseModel):
+    company_name: str
+    allowed_origin: str # e.g., "https://www.globex.com"
+    theme_color: str = "#5730F5"
+    company_tone: str = "Professional and helpful"
+
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
 
@@ -281,6 +288,50 @@ async def train_chatbot(
             conn.rollback()
         print(f"Training Error for {company['company_name']}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.post("/api/register")
+async def register_new_company(req: RegisterRequest):
+    """
+    Registers a new company, generates an unguessable API key, 
+    and inserts the record into the database.
+    """
+    conn = get_db_connection()
+    try:
+        # Generate a secure 32-byte key and add your prefix
+        new_api_key = f"sb_live_{secrets.token_urlsafe(32)}"
+        
+        cursor = conn.cursor()
+        # Extract basic domain from allowed_origin (e.g. "https://www.acme.com" -> "www.acme.com")
+        domain_str = req.allowed_origin.replace("https://", "").replace("http://", "").split("/")[0]
+
+        cursor.execute(
+            """
+            INSERT INTO companies (company_name, domain, allowed_origin, api_key, theme_color, company_tone) 
+            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+            """,
+            (req.company_name, domain_str, req.allowed_origin, new_api_key, req.theme_color, req.company_tone)
+        )
+        new_company_id = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+
+        # Return the key to the Dashboard so you can show it to the client
+        return {
+            "status": "success",
+            "message": f"Welcome to SaPyBase, {req.company_name}!",
+            "api_key": new_api_key,
+            "allowed_origin": req.allowed_origin
+        }
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Registration Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
     finally:
         if conn:
             conn.close()
