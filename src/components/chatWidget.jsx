@@ -147,18 +147,20 @@ const ChatWidget = ({ apiKey }) => {
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
-                                        className="p-2 sm:p-1.5 hover:bg-black/5 rounded-full transition-colors group focus:outline-none"
+                                        className="p-2.5 sm:p-2 hover:bg-black/5 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                        style={{ touchAction: 'manipulation' }}
                                         aria-label="Chat menu"
                                     >
-                                        <MoreHorizontal size={24} className="text-slate-500" />
+                                        <MoreHorizontal size={22} className="text-slate-500" />
                                     </button>
 
                                     <button
                                         onClick={() => setIsOpen(false)}
-                                        className="p-2 sm:p-1.5 hover:bg-red-50 rounded-full transition-colors group focus:outline-none"
+                                        className="p-2.5 sm:p-2 hover:bg-red-50 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                        style={{ touchAction: 'manipulation' }}
                                         aria-label="Close chat"
                                     >
-                                        <X size={24} className="text-red-500 transition-transform group-hover:rotate-90" />
+                                        <X size={22} className="text-red-500 transition-transform group-hover:rotate-90" />
                                     </button>
                                 </div>
 
@@ -186,7 +188,7 @@ const ChatWidget = ({ apiKey }) => {
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 p-4 overflow-y-auto bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
+                        <div className="flex-1 p-4 overflow-y-auto overscroll-contain bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
                             <AnimatePresence initial={false}>
                                 {messages.map((msg, idx) => (
                                     <motion.div
@@ -249,7 +251,8 @@ const ChatWidget = ({ apiKey }) => {
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ask anything..."
-                                    className="flex-1 max-h-32 min-h-[38px] bg-transparent resize-none px-2.5 py-2 focus:outline-none text-sm leading-tight placeholder-gray-400 disabled:opacity-50"
+                                    className="flex-1 max-h-32 min-h-[48px] bg-transparent resize-none px-2.5 py-2 focus:outline-none text-base leading-tight placeholder-gray-400 disabled:opacity-50"
+                                    style={{ fontSize: '16px' }}
                                     rows={1}
                                     disabled={isLoading}
                                     aria-label="Chat input"
@@ -258,8 +261,8 @@ const ChatWidget = ({ apiKey }) => {
                                     type="submit"
                                     disabled={isLoading || !input.trim()}
                                     aria-label="Send message"
-                                    className="p-2 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-0.5"
-                                    style={{ backgroundColor: THEME_COLOR }}
+                                    className="p-2.5 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                    style={{ backgroundColor: THEME_COLOR, touchAction: 'manipulation' }}
                                 >
                                     <Send size={16} />
                                 </button>
@@ -287,6 +290,7 @@ const ChatWidget = ({ apiKey }) => {
                             aria-label="Open AI chat assistant"
                             aria-expanded={isOpen}
                             className="relative flex items-center justify-center w-20 h-20 sm:w-28 sm:h-28 bg-transparent transition-transform group z-10 focus:outline-none"
+                            style={{ touchAction: 'manipulation' }}
                         >
                             <img src={LOGO_URL} alt="SaPyBase" className="w-full h-full relative m-auto z-10 drop-shadow-xl group-hover:drop-shadow-2xl transition-all pointer-events-none" />
                         </motion.button>
@@ -306,6 +310,7 @@ const ChatWidget = ({ apiKey }) => {
                             onClick={() => setIsOpen(false)}
                             aria-label="Collapse chat"
                             className="hidden sm:flex items-center justify-center w-14 h-14 bg-white text-gray-500 rounded-full shadow-lg hover:bg-gray-50 transition-colors z-10 focus:outline-none border border-gray-100"
+                            style={{ touchAction: 'manipulation' }}
                         >
                             <ChevronDown size={28} />
                         </motion.button>
