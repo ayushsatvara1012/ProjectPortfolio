@@ -41,3 +41,9 @@ coverage
 
 # Production secrets
 *.pem
+
+# Python
+venv/
+env/
+__pycache__/
+*.py[cod]
