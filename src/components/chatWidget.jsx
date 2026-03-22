@@ -300,9 +300,9 @@ const ChatWidget = ({ apiKey }) => {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -6 }}
                                 transition={{ duration: 0.18 }}
-                                className="absolute bottom-0.5 left-1/2 -translate-x-1/2 z-20"
+                                className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20"
                             >
-                                <ChevronDown size={16} strokeWidth={2.5} style={{ color: THEME_COLOR }} />
+                                <ChevronDown size={22} strokeWidth={2.5} style={{ color: THEME_COLOR }} />
                             </motion.span>
                         )}
                     </AnimatePresence>
