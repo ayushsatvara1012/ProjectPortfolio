@@ -9,6 +9,7 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Registration = lazy(() => import("./pages/Registration"));
 import ErrorPage from "./pages/ErrorPage";
 
 import Logo from "./components/Logo";
@@ -81,6 +82,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <Dashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/register",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Registration />
           </Suspense>
         ),
       },
