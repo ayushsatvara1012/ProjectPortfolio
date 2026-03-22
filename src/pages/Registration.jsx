@@ -42,7 +42,7 @@ const Registration = () => {
         setIsLoading(true);
 
         try {
-            const apiUrl = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/register` : 'http://localhost:8000/api/register';
+            const apiUrl = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/register` : '/api/register';
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -89,7 +89,7 @@ const Registration = () => {
     };
 
     const frontendUrl = window.location.origin;
-    const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, "") : 'http://localhost:8000';
+    const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, "") : window.location.origin;
 
     const embedCode = `<!-- SaPyBase AI Assistant -->
 <script src="${frontendUrl}/widget.js" 
