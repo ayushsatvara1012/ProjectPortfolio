@@ -310,7 +310,7 @@ const ChatWidget = ({ apiKey }) => {
                 )}
             </AnimatePresence>
 
-            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483647 pointer-events-auto">
+            <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483647 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
                 <motion.button
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -320,11 +320,11 @@ const ChatWidget = ({ apiKey }) => {
                     style={{ touchAction: 'manipulation' }}
                     className="relative flex flex-col items-center justify-center focus:outline-none w-15 h-15 sm:w-20 sm:h-20 rounded-full bg-indigo-50 border border-dashed border-indigo-400 shadow-md sm:shadow-none transition-all"
                 >
-                    {/* Logo - hidden on mobile when open */}
+                    {/* Logo */}
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className={`w-[85%] h-[85%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none ${isOpen ? 'hidden sm:block' : 'block'}`}
+                        className="w-[85%] h-[85%] sm:w-full sm:h-full relative z-10 drop-shadow-xl transition-all pointer-events-none"
                     />
 
                     {/* Chevron — appears below the logo when chat is open */}
