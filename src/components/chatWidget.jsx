@@ -6,12 +6,16 @@ import { MoreHorizontal, Send, User, ChevronDown, X } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 
 const ChatWidget = ({ apiKey }) => {
+    // 1. Safely grab the window config if it exists
+    const winConfig = window.SaPyBaseConfig || {};
+
+    // 2. Set the initial config based on the HTML snippet OR defaults
     const [configData, setConfigData] = useState({
-        theme_color: '#5730F5',
-        bot_name: 'Sapy AI',
-        logo_url: 'https://www.sapybase.com/SB_loading_clean.svg',
-        initial_message: "Hi! I'm the SaPyBase AI Assistant. How can I help you today?",
-        quick_questions: []
+        theme_color: winConfig.themeColor || '#5730F5',
+        bot_name: winConfig.botName || 'Sapy AI',
+        logo_url: winConfig.logoUrl || 'https://www.sapybase.com/SB_loading_clean.svg',
+        initial_message: winConfig.welcomeMessage || "Hi! I'm the SaPyBase AI Assistant. How can I help you today?",
+        quick_questions: winConfig.quickQuestions || []
     });
 
     const THEME_COLOR = configData.theme_color;
@@ -20,7 +24,12 @@ const ChatWidget = ({ apiKey }) => {
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-    const [messages, setMessages] = useState([]);
+    
+    // 3. CRITICAL FIX: Initialize messages with the welcome message so it is never blank!
+    const [messages, setMessages] = useState([
+        { role: 'bot', content: configData.initial_message }
+    ]);
+    
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -31,28 +40,7 @@ const ChatWidget = ({ apiKey }) => {
     const inputRef = useRef(null);
     const menuRef = useRef(null);
 
-    // 1. Fetch Configuration on Mount
-    useEffect(() => {
-        const fetchConfig = async () => {
-            if (!activeApiKey) return;
-            try {
-                const response = await fetch(`${BASE_URL}/api/config`, {
-                    headers: { 'x-api-key': activeApiKey }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setConfigData(data);
-                    // Set initial message once config is loaded
-                    setMessages([{ role: 'bot', content: data.initial_message || "Hi! How can I help you today?" }]);
-                }
-            } catch (error) {
-                console.error("Failed to fetch widget config:", error);
-                // Fallback initial message
-                setMessages([{ role: 'bot', content: "Hi! I'm here to help. How can I assist you today?" }]);
-            }
-        };
-        fetchConfig();
-    }, [activeApiKey]);
+    // Initial message is already set in state above, so we don't need the fetch loop here for basic config.
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
