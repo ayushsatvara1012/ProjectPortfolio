@@ -103,8 +103,11 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     
     # Bypass check ONLY if you explicitly set allowed_origin to '*' for testing
     if company["allowed_origin"] != "*":
-        if not client_origin or not client_origin.startswith(company["allowed_origin"]):
-            print(f"SECURITY BLOCK: Key {api_key} used on unauthorized domain: {client_origin}")
+        # DEVELOPMENT BYPASS: Allow localhost during testing
+        is_localhost = client_origin and (client_origin.startswith("http://localhost") or client_origin.startswith("http://127.0.0.1"))
+        
+        if not is_localhost and (not client_origin or not client_origin.startswith(company["allowed_origin"])):
+            print(f"SECURITY BLOCK: Key {api_key} used on unauthorized domain: {client_origin}. Expected: {company['allowed_origin']}")
             raise HTTPException(status_code=403, detail="Domain not authorized for this API key.")
 
     return company
