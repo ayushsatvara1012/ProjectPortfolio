@@ -16,11 +16,11 @@ const ChatWidget = ({ apiKey }) => {
     const [configData, setConfigData] = useState({
         theme_color: winConfig.themeColor || '#5730F5',
         bot_name: winConfig.botName || 'Sapy AI',
-        
+
         // --- THE FIX IS HERE ---
         // If the client didn't provide a custom logo, use the dynamic base URL
         logo_url: winConfig.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
-        
+
         initial_message: winConfig.welcomeMessage || "Hi! I'm the SaPyBase AI Assistant. How can I help you today?",
         quick_questions: winConfig.quickQuestions || []
     });
@@ -39,6 +39,13 @@ const ChatWidget = ({ apiKey }) => {
 
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 640);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Typing effect for the "Chat with me" label
     const [currentPhrase, setCurrentPhrase] = useState('');
@@ -54,8 +61,8 @@ const ChatWidget = ({ apiKey }) => {
             const i = loopNum % phrases.length;
             const fullText = phrases[i];
 
-            setCurrentPhrase(isDeleting 
-                ? fullText.substring(0, currentPhrase.length - 1) 
+            setCurrentPhrase(isDeleting
+                ? fullText.substring(0, currentPhrase.length - 1)
                 : fullText.substring(0, currentPhrase.length + 1)
             );
 
@@ -194,7 +201,8 @@ const ChatWidget = ({ apiKey }) => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-xl shadow-indigo-900/20 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
+                        className="fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-[100dvh] sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
+                        style={isMobile ? { height: '100dvh', minHeight: '-webkit-fill-available' } : {}}
                     >
                         {/* Header with Animated Gradient Glow - Removed overflow-hidden to allow menu visibility */}
                         <div className="relative shrink-0">
@@ -236,7 +244,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                                 exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                                className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 py-1 z-2147483647 overflow-hidden"
+                                                className="absolute right-0 top-full mt-2 w-48 bg-white backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 py-1 z-2147483647 overflow-hidden"
                                             >
                                                 <button
                                                     onClick={() => {
@@ -247,7 +255,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 >
                                                     Clear chat
                                                 </button>
-                                                
+
                                                 <a
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
@@ -266,7 +274,7 @@ const ChatWidget = ({ apiKey }) => {
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 p-4 overflow-y-auto overscroll-contain bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
+                        <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
                             <AnimatePresence initial={false}>
                                 {messages.map((msg, idx) => (
                                     <motion.div
@@ -290,7 +298,7 @@ const ChatWidget = ({ apiKey }) => {
                                         </div>
 
                                         <div
-                                            className={`px-4 py-2.5 shadow-sm ${msg.role === 'user'
+                                            className={`px-4 py-1 shadow-sm ${msg.role === 'user'
                                                 ? 'text-white rounded-2xl rounded-br-none'
                                                 : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
                                                 }`}
@@ -340,17 +348,17 @@ const ChatWidget = ({ apiKey }) => {
                                 </div>
                             )}
 
-                            {/* Actual Input Box */}
-                            <div className="p-2 sm:p-2 w-full">
-                                <form onSubmit={handleSend} className="relative flex items-center gap-2 bg-gray-50 border border-gray-200/80 rounded-xl p-1 shadow-sm">
+                            {/* Actual Input Box with Safe Area Support */}
+                            <div className="p-2 sm:p-2 w-full pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
+                                <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                                     <textarea
                                         ref={inputRef}
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-sm leading-normal placeholder-gray-400 disabled:opacity-50"
-                                        style={{ fontSize: '14px' }}
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-[16px] leading-normal placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none"
+                                        style={{ fontSize: '16px' }}
                                         rows={1}
                                         disabled={isLoading}
                                         aria-label="Chat input"
@@ -359,8 +367,8 @@ const ChatWidget = ({ apiKey }) => {
                                         type="submit"
                                         disabled={isLoading || !input.trim()}
                                         aria-label="Send message"
-                                        className="p-2 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center translate-y-px"
-                                        style={{ backgroundColor: THEME_COLOR, touchAction: 'manipulation' }}
+                                        className="p-2 shrink-0 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center translate-y-px"
+                                        style={{ color: THEME_COLOR, touchAction: 'manipulation' }}
                                     >
                                         <Send size={15} />
                                     </button>
@@ -385,7 +393,7 @@ const ChatWidget = ({ apiKey }) => {
                                 <span className="text-sm font-bold text-slate-700 whitespace-nowrap tracking-tight">
                                     {currentPhrase}
                                 </span>
-                                <motion.span 
+                                <motion.span
                                     animate={{ opacity: [1, 0, 1] }}
                                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                                     className="w-0.5 h-4 bg-indigo-500 rounded-full"
@@ -404,17 +412,17 @@ const ChatWidget = ({ apiKey }) => {
                     aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
                     aria-expanded={isOpen}
                     style={{ touchAction: 'manipulation' }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 rounded-full bg-indigo-50 shadow-md sm:shadow-none transition-all p-1"
+                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 rounded-full bg-white shadow-md sm:shadow-none transition-all p-1"
                 >
                     {/* Rotating Dashed Border Layer */}
-                    <motion.div 
+                    <motion.div
                         className="absolute inset-0 rounded-full border border-dashed border-indigo-400 z-0"
                         animate={{ rotate: 360 }}
                         transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
                     />
 
                     {/* Pulsing Background Aura */}
-                    <motion.div 
+                    <motion.div
                         className="absolute inset-0 rounded-full bg-indigo-400/10 z-0"
                         animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -424,7 +432,7 @@ const ChatWidget = ({ apiKey }) => {
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className="w-full h-full relative -top-1 z-10 drop-shadow-xl transition-all pointer-events-none p-2"
+                        className="w-4/5 h-4/5 relative -top-1 z-10 drop-shadow-xl transition-all pointer-events-none p-2"
                     />
 
                     {/* Chevron — appears below the logo when chat is open */}
@@ -436,9 +444,9 @@ const ChatWidget = ({ apiKey }) => {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -6 }}
                                 transition={{ duration: 0.18 }}
-                                className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-20"
+                                className="absolute bottom-[10px] left-1/2 -translate-x-1/2 z-20"
                             >
-                                <ChevronDown size={25} strokeWidth={2.5} className='text-indigo-600' />
+                                <ChevronDown size={25} strokeWidth={2} className='text-blue-900' />
                             </motion.span>
                         )}
                     </AnimatePresence>
