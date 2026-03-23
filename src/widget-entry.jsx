@@ -10,34 +10,42 @@ if (!containerEl) {
   containerEl = document.createElement('div');
   containerEl.id = containerId;
   
-  // Protect the host element from external layout interference
+  // Protect the host element and ensure it spans the whole screen so it doesn't clip the chat!
   containerEl.style.position = 'fixed'; 
-  containerEl.style.zIndex = '2147483647'; // Maximum possible z-index
-  containerEl.style.pointerEvents = 'none'; // Prevent invisible container from blocking clicks
+  containerEl.style.top = '0';
+  containerEl.style.left = '0';
+  containerEl.style.width = '100vw';
+  containerEl.style.height = '100vh';
+  containerEl.style.zIndex = '2147483647'; 
+  containerEl.style.pointerEvents = 'none'; 
   document.body.appendChild(containerEl);
 
   // 2. Attach the Shadow DOM (The "Force Field")
   const shadowRoot = containerEl.attachShadow({ mode: 'open' });
 
-  // 3. Inject Tailwind CSS STRICTLY inside the Shadow DOM
+  // 3. Extract the API key and Inject CSS
   const scriptTag = document.querySelector('script[src*="widget.js"]');
+  let passedApiKey = null;
+
   if (scriptTag) {
+    // --- THE FIX: GRAB THE API KEY FROM THE HTML SCRIPT TAG ---
+    passedApiKey = scriptTag.getAttribute('data-api-key');
+
     const widgetUrl = new URL(scriptTag.src);
     const cssUrl = `${widgetUrl.origin}/style.css`; 
     
     const linkEl = document.createElement('link');
     linkEl.rel = 'stylesheet';
     linkEl.href = cssUrl;
-    // Notice we append to shadowRoot, NOT document.head!
     shadowRoot.appendChild(linkEl); 
   }
 
-  // 4. Create a React Mount Point inside the Shadow DOM
+  // 4. Create a React Mount Point
   const reactRootEl = document.createElement('div');
   reactRootEl.style.pointerEvents = 'auto'; // Re-enable clicks for the actual widget
   shadowRoot.appendChild(reactRootEl);
 
-  // 5. Render the Widget inside the protected environment
+  // 5. Render the Widget and PASS IN THE KEY!
   const root = ReactDOM.createRoot(reactRootEl);
-  root.render(<ChatWidget />);
+  root.render(<ChatWidget apiKey={passedApiKey} />);
 }
