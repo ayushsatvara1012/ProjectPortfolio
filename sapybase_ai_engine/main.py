@@ -8,6 +8,7 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
+from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader
@@ -113,9 +114,27 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         # DEVELOPMENT BYPASS: Allow localhost during testing
         is_localhost = client_origin and (client_origin.startswith("http://localhost") or client_origin.startswith("http://127.0.0.1"))
         
-        if not is_localhost and (not client_origin or not client_origin.startswith(company["allowed_origin"])):
-            print(f"SECURITY BLOCK: Key {api_key} used on unauthorized domain: {client_origin}. Expected: {company['allowed_origin']}")
-            raise HTTPException(status_code=403, detail="Domain not authorized for this API key.")
+        if not is_localhost:
+            if not client_origin:
+                raise HTTPException(status_code=403, detail="Security error: Request origin header is missing.")
+
+            # Extract hostnames for robust comparison
+            # e.g., "https://www.sapybase.com/register" -> "sapybase.com"
+            def get_base_domain(url):
+                try:
+                    hostname = urlparse(url).hostname or url
+                    if hostname.startswith("www."):
+                        hostname = hostname[4:]
+                    return hostname.lower().strip("/")
+                except:
+                    return str(url).lower().strip("/")
+
+            client_host = get_base_domain(client_origin)
+            allowed_host = get_base_domain(company["allowed_origin"])
+
+            if client_host != allowed_host:
+                print(f"SECURITY BLOCK: Origin '{client_origin}' ({client_host}) does not match authorized domain '{company['allowed_origin']}' ({allowed_host})")
+                raise HTTPException(status_code=403, detail="Domain not authorized for this API key.")
 
     return company
 
