@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch } from "lucide-react";
+import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch, LayoutDashboard, Key } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "./Logo";
 
@@ -54,6 +54,18 @@ const Navbar = () => {
       desc: "AI Engine Optimization for search engines.",
       icon: <ScanSearch size={18} />,
       href: "#services"
+    },
+    {
+      title: "Register Company",
+      desc: "Get your API key and join SaPyBase.",
+      icon: <Key size={18} />,
+      href: "/register"
+    },
+    {
+      title: "Client Dashboard",
+      desc: "Train your AI and manage knowledge.",
+      icon: <LayoutDashboard size={18} />,
+      href: "/dashboard"
     }
   ];
 

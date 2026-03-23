@@ -6,20 +6,28 @@ import { MoreHorizontal, Send, User, ChevronDown, X } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 
 const ChatWidget = ({ apiKey }) => {
-    // 1. Safely grab the window config if it exists
+    // 1. Determine if we are testing locally or live on a client's site
+    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://www.sapybase.com';
+
+    // 2. Safely grab the window config if it exists
     const winConfig = window.SaPyBaseConfig || {};
 
-    // 2. Set the initial config based on the HTML snippet OR defaults
+    // 3. Set the initial config, using the dynamic asset URL for fallbacks!
     const [configData, setConfigData] = useState({
         theme_color: winConfig.themeColor || '#5730F5',
         bot_name: winConfig.botName || 'Sapy AI',
+        
+        // --- THE FIX IS HERE ---
+        // If the client didn't provide a custom logo, use the dynamic base URL
+        logo_url: winConfig.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
+        
         initial_message: winConfig.welcomeMessage || "Hi! I'm the SaPyBase AI Assistant. How can I help you today?",
         quick_questions: winConfig.quickQuestions || []
     });
 
     const THEME_COLOR = configData.theme_color;
     const BOT_NAME = configData.bot_name;
-    const LOGO_URL = '/SB_loading_clean.svg';
+    const LOGO_URL = configData.logo_url;
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
