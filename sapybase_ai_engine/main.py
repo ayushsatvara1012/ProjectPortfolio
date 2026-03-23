@@ -105,36 +105,27 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "quick_questions": company_data[9] or []
     }
 
-    # The Ironclad Origin Check
-    # The browser sends 'origin' (e.g., https://www.acmecorp.com)
+    # 3. The Ironclad Origin Check
     client_origin = request.headers.get("origin") or request.headers.get("referer")
     
-    # Bypass check ONLY if you explicitly set allowed_origin to '*' for testing
-    if company["allowed_origin"] != "*":
-        # DEVELOPMENT BYPASS: Allow localhost during testing
-        is_localhost = client_origin and (client_origin.startswith("http://localhost") or client_origin.startswith("http://127.0.0.1"))
-        
-        if not is_localhost:
-            if not client_origin:
-                raise HTTPException(status_code=403, detail="Security error: Request origin header is missing.")
+    # Clean up the origin string just in case it has a trailing slash
+    if client_origin:
+        client_origin = client_origin.rstrip('/')
 
-            # Extract hostnames for robust comparison
-            # e.g., "https://www.sapybase.com/register" -> "sapybase.com"
-            def get_base_domain(url):
-                try:
-                    hostname = urlparse(url).hostname or url
-                    if hostname.startswith("www."):
-                        hostname = hostname[4:]
-                    return hostname.lower().strip("/")
-                except:
-                    return str(url).lower().strip("/")
+    # --- THE FIX: Define your Admin Dashboard URLs ---
+    # These URLs are allowed to use ANY API key so you can train the bots!
+    admin_origins = [
+        "http://localhost:5173", 
+        "https://www.sapybase.com",
+        "https://ghost-sdr.vercel.app" # Add your actual Vercel portfolio domain here if it's different!
+    ]
 
-            client_host = get_base_domain(client_origin)
-            allowed_host = get_base_domain(company["allowed_origin"])
-
-            if client_host != allowed_host:
-                print(f"SECURITY BLOCK: Origin '{client_origin}' ({client_host}) does not match authorized domain '{company['allowed_origin']}' ({allowed_host})")
-                raise HTTPException(status_code=403, detail="Domain not authorized for this API key.")
+    # Bypass check if the key allows all (*), OR if the request comes from your Admin Dashboard
+    if company["allowed_origin"] != "*" and client_origin not in admin_origins:
+        # If it's not an admin, it MUST match the client's exact website
+        if not client_origin or not client_origin.startswith(company["allowed_origin"]):
+            print(f"SECURITY BLOCK: Key {api_key} used on unauthorized domain: {client_origin}")
+            raise HTTPException(status_code=403, detail="Domain not authorized for this API key.")
 
     return company
 
