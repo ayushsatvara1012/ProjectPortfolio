@@ -214,7 +214,7 @@ const ChatWidget = ({ apiKey }) => {
                                     <div className="relative flex items-center gap-2 pl-4">
                                         <div className="absolute top-2.5 w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                         <div className="flex flex-col ml-4">
-                                            <p className="font-quantico font-bold text-lg" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
+                                            <p className="font-questrial font-bold text-lg" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
                                             <a href="https://www.sapybase.com" className="text-xs italic text-slate-500">Powered by SaPyBase</a>
                                         </div>
                                     </div>
@@ -297,20 +297,25 @@ const ChatWidget = ({ apiKey }) => {
                                             )}
                                         </div>
 
-                                        <div
-                                            className={`px-4 py-1 shadow-sm ${msg.role === 'user'
-                                                ? 'text-white rounded-2xl rounded-br-none'
-                                                : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
-                                                }`}
-                                            style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
-                                        >
-                                            {msg.role === 'user' ? (
-                                                <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
-                                            ) : (
-                                                <div className="text-sm">
-                                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                                </div>
+                                        <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                            {msg.role === 'bot' && (
+                                                <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1 uppercase tracking-widest leading-none">{BOT_NAME}</span>
                                             )}
+                                            <div
+                                                className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center ${msg.role === 'user'
+                                                    ? 'text-white rounded-2xl rounded-br-none'
+                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
+                                                    }`}
+                                                style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
+                                            >
+                                                {msg.role === 'user' ? (
+                                                    <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+                                                ) : (
+                                                    <div className="text-sm">
+                                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </motion.div>
                                 ))}
