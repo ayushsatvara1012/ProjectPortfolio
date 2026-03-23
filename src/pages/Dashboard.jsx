@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, Link as LinkIcon, Key, Loader2, FileText, X, BrainCircuit, Sparkles, Database, Eye, EyeOff, Boxes,Zap } from 'lucide-react';
+import { UploadCloud, Link as LinkIcon, Key, Loader2, FileText, X, BrainCircuit, Sparkles, Database, Eye, EyeOff, Boxes, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Alert from '../components/alert';
 
@@ -66,8 +66,8 @@ const Dashboard = () => {
                 formData.append('file', file);
             }
 
-            const apiUrl = import.meta.env.VITE_API_URL 
-                ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api/train` 
+            const apiUrl = import.meta.env.VITE_API_URL
+                ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api/train`
                 : '/api/train';
 
             const response = await fetch(apiUrl, {
@@ -109,9 +109,9 @@ const Dashboard = () => {
 
     const itemVariants = {
         hidden: { opacity: 0, y: 30, scale: 0.95 },
-        visible: { 
-            opacity: 1, 
-            y: 0, 
+        visible: {
+            opacity: 1,
+            y: 0,
             scale: 1,
             transition: { type: "spring", stiffness: 90, damping: 14 }
         }
@@ -122,7 +122,7 @@ const Dashboard = () => {
 
     return (
         <div className="w-full min-h-[calc(100vh-80px)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8 font-sans tracking-tight relative overflow-x-hidden flex justify-center">
-            
+
             {/* Soft Ambient Background Orbs */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 dark:bg-blue-500/5 blur-[120px]"></div>
@@ -131,7 +131,7 @@ const Dashboard = () => {
             </div>
 
             <div className="max-w-340 mx-auto w-full relative z-10">
-                <motion.div 
+                <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
@@ -140,11 +140,11 @@ const Dashboard = () => {
                     {/* Hero Title & Value Prop (Spans 2 cols) */}
                     <motion.div variants={itemVariants} className={`${bentoCardStyle} md:col-span-2 lg:col-span-2 flex justify-center bg-linear-to-br from-indigo-50/50 to-white/60 dark:from-indigo-950/20 dark:to-slate-900/40 min-h-[240px]`}>
                         <div className="absolute inset-0 bg-linear-to-b from-white/40 to-transparent dark:from-white/5 opacity-50 pointer-events-none rounded-4xl"></div>
-                        
+
                         {/* Huge Decorative Background Icon */}
                         <Sparkles className="absolute -right-12 -bottom-12 w-64 h-64 text-indigo-500/10 dark:text-indigo-400/5 -rotate-12 pointer-events-none" />
-                        
-                        <div className="relative z-10 flex flex-col justify-center">
+
+                        <div className="relative z-10 gap-4 flex flex-col justify-center">
                             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-4 w-fit transition-all">
                                 <Sparkles className="w-3.5 h-3.5" />
                                 <span>Engine Active</span>
@@ -158,13 +158,20 @@ const Dashboard = () => {
                             <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium max-w-md">
                                 Empower your AI with proprietary data. Scrape documentation or upload PDF manuals to update the vector database instantly.
                             </p>
+                            <ul className='mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-400 font-medium'>
+                                <li className="flex items-center gap-2"><span className="text-sm">📄</span>  Smart Ingestion : Instantly memorize docs, FAQs, and manuals with vector embeddings.</li>
+                                <li className="flex items-center gap-2"><span className="text-sm">🌐</span>  Web Crawling : Auto-scrape your domain for full site knowledge.</li>
+                                <li className="flex items-center gap-2"><span className="text-sm">🧠</span>  Secure Vectors : Isolated, private storage for your proprietary data.</li>
+                                <li className="flex items-center gap-2"><span className="text-sm">🎭</span>  AI Persona : Custom tone and role tailored to your business and feels like your own brand.</li>
+                                <li className="flex items-center gap-2"><span className="text-sm">⚡</span>  Live Sync : Instant brain updates as you add or delete files.</li>
+                            </ul>
                         </div>
                     </motion.div>
 
                     {/* Data Ingestion Form (Spans 2 cols) - Compacted */}
                     <motion.div variants={itemVariants} className={`${bentoCardStyle} md:col-span-2 lg:col-span-2 bg-white/80 dark:bg-slate-900/80 overflow-hidden p-0 relative`}>
-                         {/* Large Decorative Form Icon */}
-                         <UploadCloud className="absolute -right-12 -bottom-12 w-64 h-64 text-indigo-500/5 dark:text-indigo-400/5 -rotate-6 pointer-events-none" />
+                        {/* Large Decorative Form Icon */}
+                        <UploadCloud className="absolute -right-12 -bottom-12 w-64 h-64 text-indigo-500/5 dark:text-indigo-400/5 -rotate-6 pointer-events-none" />
 
                         <div className="h-full flex flex-col relative z-10">
                             <h2 className="text-lg font-bold mb-3 text-slate-900 dark:text-white flex items-center gap-3 p-4 sm:p-5 pb-0">
