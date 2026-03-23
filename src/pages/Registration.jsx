@@ -42,7 +42,9 @@ const Registration = () => {
         setIsLoading(true);
 
         try {
-            const apiUrl = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/register` : '/api/register';
+            const apiUrl = import.meta.env.VITE_API_URL 
+                ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}/api/register` 
+                : '/api/register';
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
