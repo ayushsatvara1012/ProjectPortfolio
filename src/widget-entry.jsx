@@ -12,10 +12,7 @@ if (!containerEl) {
   
   // Protect the host element and ensure it spans the whole screen so it doesn't clip the chat!
   containerEl.style.position = 'fixed'; 
-  containerEl.style.top = '0';
-  containerEl.style.left = '0';
-  containerEl.style.width = '100vw';
-  containerEl.style.height = '100vh';
+  containerEl.style.inset = '0';
   containerEl.style.zIndex = '2147483647'; 
   containerEl.style.pointerEvents = 'none'; 
   document.body.appendChild(containerEl);
