@@ -480,7 +480,7 @@ const ChatWidget = ({ apiKey }) => {
                     aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
                     aria-expanded={isOpen}
                     style={{ touchAction: "manipulation", background: "transparent" }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-md sm:shadow-none transition-all p-1"
+                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1"
                 // bg-white removed — fill is now handled by SVG so shape matches bubble
                 >
 
@@ -548,7 +548,7 @@ const ChatWidget = ({ apiKey }) => {
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 drop-shadow-xl transition-all pointer-events-none p-2"
+                        className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2"
                     />
 
                     {/* ── Chevron (unchanged) ── */}
