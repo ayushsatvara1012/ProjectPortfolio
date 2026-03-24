@@ -3,14 +3,15 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
- "scripts": {
+  "scripts": {
     "dev": "vite",
-    "build": "npm run build:widget && vite build", 
+    "build": "npm run build:widget && vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "build:widget": "vite build --config vite.widget.config.js"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.4",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
     "@vercel/analytics": "^2.0.0",

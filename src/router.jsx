@@ -10,6 +10,7 @@ const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Registration = lazy(() => import("./pages/Registration"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 import ErrorPage from "./pages/ErrorPage";
 
 import Logo from "./components/Logo";
@@ -90,6 +91,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <Registration />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/admin",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <AdminDashboard />
           </Suspense>
         ),
       },

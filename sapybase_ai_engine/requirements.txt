@@ -11,3 +11,5 @@ beautifulsoup4==4.14.3
 gunicorn==21.2.0
 pypdf
 python-multipart
+svix
+python-jose[cryptography]
