@@ -173,6 +173,14 @@
           animation: blink 4s ease-in-out infinite;
         }
 
+        .dark #e9RgroYO4Cy1 path[fill="#5730f5"] {
+          fill: #818cf8;
+        }
+
+        .dark #e9RgroYO4Cy1 path[fill="#0f2060"] {
+          fill: #e0e7ff;
+        }
+
         @keyframes blink {
           0% {
             transform: scaleY(1);
@@ -206,26 +214,26 @@
   <script type="module" src="/src/main.jsx"></script>
   <!-- AI Chatbot -->
   <!-- Note: We do NOT load widget.js or style.css here anymore because App.jsx renders ChatWidget natively in this repository -->
-<script>
-  window.SaPyBaseConfig = {
-    apiKey: "sb_test_987654321",
-    themeColor: "#5730F5",       // The SaPyBase Purple
-    botName: "Sapy AI",          
-    welcomeMessage: "Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?", 
-    logoUrl: "https://www.sapybase.com/SB_loading_clean.svg",
-    quickQuestions: [
-    {
-      label:"Services",
-      prompt:"What services do you offer?"
-    },
-    {
-      label:"About",
-      prompt:"Tell me about yourself"
-    
-    }
-  ]
-  };
-</script>
+  <script>
+    window.SaPyBaseConfig = {
+      apiKey: "sb_test_987654321",
+      themeColor: "#5730F5",       // The SaPyBase Purple
+      botName: "Sapy AI",
+      welcomeMessage: "Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?",
+      logoUrl: "https://www.sapybase.com/SB_loading_clean.svg",
+      quickQuestions: [
+        {
+          label: "Services",
+          prompt: "What services do you offer?"
+        },
+        {
+          label: "About",
+          prompt: "Tell me about yourself"
+
+        }
+      ]
+    };
+  </script>
 </body>
 
 </html>

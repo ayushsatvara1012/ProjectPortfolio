@@ -192,6 +192,22 @@ const ChatWidget = ({ apiKey }) => {
         return null;
     }
 
+    const BUBBLE_PATH = `
+  M 22 4
+  H 78
+  Q 96 4 96 22
+  V 62
+  Q 96 80 78 80
+  H 36
+  L 18 96
+  L 22 80
+  H 22
+  Q 4 80 4 62
+  V 22
+  Q 4 4 22 4
+  Z
+`;
+
     return (
         <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-2147483647 font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
             <AnimatePresence>
@@ -410,7 +426,7 @@ const ChatWidget = ({ apiKey }) => {
                     )}
                 </AnimatePresence>
 
-                <motion.button
+                {/* <motion.button
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     onClick={() => setIsOpen(prev => !prev)}
@@ -419,28 +435,28 @@ const ChatWidget = ({ apiKey }) => {
                     style={{ touchAction: 'manipulation' }}
                     className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 rounded-full bg-white shadow-md sm:shadow-none transition-all p-1"
                 >
-                    {/* Rotating Dashed Border Layer */}
+                    //Rotating Dashed Border Layer
                     <motion.div
                         className="absolute inset-0 rounded-full border border-dashed border-indigo-400 z-0"
                         animate={{ rotate: 360 }}
                         transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
                     />
 
-                    {/* Pulsing Background Aura */}
+                    //Pulsing Background Aura
                     <motion.div
                         className="absolute inset-0 rounded-full bg-indigo-400/10 z-0"
                         animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                     />
 
-                    {/* Stable Logo */}
+                   // Stable Logo
                     <img
                         src={LOGO_URL}
                         alt="SaPyBase"
-                        className="w-4/5 h-4/5 relative -top-1 z-10 drop-shadow-xl transition-all pointer-events-none p-2"
+                        className="w-4/5 h-4/5 relative sm:-top-1  z-10 drop-shadow-xl transition-all pointer-events-none p-2"
                     />
 
-                    {/* Chevron — appears below the logo when chat is open */}
+                    //Chevron — appears below the logo when chat is open
                     <AnimatePresence>
                         {isOpen && (
                             <motion.span
@@ -452,6 +468,101 @@ const ChatWidget = ({ apiKey }) => {
                                 className="absolute bottom-[10px] left-1/2 -translate-x-1/2 z-20"
                             >
                                 <ChevronDown size={25} strokeWidth={2} className='text-blue-900' />
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </motion.button> */}
+
+                <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    onClick={() => setIsOpen((prev) => !prev)}
+                    aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
+                    aria-expanded={isOpen}
+                    style={{ touchAction: "manipulation", background: "transparent" }}
+                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-md sm:shadow-none transition-all p-1"
+                // bg-white removed — fill is now handled by SVG so shape matches bubble
+                >
+
+                    {/* ── Single SVG layer: clip-path fill + aura + marching dashes ── */}
+                    <svg
+                        viewBox="0 0 100 100"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="absolute inset-0 w-full h-full z-0"
+                        overflow="visible"
+                    >
+                        <defs>
+                            {/* Clip mask so white fill is exactly bubble-shaped */}
+                            <clipPath id="bubble-clip">
+                                <path d={BUBBLE_PATH} />
+                            </clipPath>
+
+                            <style>{`
+            @keyframes march {
+              to { stroke-dashoffset: -40; }
+            }
+            .marching-dashes {
+              stroke-dasharray: 6 4;
+              stroke-dashoffset: 0;
+              animation: march 2s linear infinite;
+            }
+            @keyframes aura-pulse {
+              0%, 100% { opacity: 0.5; transform: scale(1); }
+              50%       { opacity: 0;   transform: scale(1.18); }
+            }
+            .aura-path {
+              transform-origin: 50px 50px;
+              animation: aura-pulse 3s ease-in-out infinite;
+            }
+          `}</style>
+                        </defs>
+
+                        {/* White fill clipped to bubble shape — replaces bg-white on the button */}
+                        <rect
+                            x="0" y="0" width="100" height="100"
+                            fill="white"
+                            clipPath="url(#bubble-clip)"
+                            className='dark:fill-slate-200'
+                        />
+
+                        {/* Pulsing aura — also bubble-shaped */}
+                        <path
+                            d={BUBBLE_PATH}
+                            fill="rgba(129,140,248,0.15)"
+                            className="aura-path"
+                        />
+
+                        {/* Marching dashes border */}
+                        <path
+                            d={BUBBLE_PATH}
+                            fill="none"
+                            stroke="#5731f5"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="marching-dashes dark:stroke-blue-700"
+                        />
+                    </svg>
+
+                    {/* ── Stable Logo (unchanged) ── */}
+                    <img
+                        src={LOGO_URL}
+                        alt="SaPyBase"
+                        className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 drop-shadow-xl transition-all pointer-events-none p-2"
+                    />
+
+                    {/* ── Chevron (unchanged) ── */}
+                    <AnimatePresence>
+                        {isOpen && (
+                            <motion.span
+                                key="fab-chevron"
+                                initial={{ opacity: 0, y: -6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -6 }}
+                                transition={{ duration: 0.18 }}
+                                className="absolute bottom-[10px] left-1/2 -translate-x-1/2 z-20"
+                            >
+                                <ChevronDown size={25} strokeWidth={2} className="text-blue-900" />
                             </motion.span>
                         )}
                     </AnimatePresence>
