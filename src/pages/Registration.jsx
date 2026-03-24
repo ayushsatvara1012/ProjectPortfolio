@@ -195,16 +195,16 @@ function add_sapybase_widget() {
         }
     };
 
-    // Card styling mixin for consistency
-    const bentoCardStyle = "bg-white/60 dark:bg-slate-900/40 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/60 rounded-[2rem] p-6 lg:p-8 group relative overflow-hidden flex flex-col";
+    // Card styling mixin for consistency - COPY from Dashboard
+    const bentoCardStyle = "bg-white/60 dark:bg-slate-900/40 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/60 rounded-3xl p-5 lg:p-6 group relative overflow-hidden flex flex-col";
 
     return (
         <div className="w-full min-h-[calc(100vh-80px)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8 font-sans tracking-tight relative overflow-x-hidden flex justify-center">
 
-            {/* Soft Ambient Background Orbs */}
+            {/* Soft Ambient Background Orbs - COPY from Dashboard */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 dark:bg-blue-500/5 blur-[120px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-red-500/10 dark:bg-red-500/5 blur-[100px]"></div>
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 dark:bg-indigo-500/5 blur-[120px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 dark:bg-purple-500/5 blur-[100px]"></div>
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] max-w-7xl h-[80%] border border-indigo-200/20 dark:border-indigo-800/10 rounded-[4rem] opacity-50 blur-[2px]"></div>
             </div>
 
@@ -218,12 +218,12 @@ function add_sapybase_widget() {
                             exit={{ opacity: 0, y: -20 }}
                             className="flex flex-col items-center justify-center min-h-[60vh] py-12"
                         >
-                            <div className="mb-8 text-center bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-xl max-w-2xl w-full">
+                            <div className="mb-8 text-center bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-2xl w-full">
                                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-sm font-bold uppercase tracking-wider mb-6">
                                     <Sparkles className="w-4 h-4" />
                                     <span>Welcome to SaPyBase</span>
                                 </div>
-                                <h1 className="text-4xl md:text-5xl font-black mb-6 leading-tight">Start Your <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">SaaS Journey</span></h1>
+                                <h1 className="text-4xl md:text-5xl font-black mb-6 leading-tight text-slate-900 dark:text-white">Start Your <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">SaaS Journey</span></h1>
                                 <p className="text-slate-600 dark:text-slate-400 text-lg mb-8 max-w-md mx-auto font-medium">Create an account to provision your first AI chatbot and access the developer dashboard.</p>
                                 <div className="flex justify-center">
                                     <SignUp routing="hash" signInUrl="/login" />
@@ -242,16 +242,19 @@ function add_sapybase_widget() {
                         >
                             {/* Left Column: Promotion/Details (Spans 5 cols) */}
                             <motion.div variants={itemVariants} className="lg:col-span-5 space-y-6">
-                                <div className={`${bentoCardStyle} bg-linear-to-br from-indigo-500 to-blue-700 text-white border-none shadow-2xl shadow-indigo-500/20`}>
+                                <div className={`${bentoCardStyle} bg-linear-to-br from-indigo-50/50 to-white/60 dark:from-indigo-950/20 dark:to-slate-900/40 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800/60 shadow-2xl shadow-indigo-500/5`}>
                                     <div className="relative z-10">
                                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-wider mb-6">
                                             <Sparkles className="w-3 h-3" />
                                             <span>Hey {user?.firstName || 'Innovator'}!</span>
                                         </div>
-                                        <h1 className="text-4xl font-extrabold tracking-tight mb-4 leading-tight">
-                                            Launch Your <br />AI Agent Today
+                                        <h1 className="text-4xl font-black tracking-tight mb-4 leading-tight text-slate-900 dark:text-white">
+                                            Launch Your <br />
+                                            <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">
+                                                AI Agent Today
+                                            </span>
                                         </h1>
-                                        <p className="text-indigo-100 text-sm font-medium leading-relaxed mb-8 opacity-90">
+                                        <p className="text-slate-500 dark:text-indigo-100/80 text-sm font-medium leading-relaxed mb-8">
                                             Provision your tenant, get your API key, and start conversing with your customers using the power of Gemini.
                                         </p>
                                         
@@ -261,13 +264,13 @@ function add_sapybase_widget() {
                                                 { icon: Shield, text: "Enterprise Security", sub: "Domain-locked API access" },
                                                 { icon: Code2, text: "Easy Integration", sub: "One-line snippet install" }
                                             ].map((feat, i) => (
-                                                <div key={i} className="flex items-center gap-4 p-3 bg-white/10 rounded-2xl backdrop-blur-xs">
-                                                    <div className="p-2 bg-white/20 rounded-xl">
-                                                        <feat.icon className="w-5 h-5" />
+                                                <div key={i} className="flex items-center gap-4 p-3 bg-white dark:bg-slate-900/40 rounded-2xl backdrop-blur-md border border-slate-200 dark:border-white/10 transition-all hover:bg-white/70 dark:hover:bg-white/20">
+                                                    <div className="p-2 bg-indigo-50 dark:bg-white/20 rounded-xl shadow-sm">
+                                                        <feat.icon className="w-5 h-5 text-indigo-600 dark:text-white" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-bold">{feat.text}</p>
-                                                        <p className="text-[10px] text-white/60">{feat.sub}</p>
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">{feat.text}</p>
+                                                        <p className="text-[10px] text-slate-500 dark:text-white/50 font-medium uppercase tracking-widest">{feat.sub}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -302,14 +305,14 @@ function add_sapybase_widget() {
                                                 className="h-full flex flex-col"
                                             >
                                                 <div className="mb-8">
-                                                    <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Tenant Configuration</h2>
-                                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Fill in details to generate your unique integration credentials.</p>
+                                                    <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Tenant Configuration</h2>
+                                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium leading-relaxed">Fill in details to generate your unique integration credentials.</p>
                                                 </div>
 
                                                 <form onSubmit={handleSubmit} className="space-y-6 flex-1">
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                         <div className="space-y-2">
-                                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Company Name</label>
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Company Name</label>
                                                             <div className="relative group">
                                                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                                                 <input
@@ -325,7 +328,7 @@ function add_sapybase_widget() {
                                                         </div>
 
                                                         <div className="space-y-2">
-                                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Allowed Origin</label>
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Allowed Origin</label>
                                                             <div className="relative group">
                                                                 <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                                                 <input
@@ -343,32 +346,30 @@ function add_sapybase_widget() {
 
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                         <div className="space-y-2">
-                                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Theme Color</label>
-                                                            <div className="flex gap-3">
-                                                                <div className="relative flex-1 group">
-                                                                    <Palette className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                                                    <input
-                                                                        type="text"
-                                                                        name="themeColor"
-                                                                        value={formData.themeColor}
-                                                                        onChange={handleChange}
-                                                                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none uppercase font-mono text-xs"
-                                                                    />
-                                                                </div>
-                                                                <div className="w-14 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative shadow-inner">
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Theme Color</label>
+                                                            <div className="relative group">
+                                                                <Palette className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                                                <input
+                                                                    type="text"
+                                                                    name="themeColor"
+                                                                    value={formData.themeColor}
+                                                                    onChange={handleChange}
+                                                                    className="w-full pl-12 pr-12 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none uppercase font-mono text-xs transition-all"
+                                                                />
+                                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-all group-hover:scale-110 active:scale-95">
                                                                     <input 
                                                                         type="color" 
                                                                         name="themeColor" 
                                                                         value={formData.themeColor} 
                                                                         onChange={handleChange} 
-                                                                        className="absolute inset-0 w-full h-[200%] cursor-pointer -translate-y-1/4" 
+                                                                        className="absolute inset-[-10px] w-[200%] h-[200%] cursor-pointer" 
                                                                     />
                                                                 </div>
                                                             </div>
                                                         </div>
 
                                                         <div className="space-y-2">
-                                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Tone of Voice</label>
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Tone of Voice</label>
                                                             <div className="relative">
                                                                 <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                                                 <select
@@ -390,16 +391,21 @@ function add_sapybase_widget() {
                                                         <button
                                                             type="submit"
                                                             disabled={isLoading}
-                                                            className="w-full group relative flex items-center justify-center gap-3 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-bold transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100 shadow-xl shadow-slate-900/10 dark:shadow-white/5"
+                                                            className={`relative overflow-hidden w-full flex justify-center py-4 px-4 rounded-2xl text-base font-bold text-white bg-linear-to-r from-blue-800 to-blue-600 hover:from-blue-500 hover:to-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 transform active:scale-[0.98] ${isLoading ? 'opacity-80 cursor-not-allowed shadow-none' : 'hover:shadow-blue-600/40 shadow-xl'}`}
                                                         >
                                                             {isLoading ? (
-                                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                                                <>
+                                                                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                                                                    Provisioning...
+                                                                </>
                                                             ) : (
                                                                 <>
-                                                                    Create Tenant
-                                                                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                                                    Create Tenant Knowledge
+                                                                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                                                                 </>
                                                             )}
+                                                            {/* Button soft glow overlay */}
+                                                            <div className="absolute inset-0 bg-white/20 opacity-0 hover:opacity-100 transition-opacity"></div>
                                                         </button>
                                                     </div>
                                                 </form>
@@ -411,19 +417,19 @@ function add_sapybase_widget() {
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 className="h-full flex flex-col items-center justify-center text-center space-y-8"
                                             >
-                                                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-3xl flex items-center justify-center text-green-600 shadow-inner">
+                                                <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
                                                     <CheckCircle className="w-10 h-10" />
                                                 </div>
                                                 
                                                 <div>
-                                                    <h2 className="text-3xl font-black text-slate-900 dark:text-white">{registrationData.companyName} Ready</h2>
+                                                    <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">{registrationData.companyName} Ready</h2>
                                                     <p className="text-slate-500 mt-2 font-medium">Your credentials have been generated and secured.</p>
                                                 </div>
 
                                                 <div className="w-full space-y-4 text-left">
                                                     <div className="space-y-2">
                                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">API Key</label>
-                                                        <div className="flex items-center gap-2 p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl font-mono text-xs text-indigo-600 dark:text-indigo-400 break-all transition-all hover:border-indigo-500/30">
+                                                        <div className="flex items-center gap-2 p-4 bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-indigo-600 dark:text-indigo-400 break-all transition-all hover:border-indigo-500/30 focus-within:ring-4 focus-within:ring-indigo-500/10">
                                                             <Key className="w-4 h-4 shrink-0 text-slate-400" />
                                                             {registrationData.apiKey}
                                                         </div>
@@ -431,15 +437,15 @@ function add_sapybase_widget() {
 
                                                     <div className="space-y-2">
                                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Embed Script</label>
-                                                        <div className="relative group">
-                                                            <pre className="p-4 bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto text-[10px] text-indigo-300 font-mono leading-relaxed max-h-[120px] scrollbar-hide">
+                                                        <div className="relative group/code">
+                                                            <pre className="p-5 bg-slate-900 rounded-xl border border-slate-800 overflow-x-auto text-[11px] text-indigo-300 font-mono leading-relaxed max-h-[160px] scrollbar-hide">
                                                                 <code>{embedCode}</code>
                                                             </pre>
                                                             <button
                                                                 onClick={() => handleCopy(embedCode)}
-                                                                className="absolute top-2 right-2 p-2 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-white transition-all border border-slate-700/50"
+                                                                className="absolute top-3 right-3 p-2.5 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-white transition-all border border-slate-700/50 shadow-lg"
                                                             >
-                                                                {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -447,7 +453,7 @@ function add_sapybase_widget() {
 
                                                 <button
                                                     onClick={handleReset}
-                                                    className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                                                    className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition-colors bg-indigo-50 dark:bg-indigo-900/40 py-2.5 px-6 rounded-xl border border-indigo-200 dark:border-indigo-800"
                                                 >
                                                     <ArrowRight className="w-4 h-4 rotate-180" />
                                                     Provision Another

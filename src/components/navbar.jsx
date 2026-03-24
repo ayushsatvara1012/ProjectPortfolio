@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch, LayoutDashboard, Key, ShieldCheck, LogIn, UserPlus } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth, UserButton, SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { useAuth, UserButton, SignInButton, SignUpButton, SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
 import Logo from "./Logo";
 
 
 const Navbar = () => {
   const { getToken, isLoaded: isAuthLoaded } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
   const [userRole, setUserRole] = useState('USER');
@@ -93,7 +94,7 @@ const Navbar = () => {
       icon: <LayoutDashboard size={18} />,
       href: "/dashboard"
     },
-    ...(userRole === 'ADMIN' ? [{
+    ...(userRole === 'ADMIN' && user?.primaryEmailAddress?.emailAddress === import.meta.env.VITE_ADMIN_EMAIL ? [{
       title: "Super Admin Panel",
       desc: "Manage platform users and companies.",
       icon: <ShieldCheck size={18} className="text-orange-500" />,

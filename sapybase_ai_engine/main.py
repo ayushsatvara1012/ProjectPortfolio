@@ -62,6 +62,9 @@ class ChatResponse(BaseModel):
     reply: str
     sources: list[str]
 
+class SubscriptionRequest(BaseModel):
+    tier: str # Starter, Pro, Enterprise
+
 # 5. Initialize Google AI Models
 embeddings_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_query")
 chat_model = ChatGoogleGenerativeAI(model="models/gemini-flash-latest", google_api_key=GEMINI_KEY, convert_system_message_to_human=True)
@@ -155,25 +158,32 @@ async def get_current_user(request: Request):
         if not clerk_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         
-        # 2. Look up role in our database
+        # 2. Look up role and email in our database
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT role FROM users WHERE clerk_id = %s", (clerk_id,))
+        cursor.execute("SELECT role, email FROM users WHERE clerk_id = %s", (clerk_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
         
         role = row[0] if row else "USER"
-        return {"clerk_id": clerk_id, "role": role}
+        email = row[1] if row else None
+        return {"clerk_id": clerk_id, "role": role, "email": email}
         
     except Exception as e:
         print(f"Auth Security Error: {e}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 async def get_admin_user(current_user: dict = Depends(get_current_user)):
-    """Dependency that ensures the user has a Super Admin role."""
+    """Dependency that ensures the user has a Super Admin role and matching email."""
+    allowed_admin_email = os.getenv("SUPER_ADMIN_EMAIL")
+    
     if current_user["role"] != "ADMIN":
         raise HTTPException(status_code=403, detail="Super Admin access denied.")
+    
+    if allowed_admin_email and current_user["email"] != allowed_admin_email:
+        raise HTTPException(status_code=403, detail="Unauthorized Admin Email.")
+        
     return current_user
 
 def get_company_by_clerk_id(clerk_id: str):
@@ -181,25 +191,32 @@ def get_company_by_clerk_id(clerk_id: str):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # Find the user first
+        # 1. Get our internal user_id
         cursor.execute("SELECT id FROM users WHERE clerk_id = %s", (clerk_id,))
         user_row = cursor.fetchone()
         if not user_row:
             return None
         
-        user_id = user_row[0]
-        # Find the company associated with this user
-        # (Assuming 1:1 for now, or we can use a lookup table)
+        user_uuid = user_row[0]
+        
+        # 2. Get company details
         cursor.execute(
-            """
-            SELECT id, company_name, company_tone, theme_color, allowed_origin, api_key 
-            FROM companies WHERE user_id = %s LIMIT 1
-            """, 
-            (user_id,)
+            "SELECT id, company_name, company_tone, theme_color, allowed_origin, api_key FROM companies WHERE user_id = %s", 
+            (user_uuid,)
         )
-        company_data = cursor.fetchone()
-        cursor.close()
-        return company_data
+        company_row = cursor.fetchone()
+        
+        if not company_row:
+            return None
+
+        return {
+            "id": company_row[0],
+            "company_name": company_row[1],
+            "company_tone": company_row[2],
+            "theme_color": company_row[3],
+            "allowed_origin": company_row[4],
+            "api_key": company_row[5]
+        }
     finally:
         if conn:
             conn.close()
@@ -225,12 +242,35 @@ def retrieve_knowledge(conn, company_id, query_vector, limit=3):
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(
     chat_req: ChatRequest, 
-    company: dict = Depends(verify_api_key_and_origin) # This triggers the auth & origin check!
+    company: dict = Depends(verify_api_key_and_origin)
 ):
     """
-    Core AI Chat Endpoint: Processes user queries, retrieves relevant
-    context from the vector DB, and generates a personalized response.
+    Core AI Chat Endpoint with Trial Enforcement.
     """
+    # Verify company/user subscription status
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.tier, u.trial_end_date, c.status 
+            FROM users u 
+            JOIN companies c ON c.user_id = u.id 
+            WHERE c.id = %s
+        """, (company["id"],))
+        sub_data = cursor.fetchone()
+        
+        if sub_data:
+            tier, trial_end, status = sub_data
+            if status != "active":
+                raise HTTPException(status_code=403, detail="Company account is suspended.")
+            
+            if tier == "STARTER" and trial_end:
+                from datetime import datetime
+                if trial_end < datetime.now():
+                    raise HTTPException(status_code=402, detail="Starter trial has expired. Please upgrade to Pro.")
+    finally:
+        conn.close()
+
     user_query = chat_req.message
     conn = None
     
@@ -306,9 +346,13 @@ async def train_chatbot(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Secure multi-tenant training endpoint. 
-    Uses the authenticated Clerk user to identify the company.
+    Secure multi-tenant training endpoint with Trial Enforcement.
     """
+    if current_user["tier"] == "STARTER" and current_user["trial_end_date"]:
+        from datetime import datetime
+        if current_user["trial_end_date"] < datetime.now():
+            raise HTTPException(status_code=402, detail="Starter trial has expired. Please upgrade to Pro to add more data.")
+
     clerk_id = current_user["clerk_id"]
     company_data = get_company_by_clerk_id(clerk_id)
     if not company_data:
@@ -468,13 +512,25 @@ async def get_my_company(current_user: dict = Depends(get_current_user)):
     
     return {
         "status": "success",
-        "id": str(company_data[0]),
-        "company_name": company_data[1],
-        "company_tone": company_data[2],
-        "theme_color": company_data[3],
-        "allowed_origin": company_data[4],
-        "api_key": company_data[5],
+        "id": str(company_data["id"]),
+        "company_name": company_data["company_name"],
+        "company_tone": company_data["company_tone"],
+        "theme_color": company_data["theme_color"],
+        "allowed_origin": company_data["allowed_origin"],
+        "api_key": company_data["api_key"],
         "role": current_user["role"]
+    }
+
+@app.get("/api/me")
+async def get_my_profile(current_user: dict = Depends(get_current_user)):
+    """Returns the authenticated user's own profile and subscription data."""
+    return {
+        "status": "success",
+        "clerk_id": current_user["clerk_id"],
+        "role": current_user["role"],
+        "tier": current_user["tier"],
+        "trial_end_date": current_user["trial_end_date"],
+        "email": current_user["email"]
     }
 
 # --- SUPER ADMIN ENDPOINTS ---
@@ -498,15 +554,95 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         conn.close()
 
 @app.get("/api/admin/companies")
-async def list_all_companies(admin: dict = Depends(get_admin_user)):
-    """Lists all companies across the platform (Super Admin only)."""
+async def get_all_companies(admin: dict = Depends(get_admin_user)):
+    """Admin-only view of all registered companies."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, company_name, domain, api_key FROM companies")
+        cursor.execute("SELECT id, company_name, allowed_origin, created_at, admin_notes FROM companies ORDER BY created_at DESC")
         companies = cursor.fetchall()
-        cursor.close()
-        return [{"id": str(c[0]), "name": c[1], "domain": c[2], "key": c[3]} for c in companies]
+        return [
+            {"id": c[0], "name": c[1], "origin": c[2], "created_at": c[3], "notes": c[4]} 
+            for c in companies
+        ]
+    finally:
+        conn.close()
+
+@app.post("/api/user/subscription")
+async def update_subscription(
+    request: SubscriptionRequest, 
+    user: dict = Depends(get_current_user)
+):
+    """Updates the user's subscription tier and sets trial end date for STARTER."""
+    if request.tier not in ["FREE", "STARTER", "PRO", "ENTERPRISE"]:
+        raise HTTPException(status_code=400, detail="Invalid subscription tier")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        trial_end = None
+        if request.tier == "STARTER":
+            from datetime import datetime, timedelta
+            trial_end = datetime.now() + timedelta(days=30)
+
+        cursor.execute(
+            "UPDATE users SET tier = %s, trial_end_date = %s WHERE clerk_id = %s", 
+            (request.tier, trial_end, user["clerk_id"])
+        )
+        conn.commit()
+        return {"status": "success", "message": f"Subscription updated to {request.tier}", "trial_end": trial_end}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/api/admin/users")
+async def get_all_users(admin: dict = Depends(get_admin_user)):
+    """Admin-only view of all registered users."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT clerk_id, email, role, tier, trial_end_date, created_at FROM users ORDER BY created_at DESC")
+        users = cursor.fetchall()
+        return [
+            {
+                "clerk_id": u[0], 
+                "email": u[1], 
+                "role": u[2], 
+                "tier": u[3], 
+                "trial_end": u[4], 
+                "created_at": u[5]
+            } for u in users
+        ]
+    finally:
+        conn.close()
+
+@app.patch("/api/admin/users/{clerk_id}")
+async def update_user_admin(clerk_id: str, data: dict, admin: dict = Depends(get_admin_user)):
+    """Super Admin: Update a user's role or tier."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        if "role" in data:
+            cursor.execute("UPDATE users SET role = %s WHERE clerk_id = %s", (data["role"], clerk_id))
+        if "tier" in data:
+            cursor.execute("UPDATE users SET tier = %s WHERE clerk_id = %s", (data["tier"], clerk_id))
+        conn.commit()
+        return {"status": "success"}
+    finally:
+        conn.close()
+
+@app.delete("/api/admin/companies/{company_id}")
+async def delete_company_admin(company_id: str, admin: dict = Depends(get_admin_user)):
+    """Super Admin: Delete a company."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM companies WHERE id = %s", (company_id,))
+        conn.commit()
+        return {"status": "success"}
     finally:
         conn.close()
 
