@@ -1,14 +1,40 @@
 import React, { useState, useEffect } from "react";
-import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch, LayoutDashboard, Key } from "lucide-react";
+import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch, LayoutDashboard, Key, ShieldCheck } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import Logo from "./Logo";
 
 
 const Navbar = () => {
+  const { getToken, isLoaded: isAuthLoaded } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
+  const [userRole, setUserRole] = useState('USER');
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!isAuthLoaded) return;
+      try {
+        const token = await getToken();
+        const baseUrl = import.meta.env.VITE_API_URL
+          ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}`
+          : '';
+        
+        const response = await fetch(`${baseUrl}/api/company/details`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (data.role) {
+          setUserRole(data.role);
+        }
+      } catch (err) {
+        console.error("Navbar role fetch error:", err);
+      }
+    };
+    fetchUserRole();
+  }, [isAuthLoaded, getToken]);
 
   useEffect(() => {
     if (isOpen) {
@@ -66,7 +92,13 @@ const Navbar = () => {
       desc: "Train your AI and manage knowledge.",
       icon: <LayoutDashboard size={18} />,
       href: "/dashboard"
-    }
+    },
+    ...(userRole === 'ADMIN' ? [{
+      title: "Super Admin Panel",
+      desc: "Manage platform users and companies.",
+      icon: <ShieldCheck size={18} className="text-orange-500" />,
+      href: "/admin"
+    }] : [])
   ];
 
   const navLinks = [
