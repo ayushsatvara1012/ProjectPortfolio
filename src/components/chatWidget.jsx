@@ -194,7 +194,7 @@ const ChatWidget = ({ apiKey }) => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-xl shadow-indigo-900/20 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
+                        className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 w-full h-[100dvh] sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-xl shadow-indigo-900/20 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
                     >
                         {/* Header with Animated Gradient Glow - Removed overflow-hidden to allow menu visibility */}
                         <div className="relative shrink-0">
@@ -266,7 +266,7 @@ const ChatWidget = ({ apiKey }) => {
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 p-4 overflow-y-auto overscroll-contain bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
+                        <div className="flex-1 p-4 overflow-y-auto overscroll-none bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
                             <AnimatePresence initial={false}>
                                 {messages.map((msg, idx) => (
                                     <motion.div
@@ -340,8 +340,8 @@ const ChatWidget = ({ apiKey }) => {
                                 </div>
                             )}
 
-                            {/* Actual Input Box */}
-                            <div className="p-2 sm:p-2 w-full">
+                            {/* Actual Input Box with Safe Area Support */}
+                            <div className="p-2 sm:p-2 w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                                 <form onSubmit={handleSend} className="relative flex items-center gap-2 bg-gray-50 border border-gray-200/80 rounded-xl p-1 shadow-sm">
                                     <textarea
                                         ref={inputRef}
@@ -349,8 +349,8 @@ const ChatWidget = ({ apiKey }) => {
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-sm leading-normal placeholder-gray-400 disabled:opacity-50"
-                                        style={{ fontSize: '14px' }}
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-[16px] leading-normal placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none"
+                                        style={{ fontSize: '16px' }}
                                         rows={1}
                                         disabled={isLoading}
                                         aria-label="Chat input"
@@ -359,8 +359,8 @@ const ChatWidget = ({ apiKey }) => {
                                         type="submit"
                                         disabled={isLoading || !input.trim()}
                                         aria-label="Send message"
-                                        className="p-2 shrink-0 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center translate-y-px"
-                                        style={{ backgroundColor: THEME_COLOR, touchAction: 'manipulation' }}
+                                        className="p-2 shrink-0 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center translate-y-px"
+                                        style={{ color: THEME_COLOR, touchAction: 'manipulation' }}
                                     >
                                         <Send size={15} />
                                     </button>
