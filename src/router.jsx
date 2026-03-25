@@ -11,18 +11,18 @@ const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Registration = lazy(() => import("./pages/Registration"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Pricing = lazy(() => import("./pages/Pricing"));
 import ErrorPage from "./pages/ErrorPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 import Logo from "./components/Logo";
 
-// 2. Create a high-end Loading fallback using the Logo
-const PageLoader = () => {
-  return (
-    <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-slate-950">
-      <Logo className="w-[160px] h-[80px] lg:w-[200px] lg:h-[100px]" />
+// 2. Create a high-end Loading fallback using the Logo component
+const PageLoader = () => (
+    <div className="w-full h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
     </div>
-  );
-};
+);
 
 const router = createBrowserRouter([
   {
@@ -82,7 +82,9 @@ const router = createBrowserRouter([
         path: "/dashboard",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <Dashboard />
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
           </Suspense>
         ),
       },
@@ -90,7 +92,17 @@ const router = createBrowserRouter([
         path: "/register",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <Registration />
+            <ProtectedRoute>
+              <Registration />
+            </ProtectedRoute>
+          </Suspense>
+        ),
+      },
+      {
+        path: "/pricing",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Pricing />
           </Suspense>
         ),
       },
@@ -98,7 +110,9 @@ const router = createBrowserRouter([
         path: "/admin",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <AdminDashboard />
+            <ProtectedRoute adminOnly={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
           </Suspense>
         ),
       },
