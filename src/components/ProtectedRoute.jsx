@@ -57,10 +57,11 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
         checkOnboardingStatus();
     }, [isUserLoaded, isAuthLoaded, isSignedIn, getToken]);
 
-    if (!isUserLoaded || !isAuthLoaded) {
+    // 1. Wait for BOTH Clerk and your backend/state to finish loading
+    if (!isUserLoaded || !isAuthLoaded || (isSignedIn && isLoading)) {
         return (
-            <div className="w-full h-[60vh] flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <div className="flex h-screen items-center justify-center bg-white dark:bg-slate-950">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
         );
     }
@@ -75,8 +76,9 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     // Only enforce redirects once we have finished the onboarding check (isLoading is false)
     if (!isLoading) {
         // 0. ADMIN PROTECTION (Highest priority)
-        if (adminOnly && role !== 'ADMIN') {
-            return <Navigate to="/dashboard" replace />;
+        // If they are an ADMIN, we let them through to /admin or /dashboard regardless of company/tier
+        if (role === 'ADMIN') {
+            return children;
         }
 
         // 1. If trying to access Dashboard but no Tier selected

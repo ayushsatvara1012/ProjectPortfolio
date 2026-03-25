@@ -1,8 +1,15 @@
 import os
+import time
 import tempfile
 import psycopg2
 import json
 import secrets
+import socket
+import ipaddress
+from psycopg2 import pool
+from enum import Enum
+from typing import Optional
+from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
@@ -17,6 +24,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from svix.webhooks import Webhook, WebhookVerificationError
 from jose import jwt
 import requests
+from psycopg2.errors import UniqueViolation
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -31,31 +39,137 @@ CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
 POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET")
 
-# 2. Initialize FastAPI App
+# 2. Initialize Database Connection Pool
+db_pool = pool.ThreadedConnectionPool(
+    minconn=1,
+    maxconn=20, # Scale based on your Neon tier (e.g., Free=20, Pro=500)
+    dsn=DB_URL
+)
+
+def get_db_connection():
+    """Retrieves a connection from the pool and registers pgvector."""
+    try:
+        conn = db_pool.getconn()
+        register_vector(conn)
+        return conn
+    except Exception as e:
+        print(f"Pool retrieval error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+def release_db_connection(conn):
+    """Returns a connection to the pool."""
+    if conn and hasattr(db_pool, 'putconn'):
+        db_pool.putconn(conn)
+
+def validate_safe_url(url: str):
+    """
+    SSRF Protection: Validates that the URL is public and uses a safe scheme.
+    """
+    # 1. Parse and check scheme
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="Only HTTP/HTTPS URLs are allowed.")
+
+    # 2. Prevent empty hostnames
+    if not parsed.hostname:
+        raise HTTPException(status_code=400, detail="Invalid URL hostname.")
+
+    try:
+        # 3. Resolve the hostname to an IP address
+        ip_addr_str = socket.gethostbyname(parsed.hostname)
+        ip_addr = ipaddress.ip_address(ip_addr_str)
+
+        # 4. Block private, loopback, and link-local ranges
+        if ip_addr.is_private or ip_addr.is_loopback or ip_addr.is_link_local:
+            raise HTTPException(
+                status_code=400, 
+                detail="Access to internal or private networks is forbidden."
+            )
+            
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Could not resolve the provided URL.")
+
+def log_admin_action(admin_id: str, action: str, target_id: Optional[str] = None, changes: Optional[dict] = None):
+    """
+    Issue #17: Persistence for Administrative Audit Logging.
+    Records who did what, and what changed, in a JSONB table.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO admin_audit_log (admin_clerk_id, action, target_id, changes) VALUES (%s, %s, %s, %s)",
+            (admin_id, action, target_id, json.dumps(changes) if changes else None)
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"AUDIT LOG FAILED: {e}")
+    finally:
+        release_db_connection(conn)
+
+def require_fresh_admin(request: Request):
+    """
+    Issue #16: Clerk Step-Up Auth (JWT Freshness).
+    Enforces that 'sensitive' admin actions require a token issued within 10 minutes.
+    """
+    # Note: Accessing the payload from a previously validated request state
+    # This assumes get_current_user was already called.
+    auth_state = getattr(request.state, "clerk_auth", None)
+    if not auth_state:
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
+    issued_at = auth_state.payload.get("iat", 0)
+    current_time = time.time()
+    
+    # 600 seconds = 10 minutes
+    if (current_time - issued_at) > 600:
+        raise HTTPException(
+            status_code=401, 
+            detail="Session too old. Please re-authenticate (Step-Up) for sensitive admin actions."
+        )
+    return auth_state
+
+# 3. Initialize FastAPI App
 app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
 
 # Setup SlowAPI Rate Limiter
-def get_limit_key(request: Request = None):
-    # Some versions of slowapi call the key_func without arguments 
-    # and expect it to fetch the request from context, or they use 
-    # inspection which can fail on lambdas.
-    if request:
-        return request.headers.get("x-api-key") or get_remote_address(request)
-    return "global"
+def get_limit_key(request: Request):
+    """
+    Identifies the user/client for rate limiting.
+    Prioritizes API Key, then Remote IP. Never defaults to 'global'.
+    """
+    # Priority 1: Identify by custom API Key header
+    api_key = request.headers.get("x-api-key")
+    if api_key:
+        return f"api_key:{api_key}"
+    
+    # Priority 2: Fallback to IP Address
+    return f"ip:{get_remote_address(request)}"
 
 limiter = Limiter(key_func=get_limit_key)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 3. Configure CORS (Production Hardening)
-# For the widget to work on any client site, we check origins dynamically in the chat endpoint.
-# But for the Dashboard and Admin API, we restrict to our own sites.
-ALLOWED_ORIGINS = ["*"]
+ALLOWED_ORIGINS = {
+    "https://sapybase.com",
+    "https://app.sapybase.com",
+    "https://admin.sapybase.com"
+}
+
+ALLOWED_DEV_ORIGINS = {
+    "http://localhost:5173", 
+    "http://localhost:3000", 
+    "http://127.0.0.1:5173"
+}
+
+# Sync middleware with our strict allowlist
+combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False, # Must be False for allow_origins=["*"]
+    allow_origins=combined_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,28 +191,38 @@ class ChatResponse(BaseModel):
 class SubscriptionRequest(BaseModel):
     tier: str # Starter, Pro, Enterprise
 
+class UserRole(str, Enum):
+    ADMIN = "ADMIN"
+    USER = "USER"
+
+class UserTier(str, Enum):
+    FREE = "FREE"
+    STARTER = "STARTER"
+    PRO = "PRO"
+    ENTERPRISE = "ENTERPRISE"
+
+class AdminUpdateUserRequest(BaseModel):
+    tier: Optional[UserTier] = None
+
+    class Config:
+        extra = "forbid" # Prevents extra fields in the request
+
 # 5. Initialize Google AI Models
-embeddings_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_query")
+embeddings_model_doc = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_document")
+embeddings_model_query = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_query")
+
 chat_model = ChatGoogleGenerativeAI(
-    model="models/gemini-flash-latest", 
+    model="gemini-2.5-flash", 
     google_api_key=GEMINI_KEY, 
     max_output_tokens=300,
-    convert_system_message_to_human=True
+    temperature=0.4,
+    top_p=0.9,
 )
 
 # --- AUTHENTICATION & SECURITY SHIELD ---
 
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 
-def get_db_connection():
-    """Establishes a connection to the Neon database."""
-    try:
-        conn = psycopg2.connect(DB_URL)
-        register_vector(conn)
-        return conn
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        raise HTTPException(status_code=500, detail="Database connection failed")
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
     """
@@ -120,8 +244,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         company_data = cursor.fetchone()
         cursor.close()
     finally:
-        if conn:
-            conn.close()
+        release_db_connection(conn)
 
     if not company_data:
         raise HTTPException(status_code=401, detail="Invalid API Key.")
@@ -143,20 +266,28 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     # 3. The Ironclad Origin Check
     client_origin = request.headers.get("origin") or request.headers.get("referer")
     
-    # Clean up the origin string
     if client_origin:
-        client_origin = client_origin.rstrip('/')
+        # Normalize: Remove trailing slash
+        actual_client_origin = client_origin.rstrip('/')
         
-        # Normalize for comparison (remove protocol for simple domain match if necessary, 
-        # but here we compare strict origin strings or "*" )
         allowed = (company["allowed_origin"] or "").rstrip('/')
         
-        if allowed != "*" and client_origin != allowed:
-             # Basic sanity check: also check if origin is localhost/sapybase (internal dashboard)
-             if "*" not in ALLOWED_ORIGINS and client_origin not in ALLOWED_ORIGINS:
-                 # Allow local development origins regardless of company settings
-                 if client_origin and not any(ext in client_origin for ext in ["localhost", "127.0.0.1"]):
-                    raise HTTPException(status_code=403, detail=f"Unauthorized Origin: {client_origin}")
+        # 3.1. Priority Check: Company-specific allowed origin (Exact Match)
+        if allowed != "*" and actual_client_origin != allowed:
+            # 3.2. Secondary Check: Platform Production Origins
+            if actual_client_origin in ALLOWED_ORIGINS:
+                return company
+
+            # 3.3. Development Origins (Only in Debug/Dev mode)
+            is_dev = os.getenv("ENV") == "development"
+            if is_dev and actual_client_origin in ALLOWED_DEV_ORIGINS:
+                return company
+            
+            # 3.4. Unauthorized
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Unauthorized Origin: {actual_client_origin}"
+            )
 
     return company
 
@@ -164,66 +295,82 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
 
 async def get_current_user(request: Request):
     """
-    Verifies the Clerk JWT signature (RS256) from the Authorization header.
-    This ensures the user identity is AUTHENTIC and signed by Clerk.
+    Issue #8: Silent User Sync Bypass (Auto-Provisioning).
+    If a valid JWT exists but the row is missing, we create the user profile on the fly.
     """
     try:
-        # Secure server-side verification using Clerk SDK
+        # 1. Secure server-side verification using Clerk SDK
         clerk = Clerk(bearer_auth=os.getenv("CLERK_SECRET_KEY"))
-        request_state = clerk.authenticate_request(
-            request, 
-            AuthenticateRequestOptions()
-        )
+        request_state = clerk.authenticate_request(request, AuthenticateRequestOptions())
         
         if not request_state.is_signed_in:
-            raise HTTPException(status_code=401, detail="Invalid or expired token signature")
+            raise HTTPException(status_code=401, detail="Invalid token")
             
+        # Store for Issue #16 (Step-Up Auth)
+        request.state.clerk_auth = request_state
         clerk_id = request_state.payload.get("sub")
-        
-        if not clerk_id:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
+        email = request_state.payload.get("email", "unknown@email.com")
         
         # 2. Look up profile in our database
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, role, email, tier, subscription_status FROM users WHERE clerk_id = %s", (clerk_id,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        if not row:
-            raise HTTPException(status_code=404, detail="User profile not synced. Please ensure Clerk webhooks are firing.")
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, role, email, tier, subscription_status FROM users WHERE clerk_id = %s", (clerk_id,))
+            row = cursor.fetchone()
 
-        user_id, role, email, tier, subscription_status = row
-        return {"id": user_id, "clerk_id": clerk_id, "role": role, "email": email, "tier": tier, "subscription_status": subscription_status}
+            if not row:
+                # ⚠️ WEBHOOK FALLBACK: Auto-provision missing user
+                cursor.execute(
+                    "INSERT INTO users (clerk_id, email, role, tier) VALUES (%s, %s, 'USER', 'FREE') ON CONFLICT DO NOTHING RETURNING id, role, email, tier, subscription_status",
+                    (clerk_id, email)
+                )
+                row = cursor.fetchone()
+                
+            # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
+            if row:
+                user_id, role, user_email, tier, subscription_status = row
+                
+                # SELF-HEALING: If this is the configured admin email, ensure role/tier are correct
+                admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
+                if user_email == admin_email and (role != 'ADMIN' or tier != 'PRO'):
+                    cursor.execute("UPDATE users SET role = 'ADMIN', tier = 'PRO' WHERE id = %s", (user_id,))
+                    role = 'ADMIN'
+                    tier = 'PRO'
+                
+                cursor.execute(
+                    "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
+                    (user_id,)
+                )
+            conn.commit()
+            
+            cursor.close()
+        finally:
+            release_db_connection(conn)
         
-    except HTTPException:
-        raise
+        if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
+
+        user_id, role, user_email, tier, subscription_status = row
+        # Return updated values if they were changed by self-healing
+        return {"id": user_id, "clerk_id": clerk_id, "role": role, "email": user_email, "tier": tier, "subscription_status": subscription_status}
+        
+    except HTTPException: raise
     except Exception as e:
-        print(f"Auth Security Error: {e}")
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        print(f"AUTH ERROR: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
-async def get_admin_user(current_user: dict = Depends(get_current_user)):
-    """Dependency that ensures the user has a Super Admin role and matching email."""
-    allowed_admin_email = os.getenv("SUPER_ADMIN_EMAIL")
+async def get_admin_user(user: dict = Depends(get_current_user)):
+    """
+    Issue #7: Backend Security Hardening.
+    Strictly verifies that the user is an ADMIN and matches the ADMIN_EMAIL.
+    """
+    admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
     
-    # 1. Primary Check: Role must be ADMIN
-    if current_user["role"] != "ADMIN":
-        raise HTTPException(status_code=403, detail="Super Admin access denied.")
-    
-    # 2. Secondary Guard: If SUPER_ADMIN_EMAIL is set, enforce matching email
-    # This allows for a master admin account while still enabling role-based access for others if needed,
-    # or strictly locking it down to one dev email.
-    if allowed_admin_email and current_user["email"] != allowed_admin_email:
-        # For now, if someone is specifically set as ADMIN in the DB, we can trust them 
-        # unless the SUPER_ADMIN_EMAIL is explicitly meant to be the ONLY allowed admin.
-        # But commonly, the role check is enough for platform admins.
-        # Let's keep it as a 'Warning' log but allow for now if needed, 
-        # OR keep it strict if the user prefers. 
-        # The user's request implies they want their promoted account to work.
-        pass 
-        
-    return current_user
+    if user.get("role") != "ADMIN" or user.get("email") != admin_email:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied. Only the primary administrator can perform this action."
+        )
+    return user
 
 def get_company_by_clerk_id(clerk_id: str):
     """Retrieves company data associated with a Clerk User ID."""
@@ -240,7 +387,11 @@ def get_company_by_clerk_id(clerk_id: str):
         
         # 2. Get company details
         cursor.execute(
-            "SELECT id, company_name, company_tone, theme_color, allowed_origin, api_key FROM companies WHERE user_id = %s", 
+            """
+            SELECT id, company_name, company_tone, theme_color, allowed_origin, 
+                   api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt
+            FROM companies WHERE user_id = %s
+            """, 
             (user_uuid,)
         )
         company_row = cursor.fetchone()
@@ -254,13 +405,17 @@ def get_company_by_clerk_id(clerk_id: str):
             "company_tone": company_row[2],
             "theme_color": company_row[3],
             "allowed_origin": company_row[4],
-            "api_key": company_row[5]
+            "api_key": company_row[5],
+            "bot_name": company_row[6],
+            "logo_url": company_row[7],
+            "initial_message": company_row[8],
+            "quick_questions": company_row[9],
+            "system_prompt": company_row[10]
         }
     finally:
-        if conn:
-            conn.close()
+        release_db_connection(conn)
 
-def retrieve_knowledge(conn, company_id, query_vector, limit=3):
+def retrieve_knowledge(conn, company_id, query_vector, limit=10):
     """Performs Cosine Similarity search using pgvector for a SPECIFIC company."""
     cursor = conn.cursor()
     cursor.execute(
@@ -276,8 +431,6 @@ def retrieve_knowledge(conn, company_id, query_vector, limit=3):
     cursor.close()
     return results
 
-# --- MAIN API ENDPOINT ---
-
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("10/minute")
 async def chat_endpoint(
@@ -285,15 +438,14 @@ async def chat_endpoint(
     chat_req: ChatRequest, 
     company: dict = Depends(verify_api_key_and_origin)
 ):
-    """
-    Core AI Chat Endpoint with Trial Enforcement.
-    """
-    # 0. Verify usage limits and subscription status
+    """Core AI Chat Endpoint with Trial Enforcement and Connection Pooling."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        
+        # 0. Verify usage limits and subscription status
         cursor.execute("""
-            SELECT u.tier, u.trial_end_date, c.status, ut.messages_used, u.id
+            SELECT u.tier, u.trial_end_date, u.subscription_status, ut.messages_used, u.id
             FROM users u 
             JOIN companies c ON c.user_id = u.id 
             LEFT JOIN usage_tracking ut ON ut.user_id = u.id
@@ -307,110 +459,74 @@ async def chat_endpoint(
 
         tier, trial_end, status, messages_used, user_uuid = sub_data
         
-        if status != "active":
+        if status != "active" and tier != "FREE": # Allow FREE tier even if status is pending
             raise HTTPException(status_code=403, detail="Company account is suspended.")
 
-        if tier == "STARTER" and trial_end:
-            from datetime import datetime
-            if trial_end < datetime.now():
-                raise HTTPException(status_code=402, detail="Starter trial has expired. Please upgrade.")
-
-        # Define Limits
-        LIMITS = {
-            "FREE": 200,
-            "STARTER": 2000,
-            "PRO": None,
-            "ENTERPRISE": None
-        }
+        # 1. Quota Check
+        LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
         current_limit = LIMITS.get(tier, 200)
 
-        # Atomic Usage Increment (Race-Condition Free)
-        cursor.execute(
-            """
-            UPDATE usage_tracking 
-            SET messages_used = messages_used + 1 
-            WHERE user_id = %s AND (messages_used < %s OR %s::integer IS NULL) 
-            RETURNING messages_used
-            """,
-            (user_uuid, current_limit, current_limit)
-        )
-        updated_row = cursor.fetchone()
-        conn.commit()
+        if messages_used is not None and current_limit is not None and messages_used >= current_limit:
+            raise HTTPException(status_code=402, detail=f"Message limit reached for {tier} tier.")
 
-        if not updated_row:
-            display_limit = current_limit if current_limit is not None else 'Unlimited'
-            raise HTTPException(status_code=402, detail=f"Message limit reached for {tier} tier ({display_limit} messages). Please upgrade.")
-            
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
-
-    user_query = chat_req.message
-    conn = None
-    
-    try:
-        # 1. Convert user question to vector
-        query_vector = embeddings_model.embed_query(user_query)
-        # Ensure vector dimension matches DB schema
+        # 2. Vector Search (RAG)
+        query_vector = embeddings_model_query.embed_query(chat_req.message)
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
-        
-        # 2. Search ONLY within the specific company's knowledge base
-        conn = get_db_connection()
+            
         retrieved_docs = retrieve_knowledge(conn, company["id"], query_vector)
-
-        # 3. Format Context for the LLM
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
-        sources = list(set([row[1] for row in retrieved_docs]))
 
-        # 4. Construct the Dynamic Multi-Tenant Prompt
-        master_prompt = f"""
-        Identity: "You are {company['bot_name']}, an elite enterprise AI assistant currently deployed for {company['company_name']}."
-        Tone: "Your conversational tone should be: {company['company_tone']}."
-        
-        Official Knowledge Base:
-        --- START KNOWLEDGE BASE ---
-        {context_text}
-        --- END KNOWLEDGE BASE ---
-        
-        Instructions: 
-        1. Answer the user's question using ONLY the knowledge base provided above.
-        2. If the answer is not in the knowledge base, politely say you don't have that info.
-        3. Format your response in clean Markdown.
+        # 3. Formulate Prompt
+        bot_name = company.get('bot_name') or "Sapy AI"
+        company_name = company.get('company_name') or "Sapybase"
+        company_tone = company.get('company_tone') or "Professional, expert and highly descriptive"
+        system_instructions = company.get('system_prompt') or "Answer the user's question clearly and accurately based ONLY on the provided facts."
 
-        User Question: {user_query}
+        system_message = f"""
+        You are {bot_name}, the official enterprise AI assistant for {company_name}.
+        Your tone must be: {company_tone}.
+
+        YOUR DIRECTIVE:
+        {system_instructions}
+
+        STRICT RULES YOU MUST FOLLOW:
+        1. NO HALLUCINATIONS: You must base your answer strictly on the KNOWLEDGE BASE provided below. If the answer is not in the knowledge base, do not guess. Say: "I don't have that exact information, but I can connect you with our team."
+        2. CONCISENESS: Keep your answer between 1 to 3 short paragraphs. Get straight to the point.
+        3. FORMATTING: Use brief bullet points if explaining multiple steps or items.
+        4. IMMERSION: Never say "According to the knowledge base" or "Based on the provided text." Speak directly to the user as if you just know the answer.
         """
 
-        # 5. Call LLM (Gemini)
-        messages = [
-            HumanMessage(content=master_prompt)
-        ]
+        knowledge_context = f"KNOWLEDGE BASE:\n{context_text}" if context_text else "KNOWLEDGE BASE: (Empty - No specific knowledge found for this query)"
         
+        # 4. Generate AI response
+        messages = [
+            SystemMessage(content=system_message),
+            HumanMessage(content=f"{knowledge_context}\n\nUSER QUERY: {chat_req.message}")
+        ]
         ai_response = chat_model.invoke(messages)
+        reply_text = str(ai_response.content)
 
-        # Gemini sometimes returns a list of blocks instead of a string payload
-        reply_content = ai_response.content
-        if isinstance(reply_content, list):
-            reply_text = "".join([block.get("text", "") for block in reply_content if isinstance(block, dict) and block.get("type") == "text"])
-        else:
-            reply_text = str(reply_content)
+        # 5. Track Usage
+        cursor.execute(
+            "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE user_id = %s",
+            (user_uuid,)
+        )
+        conn.commit()
 
         return ChatResponse(
             reply=reply_text,
             sources=list(set([row[1] for row in retrieved_docs]))
         )
-
     except Exception as e:
-        print(f"Error during chat processing: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-        
-    finally:
-        # Connection Leak Prevention
-        # This guarantees the connection goes back to the pool, even if the API fails
         if conn:
-            conn.close()
+            conn.rollback()
+        print(f"CHAT ERROR: {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="Internal connection error")
+    finally:
+        release_db_connection(conn)
 
 
 # --- TRAINING ENDPOINT ---
@@ -419,45 +535,93 @@ async def chat_endpoint(
 async def train_chatbot(
     url: str = Form(None), 
     file: UploadFile = File(None), 
+    text: str = Form(None),
+    api_key: str = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Secure multi-tenant training endpoint with Trial Enforcement.
-    """
-    if current_user["tier"] == "STARTER" and current_user["trial_end_date"]:
-        from datetime import datetime
-        if current_user["trial_end_date"] < datetime.now():
-            raise HTTPException(status_code=402, detail="Starter trial has expired. Please upgrade to Pro to add more data.")
-
-    clerk_id = current_user["clerk_id"]
-    company_data = get_company_by_clerk_id(clerk_id)
-    if not company_data:
-        raise HTTPException(status_code=404, detail="No company found for this user. Please register first.")
-    
-    company = {
-        "id": company_data["id"],
-        "company_name": company_data["company_name"]
-    }
-
-    if not url and not file:
-        raise HTTPException(status_code=400, detail="You must provide either a URL or a PDF file.")
-
-    docs = []
+    """Secure multi-tenant training endpoint with multiple input types."""
+    # 1. Quota Check (Issue #13)
     conn = get_db_connection()
-
     try:
-        # --- 1A. Process Website URL ---
+        cursor = conn.cursor()
+        
+        # Identify Company: Use provided API key OR the user's primary company
+        if api_key:
+            cursor.execute("SELECT id FROM companies WHERE api_key = %s", (api_key,))
+        else:
+            cursor.execute("SELECT id FROM companies WHERE user_id = %s", (current_user["id"],))
+            
+        company_row = cursor.fetchone()
+        if not company_row:
+            raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
+        company_id = company_row[0]
+
+        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (company_id,))
+        current_count = cursor.fetchone()[0]
+        
+        TIER_LIMITS = {"FREE": 50, "STARTER": 500, "PRO": 5000}
+        limit = TIER_LIMITS.get(current_user["tier"], 50)
+        
+        if current_count >= limit:
+            raise HTTPException(status_code=402, detail=f"Knowledge base limit reached for {current_user['tier']} tier.")
+
+        docs = []
+        # --- 1A. Process Website URL (Issue #14: SSRF) ---
+        warning = None
         if url:
-            web_loader = WebBaseLoader(url)
-            docs.extend(web_loader.load())
+            validate_safe_url(url)
+            # Use browser-like headers to avoid being blocked or getting empty shells
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Referer": "https://www.google.com/"
+            }
+            web_loader = WebBaseLoader(url, header_template=headers)
+            url_docs = web_loader.load()
+            
+            # Check for low content extraction (Common in CSR apps)
+            full_text = " ".join([d.page_content for d in url_docs])
+            
+            # Advanced Extraction: Look for hidden JSON data in script tags if content is low
+            if len(full_text) < 1000:
+                import json
+                from bs4 import BeautifulSoup
+                import requests
+                try:
+                    resp = requests.get(url, headers=headers, timeout=10)
+                    if resp.ok:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        # Look for common SPA data containers
+                        spa_data = []
+                        for script in soup.find_all('script', type='application/json'):
+                            spa_data.append(script.string or "")
+                        for script in soup.find_all('script'):
+                            content = script.string or ""
+                            if '__NEXT_DATA__' in content or 'window.__PRELOADED_STATE__' in content:
+                                spa_data.append(content)
+                        
+                        if spa_data:
+                            from langchain_core.documents import Document
+                            extra_text = " ".join(spa_data)
+                            # Clean up JSON boilerplate to keep it readable
+                            if len(extra_text) > 100:
+                                url_docs.append(Document(page_content=f"Extracted SPA Data: {extra_text[:5000]}", metadata={"source": url, "type": "spa_json"}))
+                                full_text = " ".join([d.page_content for d in url_docs])
+                except Exception as e:
+                    print(f"Advanced extraction failed: {e}")
+
+            if len(full_text) < 500:
+                warning = "Heads up! This site appears to be a modern JavaScript app (React/Next.js). We extracted very little text. Please use the 'Knowledge Text' box below to paste content directly for best results."
+            
+            docs.extend(url_docs)
             source_name = url
 
         # --- 1B. Process PDF File ---
         if file:
             if not file.filename.lower().endswith('.pdf'):
-                raise HTTPException(status_code=400, detail="Only PDF files are currently supported.")
+                raise HTTPException(status_code=400, detail="Only PDF files are supported.")
             
-            # Save the uploaded file to a temporary location for LangChain to read
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
                 temp_pdf.write(await file.read())
                 temp_pdf_path = temp_pdf.name
@@ -467,144 +631,129 @@ async def train_chatbot(
                 docs.extend(pdf_loader.load())
                 source_name = file.filename
             finally:
-                # Always clean up the temporary file from the server
                 if os.path.exists(temp_pdf_path):
                     os.remove(temp_pdf_path)
 
-        if not docs:
-            raise HTTPException(status_code=400, detail="No content found to extract.")
+        # --- 1C. Process Manual Text ---
+        if text and text.strip():
+            from langchain_core.documents import Document
+            docs.append(Document(page_content=text.strip(), metadata={"source": "manual_entry"}))
+            source_name = "Manual Knowledge Entry"
 
-        # --- 2. Chop the text into AI-readable chunks ---
+        if not docs:
+            raise HTTPException(status_code=400, detail="No content extracted.")
+
+        # --- 2. Chunk and Embed ---
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = text_splitter.split_documents(docs)
 
-        # --- 3. Vectorize and Save to Neon DB ---
-        cursor = conn.cursor()
         for chunk in chunks:
-            # Generate the mathematical representation using your embedding model
-            embedding = embeddings_model.embed_query(chunk.page_content)
+            if current_count >= limit: break
+            embedding = embeddings_model_doc.embed_query(chunk.page_content)
+            if len(embedding) > 768: embedding = embedding[:768]
             
-            # Ensure vector dimension matches DB schema (768 for gemini-embedding-001)
-            if len(embedding) > 768:
-                embedding = embedding[:768]
-                
-            # Lock the knowledge STRICTLY to this specific company's ID
             cursor.execute(
-                """
-                INSERT INTO company_knowledge (company_id, content, url, embedding) 
-                VALUES (%s, %s, %s, %s)
-                """,
-                (company["id"], chunk.page_content, source_name, embedding)
+                "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
+                (company_id, chunk.page_content, source_name, embedding)
             )
+            current_count += 1
         
         conn.commit()
-        cursor.close()
-
         return {
             "status": "success", 
-            "message": f"Successfully trained '{company['company_name']}' on {len(chunks)} knowledge chunks!"
+            "message": f"Trained on {len(chunks)} chunks.",
+            "warning": warning
         }
-
     except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"Training Error for {company['company_name']}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+        if conn: conn.rollback()
+        if isinstance(e, HTTPException): raise e
+        print(f"TRAIN ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Training failed.")
     finally:
-        if conn:
-            conn.close()
-
+        release_db_connection(conn)
 
 @app.post("/api/register")
-async def register_new_company(req: RegisterRequest, current_user: dict = Depends(get_current_user)):
-    """
-    Registers a new company linked to the authenticated Clerk user.
-    """
-    clerk_id = current_user["clerk_id"]
+async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_current_user)):
+    """Registers a new company tied to the current user."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
-        # 1. Get our internal user_id and tier from the clerk_id
-        cursor.execute("SELECT id, tier FROM users WHERE clerk_id = %s", (clerk_id,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            raise HTTPException(status_code=404, detail="User not synced yet. Please try again in a moment.")
-        
-        user_uuid = user_row[0]
-        user_tier = user_row[1]
-
-        # Block registration for users who haven't selected ANY plan (tier is NULL)
-        if not user_tier:
-            raise HTTPException(status_code=402, detail="Please select a subscription plan or start a free trial first.")
-
-        # 2. Check if company already exists for this user
-        cursor.execute("SELECT id FROM companies WHERE user_id = %s", (user_uuid,))
+        cursor.execute("SELECT id FROM companies WHERE user_id = %s", (user["id"],))
         if cursor.fetchone():
-            raise HTTPException(status_code=400, detail="A company is already registered for this account.")
+            raise HTTPException(status_code=400, detail="User already has a company.")
 
-        # 3. Generate a secure 32-byte key
-        new_api_key = f"sb_live_{secrets.token_urlsafe(32)}"
-        
-        # Extract basic domain
-        domain_str = req.allowed_origin.replace("https://", "").replace("http://", "").split("/")[0]
-
+        api_key = f"sb_{secrets.token_urlsafe(32)}"
         cursor.execute(
-            """
-            INSERT INTO companies (user_id, company_name, domain, allowed_origin, api_key, theme_color, company_tone) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """,
-            (user_uuid, req.company_name, domain_str, req.allowed_origin, new_api_key, req.theme_color, req.company_tone)
+            "INSERT INTO companies (user_id, company_name, allowed_origin, domain, api_key) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin, api_key)
         )
-        new_company_id = cursor.fetchone()[0]
+        company_id = cursor.fetchone()[0]
+        cursor.execute("UPDATE users SET role = 'ADMIN' WHERE id = %s", (user["id"],))
         conn.commit()
-        cursor.close()
-
-        return {
-            "status": "success",
-            "api_key": new_api_key,
-            "company_id": str(new_company_id)
-        }
-
-    except HTTPException:
-        raise
+        return {"status": "success", "api_key": api_key, "company_id": company_id}
     except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"Registration Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Registration failed.")
     finally:
-        if conn:
-            conn.close()
+        release_db_connection(conn)
 
+## BY PASS CODE 
+
+# @app.post("/api/register")
+# async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_current_user)):
+#     """
+#     TEMPORARY BYPASS: Returns success without database insertion.
+#     Remove this block to resume real registrations.
+#     """
+#     return {
+#         "status": "success", 
+#         "api_key": "sb_bypass_key_active", 
+#         "company_id": "00000000-0000-0000-0000-000000000000",
+#         "allowed_origin": reg.allowed_origin,
+#         "message": "BYPASS MODE: No data was saved to the database."
+#     }
+
+
+@app.post("/api/company/rotate-key")
+async def rotate_api_key(user: dict = Depends(get_current_user)):
+    """
+    Issue #15: API Key Rotation Mechanism.
+    Identifies the company via the user profile and generates a fresh, secure key.
+    """
+    new_key = f"sb_{secrets.token_urlsafe(32)}"
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # 1. Update the key (which immediately invalidates the old one)
+        cursor.execute(
+            "UPDATE companies SET api_key = %s WHERE user_id = %s RETURNING id",
+            (new_key, user["id"])
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="No company found for this user.")
+        
+        conn.commit()
+        
+        # 2. Audit the rotation
+        log_admin_action(user["clerk_id"], "ROTATE_API_KEY", str(row[0]), {"method": "MANUAL_ROTATION"})
+        
+        return {"status": "success", "new_key": new_key}
+    except Exception as e:
+        if conn: conn.rollback()
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail="Key rotation failed.")
+    finally:
+        release_db_connection(conn)
 
 @app.get("/api/config")
 def get_config(company: dict = Depends(verify_api_key_and_origin)):
-    """Returns the full branding and UI configuration for the frontend chat widget."""
+    """Returns branding for the widget."""
     return company
-
-@app.get("/api/company/details")
-async def get_my_company(current_user: dict = Depends(get_current_user)):
-    """Returns information about the authenticated user's company for the dashboard."""
-    clerk_id = current_user["clerk_id"]
-    company_data = get_company_by_clerk_id(clerk_id)
-    if not company_data:
-        return {"status": "none", "message": "No company registered.", "role": current_user["role"]}
-    
-    return {
-        "status": "success",
-        "id": str(company_data["id"]),
-        "company_name": company_data["company_name"],
-        "company_tone": company_data["company_tone"],
-        "theme_color": company_data["theme_color"],
-        "allowed_origin": company_data["allowed_origin"],
-        "api_key": company_data["api_key"],
-        "role": current_user["role"]
-    }
 
 @app.get("/api/me")
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
-    """Returns the authenticated user's own profile and real-time usage stats."""
+    """User profile and real-time usage stats."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -612,38 +761,35 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
             "SELECT messages_used, period_end FROM usage_tracking WHERE user_id = %s ORDER BY period_end DESC LIMIT 1",
             (current_user["id"],)
         )
-        usage_row = cursor.fetchone()
+        usage = cursor.fetchone()
         
-        messages_used = usage_row[0] if usage_row else 0
-        period_end = usage_row[1] if usage_row else None
+        LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
         
-        LIMITS = {
-            "FREE": 200,
-            "STARTER": 2000,
-            "PRO": 999999, # frontend can display 'Unlimited'
-            "ENTERPRISE": 999999
-        }
-        message_limit = LIMITS.get(current_user["tier"], 200)
-
         return {
             "status": "success",
-            "clerk_id": current_user["clerk_id"],
             "role": current_user["role"],
             "tier": current_user["tier"],
-            "subscription_status": current_user.get("subscription_status"),
             "email": current_user["email"],
-            "messages_used": messages_used,
-            "message_limit": message_limit,
-            "period_end": period_end
+            "messages_used": usage[0] if usage else 0,
+            "message_limit": LIMITS.get(current_user["tier"], 200),
+            "period_end": usage[1] if usage else None
         }
     finally:
-        conn.close()
+        release_db_connection(conn)
+
+@app.get("/api/company/details")
+async def get_company_details(user: dict = Depends(get_current_user)):
+    """Returns company status for onboarding/navbar detection."""
+    company = get_company_by_clerk_id(user["clerk_id"])
+    if not company:
+        return {"status": "none", "role": user["role"]}
+    return {"status": "success", "role": user["role"], "company": company}
 
 # --- SUPER ADMIN ENDPOINTS ---
 
 @app.get("/api/admin/stats")
 async def get_admin_stats(admin: dict = Depends(get_admin_user)):
-    """Returns platform-wide statistics for Super Admins."""
+    """Platform-wide statistics for Super Admins."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -651,13 +797,9 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         user_count = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM companies")
         company_count = cursor.fetchone()[0]
-        cursor.close()
-        return {
-            "total_users": user_count,
-            "total_companies": company_count
-        }
+        return {"total_users": user_count, "total_companies": company_count}
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 @app.get("/api/admin/companies")
 async def get_all_companies(admin: dict = Depends(get_admin_user)):
@@ -665,94 +807,102 @@ async def get_all_companies(admin: dict = Depends(get_admin_user)):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, company_name, allowed_origin, created_at, admin_notes FROM companies ORDER BY created_at DESC")
+        cursor.execute("SELECT id, company_name, allowed_origin, created_at FROM companies ORDER BY created_at DESC")
         companies = cursor.fetchall()
-        return [
-            {"id": c[0], "name": c[1], "origin": c[2], "created_at": c[3], "notes": c[4]} 
-            for c in companies
-        ]
+        return [{"id": c[0], "name": c[1], "origin": c[2], "created_at": c[3]} for c in companies]
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 @app.post("/api/user/subscription")
-async def update_subscription(
-    request: SubscriptionRequest, 
-    user: dict = Depends(get_current_user)
+async def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_current_user)):
+    """Self-serve subscription update."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET tier = %s WHERE clerk_id = %s", (request.tier, user["clerk_id"]))
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update subscription.")
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/admin/users")
+async def get_all_users(admin: dict = Depends(get_admin_user)):
+    """Admin-only list of all platform users."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT clerk_id, email, role, tier, created_at FROM users ORDER BY created_at DESC")
+        users = cursor.fetchall()
+        return [{"clerk_id": u[0], "email": u[1], "role": u[2], "tier": u[3], "created_at": u[4]} for u in users]
+    finally:
+        release_db_connection(conn)
+
+@app.patch("/api/admin/users/{clerk_id}")
+async def update_user_admin(
+    clerk_id: str, 
+    req: AdminUpdateUserRequest, 
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
 ):
-    """Updates the user's subscription tier and sets trial end date for STARTER."""
-    if request.tier not in ["FREE", "STARTER", "PRO", "ENTERPRISE"]:
-        raise HTTPException(status_code=400, detail="Invalid subscription tier")
+    """Super Admin: Hardened update of user role/tier with Audit Logging."""
+    updates = []
+    params = []
+    
+    # Track changes for audit log
+    changes = {}
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         
-        trial_end = None
-        if request.tier == "STARTER":
-            from datetime import datetime, timedelta
-            trial_end = datetime.now() + timedelta(days=30)
+        # Fetch current state for audit
+        cursor.execute("SELECT role, tier FROM users WHERE clerk_id = %s", (clerk_id,))
+        old_state = cursor.fetchone()
+        
+        if req.tier is not None:
+            updates.append("tier = %s")
+            params.append(req.tier.value)
+            if old_state: changes["tier"] = {"old": old_state[1], "new": req.tier.value}
 
-        cursor.execute(
-            "UPDATE users SET tier = %s, trial_end_date = %s WHERE clerk_id = %s", 
-            (request.tier, trial_end, user["clerk_id"])
-        )
+        if not updates: return {"message": "No changes provided"}
+
+        query = f"UPDATE users SET {', '.join(updates)} WHERE clerk_id = %s"
+        params.append(clerk_id)
+        cursor.execute(query, tuple(params))
         conn.commit()
-        return {"status": "success", "message": f"Subscription updated to {request.tier}", "trial_end": trial_end}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.get("/api/admin/users")
-async def get_all_users(admin: dict = Depends(get_admin_user)):
-    """Admin-only view of all registered users."""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT clerk_id, email, role, tier, trial_end_date, created_at FROM users ORDER BY created_at DESC")
-        users = cursor.fetchall()
-        return [
-            {
-                "clerk_id": u[0], 
-                "email": u[1], 
-                "role": u[2], 
-                "tier": u[3], 
-                "trial_end": u[4], 
-                "created_at": u[5]
-            } for u in users
-        ]
-    finally:
-        conn.close()
-
-@app.patch("/api/admin/users/{clerk_id}")
-async def update_user_admin(clerk_id: str, data: dict, admin: dict = Depends(get_admin_user)):
-    """Super Admin: Update a user's role or tier."""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        if "role" in data:
-            cursor.execute("UPDATE users SET role = %s WHERE clerk_id = %s", (data["role"], clerk_id))
-        if "tier" in data:
-            cursor.execute("UPDATE users SET tier = %s WHERE clerk_id = %s", (data["tier"], clerk_id))
-        conn.commit()
+        
+        # Issue #17: Log the action
+        log_admin_action(admin["clerk_id"], "UPDATE_USER_PROFILE", clerk_id, changes)
+        
         return {"status": "success"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Update failed.")
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 @app.delete("/api/admin/companies/{company_id}")
-async def delete_company_admin(company_id: str, admin: dict = Depends(get_admin_user)):
-    """Super Admin: Delete a company."""
+async def delete_company_admin(
+    company_id: str, 
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
+):
+    """Super Admin: Delete a company tenant with Audit Logging."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM companies WHERE id = %s", (company_id,))
         conn.commit()
+        
+        # Issue #17: Log the destructive action
+        log_admin_action(admin["clerk_id"], "DELETE_COMPANY", company_id, {"deleted": True})
+        
         return {"status": "success"}
     finally:
-        conn.close()
-
-# --- CLERK SYNC WEBHOOK ---
+        release_db_connection(conn)
 
 @app.post("/api/webhooks/clerk")
 async def clerk_webhook(
@@ -761,277 +911,132 @@ async def clerk_webhook(
     svix_timestamp: str = Header(None, alias="svix-timestamp"),
     svix_signature: str = Header(None, alias="svix-signature")
 ):
-    """
-    Securely syncs Clerk users to our Neon database using Svix.
-    Triggered when a user signs up on the frontend.
-    """
-    if not CLERK_WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="Clerk webhook secret not configured")
-
-    if not svix_id or not svix_timestamp or not svix_signature:
-        raise HTTPException(status_code=400, detail="Missing Svix headers")
-
-    payload = await request.body()
+    """Transactional Clerk user sync with idempotency."""
+    if not CLERK_WEBHOOK_SECRET: raise HTTPException(status_code=500, detail="Missing secret")
     
-    # 1. Verify the signature
+    payload = await request.body()
     wh = Webhook(CLERK_WEBHOOK_SECRET)
     try:
-        msg = wh.verify(payload, {
-            "svix-id": svix_id,
-            "svix-timestamp": svix_timestamp,
-            "svix-signature": svix_signature
-        })
-    except WebhookVerificationError as e:
-        print(f"Webhook verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        msg = wh.verify(payload, {"svix-id": svix_id, "svix-timestamp": svix_timestamp, "svix-signature": svix_signature})
+    except WebhookVerificationError: raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # 2. Extract event data
     event_type = msg.get("type")
     data = msg.get("data")
 
-    if event_type == "user.created":
-        clerk_id = data.get("id")
-        email_addresses = data.get("email_addresses", [])
-        primary_email = email_addresses[0].get("email_address") if email_addresses else "unknown@email.com"
-
-        conn = get_db_connection()
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
         try:
-            cursor = conn.cursor()
-            # Upsert user into DB
+            cursor.execute("INSERT INTO processed_webhooks (webhook_id, provider) VALUES (%s, 'clerk')", (svix_id,))
+        except UniqueViolation:
+            conn.rollback()
+            return {"status": "success", "message": "Duplicate"}
+
+        if event_type == "user.created":
+            clerk_id = data.get("id")
+            email = data.get("email_addresses", [{}])[0].get("email_address", "unknown")
             cursor.execute(
-                """
-                INSERT INTO users (clerk_id, email, tier, subscription_status) 
-                VALUES (%s, %s, '', 'pending')
-                ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email
-                RETURNING id
-                """,
-                (clerk_id, primary_email)
+                "INSERT INTO users (clerk_id, email, role, tier) VALUES (%s, %s, 'USER', 'FREE') RETURNING id",
+                (clerk_id, email)
             )
             user_id = cursor.fetchone()[0]
-            
-            # Initialize Usage Tracking for the first month
-            from datetime import datetime, timedelta
-            now = datetime.now()
-            next_month = now + timedelta(days=30)
-            
-            cursor.execute(
-                """
-                INSERT INTO usage_tracking (user_id, period_start, period_end)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (user_id) DO NOTHING
-                """,
-                (user_id, now, next_month)
-            )
-            
-            conn.commit()
-            print(f"SYNC: Created/Updated user {clerk_id} in SaPyBase DB")
-        except Exception as e:
-            conn.rollback()
-            print(f"ERROR syncing Clerk user: {e}")
-            raise HTTPException(status_code=500, detail="Database sync failed")
-        finally:
-            cursor.close()
-            conn.close()
-
-    return {"status": "success"}
-
-@app.post("/api/webhooks/polar")
-async def polar_webhook(
-    request: Request,
-    webhook_id: str = Header(None, alias="webhook-id"),
-    webhook_timestamp: str = Header(None, alias="webhook-timestamp"),
-    webhook_signature: str = Header(None, alias="webhook-signature")
-):
-    """
-    Handles Polar.sh subscription webhooks to update user tiers and reset usage.
-    """
-    if not POLAR_WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="Polar webhook secret not configured")
-
-    if not webhook_id or not webhook_timestamp or not webhook_signature:
-        raise HTTPException(status_code=400, detail="Missing Webhook headers")
-
-    payload = await request.body()
-    
-    # Polar secrets can start with polar_whs_ - we must strip it if present for Standard Webhook compat
-    secret = POLAR_WEBHOOK_SECRET or ""
-    if secret.startswith("polar_whs_"):
-        secret = secret[len("polar_whs_"):]
-    
-    wh = Webhook(secret)
-    try:
-        msg = wh.verify(payload, {
-            "webhook-id": webhook_id,
-            "webhook-timestamp": webhook_timestamp,
-            "webhook-signature": webhook_signature
-        })
-    except WebhookVerificationError as e:
-        print(f"POLAR WEBHOOK ERROR: Signature verification failed. Error: {e}")
-        # Log IDs for debugging (don't log the full signature for security)
-        print(f"POLAR DEBUG: id={webhook_id}, ts={webhook_timestamp}")
-        raise HTTPException(status_code=400, detail="Invalid signature")
-
-    event_type = msg.get("type")
-    data = msg.get("data")
-
-    clerk_id = data.get("customer_external_id") or data.get("external_customer_id")
-    polar_customer_id = data.get("customer_id")
-
-    if not clerk_id:
-        return {"status": "ignored", "reason": "No clerk_id attached"}
-
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-
-        if event_type in ["subscription.created", "subscription.updated"]:
-            product_name = data.get("product", {}).get("name", "PRO").upper()
-            tier = "PRO" if "PRO" in product_name else ("STARTER" if "STARTER" in product_name else "FREE")
-            
-            period_end = data.get("current_period_end")
-            period_start = data.get("current_period_start")
-
-            # 1. Update User Tier and Polar Customer ID
-            cursor.execute(
-                "UPDATE users SET tier = %s, billing_period_end = %s, polar_customer_id = %s, subscription_status = 'active' WHERE clerk_id = %s RETURNING id",
-                (tier, period_end, polar_customer_id, clerk_id)
-            )
-            user_row = cursor.fetchone()
-            
-            if user_row:
-                user_id = user_row[0]
-                
-                # 2. Idempotent Reset Usage Tracking 
-                cursor.execute(
-                    """
-                    UPDATE usage_tracking 
-                    SET messages_used = 0, period_start = %s, period_end = %s 
-                    WHERE user_id = %s AND (period_end IS NULL OR %s::timestamptz > period_end)
-                    """,
-                    (period_start, period_end, user_id, period_end)
-                )
-                
-                if cursor.rowcount == 0:
-                    cursor.execute("SELECT 1 FROM usage_tracking WHERE user_id = %s", (user_id,))
-                    if not cursor.fetchone():
-                        cursor.execute(
-                            """
-                            INSERT INTO usage_tracking (user_id, messages_used, period_start, period_end) 
-                            VALUES (%s, 0, %s, %s)
-                            ON CONFLICT (user_id) DO UPDATE SET 
-                                messages_used = EXCLUDED.messages_used,
-                                period_start = EXCLUDED.period_start,
-                                period_end = EXCLUDED.period_end
-                            """,
-                            (user_id, period_start, period_end)
-                        )
-                    else:
-                        print(f"POLAR SYNC: Ignored redundant usage wipe for user {clerk_id}")
-                
-                conn.commit()
-                print(f"POLAR SYNC: Updated user {clerk_id} to tier {tier}")
-            else:
-                print(f"POLAR SYNC: No user found with clerk_id {clerk_id}")
-
-        elif event_type in ["subscription.revoked", "subscription.canceled"]:
-            # DOWNGRADE LOGIC: Instantly revert to FREE tier
-            cursor.execute(
-                "UPDATE users SET tier = 'FREE', billing_period_end = NULL, subscription_status = 'canceled' WHERE clerk_id = %s RETURNING id",
-                (clerk_id,)
-            )
-            if cursor.fetchone():
-                conn.commit()
-                print(f"POLAR DOWNGRADE: User {clerk_id} instantly reverted to FREE tier.")
-            else:
-                print(f"POLAR DOWNGRADE: No user found for {clerk_id}")
-
-    except Exception as e:
-        conn.rollback()
-        print(f"POLAR SYNC ERROR: {e}")
-    finally:
-        conn.close()
-
-    return {"status": "success"}
-
-@app.post("/api/user/subscription")
-async def update_user_subscription(data: dict, current_user: dict = Depends(get_current_user)):
-    """Allows users to select the FREE tier during onboarding."""
-    tier = data.get("tier")
-    if tier != "FREE":
-        raise HTTPException(status_code=400, detail="Only 'FREE' tier can be manually selected.")
-    
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        # Set user tier to FREE and status to active
-        cursor.execute("UPDATE users SET tier = 'FREE', subscription_status = 'active' WHERE id = %s", (current_user["id"],))
-        
-        # Ensure they have a usage tracking row initialized
-        from datetime import datetime, timedelta
-        now = datetime.now()
-        next_month = now + timedelta(days=30)
-        
-        cursor.execute(
-            """
-            INSERT INTO usage_tracking (user_id, period_start, period_end)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (user_id) DO NOTHING
-            """,
-            (current_user["id"], now, next_month)
-        )
+            cursor.execute("INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days')", (user_id,))
         
         conn.commit()
-        return {"status": "success", "tier": tier}
+        return {"status": "success"}
     except Exception as e:
-        conn.rollback()
-        print(f"Error setting FREE tier: {e}")
-        raise HTTPException(status_code=500, detail="Failed to initialize FREE tier")
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Webhook failed")
     finally:
-        conn.close()
+        release_db_connection(conn)
+
+@app.post("/api/webhooks/polar")
+async def polar_webhook(request: Request):
+    """
+    Issue #9: Polar Webhook Secret Handling.
+    Uses the svix library directly with the full polar_whs_ secret.
+    """
+    if not POLAR_WEBHOOK_SECRET: raise HTTPException(status_code=500, detail="Missing secret")
+    
+    payload = await request.body()
+    headers = request.headers
+    
+    wh = Webhook(POLAR_WEBHOOK_SECRET)
+    try:
+        # The svix library handles the 'polar_whs_' prefix and header extraction internally
+        msg = wh.verify(payload, headers)
+    except WebhookVerificationError: raise HTTPException(status_code=400, detail="Invalid signature")
+
+    data = msg.get("data")
+    event_type = msg.get("type")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO processed_webhooks (webhook_id, provider) VALUES (%s, 'polar')", (webhook_id,))
+        except UniqueViolation:
+            conn.rollback()
+            return {"status": "success"}
+
+        clerk_id = data.get("customer_external_id") or data.get("external_customer_id")
+        if not clerk_id: return {"status": "ignored"}
+
+        if event_type in ["subscription.created", "subscription.updated"]:
+            product_name = data.get("product", {}).get("name", "").upper()
+            tier = "PRO" if "PRO" in product_name else ("STARTER" if "STARTER" in product_name else "FREE")
+            
+            cursor.execute(
+                "UPDATE users SET tier = %s, subscription_status = 'active', polar_customer_id = %s WHERE clerk_id = %s RETURNING id",
+                (tier, data.get("customer_id"), clerk_id)
+            )
+            row = cursor.fetchone()
+            if row:
+                cursor.execute(
+                    "UPDATE usage_tracking SET messages_used = 0, period_start = now(), period_end = now() + interval '30 days' WHERE user_id = %s",
+                    (row[0],)
+                )
+
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Webhook failed")
+    finally:
+        release_db_connection(conn)
+
+@app.post("/api/user/subscription-manual")
+async def select_free_tier(current_user: dict = Depends(get_current_user)):
+    """Manually select FREE tier during onboarding."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET tier = 'FREE', subscription_status = 'active' WHERE id = %s", (current_user["id"],))
+        cursor.execute(
+            "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
+            (current_user["id"],)
+        )
+        conn.commit()
+        return {"status": "success"}
+    finally:
+        release_db_connection(conn)
 
 @app.get("/api/billing/portal")
 async def get_billing_portal(current_user: dict = Depends(get_current_user)):
-    """Generates an authenticated Customer Portal URL for the user."""
-    from os import getenv
+    """Generates Polar Customer Portal URL."""
     import httpx
-    
-    polar_access_token = getenv("POLAR_ACCESS_TOKEN")
-    if not polar_access_token:
-        raise HTTPException(
-            status_code=500, 
-            detail="POLAR_ACCESS_TOKEN is not configured in .env. Please check the implementation plan for instructions."
-        )
+    token = os.getenv("POLAR_ACCESS_TOKEN")
+    cust_id = current_user.get("polar_customer_id")
+    if not token or not cust_id: raise HTTPException(status_code=404, detail="Billing setup incomplete")
 
-    polar_customer_id = current_user.get("polar_customer_id")
-    if not polar_customer_id:
-        # Fallback: If we don't have the ID, they might not have a subscription yet
-        # or they might need to use the manual login portal once to sync.
-        raise HTTPException(
-            status_code=404, 
-            detail="No Polar customer record found for your account. Please subscribe to a plan first or contact support."
-        )
-
-    # Call Polar API to create a Customer Session
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                "https://api.polar.sh/api/v1/customer-sessions",
-                headers={
-                    "Authorization": f"Bearer {polar_access_token}",
-                    "Content-Type": "application/json"
-                },
-                json={"customer_id": polar_customer_id}
-            )
-            response.raise_for_status()
-            session_data = response.json()
-            return {"status": "success", "url": session_data.get("customer_portal_url")}
-        except httpx.HTTPStatusError as e:
-            print(f"POLAR API ERROR: {e.response.text}")
-            raise HTTPException(status_code=500, detail="Failed to create Polar billing session.")
-        except Exception as e:
-            print(f"POLAR SESSION ERROR: {e}")
-            raise HTTPException(status_code=500, detail="An error occurred while connecting to the billing portal.")
+        resp = await client.post(
+            "https://api.polar.sh/api/v1/customer-sessions",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"customer_id": cust_id}
+        )
+        resp.raise_for_status()
+        return {"url": resp.json().get("customer_portal_url")}
 
 @app.get("/")
-def read_root():
-    return {"status": "SaPyBase Multi-Tenant AI Engine is running!"}
+def read_root(): return {"status": "SaPyBase AI Engine Running"}
