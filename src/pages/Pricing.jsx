@@ -138,11 +138,10 @@ const Pricing = ({ onPlanSelected, onBack }) => {
     };
 
     return (
-        <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center py-20 px-4 relative overflow-hidden">
-            {/* Background Orbs */}
+        <div className="w-full min-h-screen bg-white dark:bg-[#0A0A0A] flex flex-col items-center py-12 px-4 relative overflow-hidden">
+            {/* Background Glows (Subtle) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 dark:bg-indigo-500/5 blur-[120px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 dark:bg-purple-500/5 blur-[100px]"></div>
+                <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[60%] h-[40%] rounded-full bg-indigo-500/5 dark:bg-indigo-500/10 blur-[120px]"></div>
             </div>
 
             <div className="max-w-7xl mx-auto relative z-10 w-full">
@@ -159,67 +158,89 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                 )}
                 <div className="text-center mb-16">
                     <motion.div 
-                        initial={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-6"
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-4"
                     >
-                        <Sparkles className="w-4 h-4" />
-                        <span>Select Your Power Level</span>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Select Your Plan</span>
                     </motion.div>
                     <motion.h1 
-                        initial={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white mb-6"
+                        className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white mb-3"
                     >
-                        Choose Your <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">Subscription</span>
+                        Scaling as you <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">grow</span>.
                     </motion.h1>
                     <motion.p 
-                        initial={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto font-medium"
+                        className="text-slate-500 dark:text-slate-400 max-w-lg mx-auto text-sm font-medium"
                     >
-                        Scale your AI capabilities as you grow. Every plan includes our core RAG engine and domain-specific training.
+                        Choose the plan that fits your current stage. Seamlessly upgrade as your AI knowledge base expands.
                     </motion.p>
+ 
+                    {/* Tactile Toggle Switch */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-8 mb-4 flex justify-center"
+                    >
+                        <div className="flex items-center bg-slate-100 dark:bg-[#111] p-1 rounded-full border border-slate-200 dark:border-slate-800">
+                            <button className="px-6 py-1.5 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 shadow-sm rounded-full transition-all">
+                                Monthly
+                            </button>
+                            <button className="px-6 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 transition-all">
+                                Yearly
+                            </button>
+                        </div>
+                    </motion.div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                     {plans.map((plan, index) => (
                         <motion.div
                             key={plan.id}
-                            initial={{ opacity: 0, y: 30 }}
+                            initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 * (index + 3) }}
-                            className={`relative group bg-white/60 dark:bg-slate-900/40 backdrop-blur-2xl border ${plan.highlight ? 'border-indigo-500 shadow-2xl shadow-indigo-500/10' : 'border-slate-200 dark:border-slate-800/60'} rounded-[2.5rem] p-8 flex flex-col transition-all hover:scale-[1.02]`}
+                            className={`relative group bg-white dark:bg-[#0A0A0A] border transition-all duration-300 hover:-translate-y-1 ${
+                                plan.highlight 
+                                ? 'border-indigo-500 ring-2 ring-indigo-500 dark:ring-indigo-500 shadow-[0_0_40px_-15px_rgba(99,102,241,0.4)]' 
+                                : 'border-slate-200 dark:border-slate-800'
+                            } rounded-2xl p-6 flex flex-col`}
                         >
                             {plan.highlight && (
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full z-20 shadow-lg shadow-indigo-500/20 whitespace-nowrap">
                                     Most Popular
                                 </div>
                             )}
 
-                            <div className="mb-8">
-                                <div className={`w-14 h-14 rounded-2xl ${plan.highlight ? 'bg-indigo-600 text-white' : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'} flex items-center justify-center mb-6`}>
-                                    <plan.icon className="w-7 h-7" />
+                            <div className="mb-6">
+                                <div className={`w-12 h-12 rounded-xl border ${plan.highlight ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'} flex items-center justify-center mb-5 transition-transform group-hover:scale-110 duration-500`}>
+                                    <plan.icon className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{plan.name}</h3>
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1 tracking-tight">{plan.name}</h3>
                                 <div className="flex items-baseline gap-1">
-                                    <span className="text-4xl font-black text-slate-900 dark:text-white">{plan.price}</span>
-                                    {plan.period && <span className="text-slate-500 font-bold">{plan.period}</span>}
+                                    {plan.id !== 'FREE' && <span className="text-slate-400 text-sm font-medium">$</span>}
+                                    <span className="text-5xl font-black tracking-tighter text-slate-900 dark:text-white">
+                                        {plan.price.startsWith('$') ? plan.price.substring(1) : plan.price}
+                                    </span>
+                                    {plan.period && <span className="text-slate-400 text-sm font-medium tracking-tight">{plan.period}</span>}
                                 </div>
-                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-4 font-medium leading-relaxed">
+                                <p className="text-slate-500 dark:text-slate-400 text-[13px] mt-3 font-medium leading-normal">
                                     {plan.description}
                                 </p>
                             </div>
 
-                            <div className="space-y-4 mb-10 flex-1">
+                            <div className="space-y-3 mb-8 flex-1">
                                 {plan.features.map((feature, i) => (
                                     <div key={i} className="flex items-center gap-3">
-                                        <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
-                                            <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
-                                        </div>
-                                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{feature}</span>
+                                        <Check className="w-4 h-4 text-indigo-500 group-hover:text-indigo-400 transition-colors shrink-0" />
+                                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">{feature}</span>
                                     </div>
                                 ))}
                             </div>
@@ -227,18 +248,18 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                             <button
                                 onClick={() => handleSelectPlan(plan.id)}
                                 disabled={isLoading}
-                                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${
+                                className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn relative overflow-hidden ${
                                     plan.highlight 
-                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/20' 
-                                    : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90'
-                                } active:scale-95 flex items-center justify-center gap-2`}
+                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 active:scale-[0.98]' 
+                                    : 'bg-transparent border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 active:scale-[0.98]'
+                                }`}
                             >
                                 {isLoading && selectedTier === plan.id ? (
                                     <Logo className="w-8 h-4" />
                                 ) : (
                                     <>
-                                        {plan.id === 'FREE' ? 'Start 30-Day Free Trial' : `Select ${plan.name}`}
-                                        <Rocket className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <span>{plan.id === 'FREE' ? 'Start Free Trial' : `Select ${plan.name}`}</span>
+                                        <Rocket className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1" />
                                     </>
                                 )}
                             </button>

@@ -21,7 +21,7 @@ const TermsAndConditions = () => {
                         Service Agreement
                     </div>
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">Terms & Conditions</h1>
-                    <p className="text-slate-500">Last Updated: March 10, 2026</p>
+                    <p className="text-slate-500">Last Updated: March 25, 2026</p>
                 </header>
 
                 <div className="space-y-12">
@@ -68,6 +68,33 @@ const TermsAndConditions = () => {
                     <section>
                         <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
                             <span className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-500 text-sm">05</span>
+                            AI Training and Ingestion
+                        </h2>
+                        <div className="space-y-4 leading-relaxed">
+                            <p>
+                                Sapybase provides technical tools to ingest and process data for the purpose of training custom AI models ("AI Ingestion"). By providing a URL, PDF, or text for Ingestion, you certify that:
+                            </p>
+                            <ul className="list-disc pl-6 space-y-2 text-slate-400">
+                                <li>You have the legal right, ownership, or permission to access and scrape the content provided.</li>
+                                <li>The content does not violate any third-party intellectual property, privacy, or trade secret rights.</li>
+                                <li>The ingestion does not bypass non-public security measures or paywalls (CFAA compliance).</li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <section>
+                        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                            <span className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-500 text-sm">06</span>
+                            Indemnification
+                        </h2>
+                        <p className="leading-relaxed">
+                            You agree to defend, indemnify, and hold harmless Sapybase LLC and its employees from and against any and all claims, damages, obligations, losses, liabilities, costs, or debt (including legal fees) resulting from: (i) your use and access of the Service, (ii) your violation of any third-party right, including copyright, or (iii) any claim that your training data caused damage to a third party.
+                        </p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                            <span className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-500 text-sm">07</span>
                             Governing Law
                         </h2>
                         <p className="leading-relaxed">

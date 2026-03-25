@@ -191,7 +191,6 @@ const AdminDashboard = () => {
                                     <thead>
                                         <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                             <th className="px-6 py-2">User Entity</th>
-                                            <th className="px-6 py-2">Account Role</th>
                                             <th className="px-6 py-2">Subscription Tier</th>
                                             <th className="px-6 py-2 text-right">Settings</th>
                                         </tr>
@@ -209,16 +208,6 @@ const AdminDashboard = () => {
                                                             <p className="text-[10px] text-slate-400 font-mono mt-0.5">{u.clerk_id}</p>
                                                         </div>
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800">
-                                                    <select 
-                                                        value={u.role} 
-                                                        onChange={(e) => handleUpdateUser(u.clerk_id, 'role', e.target.value)}
-                                                        className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border-none outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                                    >
-                                                        <option value="USER">User</option>
-                                                        <option value="ADMIN">Admin</option>
-                                                    </select>
                                                 </td>
                                                 <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800">
                                                     <select 

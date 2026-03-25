@@ -125,7 +125,7 @@ function add_sapybase_widget() {
 
     const showAlert = (type, msg) => {
         setAlertConfig({ open: true, type, msg });
-        setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 4000);
+        setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 8000);
     };
 
     const handleCopy = (text) => {
@@ -149,18 +149,6 @@ function add_sapybase_widget() {
 
         setIsLoading(true);
 
-        // --- BYPASS START FOR TESTING ---
-        setTimeout(() => {
-            setRegistrationData({
-                apiKey: 'sb_test_DEMO1234567890',
-                companyName: formData.companyName,
-                allowedOrigin: formData.allowedOrigin
-            });
-            showAlert('success', 'Demo successful! (Bypassed backend)');
-            setIsLoading(false);
-        }, 800);
-        return;
-        // --- BYPASS END FOR TESTING ---
 
         try {
             const token = await getToken();
@@ -240,8 +228,8 @@ function add_sapybase_widget() {
         }
     };
 
-    // Card styling mixin for consistency - Technical Brutalism
-    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 lg:p-6 group relative flex flex-col";
+    // Card styling mixin for consistency - Technical Minimalist
+    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-6 relative flex flex-col transition-shadow duration-200 hover:shadow-md";
 
     if (!isLoaded || isTierLoading) {
         return (
@@ -252,14 +240,7 @@ function add_sapybase_widget() {
     }
 
     return (
-        <div className="w-full min-h-[calc(100vh-80px)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8 font-sans tracking-tight relative overflow-x-hidden flex justify-center">
-
-            {/* Soft Ambient Background Orbs - COPY from Dashboard */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 dark:bg-indigo-500/5 blur-[120px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 dark:bg-purple-500/5 blur-[100px]"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] max-w-7xl h-[80%] border border-indigo-200/20 dark:border-indigo-800/10 rounded-[4rem] opacity-50 blur-[2px]"></div>
-            </div>
+        <div className="w-full min-h-screen bg-slate-50 dark:bg-[#0A0A0A] text-slate-900 dark:text-slate-200 pt-28 pb-12 px-4 sm:px-6 lg:px-8 flex justify-center flex-col items-center">
 
             <div className="max-w-7xl mx-auto w-full relative z-10">
                 <AnimatePresence mode="wait">
@@ -271,13 +252,13 @@ function add_sapybase_widget() {
                             exit={{ opacity: 0, y: -20 }}
                             className="flex flex-col items-center justify-center min-h-[60vh] py-12"
                         >
-                            <div className="mb-8 text-center bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-2xl w-full">
-                                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-sm font-bold uppercase tracking-wider mb-6">
-                                    <Sparkles className="w-4 h-4" />
+                            <div className="mb-8 text-center bg-white dark:bg-[#111111] p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-2xl w-full">
+                                <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#1A1A1A] text-[11px] font-mono uppercase tracking-wider mb-6 text-slate-600 dark:text-slate-400">
+                                    <Sparkles className="w-3.5 h-3.5" />
                                     <span>Welcome to SaPyBase</span>
                                 </div>
-                                <h1 className="text-4xl md:text-5xl font-black mb-6 leading-tight text-slate-900 dark:text-white">Start Your <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">SaaS Journey</span></h1>
-                                <p className="text-slate-600 dark:text-slate-400 text-lg mb-8 max-w-md mx-auto font-medium">Create an account to provision your first AI chatbot and access the developer dashboard.</p>
+                                <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 leading-tight text-slate-900 dark:text-white">Start Your SaaS Journey</h1>
+                                <p className="text-slate-500 dark:text-slate-400 text-base mb-8 max-w-md mx-auto">Create an account to provision your first AI chatbot and access the developer dashboard.</p>
                                 <div className="flex justify-center">
                                     <SignUp routing="hash" signInUrl="/login" />
                                 </div>
@@ -293,21 +274,18 @@ function add_sapybase_widget() {
                             animate="visible"
                             className="grid grid-cols-1 lg:grid-cols-12 gap-4"
                         >
-                            {/* Left Column: Promotion/Details (Spans 5 cols) */}
-                            <motion.div variants={itemVariants} className="lg:col-span-5 flex flex-col">
-                                <div className={`${bentoCardStyle} h-full min-h-[500px] bg-linear-to-br from-indigo-50/50 to-white/60 dark:from-indigo-950/20 dark:to-slate-900/40 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800/60 shadow-2xl shadow-indigo-500/5`}>
+                            {/* Left Column: Promotion/Details (Spans 8 cols | 2/3 width) */}
+                            <motion.div variants={itemVariants} className="lg:col-span-8 flex flex-col">
+                                <div className={`${bentoCardStyle} h-full min-h-[500px]`}>
                                     <div className="relative z-10">
-                                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-wider mb-6">
+                                        <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#1A1A1A] text-[11px] font-mono uppercase tracking-wider mb-6 text-slate-600 dark:text-slate-400">
                                             <Sparkles className="w-3 h-3" />
                                             <span>Hey {user?.firstName || 'Innovator'}!</span>
                                         </div>
-                                        <h1 className="text-4xl font-black tracking-tight mb-4 leading-tight text-slate-900 dark:text-white">
-                                            Launch Your <br />
-                                            <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">
-                                                AI Agent Today
-                                            </span>
+                                        <h1 className="text-4xl font-bold tracking-tight mb-4 leading-tight text-slate-900 dark:text-white">
+                                            Launch Your <br /> <span className="bg-gradient-to-r from-red-600 to-indigo-600 bg-clip-text text-transparent font-black">AI Agent Today</span>
                                         </h1>
-                                        <p className="text-slate-500 dark:text-indigo-100/80 text-sm font-medium leading-relaxed mb-8">
+                                        <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-8">
                                             Provision your tenant, get your API key, and start conversing with your customers using the power of Gemini.
                                         </p>
 
@@ -317,13 +295,13 @@ function add_sapybase_widget() {
                                                 { icon: Shield, text: "Enterprise Security", sub: "Domain-locked API access" },
                                                 { icon: Code2, text: "Easy Integration", sub: "One-line snippet install" }
                                             ].map((feat, i) => (
-                                                <div key={i} className="flex items-center gap-4 p-3 bg-white dark:bg-slate-900/40 rounded-2xl backdrop-blur-md border border-slate-200 dark:border-white/10 transition-all hover:bg-white/70 dark:hover:bg-white/20">
-                                                    <div className="p-2 bg-indigo-50 dark:bg-white/20 rounded-xl shadow-sm">
-                                                        <feat.icon className="w-5 h-5 text-indigo-600 dark:text-white" />
+                                                <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0A0A0A] transition-colors hover:bg-slate-50 dark:hover:bg-[#111111]">
+                                                    <div className="shrink-0">
+                                                        <feat.icon className="w-4 h-4 text-slate-500" />
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">{feat.text}</p>
-                                                        <p className="text-[10px] text-slate-500 dark:text-white/50 font-medium uppercase tracking-widest">{feat.sub}</p>
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono uppercase tracking-widest">{feat.sub}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -337,8 +315,8 @@ function add_sapybase_widget() {
                                 {/* Custom Instructions block removed per Technical Brutalism redesign */}
                             </motion.div>
 
-                            {/* Right Column: The Form/Success (Spans 7 cols) */}
-                            <motion.div variants={itemVariants} className="lg:col-span-7">
+                            {/* Right Column: The Form/Success (Spans 4 cols | 1/3 width) */}
+                            <motion.div variants={itemVariants} className="lg:col-span-4">
                                 <div className={`${bentoCardStyle} h-full min-h-[500px]`}>
                                     <AnimatePresence mode="wait">
                                         {!registrationData ? (
@@ -350,106 +328,100 @@ function add_sapybase_widget() {
                                                 className="h-full flex flex-col"
                                             >
                                                 <div className="mb-8">
-                                                    <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Tenant Configuration</h2>
-                                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium leading-relaxed">Fill in details to generate your unique integration credentials.</p>
+                                                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Tenant Configuration</h2>
+                                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Fill in details to generate your unique integration credentials.</p>
                                                 </div>
 
                                                 <form onSubmit={handleSubmit} className="space-y-6 flex-1">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Company Name</label>
+                                                    <div className="grid grid-cols-1 gap-6">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-0.5">Company Name</label>
                                                             <div className="relative group">
-                                                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                                                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                                                 <input
                                                                     type="text"
                                                                     name="companyName"
                                                                     required
                                                                     value={formData.companyName}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
+                                                                    className="w-full pl-10 pr-3 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors"
                                                                     placeholder="Acme Inc."
                                                                 />
                                                             </div>
                                                         </div>
 
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Allowed Origin</label>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-0.5">Allowed Origin</label>
                                                             <div className="relative group">
-                                                                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                                                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                                                 <input
                                                                     type="url"
                                                                     name="allowedOrigin"
                                                                     required
                                                                     value={formData.allowedOrigin}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
+                                                                    className="w-full pl-10 pr-3 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors"
                                                                     placeholder="https://example.com"
                                                                 />
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Theme Color</label>
+                                                    <div className="grid grid-cols-1 gap-6">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-0.5">Theme Color</label>
                                                             <div className="relative group">
-                                                                <Palette className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                                                <Palette className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                                                 <input
                                                                     type="text"
                                                                     name="themeColor"
                                                                     value={formData.themeColor}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-12 pr-12 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none uppercase font-mono text-xs transition-all"
+                                                                    className="w-full pl-10 pr-12 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 uppercase font-mono transition-colors"
                                                                 />
-                                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-all group-hover:scale-110 active:scale-95">
+                                                                <div className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-transform hover:scale-105">
                                                                     <input
                                                                         type="color"
                                                                         name="themeColor"
                                                                         value={formData.themeColor}
                                                                         onChange={handleChange}
-                                                                        className="absolute inset-[-10px] w-[200%] h-[200%] cursor-pointer"
+                                                                        className="absolute inset-[-8px] w-[200%] h-[200%] cursor-pointer"
                                                                     />
                                                                 </div>
                                                             </div>
                                                         </div>
 
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Tone of Voice</label>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-0.5">Tone of Voice</label>
                                                             <div className="relative">
-                                                                <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                                                <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                                 <select
                                                                     name="companyTone"
                                                                     value={formData.companyTone}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-12 pr-10 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none appearance-none text-sm font-medium"
+                                                                    className="w-full pl-10 pr-10 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors appearance-none"
                                                                 >
                                                                     <option value="Professional and helpful">Professional</option>
                                                                     <option value="Friendly and casual">Friendly</option>
                                                                     <option value="Technical and concise">Technical</option>
                                                                 </select>
-                                                                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 rotate-90 pointer-events-none" />
+                                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="pt-8">
+                                                    <div className="pt-4">
                                                         <button
                                                             type="submit"
                                                             disabled={isLoading}
-                                                            className={`relative overflow-hidden w-full flex justify-center py-4 px-4 rounded-2xl text-base font-bold text-white bg-linear-to-r from-blue-800 to-blue-600 hover:from-blue-500 hover:to-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transition-all duration-300 transform active:scale-[0.98] ${isLoading ? 'opacity-80 cursor-not-allowed shadow-none' : 'hover:shadow-blue-600/40 shadow-xl'}`}
+                                                            className="w-full flex justify-center items-center py-2 px-4 rounded-md text-sm font-medium text-white dark:text-slate-900 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
-                                                            {isLoading ? (
-                                                                <>
-                                                                    Provisioning...
-                                                                </>
-                                                            ) : (
+                                                            {isLoading ? "Provisioning..." : (
                                                                 <>
                                                                     Create Tenant Knowledge
-                                                                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                                                    <ArrowRight className="w-4 h-4 ml-2" />
                                                                 </>
                                                             )}
-                                                            {/* Button soft glow overlay */}
-                                                            <div className="absolute inset-0 bg-white/20 opacity-0 hover:opacity-100 transition-opacity"></div>
                                                         </button>
                                                     </div>
                                                 </form>
@@ -462,27 +434,27 @@ function add_sapybase_widget() {
                                                 className="h-full flex-1 flex flex-col space-y-6"
                                             >
                                                 {/* Header */}
-                                                <div className="flex items-center gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-                                                    <div className="w-12 h-12 bg-indigo-50 dark:bg-[#111111] rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-800">
-                                                        <CheckCircle className="w-6 h-6" />
+                                                <div className="flex items-center gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+                                                    <div className="w-10 h-10 bg-slate-100 dark:bg-[#1A1A1A] rounded-md flex items-center justify-center text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
+                                                        <CheckCircle className="w-5 h-5" />
                                                     </div>
                                                     <div className="text-left">
-                                                        <h2 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">{registrationData.companyName} Ready</h2>
-                                                        <p className="text-xs text-slate-500 font-medium mt-0.5">Your credentials have been generated and secured.</p>
+                                                        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{registrationData.companyName} Ready</h2>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Your credentials have been generated and secured.</p>
                                                     </div>
                                                 </div>
 
                                                 {/* Top Row: Key and Script Grid */}
-                                                <div className="grid grid-cols-1  gap-4 w-full">
+                                                <div className="grid grid-cols-1 gap-4 w-full">
                                                     {/* API Key Container */}
                                                     <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col">
-                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">API Key</label>
-                                                        <div className="flex-1 flex items-center justify-between p-3 bg-slate-50 dark:bg-[#0A0A0A] border border-slate-200 dark:border-slate-800 rounded-lg font-mono text-xs text-indigo-600 dark:text-indigo-400">
+                                                        <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">API Key</label>
+                                                        <div className="flex-1 flex items-center justify-between p-3 bg-slate-50 dark:bg-[#0A0A0A] border border-slate-200 dark:border-slate-800 rounded-md font-mono text-xs text-slate-900 dark:text-slate-200">
                                                             <div className="flex items-center gap-2 truncate">
                                                                 <Key className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                                                                 <span className="truncate">{registrationData.apiKey}</span>
                                                             </div>
-                                                            <button onClick={() => handleCopy(registrationData.apiKey)} className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-500 transition-colors border border-slate-200 dark:border-slate-700 ml-2">
+                                                            <button onClick={() => handleCopy(registrationData.apiKey)} className="p-1.5 bg-white dark:bg-[#1A1A1A] hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors border border-slate-200 dark:border-slate-800 ml-2">
                                                                 <Copy className="w-3.5 h-3.5" />
                                                             </button>
                                                         </div>
@@ -490,117 +462,117 @@ function add_sapybase_widget() {
 
                                                     {/* Embed Script Container */}
                                                     <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col">
-                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">Embed Script</label>
+                                                        <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">Embed Script</label>
                                                         <div className="relative group/code flex-1">
-                                                            <pre className="p-3 bg-slate-50 dark:bg-[#0A0A0A] rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-[10px] text-indigo-600 dark:text-indigo-300 font-mono leading-relaxed h-full scrollbar-hide text-left">
+                                                            <pre className="p-3 bg-slate-50 dark:bg-[#0A0A0A] rounded-md border border-slate-200 dark:border-slate-800 overflow-x-auto text-[11px] text-slate-600 dark:text-slate-400 font-mono leading-relaxed h-full scrollbar-hide text-left">
                                                                 <code>{embedCode}</code>
                                                             </pre>
                                                             <button
                                                                 onClick={() => handleCopy(embedCode)}
-                                                                className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-500 transition-colors border border-slate-200 dark:border-slate-700"
+                                                                className="absolute top-2 right-2 p-1.5 bg-white dark:bg-[#1A1A1A] hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors border border-slate-200 dark:border-slate-800"
                                                             >
-                                                                {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                {copied ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                                                             </button>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
-                                    </motion.div>
-
-                                    {/* Full Width Integration Guides - Shifted outside and spans 12 cols */}
-                                    <AnimatePresence>
-                                        {registrationData && (
-                                            <motion.div
-                                                variants={itemVariants}
-                                                initial="hidden"
-                                                animate="visible"
-                                                exit="hidden"
-                                                className="lg:col-span-12"
-                                            >
-                                                <div className="w-full bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl mt-2 overflow-hidden shadow-xl shadow-indigo-500/5">
-                                                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0A0A] text-left">
-                                                        <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                                                            <BookOpen className="w-4 h-4 text-indigo-500" />
-                                                            Integration Guides
-                                                        </h3>
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        {[
-                                                            {
-                                                                title: "Next.js (App Router)",
-                                                                desc: "Place the script in app/layout.tsx using the next/script component.",
-                                                                code: `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script \n          src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js" \n          data-api-key="${registrationData.apiKey}" \n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`
-                                                            },
-                                                            {
-                                                                title: "React / Vite",
-                                                                desc: "Drop the <script> tag inside public/index.html.",
-                                                                code: `<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <title>My App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script\n      src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js"\n      data-api-key="${registrationData.apiKey}"\n      defer\n    ></script>\n  </body>\n</html>`
-                                                            },
-                                                            {
-                                                                title: "Vanilla HTML / Webflow",
-                                                                desc: "Paste the <script> directly above the closing </body> tag.",
-                                                                code: `<!-- Add this just before your closing </body> tag -->\n<script\n  src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js"\n  data-api-key="${registrationData.apiKey}"\n  defer\n></script>`
-                                                            },
-                                                            {
-                                                                title: "Flutter (Mobile)",
-                                                                desc: "Developer Note: Render the chat UI using the webview_flutter package to load the widget URL directly.",
-                                                                code: `import 'package:webview_flutter/webview_flutter.dart';\n\n// Create a dedicated Chat Screen\nWebViewWidget(\n  controller: WebViewController()\n    ..setJavaScriptMode(JavaScriptMode.unrestricted)\n    ..loadRequest(Uri.parse('${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/chat?key=${registrationData.apiKey}')),\n)`
-                                                            }
-                                                        ].map((item, index) => (
-                                                            <div key={index} className="border-b last:border-0 border-slate-200 dark:border-slate-800">
-                                                                <button
-                                                                    onClick={() => setOpenAccordion(openAccordion === index ? -1 : index)}
-                                                                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] transition-colors text-left group"
-                                                                >
-                                                                    <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{item.title}</span>
-                                                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === index ? 'rotate-180' : ''}`} />
-                                                                </button>
-                                                                <AnimatePresence>
-                                                                    {openAccordion === index && (
-                                                                        <motion.div
-                                                                            initial={{ height: 0, opacity: 0 }}
-                                                                            animate={{ height: "auto", opacity: 1 }}
-                                                                            exit={{ height: 0, opacity: 0 }}
-                                                                            className="overflow-hidden"
-                                                                        >
-                                                                            <div className="p-4 pt-0 bg-white dark:bg-[#111111] text-left">
-                                                                                <p className="text-[11px] text-slate-500 mb-3">{item.desc}</p>
-                                                                                <pre className="p-3 bg-slate-50 dark:bg-[#0A0A0A] rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-[10px] text-indigo-600 dark:text-indigo-300 font-mono leading-relaxed">
-                                                                                    <code>{item.code}</code>
-                                                                                </pre>
-                                                                            </div>
-                                                                        </motion.div>
-                                                                    )}
-                                                                </AnimatePresence>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                <div className="pt-6 flex flex-col sm:flex-row gap-4 w-full">
-                                                    <button
-                                                        onClick={() => navigate('/dashboard')}
-                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-xl shadow-indigo-600/20"
-                                                    >
-                                                        Proceed to Dashboard
-                                                        <ArrowRight className="w-4 h-4" />
-                                                    </button>
-
-                                                    <button
-                                                        onClick={handleReset}
-                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-sm"
-                                                    >
-                                                        Provision Another
-                                                    </button>
-                                                </div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
-                                </motion.div>
+                                </div>
+                            </motion.div>
+
+                            {/* Full Width Integration Guides - Shifted outside and spans 12 cols */}
+                            <AnimatePresence>
+                                {registrationData && (
+                                    <motion.div
+                                        variants={itemVariants}
+                                        initial="hidden"
+                                        animate="visible"
+                                        exit="hidden"
+                                        className="lg:col-span-12"
+                                    >
+                                        <div className="w-full bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl mt-2 overflow-hidden">
+                                            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0A0A] text-left">
+                                                <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 text-slate-900 dark:text-white">
+                                                    <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+                                                    Integration Guides
+                                                </h3>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                {[
+                                                    {
+                                                        title: "Next.js (App Router)",
+                                                        desc: "Place the script in app/layout.tsx using the next/script component.",
+                                                        code: `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script \n          src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js" \n          data-api-key="${registrationData.apiKey}" \n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`
+                                                    },
+                                                    {
+                                                        title: "React / Vite",
+                                                        desc: "Drop the <script> tag inside public/index.html.",
+                                                        code: `<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <title>My App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script\n      src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js"\n      data-api-key="${registrationData.apiKey}"\n      defer\n    ></script>\n  </body>\n</html>`
+                                                    },
+                                                    {
+                                                        title: "Vanilla HTML / Webflow",
+                                                        desc: "Paste the <script> directly above the closing </body> tag.",
+                                                        code: `<!-- Add this just before your closing </body> tag -->\n<script\n  src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js"\n  data-api-key="${registrationData.apiKey}"\n  defer\n></script>`
+                                                    },
+                                                    {
+                                                        title: "Flutter (Mobile)",
+                                                        desc: "Developer Note: Render the chat UI using the webview_flutter package to load the widget URL directly.",
+                                                        code: `import 'package:webview_flutter/webview_flutter.dart';\n\n// Create a dedicated Chat Screen\nWebViewWidget(\n  controller: WebViewController()\n    ..setJavaScriptMode(JavaScriptMode.unrestricted)\n    ..loadRequest(Uri.parse('${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/chat?key=${registrationData.apiKey}')),\n)`
+                                                    }
+                                                ].map((item, index) => (
+                                                    <div key={index} className="border-b last:border-0 border-slate-200 dark:border-slate-800">
+                                                        <button
+                                                            onClick={() => setOpenAccordion(openAccordion === index ? -1 : index)}
+                                                            className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] transition-colors text-left group"
+                                                        >
+                                                            <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 transition-colors uppercase tracking-wider">{item.title}</span>
+                                                            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${openAccordion === index ? 'rotate-180' : ''}`} />
+                                                        </button>
+                                                        <AnimatePresence>
+                                                            {openAccordion === index && (
+                                                                <motion.div
+                                                                    initial={{ height: 0, opacity: 0 }}
+                                                                    animate={{ height: "auto", opacity: 1 }}
+                                                                    exit={{ height: 0, opacity: 0 }}
+                                                                    className="overflow-hidden"
+                                                                >
+                                                                    <div className="p-4 pt-0 bg-white dark:bg-[#111111] text-left">
+                                                                        <p className="text-[11px] text-slate-500 mb-3">{item.desc}</p>
+                                                                        <pre className="p-3 bg-slate-50 dark:bg-[#0A0A0A] rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-[10px] text-indigo-600 dark:text-indigo-300 font-mono leading-relaxed">
+                                                                            <code>{item.code}</code>
+                                                                        </pre>
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-6 flex flex-col sm:flex-row gap-3 w-full">
+                                            <button
+                                                onClick={() => navigate('/dashboard')}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2 px-6 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-md font-medium text-xs uppercase tracking-wider transition-colors"
+                                            >
+                                                Proceed to Dashboard
+                                                <ArrowRight className="w-4 h-4" />
+                                            </button>
+
+                                            <button
+                                                onClick={handleReset}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-md font-medium text-xs uppercase tracking-wider transition-colors"
+                                            >
+                                                Provision Another
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </motion.div>
                     </SignedIn>
                 </AnimatePresence>
             </div>

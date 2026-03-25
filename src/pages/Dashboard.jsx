@@ -26,8 +26,11 @@ const Dashboard = () => {
     const [messageLimit, setMessageLimit] = useState(200);
     const [periodEnd, setPeriodEnd] = useState(null);
     const [showPricing, setShowPricing] = useState(false);
+    const [isTraining, setIsTraining] = useState(false);
+    const [trainingText, setTrainingText] = useState('');
 
     const fileInputRef = useRef(null);
+    const trainingTextRef = useRef(null);
 
     // Fetch company details on mount
     useEffect(() => {
@@ -63,9 +66,7 @@ const Dashboard = () => {
 
                 if (companyRes.ok) {
                     const data = await companyRes.json();
-                    if (data.status === 'success') {
-                        setApiKey(data.api_key);
-                    }
+                    // Removed auto-fetching API key to prevent leakage as requested
                 }
                 
                 setIsLoading(false);
@@ -80,7 +81,7 @@ const Dashboard = () => {
 
     const showAlert = (type, msg) => {
         setAlertConfig({ open: true, type, msg });
-        setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 4000);
+        setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 8000);
     };
 
     const handleFileChange = (e) => {
@@ -105,16 +106,18 @@ const Dashboard = () => {
 
     const handleTrain = async (e) => {
         e.preventDefault();
-        if (!url.trim() && !file) {
-            showAlert('error', 'You must provide either a URL or a PDF file.');
+        if (!url.trim() && !file && !trainingText.trim()) {
+            showAlert('error', 'You must provide a URL, a PDF file, or manual text.');
             return;
         }
-        setIsLoading(true);
+        setIsTraining(true);
         try {
             const token = await getToken();
             const formData = new FormData();
             if (url.trim()) formData.append('url', url.trim());
             if (file) formData.append('file', file);
+            if (trainingText.trim()) formData.append('text', trainingText.trim());
+            if (apiKey.trim()) formData.append('api_key', apiKey.trim()); // Allow manual key override/input
 
             const baseUrl = import.meta.env.VITE_API_URL || '';
             const response = await fetch(`${baseUrl}/api/train`, {
@@ -124,13 +127,23 @@ const Dashboard = () => {
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.detail || 'Training failed.');
-            showAlert('success', data.message || 'Training successful!');
+            
+            if (data.warning) {
+                showAlert('warning', data.warning);
+                // Highlight and scroll to manual text area for guidance
+                trainingTextRef.current?.focus();
+                trainingTextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                showAlert('success', data.message || 'Training successful!');
+            }
+            
             setUrl('');
+            setTrainingText('');
             clearFile();
         } catch (error) {
             showAlert('error', error.message);
         } finally {
-            setIsLoading(false);
+            setIsTraining(false);
         }
     };
 
@@ -304,44 +317,69 @@ const Dashboard = () => {
                                     )}
 
                                     {isLoading ? <SkeletonLoader.Form /> : (
-                                        <form onSubmit={handleTrain} className="space-y-6 relative z-10">
-                                            <div>
-                                                <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">API Secret Key</label>
-                                                <div className="relative group">
-                                                    <input
-                                                        type={showApiKey ? "text" : "password"}
-                                                        value={apiKey}
-                                                        onChange={(e) => setApiKey(e.target.value)}
-                                                        className="w-full px-3 py-2 bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-xs text-slate-900 dark:text-white transition-colors pr-10"
-                                                        placeholder="sb_live_..."
-                                                    />
-                                                    <button type="button" onClick={() => setShowApiKey(!showApiKey)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-700">
-                                                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                    </button>
+                                        <form onSubmit={handleTrain} className="space-y-8 relative z-10">
+                                            {/* Vertical Layout for all fields */}
+                                            <div className="flex flex-col gap-6">
+                                                <div>
+                                                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">API Secret Key</label>
+                                                    <div className="relative group">
+                                                        <input
+                                                            type={showApiKey ? "text" : "password"}
+                                                            value={apiKey}
+                                                            onChange={(e) => setApiKey(e.target.value)}
+                                                            className="w-full px-3 py-2.5 bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-xs text-slate-900 dark:text-white transition-colors pr-10"
+                                                            placeholder="sb_live_..."
+                                                        />
+                                                        <button type="button" onClick={() => setShowApiKey(!showApiKey)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-700">
+                                                            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Source URL</label>
                                                     <input
                                                         type="url"
                                                         value={url}
                                                         onChange={(e) => setUrl(e.target.value)}
-                                                        className="w-full px-3 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-white transition-colors"
+                                                        className="w-full px-3 py-2.5 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-white transition-colors"
                                                         placeholder="https://docs.site.com"
                                                     />
                                                 </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Knowledge Text (Manual Entry)</label>
+                                                    <textarea
+                                                        ref={trainingTextRef}
+                                                        value={trainingText}
+                                                        onChange={(e) => setTrainingText(e.target.value)}
+                                                        rows={4}
+                                                        className={`w-full px-3 py-2.5 text-sm bg-transparent border rounded-md focus:outline-none focus:ring-1 transition-all resize-none ${
+                                                            alertConfig.type === 'warning' && alertConfig.open 
+                                                            ? 'border-amber-400 ring-2 ring-amber-400/20 bg-amber-50/5 dark:bg-amber-400/5 animate-pulse' 
+                                                            : 'border-slate-300 dark:border-slate-800'
+                                                        }`}
+                                                        placeholder="Paste your services, FAQs, or raw knowledge here..."
+                                                    />
+                                                </div>
+
                                                 <div>
                                                     <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">PDF Archive</label>
                                                     <div 
                                                         onClick={() => fileInputRef.current?.click()}
-                                                        className="flex items-center justify-between px-3 py-2 bg-transparent border border-slate-300 dark:border-slate-800 rounded-md cursor-pointer hover:border-slate-400 transition-colors group"
+                                                        className="flex flex-col items-center justify-center gap-3 px-6 py-10 bg-transparent border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-xl cursor-pointer hover:border-indigo-500/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all group"
                                                     >
-                                                        <span className="text-xs text-slate-500 group-hover:text-slate-700 transition-colors max-w-[150px] truncate">
-                                                            {file ? file.name : "Select file..."}
-                                                        </span>
-                                                        <UploadCloud className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+                                                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 transition-colors">
+                                                            <UploadCloud className="w-6 h-6" />
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <span className="text-sm font-bold text-slate-900 dark:text-white block mb-1">
+                                                                {file ? file.name : "Drop mission-critical PDF here"}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                                                                {file ? "Click to change file" : "or click to browse filesystem"}
+                                                            </span>
+                                                        </div>
                                                         <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileChange} />
                                                     </div>
                                                 </div>
@@ -349,14 +387,19 @@ const Dashboard = () => {
 
                                             <button 
                                                 type="submit" 
-                                                disabled={isLoading || isLockedOut}
-                                                className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${
+                                                disabled={isTraining || isLockedOut}
+                                                className={`w-full py-3 rounded-md text-sm font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${
                                                     isLockedOut 
                                                     ? 'bg-slate-100 dark:bg-[#1A1A1A] text-slate-400 border border-slate-200 dark:border-slate-800 cursor-not-allowed' 
-                                                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white'
+                                                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white active:scale-[0.98]'
                                                 }`}
                                             >
-                                                {isLoading ? 'Processing Signal...' : isLockedOut ? "Lockout Active" : "Start Training Sequence"}
+                                                {isTraining ? (
+                                                    <>
+                                                        <div className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-900 dark:border-t-white rounded-full animate-spin" />
+                                                        <span>Processing Knowledge...</span>
+                                                    </>
+                                                ) : isLockedOut ? "Lockout Active" : "Start Training Sequence"}
                                             </button>
                                         </form>
                                     )}
