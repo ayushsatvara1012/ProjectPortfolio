@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SignedIn, SignedOut, SignUp, useUser, useAuth } from "@clerk/clerk-react";
-import { Building2, Globe, Palette, MessageSquare, Copy, CheckCircle, Code2, Sparkles, ShieldCheck, ArrowRight, Key, Zap, BookOpen, ChevronRight,Shield ,Rocket} from 'lucide-react';
+import { Building2, Globe, Palette, MessageSquare, Copy, CheckCircle, Code2, Sparkles, ShieldCheck, ArrowRight, Key, Zap, BookOpen, ChevronRight, ChevronDown, Shield, Rocket } from 'lucide-react';
 import Logo from '../components/Logo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +22,7 @@ const Registration = () => {
     const [copied, setCopied] = useState(false);
     const [userTier, setUserTier] = useState(null);
     const [isTierLoading, setIsTierLoading] = useState(true);
+    const [openAccordion, setOpenAccordion] = useState(0);
 
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
 
@@ -148,12 +149,25 @@ function add_sapybase_widget() {
 
         setIsLoading(true);
 
+        // --- BYPASS START FOR TESTING ---
+        setTimeout(() => {
+            setRegistrationData({
+                apiKey: 'sb_test_DEMO1234567890',
+                companyName: formData.companyName,
+                allowedOrigin: formData.allowedOrigin
+            });
+            showAlert('success', 'Demo successful! (Bypassed backend)');
+            setIsLoading(false);
+        }, 800);
+        return;
+        // --- BYPASS END FOR TESTING ---
+
         try {
             const token = await getToken();
             const baseUrl = import.meta.env.VITE_API_URL
                 ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}`
                 : 'https://sapyai.onrender.com';
-            
+
             const apiUrl = `${baseUrl}/api/register`;
 
             const response = await fetch(apiUrl, {
@@ -226,8 +240,8 @@ function add_sapybase_widget() {
         }
     };
 
-    // Card styling mixin for consistency - COPY from Dashboard
-    const bentoCardStyle = "bg-white/60 dark:bg-slate-900/40 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/60 rounded-3xl p-5 lg:p-6 group relative overflow-hidden flex flex-col";
+    // Card styling mixin for consistency - Technical Brutalism
+    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 lg:p-6 group relative flex flex-col";
 
     return (
         <div className="w-full min-h-[calc(100vh-80px)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8 font-sans tracking-tight relative overflow-x-hidden flex justify-center">
@@ -269,7 +283,7 @@ function add_sapybase_widget() {
                             variants={containerVariants}
                             initial="hidden"
                             animate="visible"
-                            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+                            className="grid grid-cols-1 lg:grid-cols-12 gap-4"
                         >
                             {/* Left Column: Promotion/Details (Spans 5 cols) */}
                             <motion.div variants={itemVariants} className="lg:col-span-5 space-y-6">
@@ -288,7 +302,7 @@ function add_sapybase_widget() {
                                         <p className="text-slate-500 dark:text-indigo-100/80 text-sm font-medium leading-relaxed mb-8">
                                             Provision your tenant, get your API key, and start conversing with your customers using the power of Gemini.
                                         </p>
-                                        
+
                                         <div className="space-y-4">
                                             {[
                                                 { icon: Zap, text: "Instant Provisioning", sub: "Get your key in seconds" },
@@ -307,25 +321,17 @@ function add_sapybase_widget() {
                                             ))}
                                         </div>
                                     </div>
-                                    
+
                                     {/* Abstract decoration */}
                                     <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
                                 </div>
-                                
-                                <div className={`${bentoCardStyle} bg-white/80 dark:bg-slate-900/40`}>
-                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                        <MessageSquare className="w-5 h-5 text-indigo-500" />
-                                        Custom Instructions
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                        Your AI assistant will follow these parameters to ensure brand consistency and helpfulness across all interactions.
-                                    </p>
-                                </div>
+
+                                {/* Custom Instructions block removed per Technical Brutalism redesign */}
                             </motion.div>
 
                             {/* Right Column: The Form/Success (Spans 7 cols) */}
                             <motion.div variants={itemVariants} className="lg:col-span-7">
-                                <div className={`${bentoCardStyle} h-full min-h-[500px] shadow-xl border-slate-200/60 dark:border-slate-800/60 bg-white/90 dark:bg-slate-900/60`}>
+                                <div className={`${bentoCardStyle} h-full min-h-[500px]`}>
                                     <AnimatePresence mode="wait">
                                         {!registrationData ? (
                                             <motion.div
@@ -388,12 +394,12 @@ function add_sapybase_widget() {
                                                                     className="w-full pl-12 pr-12 py-3.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 outline-none uppercase font-mono text-xs transition-all"
                                                                 />
                                                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-all group-hover:scale-110 active:scale-95">
-                                                                    <input 
-                                                                        type="color" 
-                                                                        name="themeColor" 
-                                                                        value={formData.themeColor} 
-                                                                        onChange={handleChange} 
-                                                                        className="absolute inset-[-10px] w-[200%] h-[200%] cursor-pointer" 
+                                                                    <input
+                                                                        type="color"
+                                                                        name="themeColor"
+                                                                        value={formData.themeColor}
+                                                                        onChange={handleChange}
+                                                                        className="absolute inset-[-10px] w-[200%] h-[200%] cursor-pointer"
                                                                     />
                                                                 </div>
                                                             </div>
@@ -426,7 +432,6 @@ function add_sapybase_widget() {
                                                         >
                                                             {isLoading ? (
                                                                 <>
-                                                                    <Logo className="w-10 h-5 mr-3" />
                                                                     Provisioning...
                                                                 </>
                                                             ) : (
@@ -446,56 +451,127 @@ function add_sapybase_widget() {
                                                 key="success-view"
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
-                                                className="h-full flex flex-col items-center justify-center text-center space-y-8"
+                                                className="h-full flex flex-col space-y-6"
                                             >
-                                                <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
-                                                    <CheckCircle className="w-10 h-10" />
-                                                </div>
-                                                
-                                                <div>
-                                                    <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">{registrationData.companyName} Ready</h2>
-                                                    <p className="text-slate-500 mt-2 font-medium">Your credentials have been generated and secured.</p>
+                                                {/* Header */}
+                                                <div className="flex items-center gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+                                                    <div className="w-12 h-12 bg-indigo-50 dark:bg-[#111111] rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-800">
+                                                        <CheckCircle className="w-6 h-6" />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <h2 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">{registrationData.companyName} Ready</h2>
+                                                        <p className="text-xs text-slate-500 font-medium mt-0.5">Your credentials have been generated and secured.</p>
+                                                    </div>
                                                 </div>
 
-                                                <div className="w-full space-y-4 text-left">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">API Key</label>
-                                                        <div className="flex items-center gap-2 p-4 bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-indigo-600 dark:text-indigo-400 break-all transition-all hover:border-indigo-500/30 focus-within:ring-4 focus-within:ring-indigo-500/10">
-                                                            <Key className="w-4 h-4 shrink-0 text-slate-400" />
-                                                            {registrationData.apiKey}
+                                                {/* Top Row: Key and Script Grid */}
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
+                                                    {/* API Key Container */}
+                                                    <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col">
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">API Key</label>
+                                                        <div className="flex-1 flex items-center justify-between p-3 bg-slate-50 dark:bg-[#0A0A0A] border border-slate-200 dark:border-slate-800 rounded-lg font-mono text-xs text-indigo-600 dark:text-indigo-400">
+                                                            <div className="flex items-center gap-2 truncate">
+                                                                <Key className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                                                <span className="truncate">{registrationData.apiKey}</span>
+                                                            </div>
+                                                            <button onClick={() => handleCopy(registrationData.apiKey)} className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-500 transition-colors border border-slate-200 dark:border-slate-700 ml-2">
+                                                                <Copy className="w-3.5 h-3.5" />
+                                                            </button>
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Embed Script</label>
-                                                        <div className="relative group/code">
-                                                            <pre className="p-5 bg-slate-900 rounded-xl border border-slate-800 overflow-x-auto text-[11px] text-indigo-300 font-mono leading-relaxed max-h-[160px] scrollbar-hide">
+                                                    {/* Embed Script Container */}
+                                                    <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col">
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">Embed Script</label>
+                                                        <div className="relative group/code flex-1">
+                                                            <pre className="p-3 bg-slate-50 dark:bg-[#0A0A0A] rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-[10px] text-indigo-600 dark:text-indigo-300 font-mono leading-relaxed h-full scrollbar-hide text-left">
                                                                 <code>{embedCode}</code>
                                                             </pre>
                                                             <button
                                                                 onClick={() => handleCopy(embedCode)}
-                                                                className="absolute top-3 right-3 p-2.5 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-white transition-all border border-slate-700/50 shadow-lg"
+                                                                className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-500 transition-colors border border-slate-200 dark:border-slate-700"
                                                             >
-                                                                {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                                                                {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                                             </button>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="pt-6 w-full space-y-4">
+                                                {/* Accordion Container */}
+                                                <div className="w-full bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl mt-2 overflow-hidden flex-1 basis-auto">
+                                                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0A0A] text-left">
+                                                        <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                                                            <BookOpen className="w-4 h-4 text-indigo-500" />
+                                                            Integration Guides
+                                                        </h3>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        {[
+                                                            {
+                                                                title: "Next.js (App Router)",
+                                                                desc: "Place the script in app/layout.tsx using the next/script component.",
+                                                                code: `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script \n          src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js" \n          data-api-key="${registrationData.apiKey}" \n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`
+                                                            },
+                                                            {
+                                                                title: "React / Vite",
+                                                                desc: "Drop the <script> tag inside public/index.html.",
+                                                                code: `<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <title>My App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script\n      src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js"\n      data-api-key="${registrationData.apiKey}"\n      defer\n    ></script>\n  </body>\n</html>`
+                                                            },
+                                                            {
+                                                                title: "Vanilla HTML / Webflow",
+                                                                desc: "Paste the <script> directly above the closing </body> tag.",
+                                                                code: `<!-- Add this just before your closing </body> tag -->\n<script\n  src="${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/widget.js"\n  data-api-key="${registrationData.apiKey}"\n  defer\n></script>`
+                                                            },
+                                                            {
+                                                                title: "Flutter (Mobile)",
+                                                                desc: "Developer Note: Render the chat UI using the webview_flutter package to load the widget URL directly.",
+                                                                code: `import 'package:webview_flutter/webview_flutter.dart';\n\n// Create a dedicated Chat Screen\nWebViewWidget(\n  controller: WebViewController()\n    ..setJavaScriptMode(JavaScriptMode.unrestricted)\n    ..loadRequest(Uri.parse('${import.meta.env.VITE_API_URL || 'http://localhost:5173'}/chat?key=${registrationData.apiKey}')),\n)`
+                                                            }
+                                                        ].map((item, index) => (
+                                                            <div key={index} className="border-b last:border-0 border-slate-200 dark:border-slate-800">
+                                                                <button
+                                                                    onClick={() => setOpenAccordion(openAccordion === index ? -1 : index)}
+                                                                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] transition-colors text-left group"
+                                                                >
+                                                                    <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{item.title}</span>
+                                                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === index ? 'rotate-180' : ''}`} />
+                                                                </button>
+                                                                <AnimatePresence>
+                                                                    {openAccordion === index && (
+                                                                        <motion.div
+                                                                            initial={{ height: 0, opacity: 0 }}
+                                                                            animate={{ height: "auto", opacity: 1 }}
+                                                                            exit={{ height: 0, opacity: 0 }}
+                                                                            className="overflow-hidden"
+                                                                        >
+                                                                            <div className="p-4 pt-0 bg-white dark:bg-[#111111] text-left">
+                                                                                <p className="text-[11px] text-slate-500 mb-3">{item.desc}</p>
+                                                                                <pre className="p-3 bg-slate-50 dark:bg-[#0A0A0A] rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-[10px] text-indigo-600 dark:text-indigo-300 font-mono leading-relaxed">
+                                                                                    <code>{item.code}</code>
+                                                                                </pre>
+                                                                            </div>
+                                                                        </motion.div>
+                                                                    )}
+                                                                </AnimatePresence>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="pt-2 flex flex-col sm:flex-row gap-4 w-full">
                                                     <button
                                                         onClick={() => navigate('/dashboard')}
-                                                        className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] group"
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
                                                     >
-                                                        Proceed to Dashboard (Train Your AI) 🚀
-                                                        <Rocket className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                                        Proceed to Dashboard
+                                                        <ArrowRight className="w-4 h-4" />
                                                     </button>
 
                                                     <button
                                                         onClick={handleReset}
-                                                        className="w-full inline-flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors py-2"
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors"
                                                     >
-                                                        Provision Another Tenant
+                                                        Provision Another
                                                     </button>
                                                 </div>
                                             </motion.div>
