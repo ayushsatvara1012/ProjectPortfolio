@@ -19,8 +19,8 @@ import Logo from "./components/Logo";
 
 // 2. Create a high-end Loading fallback using the Logo component
 const PageLoader = () => (
-    <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-slate-950 transition-colors duration-500">
-        <Logo className="w-[160px] h-20" />
+    <div className="w-full h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
     </div>
 );
 
@@ -110,7 +110,9 @@ const router = createBrowserRouter([
         path: "/admin",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <AdminDashboard />
+            <ProtectedRoute adminOnly={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
           </Suspense>
         ),
       },

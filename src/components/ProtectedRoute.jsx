@@ -7,7 +7,7 @@ import Logo from "./Logo";
  * Higher-Order Component to enforce the SaPyBase onboarding flow:
  * Signed In -> Select Tier (/pricing) -> Register Company (/register) -> Dashboard
  */
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, adminOnly = false }) => {
     const { isLoaded: isUserLoaded, isSignedIn, user } = useUser();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const location = useLocation();
@@ -15,7 +15,8 @@ const ProtectedRoute = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [onboardingState, setOnboardingState] = useState({
         tier: null,
-        hasCompany: false
+        hasCompany: false,
+        role: 'USER'
     });
 
     useEffect(() => {
@@ -29,7 +30,7 @@ const ProtectedRoute = ({ children }) => {
                 const token = await getToken();
                 const baseUrl = import.meta.env.VITE_API_URL || '';
                 
-                // 1. Check Profile (Tier)
+                // 1. Check Profile (Tier & Role)
                 const meRes = await fetch(`${baseUrl}/api/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -43,6 +44,7 @@ const ProtectedRoute = ({ children }) => {
 
                 setOnboardingState({
                     tier: meData?.tier || null,
+                    role: meData?.role || 'USER',
                     hasCompany: companyData?.status === 'success'
                 });
             } catch (err) {
@@ -55,10 +57,10 @@ const ProtectedRoute = ({ children }) => {
         checkOnboardingStatus();
     }, [isUserLoaded, isAuthLoaded, isSignedIn, getToken]);
 
-    if (!isUserLoaded || !isAuthLoaded || isLoading) {
+    if (!isUserLoaded || !isAuthLoaded) {
         return (
-            <div className="w-full h-screen bg-white dark:bg-slate-950 flex items-center justify-center transition-colors duration-500">
-                <Logo className="w-[160px] h-20" />
+            <div className="w-full h-[60vh] flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -67,23 +69,30 @@ const ProtectedRoute = ({ children }) => {
         return <Navigate to="/" state={{ from: location }} replace />;
     }
 
-    const { tier, hasCompany } = onboardingState;
+    const { tier, hasCompany, role } = onboardingState;
 
     // --- ENFORCEMENT LOGIC ---
-    
-    // 1. If trying to access Dashboard but no Tier selected
-    if (location.pathname === '/dashboard' && !tier) {
-        return <Navigate to="/pricing" replace />;
-    }
+    // Only enforce redirects once we have finished the onboarding check (isLoading is false)
+    if (!isLoading) {
+        // 0. ADMIN PROTECTION (Highest priority)
+        if (adminOnly && role !== 'ADMIN') {
+            return <Navigate to="/dashboard" replace />;
+        }
 
-    // 2. If trying to access Dashboard but no Company registered
-    if (location.pathname === '/dashboard' && !hasCompany) {
-        return <Navigate to="/register" replace />;
-    }
+        // 1. If trying to access Dashboard but no Tier selected
+        if (location.pathname === '/dashboard' && !tier) {
+            return <Navigate to="/pricing" replace />;
+        }
 
-    // 3. If trying to access Register but no Tier selected
-    if (location.pathname === '/register' && !tier) {
-        return <Navigate to="/pricing" replace />;
+        // 2. If trying to access Dashboard but no Company registered
+        if (location.pathname === '/dashboard' && !hasCompany) {
+            return <Navigate to="/register" replace />;
+        }
+
+        // 3. If trying to access Register but no Tier selected
+        if (location.pathname === '/register' && !tier) {
+            return <Navigate to="/pricing" replace />;
+        }
     }
 
     return children;

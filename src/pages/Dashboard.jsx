@@ -16,15 +16,15 @@ const Dashboard = () => {
     const [showApiKey, setShowApiKey] = useState(false);
     const [url, setUrl] = useState('');
     const [file, setFile] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [alertConfig, setAlertConfig] = useState({ open: false, type: 'success', msg: '' });
     const [userTier, setUserTier] = useState(null);
+    const [userRole, setUserRole] = useState(null);
     const [trialEndDate, setTrialEndDate] = useState(null);
     const [stats, setStats] = useState({ total_documents: 0, total_messages: 0 });
     const [messagesUsed, setMessagesUsed] = useState(0);
     const [messageLimit, setMessageLimit] = useState(200);
     const [periodEnd, setPeriodEnd] = useState(null);
-    const [isTierChecking, setIsTierChecking] = useState(true);
     const [showPricing, setShowPricing] = useState(false);
 
     const fileInputRef = useRef(null);
@@ -50,6 +50,7 @@ const Dashboard = () => {
                 if (meRes.ok) {
                     const data = await meRes.json();
                     setUserTier(data.tier);
+                    setUserRole(data.role);
                     setTrialEndDate(data.trial_end_date);
                     setMessagesUsed(data.messages_used);
                     setMessageLimit(data.message_limit);
@@ -67,10 +68,10 @@ const Dashboard = () => {
                     }
                 }
                 
-                setIsTierChecking(false);
+                setIsLoading(false);
             } catch (err) {
                 console.error("Failed to fetch user details:", err);
-                setIsTierChecking(false);
+                setIsLoading(false);
             }
         };
 
@@ -150,14 +151,6 @@ const Dashboard = () => {
 
     const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-6 group relative overflow-hidden flex flex-col";
 
-    if (isTierChecking) {
-        return (
-            <div className="w-full h-screen bg-slate-50 dark:bg-[#0A0A0A] flex items-center justify-center transition-colors duration-500">
-                <Logo className="w-[120px] h-16" />
-            </div>
-        );
-    }
-
     return (
         <>
             <SignedIn>
@@ -200,6 +193,14 @@ const Dashboard = () => {
                                 </p>
                             </div>
                             <div className="flex items-center gap-4 bg-white dark:bg-[#111111] p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                                {userRole === 'ADMIN' && (
+                                    <button 
+                                        onClick={() => navigate('/admin')}
+                                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20"
+                                    >
+                                        Admin Panel
+                                    </button>
+                                )}
                                 <button 
                                     onClick={async () => {
                                         try {
@@ -228,7 +229,7 @@ const Dashboard = () => {
                                 </div>
                                 <div>
                                     <p className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{user?.fullName || 'Developer'}</p>
-                                    <p className="text-[9px] text-slate-400 uppercase font-mono tracking-widest">Enterprise Access</p>
+                                    <p className="text-[9px] text-slate-400 uppercase font-mono tracking-widest">{userRole === 'ADMIN' ? 'System Administrator' : 'Enterprise Access'}</p>
                                 </div>
                             </div>
                         </div>
@@ -364,59 +365,63 @@ const Dashboard = () => {
 
                             {/* Right Column: Stats & Meta (Spans 5) */}
                             <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-8">
-                                <div className={`${bentoCardStyle} sm:col-span-2`}>
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="flex items-center gap-2">
-                                            <Database className="w-4 h-4 text-slate-500" />
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">API Usage</h4>
+                                {isLoading ? <SkeletonLoader.Card /> : (
+                                    <div className={`${bentoCardStyle} sm:col-span-2`}>
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="flex items-center gap-2">
+                                                <Database className="w-4 h-4 text-slate-500" />
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">API Usage</h4>
+                                            </div>
+                                            {(messageLimit === null || messageLimit >= 999999) && (
+                                                <span className="px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#1A1A1A] text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Unlimited</span>
+                                            )}
                                         </div>
-                                        {(messageLimit === null || messageLimit >= 999999) && (
-                                            <span className="px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#1A1A1A] text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Unlimited</span>
+
+                                        <div className="flex items-end gap-2 mb-4">
+                                            <span className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                                {messagesUsed}
+                                                {messageLimit !== null && messageLimit < 999999 && (
+                                                    <span className="text-sm text-slate-400"> / {messageLimit}</span>
+                                                )}
+                                            </span>
+                                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 mb-1.5 ml-1.5">reqs</span>
+                                        </div>
+
+                                        {messageLimit !== null && messageLimit < 999999 && (
+                                            <>
+                                                <div className="w-full h-1.5 bg-slate-100 dark:bg-[#1A1A1A] rounded-full overflow-hidden flex">
+                                                    <motion.div 
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${Math.min((messagesUsed / messageLimit) * 100, 100)}%` }}
+                                                        className={`h-full transition-all duration-700 ${
+                                                            (messagesUsed / messageLimit) >= 1 ? 'bg-red-500' :
+                                                            (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' :
+                                                            'bg-slate-900 dark:bg-slate-100'
+                                                        }`}
+                                                    />
+                                                </div>
+                                                <div className="flex justify-between items-center mt-3">
+                                                    <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                                                        {Math.round((messagesUsed / messageLimit) * 100)}% Consumed
+                                                    </p>
+                                                    <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                                                        Reset: {periodEnd ? new Date(periodEnd).toLocaleDateString() : '??-??-????'}
+                                                    </p>
+                                                </div>
+                                            </>
                                         )}
                                     </div>
+                                )}
 
-                                    <div className="flex items-end gap-2 mb-4">
-                                        <span className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                            {messagesUsed}
-                                            {messageLimit !== null && messageLimit < 999999 && (
-                                                <span className="text-sm text-slate-400"> / {messageLimit}</span>
-                                            )}
-                                        </span>
-                                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 mb-1.5 ml-1">reqs</span>
+                                {isLoading ? <SkeletonLoader.Card /> : (
+                                    <div className={`${bentoCardStyle} sm:col-span-2 min-h-[180px] border-indigo-200/30 dark:border-indigo-800/20`}>
+                                        <div className="relative z-10">
+                                            <div className="px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/30 bg-indigo-50 dark:bg-indigo-900/10 text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 w-fit mb-4">Roadmap Expansion</div>
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 tracking-tight uppercase">Multi-Modality Vectoring</h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Coming soon. Cross-reference images, audio logs, and structured JSON feeds into a single unified knowledge model.</p>
+                                        </div>
                                     </div>
-
-                                    {messageLimit !== null && messageLimit < 999999 && (
-                                        <>
-                                            <div className="w-full h-1.5 bg-slate-100 dark:bg-[#1A1A1A] rounded-full overflow-hidden flex">
-                                                <motion.div 
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${Math.min((messagesUsed / messageLimit) * 100, 100)}%` }}
-                                                    className={`h-full transition-all duration-700 ${
-                                                        (messagesUsed / messageLimit) >= 1 ? 'bg-red-500' :
-                                                        (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' :
-                                                        'bg-slate-900 dark:bg-slate-100'
-                                                    }`}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between items-center mt-3">
-                                                <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                                                    {Math.round((messagesUsed / messageLimit) * 100)}% Consumed
-                                                </p>
-                                                <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                                                    Reset: {periodEnd ? new Date(periodEnd).toLocaleDateString() : '??-??-????'}
-                                                </p>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                <div className={`${bentoCardStyle} sm:col-span-2 min-h-[180px] border-indigo-200/30 dark:border-indigo-800/20`}>
-                                    <div className="relative z-10">
-                                        <div className="px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/30 bg-indigo-50 dark:bg-indigo-900/10 text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 w-fit mb-4">Roadmap Expansion</div>
-                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 tracking-tight uppercase">Multi-Modality Vectoring</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Coming soon. Cross-reference images, audio logs, and structured JSON feeds into a single unified knowledge model.</p>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -243,6 +243,14 @@ function add_sapybase_widget() {
     // Card styling mixin for consistency - Technical Brutalism
     const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 lg:p-6 group relative flex flex-col";
 
+    if (!isLoaded || isTierLoading) {
+        return (
+            <div className="w-full h-[60vh] flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full min-h-[calc(100vh-80px)] bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8 font-sans tracking-tight relative overflow-x-hidden flex justify-center">
 
@@ -286,8 +294,8 @@ function add_sapybase_widget() {
                             className="grid grid-cols-1 lg:grid-cols-12 gap-4"
                         >
                             {/* Left Column: Promotion/Details (Spans 5 cols) */}
-                            <motion.div variants={itemVariants} className="lg:col-span-5 space-y-6">
-                                <div className={`${bentoCardStyle} bg-linear-to-br from-indigo-50/50 to-white/60 dark:from-indigo-950/20 dark:to-slate-900/40 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800/60 shadow-2xl shadow-indigo-500/5`}>
+                            <motion.div variants={itemVariants} className="lg:col-span-5 flex flex-col">
+                                <div className={`${bentoCardStyle} h-full min-h-[500px] bg-linear-to-br from-indigo-50/50 to-white/60 dark:from-indigo-950/20 dark:to-slate-900/40 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800/60 shadow-2xl shadow-indigo-500/5`}>
                                     <div className="relative z-10">
                                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-wider mb-6">
                                             <Sparkles className="w-3 h-3" />
@@ -451,7 +459,7 @@ function add_sapybase_widget() {
                                                 key="success-view"
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
-                                                className="h-full flex flex-col space-y-6"
+                                                className="h-full flex-1 flex flex-col space-y-6"
                                             >
                                                 {/* Header */}
                                                 <div className="flex items-center gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -465,7 +473,7 @@ function add_sapybase_widget() {
                                                 </div>
 
                                                 {/* Top Row: Key and Script Grid */}
-                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
+                                                <div className="grid grid-cols-1  gap-4 w-full">
                                                     {/* API Key Container */}
                                                     <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col">
                                                         <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 text-left">API Key</label>
@@ -497,8 +505,23 @@ function add_sapybase_widget() {
                                                     </div>
                                                 </div>
 
-                                                {/* Accordion Container */}
-                                                <div className="w-full bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl mt-2 overflow-hidden flex-1 basis-auto">
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Full Width Integration Guides - Shifted outside and spans 12 cols */}
+                                    <AnimatePresence>
+                                        {registrationData && (
+                                            <motion.div
+                                                variants={itemVariants}
+                                                initial="hidden"
+                                                animate="visible"
+                                                exit="hidden"
+                                                className="lg:col-span-12"
+                                            >
+                                                <div className="w-full bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl mt-2 overflow-hidden shadow-xl shadow-indigo-500/5">
                                                     <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0A0A0A] text-left">
                                                         <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                                                             <BookOpen className="w-4 h-4 text-indigo-500" />
@@ -558,10 +581,10 @@ function add_sapybase_widget() {
                                                     </div>
                                                 </div>
 
-                                                <div className="pt-2 flex flex-col sm:flex-row gap-4 w-full">
+                                                <div className="pt-6 flex flex-col sm:flex-row gap-4 w-full">
                                                     <button
                                                         onClick={() => navigate('/dashboard')}
-                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-xl shadow-indigo-600/20"
                                                     >
                                                         Proceed to Dashboard
                                                         <ArrowRight className="w-4 h-4" />
@@ -569,7 +592,7 @@ function add_sapybase_widget() {
 
                                                     <button
                                                         onClick={handleReset}
-                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors"
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-sm"
                                                     >
                                                         Provision Another
                                                     </button>
@@ -577,9 +600,7 @@ function add_sapybase_widget() {
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
-                                </div>
-                            </motion.div>
-                        </motion.div>
+                                </motion.div>
                     </SignedIn>
                 </AnimatePresence>
             </div>

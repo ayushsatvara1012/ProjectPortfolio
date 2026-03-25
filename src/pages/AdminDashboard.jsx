@@ -22,12 +22,9 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         if (isUserLoaded && user) {
-            const authorizedEmail = import.meta.env.VITE_ADMIN_EMAIL;
-            if (user.primaryEmailAddress?.emailAddress === authorizedEmail) {
-                fetchAdminData();
-            }
+            fetchAdminData();
         }
-    }, [isUserLoaded, user]);
+    }, [isUserLoaded, user, getToken]);
 
     const fetchAdminData = async () => {
         setIsLoading(true);
@@ -102,26 +99,14 @@ const AdminDashboard = () => {
         );
     }
 
-    const authorizedEmail = import.meta.env.VITE_ADMIN_EMAIL;
-    if (user?.primaryEmailAddress?.emailAddress !== authorizedEmail) {
+    if (isLoading) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
-                <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-4xl flex items-center justify-center text-red-600 mb-8 border border-red-100 dark:border-red-900/30 shadow-xl shadow-red-500/10">
-                    <Shield className="w-10 h-10" />
-                </div>
-                <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Access Denied</h1>
-                <p className="text-slate-500 dark:text-slate-400 font-medium text-center max-w-sm mb-10 leading-relaxed">
-                    This sector is restricted to the Primary System Administrator. Your account does not have authorization to view this module.
-                </p>
-                <button 
-                    onClick={() => window.location.href = '/dashboard'}
-                    className="px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl hover:scale-[1.02] transition-all active:scale-[0.98]"
-                >
-                    Return to Mission Control
-                </button>
+                 <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
             </div>
         );
     }
+
 
     return (
         <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 pt-28 pb-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
