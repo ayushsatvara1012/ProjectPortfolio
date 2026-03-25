@@ -147,7 +147,7 @@ const Navbar = () => {
           {/* Desktop Links (Hidden by default, shown on md+) */}
           <div className="hidden md:flex items-center gap-16 mr-10">
             {navLinks.map((link) => (
-              <div key={link.name} className="relative group">
+              <div key={`nav-desk-${link.id || link.name}`} className="relative group">
                 {link.name === "Services" ? (
                   <>
                     <button
@@ -163,7 +163,7 @@ const Navbar = () => {
                       <div className="w-[640px] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 grid grid-cols-2 gap-4">
                         {services.map((service, idx) => (
                           <a
-                            key={idx}
+                            key={`service-desk-${idx}-${service.title}`}
                             href={service.href}
                             onClick={(e) => handleLinkClick(e, service.href)}
                             className="group/item p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-700"
@@ -255,7 +255,7 @@ const Navbar = () => {
         <div className="flex flex-col h-full pt-24 px-8 pb-10 overflow-y-auto">
           <div className="space-y-4">
             {navLinks.map((link, index) => (
-              <div key={link.name} className="space-y-1">
+              <div key={`nav-mob-${link.id || link.name}-${index}`} className="space-y-1">
                 {link.name === "Services" ? (
                   <>
                     <button
@@ -271,7 +271,7 @@ const Navbar = () => {
                     <div className={`grid gap-2 overflow-hidden transition-all duration-500 ease-in-out ${isMobileServicesOpen ? 'max-h-[800px] opacity-100 mt-2 mb-4' : 'max-h-0 opacity-0'}`}>
                       {services.map((service, sIndex) => (
                         <a
-                          key={sIndex}
+                          key={`service-mob-${sIndex}-${service.title}`}
                           href={service.href}
                           onClick={(e) => {
                             handleLinkClick(e, service.href);

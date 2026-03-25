@@ -97,8 +97,8 @@ const ModernFooter = () => {
             <div className="space-y-6">
               <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Platform</h4>
               <ul className="space-y-1">
-                {navigateToPages.map((link) => (
-                  <li key={link.name}>
+                {navigateToPages.map((link, idx) => (
+                  <li key={`foot-nav-${link.name}-${idx}`}>
                     <a
                       href={link.href}
                       onClick={(e) => handleLinkClick(e, link.href)}
@@ -114,8 +114,8 @@ const ModernFooter = () => {
             <div className="space-y-6">
               <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Stack</h4>
               <ul className="space-y-3 text-sm text-slate-500 dark:text-slate-400">
-                {stackList.map((stack) => (
-                  <li key={stack.name} className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-default">
+                {stackList.map((stack, idx) => (
+                  <li key={`foot-stack-${idx}`} className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-default">
                     {stack.name}
                   </li>
                 ))}
@@ -138,7 +138,7 @@ const ModernFooter = () => {
                   },
                 ].map((social, i) => (
                   <a
-                    key={i}
+                    key={`foot-social-${i}`}
                     href={social.href}
                     className={`w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all shadow-sm ${social.hover}`}
                   >

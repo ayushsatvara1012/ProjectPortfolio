@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { SignedIn, SignedOut, SignUp, useUser, useAuth } from "@clerk/clerk-react";
-import { Building2, Globe, Palette, MessageSquare, Copy, CheckCircle, Code2, Sparkles, ShieldCheck, Loader2, ArrowRight, Key, Zap, BookOpen, ChevronRight,Shield } from 'lucide-react';
+import { Building2, Globe, Palette, MessageSquare, Copy, CheckCircle, Code2, Sparkles, ShieldCheck, ArrowRight, Key, Zap, BookOpen, ChevronRight,Shield ,Rocket} from 'lucide-react';
+import Logo from '../components/Logo';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import Alert from '../components/alert';
 
 const Registration = () => {
     const { user, isLoaded } = useUser();
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         companyName: '',
         allowedOrigin: '',
@@ -17,6 +20,35 @@ const Registration = () => {
     const [registrationData, setRegistrationData] = useState(null);
     const [alertConfig, setAlertConfig] = useState({ open: false, type: 'success', msg: '' });
     const [copied, setCopied] = useState(false);
+    const [userTier, setUserTier] = useState(null);
+    const [isTierLoading, setIsTierLoading] = useState(true);
+
+    const { getToken, isLoaded: isAuthLoaded } = useAuth();
+
+    // Check user tier on mount
+    React.useEffect(() => {
+        const checkTier = async () => {
+            if (!isAuthLoaded) return;
+            try {
+                const token = await getToken();
+                const baseUrl = import.meta.env.VITE_API_URL || '';
+                const response = await fetch(`${baseUrl}/api/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setUserTier(data.tier);
+                }
+            } catch (err) {
+                console.error("Failed to check tier:", err);
+            } finally {
+                setIsTierLoading(false);
+            }
+        };
+        checkTier();
+    }, [isAuthLoaded, getToken]);
+
+    // Redirect handled by ProtectedRoute
 
     // Platform tab state and embed code generator
     const [activePlatform, setActivePlatform] = useState('html');
@@ -105,7 +137,6 @@ function add_sapybase_widget() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const { getToken } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -210,9 +241,9 @@ function add_sapybase_widget() {
 
             <div className="max-w-7xl mx-auto w-full relative z-10">
                 <AnimatePresence mode="wait">
-                    <SignedOut>
+                    <SignedOut key="auth-signed-out">
                         <motion.div
-                            key="signed-out"
+                            key="signed-out-view"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
@@ -232,9 +263,9 @@ function add_sapybase_widget() {
                         </motion.div>
                     </SignedOut>
 
-                    <SignedIn>
+                    <SignedIn key="auth-signed-in">
                         <motion.div
-                            key="signed-in"
+                            key="registration-form-view"
                             variants={containerVariants}
                             initial="hidden"
                             animate="visible"
@@ -395,7 +426,7 @@ function add_sapybase_widget() {
                                                         >
                                                             {isLoading ? (
                                                                 <>
-                                                                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                                                                    <Logo className="w-10 h-5 mr-3" />
                                                                     Provisioning...
                                                                 </>
                                                             ) : (
@@ -451,13 +482,22 @@ function add_sapybase_widget() {
                                                     </div>
                                                 </div>
 
-                                                <button
-                                                    onClick={handleReset}
-                                                    className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition-colors bg-indigo-50 dark:bg-indigo-900/40 py-2.5 px-6 rounded-xl border border-indigo-200 dark:border-indigo-800"
-                                                >
-                                                    <ArrowRight className="w-4 h-4 rotate-180" />
-                                                    Provision Another
-                                                </button>
+                                                <div className="pt-6 w-full space-y-4">
+                                                    <button
+                                                        onClick={() => navigate('/dashboard')}
+                                                        className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] group"
+                                                    >
+                                                        Proceed to Dashboard (Train Your AI) 🚀
+                                                        <Rocket className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={handleReset}
+                                                        className="w-full inline-flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors py-2"
+                                                    >
+                                                        Provision Another Tenant
+                                                    </button>
+                                                </div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>

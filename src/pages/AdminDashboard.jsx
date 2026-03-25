@@ -3,9 +3,11 @@ import { motion } from 'framer-motion';
 import { 
     Users, Building2, Shield, Settings, Trash2, Edit3, 
     Search, Filter, ChevronRight, Activity, Globe, 
-    Calendar, Mail, Loader2, CheckCircle2, AlertCircle, 
+    Calendar, Mail, CheckCircle2, AlertCircle, 
     ShieldCheck, Zap
 } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
+import Logo from '../components/Logo';
 import { useAuth, useUser } from '@clerk/clerk-react';
 
 const AdminDashboard = () => {
@@ -94,9 +96,8 @@ const AdminDashboard = () => {
 
     if (!isUserLoaded) {
         return (
-            <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
-                <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-4" />
-                <p className="text-slate-500 font-bold animate-pulse uppercase tracking-widest text-xs">Verifying Credentials...</p>
+            <div className="w-full h-screen bg-white dark:bg-slate-950 flex items-center justify-center transition-colors duration-500">
+                <Logo className="w-[160px] h-20" />
             </div>
         );
     }
@@ -105,7 +106,7 @@ const AdminDashboard = () => {
     if (user?.primaryEmailAddress?.emailAddress !== authorizedEmail) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
-                <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-[2rem] flex items-center justify-center text-red-600 mb-8 border border-red-100 dark:border-red-900/30 shadow-xl shadow-red-500/10">
+                <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-4xl flex items-center justify-center text-red-600 mb-8 border border-red-100 dark:border-red-900/30 shadow-xl shadow-red-500/10">
                     <Shield className="w-10 h-10" />
                 </div>
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Access Denied</h1>
@@ -118,15 +119,6 @@ const AdminDashboard = () => {
                 >
                     Return to Mission Control
                 </button>
-            </div>
-        );
-    }
-
-    if (isLoading) {
-        return (
-            <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
-                <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-4" />
-                <p className="text-slate-500 font-bold animate-pulse uppercase tracking-widest text-xs">Accessing Secure Archives...</p>
             </div>
         );
     }
@@ -172,20 +164,22 @@ const AdminDashboard = () => {
 
                 {/* Quick Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-                    {[
-                        { label: 'Total Users', value: stats.total_users, icon: Users, color: 'indigo' },
-                        { label: 'Active Companies', value: stats.total_companies, icon: Building2, color: 'blue' },
-                        { label: 'Platform Status', value: 'Healthy', icon: Activity, color: 'emerald' },
-                        { label: 'Avg. Latency', value: '4.2s', icon: Zap, color: 'amber' }
-                    ].map((s, i) => (
-                        <div key={i} className="bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-6 rounded-[2rem] shadow-sm">
-                            <div className={`p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 w-fit mb-4`}>
-                                <s.icon className="w-5 h-5" />
+                    {isLoading ? <SkeletonLoader.Stats /> : (
+                        [
+                            { label: 'Total Users', value: stats.total_users, icon: Users, color: 'indigo' },
+                            { label: 'Active Companies', value: stats.total_companies, icon: Building2, color: 'blue' },
+                            { label: 'Platform Status', value: 'Healthy', icon: Activity, color: 'emerald' },
+                            { label: 'Avg. Latency', value: '4.2s', icon: Zap, color: 'amber' }
+                        ].map((s, i) => (
+                            <div key={i} className="bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-6 rounded-4xl shadow-sm">
+                                <div className={`p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 w-fit mb-4`}>
+                                    <s.icon className="w-5 h-5" />
+                                </div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{s.label}</p>
+                                <h4 className="text-2xl font-black text-slate-900 dark:text-white">{s.value}</h4>
                             </div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{s.label}</p>
-                            <h4 className="text-2xl font-black text-slate-900 dark:text-white">{s.value}</h4>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
 
                 {/* Main Management Tabs */}
@@ -206,98 +200,100 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="overflow-x-auto">
-                        {activeTab === 'users' ? (
-                            <table className="w-full text-left border-separate border-spacing-y-3">
-                                <thead>
-                                    <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        <th className="px-6 py-2">User Entity</th>
-                                        <th className="px-6 py-2">Account Role</th>
-                                        <th className="px-6 py-2">Subscription Tier</th>
-                                        <th className="px-6 py-2 text-right">Settings</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredUsers.map((u, i) => (
-                                        <tr key={u.clerk_id} className="group bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
-                                            <td className="px-6 py-5 rounded-l-3xl border-y border-l border-slate-200 dark:border-slate-800">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-slate-600">
-                                                        {u.email?.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{u.email}</p>
-                                                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{u.clerk_id}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800">
-                                                <select 
-                                                    value={u.role} 
-                                                    onChange={(e) => handleUpdateUser(u.clerk_id, 'role', e.target.value)}
-                                                    className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border-none outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                                >
-                                                    <option value="USER">User</option>
-                                                    <option value="ADMIN">Admin</option>
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800">
-                                                <select 
-                                                    value={u.tier || 'FREE'} 
-                                                    onChange={(e) => handleUpdateUser(u.clerk_id, 'tier', e.target.value)}
-                                                    className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-full border-none outline-none focus:ring-2 focus:ring-indigo-500/20 ${
-                                                        u.tier === 'PRO' ? 'bg-indigo-100 text-indigo-700' :
-                                                        u.tier === 'ENTERPRISE' ? 'bg-purple-100 text-purple-700' :
-                                                        u.tier === 'STARTER' ? 'bg-green-100 text-green-700' :
-                                                        'bg-slate-100 text-slate-500'
-                                                    }`}
-                                                >
-                                                    <option value="FREE">Free</option>
-                                                    <option value="STARTER">Starter</option>
-                                                    <option value="PRO">Pro</option>
-                                                    <option value="ENTERPRISE">Enterprise</option>
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-5 rounded-r-3xl border-y border-r border-slate-200 dark:border-slate-800 text-right">
-                                                <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
-                                                    <Settings className="w-4 h-4" />
-                                                </button>
-                                            </td>
+                        {isLoading ? <SkeletonLoader.Table /> : (
+                            activeTab === 'users' ? (
+                                <table className="w-full text-left border-separate border-spacing-y-3">
+                                    <thead>
+                                        <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            <th className="px-6 py-2">User Entity</th>
+                                            <th className="px-6 py-2">Account Role</th>
+                                            <th className="px-6 py-2">Subscription Tier</th>
+                                            <th className="px-6 py-2 text-right">Settings</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        ) : (
-                            <table className="w-full text-left border-separate border-spacing-y-3">
-                                <thead>
-                                    <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        <th className="px-6 py-2">Company Entity</th>
-                                        <th className="px-6 py-2">Allowed Origin</th>
-                                        <th className="px-6 py-2 text-right">Platform Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredCompanies.map((c) => (
-                                        <tr key={c.id} className="group bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
-                                            <td className="px-6 py-5 rounded-l-3xl border-y border-l border-slate-200 dark:border-slate-800">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center">
-                                                        <Building2 className="w-5 h-5" />
+                                    </thead>
+                                    <tbody>
+                                        {filteredUsers.map((u, i) => (
+                                            <tr key={u.clerk_id} className="group bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+                                                <td className="px-6 py-5 rounded-l-3xl border-y border-l border-slate-200 dark:border-slate-800">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-slate-600">
+                                                            {u.email?.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-900 dark:text-white">{u.email}</p>
+                                                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">{u.clerk_id}</p>
+                                                        </div>
                                                     </div>
-                                                    <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">{c.name}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-500">
-                                                {c.origin}
-                                            </td>
-                                            <td className="px-6 py-5 rounded-r-3xl border-y border-r border-slate-200 dark:border-slate-800 text-right">
-                                                <button onClick={() => handleDeleteCompany(c.id)} className="p-2.5 text-slate-400 hover:text-red-500 transition-colors bg-slate-50 dark:bg-slate-800 rounded-xl">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
+                                                </td>
+                                                <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800">
+                                                    <select 
+                                                        value={u.role} 
+                                                        onChange={(e) => handleUpdateUser(u.clerk_id, 'role', e.target.value)}
+                                                        className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border-none outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                    >
+                                                        <option value="USER">User</option>
+                                                        <option value="ADMIN">Admin</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800">
+                                                    <select 
+                                                        value={u.tier || 'FREE'} 
+                                                        onChange={(e) => handleUpdateUser(u.clerk_id, 'tier', e.target.value)}
+                                                        className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-full border-none outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                                                            u.tier === 'PRO' ? 'bg-indigo-100 text-indigo-700' :
+                                                            u.tier === 'ENTERPRISE' ? 'bg-purple-100 text-purple-700' :
+                                                            u.tier === 'STARTER' ? 'bg-green-100 text-green-700' :
+                                                            'bg-slate-100 text-slate-500'
+                                                        }`}
+                                                    >
+                                                        <option value="FREE">Free</option>
+                                                        <option value="STARTER">Starter</option>
+                                                        <option value="PRO">Pro</option>
+                                                        <option value="ENTERPRISE">Enterprise</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-6 py-5 rounded-r-3xl border-y border-r border-slate-200 dark:border-slate-800 text-right">
+                                                    <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                                                        <Settings className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-left border-separate border-spacing-y-3">
+                                    <thead>
+                                        <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            <th className="px-6 py-2">Company Entity</th>
+                                            <th className="px-6 py-2">Allowed Origin</th>
+                                            <th className="px-6 py-2 text-right">Platform Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {filteredCompanies.map((c) => (
+                                            <tr key={c.id} className="group bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+                                                <td className="px-6 py-5 rounded-l-3xl border-y border-l border-slate-200 dark:border-slate-800">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center">
+                                                            <Building2 className="w-5 h-5" />
+                                                        </div>
+                                                        <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">{c.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-5 border-y border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-500">
+                                                    {c.origin}
+                                                </td>
+                                                <td className="px-6 py-5 rounded-r-3xl border-y border-r border-slate-200 dark:border-slate-800 text-right">
+                                                    <button onClick={() => handleDeleteCompany(c.id)} className="p-2.5 text-slate-400 hover:text-red-500 transition-colors bg-slate-50 dark:bg-slate-800 rounded-xl">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )
                         )}
                         {!isLoading && activeTab === 'companies' && companies.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-20">

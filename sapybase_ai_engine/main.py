@@ -17,33 +17,37 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from svix.webhooks import Webhook, WebhookVerificationError
 from jose import jwt
 import requests
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from clerk_backend_api import Clerk
+from clerk_backend_api.security.types import AuthenticateRequestOptions
 
 # 1. Load Environment Variables
 load_dotenv()
 DB_URL = os.getenv("NEON_DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
-CLERK_FRONTEND_API = os.getenv("VITE_CLERK_PUBLISHABLE_KEY") # We can extract the domain from this if needed, or use a specific env
-# For JWT verification, we need the JWKS URL
-CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER") # e.g., https://clerk.yourdomain.com
+POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET")
 
 # 2. Initialize FastAPI App
 app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
 
+# Setup SlowAPI Rate Limiter
+limiter = Limiter(key_func=lambda req: req.headers.get("x-api-key", get_remote_address(req)))
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # 3. Configure CORS (Production Hardening)
 # For the widget to work on any client site, we check origins dynamically in the chat endpoint.
 # But for the Dashboard and Admin API, we restrict to our own sites.
-ALLOWED_ORIGINS = [
-    "http://localhost:5173", 
-    "http://127.0.0.1:5173",
-    "https://www.sapybase.com",
-    "https://sapybase.com",
-]
+ALLOWED_ORIGINS = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False, # Must be False for allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -67,7 +71,12 @@ class SubscriptionRequest(BaseModel):
 
 # 5. Initialize Google AI Models
 embeddings_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_query")
-chat_model = ChatGoogleGenerativeAI(model="models/gemini-flash-latest", google_api_key=GEMINI_KEY, convert_system_message_to_human=True)
+chat_model = ChatGoogleGenerativeAI(
+    model="models/gemini-flash-latest", 
+    google_api_key=GEMINI_KEY, 
+    max_output_tokens=300,
+    convert_system_message_to_human=True
+)
 
 # --- AUTHENTICATION & SECURITY SHIELD ---
 
@@ -126,9 +135,18 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     # 3. The Ironclad Origin Check
     client_origin = request.headers.get("origin") or request.headers.get("referer")
     
-    # Clean up the origin string just in case it has a trailing slash
+    # Clean up the origin string
     if client_origin:
         client_origin = client_origin.rstrip('/')
+        
+        # Normalize for comparison (remove protocol for simple domain match if necessary, 
+        # but here we compare strict origin strings or "*" )
+        allowed = (company["allowed_origin"] or "").rstrip('/')
+        
+        if allowed != "*" and client_origin != allowed:
+             # Basic sanity check: also check if origin is localhost/sapybase (internal dashboard)
+             if client_origin not in ALLOWED_ORIGINS:
+                 raise HTTPException(status_code=403, detail=f"Unauthorized Origin: {client_origin}")
 
     return company
 
@@ -139,37 +157,38 @@ async def get_current_user(request: Request):
     Verifies the Clerk JWT signature (RS256) from the Authorization header.
     This ensures the user identity is AUTHENTIC and signed by Clerk.
     """
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    
-    token = auth_header.split(" ")[1]
-    
     try:
-        # 1. In Production, Clerk tokens should be verified using their public keys.
-        # Since we're in a FastAPI/Python environment, typically you'd fetch the JWKS 
-        # from your Clerk Frontend API URL: https://<your-frontend-api>/.well-known/jwks.json
+        # Secure server-side verification using Clerk SDK
+        clerk = Clerk(bearer_auth=os.getenv("CLERK_SECRET_KEY"))
+        request_state = clerk.authenticate_request(
+            request, 
+            AuthenticateRequestOptions()
+        )
         
-        # For this high-perf FastAPI logic, we extract the claims.
-        # IF you set CLERK_JWT_ISSUER, we should verify the signature.
-        payload = jwt.get_unverified_claims(token)
-        clerk_id = payload.get("sub")
+        if not request_state.is_signed_in:
+            raise HTTPException(status_code=401, detail="Invalid or expired token signature")
+            
+        clerk_id = request_state.payload.get("sub")
         
         if not clerk_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
         
-        # 2. Look up role and email in our database
+        # 2. Look up profile in our database
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT role, email FROM users WHERE clerk_id = %s", (clerk_id,))
+        cursor.execute("SELECT id, role, email, tier, subscription_status FROM users WHERE clerk_id = %s", (clerk_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
         
-        role = row[0] if row else "USER"
-        email = row[1] if row else None
-        return {"clerk_id": clerk_id, "role": role, "email": email}
+        if not row:
+            raise HTTPException(status_code=404, detail="User profile not synced. Please ensure Clerk webhooks are firing.")
+
+        user_id, role, email, tier, subscription_status = row
+        return {"id": user_id, "clerk_id": clerk_id, "role": role, "email": email, "tier": tier, "subscription_status": subscription_status}
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Auth Security Error: {e}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
@@ -240,34 +259,71 @@ def retrieve_knowledge(conn, company_id, query_vector, limit=3):
 # --- MAIN API ENDPOINT ---
 
 @app.post("/api/chat", response_model=ChatResponse)
+@limiter.limit("10/minute")
 async def chat_endpoint(
+    request: Request,
     chat_req: ChatRequest, 
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """
     Core AI Chat Endpoint with Trial Enforcement.
     """
-    # Verify company/user subscription status
+    # 0. Verify usage limits and subscription status
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT u.tier, u.trial_end_date, c.status 
+            SELECT u.tier, u.trial_end_date, c.status, ut.messages_used, u.id
             FROM users u 
             JOIN companies c ON c.user_id = u.id 
+            LEFT JOIN usage_tracking ut ON ut.user_id = u.id
             WHERE c.id = %s
+            ORDER BY ut.period_end DESC LIMIT 1
         """, (company["id"],))
         sub_data = cursor.fetchone()
         
-        if sub_data:
-            tier, trial_end, status = sub_data
-            if status != "active":
-                raise HTTPException(status_code=403, detail="Company account is suspended.")
+        if not sub_data:
+            raise HTTPException(status_code=404, detail="Subscription data not found.")
+
+        tier, trial_end, status, messages_used, user_uuid = sub_data
+        
+        if status != "active":
+            raise HTTPException(status_code=403, detail="Company account is suspended.")
+
+        if tier == "STARTER" and trial_end:
+            from datetime import datetime
+            if trial_end < datetime.now():
+                raise HTTPException(status_code=402, detail="Starter trial has expired. Please upgrade.")
+
+        # Define Limits
+        LIMITS = {
+            "FREE": 200,
+            "STARTER": 2000,
+            "PRO": None,
+            "ENTERPRISE": None
+        }
+        current_limit = LIMITS.get(tier, 200)
+
+        # Atomic Usage Increment (Race-Condition Free)
+        cursor.execute(
+            """
+            UPDATE usage_tracking 
+            SET messages_used = messages_used + 1 
+            WHERE user_id = %s AND (messages_used < %s OR %s::integer IS NULL) 
+            RETURNING messages_used
+            """,
+            (user_uuid, current_limit, current_limit)
+        )
+        updated_row = cursor.fetchone()
+        conn.commit()
+
+        if not updated_row:
+            display_limit = current_limit if current_limit is not None else 'Unlimited'
+            raise HTTPException(status_code=402, detail=f"Message limit reached for {tier} tier ({display_limit} messages). Please upgrade.")
             
-            if tier == "STARTER" and trial_end:
-                from datetime import datetime
-                if trial_end < datetime.now():
-                    raise HTTPException(status_code=402, detail="Starter trial has expired. Please upgrade to Pro.")
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
         conn.close()
 
@@ -359,8 +415,8 @@ async def train_chatbot(
         raise HTTPException(status_code=404, detail="No company found for this user. Please register first.")
     
     company = {
-        "id": company_data[0],
-        "company_name": company_data[1]
+        "id": company_data["id"],
+        "company_name": company_data["company_name"]
     }
 
     if not url and not file:
@@ -449,13 +505,18 @@ async def register_new_company(req: RegisterRequest, current_user: dict = Depend
     try:
         cursor = conn.cursor()
         
-        # 1. Get our internal user_id from the clerk_id
-        cursor.execute("SELECT id FROM users WHERE clerk_id = %s", (clerk_id,))
+        # 1. Get our internal user_id and tier from the clerk_id
+        cursor.execute("SELECT id, tier FROM users WHERE clerk_id = %s", (clerk_id,))
         user_row = cursor.fetchone()
         if not user_row:
             raise HTTPException(status_code=404, detail="User not synced yet. Please try again in a moment.")
         
         user_uuid = user_row[0]
+        user_tier = user_row[1]
+
+        # Block registration for users who haven't selected ANY plan (tier is NULL)
+        if not user_tier:
+            raise HTTPException(status_code=402, detail="Please select a subscription plan or start a free trial first.")
 
         # 2. Check if company already exists for this user
         cursor.execute("SELECT id FROM companies WHERE user_id = %s", (user_uuid,))
@@ -523,15 +584,40 @@ async def get_my_company(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/me")
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
-    """Returns the authenticated user's own profile and subscription data."""
-    return {
-        "status": "success",
-        "clerk_id": current_user["clerk_id"],
-        "role": current_user["role"],
-        "tier": current_user["tier"],
-        "trial_end_date": current_user["trial_end_date"],
-        "email": current_user["email"]
-    }
+    """Returns the authenticated user's own profile and real-time usage stats."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT messages_used, period_end FROM usage_tracking WHERE user_id = %s ORDER BY period_end DESC LIMIT 1",
+            (current_user["id"],)
+        )
+        usage_row = cursor.fetchone()
+        
+        messages_used = usage_row[0] if usage_row else 0
+        period_end = usage_row[1] if usage_row else None
+        
+        LIMITS = {
+            "FREE": 200,
+            "STARTER": 2000,
+            "PRO": 999999, # frontend can display 'Unlimited'
+            "ENTERPRISE": 999999
+        }
+        message_limit = LIMITS.get(current_user["tier"], 200)
+
+        return {
+            "status": "success",
+            "clerk_id": current_user["clerk_id"],
+            "role": current_user["role"],
+            "tier": current_user["tier"],
+            "subscription_status": current_user.get("subscription_status"),
+            "email": current_user["email"],
+            "messages_used": messages_used,
+            "message_limit": message_limit,
+            "period_end": period_end
+        }
+    finally:
+        conn.close()
 
 # --- SUPER ADMIN ENDPOINTS ---
 
@@ -694,8 +780,8 @@ async def clerk_webhook(
             # Upsert user into DB
             cursor.execute(
                 """
-                INSERT INTO users (clerk_id, email, tier) 
-                VALUES (%s, %s, 'FREE')
+                INSERT INTO users (clerk_id, email, tier, subscription_status) 
+                VALUES (%s, %s, '', 'pending')
                 ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email
                 RETURNING id
                 """,
@@ -712,6 +798,7 @@ async def clerk_webhook(
                 """
                 INSERT INTO usage_tracking (user_id, period_start, period_end)
                 VALUES (%s, %s, %s)
+                ON CONFLICT (user_id) DO NOTHING
                 """,
                 (user_id, now, next_month)
             )
@@ -727,6 +814,203 @@ async def clerk_webhook(
             conn.close()
 
     return {"status": "success"}
+
+@app.post("/api/webhooks/polar")
+async def polar_webhook(
+    request: Request,
+    webhook_id: str = Header(None, alias="webhook-id"),
+    webhook_timestamp: str = Header(None, alias="webhook-timestamp"),
+    webhook_signature: str = Header(None, alias="webhook-signature")
+):
+    """
+    Handles Polar.sh subscription webhooks to update user tiers and reset usage.
+    """
+    if not POLAR_WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Polar webhook secret not configured")
+
+    if not webhook_id or not webhook_timestamp or not webhook_signature:
+        raise HTTPException(status_code=400, detail="Missing Webhook headers")
+
+    payload = await request.body()
+    
+    # Polar secrets can start with polar_whs_ - we must strip it if present for Standard Webhook compat
+    secret = POLAR_WEBHOOK_SECRET or ""
+    if secret.startswith("polar_whs_"):
+        secret = secret[len("polar_whs_"):]
+    
+    wh = Webhook(secret)
+    try:
+        msg = wh.verify(payload, {
+            "webhook-id": webhook_id,
+            "webhook-timestamp": webhook_timestamp,
+            "webhook-signature": webhook_signature
+        })
+    except WebhookVerificationError as e:
+        print(f"POLAR WEBHOOK ERROR: Signature verification failed. Error: {e}")
+        # Log IDs for debugging (don't log the full signature for security)
+        print(f"POLAR DEBUG: id={webhook_id}, ts={webhook_timestamp}")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    event_type = msg.get("type")
+    data = msg.get("data")
+
+    clerk_id = data.get("customer_external_id") or data.get("external_customer_id")
+    polar_customer_id = data.get("customer_id")
+
+    if not clerk_id:
+        return {"status": "ignored", "reason": "No clerk_id attached"}
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        if event_type in ["subscription.created", "subscription.updated"]:
+            product_name = data.get("product", {}).get("name", "PRO").upper()
+            tier = "PRO" if "PRO" in product_name else ("STARTER" if "STARTER" in product_name else "FREE")
+            
+            period_end = data.get("current_period_end")
+            period_start = data.get("current_period_start")
+
+            # 1. Update User Tier and Polar Customer ID
+            cursor.execute(
+                "UPDATE users SET tier = %s, billing_period_end = %s, polar_customer_id = %s, subscription_status = 'active' WHERE clerk_id = %s RETURNING id",
+                (tier, period_end, polar_customer_id, clerk_id)
+            )
+            user_row = cursor.fetchone()
+            
+            if user_row:
+                user_id = user_row[0]
+                
+                # 2. Idempotent Reset Usage Tracking 
+                cursor.execute(
+                    """
+                    UPDATE usage_tracking 
+                    SET messages_used = 0, period_start = %s, period_end = %s 
+                    WHERE user_id = %s AND (period_end IS NULL OR %s::timestamptz > period_end)
+                    """,
+                    (period_start, period_end, user_id, period_end)
+                )
+                
+                if cursor.rowcount == 0:
+                    cursor.execute("SELECT 1 FROM usage_tracking WHERE user_id = %s", (user_id,))
+                    if not cursor.fetchone():
+                        cursor.execute(
+                            """
+                            INSERT INTO usage_tracking (user_id, messages_used, period_start, period_end) 
+                            VALUES (%s, 0, %s, %s)
+                            ON CONFLICT (user_id) DO UPDATE SET 
+                                messages_used = EXCLUDED.messages_used,
+                                period_start = EXCLUDED.period_start,
+                                period_end = EXCLUDED.period_end
+                            """,
+                            (user_id, period_start, period_end)
+                        )
+                    else:
+                        print(f"POLAR SYNC: Ignored redundant usage wipe for user {clerk_id}")
+                
+                conn.commit()
+                print(f"POLAR SYNC: Updated user {clerk_id} to tier {tier}")
+            else:
+                print(f"POLAR SYNC: No user found with clerk_id {clerk_id}")
+
+        elif event_type in ["subscription.revoked", "subscription.canceled"]:
+            # DOWNGRADE LOGIC: Instantly revert to FREE tier
+            cursor.execute(
+                "UPDATE users SET tier = 'FREE', billing_period_end = NULL, subscription_status = 'canceled' WHERE clerk_id = %s RETURNING id",
+                (clerk_id,)
+            )
+            if cursor.fetchone():
+                conn.commit()
+                print(f"POLAR DOWNGRADE: User {clerk_id} instantly reverted to FREE tier.")
+            else:
+                print(f"POLAR DOWNGRADE: No user found for {clerk_id}")
+
+    except Exception as e:
+        conn.rollback()
+        print(f"POLAR SYNC ERROR: {e}")
+    finally:
+        conn.close()
+
+    return {"status": "success"}
+
+@app.post("/api/user/subscription")
+async def update_user_subscription(data: dict, current_user: dict = Depends(get_current_user)):
+    """Allows users to select the FREE tier during onboarding."""
+    tier = data.get("tier")
+    if tier != "FREE":
+        raise HTTPException(status_code=400, detail="Only 'FREE' tier can be manually selected.")
+    
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Set user tier to FREE and status to active
+        cursor.execute("UPDATE users SET tier = 'FREE', subscription_status = 'active' WHERE id = %s", (current_user["id"],))
+        
+        # Ensure they have a usage tracking row initialized
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        next_month = now + timedelta(days=30)
+        
+        cursor.execute(
+            """
+            INSERT INTO usage_tracking (user_id, period_start, period_end)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id) DO NOTHING
+            """,
+            (current_user["id"], now, next_month)
+        )
+        
+        conn.commit()
+        return {"status": "success", "tier": tier}
+    except Exception as e:
+        conn.rollback()
+        print(f"Error setting FREE tier: {e}")
+        raise HTTPException(status_code=500, detail="Failed to initialize FREE tier")
+    finally:
+        conn.close()
+
+@app.get("/api/billing/portal")
+async def get_billing_portal(current_user: dict = Depends(get_current_user)):
+    """Generates an authenticated Customer Portal URL for the user."""
+    from os import getenv
+    import httpx
+    
+    polar_access_token = getenv("POLAR_ACCESS_TOKEN")
+    if not polar_access_token:
+        raise HTTPException(
+            status_code=500, 
+            detail="POLAR_ACCESS_TOKEN is not configured in .env. Please check the implementation plan for instructions."
+        )
+
+    polar_customer_id = current_user.get("polar_customer_id")
+    if not polar_customer_id:
+        # Fallback: If we don't have the ID, they might not have a subscription yet
+        # or they might need to use the manual login portal once to sync.
+        raise HTTPException(
+            status_code=404, 
+            detail="No Polar customer record found for your account. Please subscribe to a plan first or contact support."
+        )
+
+    # Call Polar API to create a Customer Session
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://api.polar.sh/api/v1/customer-sessions",
+                headers={
+                    "Authorization": f"Bearer {polar_access_token}",
+                    "Content-Type": "application/json"
+                },
+                json={"customer_id": polar_customer_id}
+            )
+            response.raise_for_status()
+            session_data = response.json()
+            return {"status": "success", "url": session_data.get("customer_portal_url")}
+        except httpx.HTTPStatusError as e:
+            print(f"POLAR API ERROR: {e.response.text}")
+            raise HTTPException(status_code=500, detail="Failed to create Polar billing session.")
+        except Exception as e:
+            print(f"POLAR SESSION ERROR: {e}")
+            raise HTTPException(status_code=500, detail="An error occurred while connecting to the billing portal.")
 
 @app.get("/")
 def read_root():
