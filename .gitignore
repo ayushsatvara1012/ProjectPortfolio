@@ -17,6 +17,11 @@ lerna-debug.log*
 **/.env/
 *.pem
 *.key
+*.pfx
+*.cert
+*.crt
+*.secret
+.secrets
 
 # Dependencies
 node_modules/
