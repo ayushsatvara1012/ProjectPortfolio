@@ -10,9 +10,25 @@ const Navbar = () => {
   const { user, isLoaded: isUserLoaded } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
+  const [isDesktopServicesOpen, setIsDesktopServicesOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
   const [userRole, setUserRole] = useState('USER');
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDesktopServicesOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -113,6 +129,7 @@ const Navbar = () => {
   const handleLinkClick = (e, href) => {
     e.preventDefault();
     setIsOpen(false);
+    setIsDesktopServicesOpen(false);
 
     if (href.startsWith("#")) {
       if (location.pathname === "/") {
@@ -139,27 +156,36 @@ const Navbar = () => {
       {/* Mobile-First Header */}
       <header className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
         <div className="px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-2">
             <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} aria-label="SaPyBase Home" className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
-              <Logo className="w-auto h-16 md:h-20 md:mb-4 object-cover" />
+              <Logo className="w-auto h-12 md:h-12 object-cover" />
             </a>
           </div>
           {/* Desktop Links (Hidden by default, shown on md+) */}
-          <div className="hidden md:flex items-center gap-16 mr-10">
+          <div className="hidden md:flex items-center gap-10">
             {navLinks.map((link) => (
-              <div key={`nav-desk-${link.id || link.name}`} className="relative group">
-                {link.name === "Services" ? (
-                  <>
-                    <button
-                      onClick={(e) => handleLinkClick(e, link.href)}
-                      className="flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 cursor-pointer group-hover:text-slate-900 dark:group-hover:text-white"
-                    >
-                      {link.name}
-                      <ChevronDown size={14} className="group-hover:rotate-180 transition-transform duration-300" />
-                    </button>
+            <div key={`nav-desk-${link.id || link.name}`} className="relative group" ref={link.name === "Services" ? dropdownRef : null}>
+              {link.name === "Services" ? (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsDesktopServicesOpen(!isDesktopServicesOpen);
+                    }}
+                    onMouseEnter={() => setIsDesktopServicesOpen(true)}
+                    className={`flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 cursor-pointer ${isDesktopServicesOpen ? 'text-slate-900 dark:text-white' : ''} group-hover:text-slate-900 dark:group-hover:text-white`}
+                  >
+                    {link.name}
+                    <ChevronDown size={14} className={`${isDesktopServicesOpen ? 'rotate-180' : ''} group-hover:rotate-180 transition-transform duration-300`} />
+                  </button>
 
-                    {/* Desktop Dropdown */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300 ease-out z-70">
+                  {/* Desktop Dropdown */}
+                  <div 
+                    className={`absolute top-full left-1/2 -translate-x-1/2 pt-4 transition-all duration-300 ease-out z-70 
+                      ${isDesktopServicesOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
+                    onMouseEnter={() => setIsDesktopServicesOpen(true)}
+                    onMouseLeave={() => setIsDesktopServicesOpen(false)}
+                  >
                       <div className="w-[640px] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 grid grid-cols-2 gap-4">
                         {services.map((service, idx) => (
                           <a
@@ -319,7 +345,7 @@ const Navbar = () => {
                   </button>
                 </SignInButton>
                 <SignUpButton mode="modal">
-                  <button className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-indigo-600 text-white font-bold transition-all active:scale-95 shadow-lg shadow-indigo-200 dark:shadow-none">
+                  <button className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-800 text-white font-bold transition-all active:scale-95 dark:shadow-none">
                     <UserPlus size={20} />
                     Sign Up
                   </button>

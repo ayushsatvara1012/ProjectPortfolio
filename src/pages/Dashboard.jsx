@@ -174,7 +174,7 @@ const Dashboard = () => {
                             <div>
                                 <div className="flex items-center gap-3 mb-4 flex-wrap">
                                     <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                        AI Command Center
+                                        AI <span className="bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent">Command Center</span>
                                     </h1>
                                     {userTier === 'STARTER' && (
                                         <div className={`px-2 py-0.5 rounded-md border text-[11px] font-mono uppercase tracking-wider flex items-center gap-2 ${
@@ -209,7 +209,7 @@ const Dashboard = () => {
                                 {userRole === 'ADMIN' && (
                                     <button 
                                         onClick={() => navigate('/admin')}
-                                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20"
+                                        className="px-3 py-1.5 bg-slate-100 dark:bg-[#1A1A1A] text-slate-900 dark:text-slate-100 rounded-md text-[10px] font-bold uppercase tracking-widest border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-[#222222] transition-colors"
                                     >
                                         Admin Panel
                                     </button>
@@ -237,10 +237,7 @@ const Dashboard = () => {
                                 >
                                     Billing Portal
                                 </button>
-                                <div className="w-8 h-8 rounded-md bg-slate-100 dark:bg-[#1A1A1A] border border-slate-200 dark:border-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs text-mono">
-                                    {user?.firstName?.charAt(0) || 'U'}
-                                </div>
-                                <div>
+                                <div className='text-center'>
                                     <p className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{user?.fullName || 'Developer'}</p>
                                     <p className="text-[9px] text-slate-400 uppercase font-mono tracking-widest">{userRole === 'ADMIN' ? 'System Administrator' : 'Enterprise Access'}</p>
                                 </div>

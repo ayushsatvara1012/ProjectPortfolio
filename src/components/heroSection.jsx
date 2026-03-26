@@ -52,8 +52,11 @@ function HeroSection() {
                 >
                   Launch Your Project <ArrowRight size={20} />
                 </button>
-                <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all">
-                  View Architecture
+                <button
+                  onClick={() => navigate('/register')}
+                  className="flex items-center justify-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
+                >
+                  Add Your <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-blue-600 font-black">AI Chat Bot</span>
                 </button>
               </div>
             </div>

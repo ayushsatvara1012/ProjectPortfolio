@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 import time
 import tempfile
 import psycopg2
@@ -19,7 +20,8 @@ from pgvector.psycopg2 import register_vector
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader
+from langchain_core.documents import Document
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from svix.webhooks import Webhook, WebhookVerificationError
 from jose import jwt
@@ -169,6 +171,7 @@ combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=combined_origins,
+    allow_origin_regex=r"https://.*\.ngrok-free\.app", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -214,7 +217,7 @@ embeddings_model_query = GoogleGenerativeAIEmbeddings(model="models/gemini-embed
 chat_model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash", 
     google_api_key=GEMINI_KEY, 
-    max_output_tokens=300,
+    max_output_tokens=600,
     temperature=0.4,
     top_p=0.9,
 )
@@ -315,20 +318,24 @@ async def get_current_user(request: Request):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, role, email, tier, subscription_status FROM users WHERE clerk_id = %s", (clerk_id,))
+            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date FROM users WHERE clerk_id = %s", (clerk_id,))
             row = cursor.fetchone()
 
             if not row:
-                # ⚠️ WEBHOOK FALLBACK: Auto-provision missing user
+                # ⚠️ WEBHOOK FALLBACK: Auto-provision missing user with NULL tier
                 cursor.execute(
-                    "INSERT INTO users (clerk_id, email, role, tier) VALUES (%s, %s, 'USER', 'FREE') ON CONFLICT DO NOTHING RETURNING id, role, email, tier, subscription_status",
+                    "INSERT INTO users (clerk_id, email, role, tier, subscription_status) VALUES (%s, %s, 'USER', NULL, 'inactive') ON CONFLICT DO NOTHING RETURNING id, role, email, tier, subscription_status, trial_end_date",
                     (clerk_id, email)
                 )
                 row = cursor.fetchone()
                 
+                if not row:
+                    # Conflict happened, fetch the existing user
+                    cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date FROM users WHERE clerk_id = %s", (clerk_id,))
+                    row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
             if row:
-                user_id, role, user_email, tier, subscription_status = row
+                user_id, role, user_email, tier, subscription_status, trial_end_date = row
                 
                 # SELF-HEALING: If this is the configured admin email, ensure role/tier are correct
                 admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
@@ -349,9 +356,17 @@ async def get_current_user(request: Request):
         
         if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
 
-        user_id, role, user_email, tier, subscription_status = row
+        user_id, role, user_email, tier, subscription_status, trial_end_date = row
         # Return updated values if they were changed by self-healing
-        return {"id": user_id, "clerk_id": clerk_id, "role": role, "email": user_email, "tier": tier, "subscription_status": subscription_status}
+        return {
+            "id": user_id, 
+            "clerk_id": clerk_id, 
+            "role": role, 
+            "email": user_email, 
+            "tier": tier, 
+            "subscription_status": subscription_status,
+            "trial_end_date": trial_end_date
+        }
         
     except HTTPException: raise
     except Exception as e:
@@ -415,17 +430,17 @@ def get_company_by_clerk_id(clerk_id: str):
     finally:
         release_db_connection(conn)
 
-def retrieve_knowledge(conn, company_id, query_vector, limit=10):
-    """Performs Cosine Similarity search using pgvector for a SPECIFIC company."""
+def retrieve_knowledge(conn, company_id, query_vector, limit=5, distance_threshold=0.45):
+    """Performs Cosine Similarity search using pgvector for a SPECIFIC company with a strict distance threshold."""
     cursor = conn.cursor()
     cursor.execute(
         """
         SELECT content, url FROM company_knowledge 
-        WHERE company_id = %s 
+        WHERE company_id = %s AND embedding <=> %s::vector < %s
         ORDER BY embedding <=> %s::vector 
         LIMIT %s
         """,
-        (company_id, query_vector, limit)
+        (company_id, query_vector, distance_threshold, query_vector, limit)
     )
     results = cursor.fetchall()
     cursor.close()
@@ -476,12 +491,11 @@ async def chat_endpoint(
             
         retrieved_docs = retrieve_knowledge(conn, company["id"], query_vector)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
-
         # 3. Formulate Prompt
         bot_name = company.get('bot_name') or "Sapy AI"
         company_name = company.get('company_name') or "Sapybase"
         company_tone = company.get('company_tone') or "Professional, expert and highly descriptive"
-        system_instructions = company.get('system_prompt') or "Answer the user's question clearly and accurately based ONLY on the provided facts."
+        system_instructions = "Answer the user's question clearly and accurately based ONLY on the provided facts."
 
         system_message = f"""
         You are {bot_name}, the official enterprise AI assistant for {company_name}.
@@ -491,10 +505,9 @@ async def chat_endpoint(
         {system_instructions}
 
         STRICT RULES YOU MUST FOLLOW:
-        1. NO HALLUCINATIONS: You must base your answer strictly on the KNOWLEDGE BASE provided below. If the answer is not in the knowledge base, do not guess. Say: "I don't have that exact information, but I can connect you with our team."
-        2. CONCISENESS: Keep your answer between 1 to 3 short paragraphs. Get straight to the point.
-        3. FORMATTING: Use brief bullet points if explaining multiple steps or items.
-        4. IMMERSION: Never say "According to the knowledge base" or "Based on the provided text." Speak directly to the user as if you just know the answer.
+        1. NO HALLUCINATIONS: You must base your answer strictly on the KNOWLEDGE BASE provided below. If the answer is not in the knowledge base, do not guess. You MUST say exactly: "I don't have that exact information, please contact our support team."
+        2. CONCISENESS: Keep your answer between 1 to 3 short paragraphs. Use bullet points for lists.
+        3. IMMERSION: Never say "According to the knowledge base" or "Based on the provided text." Speak directly to the user as if you just know the answer.
         """
 
         knowledge_context = f"KNOWLEDGE BASE:\n{context_text}" if context_text else "KNOWLEDGE BASE: (Empty - No specific knowledge found for this query)"
@@ -566,56 +579,30 @@ async def train_chatbot(
             raise HTTPException(status_code=402, detail=f"Knowledge base limit reached for {current_user['tier']} tier.")
 
         docs = []
-        # --- 1A. Process Website URL (Issue #14: SSRF) ---
+        # --- 1A. Process Website URL (Jina Reader Refactor) ---
         warning = None
         if url:
             validate_safe_url(url)
-            # Use browser-like headers to avoid being blocked or getting empty shells
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Referer": "https://www.google.com/"
-            }
-            web_loader = WebBaseLoader(url, header_template=headers)
-            url_docs = web_loader.load()
-            
-            # Check for low content extraction (Common in CSR apps)
-            full_text = " ".join([d.page_content for d in url_docs])
-            
-            # Advanced Extraction: Look for hidden JSON data in script tags if content is low
-            if len(full_text) < 1000:
-                import json
-                from bs4 import BeautifulSoup
-                import requests
-                try:
-                    resp = requests.get(url, headers=headers, timeout=10)
-                    if resp.ok:
-                        soup = BeautifulSoup(resp.text, 'html.parser')
-                        # Look for common SPA data containers
-                        spa_data = []
-                        for script in soup.find_all('script', type='application/json'):
-                            spa_data.append(script.string or "")
-                        for script in soup.find_all('script'):
-                            content = script.string or ""
-                            if '__NEXT_DATA__' in content or 'window.__PRELOADED_STATE__' in content:
-                                spa_data.append(content)
-                        
-                        if spa_data:
-                            from langchain_core.documents import Document
-                            extra_text = " ".join(spa_data)
-                            # Clean up JSON boilerplate to keep it readable
-                            if len(extra_text) > 100:
-                                url_docs.append(Document(page_content=f"Extracted SPA Data: {extra_text[:5000]}", metadata={"source": url, "type": "spa_json"}))
-                                full_text = " ".join([d.page_content for d in url_docs])
-                except Exception as e:
-                    print(f"Advanced extraction failed: {e}")
-
-            if len(full_text) < 500:
-                warning = "Heads up! This site appears to be a modern JavaScript app (React/Next.js). We extracted very little text. Please use the 'Knowledge Text' box below to paste content directly for best results."
-            
-            docs.extend(url_docs)
-            source_name = url
+            try:
+                # Use Jina Reader Proxy for better scraping
+                jina_url = f"https://r.jina.ai/{url}"
+                headers = {"User-Agent": "SaPyBaseBot/1.0"}
+                
+                response = requests.get(jina_url, headers=headers, timeout=15)
+                
+                if response.status_code != 200 or len(response.text) < 50:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Failed to extract sufficient text. The website may be blocking bots."
+                    )
+                
+                docs = [Document(page_content=response.text, metadata={"source": url})]
+                source_name = url
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"JINA EXTRACTION FAILED: {e}")
+                raise HTTPException(status_code=400, detail=f"Failed to scrape website: {str(e)}")
 
         # --- 1B. Process PDF File ---
         if file:
@@ -636,7 +623,6 @@ async def train_chatbot(
 
         # --- 1C. Process Manual Text ---
         if text and text.strip():
-            from langchain_core.documents import Document
             docs.append(Document(page_content=text.strip(), metadata={"source": "manual_entry"}))
             source_name = "Manual Knowledge Entry"
 
@@ -672,9 +658,12 @@ async def train_chatbot(
     finally:
         release_db_connection(conn)
 
-@app.post("/api/register")
-async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_current_user)):
-    """Registers a new company tied to the current user."""
+    if not user.get("tier"):
+        raise HTTPException(
+            status_code=403, 
+            detail="Subscription required. Please select a plan before registering your company."
+        )
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -765,6 +754,11 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
         
         LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
         
+        trial_days_left = None
+        if current_user.get("trial_end_date"):
+            delta = current_user["trial_end_date"] - datetime.now(timezone.utc)
+            trial_days_left = max(0, delta.days)
+
         return {
             "status": "success",
             "role": current_user["role"],
@@ -772,7 +766,9 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
             "email": current_user["email"],
             "messages_used": usage[0] if usage else 0,
             "message_limit": LIMITS.get(current_user["tier"], 200),
-            "period_end": usage[1] if usage else None
+            "next_billing_date": usage[1] if usage else None,
+            "trial_days_left": trial_days_left,
+            "trial_end_date": current_user.get("trial_end_date")
         }
     finally:
         release_db_connection(conn)
@@ -936,7 +932,7 @@ async def clerk_webhook(
             clerk_id = data.get("id")
             email = data.get("email_addresses", [{}])[0].get("email_address", "unknown")
             cursor.execute(
-                "INSERT INTO users (clerk_id, email, role, tier) VALUES (%s, %s, 'USER', 'FREE') RETURNING id",
+                "INSERT INTO users (clerk_id, email, role, tier, subscription_status) VALUES (%s, %s, 'USER', NULL, 'inactive') RETURNING id",
                 (clerk_id, email)
             )
             user_id = cursor.fetchone()[0]
@@ -963,12 +959,33 @@ async def polar_webhook(request: Request):
     
     wh = Webhook(POLAR_WEBHOOK_SECRET)
     try:
-        # The svix library handles the 'polar_whs_' prefix and header extraction internally
-        msg = wh.verify(payload, headers)
-    except WebhookVerificationError: raise HTTPException(status_code=400, detail="Invalid signature")
+        # Extract headers with safe fallbacks to prevent None values
+        svix_headers = {
+            "svix-id": headers.get("svix-id") or headers.get("webhook-id", ""),
+            "svix-signature": headers.get("svix-signature") or headers.get("webhook-signature", ""),
+            "svix-timestamp": headers.get("svix-timestamp") or headers.get("webhook-timestamp", ""),
+        }
+        msg = wh.verify(payload, svix_headers)
+    except WebhookVerificationError:
+        print("WEBHOOK ERROR: Invalid Signature")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        print(f"WEBHOOK ERROR during verification: {e}")
+        raise HTTPException(status_code=500, detail="Verification process failed")
+
+    # Extract Svix ID for idempotency (Polar uses Svix)
+    webhook_id = svix_headers.get("svix-id")
+    if not webhook_id:
+        print("WEBHOOK ERROR: Missing unique ID after verification")
+        return {"status": "ignored"}
 
     data = msg.get("data")
     event_type = msg.get("type")
+    
+    # DEBUG: Print the full data object to see the structure in logs
+    import json
+    print(f"POLAR WEBHOOK EVENT: {event_type}")
+    print(f"POLAR WEBHOOK DATA: {json.dumps(data, indent=2)}")
 
     conn = get_db_connection()
     try:
@@ -976,25 +993,43 @@ async def polar_webhook(request: Request):
         try:
             cursor.execute("INSERT INTO processed_webhooks (webhook_id, provider) VALUES (%s, 'polar')", (webhook_id,))
         except UniqueViolation:
+            print(f"WEBHOOK: Already processed {webhook_id}")
             conn.rollback()
             return {"status": "success"}
 
-        clerk_id = data.get("customer_external_id") or data.get("external_customer_id")
-        if not clerk_id: return {"status": "ignored"}
+        # Extract Clerk ID (External ID) - Try multiple possible locations in the payload
+        clerk_id = (
+            data.get("customer_external_id") or 
+            data.get("external_customer_id") or 
+            data.get("customer", {}).get("external_id") or
+            data.get("metadata", {}).get("customer_external_id")
+        )
+        
+        print(f"POLAR WEBHOOK: Extracted ClerkID={clerk_id}, CustomerID={data.get('customer_id')}")
+        
+        if not clerk_id: 
+            print("WEBHOOK ERROR: Could not find clerk_id (external_id) in payload")
+            return {"status": "ignored"}
 
         if event_type in ["subscription.created", "subscription.updated"]:
-            product_name = data.get("product", {}).get("name", "").upper()
+            product = data.get("product", {})
+            product_name = product.get("name", "").upper() if isinstance(product, dict) else ""
             tier = "PRO" if "PRO" in product_name else ("STARTER" if "STARTER" in product_name else "FREE")
             
+            # Extract dates if available
+            period_end = data.get("current_period_end")
+            period_start = data.get("current_period_start")
+            
             cursor.execute(
-                "UPDATE users SET tier = %s, subscription_status = 'active', polar_customer_id = %s WHERE clerk_id = %s RETURNING id",
-                (tier, data.get("customer_id"), clerk_id)
+                "UPDATE users SET tier = %s, subscription_status = 'active', polar_customer_id = %s, billing_period_end = %s WHERE clerk_id = %s RETURNING id",
+                (tier, data.get("customer_id"), period_end, clerk_id)
             )
             row = cursor.fetchone()
             if row:
+                # Update usage tracking with the same dates
                 cursor.execute(
-                    "UPDATE usage_tracking SET messages_used = 0, period_start = now(), period_end = now() + interval '30 days' WHERE user_id = %s",
-                    (row[0],)
+                    "UPDATE usage_tracking SET messages_used = 0, period_start = %s, period_end = %s WHERE user_id = %s",
+                    (period_start or 'now()', period_end or "now() + interval '30 days'", row[0])
                 )
 
         conn.commit()
@@ -1021,21 +1056,51 @@ async def select_free_tier(current_user: dict = Depends(get_current_user)):
     finally:
         release_db_connection(conn)
 
+# @app.get("/api/billing/portal")
+# async def get_billing_portal(current_user: dict = Depends(get_current_user)):
+#     """Generates Polar Customer Portal URL."""
+#     import httpx
+#     token = os.getenv("POLAR_ACCESS_TOKEN")
+#     cust_id = current_user.get("polar_customer_id")
+#     if not token or not cust_id: raise HTTPException(status_code=404, detail="Billing setup incomplete")
+
+#     async with httpx.AsyncClient() as client:
+#         resp = await client.post(
+#             "https://api.polar.sh/api/v1/customer-sessions",
+#             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+#             json={"customer_id": cust_id}
+#         )
+#         resp.raise_for_status()
+#         return {"url": resp.json().get("customer_portal_url")}
+
 @app.get("/api/billing/portal")
 async def get_billing_portal(current_user: dict = Depends(get_current_user)):
-    """Generates Polar Customer Portal URL."""
+    """Generates Polar Customer Portal URL (Supports Sandbox & Production)."""
     import httpx
     token = os.getenv("POLAR_ACCESS_TOKEN")
     cust_id = current_user.get("polar_customer_id")
-    if not token or not cust_id: raise HTTPException(status_code=404, detail="Billing setup incomplete")
+    
+    if not token or not cust_id: 
+        raise HTTPException(status_code=404, detail="Billing setup incomplete")
+
+    # Dynamically switch between Sandbox and Production based on your .env file
+    is_dev = os.getenv("ENV") == "development"
+    polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            "https://api.polar.sh/api/v1/customer-sessions",
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            f"{polar_base_url}/api/v1/customer-sessions",
+            headers={
+                "Authorization": f"Bearer {token}", 
+                "Content-Type": "application/json"
+            },
             json={"customer_id": cust_id}
         )
-        resp.raise_for_status()
+        
+        if not resp.ok:
+            print(f"Polar API Error: {resp.text}")
+            raise HTTPException(status_code=400, detail="Failed to create billing session")
+            
         return {"url": resp.json().get("customer_portal_url")}
 
 @app.get("/")
