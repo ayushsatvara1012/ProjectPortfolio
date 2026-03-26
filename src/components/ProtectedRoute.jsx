@@ -11,7 +11,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     const { isLoaded: isUserLoaded, isSignedIn, user } = useUser();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const location = useLocation();
-    
+
     const [isLoading, setIsLoading] = useState(true);
     const [onboardingState, setOnboardingState] = useState({
         tier: null,
@@ -29,7 +29,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
             try {
                 const token = await getToken();
                 const baseUrl = import.meta.env.VITE_API_URL || '';
-                
+
                 // 1. Check Profile (Tier & Role)
                 const meRes = await fetch(`${baseUrl}/api/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }

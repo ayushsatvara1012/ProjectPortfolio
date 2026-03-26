@@ -38,7 +38,7 @@ const Navbar = () => {
         const baseUrl = import.meta.env.VITE_API_URL
           ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}`
           : '';
-        
+
         const response = await fetch(`${baseUrl}/api/company/details`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -164,28 +164,28 @@ const Navbar = () => {
           {/* Desktop Links (Hidden by default, shown on md+) */}
           <div className="hidden md:flex items-center gap-10">
             {navLinks.map((link) => (
-            <div key={`nav-desk-${link.id || link.name}`} className="relative group" ref={link.name === "Services" ? dropdownRef : null}>
-              {link.name === "Services" ? (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsDesktopServicesOpen(!isDesktopServicesOpen);
-                    }}
-                    onMouseEnter={() => setIsDesktopServicesOpen(true)}
-                    className={`flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 cursor-pointer ${isDesktopServicesOpen ? 'text-slate-900 dark:text-white' : ''} group-hover:text-slate-900 dark:group-hover:text-white`}
-                  >
-                    {link.name}
-                    <ChevronDown size={14} className={`${isDesktopServicesOpen ? 'rotate-180' : ''} group-hover:rotate-180 transition-transform duration-300`} />
-                  </button>
+              <div key={`nav-desk-${link.id || link.name}`} className="relative group" ref={link.name === "Services" ? dropdownRef : null}>
+                {link.name === "Services" ? (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsDesktopServicesOpen(!isDesktopServicesOpen);
+                      }}
+                      onMouseEnter={() => setIsDesktopServicesOpen(true)}
+                      className={`flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 cursor-pointer ${isDesktopServicesOpen ? 'text-slate-900 dark:text-white' : ''} group-hover:text-slate-900 dark:group-hover:text-white`}
+                    >
+                      {link.name}
+                      <ChevronDown size={14} className={`${isDesktopServicesOpen ? 'rotate-180' : ''} group-hover:rotate-180 transition-transform duration-300`} />
+                    </button>
 
-                  {/* Desktop Dropdown */}
-                  <div 
-                    className={`absolute top-full left-1/2 -translate-x-1/2 pt-4 transition-all duration-300 ease-out z-70 
+                    {/* Desktop Dropdown */}
+                    <div
+                      className={`absolute top-full left-1/2 -translate-x-1/2 pt-4 transition-all duration-300 ease-out z-70 
                       ${isDesktopServicesOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
-                    onMouseEnter={() => setIsDesktopServicesOpen(true)}
-                    onMouseLeave={() => setIsDesktopServicesOpen(false)}
-                  >
+                      onMouseEnter={() => setIsDesktopServicesOpen(true)}
+                      onMouseLeave={() => setIsDesktopServicesOpen(false)}
+                    >
                       <div className="w-[640px] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 grid grid-cols-2 gap-4">
                         {services.map((service, idx) => (
                           <a
@@ -239,14 +239,14 @@ const Navbar = () => {
             </SignedOut>
             <SignedIn>
               <div className="flex items-center gap-4">
-                <Link 
+                <Link
                   to="/dashboard"
                   className="text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   Dashboard
                 </Link>
-                <UserButton 
-                  afterSignOutUrl="/" 
+                <UserButton
+                  afterSignOutUrl="/"
                   appearance={{
                     elements: {
                       avatarBox: "w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-800"
@@ -352,8 +352,8 @@ const Navbar = () => {
                 </SignUpButton>
               </div>
             </SignedOut>
-            
-            <button 
+
+            <button
               onClick={() => {
                 navigate('/register');
                 setIsOpen(false);

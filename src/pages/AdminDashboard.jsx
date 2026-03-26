@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-    Users, Building2, Shield, Settings, Trash2, Edit3, 
-    Search, Filter, ChevronRight, Activity, Globe, 
-    Calendar, Mail, CheckCircle2, AlertCircle, 
+import {
+    Users, Building2, Shield, Settings, Trash2, Edit3,
+    Search, Filter, ChevronRight, Activity, Globe,
+    Calendar, Mail, CheckCircle2, AlertCircle,
     ShieldCheck, Zap
 } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
@@ -31,7 +31,7 @@ const AdminDashboard = () => {
         try {
             const token = await getToken();
             const baseUrl = import.meta.env.VITE_API_URL || '';
-            
+
             const [usersRes, companiesRes, statsRes] = await Promise.all([
                 fetch(`${baseUrl}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
                 fetch(`${baseUrl}/api/admin/companies`, { headers: { 'Authorization': `Bearer ${token}` } }),
@@ -54,7 +54,7 @@ const AdminDashboard = () => {
             const baseUrl = import.meta.env.VITE_API_URL || '';
             const res = await fetch(`${baseUrl}/api/admin/users/${clerkId}`, {
                 method: 'PATCH',
-                headers: { 
+                headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
@@ -81,13 +81,13 @@ const AdminDashboard = () => {
         }
     };
 
-    const filteredUsers = users.filter(u => 
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const filteredUsers = users.filter(u =>
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.clerk_id?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const filteredCompanies = companies.filter(c => 
-        c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const filteredCompanies = companies.filter(c =>
+        c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.origin?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -102,7 +102,7 @@ const AdminDashboard = () => {
     if (isLoading) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
-                 <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -127,9 +127,9 @@ const AdminDashboard = () => {
                     <div className="flex items-center gap-3">
                         <div className="relative group">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                            <input 
-                                type="text" 
-                                placeholder="Search users or companies..." 
+                            <input
+                                type="text"
+                                placeholder="Search users or companies..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-10 pr-4 py-2.5 bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-xs text-slate-900 dark:text-white w-64"
@@ -164,13 +164,13 @@ const AdminDashboard = () => {
                 {/* Main Management Tabs */}
                 <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-6 lg:p-8 min-h-[500px]">
                     <div className="flex gap-2 mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">
-                        <button 
+                        <button
                             onClick={() => setActiveTab('users')}
                             className={`px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${activeTab === 'users' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                         >
                             Users
                         </button>
-                        <button 
+                        <button
                             onClick={() => setActiveTab('companies')}
                             className={`px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${activeTab === 'companies' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                         >
@@ -204,8 +204,8 @@ const AdminDashboard = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-4">
-                                                    <select 
-                                                        value={u.tier || 'FREE'} 
+                                                    <select
+                                                        value={u.tier || 'FREE'}
                                                         onChange={(e) => handleUpdateUser(u.clerk_id, 'tier', e.target.value)}
                                                         className="bg-transparent border border-slate-300 dark:border-slate-800 rounded-md px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-indigo-500 outline-none"
                                                     >

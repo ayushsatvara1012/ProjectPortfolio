@@ -92,39 +92,15 @@ const Pricing = ({ onPlanSelected, onBack }) => {
 
         setIsLoading(true);
         setSelectedTier(tier);
-        
+
         try {
-            if (tier === 'FREE') {
-                // Call local backend to set tier to FREE
-                const token = await getToken();
-                const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/user/subscription`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ tier: 'FREE' })
-                });
-
-                if (response.ok) {
-                    if (onPlanSelected) {
-                        onPlanSelected('FREE');
-                    } else {
-                        navigate('/register');
-                    }
-                    return;
-                } else {
-                    const err = await response.json();
-                    throw new Error(err.detail || "Failed to set Free tier");
-                }
-            }
-
-            // Mapping tiers to Polar checkout URLs (Paid Tiers)
+            // Mapping tiers to Polar checkout URLs
             // ADDING success_url to ensure they return to /register after paying
             const returnUrl = `${window.location.origin}/register`;
-            
-            // NOTE: In production, you would have different Polar URLs for yearly plans
+
             const polarCheckoutURLs = {
+                // IMPORTANT: Replace this placeholder with your actual Free Trial Checkout URL from Polar
+                'FREE': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_GlcO80t9NECvnxk7aDYxvYC9UhXw3NUnASYTr4gXE3f/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`,
                 'STARTER': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_a737GpaDGcVAKALFibFjrhyAUb403vA0ABvto3pm67S/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`,
                 'PRO': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_njcI1HUJc7Ux1JSawhnIzLNY8LwfrPzeRsOEJ474xCs/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`
             };
@@ -161,7 +137,7 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                     </motion.button>
                 )}
                 <div className="text-center my-6">
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-4"
@@ -169,7 +145,7 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>Select Your Plan</span>
                     </motion.div>
-                    <motion.h1 
+                    <motion.h1
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
@@ -177,7 +153,7 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                     >
                         Launch your <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-indigo-600 dark:from-red-400 dark:to-indigo-500">AI Chatbot</span>
                     </motion.h1>
-                    <motion.p 
+                    <motion.p
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
@@ -185,7 +161,7 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                     >
                         Choose the plan that fits your current stage. Seamlessly upgrade as your AI knowledge base expands.
                     </motion.p>
- 
+
                     {/* Tactile Toggle Switch */}
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -194,13 +170,13 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                         className="mt-8 mb-4 flex justify-center"
                     >
                         <div className="flex items-center bg-slate-100 dark:bg-[#111] p-1 rounded-full border border-slate-200 dark:border-slate-800 relative">
-                            <button 
+                            <button
                                 onClick={() => setBillingCycle('monthly')}
                                 className={`px-6 py-1.5 text-xs font-bold rounded-full transition-all duration-300 relative z-10 ${billingCycle === 'monthly' ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}
                             >
                                 Monthly
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setBillingCycle('yearly')}
                                 className={`px-6 py-1.5 text-xs font-bold rounded-full transition-all duration-300 relative z-10 ${billingCycle === 'yearly' ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}
                             >
@@ -235,11 +211,10 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 * (index + 3) }}
-                            className={`relative group bg-white dark:bg-[#0A0A0A] border transition-all duration-300 hover:-translate-y-1 ${
-                                plan.highlight 
-                                ? 'border-blue-500 ring-1 ring-blue-500 dark:ring-blue-500' 
+                            className={`relative group bg-white dark:bg-[#0A0A0A] border transition-all duration-300 hover:-translate-y-1 ${plan.highlight
+                                ? 'border-blue-500 ring-1 ring-blue-500 dark:ring-blue-500'
                                 : 'border-slate-200 dark:border-slate-800'
-                            } rounded-2xl p-6 flex flex-col`}
+                                } rounded-2xl p-6 flex flex-col`}
                         >
                             {plan.highlight && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full z-20 shadow-lg shadow-blue-500/20 whitespace-nowrap">
@@ -276,11 +251,10 @@ const Pricing = ({ onPlanSelected, onBack }) => {
                             <button
                                 onClick={() => handleSelectPlan(plan.id)}
                                 disabled={isLoading}
-                                className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn relative overflow-hidden ${
-                                    plan.highlight 
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]' 
+                                className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group/btn relative overflow-hidden ${plan.highlight
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]'
                                     : 'bg-transparent border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 active:scale-[0.98]'
-                                }`}
+                                    }`}
                             >
                                 {isLoading && selectedTier === plan.id ? (
                                     <Logo className="w-8 h-4" />
