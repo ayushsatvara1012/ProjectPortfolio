@@ -25,6 +25,7 @@ const Dashboard = () => {
     const [messagesUsed, setMessagesUsed] = useState(0);
     const [messageLimit, setMessageLimit] = useState(200);
     const [periodEnd, setPeriodEnd] = useState(null);
+    const [subscriptionStatus, setSubscriptionStatus] = useState('active');
     const [showPricing, setShowPricing] = useState(false);
     const [isTraining, setIsTraining] = useState(false);
     const [trainingText, setTrainingText] = useState('');
@@ -39,7 +40,7 @@ const Dashboard = () => {
             try {
                 const token = await getToken();
                 const baseUrl = import.meta.env.VITE_API_URL || '';
-                
+
                 // Fetch user profile and company details in parallel for faster population
                 const [meRes, companyRes] = await Promise.all([
                     fetch(`${baseUrl}/api/me`, {
@@ -54,10 +55,11 @@ const Dashboard = () => {
                     const data = await meRes.json();
                     setUserTier(data.tier);
                     setUserRole(data.role);
+                    setSubscriptionStatus(data.subscription_status || 'active');
                     setTrialEndDate(data.trial_end_date);
                     setMessagesUsed(data.messages_used);
                     setMessageLimit(data.message_limit);
-                    setPeriodEnd(data.period_end);
+                    setPeriodEnd(data.billing_period_end);
                     setStats({
                         total_documents: data.total_documents || 0,
                         total_messages: data.total_messages || 0
@@ -68,7 +70,7 @@ const Dashboard = () => {
                     const data = await companyRes.json();
                     // Removed auto-fetching API key to prevent leakage as requested
                 }
-                
+
                 setIsLoading(false);
             } catch (err) {
                 console.error("Failed to fetch user details:", err);
@@ -127,7 +129,7 @@ const Dashboard = () => {
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.detail || 'Training failed.');
-            
+
             if (data.warning) {
                 showAlert('warning', data.warning);
                 // Highlight and scroll to manual text area for guidance
@@ -136,7 +138,7 @@ const Dashboard = () => {
             } else {
                 showAlert('success', data.message || 'Training successful!');
             }
-            
+
             setUrl('');
             setTrainingText('');
             clearFile();
@@ -174,14 +176,13 @@ const Dashboard = () => {
                             <div>
                                 <div className="flex items-center gap-3 mb-4 flex-wrap">
                                     <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                        AI Command Center
+                                        AI <span className="bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent">Command Center</span>
                                     </h1>
                                     {userTier === 'STARTER' && (
-                                        <div className={`px-2 py-0.5 rounded-md border text-[11px] font-mono uppercase tracking-wider flex items-center gap-2 ${
-                                            daysLeft > 5 
+                                        <div className={`px-2 py-0.5 rounded-md border text-[11px] font-mono uppercase tracking-wider flex items-center gap-2 ${daysLeft > 5
                                                 ? 'bg-slate-100 dark:bg-[#1A1A1A] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                                                 : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'
-                                        }`}>
+                                            }`}>
                                             <Zap className="w-3 h-3 fill-current" />
                                             {daysLeft} Days left
                                         </div>
@@ -193,7 +194,7 @@ const Dashboard = () => {
                                         </div>
                                     )}
                                     {userTier !== 'PRO' && userTier !== 'ENTERPRISE' && (
-                                        <button 
+                                        <button
                                             onClick={() => navigate('/pricing')}
                                             className="px-3 py-1 rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-white transition-colors"
                                         >
@@ -207,14 +208,14 @@ const Dashboard = () => {
                             </div>
                             <div className="flex items-center gap-4 bg-white dark:bg-[#111111] p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                                 {userRole === 'ADMIN' && (
-                                    <button 
+                                    <button
                                         onClick={() => navigate('/admin')}
-                                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20"
+                                        className="px-3 py-1.5 bg-slate-100 dark:bg-[#1A1A1A] text-slate-900 dark:text-slate-100 rounded-md text-[10px] font-bold uppercase tracking-widest border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-[#222222] transition-colors"
                                     >
                                         Admin Panel
                                     </button>
                                 )}
-                                <button 
+                                <button
                                     onClick={async () => {
                                         try {
                                             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/billing/portal`, {
@@ -237,10 +238,39 @@ const Dashboard = () => {
                                 >
                                     Billing Portal
                                 </button>
-                                <div className="w-8 h-8 rounded-md bg-slate-100 dark:bg-[#1A1A1A] border border-slate-200 dark:border-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs text-mono">
-                                    {user?.firstName?.charAt(0) || 'U'}
-                                </div>
-                                <div>
+                                {userTier && userTier !== 'FREE' && (
+                                    <button
+                                        disabled={isLoading || (userRole === 'USER' && subscriptionStatus === 'cancelling')}
+                                        onClick={async () => {
+                                            if (!window.confirm("Are you sure you want to cancel? You will keep access until the end of the billing period.")) return;
+                                            try {
+                                                const token = await getToken();
+                                                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/subscription/cancel`, {
+                                                    method: 'POST',
+                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                });
+                                                const data = await response.json();
+                                                if (response.ok) {
+                                                    showAlert('success', 'Cancellation requested. Your account will remain active until the period ends.');
+                                                    // Refresh status
+                                                    window.location.reload();
+                                                } else {
+                                                    showAlert('error', data.detail || 'Failed to cancel subscription.');
+                                                }
+                                            } catch (err) {
+                                                showAlert('error', 'Network error during cancellation.');
+                                            }
+                                        }}
+                                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest border transition-colors ${
+                                            subscriptionStatus === 'cancelling' 
+                                            ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400 cursor-not-allowed'
+                                            : 'bg-white dark:bg-[#111111] text-red-600 border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/10'
+                                        }`}
+                                    >
+                                        {subscriptionStatus === 'cancelling' ? 'Cancellation Pending' : 'Cancel Plan'}
+                                    </button>
+                                )}
+                                <div className='text-center'>
                                     <p className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{user?.fullName || 'Developer'}</p>
                                     <p className="text-[9px] text-slate-400 uppercase font-mono tracking-widest">{userRole === 'ADMIN' ? 'System Administrator' : 'Enterprise Access'}</p>
                                 </div>
@@ -284,7 +314,7 @@ const Dashboard = () => {
                                             </div>
                                             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">Requirement: Upgrade Plan</h3>
                                             <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 max-w-sm leading-relaxed">Your trial has concluded. Upgrade to continue scaling your mission-critical AI automation.</p>
-                                            <button 
+                                            <button
                                                 onClick={() => setUserTier(null)}
                                                 className="px-6 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm font-medium transition-colors"
                                             >
@@ -306,7 +336,7 @@ const Dashboard = () => {
                                                 <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed max-w-md">
                                                     You have exhausted your API message quota. Upgrade your plan to continue training.
                                                 </p>
-                                                <button 
+                                                <button
                                                     onClick={(e) => { e.preventDefault(); setShowPricing(true); }}
                                                     className="mt-3 text-[10px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400 hover:underline"
                                                 >
@@ -354,18 +384,17 @@ const Dashboard = () => {
                                                         value={trainingText}
                                                         onChange={(e) => setTrainingText(e.target.value)}
                                                         rows={4}
-                                                        className={`w-full px-3 py-2.5 text-sm bg-transparent border rounded-md focus:outline-none focus:ring-1 transition-all resize-none ${
-                                                            alertConfig.type === 'warning' && alertConfig.open 
-                                                            ? 'border-amber-400 ring-2 ring-amber-400/20 bg-amber-50/5 dark:bg-amber-400/5 animate-pulse' 
-                                                            : 'border-slate-300 dark:border-slate-800'
-                                                        }`}
+                                                        className={`w-full px-3 py-2.5 text-sm bg-transparent border rounded-md focus:outline-none focus:ring-1 transition-all resize-none ${alertConfig.type === 'warning' && alertConfig.open
+                                                                ? 'border-amber-400 ring-2 ring-amber-400/20 bg-amber-50/5 dark:bg-amber-400/5 animate-pulse'
+                                                                : 'border-slate-300 dark:border-slate-800'
+                                                            }`}
                                                         placeholder="Paste your services, FAQs, or raw knowledge here..."
                                                     />
                                                 </div>
 
                                                 <div>
                                                     <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">PDF Archive</label>
-                                                    <div 
+                                                    <div
                                                         onClick={() => fileInputRef.current?.click()}
                                                         className="flex flex-col items-center justify-center gap-3 px-6 py-10 bg-transparent border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-xl cursor-pointer hover:border-indigo-500/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all group"
                                                     >
@@ -385,14 +414,13 @@ const Dashboard = () => {
                                                 </div>
                                             </div>
 
-                                            <button 
-                                                type="submit" 
+                                            <button
+                                                type="submit"
                                                 disabled={isTraining || isLockedOut}
-                                                className={`w-full py-3 rounded-md text-sm font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${
-                                                    isLockedOut 
-                                                    ? 'bg-slate-100 dark:bg-[#1A1A1A] text-slate-400 border border-slate-200 dark:border-slate-800 cursor-not-allowed' 
-                                                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white active:scale-[0.98]'
-                                                }`}
+                                                className={`w-full py-3 rounded-md text-sm font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${isLockedOut
+                                                        ? 'bg-slate-100 dark:bg-[#1A1A1A] text-slate-400 border border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                                                        : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white active:scale-[0.98]'
+                                                    }`}
                                             >
                                                 {isTraining ? (
                                                     <>
@@ -433,14 +461,13 @@ const Dashboard = () => {
                                         {messageLimit !== null && messageLimit < 999999 && (
                                             <>
                                                 <div className="w-full h-1.5 bg-slate-100 dark:bg-[#1A1A1A] rounded-full overflow-hidden flex">
-                                                    <motion.div 
+                                                    <motion.div
                                                         initial={{ width: 0 }}
                                                         animate={{ width: `${Math.min((messagesUsed / messageLimit) * 100, 100)}%` }}
-                                                        className={`h-full transition-all duration-700 ${
-                                                            (messagesUsed / messageLimit) >= 1 ? 'bg-red-500' :
-                                                            (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' :
-                                                            'bg-slate-900 dark:bg-slate-100'
-                                                        }`}
+                                                        className={`h-full transition-all duration-700 ${(messagesUsed / messageLimit) >= 1 ? 'bg-red-500' :
+                                                                (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' :
+                                                                    'bg-slate-900 dark:bg-slate-100'
+                                                            }`}
                                                     />
                                                 </div>
                                                 <div className="flex justify-between items-center mt-3">

@@ -3,8 +3,12 @@ import { Analytics } from "@vercel/analytics/react";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import ChatWidget from './components/chatWidget';
+import useInactivityTimeout from './hooks/useInactivityTimeout';
 
 function App() {
+  // Automatically logout user after 30 minutes of inactivity
+  useInactivityTimeout(30);
+
   return (
     <div className="flex flex-col">
       <ScrollRestoration getKey={(location) => {
