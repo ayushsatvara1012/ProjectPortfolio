@@ -40,7 +40,7 @@ DB_URL = os.getenv("NEON_DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
-POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET")
+POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
 
 # 2. Initialize Database Connection Pool
 db_pool = pool.ThreadedConnectionPool(
@@ -1120,11 +1120,13 @@ async def polar_webhook(request: Request):
             "svix-timestamp": headers.get("svix-timestamp") or headers.get("webhook-timestamp", ""),
         }
         msg = wh.verify(payload, svix_headers)
-    except WebhookVerificationError:
-        print("WEBHOOK ERROR: Invalid Signature for Polar")
-        # Log headers for debugging signature issues
-        print(f"POLAR HEADERS: {json.dumps(dict(headers), indent=2)}")
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    except WebhookVerificationError as e:
+        print(f"WEBHOOK ERROR: Invalid Signature for Polar. Error: {e}")
+        # Log critical diagnostic info (Safely)
+        secret_prefix = f"{POLAR_WEBHOOK_SECRET[:10]}..." if POLAR_WEBHOOK_SECRET else "MISSING"
+        print(f"DIAGNOSTIC - Secret Prefix: {secret_prefix}, Payload Size: {len(payload)}")
+        print(f"DIAGNOSTIC - Svix Headers: {json.dumps(svix_headers, indent=2)}")
+        raise HTTPException(status_code=400, detail="Invalid signature. Please ensure your POLAR_WEBHOOK_SECRET matches exactly.")
     except Exception as e:
         print(f"WEBHOOK ERROR during verification: {e}")
         raise HTTPException(status_code=500, detail="Verification process failed")
