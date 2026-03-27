@@ -423,6 +423,7 @@ async def get_current_user(request: Request):
             request_state.payload.get("email") or 
             request_state.payload.get("email_address") or 
             request_state.payload.get("primary_email_address")
+        )
 
         if not email or email == "unknown@email.com":
             # FALLBACK: Fetch from Clerk Management API
