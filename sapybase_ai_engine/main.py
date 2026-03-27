@@ -175,7 +175,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 ALLOWED_ORIGINS = {
     "https://sapybase.com",
     "https://app.sapybase.com",
-    "https://admin.sapybase.com"
+    "https://admin.sapybase.com",
+    "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app"
 }
 
 ALLOWED_DEV_ORIGINS = {
@@ -193,7 +194,7 @@ combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=combined_origins,
-    allow_origin_regex=r"https://.*\.ngrok-free\.(app|dev)", 
+    allow_origin_regex=r"https://.*\.ngrok-free\.(app|dev)|https://.*\.vercel\.app", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
