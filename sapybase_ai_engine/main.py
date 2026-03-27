@@ -310,16 +310,21 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             # 3.2. Secondary Check: Platform Production Origins
             if actual_client_origin in ALLOWED_ORIGINS:
                 return company
+                
+            # 3.3. Wildcard Check: Vercel & Ngrok (Issue 48 Fix)
+            if re.match(r"https://.*\.vercel\.app", actual_client_origin) or \
+               re.match(r"https://.*\.ngrok-free\.(app|dev)", actual_client_origin):
+                return company
 
-            # 3.3. Development Origins (Only in Debug/Dev mode)
+            # 3.4. Development Origins (Only in Debug/Dev mode)
             is_dev = os.getenv("ENV") == "development"
             if is_dev and actual_client_origin in ALLOWED_DEV_ORIGINS:
                 return company
             
-            # 3.4. Unauthorized
+            # 3.5. Unauthorized
             raise HTTPException(
                 status_code=403, 
-                detail=f"Unauthorized Origin: {actual_client_origin}"
+                detail=f"CORS Error: Origin {client_origin} is not allowed for this API Key."
             )
 
     return company
