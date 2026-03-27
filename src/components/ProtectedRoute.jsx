@@ -20,27 +20,41 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     });
 
     useEffect(() => {
+        const timer = setTimeout(() => setIsLoading(false), 8000); // safety timeout
+        
         const checkOnboardingStatus = async () => {
             if (!isUserLoaded || !isAuthLoaded || !isSignedIn) {
                 if (isUserLoaded && isAuthLoaded) setIsLoading(false);
                 return;
             }
 
+            const searchParams = new URLSearchParams(window.location.search);
+            const justPaid = searchParams.get('payment') === 'success';
+            const maxAttempts = justPaid ? 5 : 1;
+
             try {
-                const token = await getToken();
                 const baseUrl = import.meta.env.VITE_API_URL || '';
+                let meData = null;
+                let companyData = null;
 
-                // 1. Check Profile (Tier & Role)
-                const meRes = await fetch(`${baseUrl}/api/me`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const meData = await meRes.ok ? await meRes.json() : null;
+                // Poll /api/me to handle race conditions with Polar webhooks
+                for (let i = 0; i < maxAttempts; i++) {
+                    const token = await getToken();
+                    const meRes = await fetch(`${baseUrl}/api/me`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    meData = meRes.ok ? await meRes.json() : null;
+                    
+                    if (meData?.tier) break; // tier is set, stop polling
+                    if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, 1000));
+                }
 
-                // 2. Check Company Status
+                // Final check for company details
+                const token = await getToken();
                 const companyRes = await fetch(`${baseUrl}/api/company/details`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const companyData = await companyRes.ok ? await companyRes.json() : null;
+                companyData = companyRes.ok ? await companyRes.json() : null;
 
                 setOnboardingState({
                     tier: meData?.tier || null,
@@ -51,10 +65,12 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
                 console.error("Onboarding check failed:", err);
             } finally {
                 setIsLoading(false);
+                clearTimeout(timer);
             }
         };
 
         checkOnboardingStatus();
+        return () => clearTimeout(timer);
     }, [isUserLoaded, isAuthLoaded, isSignedIn, getToken]);
 
     // 1. Wait for BOTH Clerk and your backend/state to finish loading

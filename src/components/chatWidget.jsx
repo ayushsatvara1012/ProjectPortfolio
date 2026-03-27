@@ -82,7 +82,7 @@ const ChatWidget = ({ apiKey }) => {
         return () => clearTimeout(timer);
     }, [currentPhrase, isDeleting, loopNum, typingSpeed]);
 
-    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
+    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
     const BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
 
     const messagesEndRef = useRef(null);
@@ -128,7 +128,7 @@ const ChatWidget = ({ apiKey }) => {
         try {
             // Call your local FastAPI engine
             // Prioritize Prop, then Window Object, then Vite environment variable
-            const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey || import.meta.env?.VITE_SAPYBASE_API_KEY;
+            const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
 
             if (!activeApiKey) {
                 console.warn("SaPyBase Widget: Missing API Key. Processing aborted.");
