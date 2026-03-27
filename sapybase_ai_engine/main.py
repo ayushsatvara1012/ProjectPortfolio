@@ -70,7 +70,13 @@ def get_db_connection():
                     db_pool.putconn(conn, close=True)
                 except:
                     pass
-            if attempt == max_retries - 1:
+            
+            # Add a small delay for Neon to wake up (2s, 4s, etc.)
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2
+                print(f"Waiting {wait_time}s for database to warm up...")
+                time.sleep(wait_time)
+            else:
                 raise HTTPException(status_code=503, detail="Database connection unavailable. Please try again.")
         except Exception as e:
             print(f"Unexpected pool retrieval error: {e}")
