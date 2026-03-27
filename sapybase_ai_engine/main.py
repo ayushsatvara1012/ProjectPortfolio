@@ -183,6 +183,7 @@ ALLOWED_ORIGINS = {
     "https://sapybase.com",
     "https://app.sapybase.com",
     "https://admin.sapybase.com",
+    "https://sapybase-deploy-test.vercel.app",
     "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app"
 }
 
