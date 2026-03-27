@@ -1134,20 +1134,38 @@ async def polar_webhook(request: Request):
         }
 
     # DEBUG: Log exact verification inputs
-    secret_prefix = f"{POLAR_WEBHOOK_SECRET[:10]}..." if POLAR_WEBHOOK_SECRET else "MISSING"
-    print(f"DEBUG WEBHOOK - Secret Prefix: {secret_prefix}")
+    secret_to_log = f"{POLAR_WEBHOOK_SECRET[:10]}...{POLAR_WEBHOOK_SECRET[-5:]}" if POLAR_WEBHOOK_SECRET else "MISSING"
+    print(f"DEBUG WEBHOOK - Secret (Masked): {secret_to_log}")
     print(f"DEBUG WEBHOOK - Headers: {json.dumps(svix_headers)}")
     print(f"DEBUG WEBHOOK - Payload Size: {len(payload)}")
 
-    wh = Webhook(POLAR_WEBHOOK_SECRET)
-    try:
-        msg = wh.verify(payload, svix_headers)
-    except WebhookVerificationError as e:
-        print(f"WEBHOOK ERROR: Invalid Signature for Polar. Error: {e}")
-        # Log critical diagnostic info (Safely)
+    # TRY MULTIPLE SECRET FORMATS (Sometime Polar libraries are picky)
+    secrets_to_try = [POLAR_WEBHOOK_SECRET]
+    if POLAR_WEBHOOK_SECRET.startswith("polar_whs_"):
+        # Try without the prefix just in case the Svix library version expects raw base64
+        secrets_to_try.append(POLAR_WEBHOOK_SECRET.replace("polar_whs_", ""))
+
+    msg = None
+    last_error = None
+
+    for secret in secrets_to_try:
+        try:
+            wh = Webhook(secret)
+            msg = wh.verify(payload, svix_headers)
+            print(f"WEBHOOK SUCCESS: Verified with secret format starting with {secret[:12]}")
+            break
+        except WebhookVerificationError as e:
+            last_error = e
+            continue
+        except Exception as e:
+            last_error = e
+            continue
+
+    if not msg:
+        print(f"WEBHOOK ERROR: All signature verification attempts failed. Last error: {last_error}")
         raise HTTPException(
             status_code=400, 
-            detail=f"Invalid signature. Please ensure your POLAR_WEBHOOK_SECRET matches perfectly in Render. Error: {str(e)}"
+            detail=f"Invalid signature. Tried {len(secrets_to_try)} secret formats. Error: {str(last_error)}"
         )
     except Exception as e:
         print(f"WEBHOOK ERROR during verification: {e}")
