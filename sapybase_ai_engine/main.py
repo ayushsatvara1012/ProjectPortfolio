@@ -334,6 +334,14 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                 return company
             
             # 3.5. Unauthorized
+            raise HTTPException(
+                status_code=403, 
+                detail=f"CORS Error: Origin {client_origin} is not allowed for this API Key."
+            )
+
+    return company
+
+
 # --- JWT VERIFICATION (CLERK) ---
 
 # Cache for JWKS to avoid frequent network calls
