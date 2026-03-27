@@ -1182,8 +1182,8 @@ async def polar_webhook(request: Request):
             detail=f"Invalid signature. Tried {len(secrets_to_try)} secret formats. Error: {str(last_error)}"
         )
 
-    # Extract Svix ID for idempotency (Polar uses Svix)
-    webhook_id = svix_headers.get("svix-id")
+    # Extract Unique ID for idempotency (Handles both svix and webhook prefixes)
+    webhook_id = svix_headers.get("webhook-id") or svix_headers.get("svix-id")
     if not webhook_id:
         print("WEBHOOK ERROR: Missing unique ID after verification")
         return {"status": "ignored"}
