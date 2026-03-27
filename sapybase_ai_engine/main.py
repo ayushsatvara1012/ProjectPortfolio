@@ -264,9 +264,10 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     against the allowed_origin stored in the database.
     """
     conn = get_db_connection()
+    print(f"DEBUG: verify_api_key_and_origin - Received Key: {api_key[:10]}...")
     try:
         cursor = conn.cursor()
-        # Fetch company details from Neon DB
+        # Fetch company details from DB
         cursor.execute(
             """
             SELECT id, company_name, company_tone, theme_color, allowed_origin, 
@@ -281,6 +282,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         release_db_connection(conn)
 
     if not company_data:
+        print(f"DEBUG: verify_api_key_and_origin - Key NOT FOUND in DB: {api_key[:10]}...")
         raise HTTPException(status_code=401, detail="Invalid API Key.")
 
     # Package the company data
