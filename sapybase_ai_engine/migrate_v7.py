@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("NEON_DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def migrate():
     print("Connecting to database...")
