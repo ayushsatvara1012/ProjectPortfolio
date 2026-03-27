@@ -1118,25 +1118,42 @@ async def polar_webhook(request: Request):
     payload = await request.body()
     headers = request.headers
     
-    wh = Webhook(POLAR_WEBHOOK_SECRET)
-    try:
-        # Extract headers with safe fallbacks to prevent None values
+    # Extract headers with safe fallbacks to prevent None values
+    svix_headers = {
+        "webhook-id": headers.get("webhook-id") or headers.get("svix-id", ""),
+        "webhook-signature": headers.get("webhook-signature") or headers.get("svix-signature", ""),
+        "webhook-timestamp": headers.get("webhook-timestamp") or headers.get("svix-timestamp", ""),
+    }
+
+    # Fallback to svix- prefixes if webhook- headers are missing
+    if not svix_headers["webhook-id"]:
         svix_headers = {
             "svix-id": headers.get("svix-id") or headers.get("webhook-id", ""),
             "svix-signature": headers.get("svix-signature") or headers.get("webhook-signature", ""),
             "svix-timestamp": headers.get("svix-timestamp") or headers.get("webhook-timestamp", ""),
         }
+
+    # DEBUG: Log exact verification inputs
+    secret_prefix = f"{POLAR_WEBHOOK_SECRET[:10]}..." if POLAR_WEBHOOK_SECRET else "MISSING"
+    print(f"DEBUG WEBHOOK - Secret Prefix: {secret_prefix}")
+    print(f"DEBUG WEBHOOK - Headers: {json.dumps(svix_headers)}")
+    print(f"DEBUG WEBHOOK - Payload Size: {len(payload)}")
+
+    wh = Webhook(POLAR_WEBHOOK_SECRET)
+    try:
         msg = wh.verify(payload, svix_headers)
     except WebhookVerificationError as e:
         print(f"WEBHOOK ERROR: Invalid Signature for Polar. Error: {e}")
         # Log critical diagnostic info (Safely)
-        secret_prefix = f"{POLAR_WEBHOOK_SECRET[:10]}..." if POLAR_WEBHOOK_SECRET else "MISSING"
-        print(f"DIAGNOSTIC - Secret Prefix: {secret_prefix}, Payload Size: {len(payload)}")
-        print(f"DIAGNOSTIC - Svix Headers: {json.dumps(svix_headers, indent=2)}")
-        raise HTTPException(status_code=400, detail="Invalid signature. Please ensure your POLAR_WEBHOOK_SECRET matches exactly.")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid signature. Please ensure your POLAR_WEBHOOK_SECRET matches perfectly in Render. Error: {str(e)}"
+        )
     except Exception as e:
         print(f"WEBHOOK ERROR during verification: {e}")
-        raise HTTPException(status_code=500, detail="Verification process failed")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Verification process failed: {str(e)}")
 
     # Extract Svix ID for idempotency (Polar uses Svix)
     webhook_id = svix_headers.get("svix-id")
