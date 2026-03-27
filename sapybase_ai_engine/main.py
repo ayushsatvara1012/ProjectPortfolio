@@ -36,7 +36,7 @@ from clerk_backend_api.security.types import AuthenticateRequestOptions
 
 # 1. Load Environment Variables
 load_dotenv()
-DB_URL = os.getenv("NEON_DATABASE_URL")
+DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")

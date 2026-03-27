@@ -8,7 +8,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 # Load environment variables from .env
 load_dotenv()
 
-DB_URL = os.getenv("NEON_DATABASE_URL")
+DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 COMPANY_ID = os.getenv("SAPYBASE_COMPANY_ID") # The UUID from Neon
 
