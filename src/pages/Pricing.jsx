@@ -100,9 +100,9 @@ const Pricing = ({ onPlanSelected, onBack }) => {
 
             const polarCheckoutURLs = {
                 // IMPORTANT: Replace this placeholder with your actual Free Trial Checkout URL from Polar
-                'FREE': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_GlcO80t9NECvnxk7aDYxvYC9UhXw3NUnASYTr4gXE3f/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`,
-                'STARTER': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_a737GpaDGcVAKALFibFjrhyAUb403vA0ABvto3pm67S/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`,
-                'PRO': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_njcI1HUJc7Ux1JSawhnIzLNY8LwfrPzeRsOEJ474xCs/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`
+                'FREE': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_u2e2TDhMky9ZcEdZQvSkYrhJYPrOE2pibHBOj4QmKUj/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`,
+                'STARTER': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_5lMK41gaZy8zPCdUgVplcbZOCg5VoqjB1RONk1v0boY/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`,
+                'PRO': `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_qYExGMomKIvze8YZv1OI0hutir22plkWzR30V1U1C8d/redirect?customer_external_id=${user.id}&success_url=${returnUrl}`
             };
 
             const checkoutUrl = polarCheckoutURLs[tier];
