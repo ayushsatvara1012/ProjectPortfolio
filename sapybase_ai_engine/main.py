@@ -1139,28 +1139,42 @@ async def polar_webhook(request: Request):
     print(f"DEBUG WEBHOOK - Headers: {json.dumps(svix_headers)}")
     print(f"DEBUG WEBHOOK - Payload Size: {len(payload)}")
 
-    # TRY MULTIPLE SECRET FORMATS (Sometime Polar libraries are picky)
+    # TRY MULTIPLE SECRET FORMATS
     secrets_to_try = [POLAR_WEBHOOK_SECRET]
     if POLAR_WEBHOOK_SECRET.startswith("polar_whs_"):
-        # Try without the prefix just in case the Svix library version expects raw base64
         secrets_to_try.append(POLAR_WEBHOOK_SECRET.replace("polar_whs_", ""))
+    
+    # Also try stripping any potential random whitespace/quotes from the secret
+    secrets_to_try.append(POLAR_WEBHOOK_SECRET.strip().strip('"').strip("'"))
 
     msg = None
     last_error = None
 
+    # Normalize payload: Some environments add a trailing newline to the raw body
+    payload_variants = [payload, payload.strip()]
+
     for secret in secrets_to_try:
         try:
             wh = Webhook(secret)
-            msg = wh.verify(payload, svix_headers)
-            print(f"WEBHOOK SUCCESS: Verified with secret format starting with {secret[:12]}")
-            break
-        except WebhookVerificationError as e:
-            last_error = e
-            continue
+            for p in payload_variants:
+                try:
+                    msg = wh.verify(p, svix_headers)
+                    print(f"WEBHOOK SUCCESS: Verified with secret format starting with {secret[:12]}")
+                    payload = p # Use the verified payload
+                    break
+                except:
+                    continue
+            if msg: break
         except Exception as e:
             last_error = e
             continue
 
+    # TEMPORARY BYPASS FOR DEBUGGING (Development only)
+    # If signature fails but we are in dev mode, we can optionally skip to test the rest of the flow
+    if not msg and os.getenv("ENV") == "development" and os.getenv("DEBUG_SKIP_SIGNATURE") == "true":
+        print("WEBHOOK WARNING: Signature verification FAILED but skipping due to DEBUG_SKIP_SIGNATURE=true")
+        msg = json.loads(payload)
+    
     if not msg:
         print(f"WEBHOOK ERROR: All signature verification attempts failed. Last error: {last_error}")
         raise HTTPException(
