@@ -180,6 +180,9 @@ ALLOWED_ORIGINS = {
 
 ALLOWED_DEV_ORIGINS = {
     "http://localhost:5173", 
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
     "http://localhost:3000", 
     "http://127.0.0.1:5173"
 }
@@ -1128,10 +1131,8 @@ async def polar_webhook(request: Request):
     data = msg.get("data")
     event_type = msg.get("type")
     
-    # DEBUG: Print the full data object to see the structure in logs
-    import json
+    # DEBUG: Localized logging to pinpoint failures
     print(f"POLAR WEBHOOK EVENT: {event_type}")
-    print(f"POLAR WEBHOOK DATA: {json.dumps(data, indent=2)}")
 
     conn = get_db_connection()
     try:
@@ -1155,10 +1156,20 @@ async def polar_webhook(request: Request):
         print(f"POLAR WEBHOOK: Extracted ClerkID={clerk_id}, CustomerID={data.get('customer_id')}")
         
         if not clerk_id: 
-            print("WEBHOOK ERROR: Could not find clerk_id (external_id) in payload")
-            return {"status": "ignored"}
+            # Fallback: Try to find user by email before giving up
+            customer_email = data.get("customer_email") or data.get("customer", {}).get("email")
+            if customer_email:
+                cursor.execute("SELECT clerk_id FROM users WHERE email = %s", (customer_email,))
+                user_row = cursor.fetchone()
+                if user_row:
+                    clerk_id = user_row[0]
+                    print(f"POLAR WEBHOOK: Found ClerkID via email lookup: {clerk_id}")
+            
+            if not clerk_id:
+                print("WEBHOOK ERROR: Could not find clerk_id (external_id) or user by email in payload")
+                return {"status": "ignored"}
 
-        if event_type in ["subscription.created", "subscription.updated"]:
+        if event_type in ["subscription.created", "subscription.updated", "subscription.active"]:
             # Handle checkouts too (sometimes Polar sends this before subscription)
             product = data.get("product", {})
             product_name = product.get("name", "").upper() if isinstance(product, dict) else ""
@@ -1228,7 +1239,10 @@ async def polar_webhook(request: Request):
         return {"status": "success"}
     except Exception as e:
         if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail="Webhook failed")
+        print(f"POLAR WEBHOOK CRITICAL ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Webhook Processing Failed: {str(e)}")
     finally:
         release_db_connection(conn)
 

@@ -6,7 +6,7 @@ import Logo from "./Logo";
 
 
 const Navbar = () => {
-  const { getToken, isLoaded: isAuthLoaded } = useAuth();
+  const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
@@ -32,7 +32,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const fetchUserRole = async () => {
-      if (!isAuthLoaded) return;
+      if (!isAuthLoaded || !isSignedIn) return;
       try {
         const token = await getToken();
         const baseUrl = import.meta.env.VITE_API_URL
@@ -51,7 +51,7 @@ const Navbar = () => {
       }
     };
     fetchUserRole();
-  }, [isAuthLoaded, getToken]);
+  }, [isAuthLoaded, isSignedIn, getToken]);
 
   useEffect(() => {
     if (isOpen) {
