@@ -1167,11 +1167,6 @@ async def polar_webhook(request: Request):
             status_code=400, 
             detail=f"Invalid signature. Tried {len(secrets_to_try)} secret formats. Error: {str(last_error)}"
         )
-    except Exception as e:
-        print(f"WEBHOOK ERROR during verification: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Verification process failed: {str(e)}")
 
     # Extract Svix ID for idempotency (Polar uses Svix)
     webhook_id = svix_headers.get("svix-id")
