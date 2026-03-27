@@ -13,3 +13,6 @@ pypdf
 python-multipart
 svix
 python-jose[cryptography]
+slowapi
+clerk-backend-api
+httpx

@@ -96,7 +96,7 @@ const Pricing = ({ onPlanSelected, onBack }) => {
         try {
             // Mapping tiers to Polar checkout URLs
             // ADDING success_url to ensure they return to /register after paying
-            const returnUrl = `${window.location.origin}/register`;
+            const returnUrl = `${window.location.origin}/register?payment=success`;
 
             const polarCheckoutURLs = {
                 // IMPORTANT: Replace this placeholder with your actual Free Trial Checkout URL from Polar
