@@ -8,6 +8,7 @@ import json
 import secrets
 import socket
 import ipaddress
+import hashlib
 from psycopg2 import pool
 from enum import Enum
 from typing import Optional
@@ -265,16 +266,17 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     """
     conn = get_db_connection()
     print(f"DEBUG: verify_api_key_and_origin - Received Key: {api_key[:10]}...")
+    hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
     try:
         cursor = conn.cursor()
-        # Fetch company details from DB
+        # Fetch company details from DB using hashed API Key
         cursor.execute(
             """
             SELECT id, company_name, company_tone, theme_color, allowed_origin, 
                    system_prompt, bot_name, logo_url, initial_message, quick_questions 
             FROM companies WHERE api_key = %s
             """, 
-            (api_key,)
+            (hashed_key,)
         )
         company_data = cursor.fetchone()
         cursor.close()
@@ -332,53 +334,86 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                 return company
             
             # 3.5. Unauthorized
-            raise HTTPException(
-                status_code=403, 
-                detail=f"CORS Error: Origin {client_origin} is not allowed for this API Key."
-            )
-
-    return company
-
 # --- JWT VERIFICATION (CLERK) ---
+
+# Cache for JWKS to avoid frequent network calls
+_JWKS_CACHE = {"keys": [], "expires_at": 0}
+
+async def get_clerk_jwks():
+    """Fetches and caches Clerk public keys for JWT verification."""
+    global _JWKS_CACHE
+    now = time.time()
+    if _JWKS_CACHE["keys"] and now < _JWKS_CACHE["expires_at"]:
+        return _JWKS_CACHE["keys"]
+    
+    try:
+        jwks_url = f"{CLERK_JWT_ISSUER}/.well-known/jwks.json"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(jwks_url)
+            resp.raise_for_status()
+            _JWKS_CACHE["keys"] = resp.json().get("keys", [])
+            _JWKS_CACHE["expires_at"] = now + 3600 # Cache for 1 hour
+            return _JWKS_CACHE["keys"]
+    except Exception as e:
+        print(f"JWKS FETCH FAILED: {e}")
+        return []
+
+async def verify_clerk_jwt(token: str):
+    """
+    CRITICAL SECURITY FIX: Validates JWT signature against Clerk JWKS.
+    Replaces the previous unverified fallback.
+    """
+    try:
+        keys = await get_clerk_jwks()
+        if not keys:
+            raise Exception("Could not retrieve public keys")
+            
+        # Verify the token using the provided public keys
+        payload = jwt.decode(
+            token, 
+            keys, 
+            algorithms=["RS256"], 
+            audience=None, # aud check can be added if configured in Clerk
+            issuer=CLERK_JWT_ISSUER
+        )
+        return payload
+    except Exception as e:
+        print(f"JWT VERIFICATION FAILED: {e}")
+        return None
 
 async def get_current_user(request: Request):
     """
-    Issue #8: Silent User Sync Bypass (Auto-Provisioning).
-    If a valid JWT exists but the row is missing, we create the user profile on the fly.
+    Issue #8: Secure User Context with Auto-Provisioning.
+    Uses Clerk SDK first, then falls back to a SECURE manual verification.
     """
     try:
         request_state = None
-        # 1. Secure server-side verification using Clerk SDK
+        # 1. Primary: Clerk SDK (most secure)
         try:
             clerk = Clerk(bearer_auth=os.getenv("CLERK_SECRET_KEY"))
             request_state = clerk.authenticate_request(request, AuthenticateRequestOptions())
         except Exception as sdk_err:
-            print(f"CLERK SDK AUTH FAILED: {sdk_err}")
+            if ENV != "development":
+                print(f"CLERK SDK AUTH FAILED: {sdk_err}")
 
+        # 2. Secondary: Secure Manual Fallback (if SDK fails or in specific dev setups)
         if not request_state or not request_state.is_signed_in:
-            # FALLBACK: Manual JWT verification (Issue 6)
             auth_header = request.headers.get("Authorization")
             if not auth_header or not auth_header.startswith("Bearer "):
-                raise HTTPException(status_code=401, detail="Invalid token")
+                raise HTTPException(status_code=401, detail="Authentication required")
             
             token = auth_header.split(" ")[1]
-            try:
-                # In a real high-scale app, we'd cache the JWKS.
-                # Here we verify against the issuer's public claims.
-                unverified_claims = jwt.get_unverified_claims(token)
-                if unverified_claims.get("iss") != CLERK_JWT_ISSUER:
-                    raise Exception("Invalid Issuer")
-                
-                # We trust the token if it's from our issuer (basic fallback)
-                # For full security, implement JWKS fetching here.
-                class LegacyAuth:
-                    def __init__(self, payload):
-                        self.payload = payload
-                        self.is_signed_in = True
-                request_state = LegacyAuth(unverified_claims)
-            except Exception as e:
-                print(f"JWT FALLBACK FAILED: {e}")
-                raise HTTPException(status_code=401, detail="Authentication failed")
+            payload = await verify_clerk_jwt(token)
+            
+            if not payload:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            
+            # Mock the request state for downstream compatibility
+            class SecureAuth:
+                def __init__(self, p):
+                    self.payload = p
+                    self.is_signed_in = True
+            request_state = SecureAuth(payload)
             
         # Store for Issue #16 (Step-Up Auth)
         request.state.clerk_auth = request_state
@@ -388,7 +423,6 @@ async def get_current_user(request: Request):
             request_state.payload.get("email") or 
             request_state.payload.get("email_address") or 
             request_state.payload.get("primary_email_address")
-        )
 
         if not email or email == "unknown@email.com":
             # FALLBACK: Fetch from Clerk Management API
@@ -827,9 +861,10 @@ async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_cu
             raise HTTPException(status_code=400, detail="User already has a company.")
 
         api_key = f"sb_{secrets.token_urlsafe(32)}"
+        hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
         cursor.execute(
             "INSERT INTO companies (user_id, company_name, allowed_origin, domain, api_key) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin, api_key)
+            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin, hashed_key)
         )
         company_id = cursor.fetchone()[0]
         cursor.execute("UPDATE users SET role = 'ADMIN' WHERE id = %s", (user["id"],))
@@ -849,13 +884,14 @@ async def rotate_api_key(user: dict = Depends(get_current_user)):
     Identifies the company via the user profile and generates a fresh, secure key.
     """
     new_key = f"sb_{secrets.token_urlsafe(32)}"
+    hashed_key = hashlib.sha256(new_key.encode()).hexdigest()
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # 1. Update the key (which immediately invalidates the old one)
+        # 1. Update the key (stored as hash)
         cursor.execute(
             "UPDATE companies SET api_key = %s WHERE user_id = %s RETURNING id",
-            (new_key, user["id"])
+            (hashed_key, user["id"])
         )
         row = cursor.fetchone()
         if not row:
@@ -1171,17 +1207,26 @@ async def polar_webhook(request: Request):
             last_error = e
             continue
 
-    # TEMPORARY BYPASS FOR DEBUGGING (Development only)
-    # If signature fails but we are in dev mode, we can optionally skip to test the rest of the flow
-    if not msg and os.getenv("ENV") == "development" and os.getenv("DEBUG_SKIP_SIGNATURE") == "true":
+    # SECURE BYPASS FOR DEBUGGING (Development only)
+    # Issue #9: Ensure this is IMPOSSIBLE in production
+    is_dev = os.getenv("ENV") == "development"
+    if not msg and is_dev and os.getenv("DEBUG_SKIP_SIGNATURE") == "true":
         print("WEBHOOK WARNING: Signature verification FAILED but skipping due to DEBUG_SKIP_SIGNATURE=true")
-        msg = json.loads(payload)
+        try:
+            msg = json.loads(payload)
+        except:
+            msg = None
     
     if not msg:
         print(f"WEBHOOK ERROR: All signature verification attempts failed. Last error: {last_error}")
+        # SECURITY: Redact detailed error info in production
+        error_detail = "Invalid signature"
+        if is_dev:
+            error_detail += f". Tried {len(secrets_to_try)} formats. Error: {str(last_error)}"
+        
         raise HTTPException(
             status_code=400, 
-            detail=f"Invalid signature. Tried {len(secrets_to_try)} secret formats. Error: {str(last_error)}"
+            detail=error_detail
         )
 
     # Extract Unique ID for idempotency (Handles both svix and webhook prefixes)
