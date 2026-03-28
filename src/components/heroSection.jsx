@@ -65,12 +65,19 @@ function HeroSection() {
             <div className="relative hidden sm:block lg:block">
 
 
-              <div className="relative z-10 bottom-12.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl sm:mt-15">
+              <div className="relative z-10 bg-white dark:bg-slate-900 rounded-l-md rounded-r-none py-32 px-12 shadow-[inset_2px_2px_7px_0px_rgba(160,160,160,0.6)] dark:shadow-[inset_2px_2px_7px_0px_rgba(160,160,160,0.6)] lg:-mr-64 xl:-mr-96 transform translate-x-12 overflow-hidden">
+                {/* Mathematical Grid Overlay */}
+                <div className="absolute inset-0 z-0 opacity-[0.04] dark:opacity-[0.1] pointer-events-none"
+                  style={{
+                    backgroundImage: 'linear-gradient(#4f46e5 1.5px, transparent 1.5px), linear-gradient(to right, #4f46e5 1.5px, transparent 1.5px)',
+                    backgroundSize: '45px 45px'
+                  }}>
+                </div>
                 {/* background dotted grid */}
-                <div className="absolute z-10 top-5 right-5 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-green-500 " />
-                <div className="absolute z-10 top-5 right-10 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-yellow-500 " />
-                <div className="absolute z-10 top-5 right-15 w-3 h-3 rounded-full  group-hover:bg-indigo-600/10 transition-colors duration-700 bg-red-500 " />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="absolute z-10 top-8 left-10 w-3 h-3 rounded-full bg-green-500" />
+                <div className="absolute z-10 top-8 left-16 w-3 h-3 rounded-full bg-yellow-500" />
+                <div className="absolute z-10 top-8 left-22 w-3 h-3 rounded-full bg-red-500" />
+                <div className="grid grid-cols-2 gap-6 mt-8">
                   {/* Card 1: Code */}
                   <div className="z-20 p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 space-y-3">
                     <div className="p-2 w-fit rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600">

@@ -9,6 +9,7 @@ import Logo from '../components/Logo';
 import Pricing from './Pricing';
 import { useUserRole } from '../context/UserContext';
 import Loader from '../components/Loader';
+import ManageSubscriptions from '../components/ManageSubscriptions';
 
 const Dashboard = () => {
     const { user } = useUser();
@@ -351,7 +352,7 @@ const Dashboard = () => {
                                 </section>
                             </div>
 
-                            {/* Right Column: Stats & Meta (Spans 5) */}
+                            {/* Right Column: Stats & Subscription (Spans 5) */}
                             <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-8">
                                 {isLoading ? <SkeletonLoader.Card /> : (
                                     <div className={`${bentoCardStyle} sm:col-span-2`}>
@@ -400,15 +401,10 @@ const Dashboard = () => {
                                     </div>
                                 )}
 
-                                {isLoading ? <SkeletonLoader.Card /> : (
-                                    <div className={`${bentoCardStyle} sm:col-span-2 min-h-[180px] border-indigo-200/30 dark:border-indigo-800/20`}>
-                                        <div className="relative z-10">
-                                            <div className="px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/30 bg-indigo-50 dark:bg-indigo-900/10 text-[9px] font-mono font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 w-fit mb-4">Roadmap Expansion</div>
-                                            <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-2 tracking-tight uppercase">Multi-Modality Vectoring</h3>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Coming soon. Cross-reference images, audio logs, and structured JSON feeds into a single unified knowledge model.</p>
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Subscription Management Card */}
+                                <div className="sm:col-span-2">
+                                    <ManageSubscriptions />
+                                </div>
                             </div>
                         </div>
                     </div>

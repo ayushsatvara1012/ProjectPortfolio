@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 
 const Alert = ({ message, isOpen, onClose, title, type = 'success' }) => {
   if (!isOpen) return null;
@@ -20,6 +20,13 @@ const Alert = ({ message, isOpen, onClose, title, type = 'success' }) => {
       icon: <AlertCircle className="w-6 h-6 text-red-600" />,
       defaultTitle: "Error"
     },
+    warning: {
+      container: "border-amber-200 bg-amber-50/50",
+      iconBg: "bg-amber-100",
+      iconColor: "text-amber-600",
+      icon: <AlertTriangle className="w-6 h-6 text-amber-600" />,
+      defaultTitle: "Warning"
+    },
     development: {
       container: "border-blue-200 bg-blue-50/50",
       iconBg: "bg-blue-100",
@@ -36,7 +43,7 @@ const Alert = ({ message, isOpen, onClose, title, type = 'success' }) => {
       <div className={`transition-all duration-300 flex items-center gap-4 p-4 rounded-2xl shadow-2xl border backdrop-blur-sm min-w-[320px] ${currentStyle.container}`}>
         
         {/* Dynamic Icon */}
-        <div className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full ${currentStyle.iconBg}`}>
+        <div className={`shrink-0 w-10 h-10 flex items-center justify-center rounded-full ${currentStyle.iconBg}`}>
           {currentStyle.icon}
         </div>
 
