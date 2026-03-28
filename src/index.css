@@ -45,11 +45,15 @@
 
   /* Animation Timings */
   --animate-smooth-scroll: scroll-behavior 0.5s ease-in-out;
+  --animate-spin-slow: spin 3s linear infinite;
 }
 
 @layer base {
-  html {
+  html, body {
     scroll-behavior: smooth;
+    overflow-x: hidden;
+    max-width: 100vw;
+    position: relative;
     /* Sets the default background based on mode */
     @apply bg-white text-slate-900 dark:bg-white dark:text-slate-900 antialiased;
   }

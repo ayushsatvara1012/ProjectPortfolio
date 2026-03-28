@@ -7,79 +7,59 @@ import { useNavigate } from 'react-router-dom';
 import Alert from '../components/alert';
 import Logo from '../components/Logo';
 import Pricing from './Pricing';
+import { useUserRole } from '../context/UserContext';
+import Loader from '../components/Loader';
 
 const Dashboard = () => {
     const { user } = useUser();
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const navigate = useNavigate();
+    const { 
+        userRole, userTier, isLoading: isContextLoading, 
+        subscriptionStatus: globalSubStatus, trialEndDate: globalTrialEnd, 
+        messagesUsed: globalMessagesUsed, messageLimit: globalMessageLimit,
+        totalDocuments: globalTotalDocs, totalMessages: globalTotalMsgs,
+        billingPeriodEnd: globalPeriodEnd
+    } = useUserRole();
+
     const [apiKey, setApiKey] = useState('');
     const [showApiKey, setShowApiKey] = useState(false);
     const [url, setUrl] = useState('');
     const [file, setFile] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false); // No longer blocks the whole page
     const [alertConfig, setAlertConfig] = useState({ open: false, type: 'success', msg: '' });
-    const [userTier, setUserTier] = useState(null);
-    const [userRole, setUserRole] = useState(null);
+    
+    // Derived states from UserContext
+    const [subscriptionStatus, setSubscriptionStatus] = useState('active');
     const [trialEndDate, setTrialEndDate] = useState(null);
     const [stats, setStats] = useState({ total_documents: 0, total_messages: 0 });
     const [messagesUsed, setMessagesUsed] = useState(0);
     const [messageLimit, setMessageLimit] = useState(200);
     const [periodEnd, setPeriodEnd] = useState(null);
-    const [subscriptionStatus, setSubscriptionStatus] = useState('active');
+
     const [showPricing, setShowPricing] = useState(false);
     const [isTraining, setIsTraining] = useState(false);
     const [trainingText, setTrainingText] = useState('');
 
+    // Sync local state with UserContext whenever it updates
+    useEffect(() => {
+        if (!isContextLoading) {
+            setSubscriptionStatus(globalSubStatus);
+            setTrialEndDate(globalTrialEnd);
+            setStats({
+                total_documents: globalTotalDocs,
+                total_messages: globalTotalMsgs
+            });
+            setMessagesUsed(globalMessagesUsed);
+            setMessageLimit(globalMessageLimit);
+            setPeriodEnd(globalPeriodEnd);
+        }
+    }, [isContextLoading, globalSubStatus, globalTrialEnd, globalTotalDocs, globalTotalMsgs, globalMessagesUsed, globalMessageLimit, globalPeriodEnd]);
+
     const fileInputRef = useRef(null);
     const trainingTextRef = useRef(null);
 
-    // Fetch company details on mount
-    useEffect(() => {
-        const fetchUserData = async () => {
-            if (!isAuthLoaded) return;
-            try {
-                const token = await getToken();
-                const baseUrl = import.meta.env.VITE_API_URL || '';
-
-                // Fetch user profile and company details in parallel for faster population
-                const [meRes, companyRes] = await Promise.all([
-                    fetch(`${baseUrl}/api/me`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${baseUrl}/api/company/details`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                ]);
-
-                if (meRes.ok) {
-                    const data = await meRes.json();
-                    setUserTier(data.tier);
-                    setUserRole(data.role);
-                    setSubscriptionStatus(data.subscription_status || 'active');
-                    setTrialEndDate(data.trial_end_date);
-                    setMessagesUsed(data.messages_used);
-                    setMessageLimit(data.message_limit);
-                    setPeriodEnd(data.billing_period_end);
-                    setStats({
-                        total_documents: data.total_documents || 0,
-                        total_messages: data.total_messages || 0
-                    });
-                }
-
-                if (companyRes.ok) {
-                    const data = await companyRes.json();
-                    // Removed auto-fetching API key to prevent leakage as requested
-                }
-
-                setIsLoading(false);
-            } catch (err) {
-                console.error("Failed to fetch user details:", err);
-                setIsLoading(false);
-            }
-        };
-
-        fetchUserData();
-    }, [isAuthLoaded, getToken]);
+    // fetchUserData removed as it is now handled by UserContext at the root level
 
     const showAlert = (type, msg) => {
         setAlertConfig({ open: true, type, msg });
@@ -164,24 +144,28 @@ const Dashboard = () => {
     // Lockout logic: disable if FREE/STARTER and limits are maxed out
     const isLockedOut = (userTier === 'FREE' || userTier === 'STARTER') && (messagesUsed >= messageLimit);
 
-    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-6 group relative overflow-hidden flex flex-col";
+    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 group relative overflow-hidden flex flex-col";
+
+    if (isContextLoading) {
+        return <Loader fullScreen />;
+    }
 
     return (
         <>
             <SignedIn>
-                <div className="w-full min-h-screen bg-slate-50 dark:bg-[#0A0A0A] pt-28 pb-12 px-4 sm:px-6 lg:px-8 relative">
+                <div className="w-full min-h-screen bg-slate-50 dark:bg-[#0A0A0A] text-slate-900 dark:text-slate-200 pt-28 pb-12 px-4 sm:px-6 lg:px-8 flex justify-center flex-col items-center">
                     <div className="max-w-7xl mx-auto relative z-10 w-full">
                         {/* Header */}
-                        <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                            <div>
-                                <div className="flex items-center gap-3 mb-4 flex-wrap">
-                                    <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                        AI <span className="bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent">Command Center</span>
+                        <div className="mb-8 md:mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                            <div className="w-full">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                        <span className="bg-linear-to-r from-red-600 to-indigo-600 bg-clip-text text-transparent font-black leading-tight">Neural Engine Console</span>
                                     </h1>
                                     {userTier === 'STARTER' && (
                                         <div className={`px-2 py-0.5 rounded-md border text-[11px] font-mono uppercase tracking-wider flex items-center gap-2 ${daysLeft > 5
-                                                ? 'bg-slate-100 dark:bg-[#1A1A1A] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                                                : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'
+                                            ? 'bg-slate-100 dark:bg-[#1A1A1A] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                                            : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'
                                             }`}>
                                             <Zap className="w-3 h-3 fill-current" />
                                             {daysLeft} Days left
@@ -206,95 +190,33 @@ const Dashboard = () => {
                                     Train your enterprise knowledge brain and manage AI deployments.
                                 </p>
                             </div>
-                            <div className="flex items-center gap-4 bg-white dark:bg-[#111111] p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-                                {userRole === 'ADMIN' && (
-                                    <button
-                                        onClick={() => navigate('/admin')}
-                                        className="px-3 py-1.5 bg-slate-100 dark:bg-[#1A1A1A] text-slate-900 dark:text-slate-100 rounded-md text-[10px] font-bold uppercase tracking-widest border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-[#222222] transition-colors"
-                                    >
-                                        Admin Panel
-                                    </button>
-                                )}
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/billing/portal`, {
-                                                headers: {
-                                                    'Authorization': `Bearer ${await window.Clerk.session.getToken()}`
-                                                }
-                                            });
-                                            const data = await response.json();
-                                            if (data.url) {
-                                                window.open(data.url, '_blank');
-                                            } else {
-                                                alert(data.detail || "Could not generate billing portal link.");
-                                            }
-                                        } catch (err) {
-                                            console.error("Billing portal error:", err);
-                                            alert("Failed to connect to billing portal.");
-                                        }
-                                    }}
-                                    className="px-3 py-1.5 bg-slate-100 dark:bg-[#1A1A1A] text-slate-900 dark:text-slate-100 rounded-md text-[10px] font-bold uppercase tracking-widest border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-[#222222] transition-colors"
-                                >
-                                    Billing Portal
-                                </button>
-                                {userTier && userTier !== 'FREE' && (
-                                    <button
-                                        disabled={isLoading || (userRole === 'USER' && subscriptionStatus === 'cancelling')}
-                                        onClick={async () => {
-                                            if (!window.confirm("Are you sure you want to cancel? You will keep access until the end of the billing period.")) return;
-                                            try {
-                                                const token = await getToken();
-                                                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/subscription/cancel`, {
-                                                    method: 'POST',
-                                                    headers: { 'Authorization': `Bearer ${token}` }
-                                                });
-                                                const data = await response.json();
-                                                if (response.ok) {
-                                                    showAlert('success', 'Cancellation requested. Your account will remain active until the period ends.');
-                                                    // Refresh status
-                                                    window.location.reload();
-                                                } else {
-                                                    showAlert('error', data.detail || 'Failed to cancel subscription.');
-                                                }
-                                            } catch (err) {
-                                                showAlert('error', 'Network error during cancellation.');
-                                            }
-                                        }}
-                                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest border transition-colors ${
-                                            subscriptionStatus === 'cancelling' 
-                                            ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400 cursor-not-allowed'
-                                            : 'bg-white dark:bg-[#111111] text-red-600 border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/10'
-                                        }`}
-                                    >
-                                        {subscriptionStatus === 'cancelling' ? 'Cancellation Pending' : 'Cancel Plan'}
-                                    </button>
-                                )}
-                                <div className='text-center'>
-                                    <p className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{user?.fullName || 'Developer'}</p>
-                                    <p className="text-[9px] text-slate-400 uppercase font-mono tracking-widest">{userRole === 'ADMIN' ? 'System Administrator' : 'Enterprise Access'}</p>
+                            <div className="flex items-center gap-4 bg-white dark:bg-[#111111] p-4 rounded-xl border border-slate-200 dark:border-slate-800 w-full md:w-auto justify-between md:justify-start">
+                                <div className='text-left md:text-center px-0 md:px-4'>
+                                    <p className="text-sm md:text-xs font-bold text-slate-900 dark:text-white leading-none mb-1">{user?.fullName || 'Developer'}</p>
+                                    <p className="text-[10px] md:text-[9px] text-slate-400 uppercase font-mono tracking-widest">
+                                        {userRole === 'SUPER_ADMIN' ? 'Platform Owner' : userRole === 'ADMIN' ? 'Company Admin' : 'Member'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Stats Grid */}
                         <div className="mb-10">
                             {isLoading ? <SkeletonLoader.Stats /> : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {[
                                         { label: 'Total Ingested', value: stats.total_documents || 0, icon: Database, unit: 'docs' },
                                         { label: 'Active Memory', value: stats.total_messages || 0, icon: Activity, unit: 'msgs' },
                                         { label: 'Sync Status', value: 'Optimal', icon: Zap, unit: 'real-time' },
                                         { label: 'System Tier', value: userTier || 'Loading...', icon: Lock, unit: 'unlocked' }
                                     ].map((s, i) => (
-                                        <div key={i} className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 p-6 rounded-xl transition-colors">
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <s.icon className="w-4 h-4 text-slate-500" />
-                                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{s.label}</p>
+                                        <div key={i} className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 rounded-xl transition-colors">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <s.icon className="w-3.5 h-3.5 text-slate-500" />
+                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{s.label}</p>
                                             </div>
-                                            <h4 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-baseline gap-2">
+                                            <h4 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-baseline gap-2">
                                                 {s.value}
-                                                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-mono font-medium">{s.unit}</span>
+                                                <span className="text-[9px] text-slate-400 uppercase tracking-widest font-mono font-medium">{s.unit}</span>
                                             </h4>
                                         </div>
                                     ))}
@@ -306,7 +228,7 @@ const Dashboard = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             {/* Knowledge Ingestion (Spans 7) */}
                             <div className="lg:col-span-7 space-y-8">
-                                <section className={`${bentoCardStyle} p-6 lg:p-8 min-h-[400px]`}>
+                                <section className={`${bentoCardStyle} p-5 lg:p-6 min-h-[400px]`}>
                                     {isTrialExpired && (
                                         <div className="absolute inset-0 z-30 bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
                                             <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-[#1A1A1A] border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 mb-6">
@@ -323,9 +245,9 @@ const Dashboard = () => {
                                         </div>
                                     )}
 
-                                    <div className="flex items-center gap-2 mb-8 relative z-10">
-                                        <BrainCircuit className="w-4 h-4 text-slate-500" />
-                                        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 dark:text-white">Knowledge Ingestion</h2>
+                                    <div className="flex items-center gap-2 mb-6 relative z-10">
+                                        <BrainCircuit className="w-3.5 h-3.5 text-slate-500" />
+                                        <h2 className="text-xs font-bold uppercase tracking-widest text-slate-900 dark:text-white">Knowledge Ingestion</h2>
                                     </div>
 
                                     {isLockedOut && (
@@ -378,34 +300,34 @@ const Dashboard = () => {
                                                 </div>
 
                                                 <div>
-                                                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Knowledge Text (Manual Entry)</label>
+                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Knowledge Text (Manual Entry)</label>
                                                     <textarea
                                                         ref={trainingTextRef}
                                                         value={trainingText}
                                                         onChange={(e) => setTrainingText(e.target.value)}
                                                         rows={4}
                                                         className={`w-full px-3 py-2.5 text-sm bg-transparent border rounded-md focus:outline-none focus:ring-1 transition-all resize-none ${alertConfig.type === 'warning' && alertConfig.open
-                                                                ? 'border-amber-400 ring-2 ring-amber-400/20 bg-amber-50/5 dark:bg-amber-400/5 animate-pulse'
-                                                                : 'border-slate-300 dark:border-slate-800'
+                                                            ? 'border-amber-400 ring-2 ring-amber-400/20 bg-amber-50/5 dark:bg-amber-400/5 animate-pulse'
+                                                            : 'border-slate-300 dark:border-slate-800'
                                                             }`}
                                                         placeholder="Paste your services, FAQs, or raw knowledge here..."
                                                     />
                                                 </div>
 
                                                 <div>
-                                                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">PDF Archive</label>
+                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">PDF Archive</label>
                                                     <div
                                                         onClick={() => fileInputRef.current?.click()}
                                                         className="flex flex-col items-center justify-center gap-3 px-6 py-10 bg-transparent border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-xl cursor-pointer hover:border-indigo-500/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all group"
                                                     >
-                                                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 transition-colors">
-                                                            <UploadCloud className="w-6 h-6" />
+                                                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 transition-colors">
+                                                            <UploadCloud className="w-5 h-5" />
                                                         </div>
                                                         <div className="text-center">
-                                                            <span className="text-sm font-bold text-slate-900 dark:text-white block mb-1">
+                                                            <span className="text-[13px] font-bold text-slate-900 dark:text-white block mb-0.5">
                                                                 {file ? file.name : "Drop mission-critical PDF here"}
                                                             </span>
-                                                            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                                                            <span className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">
                                                                 {file ? "Click to change file" : "or click to browse filesystem"}
                                                             </span>
                                                         </div>
@@ -418,16 +340,11 @@ const Dashboard = () => {
                                                 type="submit"
                                                 disabled={isTraining || isLockedOut}
                                                 className={`w-full py-3 rounded-md text-sm font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${isLockedOut
-                                                        ? 'bg-slate-100 dark:bg-[#1A1A1A] text-slate-400 border border-slate-200 dark:border-slate-800 cursor-not-allowed'
-                                                        : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white active:scale-[0.98]'
+                                                    ? 'bg-slate-100 dark:bg-[#1A1A1A] text-slate-400 border border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                                                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white active:scale-[0.98]'
                                                     }`}
                                             >
-                                                {isTraining ? (
-                                                    <>
-                                                        <div className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-900 dark:border-t-white rounded-full animate-spin" />
-                                                        <span>Processing Knowledge...</span>
-                                                    </>
-                                                ) : isLockedOut ? "Lockout Active" : "Start Training Sequence"}
+                                                {isTraining ? "Training Neural Model..." : isLockedOut ? "Lockout Active" : "Start Training Sequence"}
                                             </button>
                                         </form>
                                     )}
@@ -440,22 +357,22 @@ const Dashboard = () => {
                                     <div className={`${bentoCardStyle} sm:col-span-2`}>
                                         <div className="flex justify-between items-start mb-6">
                                             <div className="flex items-center gap-2">
-                                                <Database className="w-4 h-4 text-slate-500" />
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">API Usage</h4>
+                                                <Database className="w-3.5 h-3.5 text-slate-500" />
+                                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">API Usage</h4>
                                             </div>
                                             {(messageLimit === null || messageLimit >= 999999) && (
-                                                <span className="px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#1A1A1A] text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Unlimited</span>
+                                                <span className="px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#1A1A1A] text-[9px] font-mono font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Unlimited</span>
                                             )}
                                         </div>
 
                                         <div className="flex items-end gap-2 mb-4">
-                                            <span className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                            <span className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
                                                 {messagesUsed}
                                                 {messageLimit !== null && messageLimit < 999999 && (
-                                                    <span className="text-sm text-slate-400"> / {messageLimit}</span>
+                                                    <span className="text-xs text-slate-400"> / {messageLimit}</span>
                                                 )}
                                             </span>
-                                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 mb-1.5 ml-1.5">reqs</span>
+                                            <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500 mb-1.5 ml-1.5">reqs</span>
                                         </div>
 
                                         {messageLimit !== null && messageLimit < 999999 && (
@@ -465,8 +382,8 @@ const Dashboard = () => {
                                                         initial={{ width: 0 }}
                                                         animate={{ width: `${Math.min((messagesUsed / messageLimit) * 100, 100)}%` }}
                                                         className={`h-full transition-all duration-700 ${(messagesUsed / messageLimit) >= 1 ? 'bg-red-500' :
-                                                                (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' :
-                                                                    'bg-slate-900 dark:bg-slate-100'
+                                                            (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' :
+                                                                'bg-slate-900 dark:bg-slate-100'
                                                             }`}
                                                     />
                                                 </div>
@@ -486,9 +403,9 @@ const Dashboard = () => {
                                 {isLoading ? <SkeletonLoader.Card /> : (
                                     <div className={`${bentoCardStyle} sm:col-span-2 min-h-[180px] border-indigo-200/30 dark:border-indigo-800/20`}>
                                         <div className="relative z-10">
-                                            <div className="px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/30 bg-indigo-50 dark:bg-indigo-900/10 text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 w-fit mb-4">Roadmap Expansion</div>
-                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 tracking-tight uppercase">Multi-Modality Vectoring</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Coming soon. Cross-reference images, audio logs, and structured JSON feeds into a single unified knowledge model.</p>
+                                            <div className="px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/30 bg-indigo-50 dark:bg-indigo-900/10 text-[9px] font-mono font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 w-fit mb-4">Roadmap Expansion</div>
+                                            <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-2 tracking-tight uppercase">Multi-Modality Vectoring</h3>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Coming soon. Cross-reference images, audio logs, and structured JSON feeds into a single unified knowledge model.</p>
                                         </div>
                                     </div>
                                 )}

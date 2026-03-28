@@ -29,7 +29,7 @@ const AboutPage = () => {
         <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-hidden transition-colors duration-500">
 
             {/* SECTION 1: Laptop-Optimized Hero & Partners (Fits 100vh) */}
-            <section className="min-h-dvh flex flex-col justify-center pt-24 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
+            <section className="min-h-dvh flex flex-col justify-center pt-24 pb-12 px-4 md:px-8 lg:px-12 max-w-[1600px] mx-auto">
                 <div className="grid lg:grid-cols-12 gap-8 lg:gap-5 items-center">
 
                     {/* LEFT: Heading & Context */}
@@ -38,7 +38,7 @@ const AboutPage = () => {
                             <Terminal className='w-4 h-4 text-indigo-600 dark:text-indigo-400'/>
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Sapybase_v2.0</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-slate-200">
+                        <h1 className="text-3xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-slate-200">
                             THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECTS</span> <br /> OF CODE.
                         </h1>
                         <p className="text-base text-slate-500 font-light max-w-md leading-relaxed">
@@ -91,7 +91,7 @@ const AboutPage = () => {
             <section><Resume /></section>
 
             {/* SECTION 2: Technical Philosophy & Business (Muted Colors) */}
-            <section className="bg-gray-950 border-t border-t-slate-700 py-20 md:py-32 px-6 rounded-t-[2.5rem] md:rounded-t-[3rem] lg:rounded-t-[5rem] relative">
+            <section className="bg-gray-950 border-t border-t-slate-700 py-20 md:py-32 px-4 md:px-8 rounded-t-[2.5rem] md:rounded-t-[3rem] lg:rounded-t-[5rem] relative">
                 <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 md:gap-16 items-center">
 
                     <div className="space-y-6 md:space-y-8">

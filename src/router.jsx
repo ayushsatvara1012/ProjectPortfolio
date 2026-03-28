@@ -16,13 +16,10 @@ import ErrorPage from "./pages/ErrorPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Logo from "./components/Logo";
+import Loader from "./components/Loader";
 
-// 2. Create a high-end Loading fallback using the Logo component
-const PageLoader = () => (
-    <div className="w-full h-[60vh] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
-    </div>
-);
+// 2. Create a high-end Loading fallback using the unified Loader
+const PageLoader = () => <Loader />;
 
 const router = createBrowserRouter([
   {

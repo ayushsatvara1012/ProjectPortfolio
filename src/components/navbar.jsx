@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch, LayoutDashboard, Key, ShieldCheck, LogIn, UserPlus } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth, UserButton, SignInButton, SignUpButton, SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
 import Logo from "./Logo";
+import { useUserRole } from "../context/UserContext";
 
 
 const Navbar = () => {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
+  const { userRole, isLoading: isContextLoading } = useUserRole();
   const [isOpen, setIsOpen] = useState(false);
-  const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
   const [isDesktopServicesOpen, setIsDesktopServicesOpen] = useState(false);
-  const dropdownRef = React.useRef(null);
-  const [userRole, setUserRole] = useState('USER');
+  const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -30,28 +31,7 @@ const Navbar = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!isAuthLoaded || !isSignedIn) return;
-      try {
-        const token = await getToken();
-        const baseUrl = import.meta.env.VITE_API_URL
-          ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}`
-          : '';
-
-        const response = await fetch(`${baseUrl}/api/company/details`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        if (data.role) {
-          setUserRole(data.role);
-        }
-      } catch (err) {
-        console.error("Navbar role fetch error:", err);
-      }
-    };
-    fetchUserRole();
-  }, [isAuthLoaded, isSignedIn, getToken]);
+  // Role fetching logic removed; now using global useUserRole()
 
   useEffect(() => {
     if (isOpen) {
@@ -98,24 +78,6 @@ const Navbar = () => {
       icon: <ScanSearch size={18} />,
       href: "#services"
     },
-    {
-      title: "Register Company",
-      desc: "Get your API key and join SaPyBase.",
-      icon: <Key size={18} />,
-      href: "/register"
-    },
-    {
-      title: "Client Dashboard",
-      desc: "Train your AI and manage knowledge.",
-      icon: <LayoutDashboard size={18} />,
-      href: "/dashboard"
-    },
-    ...(userRole === 'SUPER_ADMIN' ? [{
-      title: "Super Admin Panel",
-      desc: "Manage platform users and companies.",
-      icon: <ShieldCheck size={18} className="text-orange-500" />,
-      href: "/admin"
-    }] : [])
   ];
 
   const navLinks = [
@@ -154,15 +116,15 @@ const Navbar = () => {
   return (
     <>
       {/* Mobile-First Header */}
-      <header className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
-        <div className="px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 pl-2">
+      <header className="fixed top-0 w-full z-50 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+        <div className="px-4 md:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 overflow-hidden">
             <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} aria-label="SaPyBase Home" className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
-              <Logo className="w-auto h-12 md:h-12 object-cover" />
+              <Logo className="w-24 sm:w-auto h-10 sm:h-12 object-contain" />
             </a>
           </div>
           {/* Desktop Links (Hidden by default, shown on md+) */}
-          <div className="hidden md:flex items-center gap-10">
+          <div className="hidden md:flex lg:ml-28 items-center gap-10">
             {navLinks.map((link) => (
               <div key={`nav-desk-${link.id || link.name}`} className="relative group" ref={link.name === "Services" ? dropdownRef : null}>
                 {link.name === "Services" ? (
@@ -257,29 +219,34 @@ const Navbar = () => {
             </SignedIn>
           </div>
 
-          {/* Mobile Toggle - Visible on small screens */}
-          <div className="flex items-center gap-3 md:hidden">
+          <div className="flex items-center gap-2 md:hidden">
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-9 h-9 sm:w-10 sm:h-10 rounded-xl"
+                  }
+                }}
+              />
             </SignedIn>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-200 active:scale-95 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-200 active:scale-95 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center border border-transparent dark:border-slate-800"
               aria-label="Toggle Menu"
             >
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+              {isOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile Full-Screen Overlay (Tree of Thought: Mobile UX) */}
       <div
-        className={`fixed inset-0 z-55 bg-white dark:bg-slate-950 transition-transform duration-500 ease-in-out md:hidden ${isOpen ? "translate-y-0" : "-translate-y-full"
+        className={`fixed inset-0 z-40 bg-white dark:bg-[#020617] transition-transform duration-500 ease-in-out md:hidden overflow-hidden ${isOpen ? "translate-y-0" : "-translate-y-full"
           }`}
       >
-        <div className="flex flex-col h-full pt-24 px-8 pb-10 overflow-y-auto">
-          <div className="space-y-4">
+        <div className="flex flex-col h-full pt-20 px-4 sm:px-6 pb-8 overflow-y-auto overflow-x-hidden">
+          <div className="flex flex-col gap-1">
             {navLinks.map((link, index) => (
               <div key={`nav-mob-${link.id || link.name}-${index}`} className="space-y-1">
                 {link.name === "Services" ? (
@@ -335,18 +302,18 @@ const Navbar = () => {
             ))}
           </div>
 
-          <div className="mt-auto pt-8 border-t border-slate-100 dark:border-slate-900">
+          <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-900 flex flex-col gap-6">
             <SignedOut>
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3">
                 <SignInButton mode="modal">
-                  <button className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white font-bold transition-all active:scale-95">
-                    <LogIn size={20} />
+                  <button className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white font-bold transition-all active:scale-95 text-sm sm:text-base border border-transparent dark:border-slate-800">
+                    <LogIn size={18} />
                     Login
                   </button>
                 </SignInButton>
                 <SignUpButton mode="modal">
-                  <button className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-800 text-white font-bold transition-all active:scale-95 dark:shadow-none">
-                    <UserPlus size={20} />
+                  <button className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-indigo-600 text-white font-bold transition-all active:scale-95 text-sm sm:text-base shadow-lg shadow-indigo-600/20">
+                    <UserPlus size={18} />
                     Sign Up
                   </button>
                 </SignUpButton>
@@ -358,7 +325,7 @@ const Navbar = () => {
                 navigate('/register');
                 setIsOpen(false);
               }}
-              className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl text-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
+              className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 sm:py-5 rounded-xl text-base sm:text-lg font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-900/10 dark:shadow-none"
             >
               Start Free Trial
             </button>

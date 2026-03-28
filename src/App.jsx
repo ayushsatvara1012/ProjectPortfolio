@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/react";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import ChatWidget from './components/chatWidget';
+import NavToggle from './components/NavToggle';
 import useInactivityTimeout from './hooks/useInactivityTimeout';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         Skip to content
       </a>
       <Navbar />
+      <NavToggle />
       <main id="main-content">
         <Outlet />
       </main>
