@@ -110,7 +110,7 @@ const Navbar = () => {
       icon: <LayoutDashboard size={18} />,
       href: "/dashboard"
     },
-    ...(userRole === 'ADMIN' ? [{
+    ...(userRole === 'SUPER_ADMIN' ? [{
       title: "Super Admin Panel",
       desc: "Manage platform users and companies.",
       icon: <ShieldCheck size={18} className="text-orange-500" />,

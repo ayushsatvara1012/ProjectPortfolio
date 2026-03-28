@@ -227,6 +227,7 @@ class SubscriptionRequest(BaseModel):
     tier: str # Starter, Pro, Enterprise
 
 class UserRole(str, Enum):
+    SUPER_ADMIN = "SUPER_ADMIN"
     ADMIN = "ADMIN"
     USER = "USER"
 
@@ -483,12 +484,21 @@ async def get_current_user(request: Request):
                 # Assign variables correctly from the expanded query before use
                 user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end = row
                 
-                # SELF-HEALING: If this is the configured admin email, ensure role/tier are correct
+                # 4. Role Sync & "Only 1 Super Admin" Enforcement
+                # CRITICAL: Ensures no one else can EVER have the SUPER_ADMIN role.
                 admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
-                if user_email == admin_email and (role != 'ADMIN' or tier != 'PRO'):
-                    cursor.execute("UPDATE users SET role = 'ADMIN', tier = 'PRO' WHERE id = %s", (user_id,))
-                    role = 'ADMIN'
-                    tier = 'PRO'
+                
+                if user_email == admin_email:
+                    # Auto-promote authorized Super Admin
+                    if role != 'SUPER_ADMIN' or tier != 'PRO':
+                        cursor.execute("UPDATE users SET role = 'SUPER_ADMIN', tier = 'PRO' WHERE id = %s", (user_id,))
+                        role = 'SUPER_ADMIN'
+                        tier = 'PRO'
+                elif role == 'SUPER_ADMIN':
+                    # SECURITY: Downgrade anyone else who has the SUPER_ADMIN role in the DB
+                    print(f"SECURITY ALERT: Unauthorized SUPER_ADMIN detected ({user_email}). Downgrading to USER.")
+                    cursor.execute("UPDATE users SET role = 'USER' WHERE id = %s", (user_id,))
+                    role = 'USER'
                 
                 cursor.execute(
                     "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
@@ -522,16 +532,12 @@ async def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="Authentication failed")
 
 async def get_admin_user(user: dict = Depends(get_current_user)):
-    """
-    Issue #7: Backend Security Hardening.
-    Strictly verifies that the user is an ADMIN and matches the ADMIN_EMAIL.
-    """
+    """Dependency to ensure the current user is the platform Super Admin."""
     admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
-    
-    if user.get("role") != "ADMIN" or user.get("email") != admin_email:
+    if user.get("role") != "SUPER_ADMIN" or user.get("email") != admin_email:
         raise HTTPException(
             status_code=403, 
-            detail="Access denied. Only the primary administrator can perform this action."
+            detail="Forbidden: This endpoint is restricted to the platform Super Admin."
         )
     return user
 
