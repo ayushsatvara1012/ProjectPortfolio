@@ -96,13 +96,89 @@ export const CardSkeleton = ({ className = "" }) => (
     </div>
 );
 
+export const AppPageSkeleton = () => (
+    <div className="space-y-6 animate-pulse">
+        {/* Page heading */}
+        <div className="space-y-2">
+            <div className="flex items-center gap-3">
+                <SkeletonBase className="w-5 h-5 rounded-md" />
+                <SkeletonBase className="w-40 h-5 rounded-md" />
+            </div>
+            <SkeletonBase className="w-72 h-3.5 rounded" />
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => (
+                <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <SkeletonBase className="w-3.5 h-3.5 rounded" />
+                        <SkeletonBase className="w-20 h-2.5 rounded" />
+                    </div>
+                    <SkeletonBase className="w-24 h-7 rounded-md" />
+                </div>
+            ))}
+        </div>
+
+        {/* Main content grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left card — form skeleton */}
+            <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+                <SkeletonBase className="w-36 h-3.5 rounded" />
+                {/* Tab bar */}
+                <div className="flex gap-2">
+                    {[60, 80, 80].map((w, i) => (
+                        <SkeletonBase key={i} className={`h-8 w-${w > 70 ? '20' : '16'} rounded-md`} />
+                    ))}
+                </div>
+                {/* Field */}
+                <div className="space-y-2">
+                    <SkeletonBase className="w-24 h-2.5 rounded" />
+                    <SkeletonBase className="w-full h-10 rounded-lg" />
+                </div>
+                <div className="space-y-2">
+                    <SkeletonBase className="w-20 h-2.5 rounded" />
+                    <SkeletonBase className="w-full h-10 rounded-lg" />
+                </div>
+                <SkeletonBase className="w-full h-11 rounded-lg mt-2" />
+            </div>
+
+            {/* Right column */}
+            <div className="lg:col-span-5 space-y-4">
+                <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <SkeletonBase className="w-3.5 h-3.5 rounded" />
+                        <SkeletonBase className="w-20 h-2.5 rounded" />
+                    </div>
+                    <SkeletonBase className="w-16 h-8 rounded-md" />
+                    <SkeletonBase className="w-full h-2 rounded-full" />
+                    <div className="flex justify-between">
+                        <SkeletonBase className="w-12 h-2 rounded" />
+                        <SkeletonBase className="w-16 h-2 rounded" />
+                    </div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+                    {[1,2,3].map(i => (
+                        <div key={i} className="flex items-center gap-3">
+                            <SkeletonBase className="w-5 h-5 rounded-full shrink-0" />
+                            <SkeletonBase className="flex-1 h-3 rounded" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 const SkeletonLoader = {
     Stats: StatsSkeleton,
     Form: FormSkeleton,
     Table: TableSkeleton,
     Bento: BentoCardSkeleton,
     Card: CardSkeleton,
-    Base: SkeletonBase
+    Base: SkeletonBase,
+    AppPage: AppPageSkeleton,
 };
 
 export default SkeletonLoader;
+

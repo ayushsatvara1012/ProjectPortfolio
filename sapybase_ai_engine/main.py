@@ -1145,15 +1145,15 @@ async def clerk_webhook(
                 primary_id = data.get("primary_email_address_id")
                 primary_email = next((e.get("email_address") for e in email_addresses if e.get("id") == primary_id), None)
                 email = primary_email or email_addresses[0].get("email_address", "unknown@email.com")
-            # UPSERT: Provision with FREE/ACTIVE by default. Never allow null state.
+            # UPSERT: New users get FREE tier with NULL subscription_status.
+            # subscription_status is only set to ACTIVE by a Polar subscription webhook.
             cursor.execute(
                 """
                 INSERT INTO users (clerk_id, email, tier, subscription_status)
-                VALUES (%s, %s, 'FREE', 'ACTIVE')
+                VALUES (%s, %s, 'FREE', NULL)
                 ON CONFLICT (clerk_id) DO UPDATE SET
                     email = EXCLUDED.email,
-                    tier = COALESCE(users.tier, 'FREE'),
-                    subscription_status = COALESCE(users.subscription_status, 'ACTIVE')
+                    tier = COALESCE(users.tier, 'FREE')
                 RETURNING id
                 """,
                 (clerk_id, email)
