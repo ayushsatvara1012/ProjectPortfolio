@@ -3,6 +3,7 @@ import {
     UploadCloud, BrainCircuit, Database, Eye, EyeOff,
     Zap, Lock, Activity, Globe, FileText, AlignLeft, X, Clock
 } from 'lucide-react';
+import Alert from '../components/alert';
 import { useAuth } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
 import { AppPageSkeleton } from '../components/SkeletonLoader';

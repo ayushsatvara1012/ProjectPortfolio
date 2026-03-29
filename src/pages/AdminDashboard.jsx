@@ -197,10 +197,10 @@ const AdminDashboard = () => {
                 <div className="p-8">
                     {isLoading ? <SkeletonLoader.Table /> : (
                         activeTab === 'users' ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse border border-gray-100">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-100">
+                            <div className="overflow-x-auto max-h-[640px] overflow-y-auto border border-gray-100">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm">
+                                        <tr>
                                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Entity Details</th>
                                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Access Tier</th>
                                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Settings</th>
@@ -246,10 +246,10 @@ const AdminDashboard = () => {
                                 </table>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse border border-gray-100">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-100">
+                            <div className="overflow-x-auto max-h-[640px] overflow-y-auto border border-gray-100">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm">
+                                        <tr>
                                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Company Node</th>
                                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Allowed Origin</th>
                                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Node Controls</th>

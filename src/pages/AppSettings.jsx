@@ -41,15 +41,6 @@ export const AccountSection = () => {
                 </div>
                 <p className="text-xs text-slate-400 mt-3">Click your avatar to manage name, password, and connected accounts.</p>
             </div>
-            {userRole === 'SUPER_ADMIN' && (
-                <div className={`${cellCls} p-6 border border-gray-100`}>
-                    <p className={headingCls}><ShieldCheck className="inline w-3.5 h-3.5 mr-1.5 text-orange-500" />Admin Access</p>
-                    <button onClick={() => navigate('/admin')}
-                        className="flex items-center gap-2 px-5 py-2.5 min-h-[44px] bg-orange-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors active:scale-[0.99]">
-                        <ShieldCheck className="w-4 h-4" /> Open Admin Dashboard
-                    </button>
-                </div>
-            )}
         </div>
     );
 };

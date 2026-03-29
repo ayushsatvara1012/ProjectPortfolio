@@ -75,21 +75,14 @@ const SidebarContent = ({ user, onClose }) => {
             {/* Mobile close row */}
             {onClose && (
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 lg:hidden">
-                    <div className="flex items-center gap-2">
-                        <Logo className="h-5 w-auto" />
-                        <span className="text-sm font-bold text-slate-900">SaPyBase</span>
-                    </div>
+                    <div className="flex items-center gap-2" />
                     <button onClick={onClose} className="p-2 hover:bg-white min-h-[44px] min-w-[44px] flex items-center justify-center">
                         <X className="w-5 h-5 text-slate-500" />
                     </button>
                 </div>
             )}
 
-            {/* Brand row — desktop */}
-            <div className="hidden lg:flex items-center gap-2.5 px-4 py-3.5 border-b border-gray-100">
-                <Logo className="h-5 w-auto" />
-                <span className="text-sm font-bold text-slate-900 tracking-tight">SaPyBase</span>
-            </div>
+
 
             {/* Nav */}
             <nav className="flex-1 overflow-y-auto py-2">
@@ -185,17 +178,20 @@ const TopNav = ({ user, onMenuClick }) => {
 
     return (
         <header className="fixed top-0 left-0 right-0 h-12 bg-white border-b border-gray-100 flex items-center px-4 gap-2 z-40">
-            {/* Hamburger — mobile only */}
-            <button
-                onClick={onMenuClick}
-                className="lg:hidden p-2 hover:bg-gray-50 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="Open menu"
-            >
-                <Menu className="w-5 h-5 text-slate-600" />
-            </button>
-
-            {/* Logo — desktop (inside sidebar column space) */}
-            <div className="hidden lg:block w-[calc(208px-1rem)]" />
+            {/* Left section: Hamburger (mobile) + Brand (all) */}
+            <div className="flex items-center gap-2 lg:w-[calc(208px-1rem)]">
+                <button
+                    onClick={onMenuClick}
+                    className="lg:hidden p-2 hover:bg-gray-50 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    aria-label="Open menu"
+                >
+                    <Menu className="w-5 h-5 text-slate-600" />
+                </button>
+                <div className="flex items-center gap-2.5">
+                    <Logo className="h-5 w-auto" />
+                    <span className="text-sm font-bold text-slate-900 tracking-tight">SaPyBase</span>
+                </div>
+            </div>
 
             {/* Breadcrumb */}
             <div className="flex items-center gap-1.5 text-sm text-slate-400 min-w-0 flex-1">
