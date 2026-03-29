@@ -2,9 +2,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence, color } from 'framer-motion';
-import { MoreHorizontal, Send, User, ChevronDown, X } from 'lucide-react';
+import { Send, User, ChevronDown, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
-
+import BrandLogo from './brandLogo';
+ 
 const ChatWidget = ({ apiKey }) => {
     // 1. Determine if we are testing locally or live on a client's site
     const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://www.sapybase.com';
@@ -223,21 +224,26 @@ const ChatWidget = ({ apiKey }) => {
                         {/* Header with Animated Gradient Glow - Removed overflow-hidden to allow menu visibility */}
                         <div className="relative shrink-0">
                             {/* Animated Background */}
-                            <div 
-                                className="absolute inset-0 animate-gradient-x opacity-20" 
-                                style={{ 
+                            <div
+                                className="absolute inset-0 animate-gradient-x opacity-20"
+                                style={{
                                     background: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`,
-                                    backgroundSize: '200% 200%' 
-                                }} 
+                                    backgroundSize: '200% 200%'
+                                }}
                             />
 
                             <div className="bg-white/40 backdrop-blur-md text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50">
                                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
-                                    <div className="relative flex items-center gap-2 pl-4">
-                                        <div className="absolute top-2.5 w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                        <div className="flex flex-col ml-4">
-                                            <p className="font-questrial font-bold text-lg" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
-                                            <a href="https://www.sapybase.com" className="text-xs italic text-slate-500">Powered by SaPyBase</a>
+                                    <div className="relative flex items-center gap-3 pl-4">
+                                        <div className="relative">
+                                            <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-gray-100 flex items-center justify-center p-1.5 transition-transform hover:scale-105">
+                                                <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
+                                            </div>
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <p className="font-questrial font-bold text-lg leading-tight" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
+                                            <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer" className="text-xs italic text-slate-500 hover:text-slate-700 transition-colors">Powered by SaPyBase</a>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -282,8 +288,9 @@ const ChatWidget = ({ apiKey }) => {
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full text-left px-4 py-2 text-sm text-indigo-600 font-medium hover:bg-indigo-50 transition-colors flex items-center justify-between group"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-between group"
                                                     onClick={() => setShowMenu(false)}
+                                                    style={{ color: THEME_COLOR }}
                                                 >
                                                     Add to your site
                                                     <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
@@ -313,8 +320,8 @@ const ChatWidget = ({ apiKey }) => {
                                                     <User size={18} />
                                                 </div>
                                             ) : (
-                                                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center relative " >
-                                                    <img src={LOGO_URL} alt="SaPyBase AI" className=" object-contain pointer-events-none scale-80" />
+                                                <div className="w-9 h-9 rounded-full flex items-center justify-center relative " >
+                                                    <img src={LOGO_URL} alt="Sapy AI" className=" object-contain pointer-events-none scale-80" />
                                                 </div>
                                             )}
                                         </div>
@@ -350,7 +357,7 @@ const ChatWidget = ({ apiKey }) => {
                                         layout="position"
                                         className="flex flex-col items-start gap-1"
                                     >
-                                        <ThinkingLogo size={45} className="origin-left" />
+                                        <ThinkingLogo size={45} className="origin-left" themeColor={THEME_COLOR} />
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -366,8 +373,13 @@ const ChatWidget = ({ apiKey }) => {
                                         <button
                                             key={qidx}
                                             onClick={() => { setInput(q.prompt); inputRef.current?.focus(); }}
-                                            className="shrink-0 snap-start px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
-                                            style={{ touchAction: 'manipulation' }}
+                                            className="shrink-0 snap-start px-3 py-1.5 border text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
+                                            style={{ 
+                                                touchAction: 'manipulation',
+                                                color: THEME_COLOR,
+                                                borderColor: THEME_COLOR.startsWith('#') ? `${THEME_COLOR}33` : THEME_COLOR,
+                                                backgroundColor: THEME_COLOR.startsWith('#') ? `${THEME_COLOR}15` : 'transparent'
+                                            }}
                                         >
                                             {q.label}
                                         </button>
@@ -423,7 +435,8 @@ const ChatWidget = ({ apiKey }) => {
                                 <motion.span
                                     animate={{ opacity: [1, 0, 1] }}
                                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                    className="w-0.5 h-4 bg-indigo-500 rounded-full"
+                                    className="w-0.5 h-4 rounded-full"
+                                    style={{ backgroundColor: THEME_COLOR }}
                                 />
                                 {/* Speech Bubble Tail */}
                                 <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white/95 border-r border-t border-indigo-100/50 rotate-45" />
@@ -431,53 +444,6 @@ const ChatWidget = ({ apiKey }) => {
                         </motion.div>
                     )}
                 </AnimatePresence>
-
-                {/* <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    onClick={() => setIsOpen(prev => !prev)}
-                    aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
-                    aria-expanded={isOpen}
-                    style={{ touchAction: 'manipulation' }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 rounded-full bg-white shadow-md sm:shadow-none transition-all p-1"
-                >
-                    //Rotating Dashed Border Layer
-                    <motion.div
-                        className="absolute inset-0 rounded-full border border-dashed border-indigo-400 z-0"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                    />
-
-                    //Pulsing Background Aura
-                    <motion.div
-                        className="absolute inset-0 rounded-full bg-indigo-400/10 z-0"
-                        animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    />
-
-                   // Stable Logo
-                    <img
-                        src={LOGO_URL}
-                        alt="SaPyBase"
-                        className="w-4/5 h-4/5 relative sm:-top-1  z-10 drop-shadow-xl transition-all pointer-events-none p-2"
-                    />
-
-                    //Chevron — appears below the logo when chat is open
-                    <AnimatePresence>
-                        {isOpen && (
-                            <motion.span
-                                key="fab-chevron"
-                                initial={{ opacity: 0, y: -6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -6 }}
-                                transition={{ duration: 0.18 }}
-                                className="absolute bottom-[10px] left-1/2 -translate-x-1/2 z-20"
-                            >
-                                <ChevronDown size={25} strokeWidth={2} className='text-blue-900' />
-                            </motion.span>
-                        )}
-                    </AnimatePresence>
-                </motion.button> */}
 
                 <motion.button
                     whileTap={{ scale: 0.95 }}
@@ -503,24 +469,7 @@ const ChatWidget = ({ apiKey }) => {
                                 <path d={BUBBLE_PATH} />
                             </clipPath>
 
-                            <style>{`
-            @keyframes march {
-              to { stroke-dashoffset: -40; }
-            }
-            .marching-dashes {
-              stroke-dasharray: 6 4;
-              stroke-dashoffset: 0;
-              animation: march 2s linear infinite;
-            }
-            @keyframes aura-pulse {
-              0%, 100% { opacity: 0.5; transform: scale(1); }
-              50%       { opacity: 0;   transform: scale(1.18); }
-            }
-            .aura-path {
-              transform-origin: 50px 50px;
-              animation: aura-pulse 3s ease-in-out infinite;
-            }
-          `}</style>
+
                         </defs>
 
                         {/* White fill clipped to bubble shape — replaces bg-white on the button */}
@@ -534,7 +483,7 @@ const ChatWidget = ({ apiKey }) => {
                         {/* Pulsing aura — also bubble-shaped */}
                         <path
                             d={BUBBLE_PATH}
-                            fill="rgba(129,140,248,0.15)"
+                            fill="white"
                             className="aura-path"
                         />
 
@@ -543,22 +492,19 @@ const ChatWidget = ({ apiKey }) => {
                             d={BUBBLE_PATH}
                             fill="none"
                             stroke={THEME_COLOR}
-                            strokeWidth="2.2"
+                            strokeWidth="1"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            className="marching-dashes"
                         />
                     </svg>
 
-                    {/* ── Stable Logo (unchanged) ── */}
-                    <img
-                        src={LOGO_URL}
-                        alt="SaPyBase"
-                        className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2"
-                    />
+                    {/* ── Stable Logo (Reusable BrandLogo component) ── */}
+                    <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2 flex items-center justify-center">
+                        <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
+                    </div>
 
                     {/* ── Chevron (unchanged) ── */}
-                    <AnimatePresence>
+                    {/* <AnimatePresence>
                         {isOpen && (
                             <motion.span
                                 key="fab-chevron"
@@ -571,7 +517,7 @@ const ChatWidget = ({ apiKey }) => {
                                 <ChevronDown size={25} strokeWidth={2} className="text-blue-900" />
                             </motion.span>
                         )}
-                    </AnimatePresence>
+                    </AnimatePresence> */}
                 </motion.button>
             </div>
         </div>

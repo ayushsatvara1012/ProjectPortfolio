@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react';
-import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, Palette, ShieldCheck, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { useNavigate,Link } from 'react-router-dom';
+import { User, CreditCard, Palette, ShieldCheck, KeyRound, Eye, EyeOff,Lock } from 'lucide-react';
 import Alert from '../components/alert';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useBotSettings } from '../context/BotSettingsContext';
@@ -59,18 +59,33 @@ export const BillingSection = () => (
 // ── Customize (docked BotPreview as separate full-height column) ─────────────
 export const CustomizeSection = () => {
     const { botSettings, updateSetting } = useBotSettings();
+    const { userTier } = useUserRole();
+    const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-full bg-[#E8EBF0] overflow-hidden" style={GRID_BG}>
             {/* Left Column: Header + Form */}
-            <div className="bg-white flex flex-col overflow-hidden">
+            <div className="bg-white flex flex-col overflow-hidden relative">
                 <div className="px-8 py-6 border-b border-gray-100 shrink-0">
                     <h2 className="text-base font-bold text-slate-900 mb-0.5">Customize</h2>
                     <p className="text-sm text-slate-500">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
                 </div>
                 {/* Form area (padded, scrollable) */}
-                <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+                <div className="p-8 overflow-y-auto custom-scrollbar flex-1 relative">
+                    
+                    {isLocked && (
+                        <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100">
+                             <Lock className="w-8 h-8 text-slate-400 mb-4" />
+                             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-2">Upgrade Required</h3>
+                             <p className="text-xs text-slate-500 max-w-[260px] leading-relaxed mb-6">Customizing your bot's visual identity requires an active subscription.</p>
+                             <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-slate-800 transition-colors shadow-sm">
+                                 View Plans
+                             </Link>
+                        </div>
+                    )}
+
                     <p className={headingCls}><Palette className="inline w-3.5 h-3.5 mr-1.5 text-slate-400" />Bot Appearance</p>
-                    <div className="space-y-6">
+                    <div className={`space-y-6 ${isLocked ? 'opacity-30 pointer-events-none' : ''}`}>
                         <div>
                             <label className={labelCls}>Bot Name</label>
                             <input type="text" value={botSettings.name}
@@ -86,7 +101,7 @@ export const CustomizeSection = () => {
                         <div>
                             <label className={labelCls}>Primary Color</label>
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 border border-gray-200 overflow-hidden cursor-pointer shrink-0 rounded-lg shadow-sm"
+                                <div className="w-12 h-12 border border-gray-200 overflow-hidden cursor-pointer shrink-0 rounded-none bg-slate-100"
                                     style={{ background: botSettings.primaryColor }}>
                                     <input type="color" value={botSettings.primaryColor}
                                         onChange={e => updateSetting('primaryColor', e.target.value)}

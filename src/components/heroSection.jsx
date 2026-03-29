@@ -27,7 +27,7 @@ const HeroSection = () => {
   return (
     <section id="home" className="relative min-h-screen bg-white pt-16 lg:pt-20 overflow-hidden">
       {/* Architectural Grid Container */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 border border-gray-100 p-px">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 border border-gray-100">
 
         {/* ── LEFT COLUMN: VALUE PROPOSITION ──────────────── */}
         <div className="bg-white p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">

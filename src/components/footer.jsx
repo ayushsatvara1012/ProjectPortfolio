@@ -1,6 +1,6 @@
-import { Github, Linkedin, Twitter, ArrowUpRight, Mail, Zap } from 'lucide-react';
+import React from 'react';
+import { Github, Linkedin, Twitter, ArrowUpRight, Mail, Zap, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Logo from "./Logo";
 
 const ModernFooter = () => {
   const navigate = useNavigate();
@@ -13,15 +13,14 @@ const ModernFooter = () => {
     { name: "Contact", href: "/contact" },
   ]
   const stackList = [
-    { name: "React 19 / Next.js 16" },
+    { name: "React 19 / Vite" },
     { name: "Python 3.12 / FastAPI" },
     { name: "PostgreSQL / Supabase" },
-    { name: "Tailwind CSS " },
-    { name: "Framer Motion " },
-    { name: "AWS" },
-    { name: "Docker / Kubernetes" },
-    { name: "Git / GitHub" }
-
+    { name: "Tailwind CSS v4" },
+    { name: "Lucide / Framer" },
+    { name: "AWS Cloud" },
+    { name: "Docker Container" },
+    { name: "Git Workflow" }
   ]
 
   const handleLinkClick = (e, href) => {
@@ -48,120 +47,137 @@ const ModernFooter = () => {
   };
 
   return (
-    <footer className="relative bg-white dark:bg-slate-950 pt-24 pb-12 overflow-hidden border-t border-slate-200 dark:border-slate-900 transition-colors">
-      {/* Background Mesh Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-linear-to-r from-transparent via-indigo-500/20 dark:via-indigo-500 to-transparent opacity-50" />
-      <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-indigo-600/5 dark:bg-indigo-600/20 blur-[120px] rounded-full" />
-
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
-
-          {/* Big CTA Branding Box (The Bento Style) */}
-          <div className="lg:col-span-5 p-8 rounded-3xl bg-linear-to-r from-indigo-100 to-violet-100 inset-shadow-sm inset-shadow-indigo-500/50 dark:from-slate-900/50 dark:to-slate-900/50 border border-slate-200 dark:border-slate-800 backdrop-blur-sm flex flex-col justify-between group hover:border-indigo-500/50 transition-all duration-500 relative overflow-hidden">
-            {/* Ghost Logo Background */}
-            <div className="absolute -right-50 -bottom-6 pointer-events-none opacity-[0.07] dark:opacity-[0.10]">
-              <img src="/SB_loading.svg" className="w-[650px] h-auto block dark:hidden" alt="" />
-              <img src="/SB_loading_dark.svg" className="w-[650px] h-auto hidden dark:block" alt="" />
-            </div>
-
-            <div className="relative z-10">
-              <div className="flex items-center mb-6">
-                  <span className="text-2xl font-bold tracking-tight text-smokewhite dark:text-slate-200 font-glook">
-                    Sa
-                    <span className="font-glook">Py</span>
-                    <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500 font-glook tracking-wide ">Base</span>
-                  </span>
-              
+    <footer className="bg-white border-t border-gray-100 overflow-hidden">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Tic-Tac-Toe Grid Architecture */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-px bg-gray-200 border-x border-gray-200">
+          
+          {/* 1. BRANDING CELL (md:col-span-5) */}
+          <div className="md:col-span-5 bg-white p-12 md:p-16 flex flex-col justify-between gap-12 group/brand">
+            <div className="space-y-8 relative z-10">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">
+                  SaPy<span className="text-indigo-600">Base</span>
+                </span>
+                <div className="h-px w-8 bg-gray-100" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Protocol_V4.2</span>
               </div>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-200 leading-tight">
+              
+              <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter leading-[0.85] uppercase">
                 Ready to architect your <br />
-                <span className="text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">next digital frontier?</span>
+                <span className="text-slate-200 transition-colors duration-500 group-hover/brand:text-indigo-600">next Digital Frontier?</span>
               </h2>
             </div>
 
-            <div className="mt-10 flex flex-wrap gap-4 relative z-10">
+            <div className="flex flex-wrap gap-4 relative z-10">
               <button
                 onClick={() => navigate('/services')}
-                className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-lg shadow-slate-200/50 dark:shadow-none"
+                className="bg-slate-900 text-white px-8 py-4 rounded-none font-black text-[10px] uppercase tracking-[0.3em] hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-3 group/btn"
               >
-                Start Project <Zap size={18} fill="currentColor" />
+                Start_Project <Zap size={14} className="opacity-40 group-hover/btn:opacity-100" />
               </button>
-              <a href="mailto:ayushsatvara2002@gmail.com" className="w-12 h-12 rounded-full border border-indigo-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center">
-                <Mail size={20} />
+              <a 
+                href="mailto:ayushsatvara2002@gmail.com" 
+                className="w-12 h-12 rounded-none border border-gray-200 text-slate-400 hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center p-0"
+              >
+                <Mail size={18} />
               </a>
             </div>
           </div>
 
-          {/* Navigation Links Grid */}
-          <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-8 p-4">
-            <div className="space-y-6">
-              <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Platform</h4>
-              <ul className="space-y-1">
+          {/* 2. NAVIGATION GRID (md:col-span-7) */}
+          <div className="md:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200">
+            
+            {/* PLATFORM MODULE */}
+            <div className="bg-white p-10 md:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
+                <div className="h-1.5 w-1.5 rounded-none bg-indigo-600" />
+                <span>Platform</span>
+              </div>
+              <ul className="space-y-4">
                 {navigateToPages.map((link, idx) => (
                   <li key={`foot-nav-${link.name}-${idx}`}>
                     <a
                       href={link.href}
                       onClick={(e) => handleLinkClick(e, link.href)}
-                      className="text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-colors text-sm flex items-center gap-1 group py-3"
+                      className="text-slate-500 hover:text-indigo-600 transition-all text-[11px] font-bold uppercase tracking-widest flex items-center justify-between group/link"
                     >
-                      {link.name} <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-all" />
+                      {link.name} <ArrowUpRight size={12} className="opacity-0 group-hover/link:opacity-100 transition-all translate-y-1 group-hover/link:translate-y-0" />
                     </a>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="space-y-6">
-              <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Stack</h4>
-              <ul className="space-y-3 text-sm text-slate-500 dark:text-slate-400">
+            {/* STACK MODULE */}
+            <div className="bg-white p-10 md:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
+                <div className="h-1.5 w-1.5 rounded-none bg-slate-900" />
+                <span>Tech_Stack</span>
+              </div>
+              <ul className="space-y-4">
                 {stackList.map((stack, idx) => (
-                  <li key={`foot-stack-${idx}`} className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-default">
+                  <li key={`foot-stack-${idx}`} className="text-slate-400 font-mono text-[10px] uppercase tracking-widest cursor-default hover:text-slate-900 transition-colors">
                     {stack.name}
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="space-y-6 col-span-2 md:col-span-1">
-              <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">Social</h4>
-              <div className="flex gap-4">
-                {[
-                  {
-                    Icon: Github,
-                    href: "https://github.com/ayushsatvara1012",
-                    hover: "hover:text-slate-950 hover:border-slate-950 dark:hover:text-white dark:hover:border-slate-600"
-                  },
-                  {
-                    Icon: Linkedin,
-                    href: "https://www.linkedin.com/in/ayushsatvara",
-                    hover: "hover:text-blue-600 hover:border-blue-600 dark:hover:text-blue-400 dark:hover:border-blue-400/50"
-                  },
-                ].map((social, i) => (
-                  <a
-                    key={`foot-social-${i}`}
-                    href={social.href}
-                    className={`w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all shadow-sm ${social.hover}`}
-                  >
-                    <social.Icon size={20} />
-                  </a>
-                ))}
+            {/* SOCIAL MODULE */}
+            <div className="bg-white p-6 md:p-12 space-y-6 md:space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 relative overflow-hidden">
+
+
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 relative z-10">
+                <div className="h-1.5 w-1.5 rounded-none bg-emerald-500" />
+                <span>Social_Net</span>
+              </div>
+              <div className="flex flex-col gap-6 relative z-10">
+                {/* Row 1: Social Links (Horizontal on sm+) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-200 border border-gray-100">
+                  {[
+                    { Icon: Github, href: "https://github.com/ayushsatvara1012", label: "GIT" },
+                    { Icon: Linkedin, href: "https://www.linkedin.com/in/ayushsatvara", label: "LNK" },
+                  ].map((social, i) => (
+                    <a
+                      key={`foot-social-${i}`}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white p-6 flex flex-row md:flex-col items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all gap-2 group/social"
+                    >
+                      <social.Icon size={18} className="opacity-40 group-hover/social:opacity-100" />
+                      <span className="text-[8px] font-bold tracking-[0.2em]">{social.label}</span>
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
+
           </div>
+
+          {/* 3. BOTTOM LEGEND ROW (md:col-span-12) */}
+          <div className="md:col-span-12 bg-white p-8 md:p-10 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex flex-col md:flex-row items-center gap-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <p className='text-center'>© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
+              <div className="hidden md:block h-px w-6 bg-gray-200" />
+              <div className="flex gap-6">
+                <a href="/privacy-policy" className="hover:text-slate-900 transition-colors">PRIVACY</a>
+                <a href="/terms-and-conditions" className="hover:text-slate-900 transition-colors">TERMS</a>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Activity size={14} className="text-emerald-500" />
+              <span className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em]">
+                Status: <span className="text-emerald-600">Operational</span>
+              </span>
+            </div>
+          </div>
+
         </div>
 
-        {/* Bottom Section */}
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-slate-100 dark:border-slate-900 text-slate-500 text-xs">
-          <p>© 2026 Sapybase LLC — Engineered with precision.</p>
-          <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-white transition-colors py-3 px-3">Privacy</a>
-            <a href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-white transition-colors py-3 px-3">Terms</a>
-            <span className="text-slate-300 dark:text-slate-800 place-content-center">|</span>
-            <span className="flex items-center gap-1">
-              Status: <span className="text-emerald-500/80 dark:text-emerald-500 font-bold">Systems Operational</span>
-            </span>
-          </div>
-        </div>
       </div>
     </footer>
   );

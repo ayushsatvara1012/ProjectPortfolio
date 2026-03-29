@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import {
     Building2, Globe, Palette, MessageSquare, Copy, CheckCircle,
     Code2, Sparkles, ArrowRight, Key, Zap, BookOpen, ChevronRight,
-    ChevronDown, Shield, Bot
+    ChevronDown, Shield, Bot, Lock
 } from 'lucide-react';
 import { SignedIn, SignedOut, SignUp, useUser, useAuth } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Alert from '../components/alert';
 import { AppPageSkeleton } from '../components/SkeletonLoader';
+import { useUserRole } from '../context/UserContext';
 
 const AppRegistration = () => {
     const { user, isLoaded } = useUser();
     const { getToken } = useAuth();
     const navigate = useNavigate();
+    const { userTier } = useUserRole();
 
     const [formData, setFormData] = useState({
         companyName: '', allowedOrigin: '',
@@ -24,6 +26,8 @@ const AppRegistration = () => {
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const [copied, setCopied] = useState(false);
     const [openAccordion, setOpenAccordion] = useState(0);
+
+    const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
 
     if (!isLoaded) return <div className="p-8"><AppPageSkeleton /></div>;
 
@@ -155,11 +159,24 @@ const AppRegistration = () => {
                             </div>
 
                             {/* Right: Form card */}
-                            <div className={`lg:col-span-7 ${cellCls} p-10 overflow-y-auto custom-scrollbar border-l border-gray-100`}>
-                                <h3 className="text-xl font-bold text-slate-900 mb-1 tracking-tight">Tenant Config</h3>
-                                <p className="text-sm text-slate-500 mb-8 font-medium">Fill in details to generate your unique credentials.</p>
+                            <div className={`lg:col-span-7 ${cellCls} p-10 overflow-y-auto custom-scrollbar border-l border-gray-100 relative`}>
+                                
+                                {isLocked && (
+                                    <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100">
+                                         <Lock className="w-8 h-8 text-slate-400 mb-4" />
+                                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-2">Upgrade Required</h3>
+                                         <p className="text-xs text-slate-500 max-w-[260px] leading-relaxed mb-6">Provisioning a new tenant requires an active subscription.</p>
+                                         <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-slate-800 transition-colors shadow-sm">
+                                             View Plans
+                                         </Link>
+                                    </div>
+                                )}
 
-                                <form onSubmit={handleSubmit} className="space-y-5">
+                                <div className={isLocked ? 'opacity-30 pointer-events-none' : ''}>
+                                    <h3 className="text-xl font-bold text-slate-900 mb-1 tracking-tight">Tenant Config</h3>
+                                    <p className="text-sm text-slate-500 mb-8 font-medium">Fill in details to generate your unique credentials.</p>
+
+                                    <form onSubmit={handleSubmit} className="space-y-5">
                                     {[
                                         { name: 'companyName', label: 'Company Name', Icon: Building2, type: 'text', placeholder: 'Acme Inc.' },
                                         { name: 'allowedOrigin', label: 'Allowed Origin', Icon: Globe, type: 'url', placeholder: 'https://example.com' },
@@ -211,6 +228,7 @@ const AppRegistration = () => {
                                         }
                                     </button>
                                 </form>
+                                </div>
                             </div>
                         </motion.div>
                     ) : (

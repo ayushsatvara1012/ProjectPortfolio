@@ -8,7 +8,7 @@ import { GraduationCap, Briefcase, Cpu, Globe, ArrowUpRight, Code2, Shield, Zap 
  */
 const ResumeNode = ({ name, role, education, experience, stack, accentColor }) => (
   <div className="relative group p-px rounded-[2.5rem] bg-linear-to-b from-slate-200 to-transparent dark:from-slate-800 dark:to-transparent">
-    <div className="bg-white dark:bg-slate-950 rounded-[2.4rem] p-8 lg:p-10 shadow-2xl transition-all duration-500 hover:shadow-indigo-500/10 border border-slate-100 dark:border-slate-900 overflow-hidden h-full flex flex-col">
+    <div className="bg-white dark:bg-slate-950 rounded-[2.4rem] p-8 lg:p-10 transition-all duration-500 border border-slate-100 dark:border-slate-900 overflow-hidden h-full flex flex-col">
 
       {/* 1. IDENTITY BLOCK */}
       <div className="flex justify-between items-start mb-10">
