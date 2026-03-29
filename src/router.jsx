@@ -8,10 +8,7 @@ const Contactpage = lazy(() => import("./pages/contactpage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Registration = lazy(() => import("./pages/Registration"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const Pricing = lazy(() => import("./pages/Pricing"));
 
 // ── App Layout pages ───────────────────────────────────────────────────────────
 const AppLayout       = lazy(() => import("./components/AppLayout"));
@@ -29,9 +26,13 @@ const AppSettingsApiKeys  = lazy(() => import("./pages/AppSettings").then(m => (
 import ErrorPage from "./pages/ErrorPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Logo from "./components/Logo";
-import Loader from "./components/Loader";
+import { SkeletonBase } from "./components/SkeletonLoader";
 
-const PageLoader = () => <Loader />;
+const PageLoader = () => (
+  <div className="p-8">
+    <SkeletonBase className="w-full h-[400px]" />
+  </div>
+);
 
 const router = createBrowserRouter([
   {
@@ -46,14 +47,7 @@ const router = createBrowserRouter([
       { path: "/terms-and-conditions", element: <Suspense fallback={<PageLoader />}><TermsAndConditions /></Suspense> },
       { path: "/services", element: <Suspense fallback={<PageLoader />}><ServicesCatalog /></Suspense> },
       // Legacy routes — redirect to AppLayout equivalents
-      { path: "/dashboard", element: <Navigate to="/app/train" replace /> },
-      { path: "/register",  element: <Navigate to="/app/register" replace /> },
       { path: "/pricing",   element: <Navigate to="/app/pricing" replace /> },
-      // Keep old pages available for fallback
-      {
-        path: "/dashboard-legacy",
-        element: <Suspense fallback={<PageLoader />}><ProtectedRoute><Dashboard /></ProtectedRoute></Suspense>,
-      },
       {
         path: "/admin",
         element: <Navigate to="/app/settings/admin" replace />,

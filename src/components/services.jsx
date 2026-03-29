@@ -1,6 +1,8 @@
 import { BrainCircuit, Code2, CloudCog, Globe, Terminal, Fingerprint, Activity, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Services = () => {
+  const navigate = useNavigate();
   return (
     <section id="services" className="py-24 bg-white dark:bg-slate-950 relative overflow-hidden transition-colors border-t border-slate-100 dark:border-slate-900">
 
@@ -65,7 +67,10 @@ const Services = () => {
                     <Fingerprint size={18} className="text-violet-600 dark:text-violet-400" />
                   </div>
                 </div>
-                <button className="text-xs font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2 group/btn min-h-[48px] py-2">
+                <button 
+                  onClick={() => navigate('/services')}
+                  className="text-xs font-bold text-slate-900 dark:text-slate-200 flex items-center gap-2 group/btn min-h-[48px] py-2"
+                >
                   EXPLORE ARCHITECTURE <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -144,7 +149,10 @@ const Services = () => {
                   <p className="text-slate-500 dark:text-slate-400 text-sm">CDN-first deployment for global audiences.</p>
                 </div>
               </div>
-              <button className="px-6 py-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs font-bold hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all min-h-[48px]">
+              <button 
+                onClick={() => navigate('/app/train')}
+                className="px-6 py-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 text-xs font-bold hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all min-h-[48px]"
+              >
                 VIEW DEPLOYMENT LOGS
               </button>
             </div>

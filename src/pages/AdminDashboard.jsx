@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
 import Logo from '../components/Logo';
-import Loader from '../components/Loader';
+import { AppPageSkeleton } from '../components/SkeletonLoader';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useUserRole } from '../context/UserContext';
 
@@ -109,21 +109,10 @@ const AdminDashboard = () => {
         );
     }
 
-    if (isContextLoading) {
-        return <Loader fullScreen />;
-    }
-
-
     // ── Render ─────────────────────────────────────────────────────────────────
-    if (!isUserLoaded) {
-        return (
-            <div className="w-full h-screen bg-white flex items-center justify-center">
-                <Logo className="w-[160px] h-20" />
-            </div>
-        );
+    if (!isUserLoaded || isContextLoading || isLoading) {
+        return <div className="p-8"><AppPageSkeleton /></div>;
     }
-
-    if (isContextLoading) return <Loader fullScreen />;
 
     return (
         <div className="grid gap-px bg-gray-100 border-b border-gray-100">

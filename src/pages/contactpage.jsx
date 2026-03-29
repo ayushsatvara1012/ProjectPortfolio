@@ -3,7 +3,6 @@ import { Mail, MessageSquare, Send, Zap, Terminal, ChevronDown } from 'lucide-re
 import Alert from '../components/alert';
 import SEO from '../components/Seo';
 import seoConfig from '../seo/seoConfig';
-import Settings from '../components/Settings';
 
 function ContactPage() {
   const [activeFaq, setActiveFaq] = useState(null);
@@ -107,8 +106,6 @@ function ContactPage() {
             </div>
           </div>
 
-          {/* Integration of Settings Module */}
-          <Settings />
         </div>
 
         <Alert

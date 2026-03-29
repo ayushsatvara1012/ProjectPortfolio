@@ -8,7 +8,7 @@ import { SignedIn, SignedOut, SignUp, useUser, useAuth } from '@clerk/clerk-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../components/alert';
-import Loader from '../components/Loader';
+import { AppPageSkeleton } from '../components/SkeletonLoader';
 
 const AppRegistration = () => {
     const { user, isLoaded } = useUser();
@@ -25,7 +25,7 @@ const AppRegistration = () => {
     const [copied, setCopied] = useState(false);
     const [openAccordion, setOpenAccordion] = useState(0);
 
-    if (!isLoaded) return <Loader />;
+    if (!isLoaded) return <div className="p-8"><AppPageSkeleton /></div>;
 
     const showAlert = (type, msg) => {
         setAlert({ open: true, type, msg });

@@ -1,8 +1,7 @@
 import { useUser, useAuth } from "@clerk/clerk-react";
 import { Navigate, useLocation } from "react-router-dom";
 import React, { useState, useEffect } from "react";
-import Logo from "./Logo";
-import Loader from "./Loader";
+import { AppPageSkeleton } from "./SkeletonLoader";
 
 /**
  * Higher-Order Component to enforce the SaPyBase onboarding flow:
@@ -76,7 +75,11 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
     // 1. Wait for BOTH Clerk and your backend/state to finish loading
     if (!isUserLoaded || !isAuthLoaded || (isSignedIn && isLoading)) {
-        return <Loader fullScreen />;
+        return (
+            <div className="min-h-screen bg-white p-8 animate-pulse">
+                <AppPageSkeleton />
+            </div>
+        );
     }
 
     if (!isSignedIn) {

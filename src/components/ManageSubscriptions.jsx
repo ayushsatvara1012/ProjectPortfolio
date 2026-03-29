@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Zap, Rocket, Shield, Calendar, Clock, AlertCircle, ExternalLink } from 'lucide-react';
 import { useUserRole } from '../context/UserContext';
+import { SkeletonBase } from './SkeletonLoader';
 import Alert from './alert';
 
 // ─── Skeleton Loader ───────────────────────────────────────────────────────────
@@ -164,6 +165,12 @@ const ManageSubscriptions = () => {
     const label = (key, text) => processing === key ? 'Processing...' : text;
 
     // ── Render ─────────────────────────────────────────────────────────────────
+    if (isLoading) return (
+        <div className="p-8 space-y-4">
+            <SkeletonBase className="h-6 w-1/3" />
+            <SkeletonBase className="h-24 w-full" />
+        </div>
+    );
     return (
         <div className="grid gap-px bg-gray-100 border border-gray-100">
             {/* Header Cell */}

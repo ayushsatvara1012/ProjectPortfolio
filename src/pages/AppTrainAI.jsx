@@ -5,8 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
-import SkeletonLoader from '../components/SkeletonLoader';
-import Alert from '../components/alert';
+import { AppPageSkeleton } from '../components/SkeletonLoader';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useUserRole } from '../context/UserContext';
 
@@ -23,12 +22,14 @@ const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 focus
 const labelCls = "block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1.5";
 
 const AppTrainAI = () => {
-    const { getToken } = useAuth();
+    const { getToken, isLoaded } = useAuth();
     const {
         userTier, isLoading: ctxLoading,
         messagesUsed, messageLimit, billingPeriodEnd,
         totalDocuments, totalMessages
     } = useUserRole();
+
+    if (!isLoaded || ctxLoading) return <div className="p-8"><AppPageSkeleton /></div>;
 
     const [activeTab, setActiveTab] = useState('url');
     const [url, setUrl] = useState('');
