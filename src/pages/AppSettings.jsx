@@ -143,7 +143,7 @@ export const ApiKeysSection = () => {
         setIsLoading(true);
         try {
             const token = await getToken();
-            const res = await fetch(`${baseUrl}/api/rotate-key`, {
+            const res = await fetch(`${baseUrl}/api/company/rotate-key`, {
                 method: 'POST', headers: { Authorization: `Bearer ${token}` },
             });
             const data = await res.json();
