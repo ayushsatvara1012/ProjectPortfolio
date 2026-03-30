@@ -286,7 +286,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         release_db_connection(conn)
 
     if not company_data:
-        print(f"DEBUG: verify_api_key_and_origin - Key NOT FOUND in DB: {api_key[:10]}...")
+        print(f"DEBUG: verify_api_key_and_origin - Key NOT FOUND in DB (Hashed: {hashed_key[:10]}...)")
         raise HTTPException(status_code=401, detail="Invalid API Key.")
 
     # Package the company data
@@ -336,6 +336,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                 return company
             
             # 3.5. Unauthorized
+            print(f"DEBUG: verify_api_key_and_origin - CORS REJECTED for Origin: {actual_client_origin}. Expected: {allowed}")
             raise HTTPException(
                 status_code=403, 
                 detail=f"CORS Error: Origin {client_origin} is not allowed for this API Key."
