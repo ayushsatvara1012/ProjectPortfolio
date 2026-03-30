@@ -43,52 +43,28 @@ CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
 POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
 
-# 2. Initialize Database Connection Pool
-db_pool = pool.ThreadedConnectionPool(
-    minconn=1,
-    maxconn=20, # Scale based on your Neon tier (e.g., Free=20, Pro=500)
-    dsn=DB_URL
-)
-
+# 2. Database Connection (Supabase pgBouncer Pooler)
+# Using direct connect since the connection string uses port 6543 (transaction pooler).
 def get_db_connection():
-    """Retrieves a healthy connection from the pool with retry logic."""
-    max_retries = 3
-    for attempt in range(max_retries):
-        conn = None
-        try:
-            conn = db_pool.getconn()
-            # Health check: Verify the connection is still alive
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-            
-            # If we reach here, connection is healthy
-            register_vector(conn)
-            return conn
-        except (psycopg2.OperationalError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
-            print(f"Database connection health check failed (attempt {attempt+1}/{max_retries}): {e}")
-            if conn:
-                try:
-                    db_pool.putconn(conn, close=True)
-                except:
-                    pass
-            
-            # Add a small delay for Neon to wake up (2s, 4s, etc.)
-            if attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 2
-                print(f"Waiting {wait_time}s for database to warm up...")
-                time.sleep(wait_time)
-            else:
-                raise HTTPException(status_code=503, detail="Database connection unavailable. Please try again.")
-        except Exception as e:
-            print(f"Unexpected pool retrieval error: {e}")
-            if conn:
-                db_pool.putconn(conn)
-            raise HTTPException(status_code=500, detail="Internal server error")
+    """Establishes a connection via Supabase pgBouncer pooler (port 6543)."""
+    try:
+        conn = psycopg2.connect(DB_URL)
+        register_vector(conn)
+        return conn
+    except psycopg2.OperationalError as e:
+        print(f"Database connection failed: {e}")
+        raise HTTPException(status_code=503, detail="Database connection unavailable. Please try again.")
+    except Exception as e:
+        print(f"Unexpected connection error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 def release_db_connection(conn):
-    """Returns a connection to the pool."""
-    if conn and hasattr(db_pool, 'putconn'):
-        db_pool.putconn(conn)
+    """Closes the connection, returning it to the Supabase pooler."""
+    if conn and not conn.closed:
+        try:
+            conn.close()
+        except:
+            pass
 
 def validate_safe_url(url: str):
     """
