@@ -5,7 +5,7 @@ import { motion, AnimatePresence, color } from 'framer-motion';
 import { Send, User, ChevronDown, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 import BrandLogo from './brandLogo';
- 
+
 const ChatWidget = ({ apiKey }) => {
     // 1. Determine if we are testing locally or live on a client's site
     const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://www.sapybase.com';
@@ -242,8 +242,8 @@ const ChatWidget = ({ apiKey }) => {
                                             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
                                         </div>
                                         <div className="flex flex-col">
-                                            <p className="font-questrial font-bold text-lg leading-tight" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
-                                            <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer" className="text-xs italic text-slate-500 hover:text-slate-700 transition-colors">Powered by SaPyBase</a>
+                                            <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
+                                            <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 font-medium italic hover:text-slate-700 transition-colors">Powered by SaPyBase</a>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -328,7 +328,7 @@ const ChatWidget = ({ apiKey }) => {
 
                                         <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                             {msg.role === 'bot' && (
-                                                <span className="text-[10px] font-bold text-slate-400 mb-1 ml-1 uppercase tracking-widest leading-none">{BOT_NAME}</span>
+                                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
                                             )}
                                             <div
                                                 className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center ${msg.role === 'user'
@@ -338,9 +338,9 @@ const ChatWidget = ({ apiKey }) => {
                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                             >
                                                 {msg.role === 'user' ? (
-                                                    <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+                                                    <div className="whitespace-pre-wrap text-base leading-relaxed">{msg.content}</div>
                                                 ) : (
-                                                    <div className="text-sm">
+                                                    <div className="text-base leading-relaxed">
                                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                                     </div>
                                                 )}
@@ -373,8 +373,8 @@ const ChatWidget = ({ apiKey }) => {
                                         <button
                                             key={qidx}
                                             onClick={() => { setInput(q.prompt); inputRef.current?.focus(); }}
-                                            className="shrink-0 snap-start px-3 py-1.5 border text-xs sm:text-sm rounded-full transition-colors whitespace-nowrap"
-                                            style={{ 
+                                            className="shrink-0 snap-start px-3 py-1.5 border text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-colors whitespace-nowrap"
+                                            style={{
                                                 touchAction: 'manipulation',
                                                 color: THEME_COLOR,
                                                 borderColor: THEME_COLOR.startsWith('#') ? `${THEME_COLOR}33` : THEME_COLOR,
@@ -396,7 +396,7 @@ const ChatWidget = ({ apiKey }) => {
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-[16px] leading-normal placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none"
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-base leading-relaxed placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none"
                                         style={{ fontSize: '16px' }}
                                         rows={1}
                                         disabled={isLoading}
@@ -429,7 +429,7 @@ const ChatWidget = ({ apiKey }) => {
                             className="absolute right-full mr-5 top-1/2 -translate-y-1/2 hidden sm:flex items-center pointer-events-none"
                         >
                             <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 flex items-center gap-1.5 min-w-[150px] justify-center relative">
-                                <span className="text-sm font-bold text-slate-700 whitespace-nowrap tracking-tight">
+                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 font-sans whitespace-nowrap">
                                     {currentPhrase}
                                 </span>
                                 <motion.span

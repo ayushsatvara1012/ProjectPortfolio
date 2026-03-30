@@ -36,7 +36,7 @@ const ErrorPage = () => {
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-black text-slate-900 dark:text-slate-200"
+            className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200"
           >
             Sapybase <span className="text-rose-500 underline decoration-rose-500/30 underline-offset-8">Interrupted.</span>
           </motion.h1>
@@ -44,7 +44,7 @@ const ErrorPage = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-slate-500 dark:text-slate-400 text-lg font-light max-w-md mx-auto"
+            className="text-base text-slate-500 leading-relaxed dark:text-slate-400 max-w-md mx-auto"
           >
             We encountered an unexpected architectural breach or the page you're looking for has moved into a different dimension.
           </motion.p>
@@ -60,9 +60,9 @@ const ErrorPage = () => {
           <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-800 pb-3">
             <img src="/sb_logo2.svg" className="w-4 h-4 block dark:hidden object-contain" alt="" />
             <img src="/sb_logo2_dark.svg" className="w-4 h-4 hidden dark:block object-contain" alt="" />
-            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Error_Report</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">Error_Report</span>
           </div>
-          <p className="text-xs text-rose-500/80 dark:text-rose-400 font-medium leading-relaxed">
+          <p className="text-sm font-medium text-rose-500/80 dark:text-rose-400">
             {error.statusText || error.message || "Unknown Runtime Exception"}
           </p>
           {error.status && (
@@ -81,13 +81,13 @@ const ErrorPage = () => {
         >
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
+            className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-bold font-sans hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
           >
             <Home size={18} /> Return Home
           </button>
           <button
             onClick={() => window.location.reload()}
-            className="flex items-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-2xl font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
+            className="flex items-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-2xl font-bold font-sans hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
           >
             <RotateCcw size={18} /> Retry System
           </button>

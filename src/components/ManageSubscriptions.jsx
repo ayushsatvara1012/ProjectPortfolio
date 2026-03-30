@@ -156,7 +156,7 @@ const ManageSubscriptions = () => {
         }
     };
 
-    const btnBase = 'w-full py-3 rounded-none text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2';
+    const btnBase = 'w-full py-3 rounded-none text-[10px] uppercase tracking-widest font-bold font-sans transition-all flex items-center justify-center gap-2';
     const btnPrimary = `${btnBase} bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.99]`;
     const btnSecondary = `${btnBase} border border-gray-100 text-slate-600 hover:bg-gray-50`;
     const btnDanger = `${btnBase} border border-red-100 text-red-600 hover:bg-red-50`;
@@ -177,9 +177,9 @@ const ManageSubscriptions = () => {
             <div className="bg-white px-8 py-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Subscription</h4>
+                    <h4 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">Subscription</h4>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest border border-current/10 ${meta.badge} rounded-none`}>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold font-sans border border-current/10 ${meta.badge} rounded-none`}>
                     <TierIcon className="w-3 h-3" />
                     {meta.label}
                 </span>
@@ -193,20 +193,20 @@ const ManageSubscriptions = () => {
                     {/* Stats Grid Cell (Flush internal) */}
                     <div className="grid grid-cols-3 gap-px bg-gray-100 border-b border-gray-100">
                         <div className="bg-white p-6 text-center">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Plan</p>
-                            <p className={`text-sm font-black ${meta.color}`}>{meta.label}</p>
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5">Plan</p>
+                            <p className={`text-xl md:text-2xl font-display font-bold ${meta.color}`}>{meta.label}</p>
                         </div>
                         <div className="bg-white p-6 text-center">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Status</p>
-                            <p className={`text-sm font-black ${subscriptionStatus === 'ACTIVE' ? 'text-emerald-600' : subscriptionStatus === 'CANCELED' ? 'text-red-500' : 'text-amber-500'}`}>
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5">Status</p>
+                            <p className={`text-xl md:text-2xl font-display font-bold ${subscriptionStatus === 'ACTIVE' ? 'text-emerald-600' : subscriptionStatus === 'CANCELED' ? 'text-red-500' : 'text-amber-500'}`}>
                                 {subscriptionStatus || 'Active'}
                             </p>
                         </div>
                         <div className="bg-white p-6 text-center">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5">
                                 {tier === 'TRIAL' ? 'Days Left' : 'Renews'}
                             </p>
-                            <p className="text-sm font-black text-slate-900">
+                            <p className="text-xl md:text-2xl font-display font-bold text-slate-900">
                                 {tier === 'TRIAL'
                                     ? (trialDaysLeft !== null ? `${trialDaysLeft}d` : '—')
                                     : formattedPeriodEnd}
@@ -218,7 +218,7 @@ const ManageSubscriptions = () => {
                     <div className="bg-white p-8">
                         {/* Trial Countdown Banner */}
                         {tier === 'TRIAL' && trialDaysLeft !== null && (
-                            <div className={`flex items-center gap-3 p-4 mb-6 border text-xs font-medium rounded-none
+                            <div className={`flex items-center gap-3 p-4 mb-6 border text-sm font-medium rounded-none
                                 ${trialDaysLeft <= 5
                                     ? 'bg-amber-50 border-amber-100 text-amber-700'
                                     : 'bg-slate-50 border-gray-100 text-slate-600'
@@ -259,11 +259,11 @@ const ManageSubscriptions = () => {
 
                         {/* Full Pricing CTA */}
                         {(tier === 'FREE' || tier === 'TRIAL') && (
-                            <p className="text-center text-[10px] text-slate-400">
+                            <p className="text-center text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">
                                 View all plans →{' '}
                                 <button
                                     onClick={() => navigate('/app/pricing')}
-                                    className="text-slate-900 font-bold hover:underline"
+                                    className="text-slate-900 hover:text-indigo-600 transition-colors"
                                 >
                                     Pricing Page
                                 </button>

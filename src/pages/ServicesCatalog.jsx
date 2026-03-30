@@ -123,13 +123,13 @@ const ServicesCatalog = () => {
             >
               <ArrowLeft size={14} /> Back to Portfolio
             </button>
-            <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-3">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">
               Registry_V4.2 // Service_Architect
             </div>
-            <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight uppercase leading-tight">
+            <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900">
               Tailored Digital Service Solutions
             </h1>
-            <p className="text-sm md:text-base text-slate-500 leading-relaxed">
+            <p className="text-base text-slate-500 leading-relaxed">
               We combine architectural precision with creative engineering to deliver products that redefine industry standards.
             </p>
           </div>
@@ -146,15 +146,15 @@ const ServicesCatalog = () => {
                   {service.icon}
                 </div>
                 
-                <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-3">
+                <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">
                   {service.price} // ID: {service.id.toUpperCase()}
                 </div>
                 
-                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight mb-2">
+                <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-2">
                   {service.name}
-                </h2>
+                </h3>
                 
-                <p className="text-sm md:text-base text-slate-500 leading-relaxed">
+                <p className="text-base text-slate-500 leading-relaxed">
                   {service.description}
                 </p>
                 
@@ -168,7 +168,7 @@ const ServicesCatalog = () => {
                 </div>
                 
                 <div className="mt-auto pt-8">
-                  <button onClick={() => navigate('/services')} className="rounded-none bg-slate-900 text-white font-bold tracking-widest uppercase text-[10px] px-6 py-4 hover:bg-slate-800 w-full text-center tracking-[0.2em]">
+                  <button onClick={() => navigate('/services')} className="rounded-none bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white px-6 py-4 hover:bg-slate-800 w-full text-center transition-colors">
                     Configure Project
                   </button>
                 </div>
@@ -180,23 +180,23 @@ const ServicesCatalog = () => {
         {/* Bottom CTA */}
         <section className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto mt-16 md:mt-24">
           <div className="bg-white border border-gray-200 rounded-none p-8 md:p-16 flex flex-col items-center text-center">
-            <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-3">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">
               System_Protocol [001]
             </div>
             
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight uppercase mb-4">
+            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 uppercase mb-4">
               Ready to Architect Your Digital Future?
             </h2>
             
-            <p className="text-sm md:text-base text-slate-500 leading-relaxed max-w-2xl mb-8">
+            <p className="text-base text-slate-500 leading-relaxed max-w-2xl mb-8">
               Schedule a strategy call to discuss your project requirements and get a detailed architectural breakdown.
             </p>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-200 border border-gray-200 w-full max-w-lg">
-              <a href="tel:+15626681855" className="bg-white flex items-center justify-center gap-3 p-5 text-[10px] font-bold tracking-[0.2em] uppercase text-slate-900 hover:bg-slate-50 transition-colors">
+              <a href="tel:+15626681855" className="bg-white flex items-center justify-center gap-3 p-5 text-[10px] uppercase tracking-widest font-bold text-slate-900 hover:bg-slate-50 transition-colors">
                 <Phone size={14} /> Book a Call
               </a>
-              <button onClick={() => window.open('https://wa.me/15626681855', '_blank')} className="bg-white flex items-center justify-center gap-3 p-5 text-[10px] font-bold tracking-[0.2em] uppercase text-slate-900 hover:bg-slate-50 transition-colors">
+              <button onClick={() => window.open('https://wa.me/15626681855', '_blank')} className="bg-white flex items-center justify-center gap-3 p-5 text-[10px] uppercase tracking-widest font-bold text-slate-900 hover:bg-slate-50 transition-colors">
                 <MessageCircle size={14} /> Message System
               </button>
             </div>

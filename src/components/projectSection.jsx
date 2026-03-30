@@ -63,24 +63,24 @@ const projects = [
 
 const ProjectSection = () => {
   return (
-    <section id="projects" className="bg-white py-24 md:py-32 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 md:px-12">
+    <section id="projects" className="bg-white py-12 overflow-hidden">
+      <div className="max-w-8xl mx-auto px-6 md:px-12">
         
         {/* Tic-Tac-Toe Grid Architecture */}
         <div className="grid grid-cols-1 gap-px bg-gray-200 border border-gray-200 rounded-none overflow-hidden">
           
           {/* 1. SECTION HEADER BLOCK */}
-          <div className="bg-white p-12 md:p-24 flex flex-col justify-center gap-8">
-            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
+          <div className="bg-white p-12 md:p-6 flex flex-col justify-center gap-8">
+            <div className="flex items-center gap-3 text-md uppercase tracking-widest font-bold text-slate-600">
               <Boxes size={14} />
               <span>Project_Portfolio</span>
             </div>
             <div className="space-y-4">
-              <h2 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tighter leading-[0.85] uppercase">
-                PRODUCTION <br />
-                <span className="text-slate-200">Ecosystems.</span>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900">
+                Our 
+                <span className="text-indigo-600"> Work.</span>
               </h2>
-              <p className="text-sm md:text-lg text-slate-500 font-medium max-w-2xl leading-relaxed tracking-tight">
+              <p className="text-base font-display text-slate-600 leading-relaxed max-w-2xl">
                 Architecting high-concurrency systems that bridge the gap between complex business logic and high-performance digital interfaces.
               </p>
             </div>
@@ -97,28 +97,28 @@ const ProjectSection = () => {
                   alt={project.title} 
                   className="w-full h-full object-cover grayscale-0 lg:grayscale opacity-90 transition-all duration-700 lg:group-hover/img:grayscale-0 group-hover/img:scale-105"
                 />
-                <div className="absolute top-6 left-6 py-1 px-3 bg-slate-900 text-white text-[9px] font-bold uppercase tracking-[0.3em]">
+                <div className="absolute top-6 left-6 py-1 px-3 bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white">
                   NODE_REF_{project.id}
                 </div>
               </div>
 
               {/* CONTENT CELL */}
               <div className="lg:col-span-5 bg-white p-10 md:p-14 flex flex-col justify-center gap-6 group/content">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                  <span className="text-indigo-600">{project.icon}</span>
+                <div className="flex items-center justify-end gap-2 text-sm font-display uppercase tracking-widest font-bold text-slate-600">
+                  <span className="text-green-600">{project.icon}</span>
                   <span>{project.status}</span>
                 </div>
                 
                 <div className="space-y-4">
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tighter leading-[0.85] uppercase transition-transform duration-500 group-hover/content:translate-x-1">
+                  <h3 className="text-xl md:text-3xl font-display text-slate-900 transition-transform duration-500 group-hover/content:translate-x-1">
                     {project.title}
                   </h3>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600 font-mono">
+                  <p className="text-sm font-display uppercase tracking-widest font-bold text-blue-600">
                     // {project.subtitle}
                   </p>
                 </div>
 
-                <p className="text-sm text-slate-500 font-medium leading-relaxed tracking-tight">
+                <p className="text-sm font-display text-slate-600 leading-relaxed">
                   {project.description}
                 </p>
               </div>
@@ -131,15 +131,15 @@ const ProjectSection = () => {
                   rel="noopener noreferrer"
                   className="bg-white hover:bg-slate-900 hover:text-white transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
-                  <Github className="w-5 h-5 opacity-40 group-hover/btn:opacity-100" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Source_Code</span>
+                  <Github className="w-5 h-5 md:w-8 md:h-8 opacity-40 group-hover/btn:opacity-100" />
+                  <span className="text-md tracking-widest font-display">Source</span>
                 </a>
                 <a 
                   href={project.launch} 
-                  className="bg-white hover:bg-indigo-600 hover:text-white transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
+                  className="bg-white hover:bg-blue-800 hover:text-white transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
-                  <ArrowRight className="w-5 h-5 opacity-40 group-hover/btn:opacity-100" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Launch_App</span>
+                  <ArrowRight className="w-5 h-5 md:w-8 md:h-8 opacity-40 group-hover/btn:opacity-100" />
+                  <span className="text-md tracking-widest font-display">Launch</span>
                 </a>
               </div>
 
@@ -147,7 +147,7 @@ const ProjectSection = () => {
           ))}
 
           {/* 3. PERFORMANCE PROTOCOL CTA BLOCK */}
-          <div className="bg-white p-12 md:p-20 flex flex-col items-center gap-12 text-center">
+          <div className="bg-white p-12 flex flex-col items-center gap-3 text-center">
             <div className="flex flex-wrap justify-center gap-8 md:gap-16">
               {[
                 { label: "LATENCY", value: "<100ms", icon: <Zap size={14} /> },
@@ -157,13 +157,11 @@ const ProjectSection = () => {
               ].map((m, i) => (
                 <div key={i} className="flex flex-col items-center gap-2">
                   <div className="text-slate-300">{m.icon}</div>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.label}</span>
-                  <span className="text-xs font-black text-slate-900 uppercase tracking-tighter">{m.value}</span>
+                  <span className="text-md font-display uppercase tracking-widest font-bold text-slate-600">{m.label}</span>
+                  <span className="text-base font-bold text-slate-900">{m.value}</span>
                 </div>
               ))}
             </div>
-            <div className="h-px w-24 bg-gray-200" />
-            <p className="text-[10px] font-mono font-bold text-slate-300 uppercase tracking-[0.4em]">SaPyBase_Stable_Release_V4.2</p>
           </div>
 
         </div>

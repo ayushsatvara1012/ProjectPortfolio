@@ -119,14 +119,14 @@ const AdminDashboard = () => {
             {/* Header Cell */}
             <div className="bg-white p-8 lg:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
-                    <div className="px-2 py-0.5 border border-gray-100 bg-gray-50 text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2 w-fit mb-4 rounded-none">
+                    <div className="px-2 py-0.5 border border-gray-100 bg-gray-50 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans flex items-center gap-2 w-fit mb-4 rounded-none">
                         <ShieldCheck className="w-3.5 h-3.5" />
                         Super Admin Console
                     </div>
-                    <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight uppercase">
+                    <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 uppercase">
                         Platform <span className="text-slate-400">Management</span>
                     </h1>
-                    <p className="text-slate-500 mt-2 font-medium">Monitor ecosystem health and manage user subscriptions.</p>
+                    <p className="text-base text-slate-500 leading-relaxed mt-2">Monitor ecosystem health and manage user subscriptions.</p>
                 </div>
 
                 <div className="flex items-center gap-px bg-gray-100 border border-gray-100">
@@ -137,7 +137,7 @@ const AdminDashboard = () => {
                             placeholder="Search users or companies..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 pr-4 py-2.5 bg-transparent border-none focus:outline-none font-medium text-xs text-slate-900 w-64 rounded-none"
+                            className="pl-9 pr-4 py-2.5 bg-transparent border-none focus:outline-none text-sm text-slate-900 font-medium w-64 rounded-none"
                         />
                     </div>
                     <button 
@@ -166,10 +166,10 @@ const AdminDashboard = () => {
                                 <div className={`p-2 border border-gray-100 bg-gray-50 rounded-none ${s.color}`}>
                                     <s.icon className="w-4 h-4" />
                                 </div>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Live</span>
+                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">Live</span>
                             </div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{s.label}</p>
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{s.value}</h3>
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1">{s.label}</p>
+                            <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900">{s.value}</h3>
                         </div>
                     ))
                 )}
@@ -181,13 +181,13 @@ const AdminDashboard = () => {
                 <div className="flex gap-px bg-gray-100 border-b border-gray-100">
                     <button
                         onClick={() => setActiveTab('users')}
-                        className={`px-8 py-4 text-[10px] font-bold uppercase tracking-widest transition-colors ${activeTab === 'users' ? 'bg-white text-slate-900 border-b-2 border-slate-900' : 'bg-gray-50 text-slate-400 hover:bg-white hover:text-slate-600'}`}
+                        className={`px-8 py-4 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors ${activeTab === 'users' ? 'bg-white text-slate-900 border-b-2 border-slate-900' : 'bg-gray-50 text-slate-400 hover:bg-white hover:text-slate-600'}`}
                     >
                         User Entities
                     </button>
                     <button
                         onClick={() => setActiveTab('companies')}
-                        className={`px-8 py-4 text-[10px] font-bold uppercase tracking-widest transition-colors ${activeTab === 'companies' ? 'bg-white text-slate-900 border-b-2 border-slate-900' : 'bg-gray-50 text-slate-400 hover:bg-white hover:text-slate-600'}`}
+                        className={`px-8 py-4 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors ${activeTab === 'companies' ? 'bg-white text-slate-900 border-b-2 border-slate-900' : 'bg-gray-50 text-slate-400 hover:bg-white hover:text-slate-600'}`}
                     >
                         Company Nodes
                     </button>
@@ -201,9 +201,9 @@ const AdminDashboard = () => {
                                 <table className="w-full text-left border-collapse">
                                     <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm">
                                         <tr>
-                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Entity Details</th>
-                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Access Tier</th>
-                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Settings</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans border-r border-gray-100">Entity Details</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans border-r border-gray-100">Access Tier</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans text-right">Settings</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -211,12 +211,12 @@ const AdminDashboard = () => {
                                             <tr key={u.clerk_id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-5 border-r border-gray-100">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 border border-gray-100 bg-white flex items-center justify-center font-black text-xs text-slate-400">
+                                                        <div className="w-10 h-10 border border-gray-100 bg-white flex items-center justify-center text-xl md:text-2xl font-display font-bold text-slate-400">
                                                             {u.email?.charAt(0).toUpperCase()}
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-bold text-slate-900">{u.email}</p>
-                                                            <p className="text-[10px] text-slate-400 font-medium mt-0.5 tracking-tight uppercase">{u.clerk_id}</p>
+                                                            <p className="text-sm text-slate-900 font-medium">{u.email}</p>
+                                                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mt-0.5">{u.clerk_id}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -224,7 +224,7 @@ const AdminDashboard = () => {
                                                     <select
                                                         value={u.tier || 'FREE'}
                                                         onChange={(e) => handleUpdateUser(u.clerk_id, 'tier', e.target.value)}
-                                                        className="bg-white border border-gray-100 rounded-none px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-700 focus:ring-1 focus:ring-slate-900 outline-none"
+                                                        className="bg-white border border-gray-100 rounded-none px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold text-slate-700 font-sans focus:ring-1 focus:ring-slate-900 outline-none"
                                                     >
                                                         <option value="FREE">Free</option>
                                                         <option value="STARTER">Starter</option>
@@ -237,7 +237,7 @@ const AdminDashboard = () => {
                                                         disabled={isActionLoading}
                                                         className="p-2.5 bg-gray-50 border border-gray-100 text-slate-400 hover:bg-white hover:text-slate-900 transition-colors disabled:opacity-50"
                                                     >
-                                                        {isActionLoading ? <span className="text-[10px] font-bold leading-none">...</span> : <Settings className="w-4 h-4" />}
+                                                        {isActionLoading ? <span className="text-[10px] uppercase tracking-widest font-bold font-sans leading-none">...</span> : <Settings className="w-4 h-4" />}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -250,9 +250,9 @@ const AdminDashboard = () => {
                                 <table className="w-full text-left border-collapse">
                                     <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm">
                                         <tr>
-                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Company Node</th>
-                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-gray-100">Allowed Origin</th>
-                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Node Controls</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans border-r border-gray-100">Company Node</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans border-r border-gray-100">Allowed Origin</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans text-right">Node Controls</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -263,10 +263,10 @@ const AdminDashboard = () => {
                                                         <div className="w-10 h-10 border border-gray-100 bg-white flex items-center justify-center text-slate-400">
                                                             <Building2 className="w-5 h-5" />
                                                         </div>
-                                                        <span className="text-xs font-bold text-slate-900 uppercase tracking-widest">{c.name}</span>
+                                                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-900 font-sans">{c.name}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-5 border-r border-gray-100 text-[11px] font-medium text-slate-500 uppercase tracking-tight">
+                                                <td className="px-6 py-5 border-r border-gray-100 text-sm text-slate-500 font-medium">
                                                     {c.origin}
                                                 </td>
                                                 <td className="px-6 py-5 text-right">
@@ -275,7 +275,7 @@ const AdminDashboard = () => {
                                                         disabled={isActionLoading}
                                                         className="p-2.5 bg-red-50 border border-red-100 text-red-600 hover:bg-red-600 hover:text-white transition-colors disabled:opacity-50"
                                                     >
-                                                        {isActionLoading ? <span className="text-[10px] font-bold leading-none">...</span> : <Trash2 className="w-4 h-4" />}
+                                                        {isActionLoading ? <span className="text-[10px] uppercase tracking-widest font-bold font-sans leading-none">...</span> : <Trash2 className="w-4 h-4" />}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
                                 {filteredCompanies.length === 0 && (
                                     <div className="flex flex-col items-center justify-center py-20 bg-gray-50">
                                         <Building2 className="w-12 h-12 text-gray-200 mb-4" />
-                                        <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">No Node Entities Found</p>
+                                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">No Node Entities Found</p>
                                     </div>
                                 )}
                             </div>

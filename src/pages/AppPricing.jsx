@@ -5,9 +5,9 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 
 const POLAR_URLS = {
-    FREE:    `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_qvVDFbLIJZjAyayYqbcuhhlyHOVbE6wmfYzCv4RE0wq/redirect`,
+    FREE: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_qvVDFbLIJZjAyayYqbcuhhlyHOVbE6wmfYzCv4RE0wq/redirect`,
     STARTER: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ohwJA87iVQyjKgqyQsTcx4yJuWNg5VK907DuI4ZdmGd/redirect`,
-    PRO:     `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
+    PRO: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
 };
 
 const cellCls = 'bg-white';
@@ -57,63 +57,59 @@ const AppPricing = () => {
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] overflow-hidden">
             {/* Header */}
-            <div className="bg-white px-8 py-6 shrink-0 border-b border-gray-100">
-                <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-4 h-4 text-slate-400" />
-                    <h1 className="text-lg font-bold text-slate-900 tracking-tight uppercase tracking-widest text-base">Plans &amp; Pricing</h1>
+            <div className="bg-white px-8 py-6 shrink-0 border-b border-gray-100 flex flex-row justify-between">
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="w-4 h-4 text-slate-400" />
+                        <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900">Plans &amp; Pricing</h1>
+                    </div>
+                    <p className="text-md font-display text-slate-600 leading-relaxed">Choose the plan that fits your stage. Upgrade anytime.</p>
                 </div>
-                <p className="text-sm text-slate-500">Choose the plan that fits your stage. Upgrade anytime.</p>
+                {/* Billing Toggle */}
+                <div className={`${cellCls} px-8 py-5 border-b border-gray-100`}>
+                    <div className="flex border border-gray-100 w-fit h-10">
+                        {['monthly', 'yearly'].map(cycle => (
+                            <button key={cycle} onClick={() => setBillingCycle(cycle)}
+                                className={`relative px-8 py-2 text-md uppercase tracking-widest font-bold font-sans transition-colors ${billingCycle === cycle ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800 hover:bg-[#FAFAFA]'
+                                    }`}>
+                                {cycle}
+                                {cycle === 'yearly' && billingCycle !== 'yearly' && (
+                                    <span className="absolute -top-2 -right-1 bg-blue-600 text-white text-md uppercase tracking-widest font-bold font-sans px-1.5 py-0.5">-20%</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
 
-            {/* Billing Toggle */}
-            <div className={`${cellCls} px-8 py-5 border-b border-gray-100`}>
-                <div className="flex border border-gray-100 w-fit h-11">
-                    {['monthly', 'yearly'].map(cycle => (
-                        <button key={cycle} onClick={() => setBillingCycle(cycle)}
-                            className={`relative px-8 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                                billingCycle === cycle ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800 hover:bg-[#FAFAFA]'
-                            }`}>
-                            {cycle}
-                            {cycle === 'yearly' && billingCycle !== 'yearly' && (
-                                <span className="absolute -top-2 -right-1 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 font-black">-20%</span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </div>
 
             {/* Plan Cards — gap-px tic-tac-toe grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#E8EBF0] flex-1 overflow-y-auto custom-scrollbar">
                 {plans.map((plan, i) => (
                     <motion.div key={plan.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.06 }}
-                        className={`${cellCls} flex flex-col p-10 relative border-t-2 ${
-                            plan.highlight ? 'border-blue-600' : 'border-transparent'
-                        }`}
+                        className={`${cellCls} flex flex-col p-10 relative border-t-2 ${plan.highlight ? 'border-blue-600' : 'border-transparent'
+                            }`}
                     >
                         {plan.highlight && (
-                            <div className="absolute top-0 right-0 px-4 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest">
+                            <div className="absolute top-0 right-0 px-4 py-1.5 bg-blue-600 text-white text-md uppercase tracking-widest font-bold font-sans">
                                 Most Popular
                             </div>
                         )}
 
-                        <div className={`w-12 h-12 border flex items-center justify-center mb-6 ${
-                            plan.highlight ? 'bg-blue-600 border-blue-400 text-white' : 'bg-[#FAFAFA] border-gray-100 text-slate-600'
-                        }`}>
+                        <div className={`w-12 h-12 border flex items-center justify-center mb-6 ${plan.highlight ? 'bg-blue-600 border-blue-400 text-white' : 'bg-[#FAFAFA] border-gray-100 text-slate-600'
+                            }`}>
                             <plan.icon className="w-5 h-5" />
                         </div>
 
-                        <h3 className="text-lg font-bold text-slate-900 mb-1.5">{plan.name}</h3>
+                        <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-1.5">{plan.name}</h3>
                         <div className="flex items-baseline gap-1 mb-2">
-                            <span className="text-4xl font-black text-slate-900 tracking-tighter">
+                            <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900">
                                 {plan.price.startsWith('$') ? plan.price.substring(1) : plan.price}
                             </span>
-                            {plan.period && <span className="text-slate-400 text-xs font-medium italic mb-1">{plan.period}</span>}
-                            {!plan.period && plan.id === 'FREE' && <span className="text-slate-400 text-xs font-medium italic mb-1">30 days</span>}
+                            {plan.period && <span className="text-sm text-slate-400 font-display italic mb-1">{plan.period}</span>}
+                            {!plan.period && plan.id === 'FREE' && <span className="text-sm text-slate-400 font-medium italic mb-1">30 days</span>}
                         </div>
-                        <p className="text-xs text-slate-500 mb-8 leading-relaxed font-medium">{plan.description}</p>
+                        <p className="text-base text-slate-500 leading-relaxed mb-8">{plan.description}</p>
 
                         <div className="space-y-4 flex-1 mb-8">
                             {plan.features.map((f, j) => (
@@ -121,17 +117,16 @@ const AppPricing = () => {
                                     <div className="w-4 h-4 rounded-full bg-blue-50 flex items-center justify-center">
                                         <Check className="w-2.5 h-2.5 text-blue-500 shrink-0" />
                                     </div>
-                                    <span className="text-xs text-slate-600 font-medium">{f}</span>
+                                    <span className="text-md text-slate-600 font-sans">{f}</span>
                                 </div>
                             ))}
                         </div>
 
                         <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading}
-                            className={`w-full py-3.5 min-h-[44px] text-xs font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 active:scale-95 ${
-                                plan.highlight
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20'
-                                    : 'bg-transparent border border-gray-100 text-slate-900 hover:bg-[#FAFAFA]'
-                            } ${isLoading && selectedTier === plan.id ? 'opacity-60' : ''}`}>
+                            className={`w-full py-3.5 min-h-[44px] text-md uppercase tracking-widest font-bold font-sans transition-all flex items-center justify-center gap-2 active:scale-95 ${plan.highlight
+                                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20'
+                                : 'bg-transparent border border-gray-100 text-slate-900 hover:bg-[#FAFAFA]'
+                                } ${isLoading && selectedTier === plan.id ? 'opacity-60' : ''}`}>
                             {isLoading && selectedTier === plan.id
                                 ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin" /> Processing...</>
                                 : plan.id === 'FREE' ? 'Start Free Trial' : `Select ${plan.name}`

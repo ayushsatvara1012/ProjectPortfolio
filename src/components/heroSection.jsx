@@ -27,21 +27,21 @@ const HeroSection = () => {
   return (
     <section id="home" className="relative min-h-screen bg-white pt-16 lg:pt-20 overflow-hidden">
       {/* Architectural Grid Container */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 border border-gray-100">
+      <div className="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100">
 
         {/* ── LEFT COLUMN: VALUE PROPOSITION ──────────────── */}
         <div className="bg-white p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">
-          <div className="px-2 py-0.5 border border-gray-100 bg-gray-50 text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2 w-fit mb-8 rounded-none">
+          <div className="px-2 py-0.5 bg-gray-50 text-xs uppercase tracking-widest font-bold text-slate-600 flex items-center gap-2 w-fit mb-8 rounded-none">
             <Cpu className="w-3.5 h-3.5" />
             Next-Gen AI Infrastructure
           </div>
 
-          <h1 className="text-4xl lg:text-6xl font-black text-slate-900 tracking-tight uppercase leading-[0.95] mb-6">
-            Autonomous <span className="text-slate-400">AI Agents</span> <br />
+          <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 mb-6">
+            Autonomous <br /> <span className="text-blue-800">AI Chat Bots</span> <br />
             For Modern <span className="text-indigo-600">SaaS</span>
           </h1>
 
-          <p className="text-slate-500 text-lg lg:text-xl font-medium max-w-lg mb-10 leading-relaxed">
+          <p className="text-base font-display text-slate-500 leading-relaxed max-w-lg mb-10">
             Connect your database, upload your docs, and deploy a custom RAG agent in minutes.
             No complex pipelines required.
           </p>
@@ -49,13 +49,13 @@ const HeroSection = () => {
           <div className="flex flex-col sm:flex-row gap-px bg-gray-100 w-fit">
             <button
               onClick={() => navigate('/services')}
-              className="bg-slate-900 text-white px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center gap-2 rounded-none"
+              className="bg-slate-900 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 transition-colors flex items-center gap-2 rounded-none"
             >
               Start Building Free <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => window.open('https://docs.sapybase.com', '_blank')}
-              className="bg-white border border-transparent text-slate-600 px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors rounded-none outline-1 outline-gray-100"
+              className="bg-white border border-transparent px-8 py-4 text-sm font-display tracking-widest text-slate-600 hover:bg-gray-50 transition-colors rounded-none outline-1 outline-gray-100"
             >
               Read the Docs
             </button>
@@ -63,7 +63,7 @@ const HeroSection = () => {
         </div>
 
         {/* ── RIGHT COLUMN: HIGH-FIDELITY MICRO-REPLICAS ────── */}
-        <div className="bg-[#FAFAFA] relative min-h-[650px] overflow-hidden flex flex-col items-center">
+        <div className="bg-[#FAFAFA] relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)]">
 
           {/* Blueprint Grid Background */}
           <div
@@ -78,13 +78,13 @@ const HeroSection = () => {
           <div className="relative z-30 mt-8 bg-gray-100 p-1 rounded-full flex gap-1 border border-gray-200 shadow-inner">
             <button
               onClick={() => setView('train')}
-              className={`px-6 py-2 text-[11px] font-bold uppercase tracking-widest transition-all rounded-full ${view === 'train' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`px-6 py-2 text-[10px] uppercase tracking-widest font-bold transition-all rounded-full ${view === 'train' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-600'}`}
             >
               Train Agent
             </button>
             <button
               onClick={() => setView('configure')}
-              className={`px-6 py-2 text-[11px] font-bold uppercase tracking-widest transition-all rounded-full ${view === 'configure' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`px-6 py-2 text-[10px] uppercase tracking-widest font-bold transition-all rounded-full ${view === 'configure' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-600'}`}
             >
               Configure Bot
             </button>
@@ -95,7 +95,7 @@ const HeroSection = () => {
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              className="absolute left-0 top-0 w-[85%] z-10 bg-white border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden rounded-none"
+              className="absolute left-5 top-0 w-[85%] z-10 bg-white border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden rounded-none"
             >
               {/* macOS Header */}
               <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
@@ -104,14 +104,14 @@ const HeroSection = () => {
                   <div className="w-2.5 h-2.5 bg-[#FFBD2E] rounded-full" />
                   <div className="w-2.5 h-2.5 bg-[#27C93F] rounded-full" />
                 </div>
-                <div className="bg-white border border-gray-200 rounded px-12 py-0.5 text-[9px] text-gray-400 font-medium">
+                <div className="bg-white border border-gray-200 rounded px-12 py-0.5 text-sm text-slate-600 font-medium">
                   app.sapybase.com
                 </div>
                 <div className="w-10" />
               </div>
 
               {/* App Content with Scale Trick */}
-              <div className="p-0 overflow-hidden" style={{ height: '400px' }}>
+              <div className="p-0 overflow-hidden" style={{ height: '450px' }}>
                 <div style={{ transform: 'scale(0.8)', transformOrigin: 'top left', width: '125%' }}>
                   <AnimatePresence mode="wait">
                     {view === 'configure' ? (
@@ -124,14 +124,14 @@ const HeroSection = () => {
                         className="p-8"
                       >
                         <div className="flex items-center gap-2 mb-6">
-                          <Bot className="w-4 h-4 text-slate-400" />
-                          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-900">Bot Identity</h2>
+                          <Bot className="w-4 h-4 text-slate-600" />
+                          <h3 className="text-sm tracking-widest font-display text-slate-900">Bot Identity</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-8 mb-6">
                           <div className="space-y-4">
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                            <h4 className="text-xl md:text-2xl font-display font-bold text-slate-900">
                               Identity & <span className="text-indigo-600">Deployment</span>
-                            </h3>
+                            </h4>
 
                             <div className="space-y-3">
                               {[
@@ -141,9 +141,9 @@ const HeroSection = () => {
                               ].map(({ Icon, label }, i) => (
                                 <div key={i} className="flex items-center gap-3 group">
                                   <div className="w-8 h-8 flex items-center justify-center bg-gray-50 border border-gray-100 group-hover:bg-white transition-colors">
-                                    <Icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                                    <Icon className="w-4 h-4 text-slate-600 group-hover:text-indigo-600 transition-colors" />
                                   </div>
-                                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">
+                                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans group-hover:text-slate-600 transition-colors">
                                     {label}
                                   </span>
                                 </div>
@@ -152,10 +152,10 @@ const HeroSection = () => {
 
                             {/* Compatibility Bullet Points */}
                             <div className="pt-2 space-y-1.5">
-                              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Universal Compatibility</p>
+                              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans mb-1">Universal Compatibility</p>
                               <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
                                 {['Next.js', 'React', 'Flutter', 'Angular'].map(tech => (
-                                  <li key={tech} className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">
+                                  <li key={tech} className="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
                                     <div className="w-1 h-1 bg-indigo-500" /> {tech}
                                   </li>
                                 ))}
@@ -165,13 +165,13 @@ const HeroSection = () => {
 
                           <div className="space-y-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Company Name</label>
-                              <div className="w-full bg-gray-50 border border-gray-100 py-2.5 px-3 text-xs text-slate-900 font-medium">SaPyBase AI</div>
+                              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">Company Name</label>
+                              <div className="w-full bg-gray-50 border border-gray-100 py-2.5 px-3 text-sm text-slate-900 font-medium">Sapy AI</div>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Theme Color</label>
+                              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">Theme Color</label>
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 bg-gray-50 border border-gray-100 py-2.5 px-3 text-xs font-mono text-slate-900 uppercase">
+                                <div className="flex-1 bg-gray-50 border border-gray-100 py-2.5 px-3 text-sm text-slate-900 font-mono uppercase">
                                   {botColor}
                                 </div>
                                 <input
@@ -182,7 +182,7 @@ const HeroSection = () => {
                                 />
                               </div>
                             </div>
-                            <button className="w-full py-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest">
+                            <button className="w-full py-3 bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white font-sans">
                               Create Tenant
                             </button>
                           </div>
@@ -191,11 +191,11 @@ const HeroSection = () => {
                         {/* Full-width Quick Embed Snippet */}
                         <div className="pt-4 border-t border-gray-100">
                           <div className="flex items-center gap-2 mb-3">
-                            <Code2 className="w-3 h-3 text-slate-400" />
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Quick Embed Snippet</p>
+                            <Code2 className="w-3 h-3 text-slate-600" />
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">Quick Embed Snippet</p>
                           </div>
                           <div className="relative group">
-                            <pre className="p-4 bg-slate-900 text-[#F8F8F2] border border-slate-900 text-[11px] font-mono overflow-hidden shadow-2xl rounded-none group-hover:border-indigo-500/30 transition-colors">
+                            <pre className="p-4 bg-slate-900 text-[#F8F8F2] border border-slate-900 text-sm font-mono overflow-hidden shadow-2xl rounded-none group-hover:border-indigo-500/30 transition-colors">
                               <code>
                                 <span className="text-[#6272A4]">&lt;</span>
                                 <span className="text-[#FF79C6]">script</span>
@@ -230,8 +230,8 @@ const HeroSection = () => {
                         className="p-8 pb-0"
                       >
                         <div className="flex items-center gap-2 mb-6">
-                          <BrainCircuit className="w-4 h-4 text-slate-400" />
-                          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-900">Train AI</h2>
+                          <BrainCircuit className="w-4 h-4 text-slate-600" />
+                          <h3 className="text-sm tracking-widest font-display text-slate-900">Train AI</h3>
                         </div>
                         <div className="grid grid-cols-4 gap-px bg-gray-100 border border-gray-100 mb-8">
                           {[
@@ -242,26 +242,26 @@ const HeroSection = () => {
                           ].map((s, i) => (
                             <div key={i} className="bg-white p-4">
                               <div className="flex items-center gap-1.5 mb-1">
-                                <s.icon className="w-3 h-3 text-slate-400" />
-                                <span className="text-[8px] font-bold uppercase tracking-tighter text-slate-400">{s.label}</span>
+                                <s.icon className="w-3 h-3 text-slate-600" />
+                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">{s.label}</span>
                               </div>
-                              <p className="text-lg font-bold text-slate-900 tracking-tight">{s.val}</p>
+                              <p className="text-xl md:text-2xl font-display font-bold text-slate-900">{s.val}</p>
                             </div>
                           ))}
                         </div>
                         <div className="space-y-4">
                           <div className="flex gap-px bg-gray-100 border border-gray-100 w-fit mb-4">
                             {['URL', 'PDF Upload', 'Manual Text'].map((t, i) => (
-                              <div key={i} className={`px-4 py-2 text-[9px] font-bold uppercase tracking-widest ${i === 0 ? 'bg-white text-slate-900' : 'bg-gray-50 text-slate-400'}`}>
+                              <div key={i} className={`px-4 py-2 text-[10px] uppercase tracking-widest font-bold font-sans ${i === 0 ? 'bg-white text-slate-900' : 'bg-gray-50 text-slate-600'}`}>
                                 {t}
                               </div>
                             ))}
                           </div>
                           <div className="w-full aspect-video bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2">
                             <Globe className="w-6 h-6 text-gray-300" />
-                            <p className="text-[10px] text-gray-400 font-medium">https://docs.sapybase.com</p>
+                            <p className="text-sm text-slate-600 font-medium">https://docs.sapybase.com</p>
                           </div>
-                          <button className="w-full py-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest">
+                          <button className="w-full py-3 bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white font-sans">
                             Start Training Sequence
                           </button>
                         </div>
@@ -280,12 +280,12 @@ const HeroSection = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#22C55E]" />
                     <div className="flex flex-col">
-                      <p className="text-xs font-black text-[#4F46E5] leading-tight tracking-tight">Sapy AI</p>
-                      <p className="text-[9px] text-slate-400 font-bold italic opacity-80">Powered by SaPyBase</p>
+                      <p className="text-[10px] uppercase tracking-widest font-bold text-[#4F46E5] font-sans">Sapy AI</p>
+                      <p className="text-sm text-slate-600 font-medium italic opacity-80">Powered by SaPyBase</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <MoreHorizontal className="w-4 h-4 text-slate-400 cursor-pointer hover:text-slate-600 transition-colors" />
+                    <MoreHorizontal className="w-4 h-4 text-slate-600 cursor-pointer hover:text-slate-600 transition-colors" />
                     <div className="w-5 h-5 flex items-center justify-center text-red-500 cursor-pointer hover:text-red-700 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -303,8 +303,8 @@ const HeroSection = () => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 flex-1">
-                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Sapy AI</span>
-                      <div className="bg-white border border-gray-100 p-3 rounded-xl text-[3px] text-slate-700 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] border-b-2 border-b-gray-50">
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans ml-1">Sapy AI</span>
+                      <div className="bg-white border border-gray-100 p-3 rounded-xl text-sm text-slate-500 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] border-b-2 border-b-gray-50">
                         Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?
                       </div>
                     </div>
@@ -318,8 +318,8 @@ const HeroSection = () => {
                     >
                       <Settings className="w-4 h-4 text-indigo-600 animate-spin" style={{ color: botColor }} />
                       <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">Training Active</span>
-                        <span className="text-[8px] text-slate-400 font-bold italic animate-pulse">Syncing knowledge base...</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-900 font-sans">Training Active</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans animate-pulse">Syncing knowledge base...</span>
                       </div>
                     </motion.div>
                   )}
@@ -329,13 +329,13 @@ const HeroSection = () => {
                 <div className="px-4.5 py-4 border-t border-gray-50 bg-white">
                   <div className="flex gap-2 mb-3">
                     {['Services', 'About'].map(btn => (
-                      <div key={btn} className="px-4 py-2 bg-[#EEF2FF] text-[#4F46E5] text-[10px] font-bold rounded-full hover:bg-indigo-100 transition-colors cursor-pointer border border-indigo-50 shadow-sm">
+                      <div key={btn} className="px-4 py-2 bg-[#EEF2FF] text-[#4F46E5] text-[10px] uppercase tracking-widest font-bold font-sans rounded-full hover:bg-indigo-100 transition-colors cursor-pointer border border-indigo-50 shadow-sm">
                         {btn}
                       </div>
                     ))}
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="text-[11px] text-slate-400 font-medium tracking-tight">Ask anything...</div>
+                    <div className="text-sm text-slate-600 font-medium">Ask anything...</div>
                     <Send className="w-4 h-4 text-indigo-500 hover:text-indigo-700 transition-colors cursor-pointer" style={{ color: botColor }} />
                   </div>
                 </div>

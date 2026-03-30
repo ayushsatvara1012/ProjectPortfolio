@@ -36,12 +36,12 @@ const AboutPage = () => {
                         <div className="lg:col-span-5 space-y-6 flex items-center lg:items-start text-center lg:text-start flex-col">
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                                 <Terminal className='w-4 h-4 text-indigo-600 dark:text-indigo-400' />
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono">Sapybase_v2.0</span>
+                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500">Sapybase_v2.0</span>
                             </div>
-                            <h1 className="text-3xl sm:text-5xl lg:text-5xl xl:text-7xl font-black tracking-tighter leading-[0.9] text-slate-900 dark:text-slate-200">
+                            <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200">
                                 THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECTS</span> <br /> OF CODE.
                             </h1>
-                            <p className="text-base text-slate-500 font-light max-w-md leading-relaxed">
+                            <p className="text-base text-slate-500 leading-relaxed max-w-md">
                                 We engineer scalable ecosystems that bridge business vision and technical reality.
                             </p>
                         </div>
@@ -64,12 +64,12 @@ const AboutPage = () => {
                                         <div className="h-40 md:h-48 lg:h-56 xl:h-48 shrink-0 overflow-hidden rounded-2xl mb-4 bg-slate-200 dark:bg-slate-800">
                                             <img src={p.image} alt={p.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
                                         </div>
-                                        <h2 className="font-bold text-lg leading-tight text-slate-900 dark:text-slate-200">{p.name}</h2>
-                                        <p className="text-indigo-600 dark:text-indigo-400 font-mono text-[9px] uppercase tracking-widest mb-3">{p.role}</p>
-                                        <div className='text-slate-900 dark:text-slate-300 text-xs font-quantico mb-4 grow leading-relaxed'>{p.desc}</div>
+                                        <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200">{p.name}</h3>
+                                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">{p.role}</p>
+                                        <div className='text-sm text-slate-400 font-medium mb-4 grow leading-relaxed'>{p.desc}</div>
                                         <div className="mt-auto flex flex-wrap gap-1">
                                             {p.skills.map(s => (
-                                                <span key={s} className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 text-[10px] font-bold text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700">{s}</span>
+                                                <span key={s} className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-400 border border-slate-100 dark:border-slate-700">{s}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -79,9 +79,9 @@ const AboutPage = () => {
                             {/* Floating Technical Overlay */}
                             <div className="absolute bottom-4 right-6 bg-slate-900 text-white p-3 md:p-4 rounded-xl md:rounded-2xl shadow-2xl flex items-center gap-3 md:gap-4">
                                 <Activity className="text-emerald-400 animate-pulse" size={18} />
-                                <div className="font-mono text-[8px] md:text-[9px]">
-                                    <p className="opacity-50 uppercase">Stack_Ready</p>
-                                    <p className="font-bold">UPTIME: 99.98%</p>
+                                <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
+                                    <p className="opacity-70">Stack_Ready</p>
+                                    <p>UPTIME: 99.98%</p>
                                 </div>
                             </div>
                         </div>
@@ -95,10 +95,10 @@ const AboutPage = () => {
                     <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 md:gap-16 items-center">
 
                         <div className="space-y-6 md:space-y-8">
-                            <h2 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter leading-tight">
-                                Performance-First <br className="hidden md:block" /> <span className="text-slate-500 font-light italic">Solutions.</span>
+                            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-white">
+                                Performance-First <br className="hidden md:block" /> <span className="text-slate-500 leading-relaxed italic">Solutions.</span>
                             </h2>
-                            <div className="space-y-4 text-slate-400 font-light text-sm md:text-base leading-relaxed max-w-lg">
+                            <div className="space-y-4 text-base text-slate-500 leading-relaxed max-w-lg">
                                 <p>
                                     Built on <span className="text-indigo-400">Atomic Design Principles</span>, this platform utilizes React 19 and Vite to ensure lightning-fast interaction.
                                 </p>
@@ -114,7 +114,7 @@ const AboutPage = () => {
                                 <Rocket size={120} />
                             </div>
 
-                            <h3 className="text-xl md:text-2xl font-bold mb-6 md:mb-8 flex items-center gap-3">
+                            <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-6 md:mb-8 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
                                     <div className="w-2 h-2 rounded-full bg-indigo-500" />
                                 </div>
@@ -128,14 +128,14 @@ const AboutPage = () => {
                                     "Scalable System Integration",
                                     "Customer Retention UX"
                                 ].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-xs md:text-sm text-slate-300">
+                                    <li key={i} className="flex items-center gap-3 text-sm text-slate-400 font-medium">
                                         <ChevronRight size={14} className="text-indigo-500" />
                                         {item}
                                     </li>
                                 ))}
                             </ul>
 
-                            <button className="mt-8 md:mt-10 w-full py-3 md:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all active:scale-95">
+                            <button className="mt-8 md:mt-10 w-full py-3 md:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all active:scale-95">
                                 Initiate Consultation
                             </button>
                         </div>

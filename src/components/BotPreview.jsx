@@ -42,8 +42,8 @@ const BotPreview = () => {
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <p className="font-bold text-base leading-none tracking-tight" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
-                                <span className="text-[10px] italic text-slate-500 mt-1">Powered by SaPyBase</span>
+                                <p className="text-xl md:text-2xl font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
+                                <span className="text-sm text-slate-400 font-medium italic mt-1">Powered by SaPyBase</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -67,10 +67,10 @@ const BotPreview = () => {
                             </div>
                         </div>
                         <div className="flex flex-col items-start px-1">
-                            <span className="text-[10px] font-bold text-slate-400 mb-1.5 ml-1 uppercase tracking-widest leading-none">
+                            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">
                                 {BOT_NAME}
                             </span>
-                            <div className="bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm text-sm leading-relaxed">
+                            <div className="bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm text-base leading-relaxed">
                                 {greeting || 'Hi! How can I help you today?'}
                             </div>
                         </div>
@@ -84,7 +84,7 @@ const BotPreview = () => {
                             </div>
                         </div>
                         <div className="flex flex-col items-end px-1">
-                            <div className="px-4 py-3 rounded-2xl rounded-br-none shadow-sm text-sm text-white" style={{ backgroundColor: THEME_COLOR }}>
+                            <div className="px-4 py-3 rounded-2xl rounded-br-none shadow-sm text-base leading-relaxed text-white" style={{ backgroundColor: THEME_COLOR }}>
                                 Looking good!
                             </div>
                         </div>
@@ -98,7 +98,7 @@ const BotPreview = () => {
                     <div className="pb-4 flex gap-2 overflow-x-auto no-scrollbar">
                         {['Pricing', 'Integration', 'Support'].map(q => (
                             <button key={q}
-                                className="shrink-0 px-4 py-2 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-[11px] font-bold rounded-full transition-all active:scale-95 whitespace-nowrap"
+                                className="shrink-0 px-4 py-2 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-all active:scale-95 whitespace-nowrap"
                             >
                                 {q}
                             </button>
@@ -108,7 +108,7 @@ const BotPreview = () => {
                         <input
                             readOnly
                             placeholder="Ask anything..."
-                            className="flex-1 bg-transparent text-sm text-slate-600 placeholder-gray-400 focus:outline-none py-1.5"
+                            className="flex-1 bg-transparent text-base leading-relaxed text-slate-600 placeholder-gray-400 focus:outline-none py-1.5"
                         />
                         <button className="p-2 rounded-lg transition-all group">
                             <Send size={18} className="group-hover:scale-110 transition-transform" style={{ color: THEME_COLOR }} />

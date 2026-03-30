@@ -12,15 +12,15 @@ import { useUserRole } from '../context/UserContext';
 
 const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100" />;
 const TABS = [
-    { id: 'url',  label: 'URL',         Icon: Globe     },
-    { id: 'pdf',  label: 'PDF Upload',  Icon: FileText  },
+    { id: 'url', label: 'URL', Icon: Globe },
+    { id: 'pdf', label: 'PDF Upload', Icon: FileText },
     { id: 'text', label: 'Manual Text', Icon: AlignLeft },
 ];
 
 // Grid primitives
 const cellCls = 'bg-white';
 const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 focus:outline-none focus:ring-1 focus:ring-slate-900/20 focus:border-slate-400 text-sm text-slate-900 transition-all";
-const labelCls = "block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1.5";
+const labelCls = "block text-md font-display uppercase tracking-widest text-slate-600 mb-1.5";
 
 const AppTrainAI = () => {
     const { getToken, isLoaded } = useAuth();
@@ -81,8 +81,8 @@ const AppTrainAI = () => {
 
     const statCards = [
         { label: 'Ingested Sources', value: totalDocuments ?? 0, Icon: Database, unit: 'docs' },
-        { label: 'AI Memory',        value: totalMessages ?? 0,  Icon: Activity, unit: 'msgs' },
-        { label: 'System Tier',      value: userTier || '—',     Icon: Zap,      unit: 'plan' },
+        { label: 'AI Memory', value: totalMessages ?? 0, Icon: Activity, unit: 'msgs' },
+        { label: 'System Tier', value: userTier || '—', Icon: Zap, unit: 'plan' },
         { label: 'Quota Used', value: `${messagesUsed ?? 0}/${messageLimit ?? 200}`, Icon: Lock, unit: 'reqs' },
     ];
 
@@ -91,10 +91,10 @@ const AppTrainAI = () => {
             {/* ── Page Header ── */}
             <div className="bg-white px-8 py-6 shrink-0 border-b border-gray-100">
                 <div className="flex items-center gap-2 mb-1">
-                    <BrainCircuit className="w-4 h-4 text-slate-400" />
-                    <h1 className="text-lg font-bold text-slate-900 tracking-tight text-base uppercase tracking-widest">Train AI</h1>
+                    <BrainCircuit className="w-4 h-4 text-slate-600" />
+                    <h1 className="text-xl md:text-2xl font-display font-black tracking-tight leading-none text-slate-900">Train AI</h1>
                 </div>
-                <p className="text-sm text-slate-500">Ingest knowledge sources into your AI's vector brain.</p>
+                <p className="text-md font-display text-slate-500 leading-relaxed">Ingest knowledge sources into your AI's vector brain.</p>
             </div>
 
             {/* ── Stats Row (tic-tac-toe grid) ── */}
@@ -104,11 +104,11 @@ const AppTrainAI = () => {
                     : statCards.map(({ label, value, Icon, unit }) => (
                         <div key={label} className={`${cellCls} p-8`}>
                             <div className="flex items-center gap-2 mb-3">
-                                <Icon className="w-3.5 h-3.5 text-slate-400" />
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+                                <Icon className="w-3.5 h-3.5 text-slate-600" />
+                                <p className="text-md uppercase tracking-widest font-bold text-slate-600">{label}</p>
                             </div>
-                            <p className="text-3xl font-bold text-slate-900 tracking-tight">
-                                {value} <span className="text-[11px] font-mono text-slate-400">{unit}</span>
+                            <p className="text-2xl md:text-3xl font-display font-bold tracking-tight text-slate-900">
+                                {value} <span className="text-sm font-mono text-slate-600">{unit}</span>
                             </p>
                         </div>
                     ))
@@ -125,28 +125,27 @@ const AppTrainAI = () => {
                                 <Lock className="w-6 h-6 text-slate-900" />
                             </div>
                             <div className="text-center">
-                                <p className="text-lg font-bold text-slate-900 mb-2">Trial Plan Required</p>
-                                <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
+                                <p className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-2">Trial Plan Required</p>
+                                <p className="text-md font-display text-slate-600 leading-relaxed max-w-sm">
                                     Vector training is available on Starter and Scale plans. Unlock your bot's brain today.
                                 </p>
                             </div>
-                            <a href="/app/pricing" className="px-8 py-3 bg-slate-900 text-white text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-slate-800 transition-all flex items-center active:scale-95">
+                            <a href="/app/pricing" className="px-8 py-3 bg-slate-900 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-all flex items-center active:scale-95">
                                 Upgrade Now
                             </a>
                         </div>
                     )}
 
-                    <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">Knowledge Sources</h2>
+                    <h2 className="text-md font-display font-bold text-slate-900 mb-4">Knowledge Sources</h2>
 
                     {/* Source Tabs */}
                     <div className="flex border border-gray-100 mb-5 overflow-x-auto">
                         {TABS.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`flex items-center gap-1.5 flex-1 py-2.5 px-3 text-xs font-bold uppercase tracking-wider transition-colors min-h-[40px] shrink-0 border-b-2 ${
-                                    activeTab === t.id
+                                className={`flex items-center gap-1.5 flex-1 py-2.5 px-3 text-sm font-display uppercase tracking-widest font-bold transition-colors min-h-[40px] shrink-0 border-b-2 ${activeTab === t.id
                                         ? 'border-slate-900 text-slate-900 bg-[#FAFAFA]'
-                                        : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-[#FAFAFA]'
-                                }`}>
+                                        : 'border-transparent text-slate-600 hover:text-slate-700 hover:bg-[#FAFAFA]'
+                                    }`}>
                                 <t.Icon className="w-3.5 h-3.5" />{t.label}
                             </button>
                         ))}
@@ -157,9 +156,9 @@ const AppTrainAI = () => {
                         <label className={labelCls}>API Secret Key</label>
                         <div className="relative">
                             <input type={showKey ? 'text' : 'password'} value={apiKey}
-                                onChange={e => setApiKey(e.target.value)} className={inputCls + ' pr-10'} placeholder="sb_live_..." />
+                                onChange={e => setApiKey(e.target.value)} className={inputCls + ' pr-10 text-sm font-mono'} placeholder="sb_live_..." />
                             <button type="button" onClick={() => setShowKey(p => !p)}
-                                className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600">
+                                className="absolute inset-y-0 right-3 flex items-center text-slate-600 hover:text-slate-600">
                                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
@@ -169,7 +168,7 @@ const AppTrainAI = () => {
                         {activeTab === 'url' && (
                             <div>
                                 <label className={labelCls}>Source URL</label>
-                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls} placeholder="https://docs.example.com" />
+                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls + ' text-sm font-mono'} placeholder="https://docs.example.com" />
                             </div>
                         )}
                         {activeTab === 'pdf' && (
@@ -177,10 +176,10 @@ const AppTrainAI = () => {
                                 <label className={labelCls}>PDF Archive</label>
                                 <div onClick={() => fileRef.current?.click()}
                                     className="flex flex-col items-center justify-center gap-3 px-6 py-8 bg-[#FAFAFA] border border-dashed border-gray-200 cursor-pointer hover:border-slate-400 transition-colors">
-                                    <UploadCloud className="w-7 h-7 text-slate-400" />
+                                    <UploadCloud className="w-7 h-7 text-slate-600" />
                                     <div className="text-center">
-                                        <p className="text-sm font-bold text-slate-700">{file ? file.name : 'Drop PDF here'}</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">or click to browse</p>
+                                        <p className="text-sm text-slate-700 font-medium">{file ? file.name : 'Drop PDF here'}</p>
+                                        <p className="text-md uppercase tracking-widest font-bold text-slate-600 mt-0.5">or click to browse</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
                                         onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
@@ -201,7 +200,7 @@ const AppTrainAI = () => {
                             </div>
                         )}
                         <button type="submit" disabled={isTraining || isLockedOut}
-                            className="w-full py-3 min-h-[44px] bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
+                            className="w-full py-3 min-h-[44px] bg-slate-900 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
                             {isTraining ? (<><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Training...</>) : isLockedOut ? 'Quota Exceeded' : 'Start Training Sequence'}
                         </button>
                     </form>
@@ -213,17 +212,17 @@ const AppTrainAI = () => {
                     <div className={`${cellCls} p-8 flex flex-col justify-center min-h-[240px]`}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <Database className="w-3.5 h-3.5 text-slate-400" />
-                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Usage</h4>
+                                <Database className="w-3.5 h-3.5 text-slate-600" />
+                                <h4 className="text-md uppercase tracking-widest font-bold text-slate-600">Total Usage</h4>
                             </div>
                             {(messageLimit ?? 0) >= 999999 && (
-                                <span className="px-2 py-0.5 border border-slate-200 bg-white text-[9px] font-bold uppercase tracking-widest text-slate-500">Unlimited</span>
+                                <span className="px-2 py-0.5 border border-slate-200 bg-white text-md uppercase tracking-widest font-bold text-slate-500">Unlimited</span>
                             )}
                         </div>
                         <div className="flex items-end gap-1 mb-4">
-                            <span className="text-5xl font-bold text-slate-900 tracking-tighter">{messagesUsed ?? 0}</span>
-                            {(messageLimit ?? 0) < 999999 && <span className="text-lg text-slate-400 mb-1 font-light italic">/ {messageLimit}</span>}
-                            <span className="text-[10px] font-bold text-slate-400 mb-2 ml-1 uppercase tracking-widest">reqs</span>
+                            <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900">{messagesUsed ?? 0}</span>
+                            {(messageLimit ?? 0) < 999999 && <span className="text-xl text-slate-600 mb-1 font-medium italic">/ {messageLimit}</span>}
+                            <span className="text-md uppercase tracking-widest font-bold text-slate-600 mb-2 ml-1">reqs</span>
                         </div>
                         {(messageLimit ?? 0) < 999999 && (
                             <>
@@ -232,15 +231,13 @@ const AppTrainAI = () => {
                                         animate={{ width: `${Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100)}%` }}
                                         className={`h-full ${(messagesUsed / messageLimit) >= 1 ? 'bg-red-500' : (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' : 'bg-slate-900'}`} />
                                 </div>
-                                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-3">
+                                <div className="flex justify-between text-md uppercase tracking-widest font-bold text-slate-600 mt-3">
                                     <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% Capacity</span>
                                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Resets {periodEndStr}</span>
                                 </div>
                             </>
                         )}
                     </div>
-                    {/* Subscription */}
-                    <div className={`${cellCls}`}><ManageSubscriptions /></div>
                 </div>
             </div>
 

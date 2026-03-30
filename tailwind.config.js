@@ -9,7 +9,12 @@ export default {
     preflight: false, // Prevents Tailwind from overwriting client website defaults
   },
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['"Darker Grotesque"', 'sans-serif'], // Sets Darker Grotesque as the default body font
+        display: ['"Bricolage Grotesque"', 'sans-serif'], // Creates a custom font-display class for headers
+      },
+    },
   },
   plugins: [],
 }

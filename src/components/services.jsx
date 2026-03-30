@@ -45,36 +45,36 @@ const Services = () => {
   ];
 
   return (
-    <section id="services" className="bg-white py-24 md:py-32 border-t border-gray-100 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 md:px-12">
+    <section id="services" className="bg-white py-12 overflow-hidden">
+      <div className="max-w-8xl mx-auto px-6 md:px-12">
         
         {/* Tic-Tac-Toe Grid Architecture */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border border-gray-200 rounded-none overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border-b border-gray-200 rounded-none overflow-hidden">
           
           {/* 1. HEADER CELL (Full Width) */}
-          <div className="md:col-span-2 bg-white p-12 md:p-20 flex flex-col md:flex-row justify-between items-start md:items-end gap-12 group/header">
+          <div className="md:col-span-2 bg-white p-12 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-12 group/header">
             <div className="max-w-2xl space-y-8">
-              <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
+              <div className="flex items-center gap-3 text-md font-display uppercase tracking-widest font-bold text-slate-600">
                 <Activity size={14} className="text-slate-300" />
                 <span>Service_Module_Registry</span>
               </div>
-              <h2 className="text-4xl sm:text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.85] uppercase">
+              <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 uppercase">
                 ENGINEERING <br />
-                <span className="text-slate-200">Super-Structures.</span>
+                <span className="text-blue-600">Super-Structures.</span>
               </h2>
             </div>
             
             {/* Architectural Legend */}
-            <div className="border border-gray-200 p-6 md:p-8 space-y-4 min-w-[240px] transition-colors duration-500 group-hover/header:border-indigo-100">
-              <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-slate-400 uppercase">
+            <div className="border-l border-gray-200 p-6 md:p-8 space-y-4 min-w-[240px] transition-colors duration-500 group-hover/header:border-indigo-100">
+              <div className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-slate-600">
                 <span>System_Version</span>
-                <span className="text-slate-900">2.0.6</span>
+                <span className="text-slate-900 font-sans">2.0.6</span>
               </div>
-              <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-slate-400 uppercase">
+              <div className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-slate-600 mt-4">
                 <span>Uptime</span>
-                <span className="text-emerald-600 font-bold">99.99%</span>
+                <span className="text-emerald-600 font-sans">99.99%</span>
               </div>
-              <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-slate-400 uppercase">
+              <div className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-slate-600 mt-4">
                 <span>Protocol</span>
                 <span className="text-slate-900">HP_SECURE</span>
               </div>
@@ -88,12 +88,12 @@ const Services = () => {
 
           {/* 2. MODULE CELLS (4 Services) */}
           {services.map((service, idx) => (
-            <div key={service.id} className="bg-white p-10 md:p-14 flex flex-col justify-between gap-12 group/cell transition-colors duration-500 hover:bg-slate-50/50">
+            <div key={service.id} className="bg-white p-5 md:p-10 flex flex-col justify-between gap-12 group/cell transition-colors duration-500 hover:bg-slate-50/50 border-t">
               <div className="space-y-8">
                 {/* Eyebrow Label */}
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
-                  <span className="text-indigo-600">MODULE_{service.id}</span>
-                  <span className="text-slate-300 text-[8px]">//</span>
+                <div className="flex items-center gap-2 text-md font-display tracking-widest font-bold text-slate-600">
+                  <span className="text-blue-600">MODULE_{service.id}</span>
+                  <span className="text-slate-500">//</span>
                   <span>{service.label}</span>
                 </div>
 
@@ -104,10 +104,10 @@ const Services = () => {
 
                 {/* Content */}
                 <div className="space-y-4">
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter uppercase leading-[0.9]">
+                  <h3 className="text-xl md:text-4xl font-display font-bold text-slate-900">
                     {service.title.split(' & ').join(' \n& ')}
                   </h3>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed tracking-tight max-w-sm">
+                  <p className="text-md font-display text-slate-500 leading-relaxed max-w-sm">
                     {service.description}
                   </p>
                 </div>
@@ -116,7 +116,7 @@ const Services = () => {
                 {service.tags && (
                   <div className="flex flex-wrap gap-2 pt-2">
                     {service.tags.map(tag => (
-                      <span key={tag} className="border border-gray-100 bg-white text-slate-400 px-2 py-1 text-[9px] font-bold uppercase tracking-widest font-mono">
+                      <span key={tag} className="border-l border-gray-300 bg-transparent px-2 py-1 text-md font-display uppercase tracking-widest font-bold text-slate-600">
                         {tag}
                       </span>
                     ))}
@@ -128,7 +128,7 @@ const Services = () => {
               <div className="pt-8 border-t border-gray-100 mt-auto">
                 <button 
                   onClick={() => navigate(service.route)}
-                  className="w-full md:w-auto px-8 py-5 bg-slate-900 text-white hover:bg-indigo-600 text-[10px] font-black uppercase tracking-[0.3em] transition-all duration-300 flex items-center justify-center gap-3 group/btn"
+                  className="w-full md:w-auto px-8 py-5 bg-slate-900 hover:bg-indigo-600 text-md font-sans uppercase tracking-widest font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 group/btn"
                 >
                   {service.btnText}
                   <ChevronRight size={14} className="opacity-40 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all" />

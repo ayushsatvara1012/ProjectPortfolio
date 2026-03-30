@@ -49,10 +49,10 @@ const Alert = ({ message, isOpen, onClose, title, type = 'success' }) => {
 
         {/* Content */}
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-slate-900">
+          <h3 className="text-sm text-slate-900 font-bold font-sans">
             {title || currentStyle.defaultTitle}
           </h3>
-          <p className="text-xs text-slate-600 mt-0.5">{message}</p>
+          <p className="text-sm text-slate-600 font-medium mt-0.5">{message}</p>
         </div>
 
         {/* Close Button */}
