@@ -38,7 +38,7 @@ function ContactPage() {
           <div className="my-10 text-center sm:mb-10 sm:mt-0 lg:mb-10 lg:mt-0 lg:text-left">
             <div className="inline-flex items-center gap-2 px-2 py-1 rounded-none bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
               <Terminal size={16} className='text-indigo-600' />
-              <span className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-600">Sapybase_v2.0</span>
+              <span className="text-sm font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200">Sapybase_v2.0</span>
             </div>
             <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200">
               Let's <span className="text-indigo-600">Connect.</span>
@@ -49,7 +49,7 @@ function ContactPage() {
             {/* LEFT: FAQ & Contact Nodes */}
             <div className="w-full space-y-6">
               <div className="space-y-3">
-                <h2 className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-600 text-center lg:text-left">Frequently Asked Questions</h2>
+                <h2 className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 text-center lg:text-left">Frequently Asked Questions</h2>
                 {faqs.map((faq, i) => (
                   <div key={i} className="rounded-none border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900 overflow-hidden transition-all">
                     <button
@@ -57,10 +57,10 @@ function ContactPage() {
                       className="w-full px-5 py-4 flex items-center justify-between text-left group"
                     >
                       <span className="text-lg font-display text-slate-700 dark:text-slate-200 tracking-tight">{faq.q}</span>
-                      <ChevronDown className={`transition-transform duration-300 text-slate-400 dark:text-slate-600 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 ${activeFaq === i ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`} size={16} />
+                      <ChevronDown className={`transition-transform duration-300 text-slate-400 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 ${activeFaq === i ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : ''}`} size={16} />
                     </button>
                     <div className={`px-5 transition-all duration-300 ease-in-out ${activeFaq === i ? 'pb-5 max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}>
-                      <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed border-l-2 border-slate-200 dark:border-slate-800 pl-4">{faq.a}</p>
+                      <p className="text-lg font-sans font-medium text-slate-600 dark:text-slate-200 leading-relaxed border-l-2 border-slate-200 dark:border-slate-800 pl-4">{faq.a}</p>
                     </div>
                   </div>
                 ))}
@@ -85,16 +85,16 @@ function ContactPage() {
                 <form className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-600 ml-1">Your Identity</label>
+                      <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Your Identity</label>
                       <input type="text" placeholder="Name" className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-0 focus:border-slate-900 transition-colors outline-none" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-600 ml-1">Channel</label>
+                      <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Channel</label>
                       <input type="email" placeholder="Email" className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-0 focus:border-slate-900 transition-colors outline-none" />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-600 ml-1">Architecture Overview</label>
+                    <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Architecture Overview</label>
                     <textarea rows="4" placeholder="Describe your vision..." className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-0 focus:border-slate-900 transition-colors outline-none resize-none"></textarea>
                   </div>
                   <button onClick={showDev} type='button' className="w-full bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-md font-display uppercase tracking-widest font-bold text-white px-8 py-5 rounded-none flex items-center justify-center gap-2 transition-colors group">

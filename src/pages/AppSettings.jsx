@@ -9,12 +9,11 @@ import { useBotSettings } from '../context/BotSettingsContext';
 import { useUserRole } from '../context/UserContext';
 import BotPreview from '../components/BotPreview';
 
-const cellCls = 'bg-white';
-const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 focus:outline-none focus:ring-1 focus:ring-slate-900/20 focus:border-slate-400 text-sm text-slate-900 transition-all";
-const labelCls = "block text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5";
-const headingCls = "text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-4";
+const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
+const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 focus:border-slate-400 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-500 transition-colors";
+const labelCls = "block text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5 transition-colors";
+const headingCls = "text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4 transition-colors";
 const sectionGap = 'space-y-px';
-const GRID_BG = { background: 'white' };
 
 // ── Account ───────────────────────────────────────────────────────────────────
 export const AccountSection = () => {
@@ -22,24 +21,24 @@ export const AccountSection = () => {
     const { userRole } = useUserRole();
     const navigate = useNavigate();
     return (
-        <div className={sectionGap + ' p-8'} style={GRID_BG}>
-            <div className={`${cellCls} px-6 py-5 border border-gray-100`}>
-                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-0.5">Account</h2>
-                <p className="text-base text-slate-500 leading-relaxed">Manage your profile and access.</p>
+        <div className={sectionGap + ' p-8 bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500'}>
+            <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
+                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Account</h2>
+                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Manage your profile and access.</p>
             </div>
-            <div className={`${cellCls} p-6 border border-gray-100`}>
-                <p className={headingCls}><User className="inline w-3.5 h-3.5 mr-1.5 text-slate-400" />Profile</p>
-                <div className="flex items-center gap-4 p-4 bg-[#FAFAFA] border border-gray-100">
+            <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
+                <p className={headingCls}><User className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />Profile</p>
+                <div className="flex items-center gap-4 p-4 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors">
                     <UserButton appearance={{ elements: { avatarBox: 'w-12 h-12' } }} />
                     <div>
-                        <p className="text-xl md:text-2xl font-display font-bold text-slate-900">{user?.fullName || 'Developer'}</p>
-                        <p className="text-base text-slate-500 leading-relaxed">{user?.primaryEmailAddress?.emailAddress}</p>
-                        <span className="inline-flex mt-1 px-2 py-0.5 border border-gray-200 bg-[#FAFAFA] text-[10px] uppercase tracking-widest font-bold text-slate-500 font-sans">
+                        <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">{user?.fullName || 'Developer'}</p>
+                        <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">{user?.primaryEmailAddress?.emailAddress}</p>
+                        <span className="inline-flex mt-1 px-2 py-0.5 border border-gray-200 dark:border-slate-700 bg-[#FAFAFA] dark:bg-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans transition-colors">
                             {userRole === 'SUPER_ADMIN' ? 'Platform Owner' : userRole === 'ADMIN' ? 'Admin' : 'Member'}
                         </span>
                     </div>
                 </div>
-                <p className="text-sm text-slate-400 font-medium mt-3">Click your avatar to manage name, password, and connected accounts.</p>
+                <p className="text-lg font-sans text-slate-400 dark:text-slate-500 font-medium mt-3 transition-colors">Click your avatar to manage name, password, and connected accounts.</p>
             </div>
         </div>
     );
@@ -47,12 +46,12 @@ export const AccountSection = () => {
 
 // ── Billing ───────────────────────────────────────────────────────────────────
 export const BillingSection = () => (
-    <div className={sectionGap + ' p-8'} style={GRID_BG}>
-        <div className={`${cellCls} px-6 py-5 border border-gray-100`}>
-            <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-0.5">Billing</h2>
-            <p className="text-base text-slate-500 leading-relaxed">Manage your subscription and invoices.</p>
+    <div className={sectionGap + ' p-8 bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500'}>
+        <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
+            <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Billing</h2>
+            <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Manage your subscription and invoices.</p>
         </div>
-        <div className={cellCls + ' border border-gray-100'}><ManageSubscriptions /></div>
+        <div className={cellCls + ' border border-gray-100 dark:border-slate-800 transition-colors'}><ManageSubscriptions /></div>
     </div>
 );
 
@@ -63,28 +62,28 @@ export const CustomizeSection = () => {
     const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-full bg-[#E8EBF0] overflow-hidden" style={GRID_BG}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
             {/* Left Column: Header + Form */}
-            <div className="bg-white flex flex-col overflow-hidden relative">
-                <div className="px-8 py-6 border-b border-gray-100 shrink-0">
-                    <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-0.5">Customize</h2>
-                    <p className="text-base text-slate-500 leading-relaxed">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
+            <div className="bg-white dark:bg-slate-950 flex flex-col overflow-hidden relative transition-colors">
+                <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
+                    <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Customize</h2>
+                    <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
                 </div>
                 {/* Form area (padded, scrollable) */}
                 <div className="p-8 overflow-y-auto custom-scrollbar flex-1 relative">
                     
                     {isLocked && (
-                        <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100">
-                             <Lock className="w-8 h-8 text-slate-400 mb-4" />
-                             <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-900 font-sans mb-2">Upgrade Required</h3>
-                             <p className="text-base text-slate-500 leading-relaxed max-w-[260px] mb-6">Customizing your bot's visual identity requires an active subscription.</p>
-                             <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 transition-colors shadow-sm">
+                        <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors">
+                             <Lock className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-4 transition-colors" />
+                             <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans mb-2 transition-colors">Upgrade Required</h3>
+                             <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[260px] mb-6 transition-colors">Customizing your bot's visual identity requires an active subscription.</p>
+                             <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors shadow-sm">
                                  View Plans
                              </Link>
                         </div>
                     )}
 
-                    <p className={headingCls}><Palette className="inline w-3.5 h-3.5 mr-1.5 text-slate-400" />Bot Appearance</p>
+                    <p className={headingCls}><Palette className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />Bot Appearance</p>
                     <div className={`space-y-6 ${isLocked ? 'opacity-30 pointer-events-none' : ''}`}>
                         <div>
                             <label className={labelCls}>Bot Name</label>
@@ -101,7 +100,7 @@ export const CustomizeSection = () => {
                         <div>
                             <label className={labelCls}>Primary Color</label>
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 border border-gray-200 overflow-hidden cursor-pointer shrink-0 rounded-none bg-slate-100"
+                                <div className="w-12 h-12 border border-gray-200 dark:border-slate-700 overflow-hidden cursor-pointer shrink-0 rounded-none bg-slate-100 dark:bg-slate-900 transition-colors"
                                     style={{ background: botSettings.primaryColor }}>
                                     <input type="color" value={botSettings.primaryColor}
                                         onChange={e => updateSetting('primaryColor', e.target.value)}
@@ -109,7 +108,7 @@ export const CustomizeSection = () => {
                                 </div>
                                 <input type="text" value={botSettings.primaryColor}
                                     onChange={e => updateSetting('primaryColor', e.target.value)}
-                                    className={inputCls + ' font-mono uppercase text-base leading-relaxed'} placeholder="#5730F5" />
+                                    className={inputCls + ' font-mono uppercase text-md font-display leading-relaxed'} placeholder="#5730F5" />
                             </div>
                         </div>
                     </div>
@@ -117,7 +116,7 @@ export const CustomizeSection = () => {
             </div>
             
             {/* Right Column: Preview (flush) */}
-            <div className="bg-white overflow-hidden border-l border-gray-100 h-full relative">
+            <div className="bg-white dark:bg-slate-950 overflow-hidden border-l border-gray-100 dark:border-slate-800 h-full relative transition-colors">
                 <BotPreview />
             </div>
         </div>
@@ -156,28 +155,28 @@ export const ApiKeysSection = () => {
     };
 
     return (
-        <div className={sectionGap + ' p-8'} style={GRID_BG}>
-            <div className={`${cellCls} px-6 py-5 border border-gray-100`}>
-                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-0.5">API Keys</h2>
-                <p className="text-base text-slate-500 leading-relaxed">Rotate your secret API key. The old key is immediately invalidated.</p>
+        <div className={sectionGap + ' p-8 bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500'}>
+            <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
+                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">API Keys</h2>
+                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Rotate your secret API key. The old key is immediately invalidated.</p>
             </div>
-            <div className={`${cellCls} p-6 border border-gray-100`}>
-                <p className={headingCls}><KeyRound className="inline w-3.5 h-3.5 mr-1.5 text-slate-400" />API Key Management</p>
+            <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
+                <p className={headingCls}><KeyRound className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />API Key Management</p>
                 {newKey && (
-                    <div className="mb-5 p-4 bg-emerald-50 border border-emerald-200">
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 font-sans mb-2">New Key — Copy Now</p>
-                        <div className="flex items-center gap-2 font-mono text-sm text-slate-900 font-medium bg-white border border-emerald-200 p-3">
+                    <div className="mb-5 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 transition-colors">
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans mb-2 transition-colors">New Key — Copy Now</p>
+                        <div className="flex items-center gap-2 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/50 p-3 transition-colors">
                             <span className="flex-1 truncate">{showKey ? newKey : newKey.slice(0, 8) + '••••••••••••••••'}</span>
-                            <button onClick={() => setShowKey(p => !p)} className="text-slate-400 hover:text-slate-600">
+                            <button onClick={() => setShowKey(p => !p)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                             <button onClick={() => { navigator.clipboard.writeText(newKey); showAlertMsg('success', 'Copied!'); }}
-                                className="px-2 py-1 bg-slate-900 text-white text-[10px] uppercase tracking-widest font-bold font-sans">Copy</button>
+                                className="px-2 py-1 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">Copy</button>
                         </div>
                     </div>
                 )}
                 <button onClick={handleRotate} disabled={isLoading}
-                    className="px-5 py-2.5 min-h-[44px] bg-slate-900 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center gap-2 active:scale-[0.99]">
+                    className="px-5 py-2.5 min-h-[44px] bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors disabled:opacity-50 flex items-center gap-2 active:scale-[0.99]">
                     {isLoading ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Rotating...</> : 'Rotate API Key'}
                 </button>
             </div>

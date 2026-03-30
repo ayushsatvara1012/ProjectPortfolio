@@ -25,37 +25,37 @@ const HeroSection = () => {
   }, [view]);
 
   return (
-    <section id="home" className="relative min-h-screen bg-white pt-16 lg:pt-20 overflow-hidden">
+    <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-hidden transition-colors duration-500">
       {/* Architectural Grid Container */}
-      <div className="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100">
+      <div className="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 dark:bg-slate-800 border-x border-gray-100 dark:border-slate-800 transition-colors duration-500">
 
         {/* ── LEFT COLUMN: VALUE PROPOSITION ──────────────── */}
-        <div className="bg-white p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">
-          <div className="px-2 py-0.5 bg-gray-50 text-xs uppercase tracking-widest font-bold text-slate-600 flex items-center gap-2 w-fit mb-8 rounded-none">
+        <div className="bg-white dark:bg-slate-950 p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">
+          <div className="px-2 py-0.5 bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 flex items-center gap-2 w-fit mb-8 rounded-none border border-gray-100 dark:border-slate-800 transition-colors">
             <Cpu className="w-3.5 h-3.5" />
             Next-Gen AI Infrastructure
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 mb-6">
-            Autonomous <br /> <span className="text-blue-800">AI Chat Bots</span> <br />
-            For Modern <span className="text-indigo-600">SaaS</span>
+          <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
+            Autonomous <br /> <span className="text-blue-800 dark:text-blue-400">AI Chat Bots</span> <br />
+            For Modern <span className="text-indigo-600 dark:text-indigo-400">SaaS</span>
           </h1>
 
-          <p className="text-base font-display text-slate-500 leading-relaxed max-w-lg mb-10">
+          <p className="text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
             Connect your database, upload your docs, and deploy a custom RAG agent in minutes.
             No complex pipelines required.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-px bg-gray-100 w-fit">
+          <div className="flex flex-col sm:flex-row gap-px bg-gray-100 dark:bg-slate-800 w-fit transition-colors">
             <button
               onClick={() => navigate('/services')}
-              className="bg-slate-900 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 transition-colors flex items-center gap-2 rounded-none"
+              className="bg-slate-900 dark:bg-indigo-600 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors flex items-center gap-2 rounded-none"
             >
               Start Building Free <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => window.open('https://docs.sapybase.com', '_blank')}
-              className="bg-white border border-transparent px-8 py-4 text-sm font-display tracking-widest text-slate-600 hover:bg-gray-50 transition-colors rounded-none outline-1 outline-gray-100"
+              className="bg-white dark:bg-slate-950 border border-transparent px-8 py-4 text-sm font-display tracking-widest text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none outline-1 outline-gray-100 dark:outline-slate-800"
             >
               Read the Docs
             </button>
@@ -63,28 +63,28 @@ const HeroSection = () => {
         </div>
 
         {/* ── RIGHT COLUMN: HIGH-FIDELITY MICRO-REPLICAS ────── */}
-        <div className="bg-[#FAFAFA] relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)]">
+        <div className="bg-[#FAFAFA] dark:bg-slate-950 relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)] dark:shadow-none transition-colors duration-500">
 
           {/* Blueprint Grid Background */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-[0.05]"
+            className="absolute inset-0 pointer-events-none opacity-[0.05] dark:opacity-[0.1] text-black dark:text-white"
             style={{
-              backgroundImage: `linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)`,
+              backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
               backgroundSize: '40px 40px'
             }}
           />
 
           {/* Segmented Control (Toggle) */}
-          <div className="relative z-30 mt-8 bg-gray-100 p-1 rounded-full flex gap-1 border border-gray-200 shadow-inner">
+          <div className="relative z-30 mt-8 bg-gray-100 dark:bg-slate-900 p-1 rounded-full flex gap-1 border border-gray-200 dark:border-slate-800 shadow-inner dark:shadow-none transition-colors duration-500">
             <button
               onClick={() => setView('train')}
-              className={`px-6 py-2 text-[10px] uppercase tracking-widest font-bold transition-all rounded-full ${view === 'train' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-600'}`}
+              className={`px-6 py-2 text-[10px] uppercase tracking-widest font-bold transition-all rounded-full ${view === 'train' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
             >
               Train Agent
             </button>
             <button
               onClick={() => setView('configure')}
-              className={`px-6 py-2 text-[10px] uppercase tracking-widest font-bold transition-all rounded-full ${view === 'configure' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-600'}`}
+              className={`px-6 py-2 text-[10px] uppercase tracking-widest font-bold transition-all rounded-full ${view === 'configure' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
             >
               Configure Bot
             </button>
@@ -95,16 +95,16 @@ const HeroSection = () => {
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              className="absolute left-5 top-0 w-[85%] z-10 bg-white border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.06)] overflow-hidden rounded-none"
+              className="absolute left-5 top-0 w-[85%] z-10 bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden rounded-none transition-colors duration-500"
             >
               {/* macOS Header */}
-              <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between transition-colors duration-500">
                 <div className="flex gap-1.5">
                   <div className="w-2.5 h-2.5 bg-[#FF5F56] rounded-full" />
                   <div className="w-2.5 h-2.5 bg-[#FFBD2E] rounded-full" />
                   <div className="w-2.5 h-2.5 bg-[#27C93F] rounded-full" />
                 </div>
-                <div className="bg-white border border-gray-200 rounded px-12 py-0.5 text-sm text-slate-600 font-medium">
+                <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded px-12 py-0.5 text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">
                   app.sapybase.com
                 </div>
                 <div className="w-10" />
@@ -124,13 +124,13 @@ const HeroSection = () => {
                         className="p-8"
                       >
                         <div className="flex items-center gap-2 mb-6">
-                          <Bot className="w-4 h-4 text-slate-600" />
-                          <h3 className="text-sm tracking-widest font-display text-slate-900">Bot Identity</h3>
+                          <Bot className="w-4 h-4 text-slate-600 dark:text-slate-400 transition-colors" />
+                          <h3 className="text-sm tracking-widest font-display text-slate-900 dark:text-slate-200 transition-colors">Bot Identity</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-8 mb-6">
                           <div className="space-y-4">
-                            <h4 className="text-xl md:text-2xl font-display font-bold text-slate-900">
-                              Identity & <span className="text-indigo-600">Deployment</span>
+                            <h4 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">
+                              Identity & <span className="text-indigo-600 dark:text-indigo-400">Deployment</span>
                             </h4>
 
                             <div className="space-y-3">
@@ -140,10 +140,10 @@ const HeroSection = () => {
                                 { Icon: ShieldCheck, label: 'Enhance user experience' }
                               ].map(({ Icon, label }, i) => (
                                 <div key={i} className="flex items-center gap-3 group">
-                                  <div className="w-8 h-8 flex items-center justify-center bg-gray-50 border border-gray-100 group-hover:bg-white transition-colors">
-                                    <Icon className="w-4 h-4 text-slate-600 group-hover:text-indigo-600 transition-colors" />
+                                  <div className="w-8 h-8 flex items-center justify-center bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors">
+                                    <Icon className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
                                   </div>
-                                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans group-hover:text-slate-600 transition-colors">
+                                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
                                     {label}
                                   </span>
                                 </div>
@@ -152,10 +152,10 @@ const HeroSection = () => {
 
                             {/* Compatibility Bullet Points */}
                             <div className="pt-2 space-y-1.5">
-                              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans mb-1">Universal Compatibility</p>
+                              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans mb-1 transition-colors">Universal Compatibility</p>
                               <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
                                 {['Next.js', 'React', 'Flutter', 'Angular'].map(tech => (
-                                  <li key={tech} className="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
+                                  <li key={tech} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">
                                     <div className="w-1 h-1 bg-indigo-500" /> {tech}
                                   </li>
                                 ))}
@@ -165,13 +165,13 @@ const HeroSection = () => {
 
                           <div className="space-y-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">Company Name</label>
-                              <div className="w-full bg-gray-50 border border-gray-100 py-2.5 px-3 text-sm text-slate-900 font-medium">Sapy AI</div>
+                              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors">Company Name</label>
+                              <div className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 py-2.5 px-3 text-sm text-slate-900 dark:text-slate-200 font-medium transition-colors">Sapy AI</div>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">Theme Color</label>
+                              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors">Theme Color</label>
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 bg-gray-50 border border-gray-100 py-2.5 px-3 text-sm text-slate-900 font-mono uppercase">
+                                <div className="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 py-2.5 px-3 text-sm text-slate-900 dark:text-slate-200 font-mono uppercase transition-colors">
                                   {botColor}
                                 </div>
                                 <input
@@ -182,17 +182,17 @@ const HeroSection = () => {
                                 />
                               </div>
                             </div>
-                            <button className="w-full py-3 bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white font-sans">
+                            <button className="w-full py-3 bg-slate-900 dark:bg-indigo-600 outline-1 outline-transparent text-[10px] uppercase tracking-widest font-bold text-white font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">
                               Create Tenant
                             </button>
                           </div>
                         </div>
 
                         {/* Full-width Quick Embed Snippet */}
-                        <div className="pt-4 border-t border-gray-100">
+                        <div className="pt-4 border-t border-gray-100 dark:border-slate-800 transition-colors">
                           <div className="flex items-center gap-2 mb-3">
-                            <Code2 className="w-3 h-3 text-slate-600" />
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">Quick Embed Snippet</p>
+                            <Code2 className="w-3 h-3 text-slate-600 dark:text-slate-400" />
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors">Quick Embed Snippet</p>
                           </div>
                           <div className="relative group">
                             <pre className="p-4 bg-slate-900 text-[#F8F8F2] border border-slate-900 text-sm font-mono overflow-hidden shadow-2xl rounded-none group-hover:border-indigo-500/30 transition-colors">
@@ -230,38 +230,38 @@ const HeroSection = () => {
                         className="p-8 pb-0"
                       >
                         <div className="flex items-center gap-2 mb-6">
-                          <BrainCircuit className="w-4 h-4 text-slate-600" />
-                          <h3 className="text-sm tracking-widest font-display text-slate-900">Train AI</h3>
+                          <BrainCircuit className="w-4 h-4 text-slate-600 dark:text-slate-400 transition-colors" />
+                          <h3 className="text-sm tracking-widest font-display text-slate-900 dark:text-slate-200 transition-colors">Train AI</h3>
                         </div>
-                        <div className="grid grid-cols-4 gap-px bg-gray-100 border border-gray-100 mb-8">
+                        <div className="grid grid-cols-4 gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 mb-8 transition-colors">
                           {[
                             { label: 'Sources', val: '12', icon: Database },
                             { label: 'Memory', val: '4.2k', icon: Activity },
                             { label: 'Tier', val: 'Scale', icon: Zap },
                             { label: 'Quota', val: '80%', icon: Clock },
                           ].map((s, i) => (
-                            <div key={i} className="bg-white p-4">
+                            <div key={i} className="bg-white dark:bg-slate-950 p-4 transition-colors">
                               <div className="flex items-center gap-1.5 mb-1">
-                                <s.icon className="w-3 h-3 text-slate-600" />
-                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans">{s.label}</span>
+                                <s.icon className="w-3 h-3 text-slate-600 dark:text-slate-400" />
+                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors">{s.label}</span>
                               </div>
-                              <p className="text-xl md:text-2xl font-display font-bold text-slate-900">{s.val}</p>
+                              <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">{s.val}</p>
                             </div>
                           ))}
                         </div>
                         <div className="space-y-4">
-                          <div className="flex gap-px bg-gray-100 border border-gray-100 w-fit mb-4">
+                          <div className="flex gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 w-fit mb-4 transition-colors">
                             {['URL', 'PDF Upload', 'Manual Text'].map((t, i) => (
-                              <div key={i} className={`px-4 py-2 text-[10px] uppercase tracking-widest font-bold font-sans ${i === 0 ? 'bg-white text-slate-900' : 'bg-gray-50 text-slate-600'}`}>
+                              <div key={i} className={`px-4 py-2 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors ${i === 0 ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200' : 'bg-gray-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400'}`}>
                                 {t}
                               </div>
                             ))}
                           </div>
-                          <div className="w-full aspect-video bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2">
-                            <Globe className="w-6 h-6 text-gray-300" />
-                            <p className="text-sm text-slate-600 font-medium">https://docs.sapybase.com</p>
+                          <div className="w-full aspect-video bg-gray-50 dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 transition-colors">
+                            <Globe className="w-6 h-6 text-gray-300 dark:text-slate-600" />
+                            <p className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">https://docs.sapybase.com</p>
                           </div>
-                          <button className="w-full py-3 bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white font-sans">
+                          <button className="w-full py-3 bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-[10px] uppercase tracking-widest font-bold text-white font-sans transition-colors">
                             Start Training Sequence
                           </button>
                         </div>
@@ -274,18 +274,18 @@ const HeroSection = () => {
 
             {/* ── FREE-FLOATING BOT PREVIEW (Outside Window) ─────────────────── */}
             {view === 'train' && (
-              <div className="absolute right-4 top-24 w-[310px] z-20 bg-white border border-gray-100 shadow-[0_40px_80px_rgba(0,0,0,0.18)] overflow-hidden rounded-2xl">
+              <div className="absolute right-4 top-24 w-[310px] z-20 bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 shadow-[0_40px_80px_rgba(0,0,0,0.18)] dark:shadow-[0_40px_80px_rgba(0,0,0,0.6)] overflow-hidden rounded-2xl transition-colors duration-500">
                 {/* Chat Header - Natively Scaled */}
-                <div className="px-4.5 py-3.5 flex items-center justify-between border-b border-gray-100 bg-linear-to-r from-[#F3E8FF] via-[#F5F3FF] to-[#FFF7ED]">
+                <div className="px-4.5 py-3.5 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 bg-linear-to-r from-[#F3E8FF] via-[#F5F3FF] to-[#FFF7ED] dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#22C55E]" />
                     <div className="flex flex-col">
-                      <p className="text-[10px] uppercase tracking-widest font-bold text-[#4F46E5] font-sans">Sapy AI</p>
-                      <p className="text-sm text-slate-600 font-medium italic opacity-80">Powered by SaPyBase</p>
+                      <p className="text-[10px] uppercase tracking-widest font-bold text-[#4F46E5] dark:text-indigo-400 font-sans">Sapy AI</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 font-medium italic opacity-80 transition-colors">Powered by SaPyBase</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <MoreHorizontal className="w-4 h-4 text-slate-600 cursor-pointer hover:text-slate-600 transition-colors" />
+                    <MoreHorizontal className="w-4 h-4 text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 transition-colors" />
                     <div className="w-5 h-5 flex items-center justify-center text-red-500 cursor-pointer hover:text-red-700 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -295,16 +295,16 @@ const HeroSection = () => {
                 </div>
 
                 {/* Chat Body - Natively Scaled */}
-                <div className="p-4.5 h-[250px] bg-white space-y-5 overflow-hidden">
+                <div className="p-4.5 h-[250px] bg-white dark:bg-slate-950 space-y-5 overflow-hidden transition-colors duration-500">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                      <div className="w-full h-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                      <div className="w-full h-full bg-indigo-50 dark:bg-slate-900 border border-indigo-100 dark:border-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 transition-colors">
                         <Cpu className="w-5 h-5" style={{ color: botColor }} />
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 flex-1">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans ml-1">Sapy AI</span>
-                      <div className="bg-white border border-gray-100 p-3 rounded-xl text-sm text-slate-500 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] border-b-2 border-b-gray-50">
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans ml-1 transition-colors">Sapy AI</span>
+                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-3 rounded-xl text-sm text-slate-500 dark:text-slate-300 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] dark:shadow-none border-b-2 border-b-gray-50 dark:border-b-slate-900 transition-colors">
                         Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?
                       </div>
                     </div>
@@ -314,29 +314,29 @@ const HeroSection = () => {
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 p-3 bg-gray-50/50 border border-dashed border-indigo-200 mt-4 rounded-xl"
+                      className="flex items-center gap-3 p-3 bg-gray-50/50 dark:bg-slate-900/50 border border-dashed border-indigo-200 dark:border-indigo-800/50 mt-4 rounded-xl transition-colors"
                     >
                       <Settings className="w-4 h-4 text-indigo-600 animate-spin" style={{ color: botColor }} />
                       <div className="flex flex-col">
-                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-900 font-sans">Training Active</span>
-                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 font-sans animate-pulse">Syncing knowledge base...</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans transition-colors">Training Active</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans animate-pulse transition-colors">Syncing knowledge base...</span>
                       </div>
                     </motion.div>
                   )}
                 </div>
 
                 {/* Chat Footer - Natively Scaled */}
-                <div className="px-4.5 py-4 border-t border-gray-50 bg-white">
+                <div className="px-4.5 py-4 border-t border-gray-50 dark:border-slate-800 bg-white dark:bg-slate-950 transition-colors duration-500">
                   <div className="flex gap-2 mb-3">
                     {['Services', 'About'].map(btn => (
-                      <div key={btn} className="px-4 py-2 bg-[#EEF2FF] text-[#4F46E5] text-[10px] uppercase tracking-widest font-bold font-sans rounded-full hover:bg-indigo-100 transition-colors cursor-pointer border border-indigo-50 shadow-sm">
+                      <div key={btn} className="px-4 py-2 bg-[#EEF2FF] dark:bg-indigo-900/40 text-[#4F46E5] dark:text-indigo-300 text-[10px] uppercase tracking-widest font-bold font-sans rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer border border-indigo-50 dark:border-indigo-800/50 shadow-sm">
                         {btn}
                       </div>
                     ))}
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-slate-600 font-medium">Ask anything...</div>
-                    <Send className="w-4 h-4 text-indigo-500 hover:text-indigo-700 transition-colors cursor-pointer" style={{ color: botColor }} />
+                    <div className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">Ask anything...</div>
+                    <Send className="w-4 h-4 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer" style={{ color: botColor }} />
                   </div>
                 </div>
               </div>

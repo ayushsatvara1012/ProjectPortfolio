@@ -9,14 +9,14 @@ import Alert from './alert';
 // ─── Skeleton Loader ───────────────────────────────────────────────────────────
 const BillingSkeleton = () => (
     <div className="animate-pulse space-y-4">
-        <div className="h-6 w-1/3 bg-slate-200 rounded-none" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100">
+        <div className="h-6 w-1/3 bg-slate-200 dark:bg-slate-800 rounded-none transition-colors" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100 dark:bg-slate-800">
             {[1, 2, 3].map(i => (
-                <div key={i} className="h-24 bg-slate-200 rounded-none" />
+                <div key={i} className="h-24 bg-slate-200 dark:bg-slate-800 rounded-none transition-colors" />
             ))}
         </div>
-        <div className="h-12 bg-slate-200 rounded-none" />
-        <div className="h-12 bg-slate-200 rounded-none" />
+        <div className="h-12 bg-slate-200 dark:bg-slate-800 rounded-none transition-colors" />
+        <div className="h-12 bg-slate-200 dark:bg-slate-800 rounded-none transition-colors" />
     </div>
 );
 
@@ -156,10 +156,10 @@ const ManageSubscriptions = () => {
         }
     };
 
-    const btnBase = 'w-full py-3 rounded-none text-[10px] uppercase tracking-widest font-bold font-sans transition-all flex items-center justify-center gap-2';
-    const btnPrimary = `${btnBase} bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.99]`;
-    const btnSecondary = `${btnBase} border border-gray-100 text-slate-600 hover:bg-gray-50`;
-    const btnDanger = `${btnBase} border border-red-100 text-red-600 hover:bg-red-50`;
+    const btnBase = 'w-full py-3 rounded-none text-sm uppercase tracking-widest font-bold font-display transition-all flex items-center justify-center gap-2';
+    const btnPrimary = `${btnBase} bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 active:scale-[0.99]`;
+    const btnSecondary = `${btnBase} border border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800`;
+    const btnDanger = `${btnBase} border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20`;
 
     const isDisabled = (key) => processing !== null;
     const label = (key, text) => processing === key ? 'Processing...' : text;
@@ -172,14 +172,14 @@ const ManageSubscriptions = () => {
         </div>
     );
     return (
-        <div className="grid gap-px bg-gray-100 border border-gray-100">
+        <div className="grid gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 transition-colors duration-500">
             {/* Header Cell */}
-            <div className="bg-white px-8 py-6 flex items-center justify-between">
+            <div className="bg-white dark:bg-slate-950 px-8 py-6 flex items-center justify-between transition-colors">
                 <div className="flex items-center gap-2">
-                    <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                    <h4 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">Subscription</h4>
+                    <CreditCard className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                    <h4 className="text-sm uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display">Subscription</h4>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold font-sans border border-current/10 ${meta.badge} rounded-none`}>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-sm uppercase tracking-widest font-bold font-display border border-current/10 ${meta.badge} rounded-none transition-colors`}>
                     <TierIcon className="w-3 h-3" />
                     {meta.label}
                 </span>
@@ -187,26 +187,26 @@ const ManageSubscriptions = () => {
 
             {/* Skeleton or Content Area */}
             {isLoading ? (
-                <div className="bg-white p-8"><BillingSkeleton /></div>
+                <div className="bg-white dark:bg-slate-950 p-8 transition-colors"><BillingSkeleton /></div>
             ) : (
                 <>
                     {/* Stats Grid Cell (Flush internal) */}
-                    <div className="grid grid-cols-3 gap-px bg-gray-100 border-b border-gray-100">
-                        <div className="bg-white p-6 text-center">
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5">Plan</p>
+                    <div className="grid grid-cols-3 gap-px bg-gray-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors">
+                        <div className="bg-white dark:bg-slate-950 p-6 text-center transition-colors">
+                            <p className="text-sm  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-1.5">Plan</p>
                             <p className={`text-xl md:text-2xl font-display font-bold ${meta.color}`}>{meta.label}</p>
                         </div>
-                        <div className="bg-white p-6 text-center">
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5">Status</p>
-                            <p className={`text-xl md:text-2xl font-display font-bold ${subscriptionStatus === 'ACTIVE' ? 'text-emerald-600' : subscriptionStatus === 'CANCELED' ? 'text-red-500' : 'text-amber-500'}`}>
+                        <div className="bg-white dark:bg-slate-950 p-6 text-center transition-colors">
+                            <p className="text-sm  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-1.5">Status</p>
+                            <p className={`text-xl md:text-2xl font-display font-bold ${subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' : subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400'}`}>
                                 {subscriptionStatus || 'Active'}
                             </p>
                         </div>
-                        <div className="bg-white p-6 text-center">
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5">
+                        <div className="bg-white dark:bg-slate-950 p-6 text-center transition-colors">
+                            <p className="text-sm  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-1.5">
                                 {tier === 'TRIAL' ? 'Days Left' : 'Renews'}
                             </p>
-                            <p className="text-xl md:text-2xl font-display font-bold text-slate-900">
+                            <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-100">
                                 {tier === 'TRIAL'
                                     ? (trialDaysLeft !== null ? `${trialDaysLeft}d` : '—')
                                     : formattedPeriodEnd}
@@ -215,13 +215,13 @@ const ManageSubscriptions = () => {
                     </div>
 
                     {/* Actions Area */}
-                    <div className="bg-white p-8">
+                    <div className="bg-white dark:bg-slate-950 p-8 transition-colors">
                         {/* Trial Countdown Banner */}
                         {tier === 'TRIAL' && trialDaysLeft !== null && (
-                            <div className={`flex items-center gap-3 p-4 mb-6 border text-sm font-medium rounded-none
+                            <div className={`flex items-center gap-3 p-4 mb-6 border text-sm font-medium rounded-none transition-colors
                                 ${trialDaysLeft <= 5
-                                    ? 'bg-amber-50 border-amber-100 text-amber-700'
-                                    : 'bg-slate-50 border-gray-100 text-slate-600'
+                                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/30 text-amber-700 dark:text-amber-400'
+                                    : 'bg-slate-50 dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                                 }`}>
                                 <Clock className="w-4 h-4 shrink-0" />
                                 <span>
@@ -233,25 +233,25 @@ const ManageSubscriptions = () => {
                         )}
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col gap-px bg-gray-100 border border-gray-100 mb-6">
+                        <div className="flex flex-col gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 mb-6 transition-colors">
                             {tier === 'FREE' && (
                                 <>
-                                    <div className="bg-white"><button onClick={handleStartTrial} disabled={isDisabled('trial')} className={btnPrimary}>{label('trial', 'Start 30-Day Free Trial')}</button></div>
-                                    <div className="bg-white"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $5/mo')}</button></div>
-                                    <div className="bg-white"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $10/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleStartTrial} disabled={isDisabled('trial')} className={btnPrimary}>{label('trial', 'Start 30-Day Free Trial')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $5/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $10/mo')}</button></div>
                                 </>
                             )}
                             {tier === 'TRIAL' && (
                                 <>
-                                    <div className="bg-white"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnPrimary}>{label('starter', 'Upgrade to Professional — $5/mo')}</button></div>
-                                    <div className="bg-white"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $10/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnPrimary}>{label('starter', 'Upgrade to Professional — $5/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $10/mo')}</button></div>
                                 </>
                             )}
                             {(tier === 'STARTER' || tier === 'PRO') && (
                                 <>
-                                    <div className="bg-white"><button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={btnPrimary}><ExternalLink className="w-3.5 h-3.5" /> {label('portal', 'Manage Billing')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={btnPrimary}><ExternalLink className="w-3.5 h-3.5" /> {label('portal', 'Manage Billing')}</button></div>
                                     {subscriptionStatus !== 'CANCELED' && (
-                                        <div className="bg-white"><button onClick={handleCancel} disabled={isDisabled('cancel')} className={btnDanger}><AlertCircle className="w-3.5 h-3.5" /> {label('cancel', 'Cancel Subscription')}</button></div>
+                                        <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleCancel} disabled={isDisabled('cancel')} className={btnDanger}><AlertCircle className="w-3.5 h-3.5" /> {label('cancel', 'Cancel Subscription')}</button></div>
                                     )}
                                 </>
                             )}
@@ -259,11 +259,11 @@ const ManageSubscriptions = () => {
 
                         {/* Full Pricing CTA */}
                         {(tier === 'FREE' || tier === 'TRIAL') && (
-                            <p className="text-center text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">
+                            <p className="text-center text-sm uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display transition-colors">
                                 View all plans →{' '}
                                 <button
                                     onClick={() => navigate('/app/pricing')}
-                                    className="text-slate-900 hover:text-indigo-600 transition-colors"
+                                    className="text-slate-900 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                                 >
                                     Pricing Page
                                 </button>

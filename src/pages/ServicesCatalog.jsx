@@ -112,24 +112,24 @@ const ServicesCatalog = () => {
   return (
     <>
       <SEO {...seoConfig.services} />
-      <div className="min-h-screen bg-slate-50 pt-24 pb-20">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pt-24 pb-20 transition-colors duration-500">
         
         {/* Header Section */}
         <header className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto mb-16 lg:mb-24 flex flex-col lg:flex-row items-start justify-between gap-12 pt-12">
           <div className="space-y-6 flex-1 max-w-2xl">
             <button
               onClick={() => navigate('/')}
-              className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-[10px] uppercase font-bold tracking-widest mb-4"
+              className="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors text-[10px] uppercase font-bold tracking-widest mb-4"
             >
               <ArrowLeft size={14} /> Back to Portfolio
             </button>
-            <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-3 transition-colors">
               Registry_V4.2 // Service_Architect
             </div>
-            <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900">
+            <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
               Tailored Digital Service Solutions
             </h1>
-            <p className="text-base text-slate-500 leading-relaxed">
+            <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
               We combine architectural precision with creative engineering to deliver products that redefine industry standards.
             </p>
           </div>
@@ -139,36 +139,36 @@ const ServicesCatalog = () => {
 
         {/* Catalog Grid */}
         <section className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-px bg-gray-200 border border-gray-200 rounded-none">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border border-gray-200 dark:border-slate-800 rounded-none transition-colors duration-500">
             {services.map((service) => (
-              <div key={service.id} className="bg-white rounded-none p-6 md:p-8 flex flex-col">
-                <div className="w-12 h-12 border border-gray-200 flex items-center justify-center text-slate-900 rounded-none mb-6">
+              <div key={service.id} className="bg-white dark:bg-slate-950 rounded-none p-6 md:p-8 flex flex-col transition-colors duration-500">
+                <div className="w-12 h-12 border border-gray-200 dark:border-slate-800 flex items-center justify-center text-slate-900 dark:text-slate-200 rounded-none mb-6 transition-colors">
                   {service.icon}
                 </div>
                 
-                <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">
+                <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-3 transition-colors">
                   {service.price} // ID: {service.id.toUpperCase()}
                 </div>
                 
-                <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 mb-2">
+                <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">
                   {service.name}
                 </h3>
                 
-                <p className="text-base text-slate-500 leading-relaxed">
+                <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
                   {service.description}
                 </p>
                 
-                <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-gray-100">
+                <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
                   {service.features.map((feature, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-xs md:text-sm text-slate-600">{feature}</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600 transition-colors" />
+                      <span className="text-xs md:text-sm text-slate-600 dark:text-slate-400 transition-colors">{feature}</span>
                     </div>
                   ))}
                 </div>
                 
                 <div className="mt-auto pt-8">
-                  <button onClick={() => navigate('/services')} className="rounded-none bg-slate-900 text-[10px] uppercase tracking-widest font-bold text-white px-6 py-4 hover:bg-slate-800 w-full text-center transition-colors">
+                  <button onClick={() => navigate('/services')} className="rounded-none bg-slate-900 dark:bg-indigo-600 text-[10px] uppercase tracking-widest font-bold text-white px-6 py-4 hover:bg-slate-800 dark:hover:bg-indigo-500 w-full text-center transition-colors">
                     Configure Project
                   </button>
                 </div>
@@ -179,24 +179,24 @@ const ServicesCatalog = () => {
 
         {/* Bottom CTA */}
         <section className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto mt-16 md:mt-24">
-          <div className="bg-white border border-gray-200 rounded-none p-8 md:p-16 flex flex-col items-center text-center">
-            <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-3">
+          <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-none p-8 md:p-16 flex flex-col items-center text-center transition-colors duration-500">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-3 transition-colors">
               System_Protocol [001]
             </div>
             
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 uppercase mb-4">
+            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase mb-4 transition-colors">
               Ready to Architect Your Digital Future?
             </h2>
             
-            <p className="text-base text-slate-500 leading-relaxed max-w-2xl mb-8">
+            <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mb-8 transition-colors">
               Schedule a strategy call to discuss your project requirements and get a detailed architectural breakdown.
             </p>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-200 border border-gray-200 w-full max-w-lg">
-              <a href="tel:+15626681855" className="bg-white flex items-center justify-center gap-3 p-5 text-[10px] uppercase tracking-widest font-bold text-slate-900 hover:bg-slate-50 transition-colors">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border border-gray-200 dark:border-slate-800 w-full max-w-lg transition-colors duration-500">
+              <a href="tel:+15626681855" className="bg-white dark:bg-slate-950 flex items-center justify-center gap-3 p-5 text-[10px] uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                 <Phone size={14} /> Book a Call
               </a>
-              <button onClick={() => window.open('https://wa.me/15626681855', '_blank')} className="bg-white flex items-center justify-center gap-3 p-5 text-[10px] uppercase tracking-widest font-bold text-slate-900 hover:bg-slate-50 transition-colors">
+              <button onClick={() => window.open('https://wa.me/15626681855', '_blank')} className="bg-white dark:bg-slate-950 flex items-center justify-center gap-3 p-5 text-[10px] uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                 <MessageCircle size={14} /> Message System
               </button>
             </div>

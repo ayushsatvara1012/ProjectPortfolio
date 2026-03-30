@@ -46,14 +46,14 @@ const SidebarItem = ({ label, icon: Icon, path, onClick }) => (
         onClick={onClick}
         className={({ isActive }) =>
             `flex items-center gap-3 px-4 py-2.5 text-md font-display transition-colors min-h-[44px] border-l-2 w-full ${isActive
-                ? 'border-slate-900 bg-white text-slate-900 font-bold'
-                : 'border-transparent text-slate-600 hover:bg-white hover:text-slate-800'
+                ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
             }`
         }
     >
         {({ isActive }) => (
             <>
-                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-slate-900' : 'text-slate-400'}`} />
+                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`} />
                 <span className="flex-1 truncate">{label}</span>
             </>
         )}
@@ -70,13 +70,13 @@ const SidebarContent = ({ user, onClose }) => {
     useEffect(() => { if (onSettings) setSettingsOpen(true); }, [onSettings]);
 
     return (
-        <div className="flex flex-col h-full bg-[#FAFAFA]">
+        <div className="flex flex-col h-full bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500">
             {/* Mobile close row */}
             {onClose && (
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 lg:hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800 lg:hidden transition-colors">
                     <div className="flex items-center gap-2" />
-                    <button onClick={onClose} className="p-2 hover:bg-white min-h-[44px] min-w-[44px] flex items-center justify-center">
-                        <X className="w-5 h-5 text-slate-500" />
+                    <button onClick={onClose} className="p-2 hover:bg-white dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
+                        <X className="w-5 h-5 text-slate-500 dark:text-slate-400 transition-colors" />
                     </button>
                 </div>
             )}
@@ -94,13 +94,13 @@ const SidebarContent = ({ user, onClose }) => {
                     <button
                         onClick={() => setSettingsOpen(p => !p)}
                         className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-colors min-h-[44px] border-l-2 w-full ${onSettings
-                                ? 'border-slate-900 bg-white text-slate-900 font-bold'
-                                : 'border-transparent text-slate-600 hover:bg-white hover:text-slate-800'
+                                ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
+                                : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
                             }`}
                     >
-                        <Settings className={`w-5 h-5 shrink-0 ${onSettings ? 'text-slate-900' : 'text-slate-400'}`} />
+                        <Settings className={`w-5 h-5 shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`} />
                         <span className="flex-1 text-left">Settings</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     <AnimatePresence>
@@ -119,8 +119,8 @@ const SidebarContent = ({ user, onClose }) => {
                                         onClick={onClose}
                                         className={({ isActive }) =>
                                             `flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${isActive
-                                                ? 'border-slate-900 bg-white text-slate-900 font-semibold'
-                                                : 'border-transparent text-slate-500 hover:bg-white hover:text-slate-700'
+                                                ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-semibold'
+                                                : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
                                             }`
                                         }
                                     >
@@ -135,9 +135,9 @@ const SidebarContent = ({ user, onClose }) => {
                                         to="/app/settings/admin"
                                         onClick={onClose}
                                         className={({ isActive }) =>
-                                            `flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-medium transition-colors min-h-[36px] border-l-2 w-full ${isActive
-                                                ? 'border-slate-900 bg-white text-slate-900 font-semibold'
-                                                : 'border-transparent text-slate-400 hover:bg-white hover:text-slate-700'
+                                            `flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${isActive
+                                                ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-semibold'
+                                                : 'border-transparent text-slate-400 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
                                             }`
                                         }
                                     >
@@ -152,13 +152,13 @@ const SidebarContent = ({ user, onClose }) => {
             </nav>
 
             {/* User footer */}
-            <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2.5 min-h-[56px] bg-[#FAFAFA]">
+            <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2.5 min-h-[56px] bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500">
                 <UserButton appearance={{ elements: { avatarBox: 'w-7 h-7' } }} />
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate transition-colors">
                         {user?.fullName || user?.firstName || 'My Account'}
                     </p>
-                    <p className="text-md uppercase tracking-widest font-bold text-slate-400 truncate">Profile &amp; Billing</p>
+                    <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 truncate transition-colors">Profile &amp; Billing</p>
                 </div>
             </div>
         </div>
@@ -173,35 +173,35 @@ const TopNav = ({ user, onMenuClick }) => {
     const tierLabel = userTier ? TIER_LABEL[userTier] ?? userTier : null;
 
     return (
-        <header className="fixed top-0 left-0 right-0 h-12 bg-white border-b border-gray-100 flex items-center px-4 gap-2 z-40">
+        <header className="fixed top-0 left-0 right-0 h-12 bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 flex items-center px-4 gap-2 z-40 transition-colors duration-500">
             {/* Left section: Hamburger (mobile) + Brand (all) */}
             <div className="flex items-center gap-2 lg:w-[calc(208px-1rem)]">
                 <button
                     onClick={onMenuClick}
-                    className="lg:hidden p-2 hover:bg-gray-50 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="lg:hidden p-2 hover:bg-gray-50 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                     aria-label="Open menu"
                 >
-                    <Menu className="w-5 h-5 text-slate-600" />
+                    <Menu className="w-5 h-5 text-slate-600 dark:text-slate-400 transition-colors" />
                 </button>
                 <div className="flex items-center gap-2.5">
                     <Logo className="h-5 w-auto" />
-                    <span className="text-md uppercase tracking-widest font-bold text-slate-900">SaPyBase</span>
+                    <span className="text-md uppercase tracking-widest font-bold text-slate-900 dark:text-slate-100 transition-colors">SaPyBase</span>
                 </div>
             </div>
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1.5 text-md text-slate-400 min-w-0 flex-1">
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 hidden sm:block text-slate-300" />
-                <span className="truncate max-w-[140px] text-slate-700 font-medium hidden sm:block">
+            <div className="flex items-center gap-1.5 text-md text-slate-400 dark:text-slate-500 min-w-0 flex-1 transition-colors">
+                <ChevronRight className="w-3.5 h-3.5 shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors" />
+                <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-medium hidden sm:block transition-colors">
                     {user?.fullName || user?.firstName || 'My Workspace'}
                 </span>
                 {tierLabel && (
-                    <span className="hidden sm:inline-flex shrink-0 px-1.5 py-0.5 border border-gray-200 text-md uppercase tracking-widest font-bold text-slate-500 bg-white">
+                    <span className="hidden sm:inline-flex shrink-0 px-1.5 py-0.5 border border-gray-200 dark:border-slate-700 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors">
                         {tierLabel}
                     </span>
                 )}
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 hidden sm:block text-slate-300" />
-                <span className="truncate text-slate-800 font-medium text-md">{pageLabel}</span>
+                <ChevronRight className="w-3.5 h-3.5 shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors" />
+                <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-md transition-colors">{pageLabel}</span>
             </div>
         </header>
     );
@@ -221,7 +221,7 @@ const AppLayout = () => {
 
     return (
         <BotSettingsProvider>
-            <div className="flex min-h-screen bg-white antialiased">
+            <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
 
                 <TopNav user={user} onMenuClick={() => setSidebarOpen(true)} />
 
@@ -242,7 +242,7 @@ const AppLayout = () => {
                                 animate={{ x: 0 }}
                                 exit={{ x: '-100%' }}
                                 transition={{ type: 'spring', damping: 28, stiffness: 280, mass: 0.8 }}
-                                className="absolute top-0 left-0 bottom-0 w-52 border-r border-gray-100 shadow-none"
+                                className="absolute top-0 left-0 bottom-0 w-52 border-r border-gray-100 dark:border-slate-800 shadow-none transition-colors"
                             >
                                 <SidebarContent user={user} onClose={() => setSidebarOpen(false)} />
                             </motion.aside>
@@ -251,12 +251,12 @@ const AppLayout = () => {
                 </AnimatePresence>
 
                 {/* ── Desktop sidebar ──────────────────────────────── */}
-                <aside className="hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 w-52 border-r border-gray-100 z-30 bg-[#FAFAFA]">
+                <aside className="hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 w-52 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500">
                     <SidebarContent user={user} onClose={null} />
                 </aside>
 
                 {/* ── Main Content (Flush Architectural Area) ─────────── */}
-                <main className="flex-1 mt-12 lg:ml-52 min-h-[calc(100vh-3rem)] bg-white overflow-hidden flex flex-col">
+                <main className="flex-1 mt-12 lg:ml-52 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 overflow-hidden flex flex-col transition-colors duration-500">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={pathname}

@@ -84,25 +84,25 @@ const PerformanceMetrics = () => {
   ];
 
   return (
-    <section id="metrics" className="w-full bg-white py-2 overflow-hidden">
+    <section id="metrics" className="w-full bg-white dark:bg-slate-950 py-2 overflow-hidden transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 md:px-12">
         
         {/* 9-Cell Checkerboard Extended Grid Archivecture */}
         <div className="relative group/grid">
           
           {/* Responsive Vertical Extended Lines */}
-          <div className="hidden lg:block absolute left-[33.33%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
-          <div className="hidden lg:block absolute left-[66.66%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
-          <div className="hidden md:block lg:hidden absolute left-[50%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
+          <div className="hidden lg:block absolute left-[33.33%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
+          <div className="hidden lg:block absolute left-[66.66%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
+          <div className="hidden md:block lg:hidden absolute left-[50%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
           
           {/* Responsive Horizontal Extended Lines */}
-          <div className="absolute top-0 left-[-100vw] right-[-100vw] h-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
-          <div className="hidden lg:block absolute top-[33.33%] left-[-100vw] right-[-100vw] h-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
-          <div className="hidden lg:block absolute top-[66.66%] left-[-100vw] right-[-100vw] h-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
-          <div className="absolute bottom-0 left-[-100vw] right-[-100vw] h-px bg-slate-200 transition-colors duration-500 group-hover/grid:bg-indigo-100" />
+          <div className="absolute top-0 left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
+          <div className="hidden lg:block absolute top-[33.33%] left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
+          <div className="hidden lg:block absolute top-[66.66%] left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
+          <div className="absolute bottom-0 left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
 
           {/* 1/2/3 Column Checkerboard Grid Architecture */}
-          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[1fr] gap-px bg-slate-200 relative z-10 border-x border-slate-200">
+          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[1fr] gap-px bg-slate-200 dark:bg-slate-800 relative z-10 border-x border-slate-200 dark:border-slate-800 transition-colors duration-500">
             {/* Glowing Snake Overlay (Desktop Only) */}
             <div className="absolute inset-0 pointer-events-none z-20 hidden lg:block">
               <svg className="w-full h-full" viewBox="0 0 300 300" preserveAspectRatio="none">
@@ -175,25 +175,25 @@ const PerformanceMetrics = () => {
                 key={index} 
                 className={`
                   p-12 md:p-14 flex flex-col gap-6 group/cell transition-colors duration-500
-                  ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}
+                  ${index % 2 === 0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50/50 dark:bg-slate-900'}
                 `}
               >
                 {cell.type === "metric" ? (
                   <>
                     {/* Eyebrow Label */}
-                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 font-sans">
+                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors duration-500">
                       <span className="text-indigo-500 transition-colors">{cell.icon}</span>
                       <span>{cell.eyebrow}</span>
                     </div>
 
                     {/* Primary Metric */}
                     <div className="space-y-4">
-                      <div className="text-4xl md:text-6xl font-display tracking-tight text-slate-900 tabular-nums leading-[0.8] transition-transform duration-500 group-hover/cell:translate-x-1">
+                      <div className="text-4xl md:text-6xl font-display tracking-tight text-slate-900 dark:text-slate-200 tabular-nums leading-[0.8] transition-all duration-500 group-hover/cell:translate-x-1">
                         {cell.value}
                       </div>
                       
                       {/* Subtext */}
-                      <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-600 font-sans leading-relaxed opacity-80">
+                      <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-600 dark:text-slate-400 font-sans leading-relaxed opacity-80 transition-colors duration-500">
                         <ArrowUpRight className="w-5 h-5 text-emerald-500 shrink-0" strokeWidth={3} />
                         <span>{cell.subtext}</span>
                       </div>
@@ -202,22 +202,22 @@ const PerformanceMetrics = () => {
                 ) : (
                   <>
                     {/* Heading for Text Cells */}
-                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 font-sans">
+                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors duration-500">
                       <div className="h-1.5 w-1.5 rounded-full bg-indigo-300" />
                       <span>{cell.heading}</span>
                     </div>
 
                     {/* Body Text */}
-                    <p className="text-base text-md font-display text-slate-500 leading-relaxed max-w-[280px]">
+                    <p className="text-base text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] transition-colors duration-500">
                       {cell.body}
                     </p>
 
                     {/* Technical ID */}
-                    <div className="mt-auto pt-8 border-t border-slate-100/50 flex items-center justify-between opacity-40">
-                      <span className="text-md font-mono text-slate-500 uppercase tracking-widest">SY_SYS_ARCH_0{index + 1}</span>
+                    <div className="mt-auto pt-8 border-t border-slate-100/50 dark:border-slate-800 flex items-center justify-between opacity-40 transition-colors duration-500">
+                      <span className="text-md font-mono text-slate-500 dark:text-slate-400 uppercase tracking-widest transition-colors duration-500">SY_SYS_ARCH_0{index + 1}</span>
                       <div className="flex gap-1">
                         {[40, 60, 80].map(op => (
-                          <div key={op} className={`h-1 w-1 bg-slate-900 opacity-${op / 100}`} />
+                          <div key={op} className={`h-1 w-1 bg-slate-900 dark:bg-slate-200 opacity-${op / 100} transition-colors duration-500`} />
                         ))}
                       </div>
                     </div>
