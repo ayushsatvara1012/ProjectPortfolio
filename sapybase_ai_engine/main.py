@@ -158,6 +158,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # 3. Configure CORS (Production Hardening)
 ALLOWED_ORIGINS = {
     "https://sapybase.com",
+    "https://www.sapybase.com",
     "https://app.sapybase.com",
     "https://admin.sapybase.com",
     "https://sapybase-deploy-test.vercel.app",
@@ -641,8 +642,7 @@ async def update_company_details(
 async def chat_endpoint(
     request: Request,
     chat_req: ChatRequest, 
-    company: dict = Depends(verify_api_key_and_origin),
-    _premium: dict = Depends(require_premium_tier)
+    company: dict = Depends(verify_api_key_and_origin)
 ):
     """Core AI Chat Endpoint with Trial Enforcement and Connection Pooling."""
     conn = get_db_connection()
