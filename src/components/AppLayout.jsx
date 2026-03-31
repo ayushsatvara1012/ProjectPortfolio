@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import { UserButton, useUser } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Bot, BrainCircuit, CreditCard, Settings,
+    Bot, BrainCircuit, CreditCard, Settings, Building2,
     ChevronRight, User, Palette, KeyRound,
     ChevronDown, Menu, X, ShieldCheck
 } from 'lucide-react';
@@ -20,12 +20,14 @@ const SETTINGS_SUB = [
 ];
 
 const TOP_NAV = [
-    { label: 'Bot Identity', icon: Bot, path: '/app/register' },
-    { label: 'Train AI', icon: BrainCircuit, path: '/app/train' },
-    { label: 'Pricing', icon: CreditCard, path: '/app/pricing' },
+    { label: 'My Bots',      icon: Bot,         path: '/app/bots' },
+    { label: 'Bot Identity', icon: Building2,    path: '/app/register' },
+    { label: 'Train AI',     icon: BrainCircuit, path: '/app/train' },
+    { label: 'Pricing',      icon: CreditCard,   path: '/app/pricing' },
 ];
 
 const PATH_LABELS = {
+    '/app/bots': 'My Bots',
     '/app/register': 'Bot Identity',
     '/app/train': 'Train AI',
     '/app/pricing': 'Pricing',

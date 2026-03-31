@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import Alert from '../components/alert';
 import { useUserRole } from '../context/UserContext';
+import UpgradePrompt from '../components/UpgradePrompt';
 
 const AppRegistration = () => {
     const { user } = useUser();
@@ -25,6 +26,7 @@ const AppRegistration = () => {
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const [copied, setCopied] = useState(false);
     const [openAccordion, setOpenAccordion] = useState(0);
+    const [upgradeError, setUpgradeError] = useState(null);
 
     const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
 
@@ -62,7 +64,18 @@ const AppRegistration = () => {
                 }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || data.message || 'Registration failed.');
+            if (!res.ok) {
+                if (res.status === 402) {
+                    const detail = data?.detail;
+                    setUpgradeError(
+                        typeof detail === 'object' && detail?.code
+                            ? detail
+                            : { code: 'BOT_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Bot limit reached.', tier: '', current: null, limit: null }
+                    );
+                    return;
+                }
+                throw new Error(data.detail?.message || data.detail || data.message || 'Registration failed.');
+            }
             setRegistrationData({ apiKey: data.api_key, companyName: formData.companyName, allowedOrigin: data.allowed_origin });
             showAlert('success', data.message || 'Registration successful!');
         } catch (err) {
@@ -321,6 +334,17 @@ const AppRegistration = () => {
             </SignedIn>
 
             <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />
+
+            {upgradeError && (
+                <UpgradePrompt
+                    mode="modal"
+                    code={upgradeError.code}
+                    tier={upgradeError.tier}
+                    current={upgradeError.current}
+                    limit={upgradeError.limit}
+                    onDismiss={() => setUpgradeError(null)}
+                />
+            )}
         </div>
     );
 };

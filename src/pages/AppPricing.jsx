@@ -21,25 +21,46 @@ const AppPricing = () => {
 
     const plans = [
         {
-            name: 'Starter', id: 'FREE', price: 'Free Trial',
-            description: 'Perfect for exploring SaPyBase capabilities.',
-            features: ['1 AI Assistant', '50 MB Knowledge base', 'Basic Analytics', 'Standard Speed', 'Community Support'],
+            name: 'Trial', id: 'FREE', price: 'Free Trial',
+            description: 'Explore SaPyBase with 1 bot for 30 days.',
+            features: [
+                '1 AI Bot',
+                '200 messages / month',
+                '50 knowledge chunks',
+                'Standard response speed',
+                'SaPyBase branding',
+                'Community support',
+            ],
             icon: Zap, highlight: false,
         },
         {
             name: 'Professional', id: 'STARTER',
             price: billingCycle === 'monthly' ? '$5' : '$4.5',
             period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
-            description: 'Advanced AI for growing businesses.',
-            features: ['Unlimited AI Assistants', '2 GB Knowledge base', 'Advanced Analytics', 'Priority Sync', 'Priority Email Support', 'Custom Branding'],
+            description: 'Up to 2 bots for growing businesses.',
+            features: [
+                '2 AI Bots',
+                '2,000 messages / bot / month',
+                '500 knowledge chunks per bot',
+                'Priority response speed',
+                'Custom branding & colors',
+                'Priority email support',
+            ],
             icon: Rocket, highlight: true,
         },
         {
             name: 'Enterprise', id: 'PRO',
             price: billingCycle === 'monthly' ? '$10' : '$9',
             period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
-            description: 'Custom solutions for large scale operations.',
-            features: ['Unlimited Everything', 'Dedicated Server Capacity', 'SLA & Guarantees', 'Dedicated Account Manager', 'On-premise options', 'SSO & Custom Security'],
+            description: 'Up to 5 bots for scaling operations.',
+            features: [
+                '5 AI Bots',
+                'Unlimited messages',
+                '5,000 knowledge chunks per bot',
+                'Dedicated response speed',
+                'Full white-label',
+                'SLA & dedicated support',
+            ],
             icon: Building2, highlight: false,
         },
     ];

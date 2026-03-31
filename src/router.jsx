@@ -12,6 +12,7 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 // ── App Layout pages ───────────────────────────────────────────────────────────
 const AppLayout = lazy(() => import("./components/AppLayout"));
+const AppBotManager = lazy(() => import("./pages/AppBotManager"));
 const AppTrainAI = lazy(() => import("./pages/AppTrainAI"));
 const AppRegistration = lazy(() => import("./pages/AppRegistration"));
 const AppPricing = lazy(() => import("./pages/AppPricing"));
@@ -60,7 +61,8 @@ const router = createBrowserRouter([
     ),
     errorElement: <ErrorPage />,
     children: [
-      { index: true, element: <Navigate to="/app/train" replace /> },
+      { index: true, element: <Navigate to="/app/bots" replace /> },
+      { path: "bots", element: <AppBotManager /> },
       { path: "train", element: <AppTrainAI /> },
       { path: "register", element: <AppRegistration /> },
       { path: "pricing", element: <AppPricing /> },

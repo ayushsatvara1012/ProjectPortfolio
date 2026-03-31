@@ -113,10 +113,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
             return <Navigate to="/app/pricing" replace />;
         }
 
-        // If trying to access Dashboard but no Company registered
-        if (location.pathname === '/app' && !hasCompany) {
-            return <Navigate to="/app/register" replace />;
-        }
+        // /app/bots handles the empty state gracefully — no redirect needed
     }
 
     return children;

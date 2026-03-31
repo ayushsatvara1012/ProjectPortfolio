@@ -134,6 +134,22 @@ def require_fresh_admin(request: Request):
         )
     return auth_state
 
+# ── Plan Definitions ────────────────────────────────────────────────────────
+PLAN_LIMITS = {
+    "FREE":       {"max_bots": 0, "messages": 0,       "chunks": 0,    "speed": "none"},
+    "TRIAL":      {"max_bots": 1, "messages": 200,      "chunks": 50,   "speed": "standard"},
+    "STARTER":    {"max_bots": 2, "messages": 2000,     "chunks": 500,  "speed": "priority"},
+    "PRO":        {"max_bots": 5, "messages": 1000000,  "chunks": 5000, "speed": "dedicated"},
+    "ENTERPRISE": {"max_bots": 999, "messages": 1000000,"chunks": 5000, "speed": "dedicated"},
+}
+
+UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
+
+def get_plan(tier: str, role: str = None) -> dict:
+    if role == "SUPER_ADMIN":
+        return UNLIMITED_PLAN
+    return PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+
 # 3. Initialize FastAPI App
 app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
 
@@ -649,31 +665,37 @@ async def chat_endpoint(
     try:
         cursor = conn.cursor()
         
-        # 0. Verify usage limits and subscription status
+        # 0. Verify usage limits using company_id for per-bot tracking
         cursor.execute("""
-            SELECT u.tier, u.trial_end_date, u.subscription_status, ut.messages_used, u.id
-            FROM users u 
-            JOIN companies c ON c.user_id = u.id 
-            LEFT JOIN usage_tracking ut ON ut.user_id = u.id
+            SELECT u.tier, u.trial_end_date, u.subscription_status,
+                   ut.messages_used, u.id, ut.id as usage_id, u.role
+            FROM users u
+            JOIN companies c ON c.user_id = u.id
+            LEFT JOIN usage_tracking ut ON ut.company_id = c.id
             WHERE c.id = %s
             ORDER BY ut.period_end DESC LIMIT 1
         """, (company["id"],))
         sub_data = cursor.fetchone()
-        
+
         if not sub_data:
             raise HTTPException(status_code=404, detail="Subscription data not found.")
 
-        tier, trial_end, status, messages_used, user_uuid = sub_data
-        
-        if status != "active" and tier != "FREE": # Allow FREE tier even if status is pending
+        tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
+        plan = get_plan(tier, role=user_role)
+        current_limit = plan["messages"]
+
+        if status != "active" and tier not in ("FREE", "TRIAL"):
             raise HTTPException(status_code=403, detail="Company account is suspended.")
 
-        # 1. Quota Check
-        LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
-        current_limit = LIMITS.get(tier, 200)
-
-        if messages_used is not None and current_limit is not None and messages_used >= current_limit:
-            raise HTTPException(status_code=402, detail=f"Message limit reached for {tier} tier.")
+        if messages_used is not None and current_limit < 999999 and messages_used >= current_limit:
+            raise HTTPException(status_code=402, detail={
+                "code": "MESSAGE_LIMIT_EXCEEDED",
+                "message": f"Monthly message limit reached on your {tier} plan.",
+                "current": messages_used,
+                "limit": current_limit,
+                "tier": tier,
+                "upgrade_url": "/app/pricing",
+            })
 
         # 2. Vector Search (RAG)
         query_vector = embeddings_model_query.embed_query(chat_req.message)
@@ -786,11 +808,19 @@ They complement the platform rules above — they do not replace them.
         ai_response = chat_model.invoke(messages)
         reply_text = str(ai_response.content)
 
-        # 5. Track Usage
-        cursor.execute(
-            "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE user_id = %s",
-            (user_uuid,)
-        )
+        # 5. Track Usage (per-company row)
+        if usage_id:
+            cursor.execute(
+                "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                (usage_id,)
+            )
+        else:
+            cursor.execute(
+                """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
+                   VALUES (%s, %s, 1, now(), now() + interval '30 days')
+                   ON CONFLICT DO NOTHING""",
+                (user_uuid, company["id"])
+            )
         conn.commit()
 
         return ChatResponse(
@@ -812,10 +842,11 @@ They complement the platform rules above — they do not replace them.
 
 @app.post("/api/train")
 async def train_chatbot(
-    url: str = Form(None), 
-    file: UploadFile = File(None), 
+    url: str = Form(None),
+    file: UploadFile = File(None),
     text: str = Form(None),
     api_key: str = Form(None),
+    company_id: str = Form(None),
     current_user: dict = Depends(get_current_user),
     _premium: dict = Depends(require_premium_tier)
 ):
@@ -825,25 +856,38 @@ async def train_chatbot(
     try:
         cursor = conn.cursor()
         
-        # Identify Company: Use provided API key OR the user's primary company
-        if api_key:
-            cursor.execute("SELECT id FROM companies WHERE api_key = %s", (api_key,))
+        # Identify Company: explicit company_id > api_key > user's primary company
+        if company_id:
+            cursor.execute(
+                "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+                (company_id, current_user["id"])
+            )
+        elif api_key:
+            hashed = hashlib.sha256(api_key.encode()).hexdigest()
+            cursor.execute("SELECT id FROM companies WHERE api_key = %s", (hashed,))
         else:
-            cursor.execute("SELECT id FROM companies WHERE user_id = %s", (current_user["id"],))
-            
+            cursor.execute("SELECT id FROM companies WHERE user_id = %s LIMIT 1", (current_user["id"],))
+
         company_row = cursor.fetchone()
         if not company_row:
             raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
-        company_id = company_row[0]
+        resolved_company_id = company_row[0]
 
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (company_id,))
+        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
         current_count = cursor.fetchone()[0]
-        
-        TIER_LIMITS = {"FREE": 50, "STARTER": 500, "PRO": 5000}
-        limit = TIER_LIMITS.get(current_user["tier"], 50)
-        
+
+        plan = get_plan(current_user["tier"], role=current_user.get("role"))
+        limit = plan["chunks"]
+
         if current_count >= limit:
-            raise HTTPException(status_code=402, detail=f"Knowledge base limit reached for {current_user['tier']} tier.")
+            raise HTTPException(status_code=402, detail={
+                "code": "CHUNK_LIMIT_EXCEEDED",
+                "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
+                "current": current_count,
+                "limit": limit,
+                "tier": current_user["tier"],
+                "upgrade_url": "/app/pricing",
+            })
 
         docs = []
         # --- 1A. Process Website URL (Jina Reader Refactor) ---
@@ -907,7 +951,7 @@ async def train_chatbot(
             
             cursor.execute(
                 "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
-                (company_id, chunk.page_content, source_name, embedding)
+                (resolved_company_id, chunk.page_content, source_name, embedding)
             )
             current_count += 1
         
@@ -926,35 +970,73 @@ async def train_chatbot(
         release_db_connection(conn)
 @app.post("/api/register")
 async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_current_user)):
-    """
-    Issue #6: User Role Management & Company Registration.
-    Ensures that only users with a valid subscription (tier) can register a company.
-    """
-    if not user.get("tier"):
-        raise HTTPException(
-            status_code=403, 
-            detail="Subscription required. Please select a plan before registering your company."
-        )
+    """Multi-bot registration with per-plan bot count enforcement."""
+    tier = user.get("tier") or "FREE"
+    plan = get_plan(tier, role=user.get("role"))
+
+    if plan["max_bots"] == 0:
+        raise HTTPException(status_code=402, detail={
+            "code": "BOT_LIMIT_EXCEEDED",
+            "message": "Upgrade your plan to create a bot.",
+            "current": 0,
+            "limit": 0,
+            "tier": tier,
+            "upgrade_url": "/app/pricing",
+        })
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM companies WHERE user_id = %s", (user["id"],))
-        if cursor.fetchone():
-            raise HTTPException(status_code=400, detail="User already has a company.")
+
+        cursor.execute("SELECT COUNT(*) FROM companies WHERE user_id = %s AND is_active = true", (user["id"],))
+        current_bot_count = cursor.fetchone()[0]
+
+        if current_bot_count >= plan["max_bots"]:
+            raise HTTPException(status_code=402, detail={
+                "code": "BOT_LIMIT_EXCEEDED",
+                "message": f"Your {tier} plan allows {plan['max_bots']} bot(s). You have {current_bot_count}.",
+                "current": current_bot_count,
+                "limit": plan["max_bots"],
+                "tier": tier,
+                "upgrade_url": "/app/pricing",
+            })
 
         api_key = f"sb_{secrets.token_urlsafe(32)}"
         hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
+
+        cursor.execute("SELECT COALESCE(MAX(display_order), -1) + 1 FROM companies WHERE user_id = %s", (user["id"],))
+        next_order = cursor.fetchone()[0]
+
         cursor.execute(
-            "INSERT INTO companies (user_id, company_name, allowed_origin, domain, api_key) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin, hashed_key)
+            """INSERT INTO companies
+               (user_id, company_name, allowed_origin, domain, api_key, display_order,
+                bot_name, theme_color, company_tone, initial_message)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin,
+             hashed_key, next_order,
+             reg.company_name + " AI", reg.theme_color, reg.company_tone,
+             f"Hi! I'm {reg.company_name} AI. How can I help you today?")
         )
         company_id = cursor.fetchone()[0]
-        cursor.execute("UPDATE users SET role = 'ADMIN' WHERE id = %s", (user["id"],))
+
+        cursor.execute(
+            """INSERT INTO usage_tracking (user_id, company_id, period_start, period_end)
+               VALUES (%s, %s, now(), now() + interval '30 days')
+               ON CONFLICT DO NOTHING""",
+            (user["id"], company_id)
+        )
+
+        if current_bot_count == 0:
+            cursor.execute("UPDATE users SET role = 'ADMIN' WHERE id = %s", (user["id"],))
+
         conn.commit()
-        return {"status": "success", "api_key": api_key, "company_id": company_id}
+        return {"status": "success", "api_key": api_key, "company_id": str(company_id)}
+    except HTTPException:
+        raise
     except Exception as e:
         if conn: conn.rollback()
+        print(f"REGISTER ERROR: {e}")
         raise HTTPException(status_code=500, detail="Registration failed.")
     finally:
         release_db_connection(conn)
@@ -993,6 +1075,82 @@ async def rotate_api_key(user: dict = Depends(get_current_user)):
     finally:
         release_db_connection(conn)
 
+@app.get("/api/companies")
+async def list_my_companies(user: dict = Depends(get_current_user)):
+    """Returns all bots/companies owned by the authenticated user."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT c.id, c.company_name, c.allowed_origin, c.bot_name, c.theme_color,
+                      c.logo_url, c.initial_message, c.display_order, c.is_active,
+                      c.created_at,
+                      COALESCE(ut.messages_used, 0) as messages_used,
+                      COALESCE(ut.period_end, now() + interval '30 days') as period_end
+               FROM companies c
+               LEFT JOIN usage_tracking ut ON ut.company_id = c.id
+               WHERE c.user_id = %s AND c.is_active = true
+               ORDER BY c.display_order ASC""",
+            (user["id"],)
+        )
+        rows = cursor.fetchall()
+        plan = get_plan(user.get("tier"), role=user.get("role"))
+        return {
+            "status": "success",
+            "bots": [
+                {
+                    "id": str(r[0]),
+                    "company_name": r[1],
+                    "allowed_origin": r[2],
+                    "bot_name": r[3],
+                    "theme_color": r[4],
+                    "logo_url": r[5],
+                    "initial_message": r[6],
+                    "display_order": r[7],
+                    "is_active": r[8],
+                    "created_at": r[9].isoformat() if r[9] else None,
+                    "messages_used": r[10],
+                    "period_end": r[11].isoformat() if r[11] else None,
+                }
+                for r in rows
+            ],
+            "plan": {
+                "tier": user.get("tier"),
+                "max_bots": plan["max_bots"],
+                "current_bots": len(rows),
+                "can_add_more": len(rows) < plan["max_bots"],
+                "message_limit": plan["messages"],
+                "chunk_limit": plan["chunks"],
+                "speed_tier": plan["speed"],
+            }
+        }
+    finally:
+        release_db_connection(conn)
+
+
+@app.delete("/api/companies/{company_id}")
+async def deactivate_company(company_id: str, user: dict = Depends(get_current_user)):
+    """Soft-deletes a bot by setting is_active=false. Data is retained."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE companies SET is_active = false WHERE id = %s AND user_id = %s RETURNING id",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        conn.commit()
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Failed to deactivate bot.")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/config")
 def get_config(company: dict = Depends(verify_api_key_and_origin)):
     """Returns branding for the widget."""
@@ -1009,9 +1167,9 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
             (current_user["id"],)
         )
         usage = cursor.fetchone()
-        
-        LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
-        
+
+        plan = get_plan(current_user.get("tier"), role=current_user.get("role"))
+
         trial_days_left = None
         if current_user.get("trial_end_date"):
             delta = current_user["trial_end_date"] - datetime.now(timezone.utc)
@@ -1023,10 +1181,13 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
             "tier": current_user["tier"],
             "email": current_user["email"],
             "messages_used": usage[0] if usage else 0,
-            "message_limit": LIMITS.get(current_user["tier"], 200),
+            "message_limit": plan["messages"],
             "next_billing_date": usage[1] if usage else None,
             "trial_days_left": trial_days_left,
-            "trial_end_date": current_user.get("trial_end_date")
+            "trial_end_date": current_user.get("trial_end_date"),
+            "max_bots": plan["max_bots"],
+            "speed_tier": plan["speed"],
+            "chunk_limit": plan["chunks"],
         }
     finally:
         release_db_connection(conn)

@@ -1,0 +1,273 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Bot, Plus, Trash2, Lock, Activity, ChevronRight, Zap } from 'lucide-react';
+import { useUserRole } from '../context/UserContext';
+import { SkeletonBase } from '../components/SkeletonLoader';
+import UpgradePrompt from '../components/UpgradePrompt';
+import { useApiCall } from '../hooks/useApiCall';
+
+const SPEED_BADGE = {
+  standard:  { label: 'Standard',  cls: 'text-slate-500 bg-slate-50 border-slate-200' },
+  priority:  { label: 'Priority',  cls: 'text-blue-600 bg-blue-50 border-blue-200' },
+  dedicated: { label: 'Dedicated', cls: 'text-violet-600 bg-violet-50 border-violet-200' },
+  none:      { label: 'No Access', cls: 'text-red-500 bg-red-50 border-red-200' },
+};
+
+const AppBotManager = () => {
+  const { getToken } = useAuth();
+  const navigate = useNavigate();
+  const { userTier, isLoading: ctxLoading } = useUserRole();
+  const [bots, setBots] = useState([]);
+  const [plan, setPlan] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const { call, upgradeError, clearError } = useApiCall();
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+
+  const fetchBots = async () => {
+    setIsLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${baseUrl}/api/companies`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBots(data.bots || []);
+        setPlan(data.plan || null);
+      }
+    } catch (e) {
+      console.error('Failed to fetch bots:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchBots(); }, []);
+
+  const handleDelete = async (botId, botName) => {
+    if (!window.confirm(`Delete "${botName}"? This will deactivate the bot and its API key.`)) return;
+    setDeletingId(botId);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${baseUrl}/api/companies/${botId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) await fetchBots();
+    } catch (e) {
+      console.error('Delete failed:', e);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const canAdd = plan && plan.can_add_more;
+  const speedInfo = SPEED_BADGE[plan?.speed_tier || 'none'];
+
+  return (
+    <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-950 px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between transition-colors">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Bot className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+            <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200">My Bots</h1>
+          </div>
+          <p className="text-md font-display text-slate-500 dark:text-slate-400">Manage all your AI assistants across your plan.</p>
+        </div>
+
+        {plan && (
+          <div className="hidden sm:flex items-center gap-3">
+            <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-bold font-sans border rounded-none ${speedInfo.cls}`}>
+              {speedInfo.label} Speed
+            </span>
+            <span className="text-md font-display text-slate-500 dark:text-slate-400">
+              {plan.current_bots} / {plan.max_bots === 999 ? '∞' : plan.max_bots} bots
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Plan summary strip */}
+      {plan && (
+        <div className="grid grid-cols-3 gap-px bg-gray-200 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 transition-colors">
+          {[
+            { label: 'Plan', value: plan.tier || '—' },
+            { label: 'Msgs / Bot / Mo', value: plan.message_limit >= 999999 ? 'Unlimited' : plan.message_limit.toLocaleString() },
+            { label: 'Knowledge Chunks', value: plan.chunk_limit >= 999999 ? 'Unlimited' : plan.chunk_limit.toLocaleString() },
+          ].map((s, i) => (
+            <div key={i} className="bg-white dark:bg-slate-950 px-6 py-4 transition-colors">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-0.5">{s.label}</p>
+              <p className="text-lg font-display font-bold text-slate-900 dark:text-slate-200">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Bot Cards */}
+      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1,2,3].map(i => <SkeletonBase key={i} className="h-48 rounded-none" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <AnimatePresence>
+              {bots.map(bot => (
+                <motion.div
+                  key={bot.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 flex flex-col transition-colors"
+                >
+                  {/* Color accent bar */}
+                  <div className="h-1 w-full" style={{ backgroundColor: bot.theme_color || '#5730F5' }} />
+
+                  <div className="p-5 flex flex-col flex-1 gap-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-md font-display font-bold text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mt-0.5">{bot.company_name}</p>
+                      </div>
+                      <div className="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800 flex items-center justify-center"
+                        style={{ backgroundColor: bot.theme_color + '20' }}>
+                        <Bot className="w-4 h-4" style={{ color: bot.theme_color }} />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans truncate">
+                      {bot.allowed_origin || 'No origin set'}
+                    </p>
+
+                    {/* Usage bar */}
+                    <div>
+                      <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1">
+                        <span>Usage</span>
+                        <span>{bot.messages_used} / {plan?.message_limit >= 999999 ? '∞' : plan?.message_limit}</span>
+                      </div>
+                      {plan?.message_limit < 999999 && (
+                        <div className="h-1 bg-slate-100 dark:bg-slate-800 w-full">
+                          <div
+                            className="h-full bg-slate-900 dark:bg-indigo-500 transition-all"
+                            style={{ width: `${Math.min((bot.messages_used / (plan?.message_limit || 1)) * 100, 100)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Usage warning at 80% */}
+                    {plan?.message_limit < 999999 && bot.messages_used >= plan.message_limit * 0.8 && (
+                      <div className="mt-1">
+                        <UpgradePrompt
+                          mode="widget"
+                          code={bot.messages_used >= plan.message_limit ? 'MESSAGE_LIMIT_EXCEEDED' : 'DEFAULT'}
+                          tier={plan.tier}
+                          current={bot.messages_used}
+                          limit={plan.message_limit}
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
+                      <button
+                        onClick={() => navigate(`/app/train?bot=${bot.id}`)}
+                        className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Activity className="w-3 h-3" /> Train
+                      </button>
+                      <button
+                        onClick={() => navigate(`/app/register?edit=${bot.id}`)}
+                        className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans border border-gray-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <ChevronRight className="w-3 h-3" /> Settings
+                      </button>
+                      <button
+                        onClick={() => handleDelete(bot.id, bot.bot_name)}
+                        disabled={deletingId === bot.id}
+                        className="p-2 border border-red-100 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Add new bot card */}
+            <motion.div
+              layout
+              className={`border-2 border-dashed flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors ${
+                canAdd
+                  ? 'border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 cursor-pointer bg-white dark:bg-slate-950 group'
+                  : 'border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 cursor-not-allowed'
+              }`}
+              onClick={() => canAdd && navigate('/app/register')}
+            >
+              {canAdd ? (
+                <>
+                  <div className="w-12 h-12 border border-gray-200 dark:border-slate-700 group-hover:border-indigo-300 dark:group-hover:border-indigo-600 flex items-center justify-center mb-3 transition-colors">
+                    <Plus className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+                  </div>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-center">
+                    Add New Bot
+                  </p>
+                  {plan && (
+                    <p className="text-[10px] text-slate-400 dark:text-slate-600 font-sans mt-1 text-center">
+                      {plan.max_bots - plan.current_bots} slot{plan.max_bots - plan.current_bots !== 1 ? 's' : ''} remaining
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Lock className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-3" />
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-slate-300 dark:text-slate-600 font-sans text-center">
+                    Bot Limit Reached
+                  </p>
+                  <Link
+                    to="/app/pricing"
+                    onClick={e => e.stopPropagation()}
+                    className="mt-3 text-[10px] uppercase tracking-widest font-bold font-sans text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    Upgrade Plan →
+                  </Link>
+                </>
+              )}
+            </motion.div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && bots.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Bot className="w-12 h-12 text-gray-200 dark:text-slate-700 mb-4" />
+            <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No bots yet</p>
+            <p className="text-sm text-slate-400 dark:text-slate-600 font-display mb-6">Create your first AI assistant to get started.</p>
+            <Link to="/app/register" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">
+              Create First Bot
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Upgrade modal for bot limit errors */}
+      {upgradeError && (
+        <UpgradePrompt
+          mode="modal"
+          code={upgradeError.code}
+          tier={upgradeError.tier}
+          current={upgradeError.current}
+          limit={upgradeError.limit}
+          onDismiss={clearError}
+        />
+      )}
+    </div>
+  );
+};
+
+export default AppBotManager;

@@ -8,6 +8,21 @@ import { useAuth } from "@clerk/clerk-react";
 import "./index.css";
 import { UserProvider } from "./context/UserContext";
 
+// Global fetch interceptor: emit a custom event on 402 so App.jsx can show an upgrade modal
+const _originalFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const response = await _originalFetch(...args);
+  if (response.status === 402) {
+    const cloned = response.clone();
+    cloned.json().then(data => {
+      if (data?.detail?.code) {
+        window.dispatchEvent(new CustomEvent('sapybase:upgrade-required', { detail: data.detail }));
+      }
+    }).catch(() => {});
+  }
+  return response;
+};
+
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!PUBLISHABLE_KEY) {

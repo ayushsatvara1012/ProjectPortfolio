@@ -146,7 +146,21 @@ const ChatWidget = ({ apiKey }) => {
                 body: JSON.stringify({ message: userMessage }),
             });
 
-            if (!response.ok) throw new Error('Network response was not ok');
+            if (!response.ok) {
+                if (response.status === 402) {
+                    let detail = null;
+                    try { detail = await response.json(); } catch {}
+                    const isMessageLimit = detail?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
+                    setMessages(prev => [...prev, {
+                        role: 'bot',
+                        content: isMessageLimit
+                            ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
+                            : "I'm temporarily unavailable. Please try again later.",
+                    }]);
+                    return;
+                }
+                throw new Error('Network response was not ok');
+            }
 
             const data = await response.json();
 

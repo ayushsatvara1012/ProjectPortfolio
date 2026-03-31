@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     UploadCloud, BrainCircuit, Database, Eye, EyeOff,
     Zap, Lock, Activity, Globe, FileText, AlignLeft, X, Clock
@@ -8,6 +8,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useUserRole } from '../context/UserContext';
+import UpgradePrompt from '../components/UpgradePrompt';
 
 const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
 const TABS = [
@@ -37,9 +38,27 @@ const AppTrainAI = () => {
     const [showKey, setShowKey] = useState(false);
     const [isTraining, setIsTraining] = useState(false);
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
+    const [bots, setBots] = useState([]);
+    const [selectedBotId, setSelectedBotId] = useState('');
+    const [upgradeError, setUpgradeError] = useState(null);
 
     const fileRef = useRef(null);
     const baseUrl = import.meta.env.VITE_API_URL || '';
+
+    useEffect(() => {
+        const fetchBots = async () => {
+            const token = await getToken();
+            const res = await fetch(`${baseUrl}/api/companies`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setBots(data.bots || []);
+                if (data.bots?.length > 0) setSelectedBotId(data.bots[0].id);
+            }
+        };
+        fetchBots();
+    }, []);
 
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier);
     const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'STARTER') && messagesUsed >= messageLimit;
@@ -60,11 +79,23 @@ const AppTrainAI = () => {
             if (file) fd.append('file', file);
             if (trainingText.trim()) fd.append('text', trainingText.trim());
             if (apiKey.trim()) fd.append('api_key', apiKey.trim());
+            if (selectedBotId) fd.append('company_id', selectedBotId);
             const res = await fetch(`${baseUrl}/api/train`, {
                 method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Training failed.');
+            if (!res.ok) {
+                if (res.status === 402) {
+                    const detail = data?.detail;
+                    setUpgradeError(
+                        typeof detail === 'object' && detail?.code
+                            ? detail
+                            : { code: 'CHUNK_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Chunk limit reached.', tier: '', current: null, limit: null }
+                    );
+                    return;
+                }
+                throw new Error(data.detail?.message || data.detail || 'Training failed.');
+            }
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
             setUrl(''); setTrainingText(''); setFile(null);
             if (fileRef.current) fileRef.current.value = '';
@@ -148,6 +179,22 @@ const AppTrainAI = () => {
                         ))}
                     </div>
 
+                    {/* Bot Selector (multi-bot) */}
+                    {bots.length > 1 && (
+                        <div className="mb-5">
+                            <label className={labelCls}>Training Target Bot</label>
+                            <select
+                                value={selectedBotId}
+                                onChange={e => setSelectedBotId(e.target.value)}
+                                className={inputCls + ' appearance-none font-mono'}
+                            >
+                                {bots.map(b => (
+                                    <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {/* API Key */}
                     <div className="mb-4">
                         <label className={labelCls}>API Secret Key</label>
@@ -195,6 +242,16 @@ const AppTrainAI = () => {
                                 <textarea value={trainingText} onChange={e => setTrainingText(e.target.value)}
                                     rows={6} className={inputCls + ' resize-none'} placeholder="Paste your FAQs, services, or raw knowledge here..." />
                             </div>
+                        )}
+                        {upgradeError && (
+                            <UpgradePrompt
+                                mode="inline"
+                                code={upgradeError.code}
+                                tier={upgradeError.tier}
+                                current={upgradeError.current}
+                                limit={upgradeError.limit}
+                                onDismiss={() => setUpgradeError(null)}
+                            />
                         )}
                         <button type="submit" disabled={isTraining || isLockedOut}
                             className="w-full py-3 min-h-[44px] bg-slate-900 dark:bg-indigo-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
