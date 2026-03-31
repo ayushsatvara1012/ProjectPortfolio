@@ -10,15 +10,15 @@ const NavToggle = () => {
     const { userRole, isLoading } = useUserRole();
 
     // Only show on specific platform pages
-    const showOnPaths = ['/dashboard', '/register', '/admin'];
+    const showOnPaths = ['/app', '/app/register', '/app/settings/admin'];
     const shouldShow = showOnPaths.includes(location.pathname);
 
     if (!shouldShow) return null;
 
     const navItems = [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'Register', path: '/register', icon: Key },
-        ...(userRole === 'SUPER_ADMIN' ? [{ name: 'Platform', path: '/admin', icon: ShieldCheck }] : [])
+        { name: 'Dashboard', path: '/app', icon: LayoutDashboard },
+        { name: 'Register', path: '/app/register', icon: Key },
+        ...(userRole === 'SUPER_ADMIN' ? [{ name: 'Platform', path: '/app/settings/admin', icon: ShieldCheck }] : [])
     ];
 
     return (

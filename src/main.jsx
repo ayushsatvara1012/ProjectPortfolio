@@ -43,6 +43,8 @@ createRoot(document.getElementById("root")).render(
           variables: {
             colorPrimary: '#4f46e5', // Indigo 600
             colorTextOnPrimaryBackground: 'white',
+            fontFamily: '"Poppins", sans-serif',
+            fontSize: '1rem',
           }
         }}
       >

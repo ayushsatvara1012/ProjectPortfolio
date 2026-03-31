@@ -110,7 +110,7 @@ const ManageSubscriptions = () => {
             // Get the current Clerk user ID from the token payload
             const payload = JSON.parse(atob(token.split('.')[1]));
             const userId = payload.sub;
-            const returnUrl = `${window.location.origin}/register?payment=success`;
+            const returnUrl = `${window.location.origin}/app/register?payment=success`;
             const checkoutUrl = `${POLAR_URLS[targetTier]}?customer_external_id=${userId}&success_url=${returnUrl}`;
             window.location.href = checkoutUrl;
         } catch {

@@ -241,7 +241,7 @@ const ChatWidget = ({ apiKey }) => {
                                             </div>
                                             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
                                         </div>
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col justify-center">
                                             <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
                                             <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 font-medium italic hover:text-slate-700 transition-colors">Powered by SaPyBase</a>
                                         </div>
@@ -279,7 +279,7 @@ const ChatWidget = ({ apiKey }) => {
                                                         setMessages([{ role: 'bot', content: configData.initial_message }]);
                                                         setShowMenu(false);
                                                     }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
                                                 >
                                                     Clear chat
                                                 </button>
@@ -288,12 +288,12 @@ const ChatWidget = ({ apiKey }) => {
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full text-left px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans hover:bg-slate-50 transition-colors flex items-center justify-between group"
                                                     onClick={() => setShowMenu(false)}
                                                     style={{ color: THEME_COLOR }}
                                                 >
                                                     Add to your site
-                                                    <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                                                    <span className="text-sm font-bold font-sans opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
                                                 </a>
                                             </motion.div>
                                         )}
@@ -328,7 +328,7 @@ const ChatWidget = ({ apiKey }) => {
 
                                         <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                             {msg.role === 'bot' && (
-                                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
+                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
                                             )}
                                             <div
                                                 className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center ${msg.role === 'user'
@@ -338,9 +338,9 @@ const ChatWidget = ({ apiKey }) => {
                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                             >
                                                 {msg.role === 'user' ? (
-                                                    <div className="whitespace-pre-wrap text-base leading-relaxed">{msg.content}</div>
+                                                    <div className="whitespace-pre-wrap text-lg font-medium font-sans leading-relaxed">{msg.content}</div>
                                                 ) : (
-                                                    <div className="text-base leading-relaxed">
+                                                    <div className="text-lg font-medium font-sans leading-relaxed">
                                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                                     </div>
                                                 )}
@@ -396,8 +396,7 @@ const ChatWidget = ({ apiKey }) => {
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none text-base leading-relaxed placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none"
-                                        style={{ fontSize: '16px' }}
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none text-xl font-medium font-sans"
                                         rows={1}
                                         disabled={isLoading}
                                         aria-label="Chat input"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import { UserButton, useUser } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -182,10 +182,10 @@ const TopNav = ({ user, onMenuClick }) => {
                 >
                     <Menu className="w-5 h-5 text-slate-600 dark:text-slate-400 transition-colors" />
                 </button>
-                <div className="flex items-center gap-2.5">
+                <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                     <Logo className="h-5 w-auto" />
                     <span className="text-md uppercase tracking-widest font-bold text-slate-900 dark:text-slate-100 transition-colors">SaPyBase</span>
-                </div>
+                </Link>
             </div>
 
             {/* Breadcrumb */}

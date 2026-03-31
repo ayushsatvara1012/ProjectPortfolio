@@ -148,7 +148,7 @@ export const AppPageSkeleton = () => {
                     viewBox="120 28 160 160"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
-                    style={{ width: 180, height: 'auto', marginBottom: 32 }}
+                    style={{ width: 80, height: 'auto', marginBottom: 32 }}
                 >
                     {/* Corner dots */}
                     <path opacity="0.45" d="M128 104H124C122.895 104 122 104.895 122 106V110C122 111.105 122.895 112 124 112H128C129.105 112 130 111.105 130 110V106C130 104.895 129.105 104 128 104Z" fill="#5730F5"/>
@@ -187,7 +187,7 @@ export const AppPageSkeleton = () => {
                     <g transform="matrix(1 0 0 1.802319 0 -139.202346)">
                         <path d="M249.811,171c-26.284853,1.656625-60.541601,4.781331-99.622,0-.421,0-.762,1.119-.762,2.5s.341,2.5.762,2.5h99.622c.421,0,.762-1.119-.762-2.5s-.341-2.5-.762-2.5Z" transform="matrix(1 0 0 0.999999 -1 0.000174)" fill="#0F2060" className="dark:fill-white"/>
                         <path d="M150.237,171h-1.619c-.893,0-1.618.895-1.618,2v1c0,1.105.725,2,1.618,2h1.619c.893,0,1.618-.895,1.618-2v-1c0-1.105-.725-2-1.618-2Z" fill="#5730F5"/>
-                        <path d="M251.382,171h-1.619c-.893,0-1.618.895-1.618,2v1c0,1.105.725,2,1.618,2h1.619c.893,0,1.618-.895,1.618-2v-1c0-1.105-.725-2-1.618-2Z" fill="#5730F5"/>
+                        <path d="M249.382,171h-1.619c-.893,0-1.618.895-1.618,2v1c0,1.105.725,2,1.618,2h1.619c.893,0,1.618-.895,1.618-2v-1c0-1.105-.725-2-1.618-2Z" fill="#5730F5"/>
                     </g>
                 </svg>
  
@@ -201,11 +201,11 @@ export const AppPageSkeleton = () => {
  
                 {/* Status label */}
                 {done ? (
-                    <span className="text-[13px] text-slate-400 dark:text-slate-500 transition-opacity duration-500">
+                    <span className="text-lg font-bold font-sans text-slate-400 dark:text-slate-500 transition-opacity duration-500">
                         Ready
                     </span>
                 ) : (
-                    <span className="brand-label text-[13px] text-slate-400 dark:text-slate-500">
+                    <span className="brand-label text-lg font-bold font-sans text-slate-400 dark:text-slate-500">
                         {messages[msgIdx]} {Math.round(pct)}%
                     </span>
                 )}

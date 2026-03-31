@@ -99,7 +99,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
         // 1. ADMIN PROTECTION (For /admin route)
         if (adminOnly && role !== 'SUPER_ADMIN') {
             console.warn("Access Denied: Admin route requires SUPER_ADMIN role.");
-            return <Navigate to="/dashboard" replace />;
+            return <Navigate to="/app" replace />;
         }
 
         // 2. TENANT ADMIN PROTECTION (For /dashboard and /register)
@@ -109,13 +109,13 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
         // 3. ONBOARDING REDIRECTS (For USERS/GUESTS)
         // If trying to access Dashboard/Register but no Tier selected
-        if ((location.pathname === '/dashboard' || location.pathname === '/register') && !tier) {
-            return <Navigate to="/pricing" replace />;
+        if ((location.pathname === '/app' || location.pathname === '/app/register') && !tier) {
+            return <Navigate to="/app/pricing" replace />;
         }
 
         // If trying to access Dashboard but no Company registered
-        if (location.pathname === '/dashboard' && !hasCompany) {
-            return <Navigate to="/register" replace />;
+        if (location.pathname === '/app' && !hasCompany) {
+            return <Navigate to="/app/register" replace />;
         }
     }
 

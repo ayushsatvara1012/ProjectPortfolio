@@ -158,7 +158,7 @@ const Navbar = () => {
             <SignedIn>
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
                 <Link
-                  to="/app/pricing"
+                  to="/app"
                   className="text-md text-slate-900 dark:text-slate-200 font-display hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                 >
                   Dashboard
@@ -172,6 +172,7 @@ const Navbar = () => {
                         userButtonTrigger: "rounded-none"
                       }
                     }}
+                   
                   />
                 </div>
               </div>
@@ -242,7 +243,7 @@ const Navbar = () => {
             
             <SignedIn>
                 <Link
-                  to="/app/pricing"
+                  to="/app"
                   onClick={() => setIsOpen(false)}
                   className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
                 >
