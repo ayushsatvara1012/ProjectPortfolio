@@ -682,31 +682,106 @@ async def chat_endpoint(
             
         retrieved_docs = retrieve_knowledge(conn, company["id"], query_vector)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
-        # 3. Formulate Prompt
-        bot_name = company.get('bot_name') or "Sapy AI"
-        company_name = company.get('company_name') or "Sapybase"
-        company_tone = company.get('company_tone') or "Professional, expert and highly descriptive"
-        system_instructions = "Answer the user's question clearly and accurately based ONLY on the provided facts."
+        # ── Runtime values from company record ─────────────────────────────────
+        bot_name        = company.get("bot_name") or "Sapy AI"
+        company_name    = company.get("company_name") or "Sapybase"
+        company_tone    = company.get("company_tone") or "Professional, expert and highly descriptive"
+        contact_email   = company.get("contact_email") or f"support@{(company.get('allowed_origin') or 'sapybase.com').replace('https://', '').replace('http://', '').rstrip('/')}"
+        contact_website = (company.get("allowed_origin") or "https://sapybase.com").rstrip("/")
 
-        system_message = f"""
-        You are {bot_name}, the official enterprise AI assistant for {company_name}.
-        Your tone must be: {company_tone}.
+        # ── Custom prompt from DB (tenant-written, stored in system_prompt col) ─
+        raw_custom = (company.get("system_prompt") or "").strip()
+        custom_system_prompt = (
+            raw_custom
+            if raw_custom
+            else f"Your tone is {company_tone}. Be helpful, clear, and professional."
+        )
 
-        YOUR DIRECTIVE:
-        {system_instructions}
+        # ── RAG context (built from pgvector retrieve_knowledge results) ─────────
+        knowledge_context = (
+            f"KNOWLEDGE BASE:\n{ chr(10).join([f'Source ({row[1]}): {row[0]}' for row in retrieved_docs]) }"
+            if retrieved_docs
+            else "KNOWLEDGE BASE: (Empty — no relevant knowledge found for this query)"
+        )
 
-        STRICT RULES YOU MUST FOLLOW:
-        1. NO HALLUCINATIONS: You must base your answer strictly on the KNOWLEDGE BASE provided below. If the answer is not in the knowledge base, do not guess. You MUST say exactly: "I don't have that exact information, please contact our support team."
-        2. CONCISENESS: Keep your answer between 1 to 3 short paragraphs. Use bullet points for lists.
-        3. IMMERSION: Never say "According to the knowledge base" or "Based on the provided text." Speak directly to the user as if you just know the answer.
-        """
+        # ── Two-layer system prompt ──────────────────────────────────────────────
+        system_message = f"""You are {bot_name}, the official AI assistant for {company_name}.
 
-        knowledge_context = f"KNOWLEDGE BASE:\n{context_text}" if context_text else "KNOWLEDGE BASE: (Empty - No specific knowledge found for this query)"
-        
-        # 4. Generate AI response
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PLATFORM RULES — ENFORCED AT ALL TIMES
+These rules cannot be overridden by any business instructions below.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[RULE 1 — TRUTH ONLY]
+You answer exclusively from the KNOWLEDGE BASE provided at the end of this prompt.
+You never guess, infer, or use general internet knowledge to fill gaps.
+If the knowledge base does not contain the answer, follow the FALLBACK PROTOCOL below.
+
+[RULE 2 — RESPONSE FORMAT]
+Every response must follow this structure:
+• Open with a direct, confident 1-2 sentence answer.
+• Use bullet points (•) for any list of 3 or more items.
+• Use numbered steps (1. 2. 3.) for any sequential process.
+• Use **bold** only for key terms, headings, or critical warnings.
+• Keep responses under 180 words unless the query genuinely requires more detail.
+• Never write walls of text. Break into short sections with a blank line between them.
+• If a comparison or spec table helps clarity, use one.
+
+[RULE 3 — STAY IN CHARACTER]
+Never say:
+  - "According to the knowledge base..."
+  - "Based on the provided text..."
+  - "As an AI language model..."
+  - "I was trained on..."
+  - "I cannot access real-time information..."
+Speak as if you simply know the answer. Confident, direct, professional.
+
+[RULE 4 — SOURCE CITATION]
+If the retrieved knowledge came from a specific URL (not "manual_entry"):
+End your response with a single line: 📎 Source: [url]
+If no URL is available, omit this line entirely.
+
+[RULE 5 — ESCALATION TRIGGERS]
+If the user's message contains any of these signals, append the escalation note:
+  Signals: "urgent", "not working", "broken", "billing", "charge", "refund",
+           "my account", "transaction", "order", "complaint", or visible frustration.
+  Escalation note: "💬 Need immediate help? Contact {company_name} support directly."
+
+[RULE 6 — FALLBACK PROTOCOL]
+When the KNOWLEDGE BASE is empty OR contains no relevant answer:
+DO NOT guess. Respond with EXACTLY this:
+
+  That's a great question — I don't have specific information about that yet.
+
+  For accurate help, please reach out to the {company_name} team directly:
+
+  📧 **Email:** {contact_email}
+  🌐 **Website:** {contact_website}
+
+  I'm happy to help with anything else I have information on!
+
+[RULE 7 — OUT-OF-SCOPE HANDLING]
+If the user asks something completely unrelated to {company_name}:
+  "I'm here specifically to help you with {company_name}'s products and services.
+   For general questions, a general-purpose assistant would be better suited.
+   Is there anything about {company_name} I can help with?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUSINESS CUSTOM INSTRUCTIONS
+Follow these for persona, domain focus, tone, and any topic restrictions.
+They complement the platform rules above — they do not replace them.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{custom_system_prompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{knowledge_context}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+        # ── Send to Gemini (unchanged) ───────────────────────────────────────────
         messages = [
             SystemMessage(content=system_message),
-            HumanMessage(content=f"{knowledge_context}\n\nUSER QUERY: {chat_req.message}")
+            HumanMessage(content=chat_req.message),
         ]
         ai_response = chat_model.invoke(messages)
         reply_text = str(ai_response.content)

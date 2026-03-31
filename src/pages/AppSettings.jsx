@@ -10,7 +10,7 @@ import { useUserRole } from '../context/UserContext';
 import BotPreview from '../components/BotPreview';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 focus:border-slate-400 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-500 transition-colors";
+const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 focus:border-slate-400 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-200 transition-colors";
 const labelCls = "block text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5 transition-colors";
 const headingCls = "text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4 transition-colors";
 const sectionGap = 'space-y-px';
@@ -75,9 +75,9 @@ export const CustomizeSection = () => {
                     {isLocked && (
                         <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors">
                              <Lock className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-4 transition-colors" />
-                             <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans mb-2 transition-colors">Upgrade Required</h3>
+                             <h3 className="text-md font-display uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans mb-2 transition-colors">Upgrade Required</h3>
                              <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[260px] mb-6 transition-colors">Customizing your bot's visual identity requires an active subscription.</p>
-                             <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors shadow-sm">
+                             <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-md font-display uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors shadow-sm">
                                  View Plans
                              </Link>
                         </div>
