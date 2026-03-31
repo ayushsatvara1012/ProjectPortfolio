@@ -7,8 +7,6 @@ import {
     ShieldCheck, Zap
 } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
-import Logo from '../components/Logo';
-import { AppPageSkeleton } from '../components/SkeletonLoader';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useUserRole } from '../context/UserContext';
 
@@ -20,7 +18,7 @@ const AdminDashboard = () => {
     const [stats, setStats] = useState({ total_users: 0, total_companies: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [isActionLoading, setIsActionLoading] = useState(false);
-    const { userRole, isLoading: isContextLoading } = useUserRole();
+    const { userRole } = useUserRole();
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('users'); // 'users' or 'companies'
 
@@ -100,19 +98,6 @@ const AdminDashboard = () => {
         c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.origin?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    if (!isUserLoaded) {
-        return (
-            <div className="w-full h-screen bg-white dark:bg-slate-950 flex items-center justify-center transition-colors duration-500">
-                <Logo className="w-[160px] h-20" />
-            </div>
-        );
-    }
-
-    // ── Render ─────────────────────────────────────────────────────────────────
-    if (!isUserLoaded || isContextLoading || isLoading) {
-        return <div className="p-8"><AppPageSkeleton /></div>;
-    }
 
     return (
         <div className="grid gap-px bg-gray-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">

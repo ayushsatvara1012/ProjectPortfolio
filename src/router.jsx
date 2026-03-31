@@ -11,28 +11,22 @@ const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 // ── App Layout pages ───────────────────────────────────────────────────────────
-const AppLayout       = lazy(() => import("./components/AppLayout"));
-const AppTrainAI      = lazy(() => import("./pages/AppTrainAI"));
+const AppLayout = lazy(() => import("./components/AppLayout"));
+const AppTrainAI = lazy(() => import("./pages/AppTrainAI"));
 const AppRegistration = lazy(() => import("./pages/AppRegistration"));
-const AppPricing      = lazy(() => import("./pages/AppPricing"));
-const AppSettings     = lazy(() => import("./pages/AppSettings"));
+const AppPricing = lazy(() => import("./pages/AppPricing"));
+const AppSettings = lazy(() => import("./pages/AppSettings"));
 
 // Settings sub-sections (named exports)
-const AppSettingsAccount  = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.AccountSection  })));
-const AppSettingsBilling  = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.BillingSection  })));
+const AppSettingsAccount = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.AccountSection })));
+const AppSettingsBilling = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.BillingSection })));
 const AppSettingsCustomize = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.CustomizeSection })));
-const AppSettingsApiKeys  = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.ApiKeysSection  })));
+const AppSettingsApiKeys = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.ApiKeysSection })));
 
 import ErrorPage from "./pages/ErrorPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Logo from "./components/Logo";
-import { SkeletonBase } from "./components/SkeletonLoader";
-
-const PageLoader = () => (
-  <div className="p-8">
-    <SkeletonBase className="w-full h-[400px]" />
-  </div>
-);
+// Minimal fallback for public routes — avoids a skeleton flash inside the navbar layout
+const PageLoader = () => <div className="min-h-[60vh]" />;
 
 const router = createBrowserRouter([
   {
@@ -47,7 +41,7 @@ const router = createBrowserRouter([
       { path: "/terms-and-conditions", element: <Suspense fallback={<PageLoader />}><TermsAndConditions /></Suspense> },
       { path: "/services", element: <Suspense fallback={<PageLoader />}><ServicesCatalog /></Suspense> },
       // Legacy routes — redirect to AppLayout equivalents
-      { path: "/pricing",   element: <Navigate to="/app/pricing" replace /> },
+      { path: "/pricing", element: <Navigate to="/app/pricing" replace /> },
       {
         path: "/admin",
         element: <Navigate to="/app/settings/admin" replace />,
@@ -58,11 +52,11 @@ const router = createBrowserRouter([
   {
     path: "/app",
     element: (
-      <Suspense fallback={<PageLoader />}>
-        <ProtectedRoute>
+      <ProtectedRoute>
+        <Suspense fallback={null}>
           <AppLayout />
-        </ProtectedRoute>
-      </Suspense>
+        </Suspense>
+      </ProtectedRoute>
     ),
     errorElement: <ErrorPage />,
     children: [

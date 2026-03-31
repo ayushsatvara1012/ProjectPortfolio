@@ -6,7 +6,6 @@ import {
 import Alert from '../components/alert';
 import { useAuth } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
-import { AppPageSkeleton } from '../components/SkeletonLoader';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useUserRole } from '../context/UserContext';
 
@@ -23,14 +22,12 @@ const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:
 const labelCls = "block text-md font-display uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
 
 const AppTrainAI = () => {
-    const { getToken, isLoaded } = useAuth();
+    const { getToken } = useAuth();
     const {
         userTier, isLoading: ctxLoading,
         messagesUsed, messageLimit, billingPeriodEnd,
         totalDocuments, totalMessages
     } = useUserRole();
-
-    if (!isLoaded || ctxLoading) return <div className="p-8"><AppPageSkeleton /></div>;
 
     const [activeTab, setActiveTab] = useState('url');
     const [url, setUrl] = useState('');

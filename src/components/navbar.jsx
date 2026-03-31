@@ -217,10 +217,10 @@ const Navbar = () => {
                 key={`nav-mob-${link.id || link.name}`}
                 href={link.href}
                 onClick={(e) => handleLinkClick(e, link.href)}
-                className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
               >
                 <span>{link.name}</span>
-                <ArrowRight size={14} className="opacity-40" />
+                <ArrowRight size={18} className="opacity-40" />
               </a>
             ))}
           </div>
@@ -229,12 +229,12 @@ const Navbar = () => {
           <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 mt-auto border-t border-gray-200 dark:border-slate-800 space-y-4">
             <SignedOut>
               <SignUpButton mode="modal">
-                <button className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none mb-3">
+                <button className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none mb-3">
                   Start_Free_Trial
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
-                  <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-[10px] uppercase tracking-widest font-bold font-sans rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                  <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-display tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                     Login_to_System
                   </button>
               </SignInButton>
@@ -242,9 +242,9 @@ const Navbar = () => {
             
             <SignedIn>
                 <Link
-                  to="/dashboard"
+                  to="/app/pricing"
                   onClick={() => setIsOpen(false)}
-                  className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
+                  className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
                 >
                   SYSTEM_DASHBOARD
                 </Link>

@@ -8,11 +8,10 @@ import { SignedIn, SignedOut, SignUp, useUser, useAuth } from '@clerk/clerk-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import Alert from '../components/alert';
-import { AppPageSkeleton } from '../components/SkeletonLoader';
 import { useUserRole } from '../context/UserContext';
 
 const AppRegistration = () => {
-    const { user, isLoaded } = useUser();
+    const { user } = useUser();
     const { getToken } = useAuth();
     const navigate = useNavigate();
     const { userTier } = useUserRole();
@@ -28,8 +27,6 @@ const AppRegistration = () => {
     const [openAccordion, setOpenAccordion] = useState(0);
 
     const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
-
-    if (!isLoaded) return <div className="p-8"><AppPageSkeleton /></div>;
 
     const showAlert = (type, msg) => {
         setAlert({ open: true, type, msg });

@@ -76,7 +76,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     // 1. Wait for BOTH Clerk and your backend/state to finish loading
     if (!isUserLoaded || !isAuthLoaded || (isSignedIn && isLoading)) {
         return (
-            <div className="min-h-screen bg-white p-8 animate-pulse">
+            <div className="min-h-screen bg-white dark:bg-slate-950 p-8 flex items-center justify-center transition-colors duration-500">
                 <AppPageSkeleton />
             </div>
         );

@@ -46,7 +46,7 @@ const Services = () => {
 
   return (
     <section id="services" className="bg-white dark:bg-slate-950 py-12 overflow-hidden transition-colors duration-500">
-      <div className="max-w-8xl mx-auto px-6 md:px-12">
+      <div className="max-w-8xl mx-auto px-6 md:px-3">
         
         {/* Tic-Tac-Toe Grid Architecture */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 rounded-none overflow-hidden transition-colors duration-500">
@@ -65,16 +65,16 @@ const Services = () => {
             </div>
             
             {/* Architectural Legend */}
-            <div className="border-l border-gray-200 dark:border-slate-800 p-6 md:p-8 space-y-4 min-w-[240px] transition-colors duration-500 group-hover/header:border-indigo-100 dark:group-hover/header:border-indigo-900/40">
-              <div className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+            <div className="border-x border-gray-200 dark:border-slate-800 p-6 md:p-8 space-y-4 min-w-[240px] transition-colors duration-500 group-hover/header:border-indigo-100 dark:group-hover/header:border-indigo-900/40">
+              <div className="flex justify-between items-center text-md  uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
                 <span>System_Version</span>
                 <span className="text-slate-900 dark:text-slate-200 font-sans transition-colors">2.0.6</span>
               </div>
-              <div className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
+              <div className="flex justify-between items-center text-md  uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Uptime</span>
                 <span className="text-emerald-600 dark:text-emerald-400 font-sans transition-colors">99.99%</span>
               </div>
-              <div className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
+              <div className="flex justify-between items-center text-md  uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Protocol</span>
                 <span className="text-slate-900 dark:text-slate-200 transition-colors">HP_SECURE</span>
               </div>

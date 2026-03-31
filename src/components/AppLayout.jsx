@@ -10,7 +10,6 @@ import {
 import Logo from './Logo';
 import { BotSettingsProvider } from '../context/BotSettingsContext';
 import FloatingBotWidget from './FloatingBotWidget';
-import { AppPageSkeleton } from './SkeletonLoader';
 import { useUserRole } from '../context/UserContext';
 
 const SETTINGS_SUB = [
@@ -94,8 +93,8 @@ const SidebarContent = ({ user, onClose }) => {
                     <button
                         onClick={() => setSettingsOpen(p => !p)}
                         className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-colors min-h-[44px] border-l-2 w-full ${onSettings
-                                ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
-                                : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
+                            ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
+                            : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
                             }`}
                     >
                         <Settings className={`w-5 h-5 shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -257,20 +256,11 @@ const AppLayout = () => {
 
                 {/* ── Main Content (Flush Architectural Area) ─────────── */}
                 <main className="flex-1 mt-12 lg:ml-52 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 overflow-hidden flex flex-col transition-colors duration-500">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={pathname}
-                            className="flex-1 flex flex-col pt-0" // Removed padding to allow flush-grid pages
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                        >
-                            <Suspense fallback={<AppPageSkeleton />}>
-                                <Outlet />
-                            </Suspense>
-                        </motion.div>
-                    </AnimatePresence>
+                    <div className="flex-1 flex flex-col pt-0">
+                        <Suspense fallback={null}>
+                            <Outlet />
+                        </Suspense>
+                    </div>
                 </main>
 
                 <FloatingBotWidget />
