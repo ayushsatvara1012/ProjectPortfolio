@@ -20,21 +20,19 @@ export default defineConfig({
       // The plugin exposes this via a custom injector function.
       // cssAssetsFilterFunction: undefined, // inject ALL css
       injectCode: (cssCode) => {
-        // This runs at runtime in the browser.
-        // We inject the CSS as a <style> tag into the shadow root's <head>-equiv.
-        // We use a globally shared registry to pass the shadow root reference.
         return `
           (function() {
             try {
               var styleEl = document.createElement('style');
               styleEl.setAttribute('data-sapybase-widget', 'true');
-              styleEl.textContent = ${cssCode};
-              // Try to inject directly into shadow root if it exists
+              // Tailwind attaches variables to :root, but inside Shadow DOM we need :host.
+              var css = ${cssCode}.replace(/:root/g, ':host');
+              styleEl.textContent = css;
+              
               var shadowHost = document.getElementById('sapybase-widget-root');
               if (shadowHost && shadowHost.shadowRoot) {
                 shadowHost.shadowRoot.appendChild(styleEl);
               } else {
-                // Fallback: inject into head (widget-entry.jsx will pick it up via MutationObserver)
                 document.head.appendChild(styleEl);
               }
             } catch (e) {

@@ -116,7 +116,8 @@ if (document.getElementById(CONTAINER_ID)) {
   // ─── 8. CREATE REACT MOUNT POINT ───────────────────────────────────────────
   const mountPoint = document.createElement('div');
   mountPoint.id = 'sapybase-react-root';
-  // This inner div IS pointer-events:auto so the chat bubble is clickable.
+  // This inner div IS pointer-events:none so the background is clickable,
+  // but children (like the chat window) will set pointer-events:auto.
   Object.assign(mountPoint.style, {
     position: 'fixed',
     bottom: '0',
@@ -126,6 +127,10 @@ if (document.getElementById(CONTAINER_ID)) {
     zIndex: '2147483647',
     pointerEvents: 'none',
     overflow: 'visible',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
   });
   shadow.appendChild(mountPoint);
 

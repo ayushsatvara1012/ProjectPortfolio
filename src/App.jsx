@@ -5,12 +5,16 @@ import Footer from "./components/footer";
 import ChatWidget from './components/chatWidget';
 import NavToggle from './components/NavToggle';
 import useInactivityTimeout from './hooks/useInactivityTimeout';
+import useSessionManager from './hooks/useSessionManager';
 import { useState, useEffect } from "react";
 import UpgradePrompt from './components/UpgradePrompt';
 
 function App() {
-  // Automatically logout user after 30 minutes of inactivity
-  useInactivityTimeout(30);
+  // Force logout if this is a new browser/tab instance (prevents auto-login)
+  useSessionManager();
+
+  // Automatically logout user after 15 minutes of inactivity
+  useInactivityTimeout(15);
 
   const [globalUpgradeError, setGlobalUpgradeError] = useState(null);
 
