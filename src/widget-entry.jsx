@@ -25,16 +25,7 @@ if (!containerEl) {
   let passedApiKey = null;
 
   if (scriptTag) {
-    // --- THE FIX: GRAB THE API KEY FROM THE HTML SCRIPT TAG ---
     passedApiKey = scriptTag.getAttribute('data-api-key');
-
-    const widgetUrl = new URL(scriptTag.src);
-    const cssUrl = `${widgetUrl.origin}/style.css`; 
-    
-    const linkEl = document.createElement('link');
-    linkEl.rel = 'stylesheet';
-    linkEl.href = cssUrl;
-    shadowRoot.appendChild(linkEl); 
   }
 
   // 4. Create a React Mount Point
