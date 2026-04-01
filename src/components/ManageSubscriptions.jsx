@@ -111,7 +111,7 @@ const ManageSubscriptions = () => {
             const payload = JSON.parse(atob(token.split('.')[1]));
             const userId = payload.sub;
             const returnUrl = `${window.location.origin}/app/register?payment=success`;
-            const checkoutUrl = `${POLAR_URLS[targetTier]}?metadata[customer_external_id]=${userId}&success_url=${returnUrl}`;
+            const checkoutUrl = `${POLAR_URLS[targetTier]}?customer_external_id=${userId}&success_url=${encodeURIComponent(returnUrl)}`;
             window.location.href = checkoutUrl;
         } catch {
             showAlert('error', 'Error', 'Could not initiate checkout. Please try again.');

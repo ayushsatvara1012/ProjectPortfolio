@@ -1675,6 +1675,117 @@ async def select_free_tier(current_user: dict = Depends(get_current_user)):
     finally:
         release_db_connection(conn)
 
+
+@app.post("/api/user/sync-subscription")
+async def sync_subscription_from_polar(current_user: dict = Depends(get_current_user)):
+    """
+    POST-CHECKOUT SYNC: Called immediately after Polar redirects back.
+    Pulls the user's latest active subscription directly from Polar's API
+    and updates the database. This is a reliable fallback when webhooks
+    are delayed or fail to deliver.
+    """
+    import httpx
+
+    token = os.getenv("POLAR_ACCESS_TOKEN")
+    if not token:
+        raise HTTPException(status_code=500, detail="Polar access token not configured.")
+
+    is_dev = os.getenv("ENV") == "development"
+    polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+    user_email = current_user.get("email", "").lower().strip()
+    clerk_id = current_user.get("clerk_id")
+
+    print(f"SYNC: Starting sync for ClerkID={clerk_id}, Email={user_email}")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Step 1: Look up the customer by external_id (Clerk ID) first
+        resp = await client.get(
+            f"{polar_base_url}/v1/customers",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"external_id": clerk_id, "limit": 1}
+        )
+        customers = resp.json().get("items", []) if resp.is_success else []
+
+        # Step 2: Fallback to email lookup if no external_id match
+        if not customers and user_email:
+            resp = await client.get(
+                f"{polar_base_url}/v1/customers",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"email": user_email, "limit": 1}
+            )
+            customers = resp.json().get("items", []) if resp.is_success else []
+
+        if not customers:
+            print(f"SYNC: No Polar customer found for {user_email}")
+            return {"status": "not_found", "message": "No Polar subscription found for this account yet."}
+
+        polar_customer = customers[0]
+        polar_customer_id = polar_customer["id"]
+        print(f"SYNC: Found Polar customer {polar_customer_id}")
+
+        # Step 3: Get active subscriptions for this customer
+        sub_resp = await client.get(
+            f"{polar_base_url}/v1/subscriptions",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"customer_id": polar_customer_id, "active": "true", "limit": 5}
+        )
+        subscriptions = sub_resp.json().get("items", []) if sub_resp.is_success else []
+
+        if not subscriptions:
+            print(f"SYNC: No active subscriptions for customer {polar_customer_id}")
+            return {"status": "no_active_subscription", "message": "No active subscription found."}
+
+        # Step 4: Pick the best subscription (most recently started)
+        sub = sorted(subscriptions, key=lambda s: s.get("started_at", ""), reverse=True)[0]
+        product_name = (sub.get("product", {}).get("name") or "").upper()
+        status = sub.get("status", "").upper()
+        period_end = sub.get("current_period_end")
+
+        print(f"SYNC: Found subscription - Product={product_name}, Status={status}")
+
+        # Step 5: Map Polar product name to our tier
+        if "PRO" in product_name:
+            tier = "PRO"
+            trial_sql = ""
+        elif "STARTER" in product_name:
+            tier = "STARTER"
+            trial_sql = ""
+        else:  # TRIAL or FREE or anything else
+            tier = "TRIAL"
+            trial_sql = ", trial_end_date = now() + interval '30 days'"
+
+        db_status = "ACTIVE" if status in ("ACTIVE", "TRIALING") else status
+
+        # Step 6: Update the database
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                UPDATE users SET
+                    tier = %s,
+                    subscription_status = %s,
+                    polar_customer_id = %s,
+                    billing_period_end = %s
+                    {trial_sql}
+                WHERE clerk_id = %s
+                """,
+                (tier, db_status, polar_customer_id, period_end, clerk_id)
+            )
+            cursor.execute(
+                "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
+                (current_user["id"],)
+            )
+            conn.commit()
+            print(f"SYNC SUCCESS: Set tier={tier} for ClerkID={clerk_id}")
+            return {"status": "success", "tier": tier, "subscription_status": db_status}
+        except Exception as e:
+            conn.rollback()
+            print(f"SYNC DB ERROR: {e}")
+            raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+        finally:
+            release_db_connection(conn)
+
 # @app.get("/api/billing/portal")
 # async def get_billing_portal(current_user: dict = Depends(get_current_user)):
 #     """Generates Polar Customer Portal URL."""

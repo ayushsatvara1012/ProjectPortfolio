@@ -85,7 +85,9 @@ const AppPricing = () => {
         setIsLoading(true); setSelectedTier(tier);
         try {
             const returnUrl = `${window.location.origin}/app/register?payment=success`;
-            const url = `${POLAR_URLS[tier]}?metadata[customer_external_id]=${user.id}&success_url=${returnUrl}`;
+            // Use customer_external_id directly — this is the Polar-native parameter
+            // that maps to customer.external_id in webhook payloads.
+            const url = `${POLAR_URLS[tier]}?customer_external_id=${user.id}&success_url=${encodeURIComponent(returnUrl)}`;
             window.location.href = url;
         } catch { setIsLoading(false); }
     };
