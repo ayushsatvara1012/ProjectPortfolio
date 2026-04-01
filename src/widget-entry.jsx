@@ -18,14 +18,31 @@ if (!containerEl) {
   document.body.appendChild(containerEl);
 
   // 2. Attach the Shadow DOM (The "Force Field")
+  // mode: 'open' allows us to move styles inside!
   const shadowRoot = containerEl.attachShadow({ mode: 'open' });
 
-  // 3. Extract the API key and Inject CSS
+  // 4. THE STYLING FIX: Move Vite-injected CSS into the Shadow DOM
+  // vite-plugin-css-injected-by-js usually puts styles in the <head>.
+  // We need to move them inside the shadowRoot so the widget can see them!
+  const moveStyles = () => {
+    const styleTags = document.querySelectorAll('style');
+    styleTags.forEach(tag => {
+      // Look for the tag containing our Tailwind/Widget styles
+      if (tag.textContent.includes('sapybase-widget-container') || tag.textContent.includes('tailwind')) {
+        const shadowStyle = tag.cloneNode(true);
+        shadowRoot.appendChild(shadowStyle);
+      }
+    });
+  };
+  
+  // 3. Extract the API key and Move Styles
   const scriptTag = document.querySelector('script[src*="widget.js"]');
   let passedApiKey = null;
 
   if (scriptTag) {
     passedApiKey = scriptTag.getAttribute('data-api-key');
+    // Run the style migration!
+    moveStyles();
   }
 
   // 4. Create a React Mount Point
