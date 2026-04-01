@@ -196,8 +196,7 @@ combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=combined_origins,
-    allow_origin_regex=r"https://.*\.ngrok-free\.(app|dev)|https://.*\.vercel\.app", 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

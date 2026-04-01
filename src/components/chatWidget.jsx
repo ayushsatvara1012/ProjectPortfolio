@@ -8,7 +8,7 @@ import BrandLogo from './brandLogo';
 
 const ChatWidget = ({ apiKey }) => {
     // 1. Determine if we are testing locally or live on a client's site
-    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://www.sapybase.com';
+    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://sapybase-deploy-test.vercel.app';
 
     // 2. Safely grab the window config if it exists
     const winConfig = window.SaPyBaseConfig || {};
