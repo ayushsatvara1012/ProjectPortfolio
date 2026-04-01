@@ -353,8 +353,8 @@ const ChatWidget = ({ apiKey }) => {
                                                 </div>
                                             ) : (
                                                 <div className="w-9 h-9 flex items-center justify-center pointer-events-none">
-            <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-        </div>
+                                                    <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
+                                                </div>
                                             )}
                                         </div>
 
@@ -365,14 +365,14 @@ const ChatWidget = ({ apiKey }) => {
                                             <div
                                                 className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center ${msg.role === 'user'
                                                     ? 'text-white rounded-2xl rounded-br-none'
-                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0'
+                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold'
                                                     }`}
                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                             >
                                                 {msg.role === 'user' ? (
-                                                    <div className="whitespace-pre-wrap text-lg font-medium font-sans leading-relaxed">{msg.content}</div>
+                                                    <div className="whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                 ) : (
-                                                    <div className="text-lg font-medium font-sans leading-relaxed">
+                                                    <div className="text-lg font-semibold font-sans leading-relaxed">
                                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                                     </div>
                                                 )}
@@ -474,7 +474,7 @@ const ChatWidget = ({ apiKey }) => {
                                         style={{ backgroundColor: THEME_COLOR }}
                                     />
                                     {/* Speech Bubble Tail */}
-<div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white border-r border-t border-indigo-100/50 rotate-45 rounded-sm" />
+                                    <div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white border-r border-t border-indigo-100/50 rotate-45 rounded-sm" />
                                 </div>
                             </motion.div>
                         )}
@@ -537,21 +537,6 @@ const ChatWidget = ({ apiKey }) => {
                             <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
                         </div>
 
-                        {/* ── Chevron (unchanged) ── */}
-                        {/* <AnimatePresence>
-                        {isOpen && (
-                            <motion.span
-                                key="fab-chevron"
-                                initial={{ opacity: 0, y: -6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -6 }}
-                                transition={{ duration: 0.18 }}
-                                className="absolute bottom-[10px] left-1/2 -translate-x-1/2 z-20"
-                            >
-                                <ChevronDown size={25} strokeWidth={2} className="text-blue-900" />
-                            </motion.span>
-                        )}
-                    </AnimatePresence> */}
                     </motion.button>
                 </div>
             </div>

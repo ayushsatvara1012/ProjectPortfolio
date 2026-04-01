@@ -52,7 +52,7 @@ if (document.getElementById(CONTAINER_ID)) {
   // Fonts MUST be registered at the global document level to be used in Shadow DOM.
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
-  fontLink.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Darker+Grotesque:wght@400;600;700;900&display=swap';
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap';
   document.head.appendChild(fontLink);
 
   // ─── 5. INJECT COMPILED TAILWIND CSS SYNCHRONOUSLY ──────────────────────────
