@@ -495,10 +495,6 @@ async def get_current_user(request: Request):
                     cursor.execute("UPDATE users SET role = 'USER' WHERE id = %s", (user_id,))
                     role = 'USER'
                 
-                cursor.execute(
-                    "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
-                    (user_id,)
-                )
             conn.commit()
             
             cursor.close()
@@ -668,7 +664,8 @@ async def chat_endpoint(
         # 0. Verify usage limits using company_id for per-bot tracking
         cursor.execute("""
             SELECT u.tier, u.trial_end_date, u.subscription_status,
-                   ut.messages_used, u.id, ut.id as usage_id, u.role
+                   (SELECT COALESCE(SUM(messages_used), 0) FROM usage_tracking WHERE user_id = u.id) as messages_used,
+                   u.id, ut.id as usage_id, u.role
             FROM users u
             JOIN companies c ON c.user_id = u.id
             LEFT JOIN usage_tracking ut ON ut.company_id = c.id
@@ -940,12 +937,18 @@ async def train_chatbot(
         if not docs:
             raise HTTPException(status_code=400, detail="No content extracted.")
 
-        # --- 2. Chunk and Embed ---
+        # --- 2. Chunk and Embed with Strict Limit Enforcement ---
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = text_splitter.split_documents(docs)
+        all_chunks = text_splitter.split_documents(docs)
+        
+        # Calculate remaining capacity
+        remaining_slots = max(0, limit - current_count)
+        chunks = all_chunks[:remaining_slots]
+        
+        if len(all_chunks) > remaining_slots:
+            warning = f"Plan limit reached! Only {remaining_slots} of {len(all_chunks)} chunks were processed. Upgrade for more storage."
 
         for chunk in chunks:
-            if current_count >= limit: break
             embedding = embeddings_model_doc.embed_query(chunk.page_content)
             if len(embedding) > 768: embedding = embedding[:768]
             
@@ -1163,7 +1166,9 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT messages_used, period_end FROM usage_tracking WHERE user_id = %s ORDER BY period_end DESC LIMIT 1",
+            """SELECT SUM(messages_used), MAX(period_end) 
+               FROM usage_tracking 
+               WHERE user_id = %s""",
             (current_user["id"],)
         )
         usage = cursor.fetchone()
@@ -1546,7 +1551,7 @@ async def polar_webhook(request: Request):
             elif "STARTER" in product_name:
                 tier = "STARTER"
                 trial_end_clause = None
-            elif "FREE" in product_name:
+            elif "TRIAL" in product_name or "FREE" in product_name:
                 tier = "TRIAL"
                 trial_end_clause = "now() + interval '30 days'"
             else:
@@ -1594,19 +1599,6 @@ async def polar_webhook(request: Request):
                 (clerk_id, customer_email, tier, status, data.get("customer_id"), period_end)
             )
             row = cursor.fetchone()
-            if row:
-                # Update usage tracking with the same dates
-                cursor.execute(
-                    """
-                    INSERT INTO usage_tracking (user_id, messages_used, period_start, period_end) 
-                    VALUES (%s, 0, %s, %s)
-                    ON CONFLICT (user_id) DO UPDATE SET
-                        period_start = EXCLUDED.period_start,
-                        period_end = EXCLUDED.period_end
-                    """,
-                    (row[0], period_start or 'now()', period_end or "now() + interval '30 days'")
-                )
-        
         elif event_type == "subscription.revoked":
             cursor.execute(
                 "UPDATE users SET tier = 'FREE', subscription_status = 'CANCELED' WHERE clerk_id = %s",
