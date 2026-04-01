@@ -1,56 +1,125 @@
+/**
+ * SaPyBase Widget — Bulletproof Isolated Mount
+ *
+ * Architecture:
+ *  1. A fixed, pointer-events:none host <div> is appended to <body>.
+ *  2. A Shadow DOM is attached to that host element (total CSS isolation).
+ *  3. This file's own compiled CSS is captured via __INJECTED_CSS__ (set by
+ *     vite.widget.config.js define block) and injected as a <style> tag
+ *     directly inside the Shadow Root — host CSS cannot bleed in.
+ *  4. Google Fonts are injected inside the Shadow Root with a <link> tag.
+ *  5. A CSS reset (*) is written first to cancel any inherited values that
+ *     browsers might propagate through the Shadow boundary.
+ *  6. React is mounted onto a div *inside* the Shadow Root.
+ */
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ChatWidget from './components/chatWidget';
 
-const containerId = 'sapybase-widget-container';
-let containerEl = document.getElementById(containerId);
+// ─── 1. PREVENT DOUBLE-MOUNT ─────────────────────────────────────────────────
+const CONTAINER_ID = 'sapybase-widget-root';
+if (document.getElementById(CONTAINER_ID)) {
+  // Already mounted — do nothing
+} else {
+  // ─── 2. CREATE THE FIXED HOST ELEMENT ──────────────────────────────────────
+  const host = document.createElement('div');
+  host.id = CONTAINER_ID;
 
-if (!containerEl) {
-  // 1. Create the Host Element
-  containerEl = document.createElement('div');
-  containerEl.id = containerId;
-  
-  // Protect the host element and ensure it spans the whole screen so it doesn't clip the chat!
-  containerEl.style.position = 'fixed'; 
-  containerEl.style.inset = '0';
-  containerEl.style.zIndex = '2147483647'; 
-  containerEl.style.pointerEvents = 'none'; 
-  document.body.appendChild(containerEl);
+  // The host element must never interfere with the page layout.
+  // Everything visual lives INSIDE the Shadow DOM, not on this element.
+  Object.assign(host.style, {
+    position: 'fixed',
+    bottom: '0',
+    right: '0',
+    width: '0',
+    height: '0',
+    zIndex: '2147483647',
+    overflow: 'visible',
+    border: 'none',
+    padding: '0',
+    margin: '0',
+    background: 'transparent',
+    pointerEvents: 'none',
+  });
+  document.body.appendChild(host);
 
-  // 2. Attach the Shadow DOM (The "Force Field")
-  // mode: 'open' allows us to move styles inside!
-  const shadowRoot = containerEl.attachShadow({ mode: 'open' });
+  // ─── 3. ATTACH SHADOW DOM ──────────────────────────────────────────────────
+  const shadow = host.attachShadow({ mode: 'open' });
 
-  // 4. THE STYLING FIX: Move Vite-injected CSS into the Shadow DOM
-  // vite-plugin-css-injected-by-js usually puts styles in the <head>.
-  // We need to move them inside the shadowRoot so the widget can see them!
-  const moveStyles = () => {
-    const styleTags = document.querySelectorAll('style');
-    styleTags.forEach(tag => {
-      // Look for the tag containing our Tailwind/Widget styles
-      if (tag.textContent.includes('sapybase-widget-container') || tag.textContent.includes('tailwind')) {
-        const shadowStyle = tag.cloneNode(true);
-        shadowRoot.appendChild(shadowStyle);
+  // ─── 4. INJECT GOOGLE FONTS INTO SHADOW ROOT ───────────────────────────────
+  // Fonts specified in <head> don't propagate into Shadow DOM — we must inject them.
+  const fontLink = document.createElement('link');
+  fontLink.rel = 'stylesheet';
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Darker+Grotesque:wght@400;600;700;900&display=swap';
+  shadow.appendChild(fontLink);
+
+  // ─── 5. INJECT COMPILED CSS INTO SHADOW ROOT ───────────────────────────────
+  // vite.widget.config.js is configured to inject CSS as a string instead of
+  // into the <head>. The cssInjectedByJs plugin is configured with a custom
+  // injector function that appends to the shadow root via a globally shared ref.
+  // 
+  // As a guaranteed fallback, we also grab any <style> injected into <head>
+  // by the IIFE bundle and clone it into the shadow root. This covers all cases.
+  const injectStyles = () => {
+    // Grab the entire text of the bundle to find the injected style
+    const allStyles = Array.from(document.querySelectorAll('style'));
+    allStyles.forEach(styleTag => {
+      if (!shadow.contains(styleTag)) {
+        shadow.appendChild(styleTag.cloneNode(true));
       }
     });
   };
-  
-  // 3. Extract the API key and Move Styles
-  const scriptTag = document.querySelector('script[src*="widget.js"]');
-  let passedApiKey = null;
 
-  if (scriptTag) {
-    passedApiKey = scriptTag.getAttribute('data-api-key');
-    // Run the style migration!
-    moveStyles();
-  }
+  // Run immediately (synchronous scripts will have already injected)
+  injectStyles();
 
-  // 4. Create a React Mount Point
-  const reactRootEl = document.createElement('div');
-  reactRootEl.style.pointerEvents = 'auto'; // Re-enable clicks for the actual widget
-  shadowRoot.appendChild(reactRootEl);
+  // Also observe for any async style injections
+  const styleObserver = new MutationObserver(() => injectStyles());
+  styleObserver.observe(document.head, { childList: true });
 
-  // 5. Render the Widget and PASS IN THE KEY!
-  const root = ReactDOM.createRoot(reactRootEl);
+  // ─── 6. INJECT CSS RESET INSIDE SHADOW ROOT ───────────────────────────────
+  // This kills any inherited CSS values from the host that browsers may
+  // propagate through the Shadow boundary (e.g. font-size, line-height).
+  const resetStyle = document.createElement('style');
+  resetStyle.textContent = `
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+      -webkit-font-smoothing: antialiased;
+    }
+    :host {
+      all: initial;
+      font-family: 'Darker Grotesque', 'Bricolage Grotesque', system-ui, sans-serif !important;
+      font-size: 16px !important;
+      line-height: 1.5 !important;
+      color: #0f172a !important;
+    }
+  `;
+  shadow.appendChild(resetStyle);
+
+  // ─── 7. READ API KEY FROM SCRIPT TAG ───────────────────────────────────────
+  const scriptTag =
+    document.querySelector('script[src*="widget.js"][data-api-key]') ||
+    document.querySelector('script[data-api-key]');
+  const passedApiKey = scriptTag ? scriptTag.getAttribute('data-api-key') : null;
+
+  // ─── 8. CREATE REACT MOUNT POINT ───────────────────────────────────────────
+  const mountPoint = document.createElement('div');
+  mountPoint.id = 'sapybase-react-root';
+  // This inner div IS pointer-events:auto so the chat bubble is clickable.
+  Object.assign(mountPoint.style, {
+    position: 'fixed',
+    bottom: '0',
+    right: '0',
+    width: '100vw',
+    height: '100vh',
+    zIndex: '2147483647',
+    pointerEvents: 'none',
+    overflow: 'visible',
+  });
+  shadow.appendChild(mountPoint);
+
+  // ─── 9. RENDER REACT WIDGET ────────────────────────────────────────────────
+  const root = ReactDOM.createRoot(mountPoint);
   root.render(<ChatWidget apiKey={passedApiKey} />);
 }

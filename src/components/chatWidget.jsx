@@ -1,30 +1,57 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { motion, AnimatePresence, color } from 'framer-motion';
-import { Send, User, ChevronDown, X, MoreHorizontal } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 import BrandLogo from './brandLogo';
 
+const BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
+const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://sapybase-deploy-test.vercel.app';
+
+const DEFAULT_CONFIG = {
+    theme_color: '#5730F5',
+    bot_name: 'Sapy AI',
+    logo_url: `${ASSET_BASE_URL}/SB_loading_clean.svg`,
+    initial_message: "Hi! I'm your AI assistant. How can I help you today?",
+    quick_questions: [],
+};
+
 const ChatWidget = ({ apiKey }) => {
-    // 1. Determine if we are testing locally or live on a client's site
-    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://sapybase-deploy-test.vercel.app';
+    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
 
-    // 2. Safely grab the window config if it exists
-    const winConfig = window.SaPyBaseConfig || {};
+    // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
+    const [configData, setConfigData] = useState(DEFAULT_CONFIG);
+    const [configLoaded, setConfigLoaded] = useState(false);
 
-    // 3. Set the initial config, using the dynamic asset URL for fallbacks!
-    const [configData, setConfigData] = useState({
-        theme_color: winConfig.theme_color || winConfig.themeColor || '#5730F5',
-        bot_name: winConfig.bot_name || winConfig.botName || 'Sapy AI',
-
-        // --- THE FIX IS HERE ---
-        // If the client didn't provide a custom logo, use the dynamic base URL
-        logo_url: winConfig.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
-
-        initial_message: winConfig.welcomeMessage || "Hi! I'm the SaPyBase AI Assistant. How can I help you today?",
-        quick_questions: winConfig.quickQuestions || []
-    });
+    // ── FETCH BOT-SPECIFIC CONFIG FROM BACKEND ────────────────────────────────
+    useEffect(() => {
+        if (!activeApiKey) return;
+        const fetchConfig = async () => {
+            try {
+                const res = await fetch(`${BASE_URL}/api/config`, {
+                    headers: { 'x-api-key': activeApiKey },
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setConfigData({
+                        theme_color: data.theme_color || DEFAULT_CONFIG.theme_color,
+                        bot_name: data.bot_name || DEFAULT_CONFIG.bot_name,
+                        logo_url: data.logo_url || DEFAULT_CONFIG.logo_url,
+                        initial_message: data.initial_message || DEFAULT_CONFIG.initial_message,
+                        quick_questions: data.quick_questions || [],
+                    });
+                    // Update the welcome message now that we have the real one
+                    setMessages([{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }]);
+                }
+            } catch (err) {
+                console.warn('[SaPyBase] Could not load bot config:', err);
+            } finally {
+                setConfigLoaded(true);
+            }
+        };
+        fetchConfig();
+    }, [activeApiKey]);
 
     const THEME_COLOR = configData.theme_color;
     const BOT_NAME = configData.bot_name;
@@ -32,12 +59,9 @@ const ChatWidget = ({ apiKey }) => {
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-
-    // 3. CRITICAL FIX: Initialize messages with the welcome message so it is never blank!
     const [messages, setMessages] = useState([
-        { role: 'bot', content: configData.initial_message }
+        { role: 'bot', content: DEFAULT_CONFIG.initial_message }
     ]);
-
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false);
@@ -53,7 +77,6 @@ const ChatWidget = ({ apiKey }) => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [loopNum, setLoopNum] = useState(0);
     const [typingSpeed, setTypingSpeed] = useState(100);
-
     const phrases = ["Chat with me !", "Have questions ?", "I'm here to help!", "Powered by Sapybase !"];
 
     useEffect(() => {
@@ -61,14 +84,11 @@ const ChatWidget = ({ apiKey }) => {
         const handleTyping = () => {
             const i = loopNum % phrases.length;
             const fullText = phrases[i];
-
             setCurrentPhrase(isDeleting
                 ? fullText.substring(0, currentPhrase.length - 1)
                 : fullText.substring(0, currentPhrase.length + 1)
             );
-
             setTypingSpeed(isDeleting ? 40 : 100);
-
             if (!isDeleting && currentPhrase === fullText) {
                 timer = setTimeout(() => setIsDeleting(true), 2500);
             } else if (isDeleting && currentPhrase === '') {
@@ -78,20 +98,16 @@ const ChatWidget = ({ apiKey }) => {
                 timer = setTimeout(handleTyping, typingSpeed);
             }
         };
-
         timer = setTimeout(handleTyping, typingSpeed);
         return () => clearTimeout(timer);
     }, [currentPhrase, isDeleting, loopNum, typingSpeed]);
-
-    const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
-    const BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
 
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const menuRef = useRef(null);
 
-    // Initial message is already set in state above, so we don't need the fetch loop here for basic config.
     useEffect(() => {
+
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
