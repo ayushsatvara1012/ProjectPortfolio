@@ -167,7 +167,7 @@ const ChatWidget = ({ apiKey }) => {
             if (!response.ok) {
                 if (response.status === 402) {
                     let detail = null;
-                    try { detail = await response.json(); } catch {}
+                    try { detail = await response.json(); } catch { }
                     const isMessageLimit = detail?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
                     setMessages(prev => [...prev, {
                         role: 'bot',
@@ -352,9 +352,9 @@ const ChatWidget = ({ apiKey }) => {
                                                     <User size={18} />
                                                 </div>
                                             ) : (
-                                                <div className="w-9 h-9 rounded-full flex items-center justify-center relative " >
-                                                    <img src={LOGO_URL} alt="Sapy AI" className=" object-contain pointer-events-none scale-80" />
-                                                </div>
+                                                <div className="w-3/4 h-3/4 flex items-center justify-center pointer-events-none">
+            <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
+        </div>
                                             )}
                                         </div>
 
@@ -452,7 +452,7 @@ const ChatWidget = ({ apiKey }) => {
             <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
                 {/* ── Flex Wrapper for Vertical Centering ── */}
                 <div className="relative flex items-center justify-end">
-                    
+
                     {/* Typewriter Promo Label */}
                     <AnimatePresence>
                         {!isOpen && (
@@ -463,7 +463,7 @@ const ChatWidget = ({ apiKey }) => {
                                 // Removed absolute top-1/2. Flexbox handles centering.
                                 className="absolute right-[calc(100%+12px)] hidden sm:flex items-center pointer-events-none"
                             >
-                                <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 flex items-center gap-1.5 min-w-[150px] justify-center relative">
+                                <div className="bg-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 flex items-center gap-1.5 min-w-[150px] justify-center relative">
                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 font-sans whitespace-nowrap">
                                         {currentPhrase}
                                     </span>
@@ -474,7 +474,7 @@ const ChatWidget = ({ apiKey }) => {
                                         style={{ backgroundColor: THEME_COLOR }}
                                     />
                                     {/* Speech Bubble Tail */}
-                                    <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white/95 border-r border-t border-indigo-100/50 rotate-45" />
+<div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white border-r border-t border-indigo-100/50 rotate-45 rounded-sm" />
                                 </div>
                             </motion.div>
                         )}
@@ -490,55 +490,55 @@ const ChatWidget = ({ apiKey }) => {
                         className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1"
                     >
 
-                    {/* ── Single SVG layer: clip-path fill + aura + marching dashes ── */}
-                    <svg
-                        viewBox="0 0 100 100"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="absolute inset-0 w-full h-full z-0"
-                        overflow="visible"
-                    >
-                        <defs>
-                            {/* Clip mask so white fill is exactly bubble-shaped */}
-                            <clipPath id="bubble-clip">
-                                <path d={BUBBLE_PATH} />
-                            </clipPath>
+                        {/* ── Single SVG layer: clip-path fill + aura + marching dashes ── */}
+                        <svg
+                            viewBox="0 0 100 100"
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="absolute inset-0 w-full h-full z-0"
+                            overflow="visible"
+                        >
+                            <defs>
+                                {/* Clip mask so white fill is exactly bubble-shaped */}
+                                <clipPath id="bubble-clip">
+                                    <path d={BUBBLE_PATH} />
+                                </clipPath>
 
 
-                        </defs>
+                            </defs>
 
-                        {/* White fill clipped to bubble shape — replaces bg-white on the button */}
-                        <rect
-                            x="0" y="0" width="100" height="100"
-                            fill="white"
-                            clipPath="url(#bubble-clip)"
-                            className='dark:fill-slate-200'
-                        />
+                            {/* White fill clipped to bubble shape — replaces bg-white on the button */}
+                            <rect
+                                x="0" y="0" width="100" height="100"
+                                fill="white"
+                                clipPath="url(#bubble-clip)"
+                                className='dark:fill-slate-200'
+                            />
 
-                        {/* Pulsing aura — also bubble-shaped */}
-                        <path
-                            d={BUBBLE_PATH}
-                            fill="white"
-                            className="aura-path"
-                        />
+                            {/* Pulsing aura — also bubble-shaped */}
+                            <path
+                                d={BUBBLE_PATH}
+                                fill="white"
+                                className="aura-path"
+                            />
 
-                        {/* Marching dashes border */}
-                        <path
-                            d={BUBBLE_PATH}
-                            fill="none"
-                            stroke={THEME_COLOR}
-                            strokeWidth="1"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
+                            {/* Marching dashes border */}
+                            <path
+                                d={BUBBLE_PATH}
+                                fill="none"
+                                stroke={THEME_COLOR}
+                                strokeWidth="1"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
 
-                    {/* ── Stable Logo (Reusable BrandLogo component) ── */}
-                    <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2 flex items-center justify-center">
-                        <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                    </div>
+                        {/* ── Stable Logo (Reusable BrandLogo component) ── */}
+                        <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2 flex items-center justify-center">
+                            <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
+                        </div>
 
-                    {/* ── Chevron (unchanged) ── */}
-                    {/* <AnimatePresence>
+                        {/* ── Chevron (unchanged) ── */}
+                        {/* <AnimatePresence>
                         {isOpen && (
                             <motion.span
                                 key="fab-chevron"
