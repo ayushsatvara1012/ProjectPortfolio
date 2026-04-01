@@ -38,7 +38,7 @@ const PATH_LABELS = {
     '/app/settings/admin': 'Super Admin',
 };
 
-const TIER_LABEL = { FREE: 'Free', TRIAL: 'Trial', STARTER: 'Starter', PRO: 'Pro' };
+const TIER_LABEL = { FREE: 'Free', BASIC: 'Basic', STARTER: 'Starter', PRO: 'Pro' };
 
 // ── Sidebar nav item (sharp left-border active state) ─────────────────────────
 const SidebarItem = ({ label, icon: Icon, path, onClick }) => (

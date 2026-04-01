@@ -5,7 +5,7 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 
 const POLAR_URLS = {
-    TRIAL: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_qvVDFbLIJZjAyayYqbcuhhlyHOVbE6wmfYzCv4RE0wq/redirect`,
+    BASIC: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uyCgRv3VKICQ1RfDnEI1ywQvgxlx9BR9Ri2442Sf3xF/redirect`,
     STARTER: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ohwJA87iVQyjKgqyQsTcx4yJuWNg5VK907DuI4ZdmGd/redirect`,
     PRO: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
 };
@@ -35,12 +35,14 @@ const AppPricing = () => {
 
     const plans = [
         {
-            name: 'Trial', id: 'TRIAL', price: 'Free Trial',
-            description: 'Explore SaPyBase with 1 bot for 30 days.',
+            name: 'Basic', id: 'BASIC', 
+            price: billingCycle === 'monthly' ? '$5' : '$4.5',
+            period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
+            description: 'Essential AI for small projects.',
             features: [
                 '1 AI Bot',
-                '200 messages / month',
-                '50 knowledge chunks',
+                '500 messages / month',
+                '100 knowledge chunks',
                 'Standard response speed',
                 'SaPyBase branding',
                 'Community support',
@@ -49,7 +51,7 @@ const AppPricing = () => {
         },
         {
             name: 'Professional', id: 'STARTER',
-            price: billingCycle === 'monthly' ? '$5' : '$4.5',
+            price: billingCycle === 'monthly' ? '$10' : '$9',
             period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
             description: 'Up to 2 bots for growing businesses.',
             features: [
@@ -64,13 +66,13 @@ const AppPricing = () => {
         },
         {
             name: 'Enterprise', id: 'PRO',
-            price: billingCycle === 'monthly' ? '$10' : '$9',
+            price: billingCycle === 'monthly' ? '$20' : '$18',
             period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
             description: 'Up to 5 bots for scaling operations.',
             features: [
                 '5 AI Bots',
-                'Unlimited messages',
-                '5,000 knowledge chunks per bot',
+                '5,000 messages / month',
+                '2,000 knowledge chunks per bot',
                 'Dedicated response speed',
                 'Full white-label',
                 'SLA & dedicated support',
@@ -145,7 +147,6 @@ const AppPricing = () => {
                                 {plan.price.startsWith('$') ? plan.price.substring(1) : plan.price}
                             </span>
                             {plan.period && <span className="text-sm text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
-                            {!plan.period && plan.id === 'TRIAL' && <span className="text-sm text-slate-400 dark:text-slate-500 font-medium italic mb-1 transition-colors">30 days</span>}
                         </div>
                         <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>
 
@@ -168,7 +169,7 @@ const AppPricing = () => {
                             {plan.id === currentTier ? 'Current Plan' : (
                                 isLoading && selectedTier === plan.id
                                     ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin" /> Processing...</>
-                                    : plan.id === 'TRIAL' ? 'Start Free Trial' : `Select ${plan.name}`
+                                    : `Select ${plan.name}`
                             )}
                         </button>
                     </motion.div>

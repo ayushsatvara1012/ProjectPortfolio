@@ -136,11 +136,11 @@ def require_fresh_admin(request: Request):
 
 # ── Plan Definitions ────────────────────────────────────────────────────────
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0, "messages": 0,       "chunks": 0,    "speed": "none"},
-    "TRIAL":      {"max_bots": 1, "messages": 200,      "chunks": 50,   "speed": "standard"},
-    "STARTER":    {"max_bots": 2, "messages": 2000,     "chunks": 500,  "speed": "priority"},
-    "PRO":        {"max_bots": 5, "messages": 1000000,  "chunks": 5000, "speed": "dedicated"},
-    "ENTERPRISE": {"max_bots": 999, "messages": 1000000,"chunks": 5000, "speed": "dedicated"},
+    "FREE":       {"max_bots": 0, "messages": 0,    "chunks": 0,    "speed": "none"},
+    "BASIC":      {"max_bots": 1, "messages": 500,  "chunks": 100,  "speed": "standard"},
+    "STARTER":    {"max_bots": 2, "messages": 2000, "chunks": 500,  "speed": "priority"},
+    "PRO":        {"max_bots": 5, "messages": 5000, "chunks": 2000, "speed": "dedicated"},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 10000, "speed": "dedicated"},
 }
 
 UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
@@ -226,7 +226,7 @@ class UserRole(str, Enum):
 
 class UserTier(str, Enum):
     FREE = "FREE"
-    TRIAL = "TRIAL"
+    BASIC = "BASIC"
     STARTER = "STARTER"
     PRO = "PRO"
     ENTERPRISE = "ENTERPRISE"
@@ -535,13 +535,13 @@ async def get_admin_user(user: dict = Depends(get_current_user)):
 async def require_premium_tier(user: dict = Depends(get_current_user)):
     """
     Route Guard: Blocks FREE-tier users from accessing AI Command Center routes.
-    TRIAL, STARTER, and PRO users are permitted.
+    BASIC, STARTER, and PRO users are permitted.
     """
     tier = user.get("tier")
     if tier == "FREE" or tier is None:
         raise HTTPException(
             status_code=403,
-            detail="Access denied: This feature requires an active Trial or paid subscription."
+            detail="Access denied: This feature requires an active Basic or paid subscription."
         )
     return user
 
@@ -656,7 +656,7 @@ async def chat_endpoint(
     chat_req: ChatRequest, 
     company: dict = Depends(verify_api_key_and_origin)
 ):
-    """Core AI Chat Endpoint with Trial Enforcement and Connection Pooling."""
+    """Core AI Chat Endpoint with Basic/Paid Enforcement and Connection Pooling."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -681,8 +681,9 @@ async def chat_endpoint(
         plan = get_plan(tier, role=user_role)
         current_limit = plan["messages"]
 
-        if status != "active" and tier not in ("FREE", "TRIAL"):
-            raise HTTPException(status_code=403, detail="Company account is suspended.")
+        # Billing check: ensure the subscription is currently active (case-insensitive).
+        if status and status.upper() != "ACTIVE" and tier and tier.upper() != "FREE":
+            raise HTTPException(status_code=403, detail="Company account is suspended or subscription has expired.")
 
         if messages_used is not None and current_limit < 999999 and messages_used >= current_limit:
             raise HTTPException(status_code=402, detail={
@@ -828,7 +829,6 @@ They complement the platform rules above — they do not replace them.
         if conn:
             conn.rollback()
         print(f"CHAT ERROR: {e}")
-        if conn: conn.rollback()
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail="Internal connection error")
@@ -1554,46 +1554,30 @@ async def polar_webhook(request: Request):
             product = data.get("product", {})
             product_name = product.get("name", "").upper() if isinstance(product, dict) else ""
             
-            # --- THE TRIAL DECOUPLING ---
             # Products named "FREE" in Polar map to TRIAL tier in our DB.
             # This preserves our state machine invariant: FREE = no access, TRIAL = 30-day premium.
             if "PRO" in product_name:
                 tier = "PRO"
-                trial_end_clause = None  # Not a trial
             elif "STARTER" in product_name:
                 tier = "STARTER"
-                trial_end_clause = None
-            elif "TRIAL" in product_name or "FREE" in product_name:
-                tier = "TRIAL"
-                trial_end_clause = "now() + interval '30 days'"
+            elif "BASIC" in product_name:
+                tier = "BASIC"
             else:
-                # Unknown product — default to TRIAL for safety
-                tier = "TRIAL"
-                trial_end_clause = "now() + interval '30 days'"
+                tier = "BASIC"
             
             print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name}")
             
-            # Extract dates if available
             period_end = data.get("current_period_end")
-            period_start = data.get("current_period_start")
             customer_email = (
                 data.get("customer_email") or 
                 data.get("customer", {}).get("email") or
                 f"polar_{data.get('customer_id', 'unknown')}@placeholder.invalid"
             )
-            
-            # Check for cancellation at period end flag
             status = "CANCELED" if data.get("cancel_at_period_end") else "ACTIVE"
-            
-            # Build the trial_end_date update segment dynamically
-            if trial_end_clause:
-                trial_update_sql = f"trial_end_date = {trial_end_clause},"
-            else:
-                trial_update_sql = ""
-            
+
             # UPSERT: idempotent subscription state update
             cursor.execute(
-                f"""
+                """
                 INSERT INTO users (clerk_id, email, tier, subscription_status, polar_customer_id, billing_period_end)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (clerk_id) DO UPDATE SET
@@ -1601,7 +1585,6 @@ async def polar_webhook(request: Request):
                     subscription_status = EXCLUDED.subscription_status,
                     polar_customer_id = EXCLUDED.polar_customer_id,
                     billing_period_end = EXCLUDED.billing_period_end,
-                    {trial_update_sql}
                     email = CASE 
                         WHEN users.email = 'unknown@email.com' OR users.email IS NULL THEN EXCLUDED.email 
                         ELSE users.email 
@@ -1629,30 +1612,20 @@ async def polar_webhook(request: Request):
         release_db_connection(conn)
 
 @app.post("/api/user/subscription-manual")
-async def select_free_tier(current_user: dict = Depends(get_current_user)):
+async def select_basic_tier(current_user: dict = Depends(get_current_user)):
     """
-    Trial Activation: Provisions a user for the TRIAL tier.
-    TRIAL BOUNCER: Blocks STARTER/PRO users from downgrading to a trial.
+    Basic Plan Activation: Provisions a user for the BASIC tier.
+    Used for manual activations or migrations.
     """
     current_tier = current_user.get("tier")
-    
-    # --- THE TRIAL BOUNCER ---
-    # Premium users cannot activate or re-activate a trial.
-    if current_tier in ("STARTER", "PRO"):
-        raise HTTPException(
-            status_code=403,
-            detail="Trial Lockout: Premium subscribers cannot activate a Free Trial. You already have a paid plan."
-        )
     
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # Set trial_end_date to 30 days from now
         cursor.execute(
             """
             UPDATE users 
-            SET tier = 'TRIAL', subscription_status = 'ACTIVE',
-                trial_end_date = now() + interval '30 days'
+            SET tier = 'BASIC', subscription_status = 'ACTIVE'
             WHERE id = %s
             """,
             (current_user["id"],)
@@ -1662,7 +1635,7 @@ async def select_free_tier(current_user: dict = Depends(get_current_user)):
             (current_user["id"],)
         )
         conn.commit()
-        return {"status": "success", "tier": "TRIAL"}
+        return {"status": "success", "tier": "BASIC"}
     finally:
         release_db_connection(conn)
 
@@ -1734,16 +1707,15 @@ async def sync_subscription_from_polar(current_user: dict = Depends(get_current_
 
         print(f"SYNC: Found subscription - Product={product_name}, Status={status}")
 
-        # Step 5: Map Polar product name to our tier
+        # Step 5: Map Polar product name to our internal tier
         if "PRO" in product_name:
             tier = "PRO"
-            trial_sql = ""
         elif "STARTER" in product_name:
             tier = "STARTER"
-            trial_sql = ""
-        else:  # TRIAL or FREE or anything else
-            tier = "TRIAL"
-            trial_sql = ", trial_end_date = now() + interval '30 days'"
+        elif "BASIC" in product_name:
+            tier = "BASIC"
+        else:
+            tier = "BASIC"
 
         db_status = "ACTIVE" if status in ("ACTIVE", "TRIALING") else status
 
@@ -1752,13 +1724,12 @@ async def sync_subscription_from_polar(current_user: dict = Depends(get_current_
         try:
             cursor = conn.cursor()
             cursor.execute(
-                f"""
-                UPDATE users SET
+                """
+                UPDATE users SET 
                     tier = %s,
                     subscription_status = %s,
                     polar_customer_id = %s,
                     billing_period_end = %s
-                    {trial_sql}
                 WHERE clerk_id = %s
                 """,
                 (tier, db_status, polar_customer_id, period_end, clerk_id)

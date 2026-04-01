@@ -59,7 +59,7 @@ export const BillingSection = () => (
 export const CustomizeSection = () => {
     const { botSettings, updateSetting } = useBotSettings();
     const { userTier } = useUserRole();
-    const isLocked = !userTier || userTier === 'FREE' || userTier === 'TRIAL' || userTier === 'null';
+    const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">

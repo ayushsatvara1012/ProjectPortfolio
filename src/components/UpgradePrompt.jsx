@@ -9,8 +9,8 @@ const LIMIT_CONFIG = {
     title: 'Bot Limit Reached',
     accent: 'indigo',
     tip: (tier, limit) =>
-      tier === 'TRIAL'
-        ? `Your Trial plan includes 1 bot. Upgrade to Professional for 2 bots.`
+      tier === 'BASIC'
+        ? `Your Basic plan includes 1 bot. Upgrade to Professional for 2 bots.`
         : tier === 'STARTER'
         ? `Your Professional plan supports 2 bots. Upgrade to Enterprise for up to 5 bots.`
         : `Your ${tier} plan supports ${limit} bot(s). Contact us for custom limits.`,

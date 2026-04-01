@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Zap, Rocket, Shield, Calendar, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { CreditCard, Zap, Rocket, Shield, AlertCircle, ExternalLink } from 'lucide-react';
 import { useUserRole } from '../context/UserContext';
 import { SkeletonBase } from './SkeletonLoader';
 import Alert from './alert';
@@ -23,12 +23,13 @@ const BillingSkeleton = () => (
 // ─── Tier metadata ─────────────────────────────────────────────────────────────
 const TIER_META = {
     FREE:    { label: 'Free',         color: 'text-slate-500',   badge: 'bg-slate-100 dark:bg-slate-800 text-slate-500',    icon: Shield },
-    TRIAL:   { label: 'Free Trial',   color: 'text-indigo-600',  badge: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600', icon: Zap },
+    BASIC:   { label: 'Basic',        color: 'text-indigo-600',  badge: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600', icon: Zap },
     STARTER: { label: 'Professional', color: 'text-blue-600',    badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600',     icon: Rocket },
     PRO:     { label: 'Enterprise',   color: 'text-violet-600',  badge: 'bg-violet-50 dark:bg-violet-900/30 text-violet-600', icon: Shield },
 };
 
 const POLAR_URLS = {
+    BASIC:   `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uyCgRv3VKICQ1RfDnEI1ywQvgxlx9BR9Ri2442Sf3xF/redirect`,
     STARTER: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ohwJA87iVQyjKgqyQsTcx4yJuWNg5VK907DuI4ZdmGd/redirect`,
     PRO:     `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
 };
@@ -47,7 +48,7 @@ const ManageSubscriptions = () => {
     } = useUserRole();
 
     const [alert, setAlert] = useState({ open: false, type: 'success', title: '', msg: '' });
-    const [processing, setProcessing] = useState(null); // 'trial' | 'portal' | 'cancel' | 'starter' | 'pro'
+    const [processing, setProcessing] = useState(null); // 'portal' | 'cancel' | 'basic' | 'starter' | 'pro'
 
     // Resolve tier safely
     const tier = userTier || 'FREE';
@@ -55,12 +56,6 @@ const ManageSubscriptions = () => {
     const TierIcon = meta.icon;
 
     // ── Computed values ────────────────────────────────────────────────────────
-    const trialDaysLeft = (() => {
-        if (!trialEndDate) return null;
-        const delta = new Date(trialEndDate) - new Date();
-        return Math.max(0, Math.ceil(delta / (1000 * 60 * 60 * 24)));
-    })();
-
     const formattedPeriodEnd = billingPeriodEnd
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : '—';
@@ -72,36 +67,6 @@ const ManageSubscriptions = () => {
     }, []);
 
     const baseUrl = import.meta.env.VITE_API_URL || '';
-
-    // ── Actions ────────────────────────────────────────────────────────────────
-    const handleStartTrial = async () => {
-        setProcessing('trial');
-        try {
-            const token = await getToken();
-            const res = await fetch(`${baseUrl}/api/user/subscription-manual`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            const data = await res.json();
-
-            if (!res.ok) {
-                // Trial Bouncer feedback
-                if (res.status === 403) {
-                    showAlert('warning', 'Trial Locked', data.detail || 'Your plan does not allow trial activation.');
-                } else {
-                    showAlert('error', 'Error', data.detail || 'Could not start trial.');
-                }
-                return;
-            }
-
-            showAlert('success', 'Trial Activated!', 'Your 30-day free trial has started. Enjoy premium access!');
-            await refreshUser();
-        } catch {
-            showAlert('error', 'Error', 'Network error. Please try again.');
-        } finally {
-            setProcessing(null);
-        }
-    };
 
     const handleUpgrade = (targetTier) => async () => {
         setProcessing(targetTier.toLowerCase());
@@ -204,47 +169,34 @@ const ManageSubscriptions = () => {
                         </div>
                         <div className="bg-white dark:bg-slate-950 p-6 text-center transition-colors">
                             <p className="text-sm  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-1.5">
-                                {tier === 'TRIAL' ? 'Days Left' : 'Renews'}
+                                {tier === 'FREE' ? '-' : 'Renews'}
                             </p>
                             <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-100">
-                                {tier === 'TRIAL'
-                                    ? (trialDaysLeft !== null ? `${trialDaysLeft}d` : '—')
-                                    : formattedPeriodEnd}
+                                {tier === 'FREE' ? 'N/A' : formattedPeriodEnd}
                             </p>
                         </div>
                     </div>
 
                     {/* Actions Area */}
                     <div className="bg-white dark:bg-slate-950 p-8 transition-colors">
-                        {/* Trial Countdown Banner */}
-                        {tier === 'TRIAL' && trialDaysLeft !== null && (
-                            <div className={`flex items-center gap-3 p-4 mb-6 border text-sm font-medium rounded-none transition-colors
-                                ${trialDaysLeft <= 5
-                                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/30 text-amber-700 dark:text-amber-400'
-                                    : 'bg-slate-50 dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                                }`}>
-                                <Clock className="w-4 h-4 shrink-0" />
-                                <span>
-                                    {trialDaysLeft > 0
-                                        ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} remaining in your free trial.`
-                                        : 'Your trial has expired. Upgrade to continue.'}
-                                </span>
-                            </div>
-                        )}
 
                         {/* Action Buttons */}
                         <div className="flex flex-col gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 mb-6 transition-colors">
                             {tier === 'FREE' && (
                                 <>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleStartTrial} disabled={isDisabled('trial')} className={btnPrimary}>{label('trial', 'Start 30-Day Free Trial')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $5/mo')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $10/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('BASIC')} disabled={isDisabled('basic')} className={btnPrimary}>{label('basic', 'Upgrade to Basic — $5/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $10/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button></div>
                                 </>
                             )}
-                            {tier === 'TRIAL' && (
+                            {tier === 'BASIC' && (
                                 <>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnPrimary}>{label('starter', 'Upgrade to Professional — $5/mo')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $10/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={btnPrimary}><ExternalLink className="w-3.5 h-3.5" /> {label('portal', 'Manage Billing')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $10/mo')}</button></div>
+                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button></div>
+                                    {subscriptionStatus !== 'CANCELED' && (
+                                        <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleCancel} disabled={isDisabled('cancel')} className={btnDanger}><AlertCircle className="w-3.5 h-3.5" /> {label('cancel', 'Cancel Subscription')}</button></div>
+                                    )}
                                 </>
                             )}
                             {(tier === 'STARTER' || tier === 'PRO') && (
@@ -258,7 +210,7 @@ const ManageSubscriptions = () => {
                         </div>
 
                         {/* Full Pricing CTA */}
-                        {(tier === 'FREE' || tier === 'TRIAL') && (
+                        {tier === 'FREE' && (
                             <p className="text-center text-sm uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display transition-colors">
                                 View all plans →{' '}
                                 <button
