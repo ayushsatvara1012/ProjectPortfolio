@@ -48,12 +48,12 @@ if (document.getElementById(CONTAINER_ID)) {
   // ─── 3. ATTACH SHADOW DOM ──────────────────────────────────────────────────
   const shadow = host.attachShadow({ mode: 'open' });
 
-  // ─── 4. INJECT GOOGLE FONTS INTO SHADOW ROOT ───────────────────────────────
-  // Fonts specified in <head> don't propagate into Shadow DOM — we must inject them.
+  // ─── 4. INJECT GOOGLE FONTS INTO HOST HEAD ─────────────────────────────────
+  // Fonts MUST be registered at the global document level to be used in Shadow DOM.
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
   fontLink.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Darker+Grotesque:wght@400;600;700;900&display=swap';
-  shadow.appendChild(fontLink);
+  document.head.appendChild(fontLink);
 
   // ─── 5. INJECT COMPILED TAILWIND CSS SYNCHRONOUSLY ──────────────────────────
   const styleTag = document.createElement('style');

@@ -450,42 +450,45 @@ const ChatWidget = ({ apiKey }) => {
             </AnimatePresence>
 
             <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
-                {/* Typewriter Promo Label */}
-                <AnimatePresence>
-                    {!isOpen && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, x: 10 }}
-                            animate={{ opacity: 1, scale: 1, x: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                            className="absolute right-full mr-5 top-1/2 -translate-y-1/2 hidden sm:flex items-center pointer-events-none"
-                        >
-                            <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 flex items-center gap-1.5 min-w-[150px] justify-center relative">
-                                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 font-sans whitespace-nowrap">
-                                    {currentPhrase}
-                                </span>
-                                <motion.span
-                                    animate={{ opacity: [1, 0, 1] }}
-                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                    className="w-0.5 h-4 rounded-full"
-                                    style={{ backgroundColor: THEME_COLOR }}
-                                />
-                                {/* Speech Bubble Tail */}
-                                <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white/95 border-r border-t border-indigo-100/50 rotate-45" />
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                {/* ── Flex Wrapper for Vertical Centering ── */}
+                <div className="relative flex items-center justify-end">
+                    
+                    {/* Typewriter Promo Label */}
+                    <AnimatePresence>
+                        {!isOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                                animate={{ opacity: 1, scale: 1, x: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                                // Removed absolute top-1/2. Flexbox handles centering.
+                                className="absolute right-[calc(100%+12px)] hidden sm:flex items-center pointer-events-none"
+                            >
+                                <div className="bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 flex items-center gap-1.5 min-w-[150px] justify-center relative">
+                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 font-sans whitespace-nowrap">
+                                        {currentPhrase}
+                                    </span>
+                                    <motion.span
+                                        animate={{ opacity: [1, 0, 1] }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                        className="w-0.5 h-4 rounded-full"
+                                        style={{ backgroundColor: THEME_COLOR }}
+                                    />
+                                    {/* Speech Bubble Tail */}
+                                    <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white/95 border-r border-t border-indigo-100/50 rotate-45" />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    onClick={() => setIsOpen((prev) => !prev)}
-                    aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
-                    aria-expanded={isOpen}
-                    style={{ touchAction: "manipulation", background: "transparent" }}
-                    className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1"
-                // bg-white removed — fill is now handled by SVG so shape matches bubble
-                >
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        onClick={() => setIsOpen((prev) => !prev)}
+                        aria-label={isOpen ? "Collapse chat" : "Open AI chat assistant"}
+                        aria-expanded={isOpen}
+                        style={{ touchAction: "manipulation", background: "transparent" }}
+                        className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1"
+                    >
 
                     {/* ── Single SVG layer: clip-path fill + aura + marching dashes ── */}
                     <svg
@@ -549,7 +552,8 @@ const ChatWidget = ({ apiKey }) => {
                             </motion.span>
                         )}
                     </AnimatePresence> */}
-                </motion.button>
+                    </motion.button>
+                </div>
             </div>
         </div>
     );
