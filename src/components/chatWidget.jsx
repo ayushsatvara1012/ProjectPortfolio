@@ -11,7 +11,7 @@ const ChatWidget = ({ apiKey }) => {
     const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
     const activeApiUrl = window.SaPyBaseConfig?.apiUrl || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com');
 
-    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://sapybase-deploy-test.vercel.app';
+    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://www.sapybase.com';
 
     // 2. Initialize with defaults, merging in window.SaPyBaseConfig for high-fidelity fallback
     const DEFAULT_CONFIG = {

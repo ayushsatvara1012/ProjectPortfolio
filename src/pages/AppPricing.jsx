@@ -6,9 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../context/UserContext';
 
 const POLAR_URLS = {
-    BASIC: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uyCgRv3VKICQ1RfDnEI1ywQvgxlx9BR9Ri2442Sf3xF/redirect`,
-    STARTER: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ohwJA87iVQyjKgqyQsTcx4yJuWNg5VK907DuI4ZdmGd/redirect`,
-    PRO: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
+    BASIC: `https://buy.polar.sh/polar_cl_4EEEDCpTUdQUPg5UPkwUbEes1dSOYY5WoPUyM2gLFR9`,
+    STARTER: `https://buy.polar.sh/polar_cl_YmY07FtF3Xuw9GpwDrdc77o6NAfO4I0RU9USQ09XprN`,
+    PRO: `https://buy.polar.sh/polar_cl_jfcUscRnZImTTUHTYnCW8EiM3pHHBC6jdl2Gr3ez0EH`,
 };
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
