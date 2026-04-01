@@ -9,39 +9,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import cssInjectedByJs from 'vite-plugin-css-injected-by-js';
-
 export default defineConfig({
   plugins: [
     tailwindcss(),
     react(),
-    cssInjectedByJs({
-      // Instead of injecting into <head>, we inject into the shadow root.
-      // The plugin exposes this via a custom injector function.
-      // cssAssetsFilterFunction: undefined, // inject ALL css
-      injectCode: (cssCode) => {
-        return `
-          (function() {
-            try {
-              var styleEl = document.createElement('style');
-              styleEl.setAttribute('data-sapybase-widget', 'true');
-              // Tailwind attaches variables to :root, but inside Shadow DOM we need :host.
-              var css = ${cssCode}.replace(/:root/g, ':host');
-              styleEl.textContent = css;
-              
-              var shadowHost = document.getElementById('sapybase-widget-root');
-              if (shadowHost && shadowHost.shadowRoot) {
-                shadowHost.shadowRoot.appendChild(styleEl);
-              } else {
-                document.head.appendChild(styleEl);
-              }
-            } catch (e) {
-              console.error('[SaPyBase Widget] Style injection failed:', e);
-            }
-          })();
-        `;
-      },
-    }),
   ],
   define: {
     'process.env.NODE_ENV': '"production"',

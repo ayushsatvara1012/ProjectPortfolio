@@ -16,6 +16,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ChatWidget from './components/chatWidget';
+import tailwindStyles from './index.css?inline';
 
 // ─── 1. PREVENT DOUBLE-MOUNT ─────────────────────────────────────────────────
 const CONTAINER_ID = 'sapybase-widget-root';
@@ -54,33 +55,11 @@ if (document.getElementById(CONTAINER_ID)) {
   fontLink.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Darker+Grotesque:wght@400;600;700;900&display=swap';
   shadow.appendChild(fontLink);
 
-  // ─── 5. INJECT COMPILED CSS INTO SHADOW ROOT ───────────────────────────────
-  // vite.widget.config.js is configured to inject CSS as a string instead of
-  // into the <head>. The cssInjectedByJs plugin is configured with a custom
-  // injector function that appends to the shadow root via a globally shared ref.
-  // 
-  // As a guaranteed fallback, we also grab any <style> injected into <head>
-  // by the IIFE bundle and clone it into the shadow root. This covers all cases.
-  const injectStyles = () => {
-    // ONLY clone styles tagged by our widget build (data-sapybase-widget attribute)
-    const widgetStyles = document.querySelectorAll('style[data-sapybase-widget]');
-    widgetStyles.forEach(styleTag => {
-      if (!shadow.contains(styleTag)) {
-        shadow.appendChild(styleTag.cloneNode(true));
-        // Remove from <head> so it doesn't affect the host page
-        styleTag.remove();
-      }
-    });
-  };
-
-  // Run immediately (synchronous scripts will have already injected)
-  injectStyles();
-
-  // Also observe for any async style injections
-  const styleObserver = new MutationObserver(() => injectStyles());
-  styleObserver.observe(document.head, { childList: true });
-  // Auto-disconnect after 5s — all widget styles should be injected by then
-  setTimeout(() => styleObserver.disconnect(), 5000);
+  // ─── 5. INJECT COMPILED TAILWIND CSS SYNCHRONOUSLY ──────────────────────────
+  const styleTag = document.createElement('style');
+  // Fix the Tailwind :root bug for Shadow DOMs
+  styleTag.textContent = tailwindStyles.replace(/:root/g, ':host');
+  shadow.appendChild(styleTag);
 
   // ─── 6. INJECT CSS RESET INSIDE SHADOW ROOT ───────────────────────────────
   // This kills any inherited CSS values from the host that browsers may
