@@ -458,31 +458,49 @@ async def get_current_user(request: Request):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
+            
+            # --- CONSOLIDATION LOGIC ---
+            # If we don't have a row, or we have an empty (FREE/NULL) row, check for a pending one.
+            if email != "unknown@email.com":
+                # Check for a 'pending' account created by Polar webhooks for this email
+                cursor.execute(
+                    "SELECT id, tier, subscription_status, polar_customer_id, billing_period_end FROM users WHERE clerk_id LIKE 'pending_%%' AND LOWER(email) = LOWER(%s) LIMIT 1",
+                    (email,)
+                )
+                pending = cursor.fetchone()
+                
+                if pending:
+                    pending_id, p_tier, p_status, p_cust_id, p_end = pending
+                    print(f"RECONCILIATION: Found pending paid account (ID={pending_id}, Tier={p_tier}) for {email}")
+                    
+                    # Try to 'Adopt' it by setting the clerk_id (only if real clerk_id doesn't exist yet)
+                    cursor.execute("SELECT id, tier FROM users WHERE clerk_id = %s", (clerk_id,))
+                    existing = cursor.fetchone()
+                    
+                    if not existing:
+                        # Case A: No real ID row yet. Take over the pending row.
+                        cursor.execute("UPDATE users SET clerk_id = %s WHERE id = %s", (clerk_id, pending_id))
+                        print(f"RECONCILIATION: Adopted pending account successfully.")
+                    elif existing[1] in (None, 'FREE', 'null'):
+                        # Case B: Real ID row exists but is empty. Merge pending data into real row.
+                        cursor.execute(
+                            "UPDATE users SET tier = %s, subscription_status = %s, polar_customer_id = %s, billing_period_end = %s WHERE id = %s",
+                            (p_tier, p_status, p_cust_id, p_end, existing[0])
+                        )
+                        cursor.execute("DELETE FROM users WHERE id = %s", (pending_id,))
+                        print(f"RECONCILIATION: Merged pending data into existing real account.")
+
+            # Now fetch the final consolidated state
             cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
             row = cursor.fetchone()
 
-            if not row:
-                # 🛠 RECONCILIATION: Check if a Polar webhook created a "pending" account for this email.
-                # If so, take over that account instead of creating a new one.
-                if email != "unknown@email.com":
-                    cursor.execute(
-                        "UPDATE users SET clerk_id = %s WHERE clerk_id LIKE 'pending_%%' AND LOWER(email) = LOWER(%s) RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
-                        (clerk_id, email)
-                    )
-                    row = cursor.fetchone()
-
-                if not row and email != "unknown@email.com":
-                    # No pending account found, create a new one.
-                    cursor.execute(
-                        "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
-                        (clerk_id, email)
-                    )
-                    row = cursor.fetchone()
-                
-                if not row:
-                    # Final fallback
-                    cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
-                    row = cursor.fetchone()
+            if not row and email != "unknown@email.com":
+                # Final fallback: provision new row if still none exists
+                cursor.execute(
+                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
+                    (clerk_id, email)
+                )
+                row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
             if row:
                 # Assign variables correctly from the expanded query before use
