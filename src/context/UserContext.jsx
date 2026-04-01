@@ -54,6 +54,35 @@ export const UserProvider = ({ children }) => {
         refreshUser();
     }, [isAuthLoaded, isSignedIn]);
 
+    // ── POST-CHECKOUT GLOBAL SYNC ──────────────────────────────────────────────
+    // When returning from Polar with ?payment=success, we immediately polling
+    // the backend to sync the subscription from Polar's API. This handles
+    // redirect landing on ANY page (Dashboard, Register, etc.)
+    useEffect(() => {
+        if (!isAuthLoaded || !isSignedIn) return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('payment') !== 'success') return;
+
+        const syncSubscription = async () => {
+            try {
+                const token = await getToken();
+                const baseUrl = import.meta.env.VITE_API_URL || '';
+                const res = await fetch(`${baseUrl}/api/user/sync-subscription`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    await refreshUser();
+                    // Clean URL
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('payment');
+                    window.history.replaceState({}, '', url.pathname);
+                }
+            } catch (err) { console.error("Global Sync Error:", err); }
+        };
+        syncSubscription();
+    }, [isAuthLoaded, isSignedIn]);
+
     return (
         <UserContext.Provider value={{ ...userData, userRole: userData.role, userTier: userData.tier, isLoading, refreshUser }}>
             {children}

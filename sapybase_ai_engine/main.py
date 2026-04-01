@@ -1378,19 +1378,19 @@ async def clerk_webhook(
                     (clerk_id, email, user_id)
                 )
             else:
-                # 2. Standard UPSERT for fresh users
-                cursor.execute(
-                    """
-                    INSERT INTO users (clerk_id, email, tier, subscription_status)
-                    VALUES (%s, %s, 'FREE', NULL)
-                    ON CONFLICT (clerk_id) DO UPDATE SET
-                        email = EXCLUDED.email,
-                        tier = COALESCE(users.tier, 'FREE')
-                    RETURNING id
-                    """,
-                    (clerk_id, email)
-                )
-                user_id = cursor.fetchone()[0]
+            # 1. Standard UPSERT for fresh users
+            cursor.execute(
+                """
+                INSERT INTO users (clerk_id, email, tier, subscription_status)
+                VALUES (%s, %s, 'FREE', NULL)
+                ON CONFLICT (clerk_id) DO UPDATE SET
+                    email = EXCLUDED.email,
+                    tier = COALESCE(users.tier, 'FREE')
+                RETURNING id
+                """,
+                (clerk_id, email)
+            )
+            user_id = cursor.fetchone()[0]
 
             # Ensure usage tracking exists
             cursor.execute(
@@ -1515,50 +1515,41 @@ async def polar_webhook(request: Request):
     data = msg.get("data")
     event_type = msg.get("type")
     
-    # DEBUG: Localized logging to pinpoint failures
-    print(f"POLAR WEBHOOK EVENT: {event_type}")
-
+    # ── LOGGING OVERLOAD (For Debugging Identifying Issues) ────────────────────
+    customer_email = (data.get("customer_email") or data.get("customer", {}).get("email") or "").lower().strip()
+    
+    # Try every possible path for Clerk ID (customer_external_id)
+    clerk_id = (
+        data.get("metadata", {}).get("customer_external_id") or
+        data.get("metadata", {}).get("external_customer_id") or
+        (data.get("customer") if isinstance(data.get("customer"), dict) else {}).get("external_id") or
+        data.get("customer_external_id") or
+        data.get("external_customer_id")
+    )
+    
+    print(f"DEBUG: POLAR WEBHOOK - Event={event_type}")
+    print(f"DEBUG: POLAR WEBHOOK - IDs in payload: customer_id={data.get('customer_id')}, email={customer_email}, external_id_found={clerk_id}")
+    
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        try:
-            cursor.execute("INSERT INTO processed_webhooks (webhook_id, provider) VALUES (%s, 'polar')", (webhook_id,))
-        except UniqueViolation:
-            print(f"WEBHOOK: Already processed {webhook_id}")
-            conn.rollback()
-            release_db_connection(conn)
-            return {"status": "success", "message": "Duplicate"}
-
-        # Extract and Normalize identifier inputs
-        customer_email = (data.get("customer_email") or data.get("customer", {}).get("email") or "").lower().strip()
-        clerk_id = (
-            data.get("customer_external_id") or 
-            data.get("metadata", {}).get("customer_external_id") or
-            data.get("external_customer_id") or 
-            data.get("customer", {}).get("external_id")
-        )
         
-        print(f"POLAR WEBHOOK: Event={event_type}, Email={customer_email}, ClerkID={clerk_id}")
-        
-        # Identification Fallback
+        # Identification Fallback: Look up by email if no external ID was passed
         if not clerk_id and customer_email:
-            # Try to find existing clerk_id by email
             cursor.execute("SELECT clerk_id FROM users WHERE LOWER(email) = %s", (customer_email,))
             user_row = cursor.fetchone()
             if user_row:
                 clerk_id = user_row[0]
-                print(f"POLAR WEBHOOK: Found existing ClerkID via email lookup: {clerk_id}")
+                print(f"DEBUG: POLAR WEBHOOK - Identified ClerkID via email lookup: {clerk_id}")
             else:
-                # DETERMINISTIC PLACEHOLDER: If user doesn't exist yet (Race Condition)
-                # We create a pending record that will be "claimed" by clerk_webhook later.
                 clerk_id = f"pending_{customer_email}"
-                print(f"POLAR WEBHOOK: Creating placeholder record with ClerkID={clerk_id}")
+                print(f"DEBUG: POLAR WEBHOOK - Created pending placeholder: {clerk_id}")
 
         if not clerk_id:
-            print("WEBHOOK ERROR: No identifiable user found and no email provided.")
+            print("POLAR WEBHOOK ERROR: No way to identify user. Dropping event.")
             return {"status": "ignored"}
 
-        if event_type in ["subscription.created", "subscription.updated", "subscription.active"]:
+        if event_type in ["subscription.created", "subscription.updated", "subscription.active", "order.created", "order.paid"]:
             # Handle checkouts too (sometimes Polar sends this before subscription)
             product = data.get("product", {})
             product_name = product.get("name", "").upper() if isinstance(product, dict) else ""

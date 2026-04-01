@@ -30,39 +30,6 @@ const AppRegistration = () => {
 
     const isLocked = !userTier || userTier === 'FREE' || String(userTier) === 'null';
 
-    // ── POST-CHECKOUT SYNC ──────────────────────────────────────────────────────
-    // Polar redirects to /app/register?payment=success after checkout.
-    // We immediately call the backend to pull the latest subscription from Polar's API
-    // and update the database — no reliance on webhook delivery.
-    const { refreshUser } = useUserRole();
-    React.useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('payment') !== 'success') return;
-
-        const syncSubscription = async () => {
-            try {
-                const token = await getToken();
-                const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
-                const res = await fetch(`${baseUrl}/api/user/sync-subscription`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                console.log('SYNC RESULT:', data);
-                if (data.status === 'success') {
-                    // Pull fresh user data so the UI immediately reflects the new tier
-                    await refreshUser();
-                    showAlert('success', `You're all set! Your ${data.tier} plan is now active.`);
-                    // Clean up URL param so it doesn't retrigger on refresh
-                    window.history.replaceState({}, '', '/app/register');
-                }
-            } catch (err) {
-                console.error('Subscription sync failed:', err);
-            }
-        };
-        syncSubscription();
-    }, []);
-
     const showAlert = (type, msg) => {
         setAlert({ open: true, type, msg });
         setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
