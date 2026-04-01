@@ -10,6 +10,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Alert from '../components/alert';
 import { useUserRole } from '../context/UserContext';
 import UpgradePrompt from '../components/UpgradePrompt';
+import BotIntegrationDocs from '../components/BotIntegrationDocs';
 
 const AppRegistration = () => {
     const { user } = useUser();
@@ -98,20 +99,6 @@ const AppRegistration = () => {
     const cellCls = "bg-white dark:bg-slate-950 transition-colors duration-500";
     const GRID_BG = { background: '#E8EBF0' };
 
-    const integrationGuides = [
-        {
-            title: 'Next.js (App Router)',
-            code: `import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        <Script src="${frontendUrl}/widget.js"\n          data-api-key="${registrationData?.apiKey || 'YOUR_API_KEY'}"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`
-        },
-        {
-            title: 'React / Vite',
-            code: `<!-- In public/index.html -->\n<script\n  src="${frontendUrl}/widget.js"\n  data-api-key="${registrationData?.apiKey || 'YOUR_API_KEY'}"\n  defer\n></script>`
-        },
-        {
-            title: 'Vanilla HTML / Webflow',
-            code: `<!-- Before </body> -->\n<script\n  src="${frontendUrl}/widget.js"\n  data-api-key="${registrationData?.apiKey || 'YOUR_API_KEY'}"\n  defer\n></script>`
-        },
-    ];
 
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
@@ -299,34 +286,12 @@ const AppRegistration = () => {
                                 </div>
                             </div>
 
-                            {/* Integration Guides accordion */}
-                            <div className={`${cardCls} p-0! overflow-hidden border-t-0`}>
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 transition-colors">
-                                    <BookOpen className="w-3.5 h-3.5 text-slate-600 dark:text-slate-500 transition-colors" />
-                                    <h3 className="text-md uppercase tracking-widest font-display text-slate-600 dark:text-slate-400 transition-colors">Integration Guides</h3>
-                                </div>
-                                {integrationGuides.map((guide, i) => (
-                                    <div key={i} className="border-b last:border-0 border-slate-100 dark:border-slate-800 transition-colors">
-                                        <button
-                                            onClick={() => setOpenAccordion(openAccordion === i ? -1 : i)}
-                                            className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors text-left"
-                                        >
-                                            <span className="text-sm font-display text-slate-700 dark:text-slate-300 transition-colors">{guide.title}</span>
-                                            <ChevronDown className={`w-3.5 h-3.5 text-slate-600 dark:text-slate-500 transition-transform ${openAccordion === i ? 'rotate-180' : ''}`} />
-                                        </button>
-                                        <AnimatePresence>
-                                            {openAccordion === i && (
-                                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                                                    <div className="px-5 pb-4">
-                                                        <pre className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-md font-mono text-indigo-600 dark:text-indigo-400 overflow-x-auto leading-relaxed transition-colors">
-                                                            <code>{guide.code}</code>
-                                                        </pre>
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                ))}
+                            {/* Dynamic Integration Guides */}
+                            <div className="p-8 pt-4">
+                                <BotIntegrationDocs 
+                                    apiKey={registrationData.apiKey} 
+                                    apiUrl={import.meta.env.VITE_API_URL || 'https://sapyai.onrender.com'} 
+                                />
                             </div>
                         </motion.div>
                     )}
