@@ -1378,19 +1378,19 @@ async def clerk_webhook(
                     (clerk_id, email, user_id)
                 )
             else:
-            # 1. Standard UPSERT for fresh users
-            cursor.execute(
-                """
-                INSERT INTO users (clerk_id, email, tier, subscription_status)
-                VALUES (%s, %s, 'FREE', NULL)
-                ON CONFLICT (clerk_id) DO UPDATE SET
-                    email = EXCLUDED.email,
-                    tier = COALESCE(users.tier, 'FREE')
-                RETURNING id
-                """,
-                (clerk_id, email)
-            )
-            user_id = cursor.fetchone()[0]
+                # 1. Standard UPSERT for fresh users
+                cursor.execute(
+                    """
+                    INSERT INTO users (clerk_id, email, tier, subscription_status)
+                    VALUES (%s, %s, 'FREE', NULL)
+                    ON CONFLICT (clerk_id) DO UPDATE SET
+                        email = EXCLUDED.email,
+                        tier = COALESCE(users.tier, 'FREE')
+                    RETURNING id
+                    """,
+                    (clerk_id, email)
+                )
+                user_id = cursor.fetchone()[0]
 
             # Ensure usage tracking exists
             cursor.execute(
