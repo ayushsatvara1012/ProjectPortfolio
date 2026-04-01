@@ -1554,8 +1554,7 @@ async def polar_webhook(request: Request):
             product = data.get("product", {})
             product_name = product.get("name", "").upper() if isinstance(product, dict) else ""
             
-            # Products named "FREE" in Polar map to TRIAL tier in our DB.
-            # This preserves our state machine invariant: FREE = no access, TRIAL = 30-day premium.
+            # Map Polar product name to internal tier (BASIC, STARTER, PRO)
             if "PRO" in product_name:
                 tier = "PRO"
             elif "STARTER" in product_name:
