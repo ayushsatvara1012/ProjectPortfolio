@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Zap, Rocket, Building2, Sparkles } from 'lucide-react';
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '../context/UserContext';
 
 const POLAR_URLS = {
     BASIC: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uyCgRv3VKICQ1RfDnEI1ywQvgxlx9BR9Ri2442Sf3xF/redirect`,
@@ -14,24 +15,22 @@ const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 
 const AppPricing = () => {
     const { user } = useUser();
+    const navigate = useNavigate();
+    const { userTier } = useUserRole();
+    
     const [isLoading, setIsLoading] = useState(false);
     const [selectedTier, setSelectedTier] = useState(null);
     const [billingCycle, setBillingCycle] = useState('monthly');
-    const [currentTier, setCurrentTier] = useState('FREE');
 
+    // ── AUTO-REDIRECT ON SUCCESS ─────────────────────────────────────────────
+    // If the global context detects a paid tier (via sync-subscription)
+    // and we are on the pricing page with a success flag, push to registration.
     React.useEffect(() => {
-        const fetchTier = async () => {
-            try {
-                const token = await window.Clerk.session.getToken();
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                if (data.status === 'success') setCurrentTier(data.tier);
-            } catch (err) { console.error('Failed to fetch tier', err); }
-        };
-        if (user) fetchTier();
-    }, [user]);
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('payment') === 'success' && userTier && userTier !== 'FREE') {
+            navigate('/app/register');
+        }
+    }, [userTier, navigate]);
 
     const plans = [
         {
@@ -83,7 +82,7 @@ const AppPricing = () => {
 
     const handleSelectPlan = async (tier) => {
         if (!user) { window.location.href = '/sign-in'; return; }
-        if (tier === currentTier) return;
+        if (tier === userTier) return;
         setIsLoading(true); setSelectedTier(tier);
         try {
             const returnUrl = `${window.location.origin}/app/register?payment=success`;
@@ -161,12 +160,12 @@ const AppPricing = () => {
                             ))}
                         </div>
 
-                        <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading || plan.id === currentTier}
+                        <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading || plan.id === userTier}
                             className={`w-full py-3.5 min-h-[44px] text-md uppercase tracking-widest font-bold font-sans transition-all flex items-center justify-center gap-2 active:scale-95 ${plan.highlight
                                 ? 'bg-blue-600 dark:bg-indigo-600 text-white hover:bg-blue-700 dark:hover:bg-indigo-500 shadow-lg shadow-blue-500/20 dark:shadow-indigo-500/20'
                                 : 'bg-transparent border border-gray-100 dark:border-slate-700 text-slate-900 dark:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
-                                } ${(isLoading && selectedTier === plan.id) || plan.id === currentTier ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                            {plan.id === currentTier ? 'Current Plan' : (
+                                } ${(isLoading && selectedTier === plan.id) || plan.id === userTier ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                            {plan.id === userTier ? 'Current Plan' : (
                                 isLoading && selectedTier === plan.id
                                     ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin" /> Processing...</>
                                     : `Select ${plan.name}`
