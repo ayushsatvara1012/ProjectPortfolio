@@ -23,7 +23,7 @@ const AppPricing = () => {
         const fetchTier = async () => {
             try {
                 const token = await window.Clerk.session.getToken();
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/profile`, {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
