@@ -28,7 +28,7 @@ const AppRegistration = () => {
     const [openAccordion, setOpenAccordion] = useState(0);
     const [upgradeError, setUpgradeError] = useState(null);
 
-    const isLocked = !userTier || userTier === 'FREE' || userTier === 'null';
+    const isLocked = !userTier || userTier === 'FREE' || String(userTier) === 'null';
 
     const showAlert = (type, msg) => {
         setAlert({ open: true, type, msg });

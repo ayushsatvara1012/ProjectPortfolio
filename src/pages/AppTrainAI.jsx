@@ -61,7 +61,7 @@ const AppTrainAI = () => {
     }, []);
 
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier);
-    const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'STARTER') && messagesUsed >= messageLimit;
+    const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'TRIAL' || userTier === 'STARTER') && messagesUsed >= messageLimit;
 
     const showAlert = (type, msg) => {
         setAlert({ open: true, type, msg });

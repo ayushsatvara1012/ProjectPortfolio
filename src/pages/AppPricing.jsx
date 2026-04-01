@@ -5,7 +5,7 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 
 const POLAR_URLS = {
-    FREE: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_qvVDFbLIJZjAyayYqbcuhhlyHOVbE6wmfYzCv4RE0wq/redirect`,
+    TRIAL: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_qvVDFbLIJZjAyayYqbcuhhlyHOVbE6wmfYzCv4RE0wq/redirect`,
     STARTER: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ohwJA87iVQyjKgqyQsTcx4yJuWNg5VK907DuI4ZdmGd/redirect`,
     PRO: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
 };
@@ -14,14 +14,28 @@ const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 
 const AppPricing = () => {
     const { user } = useUser();
-    const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [selectedTier, setSelectedTier] = useState(null);
     const [billingCycle, setBillingCycle] = useState('monthly');
+    const [currentTier, setCurrentTier] = useState('FREE');
+
+    React.useEffect(() => {
+        const fetchTier = async () => {
+            try {
+                const token = await window.Clerk.session.getToken();
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.status === 'success') setCurrentTier(data.tier);
+            } catch (err) { console.error('Failed to fetch tier', err); }
+        };
+        if (user) fetchTier();
+    }, [user]);
 
     const plans = [
         {
-            name: 'Trial', id: 'FREE', price: 'Free Trial',
+            name: 'Trial', id: 'TRIAL', price: 'Free Trial',
             description: 'Explore SaPyBase with 1 bot for 30 days.',
             features: [
                 '1 AI Bot',
@@ -67,10 +81,11 @@ const AppPricing = () => {
 
     const handleSelectPlan = async (tier) => {
         if (!user) { window.location.href = '/sign-in'; return; }
+        if (tier === currentTier) return;
         setIsLoading(true); setSelectedTier(tier);
         try {
             const returnUrl = `${window.location.origin}/app/register?payment=success`;
-            const url = `${POLAR_URLS[tier]}?customer_external_id=${user.id}&success_url=${returnUrl}`;
+            const url = `${POLAR_URLS[tier]}?metadata[customer_external_id]=${user.id}&success_url=${returnUrl}`;
             window.location.href = url;
         } catch { setIsLoading(false); }
     };
@@ -128,7 +143,7 @@ const AppPricing = () => {
                                 {plan.price.startsWith('$') ? plan.price.substring(1) : plan.price}
                             </span>
                             {plan.period && <span className="text-sm text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
-                            {!plan.period && plan.id === 'FREE' && <span className="text-sm text-slate-400 dark:text-slate-500 font-medium italic mb-1 transition-colors">30 days</span>}
+                            {!plan.period && plan.id === 'TRIAL' && <span className="text-sm text-slate-400 dark:text-slate-500 font-medium italic mb-1 transition-colors">30 days</span>}
                         </div>
                         <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>
 
@@ -143,15 +158,16 @@ const AppPricing = () => {
                             ))}
                         </div>
 
-                        <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading}
+                        <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading || plan.id === currentTier}
                             className={`w-full py-3.5 min-h-[44px] text-md uppercase tracking-widest font-bold font-sans transition-all flex items-center justify-center gap-2 active:scale-95 ${plan.highlight
                                 ? 'bg-blue-600 dark:bg-indigo-600 text-white hover:bg-blue-700 dark:hover:bg-indigo-500 shadow-lg shadow-blue-500/20 dark:shadow-indigo-500/20'
                                 : 'bg-transparent border border-gray-100 dark:border-slate-700 text-slate-900 dark:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
-                                } ${isLoading && selectedTier === plan.id ? 'opacity-60' : ''}`}>
-                            {isLoading && selectedTier === plan.id
-                                ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin" /> Processing...</>
-                                : plan.id === 'FREE' ? 'Start Free Trial' : `Select ${plan.name}`
-                            }
+                                } ${(isLoading && selectedTier === plan.id) || plan.id === currentTier ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                            {plan.id === currentTier ? 'Current Plan' : (
+                                isLoading && selectedTier === plan.id
+                                    ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin" /> Processing...</>
+                                    : plan.id === 'TRIAL' ? 'Start Free Trial' : `Select ${plan.name}`
+                            )}
                         </button>
                     </motion.div>
                 ))}
