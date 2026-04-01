@@ -352,7 +352,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     <User size={18} />
                                                 </div>
                                             ) : (
-                                                <div className="w-3/4 h-3/4 flex items-center justify-center pointer-events-none">
+                                                <div className="w-9 h-9 flex items-center justify-center pointer-events-none">
             <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
         </div>
                                             )}
