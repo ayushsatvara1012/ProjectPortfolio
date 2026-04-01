@@ -10,15 +10,20 @@ const ThinkingLogo = ({
   showLabel = false,
   className = "",
   style = {},
+  themeColor = "#0F2060",
 }) => {
+  // Derive a lighter shade for alternating blocks
+  const primaryColor = themeColor;
+  const secondaryColor = themeColor + 'CC'; // 80% opacity variant
+
   const width = size;
   const height = size * (41 / 154);
 
   const blocks = [
-    { x: 6,     color: "#0F2060", delay: "0.00s", dur: "1.5s" },
-    { x: 43.6,  color: "#1E3A8A", delay: "0.25s", dur: "1.7s" },
-    { x: 81.2,  color: "#1E3A8A", delay: "0.50s", dur: "1.5s" },
-    { x: 118.8, color: "#0F2060", delay: "0.75s", dur: "1.6s" },
+    { x: 6,     color: primaryColor,   delay: "0.00s", dur: "1.5s" },
+    { x: 43.6,  color: secondaryColor, delay: "0.25s", dur: "1.7s" },
+    { x: 81.2,  color: secondaryColor, delay: "0.50s", dur: "1.5s" },
+    { x: 118.8, color: primaryColor,   delay: "0.75s", dur: "1.6s" },
   ];
 
   return (

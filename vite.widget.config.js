@@ -47,6 +47,11 @@ export default defineConfig({
   ],
   define: {
     'process.env.NODE_ENV': '"production"',
+    'import.meta.env.DEV': 'false',
+    'import.meta.env.PROD': 'true',
+    'import.meta.env.MODE': '"production"',
+    'import.meta.env.VITE_SAPYBASE_API_KEY': 'undefined',
+    'import.meta.env.VITE_API_URL': 'undefined',
   },
   publicDir: false,
   build: {

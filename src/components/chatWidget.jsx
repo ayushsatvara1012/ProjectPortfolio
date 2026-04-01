@@ -6,19 +6,21 @@ import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 import BrandLogo from './brandLogo';
 
-const BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
-const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://sapybase-deploy-test.vercel.app';
-
-const DEFAULT_CONFIG = {
-    theme_color: '#5730F5',
-    bot_name: 'Sapy AI',
-    logo_url: `${ASSET_BASE_URL}/SB_loading_clean.svg`,
-    initial_message: "Hi! I'm your AI assistant. How can I help you today?",
-    quick_questions: [],
-};
-
 const ChatWidget = ({ apiKey }) => {
+    // 1. Resolve API Key & Base URL
     const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
+    const activeApiUrl = window.SaPyBaseConfig?.apiUrl || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com');
+
+    const ASSET_BASE_URL = import.meta.env.DEV ? '' : 'https://sapybase-deploy-test.vercel.app';
+
+    // 2. Initialize with defaults, merging in window.SaPyBaseConfig for high-fidelity fallback
+    const DEFAULT_CONFIG = {
+        theme_color: window.SaPyBaseConfig?.themeColor || '#5730F5',
+        bot_name: window.SaPyBaseConfig?.botName || 'Sapy AI',
+        logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
+        initial_message: window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
+        quick_questions: window.SaPyBaseConfig?.quickQuestions || [],
+    };
 
     // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
     const [configData, setConfigData] = useState(DEFAULT_CONFIG);
@@ -29,7 +31,7 @@ const ChatWidget = ({ apiKey }) => {
         if (!activeApiKey) return;
         const fetchConfig = async () => {
             try {
-                const res = await fetch(`${BASE_URL}/api/config`, {
+                const res = await fetch(`${activeApiUrl}/api/config`, {
                     headers: { 'x-api-key': activeApiKey },
                 });
                 if (res.ok) {
@@ -153,7 +155,7 @@ const ChatWidget = ({ apiKey }) => {
                 return;
             }
 
-            const response = await fetch(`${BASE_URL}/api/chat`, {
+            const response = await fetch(`${activeApiUrl}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -218,8 +220,8 @@ const ChatWidget = ({ apiKey }) => {
         visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 25 } }
     };
 
-    // Completely disable rendering in production if no key is found at all
-    if (!activeApiKey && !import.meta.env?.DEV) {
+    // Completely disable rendering if no API key is found (works in both dev and production IIFE)
+    if (!activeApiKey) {
         return null;
     }
 

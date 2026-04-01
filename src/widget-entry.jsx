@@ -62,11 +62,13 @@ if (document.getElementById(CONTAINER_ID)) {
   // As a guaranteed fallback, we also grab any <style> injected into <head>
   // by the IIFE bundle and clone it into the shadow root. This covers all cases.
   const injectStyles = () => {
-    // Grab the entire text of the bundle to find the injected style
-    const allStyles = Array.from(document.querySelectorAll('style'));
-    allStyles.forEach(styleTag => {
+    // ONLY clone styles tagged by our widget build (data-sapybase-widget attribute)
+    const widgetStyles = document.querySelectorAll('style[data-sapybase-widget]');
+    widgetStyles.forEach(styleTag => {
       if (!shadow.contains(styleTag)) {
         shadow.appendChild(styleTag.cloneNode(true));
+        // Remove from <head> so it doesn't affect the host page
+        styleTag.remove();
       }
     });
   };
@@ -77,6 +79,8 @@ if (document.getElementById(CONTAINER_ID)) {
   // Also observe for any async style injections
   const styleObserver = new MutationObserver(() => injectStyles());
   styleObserver.observe(document.head, { childList: true });
+  // Auto-disconnect after 5s — all widget styles should be injected by then
+  setTimeout(() => styleObserver.disconnect(), 5000);
 
   // ─── 6. INJECT CSS RESET INSIDE SHADOW ROOT ───────────────────────────────
   // This kills any inherited CSS values from the host that browsers may
@@ -86,6 +90,9 @@ if (document.getElementById(CONTAINER_ID)) {
     *, *::before, *::after {
       box-sizing: border-box !important;
       -webkit-font-smoothing: antialiased;
+      font-family: inherit;
+      direction: ltr;
+      text-align: left;
     }
     :host {
       all: initial;
@@ -93,6 +100,9 @@ if (document.getElementById(CONTAINER_ID)) {
       font-size: 16px !important;
       line-height: 1.5 !important;
       color: #0f172a !important;
+      direction: ltr !important;
+      text-align: left !important;
+      -webkit-text-size-adjust: 100% !important;
     }
   `;
   shadow.appendChild(resetStyle);

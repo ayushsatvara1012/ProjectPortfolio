@@ -4,66 +4,331 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acme Corp - Official Site</title>
-    <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/style.css">
+    <title>Acme Corp | Premium Manufacturing Solutions</title>
+    <link rel="icon" href="/SB_Brand-removebg.png" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Darker+Grotesque:wght@300..900&display=swap" rel="stylesheet" />
+
     <style>
-        /* Just some basic styling to make it look like a website */
+        :root {
+            --primary: #ef4444; /* Acme Red */
+            --primary-dark: #b91c1c;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text-heading: #f8fafc;
+            --text-body: #94a3b8;
+            --glass: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 50px;
-            background-color: #f8fafc;
-            color: #334155;
+            font-family: 'Darker Grotesque', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-body);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-size: 1.25rem;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Bricolage Grotesque', sans-serif;
+            color: var(--text-heading);
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .navbar {
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-family: 'Bricolage Grotesque', sans-serif;
+            color: var(--primary);
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            text-transform: uppercase;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-link {
+            color: var(--text-body);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--text-heading);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
         }
 
         .hero {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            max-width: 600px;
+            padding: 120px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
         }
 
-        h1 {
-            color: #0f172a;
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%);
+            filter: blur(80px);
+            z-index: -1;
+        }
+
+        .hero h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.04em;
+        }
+
+        .hero p {
+            max-width: 800px;
+            font-size: 1.5rem;
+            color: var(--text-body);
+            margin-bottom: 3rem;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 1rem 2.5rem;
+            border-radius: 99px;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 1.1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: 'Bricolage Grotesque', sans-serif;
+            letter-spacing: 0.02em;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 10px 20px -5px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -10px rgba(239, 68, 68, 0.6);
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: var(--surface);
+            color: var(--text-heading);
+            border: 1px solid var(--glass-border);
+        }
+
+        .btn-secondary:hover {
+            background-color: #2d3748;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .features {
+            padding: 100px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 3rem;
+            border-radius: 24px;
+            backdrop-filter: blur(8px);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: var(--primary);
+        }
+
+        .feature-card h3 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 4rem 0;
+            border-top: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .support-info {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            display: inline-block;
+            border: 1px dashed rgba(239, 68, 68, 0.3);
+        }
+
+        /* Animation for the floating helper */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .chat-hint {
+            position: fixed;
+            bottom: 100px;
+            right: 40px;
+            padding: 1rem 1.5rem;
+            background: white;
+            color: #1e293b;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            font-weight: 700;
+            font-size: 0.9rem;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            animation: fadeInHint 1s forwards 2s, float 3s infinite ease-in-out;
+        }
+
+        @keyframes fadeInHint {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 
 <body>
 
-    <div class="hero">
-        <h1>Welcome to Acme Corp! 🚀</h1>
-        <p>We are a totally different company. We don't use React, we just use plain old HTML.</p>
-        <p>However, we hired SaPyBase to handle our customer support. Look at the bottom right corner of this page...
-        </p>
+    <nav class="navbar">
+        <div class="logo">ACME CORP</div>
+        <div class="nav-links">
+            <a href="#" class="nav-link">Solutions</a>
+            <a href="#" class="nav-link">Equipment</a>
+            <a href="#" class="nav-link">Materials</a>
+            <a href="#" class="nav-link">About Us</a>
+        </div>
+    </nav>
+
+    <div class="container hero">
+        <h1>Innovation for the Desert Highway.</h1>
+        <p>Providing top-tier manufacturing solutions, heavy-duty equipment, and rocket-powered innovation for the most demanding environments on Earth.</p>
+        
+        <div class="cta-group">
+            <a href="#" class="btn btn-primary">Our Equipment</a>
+            <a href="#" class="btn btn-secondary">Contact Sales</a>
+        </div>
     </div>
+
+    <div class="container features">
+        <div class="feature-card">
+            <div class="feature-icon">⚓</div>
+            <h3>Heavy Duty Anvils</h3>
+            <p>Forged with precision and built to withstand any impact. Guaranteed to drop exactly where you need them.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🚀</div>
+            <h3>Rocket Skates</h3>
+            <p>Break the sound barrier on any surface. Features our patent-pending "Quick-Stop" mechanism (sold separately).</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🌪️</div>
+            <h3>Disguise Kits</h3>
+            <p>From bushes to fake tunnels, our professional-grade disguises are 99% effective against coyotes.</p>
+        </div>
+    </div>
+
+    <footer>
+        <div class="support-info">
+            <p>Powered by <strong>SaPyBase AI Chatbot</strong> Service</p>
+        </div>
+        <p>&copy; 2026 Acme Corp. Built with Plain HTML & SaPyBase.</p>
+    </footer>
+
+    <div class="chat-hint">Try our new AI Assistant! 👇</div>
 
     <script>
         // 1. Acme Corp provides their unique API key and dynamic UI configuration
+        // We use localhost:8000 since you are running 'npm run dev:all' which includes the backend.
+        // We use the API Key from your .env file: sb_EqAYDTVfGVzqegCE9sbVMOC0niRuEcDptvDJ_n_ISPQ
         window.SaPyBaseConfig = {
-            apiKey: "sb_test_987654321",
-            themeColor: "#FF0000",
+            apiKey: "sb_EqAYDTVfGVzqegCE9sbVMOC0niRuEcDptvDJ_n_ISPQ", 
+            apiUrl: "http://localhost:8000",
+            themeColor: "#ef4444", // Acme Red
             botName: "Acme Assistant",
-            welcomeMessage: "Welcome to Acme Corp! How can we help you today?",
+            welcomeMessage: "Welcome to Acme Corp! How can I help you today?",
+            logoUrl: "https://www.sapybase.com/SB_loading_clean.svg", 
             quickQuestions: [
                 {
-                    label: "🪨 Buy an Anvil",
+                    label: "⚓ Buy an Anvil",
                     prompt: "What sizes of heavy-duty anvils do you have in stock?"
                 },
                 {
                     label: "🚀 Rocket Skates",
                     prompt: "Are the Acme Rocket Skates safe to use on desert highways?"
-                },
-                {
-                    label: "📦 Shipping Info",
-                    prompt: "How fast can you deliver an anvil to my location?"
                 }
             ]
         };
+        console.log("[SaPyBase Demo] Config initialized with Local API.");
     </script>
 
-    <script src="/widget.js" defer></script>
+    <!-- Use Vite's hot-reloading by loading the source directly (only works via dev server) -->
+    <script src="/src/widget-entry.jsx" type="module"></script>
 </body>
 
 </html>
