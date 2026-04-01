@@ -64,6 +64,7 @@ export const UserProvider = ({ children }) => {
         if (params.get('payment') !== 'success') return;
 
         const syncSubscription = async () => {
+            setIsLoading(true);
             try {
                 const token = await getToken();
                 const baseUrl = import.meta.env.VITE_API_URL || '';

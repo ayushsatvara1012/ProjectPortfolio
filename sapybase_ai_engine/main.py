@@ -1,4 +1,5 @@
 import os
+import asyncio
 import re
 from datetime import datetime, timezone
 import time
@@ -461,9 +462,17 @@ async def get_current_user(request: Request):
             row = cursor.fetchone()
 
             if not row:
-                # ⚠️ WEBHOOK FALLBACK: Auto-provision missing user with NULL tier
-                # Only insert if we have a halfway decent email
+                # 🛠 RECONCILIATION: Check if a Polar webhook created a "pending" account for this email.
+                # If so, take over that account instead of creating a new one.
                 if email != "unknown@email.com":
+                    cursor.execute(
+                        "UPDATE users SET clerk_id = %s WHERE clerk_id LIKE 'pending_%%' AND LOWER(email) = LOWER(%s) RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
+                        (clerk_id, email)
+                    )
+                    row = cursor.fetchone()
+
+                if not row and email != "unknown@email.com":
+                    # No pending account found, create a new one.
                     cursor.execute(
                         "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
                         (clerk_id, email)
@@ -471,7 +480,7 @@ async def get_current_user(request: Request):
                     row = cursor.fetchone()
                 
                 if not row:
-                    # Conflict happened, fetch the existing user
+                    # Final fallback
                     cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
                     row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
@@ -1659,6 +1668,10 @@ async def sync_subscription_from_polar(current_user: dict = Depends(get_current_
     clerk_id = current_user.get("clerk_id")
 
     print(f"SYNC: Starting sync for ClerkID={clerk_id}, Email={user_email}")
+
+    # Indexing Lag Buffer: Give Polar's background workers 1.5s to index the new subscription
+    # before we poll their API. This dramatically increases first-attempt success.
+    await asyncio.sleep(1.5)
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         # Step 1: Look up the customer by external_id (Clerk ID) first

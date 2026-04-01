@@ -30,7 +30,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
             const searchParams = new URLSearchParams(window.location.search);
             const justPaid = searchParams.get('payment') === 'success';
-            const maxAttempts = justPaid ? 5 : 1;
+            const maxAttempts = justPaid ? 8 : 1;
 
             try {
                 const baseUrl = import.meta.env.VITE_API_URL || '';
@@ -46,7 +46,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
                     meData = meRes.ok ? await meRes.json() : null;
                     
                     if (meData?.tier) break; // tier is set, stop polling
-                    if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, 1000));
+                    if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, 600));
                 }
 
                 // Final check for company details
