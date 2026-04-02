@@ -3,14 +3,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Londrina+Outline&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Kumar+One+Outline&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Gloock&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Darker+Grotesque:wght@300..900&display=swap');
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 @theme {
   --font-questrial: "Questrial", sans-serif;
   --font-quantico: "Quantico", ui-sans-serif, system-ui, sans-serif;
   --font-londrina: "Londrina Outline", cursive;
-  --font-oneoutline : "Kumar One Outline", system-ui;
-  --font-glook :"Gloock", serif;
+  --font-oneoutline: "Kumar One Outline", system-ui;
+  --font-glook: "Gloock", serif;
+  --font-sans: "Darker Grotesque", sans-serif;
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-darker: "Darker Grotesque", sans-serif;
+  --font-bricolage: "Bricolage Grotesque", sans-serif;
 }
 
 @theme {
@@ -45,17 +50,42 @@
 
   /* Animation Timings */
   --animate-smooth-scroll: scroll-behavior 0.5s ease-in-out;
+  --animate-spin-slow: spin 3s linear infinite;
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
-    /* Sets the default background based on mode */
-    @apply bg-white text-slate-900 dark:bg-white dark:text-slate-900 antialiased;
+  }
+  
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    position: relative;
   }
 
-  /* Transition for smooth theme switching */
   body {
+    @apply font-sans antialiased text-slate-500 bg-white dark:bg-slate-950 dark:text-slate-400;
     transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-slate-900 dark:text-slate-100;
+  }
+
+  /* Custom Scrollbar Utilities */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 border-2 border-transparent bg-clip-padding rounded-full hover:bg-slate-300 transition-colors;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-800 hover:bg-slate-700;
   }
 }

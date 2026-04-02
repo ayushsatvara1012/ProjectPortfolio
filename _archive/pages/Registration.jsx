@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useUserRole } from '../context/UserContext';
 import { SignedIn, SignedOut, SignUp, useUser, useAuth } from "@clerk/clerk-react";
 import { Building2, Globe, Palette, MessageSquare, Copy, CheckCircle, Code2, Sparkles, ShieldCheck, ArrowRight, Key, Zap, BookOpen, ChevronRight, ChevronDown, Shield, Rocket } from 'lucide-react';
 import Logo from '../components/Logo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Alert from '../components/alert';
+import Loader from '../components/Loader';
 
 const Registration = () => {
     const { user, isLoaded } = useUser();
@@ -20,7 +22,7 @@ const Registration = () => {
     const [registrationData, setRegistrationData] = useState(null);
     const [alertConfig, setAlertConfig] = useState({ open: false, type: 'success', msg: '' });
     const [copied, setCopied] = useState(false);
-    const [userTier, setUserTier] = useState(null);
+    const { userRole, userTier, isLoading: isContextLoading } = useUserRole();
     const [isTierLoading, setIsTierLoading] = useState(true);
     const [openAccordion, setOpenAccordion] = useState(0);
 
@@ -37,8 +39,7 @@ const Registration = () => {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (response.ok) {
-                    const data = await response.json();
-                    setUserTier(data.tier);
+                    // Handled by Context now
                 }
             } catch (err) {
                 console.error("Failed to check tier:", err);
@@ -229,14 +230,10 @@ function add_sapybase_widget() {
     };
 
     // Card styling mixin for consistency - Technical Minimalist
-    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-6 relative flex flex-col transition-shadow duration-200 hover:shadow-md";
+    const bentoCardStyle = "bg-white dark:bg-[#111111] border border-slate-200 dark:border-slate-800 rounded-xl p-6 relative flex flex-col transition-shadow duration-200 hover:shadow-md overflow-hidden";
 
-    if (!isLoaded || isTierLoading) {
-        return (
-            <div className="w-full h-[60vh] flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
-            </div>
-        );
+    if (!isLoaded || isContextLoading) {
+        return <Loader />;
     }
 
     return (
@@ -282,8 +279,8 @@ function add_sapybase_widget() {
                                             <Sparkles className="w-3 h-3" />
                                             <span>Hey {user?.firstName || 'Innovator'}!</span>
                                         </div>
-                                        <h1 className="text-4xl font-bold tracking-tight mb-4 leading-tight text-slate-900 dark:text-white">
-                                            Launch Your <br /> <span className="bg-gradient-to-r from-red-600 to-indigo-600 bg-clip-text text-transparent font-black">AI Agent Today</span>
+                                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4 leading-[1.1] text-slate-900 dark:text-white">
+                                            Launch Your <br /> <span className="bg-linear-to-r from-red-600 to-indigo-600 bg-clip-text text-transparent font-black leading-[1.1]">AI Agent Today</span>
                                         </h1>
                                         <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-8">
                                             Provision your tenant, get your API key, and start conversing with your customers using the power of Gemini.
@@ -344,7 +341,7 @@ function add_sapybase_widget() {
                                                                     required
                                                                     value={formData.companyName}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-10 pr-3 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors"
+                                                                    className="w-full pl-10 pr-3 py-3 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors min-h-[44px]"
                                                                     placeholder="Acme Inc."
                                                                 />
                                                             </div>
@@ -360,7 +357,7 @@ function add_sapybase_widget() {
                                                                     required
                                                                     value={formData.allowedOrigin}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-10 pr-3 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors"
+                                                                    className="w-full pl-10 pr-3 py-3 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors min-h-[44px]"
                                                                     placeholder="https://example.com"
                                                                 />
                                                             </div>
@@ -377,7 +374,7 @@ function add_sapybase_widget() {
                                                                     name="themeColor"
                                                                     value={formData.themeColor}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-10 pr-12 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 uppercase font-mono transition-colors"
+                                                                    className="w-full pl-10 pr-12 py-3 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 uppercase font-mono transition-colors min-h-[44px]"
                                                                 />
                                                                 <div className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-transform hover:scale-105">
                                                                     <input
@@ -399,7 +396,7 @@ function add_sapybase_widget() {
                                                                     name="companyTone"
                                                                     value={formData.companyTone}
                                                                     onChange={handleChange}
-                                                                    className="w-full pl-10 pr-10 py-2 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors appearance-none"
+                                                                    className="w-full pl-10 pr-10 py-3 text-sm bg-transparent border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors appearance-none min-h-[44px]"
                                                                 >
                                                                     <option value="Professional and helpful">Professional</option>
                                                                     <option value="Friendly and casual">Friendly</option>
@@ -414,7 +411,7 @@ function add_sapybase_widget() {
                                                         <button
                                                             type="submit"
                                                             disabled={isLoading}
-                                                            className="w-full flex justify-center items-center py-2 px-4 rounded-md text-sm font-medium text-white dark:text-slate-900 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            className="w-full flex justify-center items-center py-3.5 px-4 rounded-md text-sm font-bold uppercase tracking-widest text-white dark:text-slate-900 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
                                                         >
                                                             {isLoading ? "Provisioning..." : (
                                                                 <>
@@ -556,7 +553,7 @@ function add_sapybase_widget() {
                                         <div className="pt-6 flex flex-col sm:flex-row gap-3 w-full">
                                             <button
                                                 onClick={() => navigate('/dashboard')}
-                                                className="flex-1 flex items-center justify-center gap-2 py-2 px-6 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-md font-medium text-xs uppercase tracking-wider transition-colors"
+                                                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-md font-bold text-xs uppercase tracking-wider transition-all active:scale-95 min-h-[48px]"
                                             >
                                                 Proceed to Dashboard
                                                 <ArrowRight className="w-4 h-4" />
@@ -564,7 +561,7 @@ function add_sapybase_widget() {
 
                                             <button
                                                 onClick={handleReset}
-                                                className="flex-1 flex items-center justify-center gap-2 py-2 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-md font-medium text-xs uppercase tracking-wider transition-colors"
+                                                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-[#0A0A0A] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-md font-bold text-xs uppercase tracking-wider transition-all active:scale-95 min-h-[48px]"
                                             >
                                                 Provision Another
                                             </button>

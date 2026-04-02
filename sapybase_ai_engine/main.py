@@ -1,4 +1,6 @@
 import os
+import asyncio
+import re
 from datetime import datetime, timezone
 import time
 import tempfile
@@ -7,6 +9,7 @@ import json
 import secrets
 import socket
 import ipaddress
+import hashlib
 from psycopg2 import pool
 from enum import Enum
 from typing import Optional
@@ -35,52 +38,34 @@ from clerk_backend_api.security.types import AuthenticateRequestOptions
 
 # 1. Load Environment Variables
 load_dotenv()
-DB_URL = os.getenv("NEON_DATABASE_URL")
+DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
-POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET")
+POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
 
-# 2. Initialize Database Connection Pool
-db_pool = pool.ThreadedConnectionPool(
-    minconn=1,
-    maxconn=20, # Scale based on your Neon tier (e.g., Free=20, Pro=500)
-    dsn=DB_URL
-)
-
+# 2. Database Connection (Supabase pgBouncer Pooler)
+# Using direct connect since the connection string uses port 6543 (transaction pooler).
 def get_db_connection():
-    """Retrieves a healthy connection from the pool with retry logic."""
-    max_retries = 3
-    for attempt in range(max_retries):
-        conn = None
-        try:
-            conn = db_pool.getconn()
-            # Health check: Verify the connection is still alive
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-            
-            # If we reach here, connection is healthy
-            register_vector(conn)
-            return conn
-        except (psycopg2.OperationalError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
-            print(f"Database connection health check failed (attempt {attempt+1}/{max_retries}): {e}")
-            if conn:
-                try:
-                    db_pool.putconn(conn, close=True)
-                except:
-                    pass
-            if attempt == max_retries - 1:
-                raise HTTPException(status_code=503, detail="Database connection unavailable. Please try again.")
-        except Exception as e:
-            print(f"Unexpected pool retrieval error: {e}")
-            if conn:
-                db_pool.putconn(conn)
-            raise HTTPException(status_code=500, detail="Internal server error")
+    """Establishes a connection via Supabase pgBouncer pooler (port 6543)."""
+    try:
+        conn = psycopg2.connect(DB_URL)
+        register_vector(conn)
+        return conn
+    except psycopg2.OperationalError as e:
+        print(f"Database connection failed: {e}")
+        raise HTTPException(status_code=503, detail="Database connection unavailable. Please try again.")
+    except Exception as e:
+        print(f"Unexpected connection error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 def release_db_connection(conn):
-    """Returns a connection to the pool."""
-    if conn and hasattr(db_pool, 'putconn'):
-        db_pool.putconn(conn)
+    """Closes the connection, returning it to the Supabase pooler."""
+    if conn and not conn.closed:
+        try:
+            conn.close()
+        except:
+            pass
 
 def validate_safe_url(url: str):
     """
@@ -150,6 +135,22 @@ def require_fresh_admin(request: Request):
         )
     return auth_state
 
+# ── Plan Definitions ────────────────────────────────────────────────────────
+PLAN_LIMITS = {
+    "FREE":       {"max_bots": 0, "messages": 0,    "chunks": 0,    "speed": "none"},
+    "BASIC":      {"max_bots": 1, "messages": 500,  "chunks": 100,  "speed": "standard"},
+    "STARTER":    {"max_bots": 2, "messages": 2000, "chunks": 500,  "speed": "priority"},
+    "PRO":        {"max_bots": 5, "messages": 5000, "chunks": 2000, "speed": "dedicated"},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 10000, "speed": "dedicated"},
+}
+
+UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
+
+def get_plan(tier: str, role: str = None) -> dict:
+    if role == "SUPER_ADMIN":
+        return UNLIMITED_PLAN
+    return PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+
 # 3. Initialize FastAPI App
 app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
 
@@ -174,12 +175,18 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # 3. Configure CORS (Production Hardening)
 ALLOWED_ORIGINS = {
     "https://sapybase.com",
+    "https://www.sapybase.com",
     "https://app.sapybase.com",
-    "https://admin.sapybase.com"
+    "https://admin.sapybase.com",
+    "https://sapybase-deploy-test.vercel.app",
+    "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app"
 }
 
 ALLOWED_DEV_ORIGINS = {
     "http://localhost:5173", 
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
     "http://localhost:3000", 
     "http://127.0.0.1:5173"
 }
@@ -189,8 +196,7 @@ combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=combined_origins,
-    allow_origin_regex=r"https://.*\.ngrok-free\.(app|dev)", 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -214,11 +220,13 @@ class SubscriptionRequest(BaseModel):
     tier: str # Starter, Pro, Enterprise
 
 class UserRole(str, Enum):
+    SUPER_ADMIN = "SUPER_ADMIN"
     ADMIN = "ADMIN"
     USER = "USER"
 
 class UserTier(str, Enum):
     FREE = "FREE"
+    BASIC = "BASIC"
     STARTER = "STARTER"
     PRO = "PRO"
     ENTERPRISE = "ENTERPRISE"
@@ -252,16 +260,18 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     against the allowed_origin stored in the database.
     """
     conn = get_db_connection()
+    print(f"DEBUG: verify_api_key_and_origin - Received Key: {api_key[:10]}...")
+    hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
     try:
         cursor = conn.cursor()
-        # Fetch company details from Neon DB
+        # Fetch company details from DB using hashed API Key
         cursor.execute(
             """
             SELECT id, company_name, company_tone, theme_color, allowed_origin, 
                    system_prompt, bot_name, logo_url, initial_message, quick_questions 
             FROM companies WHERE api_key = %s
             """, 
-            (api_key,)
+            (hashed_key,)
         )
         company_data = cursor.fetchone()
         cursor.close()
@@ -269,6 +279,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         release_db_connection(conn)
 
     if not company_data:
+        print(f"DEBUG: verify_api_key_and_origin - Key NOT FOUND in DB (Hashed: {hashed_key[:10]}...)")
         raise HTTPException(status_code=401, detail="Invalid API Key.")
 
     # Package the company data
@@ -306,60 +317,107 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             # 3.2. Secondary Check: Platform Production Origins
             if actual_client_origin in ALLOWED_ORIGINS:
                 return company
+                
+            # 3.3. Wildcard Check: Vercel & Ngrok (Issue 48 Fix)
+            if re.match(r"https://.*\.vercel\.app", actual_client_origin) or \
+               re.match(r"https://.*\.ngrok-free\.(app|dev)", actual_client_origin):
+                return company
 
-            # 3.3. Development Origins (Only in Debug/Dev mode)
+            # 3.4. Development Origins (Only in Debug/Dev mode)
             is_dev = os.getenv("ENV") == "development"
             if is_dev and actual_client_origin in ALLOWED_DEV_ORIGINS:
                 return company
             
-            # 3.4. Unauthorized
+            # 3.5. Unauthorized
+            print(f"DEBUG: verify_api_key_and_origin - CORS REJECTED for Origin: {actual_client_origin}. Expected: {allowed}")
             raise HTTPException(
                 status_code=403, 
-                detail=f"Unauthorized Origin: {actual_client_origin}"
+                detail=f"CORS Error: Origin {client_origin} is not allowed for this API Key."
             )
 
     return company
 
+
 # --- JWT VERIFICATION (CLERK) ---
+
+# Cache for JWKS to avoid frequent network calls
+_JWKS_CACHE = {"keys": [], "expires_at": 0}
+
+async def get_clerk_jwks():
+    """Fetches and caches Clerk public keys for JWT verification."""
+    global _JWKS_CACHE
+    now = time.time()
+    if _JWKS_CACHE["keys"] and now < _JWKS_CACHE["expires_at"]:
+        return _JWKS_CACHE["keys"]
+    
+    try:
+        jwks_url = f"{CLERK_JWT_ISSUER}/.well-known/jwks.json"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(jwks_url)
+            resp.raise_for_status()
+            _JWKS_CACHE["keys"] = resp.json().get("keys", [])
+            _JWKS_CACHE["expires_at"] = now + 3600 # Cache for 1 hour
+            return _JWKS_CACHE["keys"]
+    except Exception as e:
+        print(f"JWKS FETCH FAILED: {e}")
+        return []
+
+async def verify_clerk_jwt(token: str):
+    """
+    CRITICAL SECURITY FIX: Validates JWT signature against Clerk JWKS.
+    Replaces the previous unverified fallback.
+    """
+    try:
+        keys = await get_clerk_jwks()
+        if not keys:
+            raise Exception("Could not retrieve public keys")
+            
+        # Verify the token using the provided public keys
+        payload = jwt.decode(
+            token, 
+            keys, 
+            algorithms=["RS256"], 
+            audience=None, # aud check can be added if configured in Clerk
+            issuer=CLERK_JWT_ISSUER
+        )
+        return payload
+    except Exception as e:
+        print(f"JWT VERIFICATION FAILED: {e}")
+        return None
 
 async def get_current_user(request: Request):
     """
-    Issue #8: Silent User Sync Bypass (Auto-Provisioning).
-    If a valid JWT exists but the row is missing, we create the user profile on the fly.
+    Issue #8: Secure User Context with Auto-Provisioning.
+    Uses Clerk SDK first, then falls back to a SECURE manual verification.
     """
     try:
         request_state = None
-        # 1. Secure server-side verification using Clerk SDK
+        # 1. Primary: Clerk SDK (most secure)
         try:
             clerk = Clerk(bearer_auth=os.getenv("CLERK_SECRET_KEY"))
             request_state = clerk.authenticate_request(request, AuthenticateRequestOptions())
         except Exception as sdk_err:
-            print(f"CLERK SDK AUTH FAILED: {sdk_err}")
+            if ENV != "development":
+                print(f"CLERK SDK AUTH FAILED: {sdk_err}")
 
+        # 2. Secondary: Secure Manual Fallback (if SDK fails or in specific dev setups)
         if not request_state or not request_state.is_signed_in:
-            # FALLBACK: Manual JWT verification (Issue 6)
             auth_header = request.headers.get("Authorization")
             if not auth_header or not auth_header.startswith("Bearer "):
-                raise HTTPException(status_code=401, detail="Invalid token")
+                raise HTTPException(status_code=401, detail="Authentication required")
             
             token = auth_header.split(" ")[1]
-            try:
-                # In a real high-scale app, we'd cache the JWKS.
-                # Here we verify against the issuer's public claims.
-                unverified_claims = jwt.get_unverified_claims(token)
-                if unverified_claims.get("iss") != CLERK_JWT_ISSUER:
-                    raise Exception("Invalid Issuer")
-                
-                # We trust the token if it's from our issuer (basic fallback)
-                # For full security, implement JWKS fetching here.
-                class LegacyAuth:
-                    def __init__(self, payload):
-                        self.payload = payload
-                        self.is_signed_in = True
-                request_state = LegacyAuth(unverified_claims)
-            except Exception as e:
-                print(f"JWT FALLBACK FAILED: {e}")
-                raise HTTPException(status_code=401, detail="Authentication failed")
+            payload = await verify_clerk_jwt(token)
+            
+            if not payload:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            
+            # Mock the request state for downstream compatibility
+            class SecureAuth:
+                def __init__(self, p):
+                    self.payload = p
+                    self.is_signed_in = True
+            request_state = SecureAuth(payload)
             
         # Store for Issue #16 (Step-Up Auth)
         request.state.clerk_auth = request_state
@@ -399,39 +457,70 @@ async def get_current_user(request: Request):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
+            
+            # --- CONSOLIDATION LOGIC ---
+            # If we don't have a row, or we have an empty (FREE/NULL) row, check for a pending one.
+            if email != "unknown@email.com":
+                # Check for a 'pending' account created by Polar webhooks for this email
+                cursor.execute(
+                    "SELECT id, tier, subscription_status, polar_customer_id, billing_period_end FROM users WHERE clerk_id LIKE 'pending_%%' AND LOWER(email) = LOWER(%s) LIMIT 1",
+                    (email,)
+                )
+                pending = cursor.fetchone()
+                
+                if pending:
+                    pending_id, p_tier, p_status, p_cust_id, p_end = pending
+                    print(f"RECONCILIATION: Found pending paid account (ID={pending_id}, Tier={p_tier}) for {email}")
+                    
+                    # Try to 'Adopt' it by setting the clerk_id (only if real clerk_id doesn't exist yet)
+                    cursor.execute("SELECT id, tier FROM users WHERE clerk_id = %s", (clerk_id,))
+                    existing = cursor.fetchone()
+                    
+                    if not existing:
+                        # Case A: No real ID row yet. Take over the pending row.
+                        cursor.execute("UPDATE users SET clerk_id = %s WHERE id = %s", (clerk_id, pending_id))
+                        print(f"RECONCILIATION: Adopted pending account successfully.")
+                    elif existing[1] in (None, 'FREE', 'null'):
+                        # Case B: Real ID row exists but is empty. Merge pending data into real row.
+                        cursor.execute(
+                            "UPDATE users SET tier = %s, subscription_status = %s, polar_customer_id = %s, billing_period_end = %s WHERE id = %s",
+                            (p_tier, p_status, p_cust_id, p_end, existing[0])
+                        )
+                        cursor.execute("DELETE FROM users WHERE id = %s", (pending_id,))
+                        print(f"RECONCILIATION: Merged pending data into existing real account.")
+
+            # Now fetch the final consolidated state
             cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
             row = cursor.fetchone()
 
-            if not row:
-                # ⚠️ WEBHOOK FALLBACK: Auto-provision missing user with NULL tier
-                # Only insert if we have a halfway decent email
-                if email != "unknown@email.com":
-                    cursor.execute(
-                        "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
-                        (clerk_id, email)
-                    )
-                    row = cursor.fetchone()
-                
-                if not row:
-                    # Conflict happened, fetch the existing user
-                    cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
-                    row = cursor.fetchone()
+            if not row and email != "unknown@email.com":
+                # Final fallback: provision new row if still none exists
+                cursor.execute(
+                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
+                    (clerk_id, email)
+                )
+                row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
             if row:
                 # Assign variables correctly from the expanded query before use
                 user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end = row
                 
-                # SELF-HEALING: If this is the configured admin email, ensure role/tier are correct
+                # 4. Role Sync & "Only 1 Super Admin" Enforcement
+                # CRITICAL: Ensures no one else can EVER have the SUPER_ADMIN role.
                 admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
-                if user_email == admin_email and (role != 'ADMIN' or tier != 'PRO'):
-                    cursor.execute("UPDATE users SET role = 'ADMIN', tier = 'PRO' WHERE id = %s", (user_id,))
-                    role = 'ADMIN'
-                    tier = 'PRO'
                 
-                cursor.execute(
-                    "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
-                    (user_id,)
-                )
+                if user_email == admin_email:
+                    # Auto-promote authorized Super Admin
+                    if role != 'SUPER_ADMIN' or tier != 'PRO':
+                        cursor.execute("UPDATE users SET role = 'SUPER_ADMIN', tier = 'PRO' WHERE id = %s", (user_id,))
+                        role = 'SUPER_ADMIN'
+                        tier = 'PRO'
+                elif role == 'SUPER_ADMIN':
+                    # SECURITY: Downgrade anyone else who has the SUPER_ADMIN role in the DB
+                    print(f"SECURITY ALERT: Unauthorized SUPER_ADMIN detected ({user_email}). Downgrading to USER.")
+                    cursor.execute("UPDATE users SET role = 'USER' WHERE id = %s", (user_id,))
+                    role = 'USER'
+                
             conn.commit()
             
             cursor.close()
@@ -460,16 +549,25 @@ async def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="Authentication failed")
 
 async def get_admin_user(user: dict = Depends(get_current_user)):
-    """
-    Issue #7: Backend Security Hardening.
-    Strictly verifies that the user is an ADMIN and matches the ADMIN_EMAIL.
-    """
+    """Dependency to ensure the current user is the platform Super Admin."""
     admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
-    
-    if user.get("role") != "ADMIN" or user.get("email") != admin_email:
+    if user.get("role") != "SUPER_ADMIN" or user.get("email") != admin_email:
         raise HTTPException(
             status_code=403, 
-            detail="Access denied. Only the primary administrator can perform this action."
+            detail="Forbidden: This endpoint is restricted to the platform Super Admin."
+        )
+    return user
+
+async def require_premium_tier(user: dict = Depends(get_current_user)):
+    """
+    Route Guard: Blocks FREE-tier users from accessing AI Command Center routes.
+    BASIC, STARTER, and PRO users are permitted.
+    """
+    tier = user.get("tier")
+    if tier == "FREE" or tier is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: This feature requires an active Basic or paid subscription."
         )
     return user
 
@@ -584,36 +682,44 @@ async def chat_endpoint(
     chat_req: ChatRequest, 
     company: dict = Depends(verify_api_key_and_origin)
 ):
-    """Core AI Chat Endpoint with Trial Enforcement and Connection Pooling."""
+    """Core AI Chat Endpoint with Basic/Paid Enforcement and Connection Pooling."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         
-        # 0. Verify usage limits and subscription status
+        # 0. Verify usage limits using company_id for per-bot tracking
         cursor.execute("""
-            SELECT u.tier, u.trial_end_date, u.subscription_status, ut.messages_used, u.id
-            FROM users u 
-            JOIN companies c ON c.user_id = u.id 
-            LEFT JOIN usage_tracking ut ON ut.user_id = u.id
+            SELECT u.tier, u.trial_end_date, u.subscription_status,
+                   (SELECT COALESCE(SUM(messages_used), 0) FROM usage_tracking WHERE user_id = u.id) as messages_used,
+                   u.id, ut.id as usage_id, u.role
+            FROM users u
+            JOIN companies c ON c.user_id = u.id
+            LEFT JOIN usage_tracking ut ON ut.company_id = c.id
             WHERE c.id = %s
             ORDER BY ut.period_end DESC LIMIT 1
         """, (company["id"],))
         sub_data = cursor.fetchone()
-        
+
         if not sub_data:
             raise HTTPException(status_code=404, detail="Subscription data not found.")
 
-        tier, trial_end, status, messages_used, user_uuid = sub_data
-        
-        if status != "active" and tier != "FREE": # Allow FREE tier even if status is pending
-            raise HTTPException(status_code=403, detail="Company account is suspended.")
+        tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
+        plan = get_plan(tier, role=user_role)
+        current_limit = plan["messages"]
 
-        # 1. Quota Check
-        LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
-        current_limit = LIMITS.get(tier, 200)
+        # Billing check: ensure the subscription is currently active (case-insensitive).
+        if status and status.upper() != "ACTIVE" and tier and tier.upper() != "FREE":
+            raise HTTPException(status_code=403, detail="Company account is suspended or subscription has expired.")
 
-        if messages_used is not None and current_limit is not None and messages_used >= current_limit:
-            raise HTTPException(status_code=402, detail=f"Message limit reached for {tier} tier.")
+        if messages_used is not None and current_limit < 999999 and messages_used >= current_limit:
+            raise HTTPException(status_code=402, detail={
+                "code": "MESSAGE_LIMIT_EXCEEDED",
+                "message": f"Monthly message limit reached on your {tier} plan.",
+                "current": messages_used,
+                "limit": current_limit,
+                "tier": tier,
+                "upgrade_url": "/app/pricing",
+            })
 
         # 2. Vector Search (RAG)
         query_vector = embeddings_model_query.embed_query(chat_req.message)
@@ -622,40 +728,123 @@ async def chat_endpoint(
             
         retrieved_docs = retrieve_knowledge(conn, company["id"], query_vector)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
-        # 3. Formulate Prompt
-        bot_name = company.get('bot_name') or "Sapy AI"
-        company_name = company.get('company_name') or "Sapybase"
-        company_tone = company.get('company_tone') or "Professional, expert and highly descriptive"
-        system_instructions = "Answer the user's question clearly and accurately based ONLY on the provided facts."
+        # ── Runtime values from company record ─────────────────────────────────
+        bot_name        = company.get("bot_name") or "Sapy AI"
+        company_name    = company.get("company_name") or "Sapybase"
+        company_tone    = company.get("company_tone") or "Professional, expert and highly descriptive"
+        contact_email   = company.get("contact_email") or f"support@{(company.get('allowed_origin') or 'sapybase.com').replace('https://', '').replace('http://', '').rstrip('/')}"
+        contact_website = (company.get("allowed_origin") or "https://sapybase.com").rstrip("/")
 
-        system_message = f"""
-        You are {bot_name}, the official enterprise AI assistant for {company_name}.
-        Your tone must be: {company_tone}.
+        # ── Custom prompt from DB (tenant-written, stored in system_prompt col) ─
+        raw_custom = (company.get("system_prompt") or "").strip()
+        custom_system_prompt = (
+            raw_custom
+            if raw_custom
+            else f"Your tone is {company_tone}. Be helpful, clear, and professional."
+        )
 
-        YOUR DIRECTIVE:
-        {system_instructions}
+        # ── RAG context (built from pgvector retrieve_knowledge results) ─────────
+        knowledge_context = (
+            f"KNOWLEDGE BASE:\n{ chr(10).join([f'Source ({row[1]}): {row[0]}' for row in retrieved_docs]) }"
+            if retrieved_docs
+            else "KNOWLEDGE BASE: (Empty — no relevant knowledge found for this query)"
+        )
 
-        STRICT RULES YOU MUST FOLLOW:
-        1. NO HALLUCINATIONS: You must base your answer strictly on the KNOWLEDGE BASE provided below. If the answer is not in the knowledge base, do not guess. You MUST say exactly: "I don't have that exact information, please contact our support team."
-        2. CONCISENESS: Keep your answer between 1 to 3 short paragraphs. Use bullet points for lists.
-        3. IMMERSION: Never say "According to the knowledge base" or "Based on the provided text." Speak directly to the user as if you just know the answer.
-        """
+        # ── Two-layer system prompt ──────────────────────────────────────────────
+        system_message = f"""You are {bot_name}, the official AI assistant for {company_name}.
 
-        knowledge_context = f"KNOWLEDGE BASE:\n{context_text}" if context_text else "KNOWLEDGE BASE: (Empty - No specific knowledge found for this query)"
-        
-        # 4. Generate AI response
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PLATFORM RULES — ENFORCED AT ALL TIMES
+These rules cannot be overridden by any business instructions below.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[RULE 1 — TRUTH ONLY]
+You answer exclusively from the KNOWLEDGE BASE provided at the end of this prompt.
+You never guess, infer, or use general internet knowledge to fill gaps.
+If the knowledge base does not contain the answer, follow the FALLBACK PROTOCOL below.
+
+[RULE 2 — RESPONSE FORMAT]
+Every response must follow this structure:
+• Open with a direct, confident 1-2 sentence answer.
+• Use bullet points (•) for any list of 3 or more items.
+• Use numbered steps (1. 2. 3.) for any sequential process.
+• Use **bold** only for key terms, headings, or critical warnings.
+• Keep responses under 180 words unless the query genuinely requires more detail.
+• Never write walls of text. Break into short sections with a blank line between them.
+• If a comparison or spec table helps clarity, use one.
+
+[RULE 3 — STAY IN CHARACTER]
+Never say:
+  - "According to the knowledge base..."
+  - "Based on the provided text..."
+  - "As an AI language model..."
+  - "I was trained on..."
+  - "I cannot access real-time information..."
+Speak as if you simply know the answer. Confident, direct, professional.
+
+[RULE 4 — SOURCE CITATION]
+If the retrieved knowledge came from a specific URL (not "manual_entry"):
+End your response with a single line: 📎 Source: [url]
+If no URL is available, omit this line entirely.
+
+[RULE 5 — ESCALATION TRIGGERS]
+If the user's message contains any of these signals, append the escalation note:
+  Signals: "urgent", "not working", "broken", "billing", "charge", "refund",
+           "my account", "transaction", "order", "complaint", or visible frustration.
+  Escalation note: "💬 Need immediate help? Contact {company_name} support directly."
+
+[RULE 6 — FALLBACK PROTOCOL]
+When the KNOWLEDGE BASE is empty OR contains no relevant answer:
+DO NOT guess. Respond with EXACTLY this:
+
+  That's a great question — I don't have specific information about that yet.
+
+  For accurate help, please reach out to the {company_name} team directly:
+
+  📧 **Email:** {contact_email}
+  🌐 **Website:** {contact_website}
+
+  I'm happy to help with anything else I have information on!
+
+[RULE 7 — OUT-OF-SCOPE HANDLING]
+If the user asks something completely unrelated to {company_name}:
+  "I'm here specifically to help you with {company_name}'s products and services.
+   For general questions, a general-purpose assistant would be better suited.
+   Is there anything about {company_name} I can help with?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUSINESS CUSTOM INSTRUCTIONS
+Follow these for persona, domain focus, tone, and any topic restrictions.
+They complement the platform rules above — they do not replace them.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{custom_system_prompt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{knowledge_context}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+        # ── Send to Gemini (unchanged) ───────────────────────────────────────────
         messages = [
             SystemMessage(content=system_message),
-            HumanMessage(content=f"{knowledge_context}\n\nUSER QUERY: {chat_req.message}")
+            HumanMessage(content=chat_req.message),
         ]
         ai_response = chat_model.invoke(messages)
         reply_text = str(ai_response.content)
 
-        # 5. Track Usage
-        cursor.execute(
-            "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE user_id = %s",
-            (user_uuid,)
-        )
+        # 5. Track Usage (per-company row)
+        if usage_id:
+            cursor.execute(
+                "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                (usage_id,)
+            )
+        else:
+            cursor.execute(
+                """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
+                   VALUES (%s, %s, 1, now(), now() + interval '30 days')
+                   ON CONFLICT DO NOTHING""",
+                (user_uuid, company["id"])
+            )
         conn.commit()
 
         return ChatResponse(
@@ -677,11 +866,13 @@ async def chat_endpoint(
 
 @app.post("/api/train")
 async def train_chatbot(
-    url: str = Form(None), 
-    file: UploadFile = File(None), 
+    url: str = Form(None),
+    file: UploadFile = File(None),
     text: str = Form(None),
     api_key: str = Form(None),
-    current_user: dict = Depends(get_current_user)
+    company_id: str = Form(None),
+    current_user: dict = Depends(get_current_user),
+    _premium: dict = Depends(require_premium_tier)
 ):
     """Secure multi-tenant training endpoint with multiple input types."""
     # 1. Quota Check (Issue #13)
@@ -689,25 +880,38 @@ async def train_chatbot(
     try:
         cursor = conn.cursor()
         
-        # Identify Company: Use provided API key OR the user's primary company
-        if api_key:
-            cursor.execute("SELECT id FROM companies WHERE api_key = %s", (api_key,))
+        # Identify Company: explicit company_id > api_key > user's primary company
+        if company_id:
+            cursor.execute(
+                "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+                (company_id, current_user["id"])
+            )
+        elif api_key:
+            hashed = hashlib.sha256(api_key.encode()).hexdigest()
+            cursor.execute("SELECT id FROM companies WHERE api_key = %s", (hashed,))
         else:
-            cursor.execute("SELECT id FROM companies WHERE user_id = %s", (current_user["id"],))
-            
+            cursor.execute("SELECT id FROM companies WHERE user_id = %s LIMIT 1", (current_user["id"],))
+
         company_row = cursor.fetchone()
         if not company_row:
             raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
-        company_id = company_row[0]
+        resolved_company_id = company_row[0]
 
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (company_id,))
+        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
         current_count = cursor.fetchone()[0]
-        
-        TIER_LIMITS = {"FREE": 50, "STARTER": 500, "PRO": 5000}
-        limit = TIER_LIMITS.get(current_user["tier"], 50)
-        
+
+        plan = get_plan(current_user["tier"], role=current_user.get("role"))
+        limit = plan["chunks"]
+
         if current_count >= limit:
-            raise HTTPException(status_code=402, detail=f"Knowledge base limit reached for {current_user['tier']} tier.")
+            raise HTTPException(status_code=402, detail={
+                "code": "CHUNK_LIMIT_EXCEEDED",
+                "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
+                "current": current_count,
+                "limit": limit,
+                "tier": current_user["tier"],
+                "upgrade_url": "/app/pricing",
+            })
 
         docs = []
         # --- 1A. Process Website URL (Jina Reader Refactor) ---
@@ -760,18 +964,24 @@ async def train_chatbot(
         if not docs:
             raise HTTPException(status_code=400, detail="No content extracted.")
 
-        # --- 2. Chunk and Embed ---
+        # --- 2. Chunk and Embed with Strict Limit Enforcement ---
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = text_splitter.split_documents(docs)
+        all_chunks = text_splitter.split_documents(docs)
+        
+        # Calculate remaining capacity
+        remaining_slots = max(0, limit - current_count)
+        chunks = all_chunks[:remaining_slots]
+        
+        if len(all_chunks) > remaining_slots:
+            warning = f"Plan limit reached! Only {remaining_slots} of {len(all_chunks)} chunks were processed. Upgrade for more storage."
 
         for chunk in chunks:
-            if current_count >= limit: break
             embedding = embeddings_model_doc.embed_query(chunk.page_content)
             if len(embedding) > 768: embedding = embedding[:768]
             
             cursor.execute(
                 "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
-                (company_id, chunk.page_content, source_name, embedding)
+                (resolved_company_id, chunk.page_content, source_name, embedding)
             )
             current_count += 1
         
@@ -790,34 +1000,73 @@ async def train_chatbot(
         release_db_connection(conn)
 @app.post("/api/register")
 async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_current_user)):
-    """
-    Issue #6: User Role Management & Company Registration.
-    Ensures that only users with a valid subscription (tier) can register a company.
-    """
-    if not user.get("tier"):
-        raise HTTPException(
-            status_code=403, 
-            detail="Subscription required. Please select a plan before registering your company."
-        )
+    """Multi-bot registration with per-plan bot count enforcement."""
+    tier = user.get("tier") or "FREE"
+    plan = get_plan(tier, role=user.get("role"))
+
+    if plan["max_bots"] == 0:
+        raise HTTPException(status_code=402, detail={
+            "code": "BOT_LIMIT_EXCEEDED",
+            "message": "Upgrade your plan to create a bot.",
+            "current": 0,
+            "limit": 0,
+            "tier": tier,
+            "upgrade_url": "/app/pricing",
+        })
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM companies WHERE user_id = %s", (user["id"],))
-        if cursor.fetchone():
-            raise HTTPException(status_code=400, detail="User already has a company.")
+
+        cursor.execute("SELECT COUNT(*) FROM companies WHERE user_id = %s AND is_active = true", (user["id"],))
+        current_bot_count = cursor.fetchone()[0]
+
+        if current_bot_count >= plan["max_bots"]:
+            raise HTTPException(status_code=402, detail={
+                "code": "BOT_LIMIT_EXCEEDED",
+                "message": f"Your {tier} plan allows {plan['max_bots']} bot(s). You have {current_bot_count}.",
+                "current": current_bot_count,
+                "limit": plan["max_bots"],
+                "tier": tier,
+                "upgrade_url": "/app/pricing",
+            })
 
         api_key = f"sb_{secrets.token_urlsafe(32)}"
+        hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
+
+        cursor.execute("SELECT COALESCE(MAX(display_order), -1) + 1 FROM companies WHERE user_id = %s", (user["id"],))
+        next_order = cursor.fetchone()[0]
+
         cursor.execute(
-            "INSERT INTO companies (user_id, company_name, allowed_origin, domain, api_key) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin, api_key)
+            """INSERT INTO companies
+               (user_id, company_name, allowed_origin, domain, api_key, display_order,
+                bot_name, theme_color, company_tone, initial_message)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin,
+             hashed_key, next_order,
+             reg.company_name + " AI", reg.theme_color, reg.company_tone,
+             f"Hi! I'm {reg.company_name} AI. How can I help you today?")
         )
         company_id = cursor.fetchone()[0]
-        cursor.execute("UPDATE users SET role = 'ADMIN' WHERE id = %s", (user["id"],))
+
+        cursor.execute(
+            """INSERT INTO usage_tracking (user_id, company_id, period_start, period_end)
+               VALUES (%s, %s, now(), now() + interval '30 days')
+               ON CONFLICT DO NOTHING""",
+            (user["id"], company_id)
+        )
+
+        if current_bot_count == 0:
+            cursor.execute("UPDATE users SET role = 'ADMIN' WHERE id = %s", (user["id"],))
+
         conn.commit()
-        return {"status": "success", "api_key": api_key, "company_id": company_id}
+        return {"status": "success", "api_key": api_key, "company_id": str(company_id)}
+    except HTTPException:
+        raise
     except Exception as e:
         if conn: conn.rollback()
+        print(f"REGISTER ERROR: {e}")
         raise HTTPException(status_code=500, detail="Registration failed.")
     finally:
         release_db_connection(conn)
@@ -830,13 +1079,14 @@ async def rotate_api_key(user: dict = Depends(get_current_user)):
     Identifies the company via the user profile and generates a fresh, secure key.
     """
     new_key = f"sb_{secrets.token_urlsafe(32)}"
+    hashed_key = hashlib.sha256(new_key.encode()).hexdigest()
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # 1. Update the key (which immediately invalidates the old one)
+        # 1. Update the key (stored as hash)
         cursor.execute(
             "UPDATE companies SET api_key = %s WHERE user_id = %s RETURNING id",
-            (new_key, user["id"])
+            (hashed_key, user["id"])
         )
         row = cursor.fetchone()
         if not row:
@@ -855,6 +1105,82 @@ async def rotate_api_key(user: dict = Depends(get_current_user)):
     finally:
         release_db_connection(conn)
 
+@app.get("/api/companies")
+async def list_my_companies(user: dict = Depends(get_current_user)):
+    """Returns all bots/companies owned by the authenticated user."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT c.id, c.company_name, c.allowed_origin, c.bot_name, c.theme_color,
+                      c.logo_url, c.initial_message, c.display_order, c.is_active,
+                      c.created_at,
+                      COALESCE(ut.messages_used, 0) as messages_used,
+                      COALESCE(ut.period_end, now() + interval '30 days') as period_end
+               FROM companies c
+               LEFT JOIN usage_tracking ut ON ut.company_id = c.id
+               WHERE c.user_id = %s AND c.is_active = true
+               ORDER BY c.display_order ASC""",
+            (user["id"],)
+        )
+        rows = cursor.fetchall()
+        plan = get_plan(user.get("tier"), role=user.get("role"))
+        return {
+            "status": "success",
+            "bots": [
+                {
+                    "id": str(r[0]),
+                    "company_name": r[1],
+                    "allowed_origin": r[2],
+                    "bot_name": r[3],
+                    "theme_color": r[4],
+                    "logo_url": r[5],
+                    "initial_message": r[6],
+                    "display_order": r[7],
+                    "is_active": r[8],
+                    "created_at": r[9].isoformat() if r[9] else None,
+                    "messages_used": r[10],
+                    "period_end": r[11].isoformat() if r[11] else None,
+                }
+                for r in rows
+            ],
+            "plan": {
+                "tier": user.get("tier"),
+                "max_bots": plan["max_bots"],
+                "current_bots": len(rows),
+                "can_add_more": len(rows) < plan["max_bots"],
+                "message_limit": plan["messages"],
+                "chunk_limit": plan["chunks"],
+                "speed_tier": plan["speed"],
+            }
+        }
+    finally:
+        release_db_connection(conn)
+
+
+@app.delete("/api/companies/{company_id}")
+async def deactivate_company(company_id: str, user: dict = Depends(get_current_user)):
+    """Soft-deletes a bot by setting is_active=false. Data is retained."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE companies SET is_active = false WHERE id = %s AND user_id = %s RETURNING id",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        conn.commit()
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail="Failed to deactivate bot.")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/config")
 def get_config(company: dict = Depends(verify_api_key_and_origin)):
     """Returns branding for the widget."""
@@ -867,13 +1193,15 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT messages_used, period_end FROM usage_tracking WHERE user_id = %s ORDER BY period_end DESC LIMIT 1",
+            """SELECT SUM(messages_used), MAX(period_end) 
+               FROM usage_tracking 
+               WHERE user_id = %s""",
             (current_user["id"],)
         )
         usage = cursor.fetchone()
-        
-        LIMITS = {"FREE": 200, "STARTER": 2000, "PRO": 1000000, "ENTERPRISE": 1000000}
-        
+
+        plan = get_plan(current_user.get("tier"), role=current_user.get("role"))
+
         trial_days_left = None
         if current_user.get("trial_end_date"):
             delta = current_user["trial_end_date"] - datetime.now(timezone.utc)
@@ -885,10 +1213,13 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
             "tier": current_user["tier"],
             "email": current_user["email"],
             "messages_used": usage[0] if usage else 0,
-            "message_limit": LIMITS.get(current_user["tier"], 200),
+            "message_limit": plan["messages"],
             "next_billing_date": usage[1] if usage else None,
             "trial_days_left": trial_days_left,
-            "trial_end_date": current_user.get("trial_end_date")
+            "trial_end_date": current_user.get("trial_end_date"),
+            "max_bots": plan["max_bots"],
+            "speed_tier": plan["speed"],
+            "chunk_limit": plan["chunks"],
         }
     finally:
         release_db_connection(conn)
@@ -1059,12 +1390,39 @@ async def clerk_webhook(
                 primary_id = data.get("primary_email_address_id")
                 primary_email = next((e.get("email_address") for e in email_addresses if e.get("id") == primary_id), None)
                 email = primary_email or email_addresses[0].get("email_address", "unknown@email.com")
+
+            # 1. Check for a pending Placeholder record by email
+            # This happens if the user subscribed via Polar before finishing Clerk signup.
+            cursor.execute("SELECT id FROM users WHERE LOWER(email) = %s AND clerk_id LIKE 'pending_%%'", (email.lower().strip(),))
+            pending_row = cursor.fetchone()
+            
+            if pending_row:
+                user_id = pending_row[0]
+                print(f"CLERK WEBHOOK: Claiming placeholder record {user_id} for {email}")
+                cursor.execute(
+                    "UPDATE users SET clerk_id = %s, email = %s WHERE id = %s",
+                    (clerk_id, email, user_id)
+                )
+            else:
+                # 1. Standard UPSERT for fresh users
+                cursor.execute(
+                    """
+                    INSERT INTO users (clerk_id, email, tier, subscription_status)
+                    VALUES (%s, %s, 'FREE', NULL)
+                    ON CONFLICT (clerk_id) DO UPDATE SET
+                        email = EXCLUDED.email,
+                        tier = COALESCE(users.tier, 'FREE')
+                    RETURNING id
+                    """,
+                    (clerk_id, email)
+                )
+                user_id = cursor.fetchone()[0]
+
+            # Ensure usage tracking exists
             cursor.execute(
-                "INSERT INTO users (clerk_id, email) VALUES (%s, %s) RETURNING id",
-                (clerk_id, email)
+                "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
+                (user_id,)
             )
-            user_id = cursor.fetchone()[0]
-            cursor.execute("INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days')", (user_id,))
         
         elif event_type == "user.updated":
             clerk_id = data.get("id")
@@ -1101,26 +1459,81 @@ async def polar_webhook(request: Request):
     payload = await request.body()
     headers = request.headers
     
-    wh = Webhook(POLAR_WEBHOOK_SECRET)
-    try:
-        # Extract headers with safe fallbacks to prevent None values
+    # Extract headers with safe fallbacks to prevent None values
+    svix_headers = {
+        "webhook-id": headers.get("webhook-id") or headers.get("svix-id", ""),
+        "webhook-signature": headers.get("webhook-signature") or headers.get("svix-signature", ""),
+        "webhook-timestamp": headers.get("webhook-timestamp") or headers.get("svix-timestamp", ""),
+    }
+
+    # Fallback to svix- prefixes if webhook- headers are missing
+    if not svix_headers["webhook-id"]:
         svix_headers = {
             "svix-id": headers.get("svix-id") or headers.get("webhook-id", ""),
             "svix-signature": headers.get("svix-signature") or headers.get("webhook-signature", ""),
             "svix-timestamp": headers.get("svix-timestamp") or headers.get("webhook-timestamp", ""),
         }
-        msg = wh.verify(payload, svix_headers)
-    except WebhookVerificationError:
-        print("WEBHOOK ERROR: Invalid Signature for Polar")
-        # Log headers for debugging signature issues
-        print(f"POLAR HEADERS: {json.dumps(dict(headers), indent=2)}")
-        raise HTTPException(status_code=400, detail="Invalid signature")
-    except Exception as e:
-        print(f"WEBHOOK ERROR during verification: {e}")
-        raise HTTPException(status_code=500, detail="Verification process failed")
 
-    # Extract Svix ID for idempotency (Polar uses Svix)
-    webhook_id = svix_headers.get("svix-id")
+    # DEBUG: Log exact verification inputs
+    secret_to_log = f"{POLAR_WEBHOOK_SECRET[:10]}...{POLAR_WEBHOOK_SECRET[-5:]}" if POLAR_WEBHOOK_SECRET else "MISSING"
+    print(f"DEBUG WEBHOOK - Secret (Masked): {secret_to_log}")
+    print(f"DEBUG WEBHOOK - Headers: {json.dumps(svix_headers)}")
+    print(f"DEBUG WEBHOOK - Payload Size: {len(payload)}")
+
+    # TRY MULTIPLE SECRET FORMATS
+    secrets_to_try = [POLAR_WEBHOOK_SECRET]
+    if POLAR_WEBHOOK_SECRET.startswith("polar_whs_"):
+        secrets_to_try.append(POLAR_WEBHOOK_SECRET.replace("polar_whs_", ""))
+    
+    # Also try stripping any potential random whitespace/quotes from the secret
+    secrets_to_try.append(POLAR_WEBHOOK_SECRET.strip().strip('"').strip("'"))
+
+    msg = None
+    last_error = None
+
+    # Normalize payload: Some environments add a trailing newline to the raw body
+    payload_variants = [payload, payload.strip()]
+
+    for secret in secrets_to_try:
+        try:
+            wh = Webhook(secret)
+            for p in payload_variants:
+                try:
+                    msg = wh.verify(p, svix_headers)
+                    print(f"WEBHOOK SUCCESS: Verified with secret format starting with {secret[:12]}")
+                    payload = p # Use the verified payload
+                    break
+                except:
+                    continue
+            if msg: break
+        except Exception as e:
+            last_error = e
+            continue
+
+    # SECURE BYPASS FOR DEBUGGING (Development only)
+    # Issue #9: Ensure this is IMPOSSIBLE in production
+    is_dev = os.getenv("ENV") == "development"
+    if not msg and is_dev and os.getenv("DEBUG_SKIP_SIGNATURE") == "true":
+        print("WEBHOOK WARNING: Signature verification FAILED but skipping due to DEBUG_SKIP_SIGNATURE=true")
+        try:
+            msg = json.loads(payload)
+        except:
+            msg = None
+    
+    if not msg:
+        print(f"WEBHOOK ERROR: All signature verification attempts failed. Last error: {last_error}")
+        # SECURITY: Redact detailed error info in production
+        error_detail = "Invalid signature"
+        if is_dev:
+            error_detail += f". Tried {len(secrets_to_try)} formats. Error: {str(last_error)}"
+        
+        raise HTTPException(
+            status_code=400, 
+            detail=error_detail
+        )
+
+    # Extract Unique ID for idempotency (Handles both svix and webhook prefixes)
+    webhook_id = svix_headers.get("webhook-id") or svix_headers.get("svix-id")
     if not webhook_id:
         print("WEBHOOK ERROR: Missing unique ID after verification")
         return {"status": "ignored"}
@@ -1128,65 +1541,66 @@ async def polar_webhook(request: Request):
     data = msg.get("data")
     event_type = msg.get("type")
     
-    # DEBUG: Print the full data object to see the structure in logs
-    import json
-    print(f"POLAR WEBHOOK EVENT: {event_type}")
-    print(f"POLAR WEBHOOK DATA: {json.dumps(data, indent=2)}")
-
+    # ── LOGGING OVERLOAD (For Debugging Identifying Issues) ────────────────────
+    customer_email = (data.get("customer_email") or data.get("customer", {}).get("email") or "").lower().strip()
+    
+    # Try every possible path for Clerk ID (customer_external_id)
+    clerk_id = (
+        data.get("metadata", {}).get("customer_external_id") or
+        data.get("metadata", {}).get("external_customer_id") or
+        (data.get("customer") if isinstance(data.get("customer"), dict) else {}).get("external_id") or
+        data.get("customer_external_id") or
+        data.get("external_customer_id")
+    )
+    
+    print(f"DEBUG: POLAR WEBHOOK - Event={event_type}")
+    print(f"DEBUG: POLAR WEBHOOK - IDs in payload: customer_id={data.get('customer_id')}, email={customer_email}, external_id_found={clerk_id}")
+    
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        try:
-            cursor.execute("INSERT INTO processed_webhooks (webhook_id, provider) VALUES (%s, 'polar')", (webhook_id,))
-        except UniqueViolation:
-            print(f"WEBHOOK: Already processed {webhook_id}")
-            conn.rollback()
-            release_db_connection(conn)
-            return {"status": "success", "message": "Duplicate"}
+        
+        # Identification Fallback: Look up by email if no external ID was passed
+        if not clerk_id and customer_email:
+            cursor.execute("SELECT clerk_id FROM users WHERE LOWER(email) = %s", (customer_email,))
+            user_row = cursor.fetchone()
+            if user_row:
+                clerk_id = user_row[0]
+                print(f"DEBUG: POLAR WEBHOOK - Identified ClerkID via email lookup: {clerk_id}")
+            else:
+                clerk_id = f"pending_{customer_email}"
+                print(f"DEBUG: POLAR WEBHOOK - Created pending placeholder: {clerk_id}")
 
-        # Extract Clerk ID (External ID) - Try multiple possible locations in the payload
-        clerk_id = (
-            data.get("customer_external_id") or 
-            data.get("external_customer_id") or 
-            data.get("customer", {}).get("external_id") or
-            data.get("metadata", {}).get("customer_external_id")
-        )
-        
-        print(f"POLAR WEBHOOK: Extracted ClerkID={clerk_id}, CustomerID={data.get('customer_id')}")
-        
-        if not clerk_id: 
-            print("WEBHOOK ERROR: Could not find clerk_id (external_id) in payload")
+        if not clerk_id:
+            print("POLAR WEBHOOK ERROR: No way to identify user. Dropping event.")
             return {"status": "ignored"}
 
-        if event_type in ["subscription.created", "subscription.updated"]:
+        if event_type in ["subscription.created", "subscription.updated", "subscription.active", "order.created", "order.paid"]:
             # Handle checkouts too (sometimes Polar sends this before subscription)
             product = data.get("product", {})
             product_name = product.get("name", "").upper() if isinstance(product, dict) else ""
             
-            # Robust tier detection
+            # Map Polar product name to internal tier (BASIC, STARTER, PRO)
             if "PRO" in product_name:
                 tier = "PRO"
             elif "STARTER" in product_name:
                 tier = "STARTER"
+            elif "BASIC" in product_name:
+                tier = "BASIC"
             else:
-                # If they are in a checkout or subscription, they are at least "FREE" trial
-                tier = "FREE"
+                tier = "BASIC"
             
             print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name}")
             
-            # Extract dates if available
             period_end = data.get("current_period_end")
-            period_start = data.get("current_period_start")
             customer_email = (
                 data.get("customer_email") or 
                 data.get("customer", {}).get("email") or
                 f"polar_{data.get('customer_id', 'unknown')}@placeholder.invalid"
             )
-            
-            # Check for cancellation at period end flag
-            status = "cancelling" if data.get("cancel_at_period_end") else "active"
-            
-            # UPSERT user to handle unknown emails and missing records
+            status = "CANCELED" if data.get("cancel_at_period_end") else "ACTIVE"
+
+            # UPSERT: idempotent subscription state update
             cursor.execute(
                 """
                 INSERT INTO users (clerk_id, email, tier, subscription_status, polar_customer_id, billing_period_end)
@@ -1205,22 +1619,9 @@ async def polar_webhook(request: Request):
                 (clerk_id, customer_email, tier, status, data.get("customer_id"), period_end)
             )
             row = cursor.fetchone()
-            if row:
-                # Update usage tracking with the same dates
-                cursor.execute(
-                    """
-                    INSERT INTO usage_tracking (user_id, messages_used, period_start, period_end) 
-                    VALUES (%s, 0, %s, %s)
-                    ON CONFLICT (user_id) DO UPDATE SET
-                        period_start = EXCLUDED.period_start,
-                        period_end = EXCLUDED.period_end
-                    """,
-                    (row[0], period_start or 'now()', period_end or "now() + interval '30 days'")
-                )
-        
         elif event_type == "subscription.revoked":
-             cursor.execute(
-                "UPDATE users SET tier = 'FREE', subscription_status = 'inactive' WHERE clerk_id = %s",
+            cursor.execute(
+                "UPDATE users SET tier = 'FREE', subscription_status = 'CANCELED' WHERE clerk_id = %s",
                 (clerk_id,)
             )
 
@@ -1228,25 +1629,153 @@ async def polar_webhook(request: Request):
         return {"status": "success"}
     except Exception as e:
         if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail="Webhook failed")
+        print(f"POLAR WEBHOOK CRITICAL ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Webhook Processing Failed: {str(e)}")
     finally:
         release_db_connection(conn)
 
 @app.post("/api/user/subscription-manual")
-async def select_free_tier(current_user: dict = Depends(get_current_user)):
-    """Manually select FREE tier during onboarding."""
+async def select_basic_tier(current_user: dict = Depends(get_current_user)):
+    """
+    Basic Plan Activation: Provisions a user for the BASIC tier.
+    Used for manual activations or migrations.
+    """
+    current_tier = current_user.get("tier")
+    
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE users SET tier = 'FREE', subscription_status = 'active' WHERE id = %s", (current_user["id"],))
+        cursor.execute(
+            """
+            UPDATE users 
+            SET tier = 'BASIC', subscription_status = 'ACTIVE'
+            WHERE id = %s
+            """,
+            (current_user["id"],)
+        )
         cursor.execute(
             "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
             (current_user["id"],)
         )
         conn.commit()
-        return {"status": "success"}
+        return {"status": "success", "tier": "BASIC"}
     finally:
         release_db_connection(conn)
+
+
+@app.post("/api/user/sync-subscription")
+async def sync_subscription_from_polar(current_user: dict = Depends(get_current_user)):
+    """
+    POST-CHECKOUT SYNC: Called immediately after Polar redirects back.
+    Pulls the user's latest active subscription directly from Polar's API
+    and updates the database. This is a reliable fallback when webhooks
+    are delayed or fail to deliver.
+    """
+    import httpx
+
+    token = os.getenv("POLAR_ACCESS_TOKEN")
+    if not token:
+        raise HTTPException(status_code=500, detail="Polar access token not configured.")
+
+    is_dev = os.getenv("ENV") == "development"
+    polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+    user_email = current_user.get("email", "").lower().strip()
+    clerk_id = current_user.get("clerk_id")
+
+    print(f"SYNC: Starting sync for ClerkID={clerk_id}, Email={user_email}")
+
+    # Indexing Lag Buffer: Give Polar's background workers 1.5s to index the new subscription
+    # before we poll their API. This dramatically increases first-attempt success.
+    await asyncio.sleep(1.5)
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Step 1: Look up the customer by external_id (Clerk ID) first
+        resp = await client.get(
+            f"{polar_base_url}/v1/customers",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"external_id": clerk_id, "limit": 1}
+        )
+        customers = resp.json().get("items", []) if resp.is_success else []
+
+        # Step 2: Fallback to email lookup if no external_id match
+        if not customers and user_email:
+            resp = await client.get(
+                f"{polar_base_url}/v1/customers",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"email": user_email, "limit": 1}
+            )
+            customers = resp.json().get("items", []) if resp.is_success else []
+
+        if not customers:
+            print(f"SYNC: No Polar customer found for {user_email}")
+            return {"status": "not_found", "message": "No Polar subscription found for this account yet."}
+
+        polar_customer = customers[0]
+        polar_customer_id = polar_customer["id"]
+        print(f"SYNC: Found Polar customer {polar_customer_id}")
+
+        # Step 3: Get active subscriptions for this customer
+        sub_resp = await client.get(
+            f"{polar_base_url}/v1/subscriptions",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"customer_id": polar_customer_id, "active": "true", "limit": 5}
+        )
+        subscriptions = sub_resp.json().get("items", []) if sub_resp.is_success else []
+
+        if not subscriptions:
+            print(f"SYNC: No active subscriptions for customer {polar_customer_id}")
+            return {"status": "no_active_subscription", "message": "No active subscription found."}
+
+        # Step 4: Pick the best subscription (most recently started)
+        sub = sorted(subscriptions, key=lambda s: s.get("started_at", ""), reverse=True)[0]
+        product_name = (sub.get("product", {}).get("name") or "").upper()
+        status = sub.get("status", "").upper()
+        period_end = sub.get("current_period_end")
+
+        print(f"SYNC: Found subscription - Product={product_name}, Status={status}")
+
+        # Step 5: Map Polar product name to our internal tier
+        if "PRO" in product_name:
+            tier = "PRO"
+        elif "STARTER" in product_name:
+            tier = "STARTER"
+        elif "BASIC" in product_name:
+            tier = "BASIC"
+        else:
+            tier = "BASIC"
+
+        db_status = "ACTIVE" if status in ("ACTIVE", "TRIALING") else status
+
+        # Step 6: Update the database
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE users SET 
+                    tier = %s,
+                    subscription_status = %s,
+                    polar_customer_id = %s,
+                    billing_period_end = %s
+                WHERE clerk_id = %s
+                """,
+                (tier, db_status, polar_customer_id, period_end, clerk_id)
+            )
+            cursor.execute(
+                "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
+                (current_user["id"],)
+            )
+            conn.commit()
+            print(f"SYNC SUCCESS: Set tier={tier} for ClerkID={clerk_id}")
+            return {"status": "success", "tier": tier, "subscription_status": db_status}
+        except Exception as e:
+            conn.rollback()
+            print(f"SYNC DB ERROR: {e}")
+            raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+        finally:
+            release_db_connection(conn)
 
 # @app.get("/api/billing/portal")
 # async def get_billing_portal(current_user: dict = Depends(get_current_user)):

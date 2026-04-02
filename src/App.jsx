@@ -1,13 +1,28 @@
-import { Outlet,ScrollRestoration } from "react-router-dom";
+import { Outlet, ScrollRestoration } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import ChatWidget from './components/chatWidget';
+import NavToggle from './components/NavToggle';
 import useInactivityTimeout from './hooks/useInactivityTimeout';
+import useSessionManager from './hooks/useSessionManager';
+import { useState, useEffect } from "react";
+import UpgradePrompt from './components/UpgradePrompt';
 
 function App() {
-  // Automatically logout user after 30 minutes of inactivity
-  useInactivityTimeout(30);
+  // Force logout if this is a new browser/tab instance (prevents auto-login)
+  useSessionManager();
+
+  // Automatically logout user after 15 minutes of inactivity
+  useInactivityTimeout(15);
+
+  const [globalUpgradeError, setGlobalUpgradeError] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => setGlobalUpgradeError(e.detail);
+    window.addEventListener('sapybase:upgrade-required', handler);
+    return () => window.removeEventListener('sapybase:upgrade-required', handler);
+  }, []);
 
   return (
     <div className="flex flex-col">
@@ -19,12 +34,23 @@ function App() {
         Skip to content
       </a>
       <Navbar />
+      <NavToggle />
       <main id="main-content">
         <Outlet />
       </main>
       <Footer />
       <Analytics />
       <ChatWidget apiKey={import.meta.env.VITE_SAPYBASE_API_KEY}/>
+      {globalUpgradeError && (
+        <UpgradePrompt
+          mode="modal"
+          code={globalUpgradeError.code}
+          tier={globalUpgradeError.tier}
+          current={globalUpgradeError.current}
+          limit={globalUpgradeError.limit}
+          onDismiss={() => setGlobalUpgradeError(null)}
+        />
+      )}
     </div>
   );
 }

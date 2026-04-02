@@ -1,127 +1,49 @@
-import React, { useState, useEffect } from "react";
-import { Menu, X, ArrowRight, ChevronDown, BrainCircuit, Code2, CloudCog, Globe as GlobeIcon, Bot, ScanSearch, LayoutDashboard, Key, ShieldCheck, LogIn, UserPlus } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Menu, X, ArrowRight, Bot, Code2, CloudCog, Globe as GlobeIcon, Activity, ChevronDown, Monitor, Smartphone, Layout, Settings } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth, UserButton, SignInButton, SignUpButton, SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
+import { UserButton, SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/clerk-react";
 import Logo from "./Logo";
 
-
 const Navbar = () => {
-  const { getToken, isLoaded: isAuthLoaded } = useAuth();
-  const { user, isLoaded: isUserLoaded } = useUser();
   const [isOpen, setIsOpen] = useState(false);
-  const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
-  const [isDesktopServicesOpen, setIsDesktopServicesOpen] = useState(false);
-  const dropdownRef = React.useRef(null);
-  const [userRole, setUserRole] = useState('USER');
+  const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDesktopServicesOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, []);
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!isAuthLoaded) return;
-      try {
-        const token = await getToken();
-        const baseUrl = import.meta.env.VITE_API_URL
-          ? `${import.meta.env.VITE_API_URL.replace(/\/$/, "")}`
-          : '';
-
-        const response = await fetch(`${baseUrl}/api/company/details`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        if (data.role) {
-          setUserRole(data.role);
-        }
-      } catch (err) {
-        console.error("Navbar role fetch error:", err);
-      }
-    };
-    fetchUserRole();
-  }, [isAuthLoaded, getToken]);
-
-  useEffect(() => {
     if (isOpen) {
+      document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
     } else {
+      document.documentElement.style.overflow = "unset";
       document.body.style.overflow = "unset";
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsServicesOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const services = [
-    {
-      title: "AI & Neural Integration",
-      desc: "RAG-optimized LLMs",
-      icon: <Bot size={18} />,
-      href: "#services"
-    },
-    {
-      title: "Ultra-Fast Web Engines",
-      desc: "React/Vite apps with sub-200ms TTFB.",
-      icon: <Code2 size={18} />,
-      href: "#services"
-    },
-    {
-      title: "Cloud Architecture",
-      desc: "AWS Serverless & High-concurrency systems.",
-      icon: <CloudCog size={18} />,
-      href: "#services"
-    },
-    {
-      title: "Global Connectivity",
-      desc: "CDN-first deployment for global audiences.",
-      icon: <GlobeIcon size={18} />,
-      href: "#services"
-    },
-    {
-      title: "SEO Optimization",
-      desc: "SEO Optimized for search engines.",
-      icon: <BrainCircuit size={18} />,
-      href: "#services"
-    },
-    {
-      title: "AI Engine Optimization / GEO",
-      desc: "AI Engine Optimization for search engines.",
-      icon: <ScanSearch size={18} />,
-      href: "#services"
-    },
-    {
-      title: "Register Company",
-      desc: "Get your API key and join SaPyBase.",
-      icon: <Key size={18} />,
-      href: "/register"
-    },
-    {
-      title: "Client Dashboard",
-      desc: "Train your AI and manage knowledge.",
-      icon: <LayoutDashboard size={18} />,
-      href: "/dashboard"
-    },
-    ...(userRole === 'ADMIN' ? [{
-      title: "Super Admin Panel",
-      desc: "Manage platform users and companies.",
-      icon: <ShieldCheck size={18} className="text-orange-500" />,
-      href: "/admin"
-    }] : [])
+    { title: "AI Integration", desc: "RAG-optimized LLM nodes", icon: <Bot size={18} /> },
+    { title: "Web Engines", desc: "Sub-200ms TTFB stack", icon: <Code2 size={18} /> },
+    { title: "Cloud Systems", desc: "AWS Lambda & Serverless", icon: <CloudCog size={18} /> },
+    { title: "Global Sync", desc: "CDN-first edge sync", icon: <GlobeIcon size={18} /> },
+    { title: "UI Engineering", desc: "Pixel-perfect architectural UI", icon: <Layout size={18} /> },
+    { title: "System Ops", desc: "CI/CD & Kubernetes", icon: <Settings size={18} /> },
   ];
 
   const navLinks = [
     { name: "Home", href: "#home", id: "home" },
     { name: "Projects", href: "#projects", id: "projects" },
-    { name: "Services", href: "#services", id: "services" },
+    { name: "Services", href: "#services", id: "services", dropdown: true },
     { name: "Contact", href: "/contact", id: "contact" },
     { name: "About", href: "/about", id: "about" },
   ];
@@ -129,7 +51,7 @@ const Navbar = () => {
   const handleLinkClick = (e, href) => {
     e.preventDefault();
     setIsOpen(false);
-    setIsDesktopServicesOpen(false);
+    setIsServicesOpen(false);
 
     if (href.startsWith("#")) {
       if (location.pathname === "/") {
@@ -153,218 +75,191 @@ const Navbar = () => {
 
   return (
     <>
-      {/* Mobile-First Header */}
-      <header className="fixed top-0 w-full z-60 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
-        <div className="px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 pl-2">
-            <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} aria-label="SaPyBase Home" className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
-              <Logo className="w-auto h-12 md:h-12 object-cover" />
+      <header className="fixed top-0 w-full z-50 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 h-16 transition-colors duration-500">
+        <div className="max-w-screen mx-2 h-full flex items-center justify-between divide-x divide-gray-200 dark:divide-slate-800 border-x border-gray-200 dark:border-slate-800 transition-colors duration-500">
+
+          {/* Cell 1: Logo */}
+          <div className="px-6 h-full flex items-center shrink-0 min-w-fit">
+            <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} className="flex items-center">
+              <Logo className="h-10 w-auto" />
             </a>
           </div>
-          {/* Desktop Links (Hidden by default, shown on md+) */}
-          <div className="hidden md:flex items-center gap-10">
-            {navLinks.map((link) => (
-              <div key={`nav-desk-${link.id || link.name}`} className="relative group" ref={link.name === "Services" ? dropdownRef : null}>
-                {link.name === "Services" ? (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setIsDesktopServicesOpen(!isDesktopServicesOpen);
-                      }}
-                      onMouseEnter={() => setIsDesktopServicesOpen(true)}
-                      className={`flex items-center gap-1 text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 cursor-pointer ${isDesktopServicesOpen ? 'text-slate-900 dark:text-white' : ''} group-hover:text-slate-900 dark:group-hover:text-white`}
-                    >
-                      {link.name}
-                      <ChevronDown size={14} className={`${isDesktopServicesOpen ? 'rotate-180' : ''} group-hover:rotate-180 transition-transform duration-300`} />
-                    </button>
 
-                    {/* Desktop Dropdown */}
-                    <div
-                      className={`absolute top-full left-1/2 -translate-x-1/2 pt-4 transition-all duration-300 ease-out z-70 
-                      ${isDesktopServicesOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}
-                      onMouseEnter={() => setIsDesktopServicesOpen(true)}
-                      onMouseLeave={() => setIsDesktopServicesOpen(false)}
+          {/* Cell 2: Desktop Navigation Links (md+) */}
+          <div className="hidden lg:flex flex-1 te items-center gap-4 lg:gap-8 xl:gap-10 px-6 lg:px-10 h-full">
+            {navLinks.map((link) => (
+              <div key={`nav-desk-${link.id || link.name}`} className="relative text-md font-display tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center" ref={link.dropdown ? dropdownRef : null}>
+                {link.dropdown ? (
+                  <button
+                    onMouseEnter={() => setIsServicesOpen(true)}
+                    onClick={() => setIsServicesOpen(!isServicesOpen)}
+                    className="text-md font-display tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-2 group"
+                  >
+                    {link.name}
+                    <ChevronDown size={12} className={`opacity-40 transition-transform ${isServicesOpen ? 'rotate-180' : ''}`} />
+                    
+                    {/* Desktop Dropdown - Architectural Blueprint */}
+                    <div 
+                      className={`absolute top-16 left-0 w-[480px] bg-gray-200 dark:bg-slate-800 p-0 border border-gray-200 dark:border-slate-800 shadow-2xl transition-all duration-300 z-50 grid grid-cols-2 gap-px ${
+                        isServicesOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
+                      }`}
+                      onMouseLeave={() => setIsServicesOpen(false)}
                     >
-                      <div className="w-[640px] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 grid grid-cols-2 gap-4">
-                        {services.map((service, idx) => (
-                          <a
-                            key={`service-desk-${idx}-${service.title}`}
-                            href={service.href}
-                            onClick={(e) => handleLinkClick(e, service.href)}
-                            className="group/item p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-700"
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 group-hover/item:scale-110 transition-transform">
-                                {service.icon}
-                              </div>
-                              <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{service.title}</span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pl-1">
-                              {service.desc}
-                            </p>
-                          </a>
-                        ))}
-                      </div>
+                      {services.map((service, idx) => (
+                        <a 
+                          key={`service-drop-${idx}`}
+                          href="#services"
+                          onClick={(e) => handleLinkClick(e, '#services')}
+                          className="bg-white dark:bg-slate-950 p-6 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all flex items-start gap-4 group/item"
+                        >
+                          <div className="w-10 h-10 border border-gray-100 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 group-hover/item:border-indigo-200 group-hover/item:text-indigo-600 transition-all">
+                            {service.icon}
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-md font-display tracking-widest text-slate-900 dark:text-slate-200 mb-1">{service.title}</h4>
+                            <p className="text-sm font-sans font-medium tracking-widest text-slate-600 dark:text-slate-400">{service.desc}</p>
+                          </div>
+                        </a>
+                      ))}
                     </div>
-                  </>
+                  </button>
                 ) : (
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="relative text-slate-600 dark:text-slate-300 transition-colors font-questrial py-3 group-hover:text-slate-900 dark:group-hover:text-white"
+                    className="text-md font-display tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
                   >
                     {link.name}
-                    <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-indigo-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-in-out origin-left" />
+                    <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
                   </a>
                 )}
               </div>
             ))}
           </div>
 
-          {/* Desktop Auth Section */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* Cell 3: Auth & Account (Desktop md+) */}
+          <div className="hidden lg:flex items-center gap-px bg-gray-200 dark:bg-slate-800 h-full overflow-hidden shrink-0 transition-colors duration-500">
             <SignedOut>
-              <SignInButton mode="modal">
-                <button className="text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-2">
-                  Sign In
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-all active:scale-95 flex items-center gap-2">
-                  <UserPlus size={16} />
-                  Get Started
-                </button>
-              </SignUpButton>
+              <div className="h-full bg-white dark:bg-slate-950 flex items-center px-2 lg:px-4 transition-colors duration-500">
+                <SignInButton mode="modal">
+                  <button className="font-display text-md tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors px-4 py-3">
+                    Login
+                  </button>
+                </SignInButton>
+              </div>
+              <div className="h-full bg-white dark:bg-slate-950 flex items-center transition-colors duration-500">
+                <SignUpButton mode="modal">
+                  <button className="bg-slate-900 dark:bg-indigo-600 tracking-widest text-white font-display text-md px-4 lg:px-6 xl:px-8 py-5 h-full hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-all rounded-none shrink-0">
+                    Get_Started
+                  </button>
+                </SignUpButton>
+              </div>
             </SignedOut>
             <SignedIn>
-              <div className="flex items-center gap-4">
+              <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
                 <Link
-                  to="/dashboard"
-                  className="text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                  to="/app"
+                  className="text-md text-slate-900 dark:text-slate-200 font-display hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                 >
                   Dashboard
                 </Link>
-                <UserButton
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-800"
-                    }
-                  }}
-                />
+                <div className="h-10 w-10 group/user p-0 flex items-center justify-center">
+                  <UserButton
+                    afterSignOutUrl="/"
+                    appearance={{
+                      elements: {
+                        avatarBox: "w-8 h-8 rounded-none",
+                        userButtonTrigger: "rounded-none"
+                      }
+                    }}
+                   
+                  />
+                </div>
               </div>
             </SignedIn>
           </div>
 
-          {/* Mobile Toggle - Visible on small screens */}
-          <div className="flex items-center gap-3 md:hidden">
+          {/* Mobile Actions (Hamburger & Auth) */}
+          <div className="flex items-center lg:hidden h-full gap-px bg-gray-200 dark:bg-slate-800 transition-colors duration-500">
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+                <div className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center border-l border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-500">
+                    <UserButton
+                      afterSignOutUrl="/"
+                      appearance={{
+                        elements: {
+                          avatarBox: "w-9 h-9 rounded-none",
+                          userButtonTrigger: "p-0 rounded-none w-full h-full"
+                        }
+                      }}
+                    />
+                </div>
             </SignedIn>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-200 active:scale-95 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center"
+              className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-slate-200 active:bg-slate-50 dark:active:bg-slate-900 transition-colors border-l border-gray-200 dark:border-slate-800 rounded-none"
               aria-label="Toggle Menu"
             >
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+              {isOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile Full-Screen Overlay (Tree of Thought: Mobile UX) */}
+      {/* Zero-Scroll Mobile Dropdown Menu */}
       <div
-        className={`fixed inset-0 z-55 bg-white dark:bg-slate-950 transition-transform duration-500 ease-in-out md:hidden ${isOpen ? "translate-y-0" : "-translate-y-full"
-          }`}
+        className={`fixed top-16 left-0 w-full h-[calc(100vh-64px)] z-40 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${
+          isOpen ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0 pointer-events-none"
+        }`}
       >
-        <div className="flex flex-col h-full pt-24 px-8 pb-10 overflow-y-auto">
-          <div className="space-y-4">
-            {navLinks.map((link, index) => (
-              <div key={`nav-mob-${link.id || link.name}-${index}`} className="space-y-1">
-                {link.name === "Services" ? (
-                  <>
-                    <button
-                      onClick={() => setIsMobileServicesOpen(!isMobileServicesOpen)}
-                      className={`w-full flex items-center justify-between text-xl font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 py-3 ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
-                        }`}
-                      style={{ transitionDelay: `${index * 100}ms` }}
-                    >
-                      {link.name}
-                      <ChevronDown size={24} className={`text-slate-400 dark:text-slate-400 transition-transform duration-300 ${isMobileServicesOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {/* Mobile Services Accordion - Simplified and Professional */}
-                    <div className={`grid gap-2 overflow-hidden transition-all duration-500 ease-in-out ${isMobileServicesOpen ? 'max-h-[800px] opacity-100 mt-2 mb-4' : 'max-h-0 opacity-0'}`}>
-                      {services.map((service, sIndex) => (
-                        <a
-                          key={`service-mob-${sIndex}-${service.title}`}
-                          href={service.href}
-                          onClick={(e) => {
-                            handleLinkClick(e, service.href);
-                            setIsMobileServicesOpen(false);
-                          }}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 active:bg-slate-100 dark:active:bg-slate-800 transition-colors"
-                        >
-                          <div className="p-2 rounded-lg bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm shrink-0">
-                            {React.cloneElement(service.icon, { size: 16 })}
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200 leading-none mb-1">{service.title}</h4>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{service.desc}</p>
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <a
-                    href={link.href}
-                    onClick={(e) => handleLinkClick(e, link.href)}
-                    className={`flex items-center justify-between text-xl font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 py-3 ${isOpen
-                      ? "opacity-100 translate-x-0"
-                      : "opacity-0 -translate-x-10"
-                      }`}
-                    style={{ transitionDelay: `${index * 100}ms` }}
-                  >
-                    {link.name}
-                    <ArrowRight className="text-slate-400 dark:text-slate-400 w-6 h-6" href={link.href}
-                      onClick={(e) => handleLinkClick(e, link.href)} />
-                  </a>
-                )}
-              </div>
+        <div className="flex-1 flex flex-col h-full">
+          <div className="flex flex-col bg-white dark:bg-slate-950">
+            {navLinks.map((link) => (
+              <a
+                key={`nav-mob-${link.id || link.name}`}
+                href={link.href}
+                onClick={(e) => handleLinkClick(e, link.href)}
+                className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+              >
+                <span>{link.name}</span>
+                <ArrowRight size={18} className="opacity-40" />
+              </a>
             ))}
           </div>
 
-          <div className="mt-auto pt-8 border-t border-slate-100 dark:border-slate-900">
+          {/* Mobile Bottom CTA Section */}
+          <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 mt-auto border-t border-gray-200 dark:border-slate-800 space-y-4">
             <SignedOut>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <SignInButton mode="modal">
-                  <button className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white font-bold transition-all active:scale-95">
-                    <LogIn size={20} />
-                    Login
+              <SignUpButton mode="modal">
+                <button className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none mb-3">
+                  Start_Free_Trial
+                </button>
+              </SignUpButton>
+              <SignInButton mode="modal">
+                  <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-display tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                    Login_to_System
                   </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-800 text-white font-bold transition-all active:scale-95 dark:shadow-none">
-                    <UserPlus size={20} />
-                    Sign Up
-                  </button>
-                </SignUpButton>
-              </div>
+              </SignInButton>
             </SignedOut>
+            
+            <SignedIn>
+                <Link
+                  to="/app"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
+                >
+                  SYSTEM_DASHBOARD
+                </Link>
+            </SignedIn>
 
-            <button
-              onClick={() => {
-                navigate('/register');
-                setIsOpen(false);
-              }}
-              className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-5 rounded-2xl text-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
-            >
-              Start Free Trial
-            </button>
-            <div className="mt-8 flex gap-8 text-slate-500 text-sm items-center justify-center">
-              <a href="https://www.linkedin.com/in/ayushsatvara/" className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">LinkedIn</a>
-              <a href="https://github.com/ayushsatvara1012" className="p-2 cursor-pointer hover:text-indigo-600 transition-colors">GitHub</a>
+            <div className="pt-8 flex items-center justify-between text-slate-600 dark:text-slate-400">
+                <div className="flex gap-6 text-[10px] uppercase tracking-widest font-bold font-sans">
+                    <a href="https://github.com/ayushsatvara1012" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">GIT</a>
+                    <a href="https://www.linkedin.com/in/ayushsatvara" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">LNK</a>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Activity size={12} className="text-emerald-500 animate-pulse" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold font-sans">Uptime: 99.99%</span>
+                </div>
             </div>
           </div>
         </div>

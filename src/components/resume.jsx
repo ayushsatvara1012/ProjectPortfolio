@@ -8,15 +8,15 @@ import { GraduationCap, Briefcase, Cpu, Globe, ArrowUpRight, Code2, Shield, Zap 
  */
 const ResumeNode = ({ name, role, education, experience, stack, accentColor }) => (
   <div className="relative group p-px rounded-[2.5rem] bg-linear-to-b from-slate-200 to-transparent dark:from-slate-800 dark:to-transparent">
-    <div className="bg-white dark:bg-slate-950 rounded-[2.4rem] p-8 lg:p-10 shadow-2xl transition-all duration-500 hover:shadow-indigo-500/10 border border-slate-100 dark:border-slate-900 overflow-hidden h-full flex flex-col">
+    <div className="bg-white dark:bg-slate-950 rounded-[2.4rem] p-8 lg:p-10 transition-all duration-500 border border-slate-100 dark:border-slate-900 overflow-hidden h-full flex flex-col">
 
       {/* 1. IDENTITY BLOCK */}
       <div className="flex justify-between items-start mb-10">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 dark:text-slate-200 tracking-tighter uppercase leading-none">
+          <h2 className="text-4xl md:text-5xl font-display font-black tracking-tight text-slate-900 dark:text-slate-200 uppercase leading-none">
             {name}
           </h2>
-          <p className={`font-mono text-[10px] tracking-[0.3em] uppercase mt-3 font-bold ${accentColor}`}>
+          <p className={`font-mono text-md tracking-[0.3em] uppercase mt-3 font-bold ${accentColor}`}>
             {role}
           </p>
         </div>
@@ -30,12 +30,12 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-slate-400">
             <GraduationCap size={16} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Education</span>
+            <span className="text-md font-display uppercase tracking-widest font-bold">Education</span>
           </div>
           <div className="relative pl-4 border-l-2 border-slate-100 dark:border-slate-800">
-            <h4 className="font-bold text-slate-900 dark:text-slate-200 text-sm leading-tight">{education.degree}</h4>
-            <p className="text-xs text-slate-500 mt-1">{education.univ}</p>
-            <div className="inline-flex mt-3 px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-900 text-[9px] font-mono text-indigo-500 border border-indigo-500/20">
+            <h4 className="text-md font-bold font-display text-slate-900 dark:text-slate-200 leading-tight">{education.degree}</h4>
+            <p className="text-md text-slate-500 font-medium mt-1">{education.univ}</p>
+            <div className="inline-flex mt-3 px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-900 text-sm font-display font-bold text-indigo-500 border border-indigo-500/20">
               GPA: {education.gpa}
             </div>
           </div>
@@ -45,11 +45,11 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-slate-400">
             <Cpu size={16} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Tactical Stack</span>
+            <span className="text-md font-display uppercase tracking-widest font-bold">Tactical Stack</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {stack.map(tech => (
-              <span key={tech} className="px-2.5 py-1 text-[9px] font-bold rounded-md border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 hover:border-indigo-500/30 transition-colors cursor-default">
+              <span key={tech} className="px-2.5 py-1 text-sm font-display font-medium rounded-md border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 hover:border-indigo-500/30 transition-colors cursor-default">
                 {tech}
               </span>
             ))}
@@ -61,7 +61,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
       <div className="mt-10 pt-8 border-t border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-3 text-slate-400 mb-6">
           <Briefcase size={16} />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Core Projects</span>
+          <span className="text-md font-display uppercase tracking-widest font-bold">Core Projects</span>
         </div>
         <div className="grid grid-cols-1 gap-3">
           {experience.map((exp, i) => (
@@ -71,8 +71,8 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
                   <Code2 size={16} />
                 </div>
                 <div>
-                  <h5 className="font-bold text-slate-900 dark:text-slate-200 text-xs">{exp.title}</h5>
-                  <p className="text-[9px] text-slate-500 mt-0.5 font-mono uppercase tracking-wider">{exp.tech}</p>
+                  <h5 className="text-md font-bold font-display text-slate-900 dark:text-slate-200 leading-tight">{exp.title}</h5>
+                  <p className="text-sm font-mono text-slate-500 uppercase tracking-widest mt-0.5">{exp.tech}</p>
                 </div>
               </div>
               <ArrowUpRight size={14} className="text-slate-300 group-hover/item:text-indigo-500 transition-all group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5" />
@@ -82,7 +82,7 @@ const ResumeNode = ({ name, role, education, experience, stack, accentColor }) =
       </div>
 
       {/* Decorative System ID */}
-      <div className="absolute -bottom-2 -right-2 text-[60px] font-black text-slate-100 dark:text-slate-900/40 select-none pointer-events-none -rotate-12">
+      <div className="absolute -bottom-2 -right-2 text-[60px] font-display font-black text-slate-100 dark:text-slate-900/40 select-none pointer-events-none -rotate-12">
         {name.substring(0, 2)}
       </div>
     </div>
@@ -98,12 +98,12 @@ const DuoPortfolio = () => {
         <div className="flex flex-col items-center text-center mb-24 space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 mb-2">
             <Zap size={14} className="text-indigo-600" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">The Synergy Protocol</span>
+            <span className="text-md uppercase tracking-widest font-bold font-sans text-indigo-600">The Synergy Protocol</span>
           </div>
-          <h1 className="text-5xl md:text-8xl font-black text-slate-900 dark:text-slate-200 tracking-tighter leading-none">
+          <h1 className="text-5xl md:text-8xl font-display font-black text-slate-900 dark:text-slate-200 tracking-tight leading-none">
             ENGINEER <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">NODES.</span>
           </h1>
-          <p className="max-w-2xl text-slate-500 dark:text-slate-400 text-sm md:text-base leading-relaxed">
+          <p className="max-w-2xl text-md font-mono text-slate-500 dark:text-slate-400 leading-relaxed">
             Bridging theoretical computer science with production-grade full-stack engineering.
             Two nodes, one unified digital ecosystem.
           </p>
@@ -142,10 +142,10 @@ const DuoPortfolio = () => {
         </div>
 
         {/* FOOTER SYNERGY BADGE */}
-        <div className="mt-20 flex justify-center">
+        <div className="mt-10 flex justify-center">
           <div className="p-6 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
-            <p className="text-xs font-mono text-slate-400 uppercase tracking-widest">
-              Integrated Deployment Status: <span className="text-emerald-500 font-bold">Optimal</span>
+            <p className="text-md font-display text-slate-400 tracking-widest">
+              Integrated Deployment Status: <span className="text-emerald-500 font-bold font-display">Optimal</span>
             </p>
           </div>
         </div>
