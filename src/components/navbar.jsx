@@ -97,16 +97,15 @@ const Navbar = () => {
                   >
                     {link.name}
                     <ChevronDown size={12} className={`opacity-40 transition-transform ${isServicesOpen ? 'rotate-180' : ''}`} />
-                    
+
                     {/* Desktop Dropdown - Architectural Blueprint */}
-                    <div 
-                      className={`absolute top-16 left-0 w-[480px] bg-gray-200 dark:bg-slate-800 p-0 border border-gray-200 dark:border-slate-800 shadow-2xl transition-all duration-300 z-50 grid grid-cols-2 gap-px ${
-                        isServicesOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
-                      }`}
+                    <div
+                      className={`absolute top-16 left-0 w-[480px] bg-gray-200 dark:bg-slate-800 p-0 border border-gray-200 dark:border-slate-800 shadow-2xl transition-all duration-300 z-50 grid grid-cols-2 gap-px ${isServicesOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
+                        }`}
                       onMouseLeave={() => setIsServicesOpen(false)}
                     >
                       {services.map((service, idx) => (
-                        <a 
+                        <a
                           key={`service-drop-${idx}`}
                           href="#services"
                           onClick={(e) => handleLinkClick(e, '#services')}
@@ -172,7 +171,7 @@ const Navbar = () => {
                         userButtonTrigger: "rounded-none"
                       }
                     }}
-                   
+
                   />
                 </div>
               </div>
@@ -182,17 +181,17 @@ const Navbar = () => {
           {/* Mobile Actions (Hamburger & Auth) */}
           <div className="flex items-center lg:hidden h-full gap-px bg-gray-200 dark:bg-slate-800 transition-colors duration-500">
             <SignedIn>
-                <div className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center border-l border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-500">
-                    <UserButton
-                      afterSignOutUrl="/"
-                      appearance={{
-                        elements: {
-                          avatarBox: "w-9 h-9 rounded-none",
-                          userButtonTrigger: "p-0 rounded-none w-full h-full"
-                        }
-                      }}
-                    />
-                </div>
+              <div className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center border-l border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-500">
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-9 h-9 rounded-none",
+                      userButtonTrigger: "p-0 rounded-none w-full h-full"
+                    }
+                  }}
+                />
+              </div>
             </SignedIn>
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -207,9 +206,8 @@ const Navbar = () => {
 
       {/* Zero-Scroll Mobile Dropdown Menu */}
       <div
-        className={`fixed top-16 left-0 w-full h-[calc(100vh-64px)] z-40 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${
-          isOpen ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0 pointer-events-none"
-        }`}
+        className={`fixed top-16 left-0 w-full h-[calc(100vh-64px)] z-40 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${isOpen ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0 pointer-events-none"
+          }`}
       >
         <div className="flex-1 flex flex-col h-full">
           <div className="flex flex-col bg-white dark:bg-slate-950">
@@ -235,31 +233,31 @@ const Navbar = () => {
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
-                  <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-display tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                    Login_to_System
-                  </button>
+                <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-display tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                  Login_to_System
+                </button>
               </SignInButton>
             </SignedOut>
-            
+
             <SignedIn>
-                <Link
-                  to="/app"
-                  onClick={() => setIsOpen(false)}
-                  className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
-                >
-                  SYSTEM_DASHBOARD
-                </Link>
+              <Link
+                to="/app"
+                onClick={() => setIsOpen(false)}
+                className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
+              >
+                SYSTEM_DASHBOARD
+              </Link>
             </SignedIn>
 
             <div className="pt-8 flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <div className="flex gap-6 text-[10px] uppercase tracking-widest font-bold font-sans">
-                    <a href="https://github.com/ayushsatvara1012" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">GIT</a>
-                    <a href="https://www.linkedin.com/in/ayushsatvara" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">LNK</a>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Activity size={12} className="text-emerald-500 animate-pulse" />
-                    <span className="text-[10px] uppercase tracking-widest font-bold font-sans">Uptime: 99.99%</span>
-                </div>
+              <div className="flex gap-6 text-[10px] uppercase tracking-widest font-bold font-sans">
+                <a href="https://github.com/ayushsatvara1012" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">GIT</a>
+                <a href="https://www.linkedin.com/in/ayushsatvara" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">LNK</a>
+              </div>
+              <div className="flex items-center gap-2">
+                <Activity size={12} className="text-emerald-500 animate-pulse" />
+                <span className="text-[10px] uppercase tracking-widest font-bold font-sans">Uptime: 99.99%</span>
+              </div>
             </div>
           </div>
         </div>

@@ -18,7 +18,7 @@ window.fetch = async (...args) => {
       if (data?.detail?.code) {
         window.dispatchEvent(new CustomEvent('sapybase:upgrade-required', { detail: data.detail }));
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }
   return response;
 };
@@ -48,7 +48,7 @@ const Root = () => {
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <HelmetProvider>
-      <ClerkProvider 
+      <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
         appearance={{
           layout: {

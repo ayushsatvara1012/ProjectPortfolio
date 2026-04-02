@@ -288,9 +288,9 @@ const AppRegistration = () => {
 
                             {/* Dynamic Integration Guides */}
                             <div className="p-8 pt-4">
-                                <BotIntegrationDocs 
-                                    apiKey={registrationData.apiKey} 
-                                    apiUrl={import.meta.env.VITE_API_URL || 'https://sapyai.onrender.com'} 
+                                <BotIntegrationDocs
+                                    apiKey={registrationData.apiKey}
+                                    apiUrl={import.meta.env.VITE_API_URL || 'https://sapyai.onrender.com'}
                                 />
                             </div>
                         </motion.div>

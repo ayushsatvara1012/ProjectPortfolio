@@ -37,7 +37,10 @@ from clerk_backend_api import Clerk
 from clerk_backend_api.security.types import AuthenticateRequestOptions
 
 # 1. Load Environment Variables
-load_dotenv()
+# .env.local takes priority (for sandbox/dev keys); .env is the fallback (production)
+load_dotenv(".env.local")   # Local overrides first (gitignored, safe for sandbox keys)
+load_dotenv()               # Standard .env as fallback
+ENV = os.getenv("ENV", "production")
 DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")

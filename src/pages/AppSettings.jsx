@@ -155,7 +155,7 @@ export const ApiKeysSection = () => {
     };
 
     return (
-        <div className={sectionGap + ' p-8 bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500'}>
+        <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
             <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
                 <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">API Keys</h2>
                 <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Rotate your secret API key. The old key is immediately invalidated.</p>
