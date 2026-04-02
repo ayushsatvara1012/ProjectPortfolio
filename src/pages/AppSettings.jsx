@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Palette, KeyRound, Eye, EyeOff, Lock, Plus, Trash2 } from 'lucide-react';
+import { User, Palette, KeyRound, Eye, EyeOff, Lock, Plus, Trash2, Sun, Moon } from 'lucide-react';
 import Alert from '../components/alert';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useBotSettings } from '../context/BotSettingsContext';
@@ -59,7 +59,19 @@ export const CustomizeSection = () => {
     const { botSettings, updateSetting, saveSettings, isSaving, isLoading } = useBotSettings();
     const { userTier, userRole } = useUserRole();
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
-    
+
+    // Theme Toggle Logic (Localized to Bot Preview)
+    const [isDark, setIsDark] = useState(false); 
+
+    useEffect(() => {
+        // Analyze current system/global theme on mount
+        const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isGlobalDark = document.documentElement.classList.contains('dark');
+        setIsDark(isSystemDark || isGlobalDark);
+    }, []);
+
+    const toggleTheme = () => setIsDark(!isDark);
+
     // Tiered Access Logic
     const isTotallyLocked = !userTier || userTier === 'null';
     const isFree = userTier === 'FREE';
@@ -68,24 +80,48 @@ export const CustomizeSection = () => {
     const showFullOverlay = isTotallyLocked || isFree;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-[calc(100vh-3rem)] md:h-[calc(100vh-3rem)] bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-auto lg:h-[calc(100vh-3rem)] bg-[#E8EBF0] dark:bg-slate-900 overflow-visible lg:overflow-hidden transition-colors duration-500">
             {/* Left Column: Header + Form */}
-            <div className="bg-white dark:bg-slate-950 flex flex-col overflow-hidden relative transition-colors h-full">
+            <div className="bg-white dark:bg-slate-950 flex flex-col lg:overflow-hidden relative transition-colors h-auto lg:h-full">
                 <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
                     <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Customize</h2>
                     <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
                 </div>
-                {/* Form area (padded, scrollable) */}
-                <div className="p-8 overflow-y-auto custom-scrollbar flex-1 relative">
+                {/* Form area (padded, scrollable on desktop) */}
+                <div className="p-8 lg:overflow-y-auto custom-scrollbar lg:flex-1 relative">
                     
                     {showFullOverlay && (
                         <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors">
                              <Lock className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-4 transition-colors" />
-                             <h3 className="text-md font-display uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans mb-2 transition-colors">Upgrade Required</h3>
+                             <h3 className="text-md font-display uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">Upgrade Required</h3>
                              <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[260px] mb-6 transition-colors">Customizing your bot's visual identity requires an active subscription.</p>
                              <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-md font-display uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors shadow-sm">
                                  View Plans
                              </Link>
+                        </div>
+                    )}
+
+                    {userRole === 'SUPER_ADMIN' && (
+                        <div className="mb-8 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 transition-colors">
+                            <p className={headingCls + ' text-amber-700! dark:text-amber-500! mb-2'}>Admin: Model Engine Override</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className={labelCls + ' text-amber-600! dark:text-amber-400!'}>Select Model Engine</label>
+                                    <select 
+                                        value={botSettings.aiModel}
+                                        onChange={e => updateSetting('aiModel', e.target.value)}
+                                        className={inputCls + ' bg-white! dark:bg-slate-950! border-amber-200! dark:border-amber-900/50!'}
+                                    >
+                                        <option value="">Default (Auto / Tier-based)</option>
+                                        <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B (Max Profit)</option>
+                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Priority)</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Dedicated)</option>
+                                    </select>
+                                    <p className="text-[10px] text-amber-600/70 mt-2 italic font-sans uppercase tracking-widest leading-relaxed">
+                                        This override bypasses the user's subscription tier model mapping.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -257,9 +293,30 @@ export const CustomizeSection = () => {
                 />
             </div>
 
-            {/* Right Column: Preview (flush) */}
-            <div className="bg-white dark:bg-slate-950 overflow-hidden border-l border-gray-100 dark:border-slate-800 h-full relative transition-colors">
-                <BotPreview />
+            {/* Right Column: Preview (Responsive Scaling Container) */}
+            {/* Right Column: Preview (Responsive Scaling Container) */}
+            <div className={`overflow-visible lg:overflow-hidden border-t lg:border-t-0 lg:border-l w-full h-auto lg:h-full relative transition-colors flex flex-col items-center justify-center custom-scrollbar p-0 lg:p-8 ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
+                {/* Visual Note & Theme Toggle */}
+                <div className="absolute bottom-8 lg:top-2 lg:bottom-auto left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full px-4 text-center">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans">
+                        Check contrast in both modes
+                    </p>
+                    <button 
+                        onClick={toggleTheme}
+                        className="flex items-center gap-2.5 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all group"
+                    >
+                        <div className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 transition-colors">
+                            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
+                        </div>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-300">
+                            {isDark ? 'Preview: Light Mode' : 'Preview: Dark Mode'} — <span className="text-indigo-500 dark:text-amber-500">Switch</span>
+                        </span>
+                    </button>
+                </div>
+
+                <div className="w-full lg:h-full lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0">
+                    <BotPreview theme={isDark ? 'dark' : 'light'} />
+                </div>
             </div>
         </div>
     );

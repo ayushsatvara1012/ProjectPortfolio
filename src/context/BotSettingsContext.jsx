@@ -12,6 +12,7 @@ export const BotSettingsProvider = ({ children }) => {
         quickQuestions: [{ label: 'Pricing', prompt: 'Tell me about pricing' }],
         companyTone: ['Professional'],
         systemPrompt: '',
+        aiModel: '', // Default (Auto)
     });
     
     const [isLoading, setIsLoading] = useState(false);
@@ -39,6 +40,7 @@ export const BotSettingsProvider = ({ children }) => {
                     quickQuestions: data.company.quick_questions || [],
                     companyTone: data.company.company_tone ? data.company.company_tone.split(',') : [],
                     systemPrompt: data.company.system_prompt || '',
+                    aiModel: data.company.ai_model || '',
                 });
             }
         } catch (err) {
@@ -66,7 +68,8 @@ export const BotSettingsProvider = ({ children }) => {
                     initial_message: botSettings.greeting,
                     company_tone: botSettings.companyTone.join(','),
                     system_prompt: botSettings.systemPrompt,
-                    quick_questions: botSettings.quickQuestions
+                    quick_questions: botSettings.quickQuestions,
+                    ai_model: botSettings.aiModel || null,
                 })
             });
             const data = await res.json();
