@@ -23,9 +23,13 @@ const useSessionManager = () => {
                 const sessionCreated = new Date(session.createdAt);
                 const ageInSeconds = (now - sessionCreated) / 1000;
 
-                // If session was created more than 60 seconds ago and no flag is set,
-                // it means the browser was likely restarted and Clerk 'auto-logged' us in.
-                if (ageInSeconds > 60) {
+                // ── GOOGLE OAUTH FIX ──────────────────────────────────────────────
+                // 1. Google OAuth flows (choosing account, 2-factor) often take > 60s. 
+                //    Adjusting to 600s (10 min) to allow humans to log in.
+                // 2. Skip this entire check if we are currently on the SSO callback route.
+                const isSsoCallback = window.location.href.includes('sso-callback');
+
+                if (ageInSeconds > 600 && !isSsoCallback) {
                     console.log("Automatic persistent login detected. Forcing logout for security...");
                     signOut();
                 } else {

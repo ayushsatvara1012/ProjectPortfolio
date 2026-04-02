@@ -17,14 +17,32 @@ const AppPricing = () => {
     const { user } = useUser();
     const navigate = useNavigate();
     const { userTier } = useUserRole();
-    
+
     const [isLoading, setIsLoading] = useState(false);
     const [selectedTier, setSelectedTier] = useState(null);
-    const [billingCycle, setBillingCycle] = useState('monthly');
+    const [currency, setCurrency] = useState('USD');
+
+    const CURRENCIES = {
+        USD: { symbol: '$', label: 'USD', locale: 'en-US' },
+        EUR: { symbol: '€', label: 'EUR', locale: 'de-DE' },
+        INR: { symbol: '₹', label: 'INR', locale: 'en-IN' },
+    };
+
+    const PRICE_MATRIX = {
+        BASIC: { USD: 5, EUR: 5, INR: 450 },
+        STARTER: { USD: 10, EUR: 10, INR: 900 },
+        PRO: { USD: 20, EUR: 20, INR: 1800 }
+    };
+
+    const formatPrice = (val) => {
+        return new Intl.NumberFormat(CURRENCIES[currency].locale, {
+            style: 'currency',
+            currency: currency,
+            minimumFractionDigits: val % 1 === 0 ? 0 : 1,
+        }).format(val);
+    };
 
     // ── AUTO-REDIRECT ON SUCCESS ─────────────────────────────────────────────
-    // If the global context detects a paid tier (via sync-subscription)
-    // and we are on the pricing page with a success flag, push to registration.
     React.useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('payment') === 'success' && userTier && userTier !== 'FREE') {
@@ -34,9 +52,9 @@ const AppPricing = () => {
 
     const plans = [
         {
-            name: 'Basic', id: 'BASIC', 
-            price: billingCycle === 'monthly' ? '$5' : '$4.5',
-            period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
+            name: 'Basic', id: 'BASIC',
+            price: PRICE_MATRIX.BASIC[currency],
+            period: '/mo',
             description: 'Essential AI for small projects.',
             features: [
                 '1 AI Bot',
@@ -50,8 +68,8 @@ const AppPricing = () => {
         },
         {
             name: 'Professional', id: 'STARTER',
-            price: billingCycle === 'monthly' ? '$10' : '$9',
-            period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
+            price: PRICE_MATRIX.STARTER[currency],
+            period: '/mo',
             description: 'Up to 2 bots for growing businesses.',
             features: [
                 '2 AI Bots',
@@ -65,8 +83,8 @@ const AppPricing = () => {
         },
         {
             name: 'Enterprise', id: 'PRO',
-            price: billingCycle === 'monthly' ? '$20' : '$18',
-            period: billingCycle === 'monthly' ? '/mo' : '/mo billed annually',
+            price: PRICE_MATRIX.PRO[currency],
+            period: '/mo',
             description: 'Up to 5 bots for scaling operations.',
             features: [
                 '5 AI Bots',
@@ -86,8 +104,6 @@ const AppPricing = () => {
         setIsLoading(true); setSelectedTier(tier);
         try {
             const returnUrl = `${window.location.origin}/app/register?payment=success`;
-            // Use customer_external_id directly — this is the Polar-native parameter
-            // that maps to customer.external_id in webhook payloads.
             const url = `${POLAR_URLS[tier]}?customer_external_id=${user.id}&success_url=${encodeURIComponent(returnUrl)}`;
             window.location.href = url;
         } catch { setIsLoading(false); }
@@ -96,7 +112,7 @@ const AppPricing = () => {
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
             {/* Header */}
-            <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 flex flex-row justify-between transition-colors duration-500">
+            <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 transition-colors duration-500">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-slate-400 dark:text-slate-500 transition-colors" />
@@ -104,23 +120,22 @@ const AppPricing = () => {
                     </div>
                     <p className="text-md font-display text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">Choose the plan that fits your stage. Upgrade anytime.</p>
                 </div>
-                {/* Billing Toggle */}
-                <div className={`${cellCls} px-8 py-5 border-b border-gray-100 dark:border-slate-800`}>
-                    <div className="flex border border-gray-100 dark:border-slate-800 w-fit h-10 transition-colors">
-                        {['monthly', 'yearly'].map(cycle => (
-                            <button key={cycle} onClick={() => setBillingCycle(cycle)}
-                                className={`relative px-8 py-2 text-md uppercase tracking-widest font-bold font-sans transition-colors ${billingCycle === cycle ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-lg' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    {/* Currency Switcher */}
+                    <div className="flex border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 h-10 transition-colors rounded-none overflow-hidden">
+                        {Object.keys(CURRENCIES).map(curr => (
+                            <button key={curr} onClick={() => setCurrency(curr)}
+                                className={`px-4 py-1.5 text-xs font-sans font-bold tracking-widest uppercase transition-all ${currency === curr
+                                    ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md'
+                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
                                     }`}>
-                                {cycle}
-                                {cycle === 'yearly' && billingCycle !== 'yearly' && (
-                                    <span className="absolute -top-2 -right-1 bg-blue-600 dark:bg-indigo-500 text-white text-md uppercase tracking-widest font-bold font-sans px-1.5 py-0.5">-20%</span>
-                                )}
+                                {curr}
                             </button>
                         ))}
                     </div>
                 </div>
             </div>
-
 
             {/* Plan Cards — gap-px tic-tac-toe grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1 overflow-y-auto custom-scrollbar transition-colors duration-500">
@@ -141,11 +156,16 @@ const AppPricing = () => {
                         </div>
 
                         <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-1.5 transition-colors">{plan.name}</h3>
-                        <div className="flex items-baseline gap-1 mb-2">
-                            <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
-                                {plan.price.startsWith('$') ? plan.price.substring(1) : plan.price}
+                        <div className="flex flex-col gap-1 mb-4">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
+                                    {formatPrice(plan.price)}
+                                </span>
+                                {plan.period && <span className="text-sm text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
+                            </div>
+                            <span className="text-xs uppercase tracking-widest font-bold text-slate-400 font-sans mt-1">
+                                + taxes calculated at checkout
                             </span>
-                            {plan.period && <span className="text-sm text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
                         </div>
                         <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>
 

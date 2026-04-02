@@ -24,6 +24,7 @@ const AppSettingsBilling = lazy(() => import("./pages/AppSettings").then(m => ({
 const AppSettingsCustomize = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.CustomizeSection })));
 const AppSettingsApiKeys = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.ApiKeysSection })));
 
+import { AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import ErrorPage from "./pages/ErrorPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 // Minimal fallback for public routes — avoids a skeleton flash inside the navbar layout
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       { path: "/privacy-policy", element: <Suspense fallback={<PageLoader />}><PrivacyPolicy /></Suspense> },
       { path: "/terms-and-conditions", element: <Suspense fallback={<PageLoader />}><TermsAndConditions /></Suspense> },
       { path: "/services", element: <Suspense fallback={<PageLoader />}><ServicesCatalog /></Suspense> },
+      { path: "/sso-callback", element: <AuthenticateWithRedirectCallback /> },
       // Legacy routes — redirect to AppLayout equivalents
       { path: "/pricing", element: <Navigate to="/app/pricing" replace /> },
       {
