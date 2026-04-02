@@ -1,20 +1,108 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 
 const BotSettingsContext = createContext();
 
 export const BotSettingsProvider = ({ children }) => {
+    const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
     const [botSettings, setBotSettings] = useState({
         name: 'SaPyBase AI',
         primaryColor: '#5730F5',
         greeting: 'Hi! How can I help you today?',
+        quickQuestions: [{ label: 'Pricing', prompt: 'Tell me about pricing' }],
+        companyTone: ['Professional'],
+        systemPrompt: '',
     });
+    
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState(null);
     const [previewOpen, setPreviewOpen] = useState(false);
+
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+
+    const fetchSettings = async () => {
+        if (!isSignedIn) return;
+        setIsLoading(true);
+        setError(null);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${baseUrl}/api/company/details`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok && data.company) {
+                setBotSettings({
+                    name: data.company.bot_name || 'SaPyBase AI',
+                    primaryColor: data.company.theme_color || '#5730F5',
+                    greeting: data.company.initial_message || 'Hi! How can I help you today?',
+                    quickQuestions: data.company.quick_questions || [],
+                    companyTone: data.company.company_tone ? data.company.company_tone.split(',') : [],
+                    systemPrompt: data.company.system_prompt || '',
+                });
+            }
+        } catch (err) {
+            console.error("Failed to fetch bot settings:", err);
+            setError("Could not load settings.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const saveSettings = async () => {
+        setIsSaving(true);
+        setError(null);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${baseUrl}/api/company`, {
+                method: 'PATCH',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bot_name: botSettings.name,
+                    theme_color: botSettings.primaryColor,
+                    initial_message: botSettings.greeting,
+                    company_tone: botSettings.companyTone.join(','),
+                    system_prompt: botSettings.systemPrompt,
+                    quick_questions: botSettings.quickQuestions
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Save failed');
+            return { success: true };
+        } catch (err) {
+            console.error("Failed to save bot settings:", err);
+            const msg = err.message || "Could not save settings.";
+            setError(msg);
+            return { success: false, message: msg };
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isAuthLoaded && isSignedIn) {
+            fetchSettings();
+        }
+    }, [isAuthLoaded, isSignedIn]);
 
     const updateSetting = (key, value) =>
         setBotSettings(prev => ({ ...prev, [key]: value }));
 
     return (
-        <BotSettingsContext.Provider value={{ botSettings, updateSetting, previewOpen, setPreviewOpen }}>
+        <BotSettingsContext.Provider value={{ 
+            botSettings, 
+            updateSetting, 
+            saveSettings,
+            fetchSettings,
+            isLoading,
+            isSaving,
+            error,
+            previewOpen, 
+            setPreviewOpen 
+        }}>
             {children}
         </BotSettingsContext.Provider>
     );

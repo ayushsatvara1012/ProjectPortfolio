@@ -96,11 +96,15 @@ const BotPreview = () => {
                 {/* ── Footer ────────────────────────────────────────────── */}
                 <div className="bg-white/95 backdrop-blur-2xl border-t border-gray-200/50 shrink-0 p-4 pt-2">
                     <div className="pb-4 flex gap-2 overflow-x-auto no-scrollbar">
-                        {['Pricing', 'Integration', 'Support'].map(q => (
-                            <button key={q}
-                                className="shrink-0 px-4 py-2 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-all active:scale-95 whitespace-nowrap"
+                        {(botSettings.quickQuestions || []).filter(q => q.label).map((q, idx) => (
+                            <button key={idx}
+                                className="shrink-0 px-4 py-2 bg-white hover:opacity-80 border text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-all active:scale-95 whitespace-nowrap shadow-sm"
+                                style={{ 
+                                    borderColor: `${THEME_COLOR}30`, // 30 is hex for ~20% opacity
+                                    color: THEME_COLOR 
+                                }}
                             >
-                                {q}
+                                {q.label}
                             </button>
                         ))}
                     </div>

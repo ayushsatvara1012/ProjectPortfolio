@@ -642,6 +642,7 @@ class CompanyUpdate(BaseModel):
     initial_message: Optional[str] = None
     system_prompt: Optional[str] = None
     allowed_origin: Optional[str] = None
+    quick_questions: Optional[list] = None
 
 @app.patch("/api/company")
 async def update_company_details(
