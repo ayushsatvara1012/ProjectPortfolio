@@ -21,6 +21,7 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field, validator
 from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
+from polar_sdk.webhooks import WebhookVerificationError, validate_event
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -1734,42 +1735,25 @@ async def polar_webhook(request: Request):
                 except Exception as e:
                     last_error = str(e)
                     continue
-            if msg: break
-        except Exception as e:
-            last_error = f"Webhook init failed: {str(e)}"
-            continue
-
-    # SECURE BYPASS FOR DEBUGGING (Development only)
-    # Issue #9: Ensure this is IMPOSSIBLE in production
-    is_dev = os.getenv("ENV") == "development"
-    if not msg and is_dev and os.getenv("DEBUG_SKIP_SIGNATURE") == "true":
-        print("WEBHOOK WARNING: Signature verification FAILED but skipping due to DEBUG_SKIP_SIGNATURE=true")
-        try:
-            msg = json.loads(payload)
-        except:
-            msg = None
-    
-    if not msg:
-        print(f"WEBHOOK ERROR: All signature verification attempts failed. Last error: {last_error}")
-        # SECURITY: Redact detailed error info in production
-        error_detail = "Invalid signature"
-        if is_dev:
-            error_detail += f". Tried {len(secrets_to_try)} formats. Error: {str(last_error)}"
-        
-        raise HTTPException(
-            status_code=400, 
-            detail=error_detail
+    try:
+        event = validate_event(
+            payload=payload,
+            headers=headers,
+            secret=POLAR_WEBHOOK_SECRET,
         )
+    except WebhookVerificationError as e:
+        print(f"WEBHOOK ERROR: Signature verification failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+    except Exception as e:
+        print(f"WEBHOOK ERROR: Unexpected error during verification: {e}")
+        raise HTTPException(status_code=400, detail="Webhook error")
 
-    # Extract Unique ID for idempotency (Handles both svix and webhook prefixes)
-    webhook_id = svix_headers.get("webhook-id") or svix_headers.get("svix-id")
+    # event is now a typed Polar event object
+    webhook_id = headers.get("webhook-id")
     if not webhook_id:
-        print("WEBHOOK ERROR: Missing unique ID after verification")
+        print("WEBHOOK ERROR: Missing webhook-id header")
         return {"status": "ignored"}
 
-    data = msg.get("data")
-    event_type = msg.get("type")
-    
     # ── LOGGING OVERLOAD (For Debugging Identifying Issues) ────────────────────
     customer_email = (data.get("customer_email") or data.get("customer", {}).get("email") or "").lower().strip()
     
