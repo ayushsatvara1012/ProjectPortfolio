@@ -28,6 +28,49 @@ const AppRegistration = () => {
     const [copied, setCopied] = useState(false);
     const [openAccordion, setOpenAccordion] = useState(0);
     const [upgradeError, setUpgradeError] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    // ── POST-CHECKOUT AUTO-SYNC ──────────────────────────────────────────────
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('payment') === 'success' && !isSyncing) {
+            handleAutoSync();
+        }
+    }, []);
+
+    const handleAutoSync = async () => {
+        const params = new URLSearchParams(window.location.search);
+        setIsSyncing(true);
+        showAlert('development', 'Payment received! Verifying your subscription with Polar...');
+
+        try {
+            const token = await getToken();
+            const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'https://sapyai.onrender.com';
+            const res = await fetch(`${baseUrl}/api/user/sync-subscription`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showAlert('success', 'Subscription verified! Your dashboard is now unlocked.');
+                await useUserRole?.refreshUser?.(); // Call refresh if available
+                
+                // Clean URL
+                const url = new URL(window.location.href);
+                url.searchParams.delete('payment');
+                window.history.replaceState({}, '', url.pathname + url.search);
+            } else {
+                // If it's the SSL error, it will be in data.detail
+                const msg = data.detail || 'Synchronization failed. Your plan might take a few minutes to update.';
+                showAlert('error', msg);
+            }
+        } catch (err) {
+            showAlert('error', 'Network error during synchronization. Please refresh the page.');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const isLocked = !userTier || userTier === 'FREE' || String(userTier) === 'null';
 

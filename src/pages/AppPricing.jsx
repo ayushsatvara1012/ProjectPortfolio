@@ -4,6 +4,7 @@ import { Check, Zap, Rocket, Building2, Sparkles, Globe } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../context/UserContext';
+import Alert from '../components/alert';
 
 const POLAR_URLS = {
     BASIC: import.meta.env.VITE_POLAR_BASIC_URL || `https://buy.polar.sh/polar_cl_4EEEDCpTUdQUPg5UPkwUbEes1dSOYY5WoPUyM2gLFR9`,
@@ -22,6 +23,12 @@ const AppPricing = () => {
     const [selectedTier, setSelectedTier] = useState(null);
     const [currency, setCurrency] = useState('USD');
     const [isDetecting, setIsDetecting] = useState(true);
+    const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
+
+    const showAlert = (type, msg) => {
+        setAlert({ open: true, type, msg });
+        setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
+    };
 
     const CURRENCIES = {
         USD: { symbol: '$', label: 'USD', locale: 'en-US' },
@@ -136,8 +143,16 @@ const AppPricing = () => {
         try {
             const returnUrl = `${window.location.origin}/app/register?payment=success`;
             const url = `${POLAR_URLS[tier]}?customer_external_id=${user.id}&success_url=${encodeURIComponent(returnUrl)}`;
-            window.location.href = url;
-        } catch { setIsLoading(false); }
+            
+            // Just before redirecting, give a small visual hint
+            showAlert('development', `Redirecting to Polar for ${tier} activation...`);
+            setTimeout(() => {
+                window.location.href = url;
+            }, 800);
+        } catch (err) { 
+            setIsLoading(false); 
+            showAlert('error', 'Failed to initiate checkout. Please try again or contact support.');
+        }
     };
 
     return (
@@ -238,6 +253,7 @@ const AppPricing = () => {
                     </motion.div>
                 ))}
             </div>
+            <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />
         </div>
     );
 };
