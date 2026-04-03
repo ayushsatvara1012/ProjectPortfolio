@@ -29,9 +29,9 @@ const TIER_META = {
 };
 
 const POLAR_URLS = {
-    BASIC:   `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uyCgRv3VKICQ1RfDnEI1ywQvgxlx9BR9Ri2442Sf3xF/redirect`,
-    STARTER: `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_ohwJA87iVQyjKgqyQsTcx4yJuWNg5VK907DuI4ZdmGd/redirect`,
-    PRO:     `https://sandbox-api.polar.sh/v1/checkout-links/polar_cl_uXNpB5PduaGrEORwhlkn1rELOCqepPiNXJGG917fccl/redirect`,
+    BASIC: import.meta.env.VITE_POLAR_BASIC_URL,
+    STARTER: import.meta.env.VITE_POLAR_STARTER_URL,
+    PRO: import.meta.env.VITE_POLAR_PRO_URL,
 };
 
 // ─── Component ─────────────────────────────────────────────────────────────────
