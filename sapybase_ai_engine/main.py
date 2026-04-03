@@ -827,6 +827,11 @@ def update_company_details(
         
         # exclude_unset ensures we only update fields provided in the request
         for field, value in update.dict(exclude_unset=True).items():
+            # SECURITY & DATA INTEGRITY: JSON fields must be serialized to strings
+            # for psycopg2 to wrap correctly in TEXT/VARCHAR columns.
+            if field == "quick_questions" and value is not None:
+                value = json.dumps(value)
+            
             updates.append(f"{field} = %s")
             params.append(value)
             
