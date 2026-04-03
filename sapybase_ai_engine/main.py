@@ -154,11 +154,11 @@ PLAN_LIMITS = {
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
-    "FREE":       "gemini-2.5-flash-lite", 
-    "BASIC":      "gemini-2.5-flash-lite", 
-    "STARTER":    "gemini-2.5-flash", 
-    "PRO":        "gemini-2.5-pro", 
-    "ENTERPRISE": "gemini-2.5-pro",
+    "FREE":       "gemini-3.1-flash-lite-preview", 
+    "BASIC":      "gemini-3.1-flash-lite-preview",  # 2026 Champion Logic
+    "STARTER":    "gemini-3.1-flash-preview", 
+    "PRO":        "gemini-3.1-pro-preview",         # 2026 Flagship Logic
+    "ENTERPRISE": "gemini-3.1-pro-preview",
 }
 
 def get_tier_model(tier: str, company_model: str = None):
@@ -166,7 +166,7 @@ def get_tier_model(tier: str, company_model: str = None):
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
     """
-    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-1.5-flash-latest")
+    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-3.1-flash-lite-preview")
     
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
     # Output tokens are expensive. We cap them based on user tier to prevent
@@ -244,7 +244,7 @@ async def startup_event():
     if redis_url:
         try:
             # Normalize redis:// vs rediss:// if needed
-            r = redis.from_url(redis_url, encoding="utf8", decode_responses=True)
+            r = redis.from_url(redis_url, encoding="utf8", decode_responses=False)
             # CRITICAL: Verify connectivity immediately to catch AuthenticationError at start
             await r.ping()
             FastAPICache.init(RedisBackend(r), prefix="sapybase-cache")
