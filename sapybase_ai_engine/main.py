@@ -1703,8 +1703,32 @@ async def polar_webhook(request: Request):
         print("WEBHOOK ERROR: Missing webhook-id header")
         return {"status": "ignored"}
 
-    event_type = event.type
-    data = event.data
+    # The polar SDK returns strongly-typed Pydantic objects, not plain dicts.
+    # We must inspect the class name to determine the event type reliably.
+    # e.g. WebhookOrderPaidPayload, WebhookSubscriptionCreatedPayload, etc.
+    event_class = type(event).__name__
+    print(f"DEBUG: POLAR WEBHOOK - Class={event_class}")
+
+    if "OrderPaid" in event_class or "OrderCreated" in event_class:
+        event_type = "order.paid"
+        data = event.data
+    elif "SubscriptionCreated" in event_class:
+        event_type = "subscription.created"
+        data = event.data
+    elif "SubscriptionUpdated" in event_class:
+        event_type = "subscription.updated"
+        data = event.data
+    elif "SubscriptionActive" in event_class:
+        event_type = "subscription.active"
+        data = event.data
+    elif "SubscriptionRevoked" in event_class or "SubscriptionCanceled" in event_class:
+        event_type = "subscription.revoked"
+        data = event.data
+    else:
+        # Fallback: try event.type if it exists, otherwise log and ignore
+        event_type = getattr(event, "type", None) or event_class
+        data = getattr(event, "data", event)
+        print(f"POLAR WEBHOOK: Unhandled event class: {event_class}, treating as: {event_type}")
 
     # Extract customer email
     customer_email = ""
