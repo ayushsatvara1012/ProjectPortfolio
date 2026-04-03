@@ -1673,68 +1673,18 @@ async def clerk_webhook(
 @app.post("/api/webhooks/polar")
 async def polar_webhook(request: Request):
     """
-    Issue #9: Polar Webhook Secret Handling.
-    Uses the svix library directly with the full polar_whs_ secret.
+    Polar Webhook Handler - Uses polar_sdk.webhooks.validate_event for signature verification.
     """
-    if not POLAR_WEBHOOK_SECRET: raise HTTPException(status_code=500, detail="Missing secret")
-    
+    if not POLAR_WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Missing webhook secret")
+
     payload = await request.body()
-    headers = request.headers
-    
-    # Extract headers with safe fallbacks to prevent None values
-    svix_headers = {
-        "webhook-id": headers.get("webhook-id") or headers.get("svix-id", ""),
-        "webhook-signature": headers.get("webhook-signature") or headers.get("svix-signature", ""),
-        "webhook-timestamp": headers.get("webhook-timestamp") or headers.get("svix-timestamp", ""),
-    }
+    headers = dict(request.headers)
 
-    # Fallback to svix- prefixes if webhook- headers are missing
-    if not svix_headers["webhook-id"]:
-        svix_headers = {
-            "svix-id": headers.get("svix-id") or headers.get("webhook-id", ""),
-            "svix-signature": headers.get("svix-signature") or headers.get("webhook-signature", ""),
-            "svix-timestamp": headers.get("svix-timestamp") or headers.get("webhook-timestamp", ""),
-        }
-
-    # DEBUG: Log exact verification inputs
-    secret_to_log = f"{POLAR_WEBHOOK_SECRET[:10]}...{POLAR_WEBHOOK_SECRET[-5:]}" if POLAR_WEBHOOK_SECRET else "MISSING"
+    secret_to_log = f"{POLAR_WEBHOOK_SECRET[:10]}...{POLAR_WEBHOOK_SECRET[-5:]}"
     print(f"DEBUG WEBHOOK - Secret (Masked): {secret_to_log}")
-    print(f"DEBUG WEBHOOK - Headers: {json.dumps(svix_headers)}")
     print(f"DEBUG WEBHOOK - Payload Size: {len(payload)}")
 
-    # TRY MULTIPLE SECRET FORMATS
-    secrets_to_try = [POLAR_WEBHOOK_SECRET]
-    if POLAR_WEBHOOK_SECRET.startswith("polar_whs_"):
-        secrets_to_try.append(POLAR_WEBHOOK_SECRET.replace("polar_whs_", ""))
-    
-    # Also try stripping any potential random whitespace/quotes from the secret
-    secrets_to_try.append(POLAR_WEBHOOK_SECRET.strip().strip('"').strip("'"))
-
-    msg = None
-    last_error = None
-
-    # Normalize payload: Some environments add a trailing newline to the raw body
-    payload_variants = [payload, payload.strip()]
-
-    print(f"WEBHOOK DEBUG: Trying {len(secrets_to_try)} secret formats and {len(payload_variants)} payload variants...")
-
-    for i, secret in enumerate(secrets_to_try):
-        if not secret: continue
-        try:
-            wh = Webhook(secret)
-            for j, p in enumerate(payload_variants):
-                try:
-                    msg = wh.verify(p, svix_headers)
-                    print(f"WEBHOOK SUCCESS: Verified with secret index {i}, variant {j}")
-                    payload = p # Use the verified payload
-                    break
-                except WebhookVerificationError as e:
-                    last_error = str(e)
-                    # print(f"WEBHOOK DEBUG: Format {i}, Variant {j} failed: {e}")
-                    continue
-                except Exception as e:
-                    last_error = str(e)
-                    continue
     try:
         event = validate_event(
             payload=payload,
@@ -1743,77 +1693,79 @@ async def polar_webhook(request: Request):
         )
     except WebhookVerificationError as e:
         print(f"WEBHOOK ERROR: Signature verification failed: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+        raise HTTPException(status_code=400, detail="Invalid signature")
     except Exception as e:
         print(f"WEBHOOK ERROR: Unexpected error during verification: {e}")
         raise HTTPException(status_code=400, detail="Webhook error")
 
-    # event is now a typed Polar event object
     webhook_id = headers.get("webhook-id")
     if not webhook_id:
         print("WEBHOOK ERROR: Missing webhook-id header")
         return {"status": "ignored"}
 
-    # ── LOGGING OVERLOAD (For Debugging Identifying Issues) ────────────────────
-    customer_email = (data.get("customer_email") or data.get("customer", {}).get("email") or "").lower().strip()
-    
-    # Try every possible path for Clerk ID (customer_external_id)
-    clerk_id = (
-        data.get("metadata", {}).get("customer_external_id") or
-        data.get("metadata", {}).get("external_customer_id") or
-        (data.get("customer") if isinstance(data.get("customer"), dict) else {}).get("external_id") or
-        data.get("customer_external_id") or
-        data.get("external_customer_id")
-    )
-    
+    event_type = event.type
+    data = event.data
+
+    # Extract customer email
+    customer_email = ""
+    if hasattr(data, "customer_email") and data.customer_email:
+        customer_email = data.customer_email.lower().strip()
+    elif hasattr(data, "customer") and data.customer:
+        customer_email = (getattr(data.customer, "email", "") or "").lower().strip()
+
+    # Extract Clerk ID
+    clerk_id = None
+    if hasattr(data, "customer") and data.customer:
+        clerk_id = getattr(data.customer, "external_id", None)
+    if not clerk_id and hasattr(data, "metadata") and data.metadata:
+        clerk_id = (
+            data.metadata.get("customer_external_id") or
+            data.metadata.get("external_customer_id")
+        )
+
     print(f"DEBUG: POLAR WEBHOOK - Event={event_type}")
-    print(f"DEBUG: POLAR WEBHOOK - IDs in payload: customer_id={data.get('customer_id')}, email={customer_email}, external_id_found={clerk_id}")
-    
+    print(f"DEBUG: POLAR WEBHOOK - email={customer_email}, clerk_id={clerk_id}")
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
-        # Identification Fallback: Look up by email if no external ID was passed
+
         if not clerk_id and customer_email:
             cursor.execute("SELECT clerk_id FROM users WHERE LOWER(email) = %s", (customer_email,))
             user_row = cursor.fetchone()
             if user_row:
                 clerk_id = user_row[0]
-                print(f"DEBUG: POLAR WEBHOOK - Identified ClerkID via email lookup: {clerk_id}")
+                print(f"DEBUG: Identified ClerkID via email: {clerk_id}")
             else:
                 clerk_id = f"pending_{customer_email}"
-                print(f"DEBUG: POLAR WEBHOOK - Created pending placeholder: {clerk_id}")
+                print(f"DEBUG: Created pending placeholder: {clerk_id}")
 
         if not clerk_id:
             print("POLAR WEBHOOK ERROR: No way to identify user. Dropping event.")
             return {"status": "ignored"}
 
-        if event_type in ["subscription.created", "subscription.updated", "subscription.active", "order.created", "order.paid"]:
-            # Handle checkouts too (sometimes Polar sends this before subscription)
-            product = data.get("product", {})
-            product_name = product.get("name", "").upper() if isinstance(product, dict) else ""
-            
-            # Map Polar product name to internal tier (BASIC, STARTER, PRO)
+        if event_type in ["subscription.created", "subscription.updated",
+                          "subscription.active", "order.created", "order.paid"]:
+
+            product = getattr(data, "product", None)
+            product_name = (getattr(product, "name", "") or "").upper() if product else ""
+
             if "PRO" in product_name:
                 tier = "PRO"
             elif "STARTER" in product_name:
                 tier = "STARTER"
-            elif "BASIC" in product_name:
-                tier = "BASIC"
             else:
                 tier = "BASIC"
-            
-            print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name}")
-            
-            period_end = data.get("current_period_end")
-            customer_email = (
-                data.get("customer_email") or 
-                data.get("customer", {}).get("email") or
-                f"polar_{data.get('customer_id', 'unknown')}@placeholder.invalid"
-            )
-            status = "CANCELED" if data.get("cancel_at_period_end") else "ACTIVE"
 
-            # UPSERT: idempotent subscription state update
+            print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name}")
+
+            period_end = getattr(data, "current_period_end", None)
+            customer_id = getattr(data, "customer_id", None)
+            status = "CANCELED" if getattr(data, "cancel_at_period_end", False) else "ACTIVE"
+
+            if not customer_email:
+                customer_email = f"polar_{customer_id or 'unknown'}@placeholder.invalid"
+
             cursor.execute(
                 """
                 INSERT INTO users (clerk_id, email, tier, subscription_status, polar_customer_id, billing_period_end)
@@ -1823,15 +1775,16 @@ async def polar_webhook(request: Request):
                     subscription_status = EXCLUDED.subscription_status,
                     polar_customer_id = EXCLUDED.polar_customer_id,
                     billing_period_end = EXCLUDED.billing_period_end,
-                    email = CASE 
-                        WHEN users.email = 'unknown@email.com' OR users.email IS NULL THEN EXCLUDED.email 
-                        ELSE users.email 
+                    email = CASE
+                        WHEN users.email = 'unknown@email.com' OR users.email IS NULL
+                        THEN EXCLUDED.email
+                        ELSE users.email
                     END
                 RETURNING id
                 """,
-                (clerk_id, customer_email, tier, status, data.get("customer_id"), period_end)
+                (clerk_id, customer_email, tier, status, customer_id, period_end)
             )
-            row = cursor.fetchone()
+
         elif event_type == "subscription.revoked":
             cursor.execute(
                 "UPDATE users SET tier = 'FREE', subscription_status = 'CANCELED' WHERE clerk_id = %s",
@@ -1840,8 +1793,10 @@ async def polar_webhook(request: Request):
 
         conn.commit()
         return {"status": "success"}
+
     except Exception as e:
-        if conn: conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"POLAR WEBHOOK CRITICAL ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
