@@ -154,7 +154,7 @@ PLAN_LIMITS = {
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
-    "FREE":       "gemini-1.5-flash-latest", 
+    "FREE":       "gemini-2.5-flash-lite", 
     "BASIC":      "gemini-2.5-flash-lite", 
     "STARTER":    "gemini-2.5-flash", 
     "PRO":        "gemini-2.5-pro", 
