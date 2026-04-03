@@ -115,7 +115,7 @@ const ServicesCatalog = () => {
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pt-24 pb-20 transition-colors duration-500">
         
         {/* Header Section */}
-        <header className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto mb-16 lg:mb-24 flex flex-col lg:flex-row items-start justify-between gap-12 pt-12">
+        <header className="px-6 md:px-8 max-w-8xl mx-auto mb-16 lg:mb-24 flex flex-col lg:flex-row items-start justify-between gap-12 pt-12">
           <div className="space-y-6 flex-1 max-w-2xl">
             <button
               onClick={() => navigate('/')}

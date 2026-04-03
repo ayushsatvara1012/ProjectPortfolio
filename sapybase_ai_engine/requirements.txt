@@ -16,3 +16,6 @@ python-jose[cryptography]
 slowapi
 clerk-backend-api
 httpx
+redis
+fastapi-cache2[redis]
+limits
