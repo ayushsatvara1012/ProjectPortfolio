@@ -215,7 +215,7 @@ export const CustomizeSection = () => {
                                         </button>
                                     </div>
                                     <div className="space-y-3">
-                                        {botSettings.quickQuestions.map((q, idx) => (
+                                        {(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []).map((q, idx) => (
                                             <div key={idx} className="p-4 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 space-y-3 relative group transition-colors">
                                                 <button 
                                                     onClick={() => {

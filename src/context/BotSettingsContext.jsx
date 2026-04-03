@@ -33,11 +33,15 @@ export const BotSettingsProvider = ({ children }) => {
             });
             const data = await res.json();
             if (res.ok && data.company) {
+                const parsedQuickQuestions = typeof data.company.quick_questions === 'string'
+                    ? JSON.parse(data.company.quick_questions)
+                    : (data.company.quick_questions || []);
+
                 setBotSettings({
                     name: data.company.bot_name || 'SaPyBase AI',
                     primaryColor: data.company.theme_color || '#5730F5',
                     greeting: data.company.initial_message || 'Hi! How can I help you today?',
-                    quickQuestions: data.company.quick_questions || [],
+                    quickQuestions: Array.isArray(parsedQuickQuestions) ? parsedQuickQuestions : [],
                     companyTone: data.company.company_tone ? data.company.company_tone.split(',') : [],
                     systemPrompt: data.company.system_prompt || '',
                     aiModel: data.company.ai_model || '',
