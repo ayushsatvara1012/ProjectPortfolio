@@ -154,24 +154,36 @@ PLAN_LIMITS = {
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
-    "FREE":       "gemini-1.5-flash-8b", 
-    "BASIC":      "gemini-1.5-flash-8b",  # Max Profit
-    "STARTER":    "gemini-1.5-flash",     # Priority Speed
-    "PRO":        "gemini-1.5-pro",       # Dedicated Reasoning
-    "ENTERPRISE": "gemini-1.5-pro",
+    "FREE":       "gemini-1.5-flash-latest", 
+    "BASIC":      "gemini-2.5-flash-lite", 
+    "STARTER":    "gemini-2.5-flash", 
+    "PRO":        "gemini-2.5-pro", 
+    "ENTERPRISE": "gemini-2.5-pro",
 }
 
 def get_tier_model(tier: str, company_model: str = None):
     """
     Factory to returned initialized model for a specific tier.
-    Prioritizes company_model override (Super Admin feature).
-    Defaults to flash-8b for optimal base cost.
+    Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
     """
-    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-1.5-flash-8b")
+    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-1.5-flash-latest")
+    
+    # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
+    # Output tokens are expensive. We cap them based on user tier to prevent
+    # unintentional overruns while keeping the interface snappy.
+    token_limits = {
+        "FREE": 400,
+        "BASIC": 600,
+        "STARTER": 800,
+        "PRO": 1200,
+        "ENTERPRISE": 2048
+    }
+    max_tokens = token_limits.get(tier or "FREE", 600)
+
     return ChatGoogleGenerativeAI(
         model=model_name,
         google_api_key=GEMINI_KEY,
-        max_output_tokens=800,
+        max_output_tokens=max_tokens,
         temperature=0.7,
     )
 
@@ -220,6 +232,7 @@ limiter = Limiter(
     key_func=get_limit_key,
     default_limits=["200/hour"],  # Global Catch-All: prevents distributed volumetric attacks
     storage_uri=_limiter_storage,
+    in_memory_fallback_enabled=True, # Resiliency: Fallback if Redis is down/auth fails
 )
 app.state.limiter = limiter
 
@@ -232,10 +245,16 @@ async def startup_event():
         try:
             # Normalize redis:// vs rediss:// if needed
             r = redis.from_url(redis_url, encoding="utf8", decode_responses=True)
+            # CRITICAL: Verify connectivity immediately to catch AuthenticationError at start
+            await r.ping()
             FastAPICache.init(RedisBackend(r), prefix="sapybase-cache")
             print("CACHE: FastAPI Cache initialized with Redis.")
         except Exception as e:
-            print(f"CACHE WARNING: Redis cache initialization failed ({e}). Running without cache.")
+            msg = str(e).lower()
+            if "invalid username-password" in msg or "authentication" in msg:
+                print(f"CACHE CRITICAL: Redis Authentication failed. Check your REDIS_URL credentials. Fallback enabled.")
+            else:
+                print(f"CACHE WARNING: Redis cache initialization failed ({e}). Running without cache.")
     else:
         print("CACHE: Running without Redis cache (REDIS_URL not set).")
 
