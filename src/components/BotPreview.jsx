@@ -100,7 +100,7 @@ const BotPreview = ({ theme = 'light' }) => {
                 {/* ── Footer ────────────────────────────────────────────── */}
                 <div className={`backdrop-blur-2xl border-t shrink-0 p-4 pt-2 ${isDark ? 'bg-slate-900/95 border-slate-800/50' : 'bg-white/95 border-gray-200/50'}`}>
                     <div className="pb-4 flex gap-2 overflow-x-auto no-scrollbar">
-                        {(botSettings.quickQuestions || []).filter(q => q.label).map((q, idx) => (
+                        {(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []).filter(q => q.label).map((q, idx) => (
                             <button key={idx}
                                 className={`shrink-0 px-4 py-2 border text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-all active:scale-95 whitespace-nowrap shadow-sm ${isDark ? 'bg-slate-800 hover:opacity-80' : 'bg-white hover:opacity-80'}`}
                                 style={{ 

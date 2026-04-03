@@ -759,6 +759,14 @@ def get_company_by_clerk_id(clerk_id: str):
         if not company_row:
             return None
 
+        def safe_json_loads(val):
+            if isinstance(val, str):
+                try:
+                    return json.loads(val)
+                except:
+                    return []
+            return val or []
+
         return {
             "id": company_row[0],
             "company_name": company_row[1],
@@ -769,7 +777,7 @@ def get_company_by_clerk_id(clerk_id: str):
             "bot_name": company_row[6],
             "logo_url": company_row[7],
             "initial_message": company_row[8],
-            "quick_questions": company_row[9],
+            "quick_questions": safe_json_loads(company_row[9]), # Safe parsing
             "system_prompt": company_row[10]
         }
     finally:
