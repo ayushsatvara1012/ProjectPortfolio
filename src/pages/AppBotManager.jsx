@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Plus, Trash2, Lock, Activity, ChevronRight, Zap } from 'lucide-react';
 import { useUserRole } from '../context/UserContext';
 import { SkeletonBase } from '../components/SkeletonLoader';
 import UpgradePrompt from '../components/UpgradePrompt';
-import { useApiCall } from '../hooks/useApiCall';
+import { useAuthenticatedFetch, UpgradeError } from '../hooks/useApiCall';
 
 const SPEED_BADGE = {
   standard:  { label: 'Standard',  cls: 'text-slate-500 bg-slate-50 border-slate-200' },
@@ -16,53 +16,41 @@ const SPEED_BADGE = {
 };
 
 const AppBotManager = () => {
-  const { getToken } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { userTier, isLoading: ctxLoading } = useUserRole();
-  const [bots, setBots] = useState([]);
-  const [plan, setPlan] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState(null);
-  const { call, upgradeError, clearError } = useApiCall();
-  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const authFetch = useAuthenticatedFetch();
 
-  const fetchBots = async () => {
-    setIsLoading(true);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${baseUrl}/api/companies`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBots(data.bots || []);
-        setPlan(data.plan || null);
-      }
-    } catch (e) {
-      console.error('Failed to fetch bots:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // ── useQuery: fetch bots + plan ──────────────────────────────────────────────
+  const {
+    data: botsData,
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ['bots'],
+    queryFn: () => authFetch('/api/companies'),
+  });
 
-  useEffect(() => { fetchBots(); }, []);
+  const bots = botsData?.bots || [];
+  const plan = botsData?.plan || null;
 
-  const handleDelete = async (botId, botName) => {
+  // Surface 402 UpgradeError from the query error
+  const upgradeError = queryError instanceof UpgradeError ? queryError : null;
+
+  // ── useMutation: delete bot ─────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: (botId) => authFetch(`/api/companies/${botId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bots'] });
+    },
+  });
+
+  const handleDelete = (botId, botName) => {
     if (!window.confirm(`Delete "${botName}"? This will deactivate the bot and its API key.`)) return;
-    setDeletingId(botId);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${baseUrl}/api/companies/${botId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) await fetchBots();
-    } catch (e) {
-      console.error('Delete failed:', e);
-    } finally {
-      setDeletingId(null);
-    }
+    deleteMutation.mutate(botId);
   };
+
+  const deletingId = deleteMutation.isPending ? deleteMutation.variables : null;
 
   const canAdd = plan && plan.can_add_more;
   const speedInfo = SPEED_BADGE[plan?.speed_tier || 'none'];
@@ -188,7 +176,7 @@ const AppBotManager = () => {
                       </button>
                       <button
                         onClick={() => handleDelete(bot.id, bot.bot_name)}
-                        disabled={deletingId === bot.id}
+                        disabled={deletingId === bot.id || deleteMutation.isPending}
                         className="p-2 border border-red-100 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -263,7 +251,7 @@ const AppBotManager = () => {
           tier={upgradeError.tier}
           current={upgradeError.current}
           limit={upgradeError.limit}
-          onDismiss={clearError}
+          onDismiss={() => {}}
         />
       )}
     </div>

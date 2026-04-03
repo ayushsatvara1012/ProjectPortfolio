@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     Users, Building2, Shield, Settings, Trash2, Edit3,
@@ -7,87 +7,84 @@ import {
     ShieldCheck, Zap
 } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { useUser } from '@clerk/clerk-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '../context/UserContext';
+import { useAuthenticatedFetch } from '../hooks/useApiCall';
 
 const AdminDashboard = () => {
-    const { getToken } = useAuth();
     const { user, isLoaded: isUserLoaded } = useUser();
-    const [users, setUsers] = useState([]);
-    const [companies, setCompanies] = useState([]);
-    const [stats, setStats] = useState({ total_users: 0, total_companies: 0 });
-    const [isLoading, setIsLoading] = useState(true);
-    const [isActionLoading, setIsActionLoading] = useState(false);
+    const queryClient = useQueryClient();
     const { userRole } = useUserRole();
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState('users'); // 'users' or 'companies'
+    const [activeTab, setActiveTab] = useState('users');
+    const authFetch = useAuthenticatedFetch();
 
-    useEffect(() => {
-        if (isUserLoaded && user) {
-            fetchAdminData();
-        }
-    }, [isUserLoaded, user, getToken]);
+    // ── useQuery: 3 parallel admin queries ────────────────────────────────────
+    const usersQuery = useQuery({
+        queryKey: ['admin', 'users'],
+        queryFn: () => authFetch('/api/admin/users'),
+        enabled: isUserLoaded && !!user,
+    });
 
-    const fetchAdminData = async () => {
-        setIsLoading(true);
-        try {
-            const token = await getToken();
-            const baseUrl = import.meta.env.VITE_API_URL || '';
+    const companiesQuery = useQuery({
+        queryKey: ['admin', 'companies'],
+        queryFn: () => authFetch('/api/admin/companies'),
+        enabled: isUserLoaded && !!user,
+    });
 
-            const [usersRes, companiesRes, statsRes] = await Promise.all([
-                fetch(`${baseUrl}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${baseUrl}/api/admin/companies`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${baseUrl}/api/admin/stats`, { headers: { 'Authorization': `Bearer ${token}` } })
-            ]);
+    const statsQuery = useQuery({
+        queryKey: ['admin', 'stats'],
+        queryFn: () => authFetch('/api/admin/stats'),
+        enabled: isUserLoaded && !!user,
+    });
 
-            if (usersRes.ok) setUsers(await usersRes.json());
-            if (companiesRes.ok) setCompanies(await companiesRes.json());
-            if (statsRes.ok) setStats(await statsRes.json());
-        } catch (error) {
-            console.error("Error fetching admin data:", error);
-        } finally {
-            setIsLoading(false);
-        }
+    const users = usersQuery.data || [];
+    const companies = companiesQuery.data || [];
+    const stats = statsQuery.data || { total_users: 0, total_companies: 0 };
+    const isLoading = usersQuery.isLoading || companiesQuery.isLoading || statsQuery.isLoading;
+
+    const refetchAll = () => {
+        usersQuery.refetch();
+        companiesQuery.refetch();
+        statsQuery.refetch();
     };
 
-    const handleUpdateUser = async (clerkId, field, value) => {
-        setIsActionLoading(true);
-        try {
-            const token = await getToken();
-            const baseUrl = import.meta.env.VITE_API_URL || '';
-            const res = await fetch(`${baseUrl}/api/admin/users/${clerkId}`, {
+    // ── useMutation: update user tier ──────────────────────────────────────
+    const updateUserMutation = useMutation({
+        mutationFn: ({ clerkId, field, value }) =>
+            authFetch(`/api/admin/users/${clerkId}`, {
                 method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ [field]: value })
-            });
-            if (res.ok) await fetchAdminData();
-        } catch (error) {
-            console.error("Error updating user:", error);
-        } finally {
-            setIsActionLoading(false);
-        }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: value }),
+            }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+            queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+        },
+    });
+
+    const handleUpdateUser = (clerkId, field, value) => {
+        updateUserMutation.mutate({ clerkId, field, value });
     };
 
-    const handleDeleteCompany = async (companyId) => {
+    // ── useMutation: delete company ───────────────────────────────────────
+    const deleteCompanyMutation = useMutation({
+        mutationFn: (companyId) =>
+            authFetch(`/api/admin/companies/${companyId}`, { method: 'DELETE' }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin', 'companies'] });
+            queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+            queryClient.invalidateQueries({ queryKey: ['bots'] });
+        },
+    });
+
+    const handleDeleteCompany = (companyId) => {
         if (!window.confirm("Are you sure you want to delete this company? All knowledge data will be lost.")) return;
-        setIsActionLoading(true);
-        try {
-            const token = await getToken();
-            const baseUrl = import.meta.env.VITE_API_URL || '';
-            const res = await fetch(`${baseUrl}/api/admin/companies/${companyId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) await fetchAdminData();
-        } catch (error) {
-            console.error("Error deleting company:", error);
-        } finally {
-            setIsActionLoading(false);
-        }
+        deleteCompanyMutation.mutate(companyId);
     };
+
+    const isActionLoading = updateUserMutation.isPending || deleteCompanyMutation.isPending;
 
     const filteredUsers = users.filter(u =>
         u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,7 +123,7 @@ const AdminDashboard = () => {
                         />
                     </div>
                     <button 
-                        onClick={fetchAdminData} 
+                        onClick={refetchAll} 
                         disabled={isLoading}
                         className="p-3 bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 disabled:opacity-50 transition-colors"
                     >

@@ -5,10 +5,12 @@ import {
 } from 'lucide-react';
 import Alert from '../components/alert';
 import { useAuth } from '@clerk/clerk-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useUserRole } from '../context/UserContext';
 import UpgradePrompt from '../components/UpgradePrompt';
+import { useAuthenticatedFetch, UpgradeError } from '../hooks/useApiCall';
 
 const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
 const TABS = [
@@ -24,11 +26,13 @@ const labelCls = "block text-md font-display uppercase tracking-widest text-slat
 
 const AppTrainAI = () => {
     const { getToken } = useAuth();
+    const queryClient = useQueryClient();
     const {
         userTier, isLoading: ctxLoading,
         messagesUsed, messageLimit, billingPeriodEnd,
         totalDocuments, totalMessages
     } = useUserRole();
+    const authFetch = useAuthenticatedFetch();
 
     const [activeTab, setActiveTab] = useState('url');
     const [url, setUrl] = useState('');
@@ -36,29 +40,27 @@ const AppTrainAI = () => {
     const [trainingText, setTrainingText] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
-    const [isTraining, setIsTraining] = useState(false);
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
-    const [bots, setBots] = useState([]);
     const [selectedBotId, setSelectedBotId] = useState('');
     const [upgradeError, setUpgradeError] = useState(null);
 
     const fileRef = useRef(null);
     const baseUrl = import.meta.env.VITE_API_URL || '';
 
+    // ── useQuery: shared ['bots'] cache with AppBotManager ─────────────────
+    const { data: botsData } = useQuery({
+        queryKey: ['bots'],
+        queryFn: () => authFetch('/api/companies'),
+    });
+
+    const bots = botsData?.bots || [];
+
+    // Auto-select first bot when data arrives
     useEffect(() => {
-        const fetchBots = async () => {
-            const token = await getToken();
-            const res = await fetch(`${baseUrl}/api/companies`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setBots(data.bots || []);
-                if (data.bots?.length > 0) setSelectedBotId(data.bots[0].id);
-            }
-        };
-        fetchBots();
-    }, []);
+        if (bots.length > 0 && !selectedBotId) {
+            setSelectedBotId(bots[0].id);
+        }
+    }, [bots, selectedBotId]);
 
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier);
     const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'BASIC' || userTier === 'STARTER') && messagesUsed >= messageLimit;
@@ -68,11 +70,9 @@ const AppTrainAI = () => {
         setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
     };
 
-    const handleTrain = async (e) => {
-        e.preventDefault();
-        if (!url.trim() && !file && !trainingText.trim()) { showAlert('error', 'Provide a URL, PDF file, or manual text.'); return; }
-        setIsTraining(true);
-        try {
+    // ── useMutation: train AI ──────────────────────────────────────────────────
+    const trainMutation = useMutation({
+        mutationFn: async () => {
             const token = await getToken();
             const fd = new FormData();
             if (url.trim()) fd.append('url', url.trim());
@@ -80,29 +80,50 @@ const AppTrainAI = () => {
             if (trainingText.trim()) fd.append('text', trainingText.trim());
             if (apiKey.trim()) fd.append('api_key', apiKey.trim());
             if (selectedBotId) fd.append('company_id', selectedBotId);
+            // Use raw fetch for FormData (authFetch would set Content-Type incorrectly)
             const res = await fetch(`${baseUrl}/api/train`, {
-                method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd,
             });
             const data = await res.json();
             if (!res.ok) {
                 if (res.status === 402) {
                     const detail = data?.detail;
-                    setUpgradeError(
-                        typeof detail === 'object' && detail?.code
-                            ? detail
-                            : { code: 'CHUNK_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Chunk limit reached.', tier: '', current: null, limit: null }
-                    );
-                    return;
+                    const errDetail = typeof detail === 'object' && detail?.code
+                        ? detail
+                        : { code: 'CHUNK_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Chunk limit reached.', tier: '', current: null, limit: null };
+                    throw new UpgradeError(errDetail);
                 }
                 throw new Error(data.detail?.message || data.detail || 'Training failed.');
             }
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['bots'] });
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
             setUrl(''); setTrainingText(''); setFile(null);
             if (fileRef.current) fileRef.current.value = '';
-        } catch (err) {
-            showAlert('error', err.message);
-        } finally { setIsTraining(false); }
+        },
+        onError: (err) => {
+            if (err instanceof UpgradeError) {
+                setUpgradeError(err);
+            } else {
+                showAlert('error', err.message);
+            }
+        },
+    });
+
+    const handleTrain = (e) => {
+        e.preventDefault();
+        if (!url.trim() && !file && !trainingText.trim()) {
+            showAlert('error', 'Provide a URL, PDF file, or manual text.');
+            return;
+        }
+        trainMutation.mutate();
     };
+
+    const isTraining = trainMutation.isPending;
 
     const periodEndStr = billingPeriodEnd
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';

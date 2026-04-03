@@ -5,24 +5,27 @@ import {
     ChevronDown, Shield, Bot, Lock
 } from 'lucide-react';
 import { SignedIn, SignedOut, SignUp, useUser, useAuth } from '@clerk/clerk-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import Alert from '../components/alert';
 import { useUserRole } from '../context/UserContext';
 import UpgradePrompt from '../components/UpgradePrompt';
 import BotIntegrationDocs from '../components/BotIntegrationDocs';
+import { useAuthenticatedFetch, UpgradeError } from '../hooks/useApiCall';
 
 const AppRegistration = () => {
     const { user } = useUser();
     const { getToken } = useAuth();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { userTier } = useUserRole();
+    const authFetch = useAuthenticatedFetch();
 
     const [formData, setFormData] = useState({
         companyName: '', allowedOrigin: '',
         themeColor: '#5730F5', companyTone: 'Professional and helpful'
     });
-    const [isLoading, setIsLoading] = useState(false);
     const [registrationData, setRegistrationData] = useState(null);
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const [copied, setCopied] = useState(false);
@@ -87,47 +90,47 @@ const AppRegistration = () => {
 
     const handleChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-    const handleSubmit = async (e) => {
+    // ── useMutation: create bot (register tenant) ─────────────────────────────
+    const registerMutation = useMutation({
+        mutationFn: (payload) =>
+            authFetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            }),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['bots'] });
+            setRegistrationData({
+                apiKey: data.api_key,
+                companyName: formData.companyName,
+                allowedOrigin: data.allowed_origin,
+            });
+            showAlert('success', data.message || 'Registration successful!');
+        },
+        onError: (err) => {
+            if (err instanceof UpgradeError) {
+                setUpgradeError(err);
+            } else {
+                showAlert('error', err.message);
+            }
+        },
+    });
+
+    const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.companyName.trim() || !formData.allowedOrigin.trim()) {
             showAlert('error', 'Company Name and Allowed Origin are required.');
             return;
         }
-        setIsLoading(true);
-        try {
-            const token = await getToken();
-            const baseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'https://sapyai.onrender.com';
-            const res = await fetch(`${baseUrl}/api/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({
-                    company_name: formData.companyName,
-                    allowed_origin: formData.allowedOrigin,
-                    theme_color: formData.themeColor,
-                    company_tone: formData.companyTone,
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                if (res.status === 402) {
-                    const detail = data?.detail;
-                    setUpgradeError(
-                        typeof detail === 'object' && detail?.code
-                            ? detail
-                            : { code: 'BOT_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Bot limit reached.', tier: '', current: null, limit: null }
-                    );
-                    return;
-                }
-                throw new Error(data.detail?.message || data.detail || data.message || 'Registration failed.');
-            }
-            setRegistrationData({ apiKey: data.api_key, companyName: formData.companyName, allowedOrigin: data.allowed_origin });
-            showAlert('success', data.message || 'Registration successful!');
-        } catch (err) {
-            showAlert('error', err.message);
-        } finally {
-            setIsLoading(false);
-        }
+        registerMutation.mutate({
+            company_name: formData.companyName,
+            allowed_origin: formData.allowedOrigin,
+            theme_color: formData.themeColor,
+            company_tone: formData.companyTone,
+        });
     };
+
+    const isLoading = registerMutation.isPending;
 
     const handleReset = () => {
         setRegistrationData(null);
