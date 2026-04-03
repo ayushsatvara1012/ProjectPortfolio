@@ -1715,20 +1715,28 @@ async def polar_webhook(request: Request):
     # Normalize payload: Some environments add a trailing newline to the raw body
     payload_variants = [payload, payload.strip()]
 
-    for secret in secrets_to_try:
+    print(f"WEBHOOK DEBUG: Trying {len(secrets_to_try)} secret formats and {len(payload_variants)} payload variants...")
+
+    for i, secret in enumerate(secrets_to_try):
+        if not secret: continue
         try:
             wh = Webhook(secret)
-            for p in payload_variants:
+            for j, p in enumerate(payload_variants):
                 try:
                     msg = wh.verify(p, svix_headers)
-                    print(f"WEBHOOK SUCCESS: Verified with secret format starting with {secret[:12]}")
+                    print(f"WEBHOOK SUCCESS: Verified with secret index {i}, variant {j}")
                     payload = p # Use the verified payload
                     break
-                except:
+                except WebhookVerificationError as e:
+                    last_error = str(e)
+                    # print(f"WEBHOOK DEBUG: Format {i}, Variant {j} failed: {e}")
+                    continue
+                except Exception as e:
+                    last_error = str(e)
                     continue
             if msg: break
         except Exception as e:
-            last_error = e
+            last_error = f"Webhook init failed: {str(e)}"
             continue
 
     # SECURE BYPASS FOR DEBUGGING (Development only)
