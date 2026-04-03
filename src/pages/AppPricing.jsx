@@ -7,9 +7,9 @@ import { useUserRole } from '../context/UserContext';
 import Alert from '../components/alert';
 
 const POLAR_URLS = {
-    BASIC: import.meta.env.VITE_POLAR_BASIC_URL || `https://buy.polar.sh/polar_cl_4EEEDCpTUdQUPg5UPkwUbEes1dSOYY5WoPUyM2gLFR9`,
-    STARTER: import.meta.env.VITE_POLAR_STARTER_URL || `https://buy.polar.sh/polar_cl_YmY07FtF3Xuw9GpwDrdc77o6NAfO4I0RU9USQ09XprN`,
-    PRO: import.meta.env.VITE_POLAR_PRO_URL || `https://buy.polar.sh/polar_cl_jfcUscRnZImTTUHTYnCW8EiM3pHHBC6jdl2Gr3ez0EH`,
+    BASIC: import.meta.env.VITE_POLAR_BASIC_URL,
+    STARTER: import.meta.env.VITE_POLAR_STARTER_URL,
+    PRO: import.meta.env.VITE_POLAR_PRO_URL,
 };
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
@@ -136,23 +136,31 @@ const AppPricing = () => {
         },
     ];
 
-    const handleSelectPlan = async (tier) => {
+    const handleSelectPlan = (tier) => {
         if (!user) { window.location.href = '/sign-in'; return; }
         if (tier === userTier) return;
-        setIsLoading(true); setSelectedTier(tier);
-        try {
-            const returnUrl = `${window.location.origin}/app/register?payment=success`;
-            const url = `${POLAR_URLS[tier]}?customer_external_id=${user.id}&success_url=${encodeURIComponent(returnUrl)}`;
-            
-            // Just before redirecting, give a small visual hint
-            showAlert('development', `Redirecting to Polar for ${tier} activation...`);
-            setTimeout(() => {
-                window.location.href = url;
-            }, 800);
-        } catch (err) { 
-            setIsLoading(false); 
-            showAlert('error', 'Failed to initiate checkout. Please try again or contact support.');
+
+        const checkoutUrl = POLAR_URLS[tier];
+
+        // SAFETY CATCH: If the .env variable is missing, stop the checkout!
+        if (!checkoutUrl) {
+            console.error(`🚨 CRITICAL: Missing Polar Checkout URL for tier: ${tier}`);
+            showAlert('error', 'Billing system is currently down for maintenance. Please try again later.');
+            return;
         }
+
+        setIsLoading(true); setSelectedTier(tier);
+        showAlert('development', `Redirecting to Polar for ${tier} activation...`);
+
+        const returnUrl = `${window.location.origin}/app/register?payment=success`;
+
+        setTimeout(() => {
+            if (user?.id) {
+                window.location.href = `${checkoutUrl}?customer_external_id=${user.id}&success_url=${encodeURIComponent(returnUrl)}`;
+            } else {
+                window.location.href = `${checkoutUrl}?success_url=${encodeURIComponent(returnUrl)}`;
+            }
+        }, 800);
     };
 
     return (
