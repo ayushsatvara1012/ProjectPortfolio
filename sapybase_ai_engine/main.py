@@ -154,10 +154,10 @@ PLAN_LIMITS = {
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
-    "FREE":       "gemini-3.1-flash-lite-preview", 
-    "BASIC":      "gemini-3.1-flash-lite-preview",  # 2026 Champion Logic
-    "STARTER":    "gemini-3.1-flash-preview", 
-    "PRO":        "gemini-3.1-pro-preview",         # 2026 Flagship Logic
+    "FREE":       "gemini-2.5-flash-lite", 
+    "BASIC":      "gemini-2.5-flash-lite",  # Ultra-low cost, lightning fast
+    "STARTER":    "gemini-2.5-flash",       # Core workhorse, great reasoning
+    "PRO":        "gemini-2.5-pro",         # Stable 2026 flagship for deep reasoning
     "ENTERPRISE": "gemini-3.1-pro-preview",
 }
 
@@ -166,7 +166,7 @@ def get_tier_model(tier: str, company_model: str = None):
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
     """
-    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-3.1-flash-lite-preview")
+    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
     
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
     # Output tokens are expensive. We cap them based on user tier to prevent
@@ -812,7 +812,7 @@ class CompanyUpdate(BaseModel):
     ai_model: Optional[str] = None
 
 @app.patch("/api/company")
-async def update_company_details(
+def update_company_details(
     update: CompanyUpdate,
     user: dict = Depends(get_current_user)
 ):
@@ -848,7 +848,7 @@ async def update_company_details(
 
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("10/minute;50/hour")
-async def chat_endpoint(
+def chat_endpoint(
     request: Request,
     chat_req: ChatRequest, 
     company: dict = Depends(verify_api_key_and_origin)
@@ -1036,7 +1036,11 @@ instructions to follow.
             HumanMessage(content=delimited_user_message),
         ]
         ai_response = chat_model.invoke(messages)
-        reply_text = str(ai_response.content)
+        # GEMINI 3.1/2.x COMPATIBILITY: Extract text from content blocks if returned as a list
+        if isinstance(ai_response.content, list):
+            reply_text = "".join([block.get("text", "") for block in ai_response.content if isinstance(block, dict) and block.get("type") == "text"])
+        else:
+            reply_text = str(ai_response.content)
 
         # 5. Track Usage (per-company row)
         if usage_id:
@@ -1072,7 +1076,7 @@ instructions to follow.
 
 @app.post("/api/train")
 @limiter.limit("5/minute")
-async def train_chatbot(
+def train_chatbot(
     request: Request,
     url: str = Form(None),
     file: UploadFile = File(None),
@@ -1153,7 +1157,7 @@ async def train_chatbot(
                 raise HTTPException(status_code=400, detail="Only PDF files are supported.")
             
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-                temp_pdf.write(await file.read())
+                temp_pdf.write(file.file.read())
                 temp_pdf_path = temp_pdf.name
             
             try:
@@ -1206,8 +1210,10 @@ async def train_chatbot(
         raise HTTPException(status_code=500, detail="Training failed.")
     finally:
         release_db_connection(conn)
+
 @app.post("/api/register")
-async def register_new_company(reg: RegisterRequest, user: dict = Depends(get_current_user)):
+def register_company(
+reg: RegisterRequest, user: dict = Depends(get_current_user)):
     """Multi-bot registration with per-plan bot count enforcement."""
     tier = user.get("tier") or "FREE"
     plan = get_plan(tier, role=user.get("role"))
@@ -1368,7 +1374,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
 
 
 @app.delete("/api/companies/{company_id}")
-async def deactivate_company(company_id: str, user: dict = Depends(get_current_user)):
+def deactivate_company(company_id: str, user: dict = Depends(get_current_user)):
     """Soft-deletes a bot by setting is_active=false. Data is retained."""
     conn = get_db_connection()
     try:
@@ -1397,7 +1403,7 @@ def get_config(company: dict = Depends(verify_api_key_and_origin)):
     return company
 
 @app.get("/api/me")
-async def get_my_profile(current_user: dict = Depends(get_current_user)):
+def get_my_profile(current_user: dict = Depends(get_current_user)):
     """User profile and real-time usage stats."""
     conn = get_db_connection()
     try:
@@ -1435,7 +1441,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
         release_db_connection(conn)
 
 @app.get("/api/company/details")
-async def get_company_details(user: dict = Depends(get_current_user)):
+def get_company_details(user: dict = Depends(get_current_user)):
     """Returns company status for onboarding/navbar detection."""
     company = get_company_by_clerk_id(user["clerk_id"])
     if not company:
@@ -1445,7 +1451,7 @@ async def get_company_details(user: dict = Depends(get_current_user)):
 # --- SUPER ADMIN ENDPOINTS ---
 
 @app.get("/api/admin/stats")
-async def get_admin_stats(admin: dict = Depends(get_admin_user)):
+def get_admin_stats(admin: dict = Depends(get_admin_user)):
     """Platform-wide statistics for Super Admins."""
     conn = get_db_connection()
     try:
@@ -1459,7 +1465,7 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         release_db_connection(conn)
 
 @app.get("/api/admin/companies")
-async def get_all_companies(admin: dict = Depends(get_admin_user)):
+def get_all_companies(admin: dict = Depends(get_admin_user)):
     """Admin-only view of all registered companies."""
     conn = get_db_connection()
     try:
@@ -1471,7 +1477,7 @@ async def get_all_companies(admin: dict = Depends(get_admin_user)):
         release_db_connection(conn)
 
 @app.post("/api/user/subscription")
-async def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_current_user)):
+def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_current_user)):
     """Self-serve subscription update."""
     conn = get_db_connection()
     try:
@@ -1486,7 +1492,7 @@ async def update_subscription(request: SubscriptionRequest, user: dict = Depends
         release_db_connection(conn)
 
 @app.get("/api/admin/users")
-async def get_all_users(admin: dict = Depends(get_admin_user)):
+def get_all_users(admin: dict = Depends(get_admin_user)):
     """Admin-only list of all platform users."""
     conn = get_db_connection()
     try:
@@ -1498,7 +1504,7 @@ async def get_all_users(admin: dict = Depends(get_admin_user)):
         release_db_connection(conn)
 
 @app.patch("/api/admin/users/{clerk_id}")
-async def update_user_admin(
+def update_user_admin(
     clerk_id: str, 
     req: AdminUpdateUserRequest, 
     admin: dict = Depends(get_admin_user),
@@ -1542,7 +1548,7 @@ async def update_user_admin(
         release_db_connection(conn)
 
 @app.delete("/api/admin/companies/{company_id}")
-async def delete_company_admin(
+def delete_company_admin(
     company_id: str, 
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
