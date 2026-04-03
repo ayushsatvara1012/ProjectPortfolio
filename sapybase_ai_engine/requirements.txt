@@ -23,3 +23,5 @@ pybind11
 wheel
 gunicorn
 uvicorn
+Jinja2
+python-multipart
