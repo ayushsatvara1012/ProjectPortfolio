@@ -113,9 +113,10 @@ export const CustomizeSection = () => {
                                         className={inputCls + ' bg-white! dark:bg-slate-950! border-amber-200! dark:border-amber-900/50!'}
                                     >
                                         <option value="">Default (Auto / Tier-based)</option>
-                                        <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B (Max Profit)</option>
-                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Priority)</option>
-                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Dedicated)</option>
+                                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Max Speed)</option>
+                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Balanced Thinking)</option>
+                                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Standard Reasoning)</option>
+                                        <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Next-Gen Preview)</option>
                                     </select>
                                     <p className="text-[10px] text-amber-600/70 mt-2 italic font-sans uppercase tracking-widest leading-relaxed">
                                         This override bypasses the user's subscription tier model mapping.
