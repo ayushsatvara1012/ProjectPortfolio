@@ -188,7 +188,7 @@ const AppPricing = () => {
                         <div className="flex border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 h-10 transition-colors rounded-none overflow-hidden shadow-sm">
                             {Object.keys(CURRENCIES).map(curr => (
                                 <button key={curr} onClick={() => setCurrency(curr)}
-                                    className={`px-4 py-1.5 text-[10px] font-sans font-bold tracking-widest uppercase transition-all ${currency === curr
+                                    className={`px-4 py-1.5 text-lg font-sans font-bold tracking-widest uppercase transition-all ${currency === curr
                                         ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md'
                                         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
                                         }`}>
@@ -234,7 +234,7 @@ const AppPricing = () => {
                                 Local taxes handled at checkout
                             </span>
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>
+                        <p className="text-lg font-sans text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>
 
                         <div className="space-y-4 flex-1 mb-8">
                             {plan.features.map((f, j) => (
@@ -242,13 +242,13 @@ const AppPricing = () => {
                                     <div className="w-4 h-4 rounded-none bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center transition-colors group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/60">
                                         <Check className="w-2.5 h-2.5 text-indigo-500 dark:text-indigo-400 shrink-0 transition-colors" />
                                     </div>
-                                    <span className="text-sm text-slate-600 dark:text-slate-400 font-sans transition-colors group-hover:text-slate-900 dark:group-hover:text-slate-200">{f}</span>
+                                    <span className="text-lg text-slate-600 dark:text-slate-400 font-sans transition-colors group-hover:text-slate-900 dark:group-hover:text-slate-200">{f}</span>
                                 </div>
                             ))}
                         </div>
 
                         <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading || plan.id === userTier}
-                            className={`w-full py-4 min-h-[48px] text-[10px] uppercase tracking-widest font-bold font-sans transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${plan.highlight
+                            className={`w-full py-4 min-h-[48px] text-lg font-sans uppercase tracking-widest font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${plan.highlight
                                 ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-500/10'
                                 : 'bg-transparent border border-gray-200 dark:border-slate-800 text-slate-900 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900'
                                 } ${(isLoading && selectedTier === plan.id) || plan.id === userTier ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>

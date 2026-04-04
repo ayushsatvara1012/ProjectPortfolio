@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Palette, KeyRound, Eye, EyeOff, Lock, Plus, Trash2, Sun, Moon } from 'lucide-react';
+import { User, Palette, KeyRound, Eye, EyeOff, Lock, Plus, Trash2, Sun, Moon, Bot, ChevronDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Alert from '../components/alert';
 import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useBotSettings } from '../context/BotSettingsContext';
 import { useUserRole } from '../context/UserContext';
 import BotPreview from '../components/BotPreview';
+import { useAuthenticatedFetch } from '../hooks/useApiCall';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 focus:border-slate-400 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-200 transition-colors";
@@ -56,9 +58,31 @@ export const BillingSection = () => (
 
 // ── Customize (docked BotPreview as separate full-height column) ─────────────
 export const CustomizeSection = () => {
-    const { botSettings, updateSetting, saveSettings, isSaving, isLoading } = useBotSettings();
+    const { botSettings, updateSetting, saveSettings, fetchSettings, isSaving, isLoading } = useBotSettings();
     const { userTier, userRole } = useUserRole();
+    const authFetch = useAuthenticatedFetch();
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
+
+    // Bot Selection Logic
+    const [selectedBotId, setSelectedBotId] = useState('');
+    const { data: botsData } = useQuery({
+        queryKey: ['bots'],
+        queryFn: () => authFetch('/api/companies'),
+    });
+    const bots = botsData?.bots || [];
+
+    // Sync selectedBotId and fetch settings
+    useEffect(() => {
+        if (bots.length > 0 && !selectedBotId) {
+            setSelectedBotId(bots[0].id);
+        }
+    }, [bots, selectedBotId]);
+
+    useEffect(() => {
+        if (selectedBotId) {
+            fetchSettings(selectedBotId);
+        }
+    }, [selectedBotId]);
 
     // Theme Toggle Logic (Localized to Bot Preview)
     const [isDark, setIsDark] = useState(false); 
@@ -126,6 +150,33 @@ export const CustomizeSection = () => {
                         </div>
                     )}
 
+                    {/* Bot Selector UI */}
+                    {bots.length > 1 && (
+                        <div className="mb-8 p-6 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors shadow-sm">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Bot className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                                <p className={headingCls + ' mb-0'}>Customization Target</p>
+                            </div>
+                            <div className="relative">
+                                <select 
+                                    value={selectedBotId}
+                                    onChange={e => setSelectedBotId(e.target.value)}
+                                    className={inputCls + " appearance-none pr-10 font-sans font-medium text-sm"}
+                                >
+                                    {bots.map(b => (
+                                        <option key={b.id} value={b.id}>
+                                            {b.bot_name || 'Unnamed Bot'} — {b.company_name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-2 italic font-sans uppercase tracking-widest leading-relaxed">
+                                Switching bots will load their specific visual identity and configuration.
+                            </p>
+                        </div>
+                    )}
+
                     <p className={headingCls}><Palette className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />Bot Appearance</p>
                     <div className={`space-y-6 ${showFullOverlay || isLoading ? 'opacity-30 pointer-events-none' : ''}`}>
                         <div>
@@ -184,7 +235,7 @@ export const CustomizeSection = () => {
                                                     }}
                                                     className="w-4 h-4 accent-slate-900 dark:accent-indigo-600"
                                                 />
-                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{tone}</span>
+                                                <span className="text-lg font-sans font-medium text-slate-700 dark:text-slate-300">{tone}</span>
                                             </label>
                                         ))}
                                     </div>
@@ -267,7 +318,7 @@ export const CustomizeSection = () => {
                         <div className="pt-4 border-t border-gray-100 dark:border-slate-800 transition-colors">
                             <button 
                                 onClick={async () => {
-                                    const res = await saveSettings();
+                                    const res = await saveSettings(selectedBotId);
                                     if (res.success) {
                                         setAlert({ open: true, type: 'success', msg: 'Settings saved successfully!' });
                                     } else {
@@ -275,7 +326,7 @@ export const CustomizeSection = () => {
                                     }
                                 }}
                                 disabled={isSaving || showFullOverlay}
-                                className="w-full py-4 min-h-[48px] bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
+                                className="w-full py-4 min-h-[48px] bg-slate-900 dark:bg-indigo-600 text-white text-lg uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
                             >
                                 {isSaving ? (
                                     <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> PERSISTING...</>

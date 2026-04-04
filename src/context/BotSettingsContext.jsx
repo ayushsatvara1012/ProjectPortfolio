@@ -22,13 +22,17 @@ export const BotSettingsProvider = ({ children }) => {
 
     const baseUrl = import.meta.env.VITE_API_URL || '';
 
-    const fetchSettings = async () => {
+    const fetchSettings = async (botId = null) => {
         if (!isSignedIn) return;
         setIsLoading(true);
         setError(null);
         try {
             const token = await getToken();
-            const res = await fetch(`${baseUrl}/api/company/details`, {
+            const url = botId 
+                ? `${baseUrl}/api/company/details?company_id=${botId}` 
+                : `${baseUrl}/api/company/details`;
+                
+            const res = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();
@@ -55,7 +59,7 @@ export const BotSettingsProvider = ({ children }) => {
         }
     };
 
-    const saveSettings = async () => {
+    const saveSettings = async (botId = null) => {
         setIsSaving(true);
         setError(null);
         try {
@@ -67,6 +71,7 @@ export const BotSettingsProvider = ({ children }) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+                    company_id: botId,
                     bot_name: botSettings.name,
                     theme_color: botSettings.primaryColor,
                     initial_message: botSettings.greeting,
