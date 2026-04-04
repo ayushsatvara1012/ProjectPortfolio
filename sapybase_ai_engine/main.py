@@ -1336,7 +1336,8 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                       c.logo_url, c.initial_message, c.display_order, c.is_active,
                       c.created_at, c.ai_model,
                       COALESCE(ut.messages_used, 0) as messages_used,
-                      COALESCE(ut.period_end, now() + interval '30 days') as period_end
+                      COALESCE(ut.period_end, now() + interval '30 days') as period_end,
+                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id) as chunks_used
                FROM companies c
                LEFT JOIN usage_tracking ut ON ut.company_id = c.id
                WHERE c.user_id = %s AND c.is_active = true
@@ -1362,6 +1363,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                     "ai_model": r[10],
                     "messages_used": r[11],
                     "period_end": r[12].isoformat() if r[12] else None,
+                    "chunks_used": r[13],
                 }
                 for r in rows
             ],
@@ -1398,6 +1400,50 @@ def deactivate_company(company_id: str, user: dict = Depends(get_current_user)):
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail="Failed to deactivate bot.")
+    finally:
+        release_db_connection(conn)
+
+
+@app.delete("/api/train/{company_id}")
+def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
+    """Purges ALL knowledge chunks for a specific bot owned by the authenticated user.
+    This is a destructive, irreversible operation."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # 1. Verify ownership: bot must belong to this user and be active
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # 2. Count existing chunks before deletion (for audit + response)
+        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (company_id,))
+        deleted_count = cursor.fetchone()[0]
+
+        if deleted_count == 0:
+            return {"status": "success", "message": "No knowledge chunks to delete.", "deleted": 0}
+
+        # 3. Delete all knowledge chunks for this bot
+        cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (company_id,))
+        conn.commit()
+
+        # 4. Audit log
+        log_admin_action(user["clerk_id"], "PURGE_KNOWLEDGE", company_id, {"chunks_deleted": deleted_count})
+
+        return {
+            "status": "success",
+            "message": f"Successfully purged {deleted_count} knowledge chunks.",
+            "deleted": deleted_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"PURGE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to purge knowledge data.")
     finally:
         release_db_connection(conn)
 
