@@ -148,7 +148,7 @@ const Navbar = () => {
               </div>
               <div className="h-full bg-white dark:bg-slate-950 flex items-center transition-colors duration-500">
                 <SignUpButton mode="modal">
-                  <button className="bg-slate-900 dark:bg-indigo-600 tracking-widest text-white font-display text-md px-4 lg:px-6 xl:px-8 py-5 h-full hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-all rounded-none shrink-0">
+                  <button className="bg-slate-900 dark:bg-indigo-600 tracking-widest text-white font-display text-md px-4 lg:px-6 xl:px-8 py-5 h-full hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-all rounded-none shrink-0 ">
                     Get_Started
                   </button>
                 </SignUpButton>
@@ -228,7 +228,7 @@ const Navbar = () => {
           <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 mt-auto border-t border-gray-200 dark:border-slate-800 space-y-4">
             <SignedOut>
               <SignUpButton mode="modal">
-                <button className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none mb-3">
+                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">
                   Start_Free_Trial
                 </button>
               </SignUpButton>
