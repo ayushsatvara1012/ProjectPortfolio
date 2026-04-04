@@ -36,9 +36,9 @@ const AppPricing = () => {
     };
 
     const PRICE_MATRIX = {
-        BASIC: { USD: 5, INR: 450 },
-        STARTER: { USD: 10, INR: 900 },
-        PRO: { USD: 20, INR: 1800 }
+        BASIC: { USD: 5, INR: 499 },
+        STARTER: { USD: 10, INR: 999 },
+        PRO: { USD: 20, INR: 1999 }
     };
 
     const formatPrice = (val) => {

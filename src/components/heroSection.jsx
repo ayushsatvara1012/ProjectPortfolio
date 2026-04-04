@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Button from './button';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, Building2, Globe, Palette,
@@ -37,28 +38,27 @@ const HeroSection = () => {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
-            Autonomous <br /> <span className="text-blue-800 dark:text-blue-400">AI Chat Bots</span> <br />
-            For Modern <span className="text-indigo-600 dark:text-indigo-400">SaaS</span>
+            Autonomous <br /> <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-blue-600">AI Chat Bots</span> <br />
+            For Modern <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600">Businesses</span>
           </h1>
 
           <p className="text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
-            Connect your database, upload your docs, and deploy a custom RAG agent in minutes.
-            No complex pipelines required.
+            Connect your database, upload your docs, and deploy a custom AI agent in minutes in your <span className="text-transparent bg-clip-text bg-linear-to-r from-green-600 dark:from-green-500 to-blue-700 dark:to-blue-500">website</span>.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-px bg-gray-100 dark:bg-slate-800 w-fit transition-colors">
+          <div className="flex flex-col sm:flex-row gap-1 w-fit transition-colors">
             <button
               onClick={() => navigate('/services')}
-              className="bg-slate-900 dark:bg-indigo-600 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors flex items-center gap-2 rounded-none"
+              className="bg-slate-900 dark:bg-slate-900 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 dark:hover:bg-black transition-colors flex items-center gap-2 rounded-none"
             >
-              Start Building Free <ArrowRight className="w-4 h-4" />
+              Get Your AI Bot<span className='material-symbols-outlined'>arrow_forward</span>
             </button>
-            <button
-              onClick={() => window.open('https://docs.sapybase.com', '_blank')}
-              className="bg-white dark:bg-slate-950 border border-transparent px-8 py-4 text-sm font-display tracking-widest text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none outline-1 outline-gray-100 dark:outline-slate-800"
-            >
-              Read the Docs
-            </button>
+            <Button onClick={() => window.open('https://docs.sapybase.com', '_blank')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-sans text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
+              <span className="material-symbols-outlined">
+                docs
+              </span>
+              Read Docs
+            </Button>
           </div>
         </div>
 
@@ -125,7 +125,7 @@ const HeroSection = () => {
                       >
                         <div className="flex items-center gap-2 mb-6">
                           <Bot className="w-4 h-4 text-slate-600 dark:text-slate-400 transition-colors" />
-                          <h3 className="text-sm tracking-widest font-display text-slate-900 dark:text-slate-200 transition-colors">Bot Identity</h3>
+                          <h3 className="text-md tracking-widest font-display text-slate-900 dark:text-slate-200 transition-colors">Bot Identity</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-8 mb-6">
                           <div className="space-y-4">
@@ -135,15 +135,17 @@ const HeroSection = () => {
 
                             <div className="space-y-3">
                               {[
-                                { Icon: Zap, label: 'Customize your appearance' },
-                                { Icon: Database, label: 'Train with your data' },
-                                { Icon: ShieldCheck, label: 'Enhance user experience' }
+                                { Icon: "tune", label: 'Customize your appearance' },
+                                { Icon: "database", label: 'Train with your data' },
+                                { Icon: "vrpano", label: 'Enhance user experience' }
                               ].map(({ Icon, label }, i) => (
                                 <div key={i} className="flex items-center gap-3 group">
-                                  <div className="w-8 h-8 flex items-center justify-center bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors">
-                                    <Icon className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+                                  <div className="w-8 h-8 flex items-center justify-center bg-gray-50 dark:bg-slate-950 border border-gray-100 dark:border-slate-800 group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors">
+                                    <span className="material-symbols-outlined">
+                                      {Icon}
+                                    </span>
                                   </div>
-                                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
+                                  <span className="text-sm uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300 font-sans group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
                                     {label}
                                   </span>
                                 </div>
@@ -152,10 +154,10 @@ const HeroSection = () => {
 
                             {/* Compatibility Bullet Points */}
                             <div className="pt-2 space-y-1.5">
-                              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans mb-1 transition-colors">Universal Compatibility</p>
+                              <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans mb-1 transition-colors">Universal Compatibility</p>
                               <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
                                 {['Next.js', 'React', 'Flutter', 'Angular'].map(tech => (
-                                  <li key={tech} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">
+                                  <li key={tech} className="flex items-center gap-1.5 text-md font-sans text-slate-600 tracking-wider dark:text-slate-300 font-semibold transition-colors">
                                     <div className="w-1 h-1 bg-indigo-500" /> {tech}
                                   </li>
                                 ))}
@@ -299,12 +301,12 @@ const HeroSection = () => {
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 flex items-center justify-center shrink-0">
                       <div className="w-full h-full bg-indigo-50 dark:bg-slate-900 border border-indigo-100 dark:border-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 transition-colors">
-                        <Cpu className="w-5 h-5" style={{ color: botColor }} />
+                        <span className='material-symbols-outlined' style={{ color: botColor }}>smart_toy</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 flex-1">
                       <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans ml-1 transition-colors">Sapy AI</span>
-                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-3 rounded-xl text-sm text-slate-500 dark:text-slate-300 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] dark:shadow-none border-b-2 border-b-gray-50 dark:border-b-slate-900 transition-colors">
+                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-3 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-300 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] dark:shadow-none border-b-2 border-b-gray-50 dark:border-b-slate-900 transition-colors">
                         Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?
                       </div>
                     </div>
