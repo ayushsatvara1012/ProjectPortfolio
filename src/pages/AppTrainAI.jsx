@@ -1,22 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-    UploadCloud, BrainCircuit, Database, Eye, EyeOff,
-    Zap, Lock, Activity, Globe, FileText, AlignLeft, X, Clock
-} from 'lucide-react';
 import Alert from '../components/alert';
 import { useAuth } from '@clerk/clerk-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useUserRole } from '../context/UserContext';
 import UpgradePrompt from '../components/UpgradePrompt';
 import { useAuthenticatedFetch, UpgradeError } from '../hooks/useApiCall';
 
 const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
 const TABS = [
-    { id: 'url', label: 'URL', Icon: Globe },
-    { id: 'pdf', label: 'PDF Upload', Icon: FileText },
-    { id: 'text', label: 'Manual Text', Icon: AlignLeft },
+    { id: 'url', label: 'URL', icon: 'public' },
+    { id: 'pdf', label: 'PDF Upload', icon: 'description' },
+    { id: 'text', label: 'Manual Text', icon: 'notes' },
 ];
 
 // Grid primitives
@@ -30,7 +25,7 @@ const AppTrainAI = () => {
     const {
         userTier, isLoading: ctxLoading,
         messagesUsed, messageLimit, billingPeriodEnd,
-        totalDocuments, totalMessages
+        totalMessages, refreshUser
     } = useUserRole();
     const authFetch = useAuthenticatedFetch();
 
@@ -38,8 +33,6 @@ const AppTrainAI = () => {
     const [url, setUrl] = useState('');
     const [file, setFile] = useState(null);
     const [trainingText, setTrainingText] = useState('');
-    const [apiKey, setApiKey] = useState('');
-    const [showKey, setShowKey] = useState(false);
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const [selectedBotId, setSelectedBotId] = useState('');
     const [upgradeError, setUpgradeError] = useState(null);
@@ -78,7 +71,6 @@ const AppTrainAI = () => {
             if (url.trim()) fd.append('url', url.trim());
             if (file) fd.append('file', file);
             if (trainingText.trim()) fd.append('text', trainingText.trim());
-            if (apiKey.trim()) fd.append('api_key', apiKey.trim());
             if (selectedBotId) fd.append('company_id', selectedBotId);
             // Use raw fetch for FormData (authFetch would set Content-Type incorrectly)
             const res = await fetch(`${baseUrl}/api/train`, {
@@ -101,6 +93,7 @@ const AppTrainAI = () => {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['bots'] });
+            refreshUser();
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
             setUrl(''); setTrainingText(''); setFile(null);
             if (fileRef.current) fileRef.current.value = '';
@@ -125,14 +118,45 @@ const AppTrainAI = () => {
 
     const isTraining = trainMutation.isPending;
 
+    // ── useMutation: purge knowledge ──────────────────────────────────────────
+    const purgeMutation = useMutation({
+        mutationFn: () => authFetch(`/api/train/${selectedBotId}`, { method: 'DELETE' }),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['bots'] });
+            refreshUser();
+            showAlert('success', data?.message || 'Knowledge purged successfully.');
+        },
+        onError: (err) => {
+            showAlert('error', err.message || 'Failed to purge knowledge.');
+        },
+    });
+
+    const handlePurge = () => {
+        if (!selectedBotId) return;
+        const selectedBot = bots.find(b => b.id === selectedBotId);
+        const botName = selectedBot?.bot_name || 'this bot';
+        if (!window.confirm(
+            `⚠️ DESTRUCTIVE ACTION\n\nThis will permanently delete ALL ${selectedBot?.chunks_used ?? 0} knowledge chunks for "${botName}".\n\nThis cannot be undone. Continue?`
+        )) return;
+        purgeMutation.mutate();
+    };
+
+    const isPurging = purgeMutation.isPending;
+
+    // ── Derived per-bot chunk data ────────────────────────────────────────────
+    const selectedBot = bots.find(b => b.id === selectedBotId);
+    const chunksUsed = selectedBot?.chunks_used ?? 0;
+    const chunkLimit = botsData?.plan?.chunk_limit ?? 0;
+    const chunkPct = chunkLimit > 0 && chunkLimit < 999999 ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
+
     const periodEndStr = billingPeriodEnd
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 
     const statCards = [
-        { label: 'Ingested Sources', value: totalDocuments ?? 0, Icon: Database, unit: 'docs' },
-        { label: 'AI Memory', value: totalMessages ?? 0, Icon: Activity, unit: 'msgs' },
-        { label: 'System Tier', value: userTier || '—', Icon: Zap, unit: 'plan' },
-        { label: 'Quota Used', value: `${messagesUsed ?? 0}/${messageLimit ?? 200}`, Icon: Lock, unit: 'reqs' },
+        { label: 'Knowledge Chunks', value: chunkLimit >= 999999 ? `${chunksUsed}` : `${chunksUsed}/${chunkLimit}`, icon: 'database', unit: chunkLimit >= 999999 ? '∞' : 'chunks' },
+        { label: 'AI Memory', value: totalMessages ?? 0, icon: 'vital_signs', unit: 'msgs' },
+        { label: 'System Tier', value: userTier || '—', icon: 'bolt', unit: 'plan' },
+        { label: 'Quota Used', value: `${messagesUsed ?? 0}/${messageLimit ?? 200}`, icon: 'lock', unit: 'reqs' },
     ];
 
     return (
@@ -140,7 +164,9 @@ const AppTrainAI = () => {
             {/* ── Page Header ── */}
             <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 <div className="flex items-center gap-2 mb-1">
-                    <BrainCircuit className="w-4 h-4 text-slate-600 dark:text-slate-400 transition-colors" />
+                    <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
+                        psychology
+                    </span>
                     <h1 className="text-xl md:text-2xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">Train AI</h1>
                 </div>
                 <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Ingest knowledge sources into your AI's vector brain.</p>
@@ -150,10 +176,12 @@ const AppTrainAI = () => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 {ctxLoading
                     ? Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-8`}><StatSkeleton /></div>)
-                    : statCards.map(({ label, value, Icon, unit }) => (
+                    : statCards.map(({ label, value, icon, unit }) => (
                         <div key={label} className={`${cellCls} p-8`}>
                             <div className="flex items-center gap-2 mb-3">
-                                <Icon className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 transition-colors" />
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">
+                                    {icon}
+                                </span>
                                 <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">{label}</p>
                             </div>
                             <p className="text-2xl md:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
@@ -171,7 +199,9 @@ const AppTrainAI = () => {
                     {isFree && (
                         <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center gap-5 p-10 transition-colors duration-500">
                             <div className="w-12 h-12 border-2 border-slate-900 dark:border-slate-700 flex items-center justify-center transition-colors">
-                                <Lock className="w-6 h-6 text-slate-900 dark:text-slate-200 transition-colors" />
+                                <span className="material-symbols-outlined text-[28px] text-slate-900 dark:text-slate-200 transition-colors">
+                                    lock
+                                </span>
                             </div>
                             <div className="text-center">
                                 <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">Trial Plan Required</p>
@@ -195,7 +225,9 @@ const AppTrainAI = () => {
                                         ? 'border-slate-900 dark:border-indigo-500 text-slate-900 dark:text-slate-200 bg-[#FAFAFA] dark:bg-slate-900'
                                         : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
                                     }`}>
-                                <t.Icon className="w-3.5 h-3.5" />{t.label}
+                                <span className="material-symbols-outlined text-[18px]">
+                                    {t.icon}
+                                </span>{t.label}
                             </button>
                         ))}
                     </div>
@@ -216,19 +248,6 @@ const AppTrainAI = () => {
                         </div>
                     )}
 
-                    {/* API Key */}
-                    <div className="mb-4">
-                        <label className={labelCls}>API Secret Key</label>
-                        <div className="relative">
-                            <input type={showKey ? 'text' : 'password'} value={apiKey}
-                                onChange={e => setApiKey(e.target.value)} className={inputCls + ' pr-10 text-sm font-mono'} placeholder="sb_live_..." />
-                            <button type="button" onClick={() => setShowKey(p => !p)}
-                                className="absolute inset-y-0 right-3 flex items-center text-slate-600 hover:text-slate-600">
-                                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                    </div>
-
                     <form onSubmit={handleTrain} className="space-y-4">
                         {activeTab === 'url' && (
                             <div>
@@ -241,7 +260,9 @@ const AppTrainAI = () => {
                                 <label className={labelCls}>PDF Archive</label>
                                 <div onClick={() => fileRef.current?.click()}
                                     className="flex flex-col items-center justify-center gap-3 px-6 py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
-                                    <UploadCloud className="w-7 h-7 text-slate-600 dark:text-slate-400 transition-colors" />
+                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">
+                                        cloud_upload
+                                    </span>
                                     <div className="text-center">
                                         <p className="text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors">{file ? file.name : 'Drop PDF here'}</p>
                                         <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
@@ -252,7 +273,7 @@ const AppTrainAI = () => {
                                 {file && (
                                     <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
                                         className="mt-2 flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
-                                        <X className="w-3.5 h-3.5" /> Remove {file.name}
+                                        <span className="material-symbols-outlined text-[16px]">close</span> Remove {file.name}
                                     </button>
                                 )}
                             </div>
@@ -287,7 +308,9 @@ const AppTrainAI = () => {
                     <div className={`${cellCls} p-8 flex flex-col justify-center min-h-[240px]`}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <Database className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 transition-colors" />
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">
+                                    database
+                                </span>
                                 <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">Total Usage</h4>
                             </div>
                             {(messageLimit ?? 0) >= 999999 && (
@@ -308,10 +331,78 @@ const AppTrainAI = () => {
                                 </div>
                                 <div className="flex justify-between text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
                                     <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% Capacity</span>
-                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Resets {periodEndStr}</span>
+                                    <span className="flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[14px]">schedule</span> Resets {periodEndStr}
+                                    </span>
                                 </div>
                             </>
                         )}
+                    </div>
+
+                    {/* ── Knowledge Management Panel ── */}
+                    <div className={`${cellCls} p-8 flex flex-col`}>
+                        <div className="flex items-center justify-between mb-5">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">
+                                    psychology
+                                </span>
+                                <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">Knowledge Management</h4>
+                            </div>
+                            {chunkLimit >= 999999 && (
+                                <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
+                            )}
+                        </div>
+
+                        {/* Bot name context */}
+                        {selectedBot && (
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4 transition-colors">
+                                Bot: {selectedBot.bot_name || 'Unnamed Bot'}
+                            </p>
+                        )}
+
+                        {/* Chunk count display */}
+                        <div className="flex items-end gap-1 mb-4">
+                            <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
+                            {chunkLimit < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>}
+                            <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
+                        </div>
+
+                        {/* Chunk progress bar */}
+                        {chunkPct !== null && (
+                            <>
+                                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
+                                    <motion.div initial={{ width: 0 }}
+                                        animate={{ width: `${chunkPct}%` }}
+                                        className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-indigo-500'}`} />
+                                </div>
+                                <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
+                                    {Math.round(chunkPct)}% Storage Used
+                                </p>
+                            </>
+                        )}
+
+                        {/* Purge section */}
+                        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
+                            <div className="flex items-start gap-3 mb-4 p-3 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 transition-colors">
+                                <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
+                                    warning
+                                </span>
+                                <p className="text-sm text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
+                                    Purging permanently removes all trained data for this bot. This action cannot be undone.
+                                </p>
+                            </div>
+                            <button
+                                onClick={handlePurge}
+                                disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
+                                className="w-full py-3 min-h-[44px] bg-red-600 dark:bg-red-700 text-white text-md uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                            >
+                                {isPurging ? (
+                                    <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Purging...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-[20px]">delete</span> Purge All Knowledge ({chunksUsed})</>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
