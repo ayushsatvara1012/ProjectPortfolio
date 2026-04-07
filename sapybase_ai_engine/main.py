@@ -1448,6 +1448,145 @@ def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
         release_db_connection(conn)
 
 
+# ── KNOWLEDGE MANAGEMENT ENDPOINTS ────────────────────────────────────────────
+
+class DeleteChunksRequest(BaseModel):
+    chunk_ids: list[str] = Field(..., max_length=500, description="List of chunk UUIDs to delete (max 500)")
+
+@app.get("/api/knowledge/sources/{company_id}")
+def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user)):
+    """Returns distinct knowledge sources (URLs/filenames) for a specific bot."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership guard: verify the bot belongs to this user
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        cursor.execute(
+            "SELECT DISTINCT url, COUNT(*) as chunk_count FROM company_knowledge WHERE company_id = %s GROUP BY url ORDER BY url",
+            (company_id,)
+        )
+        rows = cursor.fetchall()
+        sources = [{"source": row[0], "chunk_count": row[1]} for row in rows]
+        return {"sources": sources}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"KNOWLEDGE SOURCES ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve knowledge sources.")
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/knowledge/chunks/{company_id}")
+def get_knowledge_chunks(
+    company_id: str,
+    source: str,
+    limit: int = 100,
+    user: dict = Depends(get_current_user)
+):
+    """Returns chunk previews for a specific source, capped at 100 to prevent browser crashes."""
+    # Hard cap to prevent abuse
+    if limit > 100:
+        limit = 100
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership guard
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        cursor.execute(
+            "SELECT id, content, created_at FROM company_knowledge WHERE company_id = %s AND url = %s ORDER BY created_at DESC LIMIT %s",
+            (company_id, source, limit)
+        )
+        rows = cursor.fetchall()
+
+        # Get total count for this source (may exceed limit)
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            (company_id, source)
+        )
+        total = cursor.fetchone()[0]
+
+        chunks = [{
+            "id": str(row[0]),
+            "content": row[1][:300] if row[1] else "",  # Truncate for preview
+            "created_at": row[2].isoformat() if row[2] else None
+        } for row in rows]
+
+        return {"chunks": chunks, "total": total, "showing": len(chunks)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"KNOWLEDGE CHUNKS ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve knowledge chunks.")
+    finally:
+        release_db_connection(conn)
+
+
+@app.delete("/api/knowledge/chunks/{company_id}")
+def delete_knowledge_chunks(
+    company_id: str,
+    body: DeleteChunksRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Selectively deletes specific knowledge chunks with strict ownership verification."""
+    if not body.chunk_ids:
+        raise HTTPException(status_code=400, detail="No chunk IDs provided.")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership guard: verify bot belongs to user
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # Double-safety: only delete chunks that belong to THIS company_id
+        cursor.execute(
+            "DELETE FROM company_knowledge WHERE id = ANY(%s) AND company_id = %s RETURNING id",
+            (body.chunk_ids, company_id)
+        )
+        deleted_ids = [str(row[0]) for row in cursor.fetchall()]
+        conn.commit()
+
+        # Audit log
+        log_admin_action(user["clerk_id"], "DELETE_KNOWLEDGE_CHUNKS", company_id, {
+            "requested": len(body.chunk_ids),
+            "deleted": len(deleted_ids)
+        })
+
+        return {
+            "status": "success",
+            "message": f"Deleted {len(deleted_ids)} chunk(s).",
+            "deleted": len(deleted_ids),
+            "deleted_ids": deleted_ids
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"CHUNK DELETE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete knowledge chunks. The database may be temporarily locked.")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/config")
 @cache(expire=300)
 def get_config(company: dict = Depends(verify_api_key_and_origin)):
