@@ -266,6 +266,7 @@ const AppTrainAI = () => {
                                     <div className="text-center">
                                         <p className="text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors">{file ? file.name : 'Drop PDF here'}</p>
                                         <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
                                         onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
@@ -387,8 +388,9 @@ const AppTrainAI = () => {
                                 <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
                                     warning
                                 </span>
-                                <p className="text-sm text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
-                                    Purging permanently removes all trained data for this bot. This action cannot be undone.
+                                <p className="text-md
+                                 text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
+                                    Deleting permanently removes all trained data for this bot. This action cannot be undone.
                                 </p>
                             </div>
                             <button
@@ -397,9 +399,9 @@ const AppTrainAI = () => {
                                 className="w-full py-3 min-h-[44px] bg-red-600 dark:bg-red-700 text-white text-md uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                             >
                                 {isPurging ? (
-                                    <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Purging...</>
+                                    <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Deleting...</>
                                 ) : (
-                                    <><span className="material-symbols-outlined text-[20px]">delete</span> Purge All Knowledge ({chunksUsed})</>
+                                    <><span className="material-symbols-outlined text-[20px]">delete</span> Delete All Knowledge ({chunksUsed})</>
                                 )}
                             </button>
                         </div>

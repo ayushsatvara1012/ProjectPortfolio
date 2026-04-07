@@ -15,25 +15,25 @@ import { useUserRole } from '../context/UserContext';
 const SETTINGS_SUB = [
     { label: 'Account', icon: User, path: '/app/settings/account' },
     { label: 'Billing', icon: CreditCard, path: '/app/settings/billing' },
-    { label: 'Customize', icon: Palette, path: '/app/settings/customize' },
+    { label: 'Customize Bot', icon: Palette, path: '/app/settings/customize' },
     { label: 'API Keys', icon: KeyRound, path: '/app/settings/apikeys' },
 ];
 
 const TOP_NAV = [
     { label: 'My Bots',      icon: Bot,         path: '/app/bots' },
-    { label: 'Bot Identity', icon: Building2,    path: '/app/register' },
+    { label: 'Create Bot Identity', icon: Building2,    path: '/app/register' },
     { label: 'Train AI',     icon: BrainCircuit, path: '/app/train' },
     { label: 'Pricing',      icon: CreditCard,   path: '/app/pricing' },
 ];
 
 const PATH_LABELS = {
     '/app/bots': 'My Bots',
-    '/app/register': 'Bot Identity',
+    '/app/register': 'Create Bot Identity',
     '/app/train': 'Train AI',
     '/app/pricing': 'Pricing',
     '/app/settings/account': 'Account',
     '/app/settings/billing': 'Billing',
-    '/app/settings/customize': 'Customize',
+    '/app/settings/customize': 'Customize Bot',
     '/app/settings/apikeys': 'API Keys',
     '/app/settings/admin': 'Super Admin',
 };
