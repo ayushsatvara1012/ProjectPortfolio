@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from './button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser, useClerk } from '@clerk/clerk-react';
 import {
   ArrowRight, Building2, Globe, Palette,
   MessageSquare, Bot, BrainCircuit, Database,
@@ -12,6 +13,8 @@ import { useNavigate } from 'react-router-dom';
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const { isSignedIn } = useUser();
+  const { openSignUp } = useClerk();
   const [view, setView] = useState('configure'); // 'train' | 'configure'
   const [botColor, setBotColor] = useState('#5730F5');
   const [isTraining, setIsTraining] = useState(false);
@@ -38,7 +41,7 @@ const HeroSection = () => {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
-            Autonomous <br /> <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-blue-600">AI Chat Bots</span> <br />
+            Autonomous <br /> <span className="text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600">AI Chat Bots</span> <br />
             For Modern <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600">Businesses</span>
           </h1>
 
@@ -47,13 +50,33 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-1 w-fit transition-colors">
-            <button
+            {/* <button
               onClick={() => navigate('/services')}
               className="bg-slate-900 dark:bg-slate-900 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 dark:hover:bg-black transition-colors flex items-center gap-2 rounded-none"
             >
               Get Your AI Bot<span className='material-symbols-outlined'>arrow_forward</span>
+            </button> */}
+            <button
+              onClick={() => isSignedIn ? navigate('/app') : openSignUp()}
+              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-display tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"
+            >
+              Get Your AI Bot<span className='material-symbols-outlined'>arrow_forward</span>
+              {/* Layer 1: Dark Blue (Bottom - 100% width) */}
+              <span
+                class="absolute w-38 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left"
+              ></span>
+              <span
+                class="absolute w-38 h-34 -top-10 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-120 transition-transform group-hover:duration-700 duration-700 origin-left"
+              ></span>
+              <span
+                class="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-70 transition-transform group-hover:duration-1000 duration-500 origin-left"
+              ></span>
+              <span
+                className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap"
+              >Explore Now!</span>
             </button>
-            <Button onClick={() => window.open('https://docs.sapybase.com', '_blank')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-sans text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
+
+            <Button onClick={() => navigate('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-sans text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
               <span className="material-symbols-outlined">
                 docs
               </span>

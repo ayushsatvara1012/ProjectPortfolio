@@ -146,9 +146,9 @@ const Navbar = () => {
                   </button>
                 </SignInButton>
               </div>
-              <div className="h-full bg-white dark:bg-slate-950 flex items-center transition-colors duration-500">
+              <div className="h-full bg-slate-950 flex items-center transition-colors duration-500">
                 <SignUpButton mode="modal">
-                  <button className="bg-slate-900 dark:bg-indigo-600 tracking-widest text-white font-display text-md px-4 lg:px-6 xl:px-8 py-5 h-full hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-all rounded-none shrink-0 ">
+                  <button className="bg-slate-900 tracking-widest text-white font-display text-md px-4 lg:px-6 xl:px-8 py-5 h-full hover:bg-slate-900 hover:text-transparent hover:bg-clip-text hover:bg-linear-to-r hover:from-green-600 hover:to-blue-600 transition-all rounded-none shrink-0 duration-500">
                     Get_Started
                   </button>
                 </SignUpButton>
@@ -158,9 +158,9 @@ const Navbar = () => {
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
                 <Link
                   to="/app"
-                  className="text-md text-slate-900 dark:text-slate-200 font-display hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                  className="text-md text-slate-900 dark:text-slate-200 font-display hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-2"
                 >
-                  Dashboard
+                  <span className="material-symbols-outlined">dashboard</span>Dashboard
                 </Link>
                 <div className="h-10 w-10 group/user p-0 flex items-center justify-center">
                   <UserButton
