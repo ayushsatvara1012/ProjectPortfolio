@@ -53,7 +53,7 @@ const HeroSection = () => {
             >
               Get Your AI Bot<span className='material-symbols-outlined'>arrow_forward</span>
             </button>
-            <Button onClick={() => window.open('https://docs.sapybase.com', '_blank')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-sans text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
+            <Button onClick={() => navigate('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-sans text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
               <span className="material-symbols-outlined">
                 docs
               </span>

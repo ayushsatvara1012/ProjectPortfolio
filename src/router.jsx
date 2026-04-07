@@ -9,6 +9,8 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const BotIntegrationDocs = lazy(() => import("./components/BotIntegrationDocs"));
+
 
 // ── App Layout pages ───────────────────────────────────────────────────────────
 const AppLayout = lazy(() => import("./components/AppLayout"));
@@ -42,7 +44,9 @@ const router = createBrowserRouter([
       { path: "/privacy-policy", element: <Suspense fallback={<PageLoader />}><PrivacyPolicy /></Suspense> },
       { path: "/terms-and-conditions", element: <Suspense fallback={<PageLoader />}><TermsAndConditions /></Suspense> },
       { path: "/services", element: <Suspense fallback={<PageLoader />}><ServicesCatalog /></Suspense> },
+      { path: "/docs", element: <Suspense fallback={<PageLoader />}><BotIntegrationDocs standalone={true} /></Suspense> },
       { path: "/sso-callback", element: <AuthenticateWithRedirectCallback /> },
+
       // Legacy routes — redirect to AppLayout equivalents
       { path: "/pricing", element: <Navigate to="/app/pricing" replace /> },
       {
@@ -68,6 +72,7 @@ const router = createBrowserRouter([
       { path: "train", element: <AppTrainAI /> },
       { path: "register", element: <AppRegistration /> },
       { path: "pricing", element: <AppPricing /> },
+      { path: "docs", element: <BotIntegrationDocs standalone={true} /> },
       {
         path: "settings",
         element: <AppSettings />,
