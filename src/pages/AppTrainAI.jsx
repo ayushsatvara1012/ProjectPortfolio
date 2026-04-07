@@ -19,6 +19,192 @@ const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 focus:border-slate-400 dark:focus:border-indigo-400 text-sm text-slate-900 dark:text-slate-200 transition-colors";
 const labelCls = "block text-md font-display uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
 
+// ── Source Browser Sub-Component ──────────────────────────────────────────────
+const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refreshUser, isFree }) => {
+    const [selectedSource, setSelectedSource] = useState('');
+    const [selectedChunks, setSelectedChunks] = useState(new Set());
+
+    // Fetch distinct sources for this bot
+    const { data: sourcesData, isLoading: sourcesLoading } = useQuery({
+        queryKey: ['knowledge-sources', selectedBotId],
+        queryFn: () => authFetch(`/api/knowledge/sources/${selectedBotId}`),
+        enabled: !!selectedBotId && !isFree,
+        staleTime: 30_000,
+    });
+    const sources = sourcesData?.sources || [];
+
+    // Auto-select first source when data arrives or source list changes
+    useEffect(() => {
+        if (sources.length > 0 && (!selectedSource || !sources.find(s => s.source === selectedSource))) {
+            setSelectedSource(sources[0].source);
+        } else if (sources.length === 0) {
+            setSelectedSource('');
+        }
+    }, [sources, selectedSource]);
+
+    // Clear selection when source changes
+    useEffect(() => {
+        setSelectedChunks(new Set());
+    }, [selectedSource]);
+
+    // Fetch chunks for the selected source
+    const { data: chunksData, isLoading: chunksLoading } = useQuery({
+        queryKey: ['knowledge-chunks', selectedBotId, selectedSource],
+        queryFn: () => authFetch(`/api/knowledge/chunks/${selectedBotId}?source=${encodeURIComponent(selectedSource)}&limit=100`),
+        enabled: !!selectedBotId && !!selectedSource && !isFree,
+        staleTime: 30_000,
+    });
+    const chunks = chunksData?.chunks || [];
+    const totalChunks = chunksData?.total ?? 0;
+
+    // Toggle individual chunk selection
+    const toggleChunk = (id) => {
+        setSelectedChunks(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // Select All / Deselect All
+    const toggleAll = () => {
+        if (selectedChunks.size === chunks.length) {
+            setSelectedChunks(new Set());
+        } else {
+            setSelectedChunks(new Set(chunks.map(c => c.id)));
+        }
+    };
+
+    // Delete selected chunks
+    const deleteMutation = useMutation({
+        mutationFn: () => authFetch(`/api/knowledge/chunks/${selectedBotId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chunk_ids: Array.from(selectedChunks) }),
+        }),
+        onSuccess: (data) => {
+            // THE GHOST SOURCE FIX: Invalidate ALL related queries
+            queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId, selectedSource] });
+            queryClient.invalidateQueries({ queryKey: ['bots'] }); // Updates chunk count in stats
+            refreshUser();
+            setSelectedChunks(new Set());
+            showAlert('success', data?.message || 'Chunks deleted successfully.');
+        },
+        onError: (err) => {
+            showAlert('error', err.message || 'Failed to delete chunks.');
+        },
+    });
+
+    const handleDeleteSelected = () => {
+        if (selectedChunks.size === 0) return;
+        if (!window.confirm(`Delete ${selectedChunks.size} selected chunk(s)? This cannot be undone.`)) return;
+        deleteMutation.mutate();
+    };
+
+    const isDeleting = deleteMutation.isPending;
+
+    // If no bot selected or free tier, show placeholder
+    if (isFree || !selectedBotId) {
+        return (
+            <div className="py-6 text-center">
+                <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600 mb-2 block">lock</span>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Upgrade to browse knowledge sources.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Source Dropdown */}
+            <select
+                value={selectedSource}
+                onChange={e => setSelectedSource(e.target.value)}
+                disabled={sourcesLoading || sources.length === 0}
+                className={inputCls + ' appearance-none font-mono text-xs'}
+            >
+                {sourcesLoading && <option>Loading sources...</option>}
+                {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
+                {sources.map(s => (
+                    <option key={s.source} value={s.source}>
+                        {(s.source || 'Unknown').length > 50 ? s.source.substring(0, 47) + '...' : s.source} ({s.chunk_count} chunks)
+                    </option>
+                ))}
+            </select>
+
+            {/* Chunks List */}
+            {selectedSource && (
+                <>
+                    {/* Header: Select All + Count */}
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={toggleAll}
+                            disabled={chunks.length === 0}
+                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">
+                                {selectedChunks.size === chunks.length && chunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
+                            </span>
+                            {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
+                            {chunksLoading ? '...' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} chunks`}
+                        </span>
+                    </div>
+
+                    {/* Scrollable Chunk List */}
+                    <div className="max-h-[240px] overflow-y-auto custom-scrollbar border border-gray-100 dark:border-slate-800 divide-y divide-gray-50 dark:divide-slate-800 transition-colors">
+                        {chunksLoading ? (
+                            <div className="p-6 text-center">
+                                <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 animate-spin mx-auto mb-2" />
+                                <p className="text-xs text-slate-400">Loading chunks...</p>
+                            </div>
+                        ) : chunks.length === 0 ? (
+                            <div className="p-6 text-center">
+                                <span className="material-symbols-outlined text-[24px] text-slate-300 dark:text-slate-600 mb-1 block">inventory_2</span>
+                                <p className="text-xs text-slate-400">No chunks for this source.</p>
+                            </div>
+                        ) : (
+                            chunks.map(chunk => (
+                                <label
+                                    key={chunk.id}
+                                    className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors ${selectedChunks.has(chunk.id) ? 'bg-blue-50/50 dark:bg-indigo-950/30' : ''}`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedChunks.has(chunk.id)}
+                                        onChange={() => toggleChunk(chunk.id)}
+                                        className="mt-1 shrink-0 accent-slate-900 dark:accent-indigo-500"
+                                    />
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 font-mono transition-colors">
+                                        {chunk.content || '(empty chunk)'}
+                                    </p>
+                                </label>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Delete Selected Button — DOUBLE SUBMIT PREVENTION */}
+                    {chunks.length > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            disabled={selectedChunks.size === 0 || isDeleting}
+                            className="w-full py-2.5 min-h-[40px] bg-red-600 dark:bg-red-700 text-white text-xs uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        >
+                            {isDeleting ? (
+                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-[16px]">delete_sweep</span> Delete Selected ({selectedChunks.size})</>
+                            )}
+                        </button>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
+
 const AppTrainAI = () => {
     const { getToken } = useAuth();
     const queryClient = useQueryClient();
@@ -93,6 +279,8 @@ const AppTrainAI = () => {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['bots'] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
             refreshUser();
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
             setUrl(''); setTrainingText(''); setFile(null);
@@ -123,6 +311,8 @@ const AppTrainAI = () => {
         mutationFn: () => authFetch(`/api/train/${selectedBotId}`, { method: 'DELETE' }),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['bots'] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
             refreshUser();
             showAlert('success', data?.message || 'Knowledge purged successfully.');
         },
@@ -193,7 +383,7 @@ const AppTrainAI = () => {
             </div>
 
             {/* ── Main Grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1 overflow-hidden transition-colors duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 overflow-hidden transition-colors duration-500">
                 {/* Knowledge Sources */}
                 <div className={`lg:col-span-7 ${cellCls} p-8 relative overflow-y-auto custom-scrollbar`}>
                     {isFree && (
@@ -303,7 +493,7 @@ const AppTrainAI = () => {
                     </form>
                 </div>
 
-                {/* Right column */}
+                {/* Right column — Usage Stats */}
                 <div className="lg:col-span-5 gap-px flex flex-col bg-[#E8EBF0] dark:bg-slate-800 overflow-y-auto custom-scrollbar transition-colors">
                     {/* Usage */}
                     <div className={`${cellCls} p-8 flex flex-col justify-center min-h-[240px]`}>
@@ -340,35 +530,27 @@ const AppTrainAI = () => {
                         )}
                     </div>
 
-                    {/* ── Knowledge Management Panel ── */}
-                    <div className={`${cellCls} p-8 flex flex-col`}>
-                        <div className="flex items-center justify-between mb-5">
+                    {/* Chunk Stats (compact) */}
+                    <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                        <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">
-                                    psychology
-                                </span>
-                                <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">Knowledge Management</h4>
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
+                                <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">Knowledge Chunks</h4>
                             </div>
                             {chunkLimit >= 999999 && (
                                 <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
                             )}
                         </div>
-
-                        {/* Bot name context */}
                         {selectedBot && (
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4 transition-colors">
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-3 transition-colors">
                                 Bot: {selectedBot.bot_name || 'Unnamed Bot'}
                             </p>
                         )}
-
-                        {/* Chunk count display */}
-                        <div className="flex items-end gap-1 mb-4">
+                        <div className="flex items-end gap-1 mb-3">
                             <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
                             {chunkLimit < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>}
                             <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
                         </div>
-
-                        {/* Chunk progress bar */}
                         {chunkPct !== null && (
                             <>
                                 <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
@@ -381,31 +563,47 @@ const AppTrainAI = () => {
                                 </p>
                             </>
                         )}
-
-                        {/* Purge section */}
-                        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
-                            <div className="flex items-start gap-3 mb-4 p-3 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 transition-colors">
-                                <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
-                                    warning
-                                </span>
-                                <p className="text-md
-                                 text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
-                                    Deleting permanently removes all trained data for this bot. This action cannot be undone.
-                                </p>
-                            </div>
-                            <button
-                                onClick={handlePurge}
-                                disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
-                                className="w-full py-3 min-h-[44px] bg-red-600 dark:bg-red-700 text-white text-md uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
-                            >
-                                {isPurging ? (
-                                    <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Deleting...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined text-[20px]">delete</span> Delete All Knowledge ({chunksUsed})</>
-                                )}
-                            </button>
-                        </div>
                     </div>
+                </div>
+            </div>
+
+            {/* ── Knowledge Management (Full-Width Below Grid) ── */}
+            <div className={`${cellCls} p-8 flex-1 overflow-y-auto custom-scrollbar border-t border-gray-100 dark:border-slate-800`}>
+                <div className="flex items-center gap-2 mb-5">
+                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">folder_open</span>
+                    <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Manage Knowledge</h2>
+                </div>
+
+                <SourceBrowser
+                    selectedBotId={selectedBotId}
+                    authFetch={authFetch}
+                    queryClient={queryClient}
+                    showAlert={showAlert}
+                    refreshUser={refreshUser}
+                    isFree={isFree}
+                />
+
+                {/* Danger Zone */}
+                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
+                    <div className="flex items-start gap-3 mb-4 p-3 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 transition-colors">
+                        <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
+                            delete_forever
+                        </span>
+                        <p className="text-md text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
+                            Deleting permanently removes all trained data for this bot. This action cannot be undone.
+                        </p>
+                    </div>
+                    <button
+                        onClick={handlePurge}
+                        disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
+                        className="w-full py-3 min-h-[44px] bg-red-600 dark:bg-red-700 text-white text-md uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                    >
+                        {isPurging ? (
+                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Deleting...</>
+                        ) : (
+                            <><span className="material-symbols-outlined text-[20px]">delete</span> Delete All Knowledge ({chunksUsed})</>
+                        )}
+                    </button>
                 </div>
             </div>
 
