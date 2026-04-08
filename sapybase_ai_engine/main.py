@@ -731,7 +731,10 @@ async def require_premium_tier(user: dict = Depends(get_current_user)):
     BASIC, STARTER, and PRO users are permitted.
     """
     tier = user.get("tier")
-    if tier == "FREE" or tier is None:
+    role = user.get("role")
+    
+    # Block FREE-tier users unless they are a SUPER_ADMIN
+    if (tier == "FREE" or tier is None) and role != "SUPER_ADMIN":
         raise HTTPException(
             status_code=403,
             detail="Access denied: This feature requires an active Basic or paid subscription."
@@ -820,9 +823,23 @@ class CompanyUpdate(BaseModel):
 @app.patch("/api/company")
 def update_company_details(
     update: CompanyUpdate,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_premium_tier)
 ):
-    """Update company configuration for the authenticated user."""
+    """Update company configuration with tier-based field authorization."""
+    tier = user.get("tier", "FREE")
+    role = user.get("role")
+
+    # Field-level protection for BASIC users (STARTER/PRO/ADMIN have full access)
+    if tier == "BASIC" and role != "SUPER_ADMIN":
+        restricted_fields = ["system_prompt", "company_tone", "quick_questions", "ai_model"]
+        provided_fields = update.dict(exclude_unset=True).keys()
+        forbidden = [f for f in provided_fields if f in restricted_fields]
+        if forbidden:
+            raise HTTPException(
+                status_code=402, 
+                detail=f"Advanced customization ({', '.join(forbidden)}) requires a Starter or Pro plan."
+            )
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -855,6 +872,9 @@ def update_company_details(
         conn.commit()
         
         return {"status": "success"}
+    except HTTPException:
+        # Re-raise known HTTP exceptions (like 402/403 from our checks)
+        raise
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update company: {str(e)}")
@@ -2524,7 +2544,7 @@ async def get_billing_portal(current_user: dict = Depends(get_current_user)):
                 json={"customer_id": cust_id}
             )
             
-            if not resp.ok:
+            if not resp.is_success:
                 print(f"Polar API Error: {resp.text}")
                 raise HTTPException(status_code=400, detail="Failed to create billing session")
                 

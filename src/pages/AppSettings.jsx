@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Palette, KeyRound, Eye, EyeOff, Lock, Plus, Trash2, Sun, Moon, Bot, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Alert from '../components/alert';
 import ManageSubscriptions from '../components/ManageSubscriptions';
@@ -12,7 +11,7 @@ import BotPreview from '../components/BotPreview';
 import { useAuthenticatedFetch } from '../hooks/useApiCall';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 focus:border-slate-400 dark:focus:border-indigo-400 text-slate-900 dark:text-slate-200 transition-colors";
+const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors";
 const labelCls = "block text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5 transition-colors";
 const headingCls = "text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4 transition-colors";
 const sectionGap = 'space-y-px';
@@ -28,7 +27,7 @@ export const AccountSection = () => {
                 <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Manage your profile and access.</p>
             </div>
             <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <p className={headingCls}><User className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />Profile</p>
+                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">person</span>Profile</p>
                 <div className="flex items-center gap-4 p-4 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors">
                     <UserButton appearance={{ elements: { avatarBox: 'w-12 h-12' } }} />
                     <div>
@@ -101,7 +100,7 @@ export const CustomizeSection = () => {
     const isFree = userTier === 'FREE';
     const isBasic = userTier === 'BASIC';
     const isAdvancedLocked = (isFree || isBasic) && userRole !== 'SUPER_ADMIN';
-    const showFullOverlay = isTotallyLocked || isFree;
+    const showFullOverlay = (isTotallyLocked || isFree) && userRole !== 'SUPER_ADMIN';
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-auto lg:h-[calc(100vh-3rem)] bg-[#E8EBF0] dark:bg-slate-900 overflow-visible lg:overflow-hidden transition-colors duration-500">
@@ -112,14 +111,14 @@ export const CustomizeSection = () => {
                     <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
                 </div>
                 {/* Form area (padded, scrollable on desktop) */}
-                <div className="p-8 lg:overflow-y-auto custom-scrollbar lg:flex-1 relative">
+                <div className={`p-8 lg:flex-1 relative ${showFullOverlay ? 'overflow-hidden select-none' : 'lg:overflow-y-auto custom-scrollbar'}`}>
                     
                     {showFullOverlay && (
-                        <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors">
-                             <Lock className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-4 transition-colors" />
+                        <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors cursor-help">
+                             <span className="material-symbols-outlined text-[32px] text-slate-400 dark:text-slate-500 mb-4 transition-colors">lock</span>
                              <h3 className="text-md font-display uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">Upgrade Required</h3>
                              <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[260px] mb-6 transition-colors">Customizing your bot's visual identity requires an active subscription.</p>
-                             <Link to="/app/pricing" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-md font-display uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors shadow-sm">
+                             <Link to="/app/pricing" className="px-6 py-3 bg-linear-to-r from-blue-600 to-green-600 text-white text-md font-display uppercase tracking-widest font-bold hover:opacity-90 transition-all shadow-sm">
                                  View Plans
                              </Link>
                         </div>
@@ -154,7 +153,7 @@ export const CustomizeSection = () => {
                     {bots.length > 1 && (
                         <div className="mb-8 p-6 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors shadow-sm">
                             <div className="flex items-center gap-2 mb-4">
-                                <Bot className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                                <span className="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500">smart_toy</span>
                                 <p className={headingCls + ' mb-0'}>Customization Target</p>
                             </div>
                             <div className="relative">
@@ -169,7 +168,7 @@ export const CustomizeSection = () => {
                                         </option>
                                     ))}
                                 </select>
-                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
                             </div>
                             <p className="text-[10px] text-slate-400 mt-2 italic font-sans uppercase tracking-widest leading-relaxed">
                                 Switching bots will load their specific visual identity and configuration.
@@ -177,7 +176,7 @@ export const CustomizeSection = () => {
                         </div>
                     )}
 
-                    <p className={headingCls}><Palette className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />Bot Appearance</p>
+                    <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">palette</span>Bot Appearance</p>
                     <div className={`space-y-6 ${showFullOverlay || isLoading ? 'opacity-30 pointer-events-none' : ''}`}>
                         <div>
                             <label className={labelCls}>Bot Name</label>
@@ -202,7 +201,7 @@ export const CustomizeSection = () => {
                                 </div>
                                 <input type="text" value={botSettings.primaryColor}
                                     onChange={e => updateSetting('primaryColor', e.target.value)}
-                                    className={inputCls + ' font-mono uppercase text-md font-display leading-relaxed'} placeholder="#5730F5" />
+                                    className={inputCls + ' uppercase text-md font-display leading-relaxed'} placeholder="#5730F5" />
                             </div>
                         </div>
 
@@ -210,10 +209,10 @@ export const CustomizeSection = () => {
                         <div className="space-y-6 relative">
                             {isAdvancedLocked && (
                                 <div className="absolute -inset-4 z-40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help transition-all hover:backdrop-blur-sm">
-                                    <div className="px-3 py-1.5 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
-                                        <Lock className="w-3 h-3" /> Starter or Pro Required
+                                    <div className="px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[12px]">lock</span> Starter or Pro Required
                                     </div>
-                                    <Link to="/app/pricing" className="mt-2 text-xs font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
+                                    <Link to="/app/pricing" className="mt-2 text-md font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
                                 </div>
                             )}
 
@@ -233,7 +232,7 @@ export const CustomizeSection = () => {
                                                             : botSettings.companyTone.filter(t => t !== tone);
                                                         updateSetting('companyTone', newTones);
                                                     }}
-                                                    className="w-4 h-4 accent-slate-900 dark:accent-indigo-600"
+                                                    className="w-4 h-4 accent-slate-900 dark:accent-blue-600"
                                                 />
                                                 <span className="text-lg font-sans font-medium text-slate-700 dark:text-slate-300">{tone}</span>
                                             </label>
@@ -263,7 +262,7 @@ export const CustomizeSection = () => {
                                             onClick={() => updateSetting('quickQuestions', [...botSettings.quickQuestions, { label: '', prompt: '' }])}
                                             className="p-1 px-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors flex items-center gap-1.5"
                                         >
-                                            <Plus className="w-3 h-3" /> Add Question
+                                            <span className="material-symbols-outlined text-[12px]">add</span> Add Question
                                         </button>
                                     </div>
                                     <div className="space-y-3">
@@ -277,7 +276,7 @@ export const CustomizeSection = () => {
                                                     }}
                                                     className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                                                 >
-                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
                                                 </button>
                                                 <div>
                                                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 transition-colors">Label (Button Text)</p>
@@ -318,6 +317,10 @@ export const CustomizeSection = () => {
                         <div className="pt-4 border-t border-gray-100 dark:border-slate-800 transition-colors">
                             <button 
                                 onClick={async () => {
+                                    if (showFullOverlay) {
+                                        setAlert({ open: true, type: 'error', msg: 'Unauthorized: Customize requires an active subscription.' });
+                                        return;
+                                    }
                                     const res = await saveSettings(selectedBotId);
                                     if (res.success) {
                                         setAlert({ open: true, type: 'success', msg: 'Settings saved successfully!' });
@@ -326,7 +329,7 @@ export const CustomizeSection = () => {
                                     }
                                 }}
                                 disabled={isSaving || showFullOverlay}
-                                className="w-full py-4 min-h-[48px] bg-slate-900 dark:bg-indigo-600 text-white text-lg uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
+                                className="w-full py-4 min-h-[48px] bg-linear-to-r from-blue-600 to-green-600 text-white text-lg uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
                             >
                                 {isSaving ? (
                                     <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> PERSISTING...</>
@@ -358,10 +361,10 @@ export const CustomizeSection = () => {
                         className="flex items-center gap-2.5 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all group"
                     >
                         <div className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 transition-colors">
-                            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
+                            {isDark ? <span className="material-symbols-outlined text-[14px] text-amber-500">light_mode</span> : <span className="material-symbols-outlined text-[14px] text-blue-500">dark_mode</span>}
                         </div>
                         <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-300">
-                            {isDark ? 'Preview: Light Mode' : 'Preview: Dark Mode'} — <span className="text-indigo-500 dark:text-amber-500">Switch</span>
+                            {isDark ? 'Preview: Light Mode' : 'Preview: Dark Mode'} — <span className="text-blue-500 dark:text-amber-500">Switch</span>
                         </span>
                     </button>
                 </div>
@@ -412,22 +415,22 @@ export const ApiKeysSection = () => {
                 <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Rotate your secret API key. The old key is immediately invalidated.</p>
             </div>
             <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <p className={headingCls}><KeyRound className="inline w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500 transition-colors" />API Key Management</p>
+                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">vpn_key</span>API Key Management</p>
                 {newKey && (
                     <div className="mb-5 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 transition-colors">
                         <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans mb-2 transition-colors">New Key — Copy Now</p>
                         <div className="flex items-center gap-2 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/50 p-3 transition-colors">
                             <span className="flex-1 truncate">{showKey ? newKey : newKey.slice(0, 8) + '••••••••••••••••'}</span>
                             <button onClick={() => setShowKey(p => !p)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-                                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {showKey ? <span className="material-symbols-outlined text-[16px]">visibility_off</span> : <span className="material-symbols-outlined text-[16px]">visibility</span>}
                             </button>
                             <button onClick={() => { navigator.clipboard.writeText(newKey); showAlertMsg('success', 'Copied!'); }}
-                                className="px-2 py-1 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">Copy</button>
+                                className="px-2 py-1 bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-sm">Copy</button>
                         </div>
                     </div>
                 )}
                 <button onClick={handleRotate} disabled={isLoading}
-                    className="px-5 py-2.5 min-h-[44px] bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors disabled:opacity-50 flex items-center gap-2 active:scale-[0.99]">
+                    className="px-5 py-2.5 min-h-[44px] bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-md disabled:opacity-50 flex items-center gap-2 active:scale-[0.99]">
                     {isLoading ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Rotating...</> : 'Rotate API Key'}
                 </button>
             </div>

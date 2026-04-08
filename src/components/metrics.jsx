@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Zap, BarChart3, Cpu, ArrowUpRight, ShieldCheck, Database, Globe, Layers, Activity } from 'lucide-react';
 
 const PerformanceMetrics = () => {
   const gridRef = useRef(null);
@@ -31,7 +30,7 @@ const PerformanceMetrics = () => {
       eyebrow: "GLOBAL EDGE LATENCY",
       value: "< 50ms",
       subtext: "Average response time across CDN nodes.",
-      icon: <Globe className="w-3.5 h-3.5" />
+      icon: <span className="material-symbols-outlined text-[14px]">public</span>
     },
     {
       type: "text",
@@ -43,7 +42,7 @@ const PerformanceMetrics = () => {
       eyebrow: "CORE WEB VITALS",
       value: "100/100",
       subtext: "Perfect Lighthouse performance benchmarks.",
-      icon: <Activity className="w-3.5 h-3.5" />
+      icon: <span className="material-symbols-outlined text-[14px]">vital_signs</span>
     },
     {
       type: "text",
@@ -55,7 +54,7 @@ const PerformanceMetrics = () => {
       eyebrow: "DATABASE READ-WRITE",
       value: "10x",
       subtext: "Accelerated ingestion via Supabase indexing.",
-      icon: <Database className="w-3.5 h-3.5" />
+      icon: <span className="material-symbols-outlined text-[14px]">database</span>
     },
     {
       type: "text",
@@ -67,7 +66,7 @@ const PerformanceMetrics = () => {
       eyebrow: "AUTHENTICATION UPTIME",
       value: "99.9%",
       subtext: "Resilient Clerk-managed identity layer.",
-      icon: <ShieldCheck className="w-3.5 h-3.5" />
+      icon: <span className="material-symbols-outlined text-[14px]">verified_user</span>
     },
     {
       type: "text",
@@ -79,7 +78,7 @@ const PerformanceMetrics = () => {
       eyebrow: "JAVASCRIPT BUNDLE",
       value: "< 12KB",
       subtext: "Minified production footprint per route.",
-      icon: <Layers className="w-3.5 h-3.5" />
+      icon: <span className="material-symbols-outlined text-[14px]">layers</span>
     }
   ];
 
@@ -194,7 +193,7 @@ const PerformanceMetrics = () => {
                       
                       {/* Subtext */}
                       <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-600 dark:text-slate-400 font-sans leading-relaxed opacity-80 transition-colors duration-500">
-                        <ArrowUpRight className="w-5 h-5 text-emerald-500 shrink-0" strokeWidth={3} />
+                        <span className="material-symbols-outlined text-[20px] text-emerald-500 shrink-0">north_east</span>
                         <span>{cell.subtext}</span>
                       </div>
                     </div>

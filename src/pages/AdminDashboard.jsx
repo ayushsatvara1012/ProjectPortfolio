@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-    Users, Building2, Shield, Settings, Trash2, Edit3,
-    Search, Filter, ChevronRight, Activity, Globe,
-    Calendar, Mail, CheckCircle2, AlertCircle,
-    ShieldCheck, Zap
-} from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { useUser } from '@clerk/clerk-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -102,7 +96,7 @@ const AdminDashboard = () => {
             <div className="bg-white dark:bg-slate-950 p-8 lg:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6 transition-colors duration-500">
                 <div>
                     <div className="px-2 py-0.5 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 text-sm  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display flex items-center gap-2 w-fit mb-4 rounded-none transition-colors">
-                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span>
                         Super Admin Console
                     </div>
                     <h1 className="text-xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 uppercase transition-colors">
@@ -113,7 +107,7 @@ const AdminDashboard = () => {
 
                 <div className="flex items-center gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 transition-colors duration-500">
                     <div className="bg-white dark:bg-slate-950 relative flex items-center transition-colors">
-                        <Search className="absolute left-3 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                        <span className="material-symbols-outlined absolute left-3 text-[14px] text-slate-400 dark:text-slate-500">search</span>
                         <input
                             type="text"
                             placeholder="Search users or companies..."
@@ -127,7 +121,7 @@ const AdminDashboard = () => {
                         disabled={isLoading}
                         className="p-3 bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 disabled:opacity-50 transition-colors"
                     >
-                        <Activity className="w-4 h-4" />
+                        <span className="material-symbols-outlined text-[16px]">monitoring</span>
                     </button>
                 </div>
             </div>
@@ -138,15 +132,15 @@ const AdminDashboard = () => {
                     <div className="col-span-4 bg-white dark:bg-slate-950 p-8 transition-colors"><SkeletonLoader.Stats /></div>
                 ) : (
                     [
-                        { label: 'Total Users', value: stats.total_users, icon: Users, color: 'text-slate-900 dark:text-slate-200' },
-                        { label: 'Active Companies', value: stats.total_companies, icon: Building2, color: 'text-slate-900 dark:text-slate-200' },
-                        { label: 'System Health', value: '99.9%', icon: Activity, color: 'text-emerald-600 dark:text-emerald-400' },
-                        { label: 'Avg. Latency', value: '4.2s', icon: Zap, color: 'text-amber-600 dark:text-amber-400' }
+                        { label: 'Total Users', value: stats.total_users, icon: 'group', color: 'text-slate-900 dark:text-slate-200' },
+                        { label: 'Active Companies', value: stats.total_companies, icon: 'corporate_fare', color: 'text-slate-900 dark:text-slate-200' },
+                        { label: 'System Health', value: '99.9%', icon: 'monitoring', color: 'text-emerald-600 dark:text-emerald-400' },
+                        { label: 'Avg. Latency', value: '4.2s', icon: 'bolt', color: 'text-amber-600 dark:text-amber-400' }
                     ].map((s, i) => (
                         <div key={i} className="bg-white dark:bg-slate-950 p-8 transition-colors duration-500">
                             <div className="flex items-center justify-between mb-4">
                                 <div className={`p-2 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 rounded-none transition-colors ${s.color}`}>
-                                    <s.icon className="w-4 h-4" />
+                                    <span className="material-symbols-outlined text-[16px] transition-colors">{s.icon}</span>
                                 </div>
                                 <span className="text-md  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display transition-colors">Live</span>
                             </div>
@@ -219,7 +213,7 @@ const AdminDashboard = () => {
                                                         disabled={isActionLoading}
                                                         className="p-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
                                                     >
-                                                        {isActionLoading ? <span className="text-md  uppercase tracking-widest font-bold font-display leading-none">...</span> : <Settings className="w-4 h-4" />}
+                                                        {isActionLoading ? <span className="text-md  uppercase tracking-widest font-bold font-display leading-none">...</span> : <span className="material-symbols-outlined text-[16px]">settings</span>}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -243,7 +237,7 @@ const AdminDashboard = () => {
                                                 <td className="px-6 py-5 border-r border-gray-100 dark:border-slate-800 transition-colors">
                                                     <div className="flex items-center gap-4">
                                                         <div className="w-10 h-10 border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 flex items-center justify-center text-slate-400 dark:text-slate-500 transition-colors">
-                                                            <Building2 className="w-5 h-5" />
+                                                            <span className="material-symbols-outlined text-[20px]">corporate_fare</span>
                                                         </div>
                                                         <span className="text-md  uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-display transition-colors">{c.name}</span>
                                                     </div>
@@ -257,7 +251,7 @@ const AdminDashboard = () => {
                                                         disabled={isActionLoading}
                                                         className="p-2.5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-600 dark:hover:bg-red-700 hover:text-white dark:hover:text-slate-200 transition-colors disabled:opacity-50"
                                                     >
-                                                        {isActionLoading ? <span className="text-md  uppercase tracking-widest font-bold font-display leading-none">...</span> : <Trash2 className="w-4 h-4" />}
+                                                        {isActionLoading ? <span className="text-md  uppercase tracking-widest font-bold font-display leading-none">...</span> : <span className="material-symbols-outlined text-[16px]">delete</span>}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -266,7 +260,7 @@ const AdminDashboard = () => {
                                 </table>
                                 {filteredCompanies.length === 0 && (
                                     <div className="flex flex-col items-center justify-center py-20 bg-gray-50 dark:bg-slate-900 transition-colors duration-500">
-                                        <Building2 className="w-12 h-12 text-gray-200 dark:text-slate-700 mb-4 transition-colors" />
+                                        <span className="material-symbols-outlined text-[48px] text-gray-200 dark:text-slate-700 mb-4 transition-colors">corporate_fare</span>
                                         <p className="text-md  uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display transition-colors">No Node Entities Found</p>
                                     </div>
                                 )}

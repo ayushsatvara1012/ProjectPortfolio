@@ -23,9 +23,9 @@ const BillingSkeleton = () => (
 // ─── Tier metadata ─────────────────────────────────────────────────────────────
 const TIER_META = {
     FREE:    { label: 'Free',         color: 'text-slate-500',   badge: 'bg-slate-100 dark:bg-slate-800 text-slate-500',    icon: Shield },
-    BASIC:   { label: 'Basic',        color: 'text-indigo-600',  badge: 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600', icon: Zap },
-    STARTER: { label: 'Professional', color: 'text-blue-600',    badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600',     icon: Rocket },
-    PRO:     { label: 'Enterprise',   color: 'text-violet-600',  badge: 'bg-violet-50 dark:bg-violet-900/30 text-violet-600', icon: Shield },
+    BASIC:   { label: 'Basic',        color: 'text-blue-600',    badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600', icon: Zap },
+    STARTER: { label: 'Professional', color: 'text-emerald-600', badge: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600', icon: Rocket },
+    PRO:     { label: 'Enterprise',   color: 'text-cyan-600',    badge: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600', icon: Shield },
 };
 
 const POLAR_URLS = {
@@ -122,7 +122,7 @@ const ManageSubscriptions = () => {
     };
 
     const btnBase = 'w-full py-3 rounded-none text-sm uppercase tracking-widest font-bold font-display transition-all flex items-center justify-center gap-2';
-    const btnPrimary = `${btnBase} bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 active:scale-[0.99]`;
+    const btnPrimary = `${btnBase} bg-linear-to-r from-blue-600 to-green-600 text-white hover:opacity-90 active:scale-[0.99] shadow-sm`;
     const btnSecondary = `${btnBase} border border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800`;
     const btnDanger = `${btnBase} border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20`;
 
@@ -181,12 +181,12 @@ const ManageSubscriptions = () => {
                     <div className="bg-white dark:bg-slate-950 p-8 transition-colors">
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 mb-6 transition-colors">
+                        <div className="flex flex-col lg:flex-row gap-px lg:gap-4 bg-gray-100 lg:bg-transparent dark:bg-slate-800 lg:dark:bg-transparent border border-gray-100 lg:border-none dark:border-slate-800 mb-6 transition-colors">
                             {tier === 'FREE' && (
                                 <>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('BASIC')} disabled={isDisabled('basic')} className={btnPrimary}>{label('basic', 'Upgrade to Basic — $5/mo')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $10/mo')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button></div>
+                                    <div className="flex-1 bg-white dark:bg-slate-950 lg:border lg:border-gray-100 lg:dark:border-slate-800 transition-colors"><button onClick={handleUpgrade('BASIC')} disabled={isDisabled('basic')} className={btnPrimary}>{label('basic', 'Upgrade to Basic — $5/mo')}</button></div>
+                                    <div className="flex-1 bg-white dark:bg-slate-950 lg:border lg:border-gray-100 lg:dark:border-slate-800 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Starter — $10/mo')}</button></div>
+                                    <div className="flex-1 bg-white dark:bg-slate-950 lg:border lg:border-gray-100 lg:dark:border-slate-800 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Pro — $20/mo')}</button></div>
                                 </>
                             )}
                             {tier === 'BASIC' && (
@@ -215,7 +215,7 @@ const ManageSubscriptions = () => {
                                 View all plans →{' '}
                                 <button
                                     onClick={() => navigate('/app/pricing')}
-                                    className="text-slate-900 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                    className="text-slate-900 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                 >
                                     Pricing Page
                                 </button>

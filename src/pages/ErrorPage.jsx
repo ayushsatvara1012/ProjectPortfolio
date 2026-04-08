@@ -1,8 +1,6 @@
 import React from 'react';
 import { useRouteError, useNavigate } from 'react-router-dom';
-/* eslint-disable no-unused-vars */
 import { motion } from 'framer-motion';
-import { AlertCircle, Home, RotateCcw } from 'lucide-react';
 
 const ErrorPage = () => {
   const error = useRouteError();
@@ -27,7 +25,7 @@ const ErrorPage = () => {
         >
           <div className="absolute -inset-4 bg-rose-500/10 dark:bg-rose-500/20 blur-2xl rounded-full animate-pulse"></div>
           <div className="relative bg-white dark:bg-slate-900 border border-rose-100 dark:border-rose-900/50 p-8 rounded-3xl shadow-2xl">
-            <AlertCircle size={64} className="text-rose-500" strokeWidth={1.5} />
+            <span className="material-symbols-outlined text-[64px] text-rose-500">error</span>
           </div>
         </motion.div>
 
@@ -83,13 +81,13 @@ const ErrorPage = () => {
             onClick={() => navigate('/')}
             className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-bold font-sans hover:bg-slate-800 dark:hover:bg-slate-50 transition-all active:scale-95 shadow-xl shadow-slate-200/50 dark:shadow-none"
           >
-            <Home size={18} /> Return Home
+            <span className="material-symbols-outlined text-[18px]">home</span> Return Home
           </button>
           <button
             onClick={() => window.location.reload()}
             className="flex items-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-2xl font-bold font-sans hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
           >
-            <RotateCcw size={18} /> Retry System
+            <span className="material-symbols-outlined text-[18px]">refresh</span> Retry System
           </button>
         </motion.div>
       </div>
