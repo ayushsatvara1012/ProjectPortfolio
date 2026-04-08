@@ -155,13 +155,18 @@ const ChatWidget = ({ apiKey }) => {
                 return;
             }
 
+            // Build context history: last 4 messages BEFORE this new user message
+            // (messages state already includes the new user message we just pushed via setMessages)
+            // We use the pre-push snapshot to send the conversation context.
+            const recentHistory = messages.slice(-4).map(m => ({ role: m.role, content: m.content }));
+
             const response = await fetch(`${activeApiUrl}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'x-api-key': activeApiKey
                 },
-                body: JSON.stringify({ message: userMessage }),
+                body: JSON.stringify({ message: userMessage, history: recentHistory }),
             });
 
             if (!response.ok) {

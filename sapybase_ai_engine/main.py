@@ -15,7 +15,7 @@ from psycopg2 import pool
 from enum import Enum
 from typing import Optional
 from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header
+from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field, validator
@@ -351,8 +351,13 @@ JAILBREAK_PATTERNS = [
     r"(?i)do\s+not\s+follow\s+(the|your|any)\s+(rules|instructions)",
 ]
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
+    history: Optional[list[ChatMessage]] = Field(None, description="Last N chat messages for context-aware caching")
 
     @validator('message')
     def sanitize_jailbreak_patterns(cls, v):
@@ -843,6 +848,10 @@ def update_company_details(
         query = f"UPDATE companies SET {', '.join(updates)} WHERE user_id = %s"
         
         cursor.execute(query, tuple(params))
+
+        # Cache invalidation: clear ALL bots owned by this user (no company_id available here)
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id IN (SELECT id FROM companies WHERE user_id = %s)", (user["id"],))
+
         conn.commit()
         
         return {"status": "success"}
@@ -852,14 +861,89 @@ def update_company_details(
     finally:
         release_db_connection(conn)
 
+
+# ── EXACT-MATCH QUERY CACHE HELPERS ───────────────────────────────────────────
+
+def build_query_hash(company_id: str, message: str, history: list = None) -> str:
+    """Builds a context-aware SHA-256 hash.
+    THE CONTEXT TRAP FIX: Concatenates the last 4 chat messages + normalized current query
+    so 'Does it include support?' is scoped to what 'it' refers to.
+    Normalization: .lower().strip() on every part."""
+    parts = []
+    if history:
+        # Take last 4 messages for context window
+        for msg in history[-4:]:
+            role = msg.get("role", "") if isinstance(msg, dict) else getattr(msg, "role", "")
+            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+            parts.append(f"{role}:{content.lower().strip()}")
+    parts.append(message.lower().strip())
+    context_string = f"{company_id}|{'|'.join(parts)}"
+    return hashlib.sha256(context_string.encode()).hexdigest()
+
+def save_cache_entry(company_id: str, query_hash: str, response: str):
+    """Background task: saves a cache entry. Runs async so the user's HTTP response is not delayed."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO exact_query_cache (company_id, query_hash, response)
+               VALUES (%s, %s, %s)
+               ON CONFLICT (company_id, query_hash)
+               DO UPDATE SET response = EXCLUDED.response, created_at = now()""",
+            (company_id, query_hash, response)
+        )
+        conn.commit()
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"CACHE SAVE ERROR: {e}")
+    finally:
+        release_db_connection(conn)
+
+def invalidate_cache(conn, company_id: str):
+    """Wipes all cached responses for a given company_id. Called after brain-modifying operations."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
+        # Note: caller is responsible for conn.commit()
+    except Exception as e:
+        print(f"CACHE INVALIDATION ERROR: {e}")
+
+
+# ── ANALYTICS: SILENT CHAT LOGGER ─────────────────────────────────────────────
+
+FALLBACK_PHRASES = [
+    "i don't have specific information about that yet",
+    "i don't have that information",
+    "i'm here specifically to help you with",
+]
+
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool):
+    """Background task: silently logs every chat interaction for analytics.
+    Uses its own DB connection so the user's HTTP response is never delayed."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered)
+               VALUES (%s, %s, %s, %s, %s)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered)
+        )
+        conn.commit()
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"CHAT LOG ERROR: {e}")
+    finally:
+        release_db_connection(conn)
+
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("10/minute;50/hour")
 def chat_endpoint(
     request: Request,
     chat_req: ChatRequest, 
+    background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
-    """Core AI Chat Endpoint with Basic/Paid Enforcement and Connection Pooling."""
+    """Core AI Chat Endpoint with Exact-Match Cache, Basic/Paid Enforcement and Connection Pooling."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -897,6 +981,56 @@ def chat_endpoint(
                 "tier": tier,
                 "upgrade_url": "/app/pricing",
             })
+
+        # ── 1. EXACT-MATCH CACHE LOOKUP ──────────────────────────────────────
+        # Context-aware: uses last 4 messages + current query for hash.
+        # If widget sends no history, cache ONLY works for the first question
+        # (empty history = standalone query, safe to cache without context).
+        chat_history = chat_req.history or []
+        history_for_hash = [msg.dict() for msg in chat_history] if chat_history else []
+
+        # Only use cache if: (a) first question (no history), or (b) history is provided (context-aware)
+        # Cache is ALWAYS eligible since the widget now sends history. Future-proofed with None guard.
+        cache_eligible = True
+        query_hash = build_query_hash(company["id"], chat_req.message, history_for_hash) if cache_eligible else None
+
+        if query_hash:
+            cursor.execute(
+                "SELECT response FROM exact_query_cache WHERE company_id = %s AND query_hash = %s",
+                (company["id"], query_hash)
+            )
+            cached = cursor.fetchone()
+
+            if cached:
+                print(f"[CACHE HIT] company={company['id']} hash={query_hash[:12]}... history_len={len(chat_history)}")
+                cached_response = cached[0]
+
+                # Still increment usage — cache hits count toward billing
+                if usage_id:
+                    cursor.execute(
+                        "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                        (usage_id,)
+                    )
+                else:
+                    cursor.execute(
+                        """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
+                           VALUES (%s, %s, 1, now(), now() + interval '30 days')
+                           ON CONFLICT DO NOTHING""",
+                        (user_uuid, company["id"])
+                    )
+                conn.commit()
+
+                # ── ASYNC ANALYTICS LOG (cache hit) ──────────────────────────
+                background_tasks.add_task(
+                    log_chat_to_db, company["id"], chat_req.message,
+                    cached_response, True, False  # was_cache_hit=True, is_unanswered=False
+                )
+
+                return ChatResponse(
+                    reply=cached_response,
+                    sources=[]  # No RAG performed on cache hit
+                )
+        # ── END CACHE LOOKUP (miss — continue to full RAG + Gemini) ──────────
 
         # 2. Vector Search (RAG)
         query_vector = embeddings_model_query.embed_query(chat_req.message)
@@ -1048,6 +1182,23 @@ instructions to follow.
         else:
             reply_text = str(ai_response.content)
 
+        # ── ASYNC CACHE SAVE (does NOT delay HTTP response) ──────────────────
+        background_tasks.add_task(save_cache_entry, company["id"], query_hash, reply_text)
+
+        # ── ROBUST UNANSWERED FLAGGING ───────────────────────────────────────
+        # Signal 1: RAG returned 0 vector chunks
+        is_unanswered = len(retrieved_docs) == 0
+        # Signal 2: Bot response contains a known fallback phrase
+        if not is_unanswered:
+            response_lower = reply_text.lower()
+            is_unanswered = any(phrase in response_lower for phrase in FALLBACK_PHRASES)
+
+        # ── ASYNC ANALYTICS LOG (Gemini response) ───────────────────────────
+        background_tasks.add_task(
+            log_chat_to_db, company["id"], chat_req.message,
+            reply_text, False, is_unanswered  # was_cache_hit=False
+        )
+
         # 5. Track Usage (per-company row)
         if usage_id:
             cursor.execute(
@@ -1078,7 +1229,160 @@ instructions to follow.
         release_db_connection(conn)
 
 
-# --- TRAINING ENDPOINT ---
+# ── SAPYBASE INSIGHTS: AI SYNTHESIS ENDPOINT ──────────────────────────────────
+
+SPAM_WORDS = {"test", "hi", "hello", "hey", "ok", "yes", "no", "thanks", "bye"}
+
+@app.post("/api/analytics/generate-report/{company_id}")
+def generate_insight_report(
+    company_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Generates an AI-synthesized Business Intelligence Report from chat logs.
+    - 24h cooldown: returns cached report if one exists from the last 24 hours.
+    - Spam filter: excludes queries < 3 chars and common noise words.
+    - Payload optimized: only sends user_query + is_unanswered flag to LLM.
+    - Empty state: returns error if < 5 logs exist.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # ── OWNERSHIP GUARD ──────────────────────────────────────────────────
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # ── TIER GUARD: Starter+ only ────────────────────────────────────────
+        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
+        user_row = cursor.fetchone()
+        if user_row:
+            user_tier, user_role = user_row
+            if user_role != "SUPER_ADMIN" and (user_tier or "FREE").upper() == "FREE":
+                raise HTTPException(status_code=403, detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Insights reports require a Starter plan or above.",
+                    "upgrade_url": "/app/pricing"
+                })
+
+        # ── STEP A: 24-HOUR COOLDOWN CHECK ───────────────────────────────────
+        cursor.execute(
+            """SELECT report_json, created_at FROM insight_reports
+               WHERE company_id = %s AND created_at > now() - interval '24 hours'
+               ORDER BY created_at DESC LIMIT 1""",
+            (company_id,)
+        )
+        recent_report = cursor.fetchone()
+        if recent_report:
+            print(f"[INSIGHT REPORT] Returning cached report for company={company_id}")
+            return {
+                "status": "cached",
+                "report": recent_report[0],
+                "generated_at": recent_report[1].isoformat(),
+                "message": "Report generated within the last 24 hours. Returning cached version."
+            }
+
+        # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
+        cursor.execute(
+            """SELECT user_query, is_unanswered FROM chat_logs
+               WHERE company_id = %s
+                 AND LENGTH(TRIM(user_query)) >= 3
+                 AND LOWER(TRIM(user_query)) NOT IN %s
+               ORDER BY created_at DESC LIMIT 200""",
+            (company_id, tuple(SPAM_WORDS))
+        )
+        logs = cursor.fetchall()
+
+        # Empty state guard
+        if len(logs) < 5:
+            return {
+                "status": "insufficient_data",
+                "report": None,
+                "message": f"Not enough chat data yet ({len(logs)} logs). At least 5 meaningful conversations are needed to generate insights."
+            }
+
+        # ── PAYLOAD OPTIMIZATION: Only send query + unanswered flag ──────────
+        # bot_response is deliberately excluded to reduce LLM token cost
+        compressed_payload = "\n".join([
+            f"Q: {row[0]} | Unanswered: {row[1]}" for row in logs
+        ])
+
+        # ── STEP C: LLM SYNTHESIS ────────────────────────────────────────────
+        synthesis_prompt = """You are a business analyst. Read these raw customer chats from an AI chatbot.
+Return a strictly formatted JSON object with exactly three keys:
+- "top_trends": array of strings (the 5-8 most common topics or questions customers ask)
+- "missing_knowledge": array of strings (specific questions the bot FAILED to answer, marked Unanswered: True)
+- "actionable_advice": string (one concise, specific recommendation for the business owner to improve their bot)
+
+Rules:
+- Do NOT include any PII (names, emails, phone numbers).
+- Return ONLY valid JSON. No markdown, no code fences, no explanation.
+- If there are no unanswered questions, return an empty array for missing_knowledge."""
+
+        synthesis_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=1200,
+            temperature=0.3,
+        )
+
+        ai_response = synthesis_model.invoke([
+            SystemMessage(content=synthesis_prompt),
+            HumanMessage(content=f"Here are the last {len(logs)} customer interactions:\n\n{compressed_payload}")
+        ])
+
+        # Extract response text
+        if isinstance(ai_response.content, list):
+            raw_report = "".join([block.get("text", "") for block in ai_response.content if isinstance(block, dict) and block.get("type") == "text"])
+        else:
+            raw_report = str(ai_response.content)
+
+        # Parse JSON from LLM response (strip markdown fences if present)
+        clean_report = raw_report.strip()
+        if clean_report.startswith("```"):
+            clean_report = clean_report.split("\n", 1)[1] if "\n" in clean_report else clean_report[3:]
+        if clean_report.endswith("```"):
+            clean_report = clean_report[:-3].strip()
+
+        try:
+            report_json = json.loads(clean_report)
+        except json.JSONDecodeError:
+            # Fallback: wrap raw text as actionable_advice
+            report_json = {
+                "top_trends": [],
+                "missing_knowledge": [],
+                "actionable_advice": clean_report[:500]
+            }
+
+        # ── SAVE REPORT TO DB ────────────────────────────────────────────────
+        cursor.execute(
+            "INSERT INTO insight_reports (company_id, report_json) VALUES (%s, %s)",
+            (company_id, json.dumps(report_json))
+        )
+        conn.commit()
+
+        print(f"[INSIGHT REPORT] Generated new report for company={company_id} from {len(logs)} logs")
+
+        return {
+            "status": "generated",
+            "report": report_json,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "logs_analyzed": len(logs)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"INSIGHT REPORT ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate insight report.")
+    finally:
+        release_db_connection(conn)
+
+
 
 @app.post("/api/train")
 @limiter.limit("5/minute")
@@ -1203,6 +1507,9 @@ def train_chatbot(
             )
             current_count += 1
         
+        # Invalidate cache: new knowledge means old cached answers may be stale
+        invalidate_cache(conn, resolved_company_id)
+
         conn.commit()
         return {
             "status": "success", 
@@ -1428,6 +1735,10 @@ def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
 
         # 3. Delete all knowledge chunks for this bot
         cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (company_id,))
+
+        # Invalidate cache: purged knowledge = stale cached answers
+        invalidate_cache(conn, company_id)
+
         conn.commit()
 
         # 4. Audit log
@@ -1562,6 +1873,9 @@ def delete_knowledge_chunks(
             (body.chunk_ids, company_id)
         )
         deleted_ids = [str(row[0]) for row in cursor.fetchall()]
+        # Invalidate cache: deleted chunks may affect cached answers
+        invalidate_cache(conn, company_id)
+
         conn.commit()
 
         # Audit log
