@@ -1,4 +1,3 @@
-import { BrainCircuit, Code2, CloudCog, Globe, Activity, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Services = () => {
@@ -10,7 +9,7 @@ const Services = () => {
       label: "INTELLIGENCE",
       title: "AI & Neural Integration",
       description: "Deploying RAG-optimized LLMs and custom machine learning models that evolve with your data. We architect context-aware intelligence.",
-      icon: <BrainCircuit size={20} />,
+      icon: <span className="material-symbols-outlined text-[20px]">psychology</span>,
       btnText: "EXPLORE ARCHITECTURE",
       route: "/services"
     },
@@ -19,7 +18,7 @@ const Services = () => {
       label: "PERFORMANCE",
       title: "Ultra-Fast Web Engines",
       description: "React/Vite apps engineered for sub-200ms TTFB. High-end UX meeting industrial strength, V8-optimized code.",
-      icon: <Code2 size={20} />,
+      icon: <span className="material-symbols-outlined text-[20px]">code</span>,
       btnText: "VIEW DEPLOYMENT",
       tags: ["V8_OPTIMIZED", "SSR_READY"],
       route: "/services"
@@ -29,7 +28,7 @@ const Services = () => {
       label: "INFRASTRUCTURE",
       title: "Cloud Architect",
       description: "AWS infrastructure design using Lambda and Serverless patterns. Scaling without friction across distributed nodes.",
-      icon: <CloudCog size={20} />,
+      icon: <span className="material-symbols-outlined text-[20px]">storage</span>,
       btnText: "SYSTEM LOGS",
       route: "/services"
     },
@@ -38,7 +37,7 @@ const Services = () => {
       label: "CONNECTIVITY",
       title: "Global Scaling",
       description: "CDN-first deployment for global audiences. Real-time data synchronization at the edge for edge-first applications.",
-      icon: <Globe size={20} />,
+      icon: <span className="material-symbols-outlined text-[20px]">public</span>,
       btnText: "VIEW DEPLOYMENT LOGS",
       route: "/app/train"
     }
@@ -55,7 +54,7 @@ const Services = () => {
           <div className="md:col-span-2 bg-white dark:bg-slate-950 p-12 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-12 group/header transition-colors duration-500">
             <div className="max-w-2xl space-y-8">
               <div className="flex items-center gap-3 text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
-                <Activity size={14} className="text-slate-300 dark:text-slate-600 transition-colors" />
+                <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 transition-colors">vital_signs</span>
                 <span>Service_Module_Registry</span>
               </div>
               <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase transition-colors">
@@ -131,7 +130,7 @@ const Services = () => {
                   className="w-full md:w-auto px-8 py-5 bg-slate-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 text-md font-sans uppercase tracking-widest font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 group/btn"
                 >
                   {service.btnText}
-                  <ChevronRight size={14} className="opacity-40 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all" />
+                  <span className="material-symbols-outlined text-[14px] opacity-40 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all">chevron_right</span>
                 </button>
               </div>
             </div>

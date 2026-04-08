@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Zap, Rocket, Building2, Sparkles, Globe } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../context/UserContext';
@@ -102,10 +101,10 @@ const AppPricing = () => {
                 'SaPyBase branding',
                 'Community support',
             ],
-            icon: Zap, highlight: false,
+            icon: 'bolt', highlight: false,
         },
         {
-            name: 'Professional', id: 'STARTER',
+            name: 'Starter', id: 'STARTER',
             price: PRICE_MATRIX.STARTER[currency],
             period: '/mo',
             description: 'Up to 2 bots for growing businesses.',
@@ -117,10 +116,10 @@ const AppPricing = () => {
                 'Custom branding & colors',
                 'Priority email support',
             ],
-            icon: Rocket, highlight: true,
+            icon: 'rocket_launch', highlight: true,
         },
         {
-            name: 'Enterprise', id: 'PRO',
+            name: 'Pro', id: 'PRO',
             price: PRICE_MATRIX.PRO[currency],
             period: '/mo',
             description: 'Up to 5 bots for scaling operations.',
@@ -132,7 +131,7 @@ const AppPricing = () => {
                 'Full white-label',
                 'SLA & dedicated support',
             ],
-            icon: Building2, highlight: false,
+            icon: 'corporate_fare', highlight: false,
         },
     ];
 
@@ -169,7 +168,7 @@ const AppPricing = () => {
             <div className="bg-white dark:bg-slate-950 px-6 py-6 md:px-8 md:py-8 shrink-0 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 transition-colors duration-500">
                 <div className="text-center md:text-left">
                     <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                        <Sparkles className="w-4 h-4 text-indigo-500 transition-colors" />
+                        <span className="material-symbols-outlined text-[16px] text-blue-500 transition-colors">auto_awesome</span>
                         <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Plans &amp; Pricing</h1>
                     </div>
                     <p className="text-md font-display text-slate-600 dark:text-slate-400 leading-relaxed transition-colors max-w-sm md:max-w-none">Choose the plan that fits your stage. Fast & simple setup.</p>
@@ -179,7 +178,7 @@ const AppPricing = () => {
                     {/* Detection Indicator */}
                     {isDetecting && (
                         <div className="flex items-center gap-2 text-xs font-sans font-bold text-slate-400 uppercase tracking-widest animate-pulse">
-                            <Globe className="w-3 h-3" />
+                            <span className="material-symbols-outlined text-[12px]">public</span>
                             Detecting Location...
                         </div>
                     )}
@@ -189,7 +188,7 @@ const AppPricing = () => {
                             {Object.keys(CURRENCIES).map(curr => (
                                 <button key={curr} onClick={() => setCurrency(curr)}
                                     className={`px-4 py-1.5 text-lg font-sans font-bold tracking-widest uppercase transition-all ${currency === curr
-                                        ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md'
+                                        ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-md'
                                         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'
                                         }`}>
                                     {curr}
@@ -208,18 +207,18 @@ const AppPricing = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.1 }}
-                        className={`${cellCls} flex flex-col p-8 md:p-10 relative border-t-2 ${plan.highlight ? 'border-indigo-600 dark:border-indigo-500' : 'border-transparent'
+                        className={`${cellCls} flex flex-col p-8 md:p-10 relative border-t-2 ${plan.highlight ? 'border-blue-500 dark:border-blue-400' : 'border-transparent'
                             }`}
                     >
                         {plan.highlight && (
-                            <div className="absolute top-0 right-0 px-4 py-1.5 bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans transition-colors">
+                            <div className="absolute top-0 right-0 px-4 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans transition-colors">
                                 Recommended
                             </div>
                         )}
 
-                        <div className={`w-12 h-12 border flex items-center justify-center mb-6 transition-colors ${plan.highlight ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-[#FAFAFA] dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        <div className={`w-12 h-12 border flex items-center justify-center mb-6 transition-colors ${plan.highlight ? 'bg-linear-to-br from-blue-600 to-green-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' : 'bg-[#FAFAFA] dark:bg-slate-900 border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                             }`}>
-                            <plan.icon className="w-5 h-5" />
+                            <span className="material-symbols-outlined text-[20px] transition-colors">{plan.icon}</span>
                         </div>
 
                         <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-1.5 transition-colors uppercase tracking-tight">{plan.name}</h3>
@@ -230,7 +229,7 @@ const AppPricing = () => {
                                 </span>
                                 {plan.period && <span className="text-xs text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
                             </div>
-                            <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-600 dark:text-indigo-400 font-sans mt-1">
+                            <span className="text-[10px] uppercase tracking-widest font-bold text-blue-600 dark:text-blue-400 font-sans mt-1">
                                 Local taxes handled at checkout
                             </span>
                         </div>
@@ -239,17 +238,17 @@ const AppPricing = () => {
                         <div className="space-y-4 flex-1 mb-8">
                             {plan.features.map((f, j) => (
                                 <div key={j} className="flex items-center gap-3 group">
-                                    <div className="w-4 h-4 rounded-none bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center transition-colors group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/60">
-                                        <Check className="w-2.5 h-2.5 text-indigo-500 dark:text-indigo-400 shrink-0 transition-colors" />
+                                    <div className="w-4 h-4 rounded-none bg-blue-50 dark:bg-emerald-900/40 flex items-center justify-center transition-colors group-hover:bg-blue-100 dark:group-hover:bg-emerald-900/60">
+                                        <span className="material-symbols-outlined text-[10px] text-blue-500 dark:text-emerald-400 shrink-0 transition-colors">check</span>
                                     </div>
-                                    <span className="text-lg text-slate-600 dark:text-slate-400 font-sans transition-colors group-hover:text-slate-900 dark:group-hover:text-slate-200">{f}</span>
+                                    <span className="text-lg text-slate-600 font-semibold dark:text-slate-400 font-sans transition-colors group-hover:text-slate-900 dark:group-hover:text-slate-200">{f}</span>
                                 </div>
                             ))}
                         </div>
 
                         <button onClick={() => handleSelectPlan(plan.id)} disabled={isLoading || plan.id === userTier}
                             className={`w-full py-4 min-h-[48px] text-lg font-sans uppercase tracking-widest font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${plan.highlight
-                                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-500/10'
+                                ? 'bg-linear-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-xl shadow-blue-500/10'
                                 : 'bg-transparent border border-gray-200 dark:border-slate-800 text-slate-900 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900'
                                 } ${(isLoading && selectedTier === plan.id) || plan.id === userTier ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>
                             {plan.id === userTier ? 'ACTIVE_PLAN' : (

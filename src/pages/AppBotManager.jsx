@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Plus, Trash2, Lock, Activity, ChevronRight, Zap } from 'lucide-react';
 import { useUserRole } from '../context/UserContext';
 import { SkeletonBase } from '../components/SkeletonLoader';
 import UpgradePrompt from '../components/UpgradePrompt';
@@ -61,7 +60,7 @@ const AppBotManager = () => {
       <div className="bg-white dark:bg-slate-950 px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between transition-colors">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Bot className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+            <span className="material-symbols-outlined text-[16px] text-slate-600 dark:text-slate-400">smart_toy</span>
             <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200">My Bots</h1>
           </div>
           <p className="text-md font-display text-slate-500 dark:text-slate-400">Manage all your AI assistants across your plan.</p>
@@ -124,7 +123,7 @@ const AppBotManager = () => {
                       </div>
                       <div className="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800 flex items-center justify-center"
                         style={{ backgroundColor: bot.theme_color + '20' }}>
-                        <Bot className="w-4 h-4" style={{ color: bot.theme_color }} />
+                        <span className="material-symbols-outlined text-[16px]" style={{ color: bot.theme_color }}>smart_toy</span>
                       </div>
                     </div>
 
@@ -166,20 +165,20 @@ const AppBotManager = () => {
                         onClick={() => navigate(`/app/train?bot=${bot.id}`)}
                         className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors flex items-center justify-center gap-1"
                       >
-                        <Activity className="w-3 h-3" /> Train
+                        <span className="material-symbols-outlined text-[12px]">psychology</span> Train
                       </button>
                       <button
                         onClick={() => navigate(`/app/register?edit=${bot.id}`)}
                         className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans border border-gray-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1"
                       >
-                        <ChevronRight className="w-3 h-3" /> Settings
+                        <span className="material-symbols-outlined text-[12px]">settings</span> Settings
                       </button>
                       <button
                         onClick={() => handleDelete(bot.id, bot.bot_name)}
                         disabled={deletingId === bot.id || deleteMutation.isPending}
                         className="p-2 border border-red-100 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="material-symbols-outlined text-[14px]">delete</span>
                       </button>
                     </div>
                   </div>
@@ -200,7 +199,7 @@ const AppBotManager = () => {
               {canAdd ? (
                 <>
                   <div className="w-12 h-12 border border-gray-200 dark:border-slate-700 group-hover:border-indigo-300 dark:group-hover:border-indigo-600 flex items-center justify-center mb-3 transition-colors">
-                    <Plus className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+                    <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">add</span>
                   </div>
                   <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-center">
                     Add New Bot
@@ -213,7 +212,7 @@ const AppBotManager = () => {
                 </>
               ) : (
                 <>
-                  <Lock className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-3" />
+                  <span className="material-symbols-outlined text-[20px] text-slate-300 dark:text-slate-600 mb-3">lock</span>
                   <p className="text-[10px] uppercase tracking-widest font-bold text-slate-300 dark:text-slate-600 font-sans text-center">
                     Bot Limit Reached
                   </p>
@@ -233,7 +232,7 @@ const AppBotManager = () => {
         {/* Empty state */}
         {!isLoading && bots.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Bot className="w-12 h-12 text-gray-200 dark:text-slate-700 mb-4" />
+            <span className="material-symbols-outlined text-[48px] text-gray-200 dark:text-slate-700 mb-4">smart_toy</span>
             <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No bots yet</p>
             <p className="text-sm text-slate-400 dark:text-slate-600 font-display mb-6">Create your first AI assistant to get started.</p>
             <Link to="/app/register" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">

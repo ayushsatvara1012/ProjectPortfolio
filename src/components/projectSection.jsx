@@ -1,14 +1,4 @@
 import React from 'react';
-import {
-  Github,
-  ArrowRight,
-  Globe,
-  Cpu,
-  Boxes,
-  Zap,
-  Activity,
-  Layers
-} from 'lucide-react';
 
 const projects = [
   {
@@ -20,7 +10,7 @@ const projects = [
     launch: "#",
     status: "Active Development",
     accent: "indigo",
-    icon: <Globe size={14} />,
+    icon: <span className="material-symbols-outlined text-[14px]">public</span>,
     image: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80&w=1000"
   },
   {
@@ -32,7 +22,7 @@ const projects = [
     launch: "https://village-community-platform.vercel.app/",
     status: "Deployed: Vercel",
     accent: "orange",
-    icon: <Globe size={14} />,
+    icon: <span className="material-symbols-outlined text-[14px]">public</span>,
     image: "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?auto=format&fit=crop&q=80&w=1000"
   },
   {
@@ -44,7 +34,7 @@ const projects = [
     launch: "#",
     status: "Deployed: Vercel",
     accent: "blue",
-    icon: <Cpu size={14} />,
+    icon: <span className="material-symbols-outlined text-[14px]">memory</span>,
     image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000"
   },
   {
@@ -56,7 +46,7 @@ const projects = [
     launch: "#",
     status: "Under Development",
     accent: "gray",
-    icon: <Cpu size={14} />,
+    icon: <span className="material-symbols-outlined text-[14px]">memory</span>,
     image: "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&q=80&w=1000"
   }
 ];
@@ -72,7 +62,7 @@ const ProjectSection = () => {
           {/* 1. SECTION HEADER BLOCK */}
           <div className="bg-white dark:bg-slate-950 p-12 md:p-6 flex flex-col justify-center gap-8 transition-colors duration-500">
             <div className="flex items-center gap-3 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
-              <Boxes size={14} />
+              <span className="material-symbols-outlined text-[14px]">inventory_2</span>
               <span>Project_Portfolio</span>
             </div>
             <div className="space-y-4">
@@ -127,18 +117,17 @@ const ProjectSection = () => {
               <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 lg:grid-rows-2 gap-px bg-gray-200 dark:bg-slate-800 transition-colors duration-500">
                 <a 
                   href={project.github} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                  target="_blank"                   rel="noopener noreferrer"
                   className="bg-white dark:bg-slate-950 dark:text-slate-400 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white dark:hover:text-slate-200 transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
-                  <Github className="w-5 h-5 md:w-8 md:h-8 opacity-40 group-hover/btn:opacity-100" />
+                  <span className="material-symbols-outlined text-[20px] md:text-[32px] opacity-40 group-hover/btn:opacity-100">code</span>
                   <span className="text-md tracking-widest font-display">Source</span>
                 </a>
                 <a 
                   href={project.launch} 
                   className="bg-white dark:bg-slate-950 dark:text-slate-400 hover:bg-blue-800 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-slate-200 transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
-                  <ArrowRight className="w-5 h-5 md:w-8 md:h-8 opacity-40 group-hover/btn:opacity-100" />
+                  <span className="material-symbols-outlined text-[20px] md:text-[32px] opacity-40 group-hover/btn:opacity-100">arrow_forward</span>
                   <span className="text-md tracking-widest font-display">Launch</span>
                 </a>
               </div>
@@ -150,10 +139,10 @@ const ProjectSection = () => {
           <div className="bg-white dark:bg-slate-950 p-12 flex flex-col items-center gap-3 text-center transition-colors duration-500">
             <div className="flex flex-wrap justify-center gap-8 md:gap-16">
               {[
-                { label: "LATENCY", value: "<100ms", icon: <Zap size={14} /> },
-                { label: "UPTIME", value: "99.98%", icon: <Activity size={14} /> },
-                { label: "SECURITY", value: "ENCRYPTED", icon: <ShieldCheck size={14} /> },
-                { label: "ARCH", value: "ATOMIC", icon: <Layers size={14} /> }
+                { label: "LATENCY", value: "<100ms", icon: <span className="material-symbols-outlined text-[14px]">bolt</span> },
+                { label: "UPTIME", value: "99.98%", icon: <span className="material-symbols-outlined text-[14px]">vital_signs</span> },
+                { label: "SECURITY", value: "ENCRYPTED", icon: <span className="material-symbols-outlined text-[14px]">verified_user</span> },
+                { label: "ARCH", value: "ATOMIC", icon: <span className="material-symbols-outlined text-[14px]">layers</span> }
               ].map((m, i) => (
                 <div key={i} className="flex flex-col items-center gap-2">
                   <div className="text-slate-300 dark:text-slate-700 transition-colors">{m.icon}</div>
@@ -170,12 +159,5 @@ const ProjectSection = () => {
     </section>
   );
 };
-
-// Internal ShieldCheck icon to resolve dependency
-const ShieldCheck = ({ size, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 15 11"/>
-  </svg>
-);
 
 export default ProjectSection;

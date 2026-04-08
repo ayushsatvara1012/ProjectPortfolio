@@ -100,17 +100,6 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
         </div>
     );
 
-//     const snippet = `<script>
-//   window.SaPyBaseConfig = {
-//     apiKey: "${apiKey}",
-//     apiUrl: "${apiUrl}"
-//   };
-// </script>
-// <script 
-//   src="https://www.sapybase.com/widget.js" 
-//   defer>
-// </script>`;
-
     const navLinks = [
         { id: 'setup', label: '1. Account Setup', icon: 'person_add' },
         { id: 'integration', label: '2. Integration', icon: 'code' },
@@ -187,43 +176,45 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
     return (
         <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col font-sans transition-colors duration-500">
             {/* Mobile Header / Nav */}
-            <div className="lg:hidden sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between transition-colors">
+            <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between transition-all">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-blue-600">description</span>
                     <span className="font-display font-black text-slate-900 dark:text-slate-200 tracking-tight">Manual</span>
                 </div>
                 <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-slate-600 dark:text-slate-400">
-                    <span className="material-symbols-outlined text-2xl">{isMenuOpen ? 'close' : 'menu'}</span>
+                    <span className="material-symbols-outlined text-2xl">{isMenuOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
                 </button>
+
+                {/* Mobile Menu Dropdown */}
+                <AnimatePresence>
+                    {isMenuOpen && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute top-[calc(100%+8px)] left-4 right-4 z-40 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 shadow-2xl rounded-2xl overflow-hidden transition-colors"
+                        >
+                            <nav className="p-2 space-y-1">
+                                {navLinks.map((link) => (
+                                    <button
+                                        key={link.id}
+                                        onClick={() => scrollTo(link.id)}
+                                        className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl transition-colors ${activeSection === link.id
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                                                : 'text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+                                            }`}
+                                    >
+                                        <span className={`material-symbols-outlined ${activeSection === link.id ? 'text-blue-600' : 'text-slate-400'}`}>{link.icon}</span>
+                                        <span className="text-base font-bold">{link.label}</span>
+                                    </button>
+                                ))}
+                            </nav>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
-
-            {/* Mobile Menu Overlay */}
-            <AnimatePresence>
-                {isMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        className="fixed inset-0 z-40 lg:hidden bg-white dark:bg-slate-950 pt-20 px-8 transition-colors overflow-y-auto"
-                    >
-                        <nav className="space-y-6 pb-20">
-                            {navLinks.map((link) => (
-                                <button
-                                    key={link.id}
-                                    onClick={() => scrollTo(link.id)}
-                                    className="flex items-center gap-4 w-full text-left p-2 text-2xl font-medium"
-                                >
-                                    <span className="material-symbols-outlined text-green-500">{link.icon}</span>
-                                    <span className="text-xl font-bold text-slate-900 dark:text-slate-200">{link.label}</span>
-                                </button>
-                            ))}
-                        </nav>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <div className="max-w-8xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 py-12 flex-1">
+            <div className="max-w-8xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 py-12 px-3 flex-1">
 
                 {/* ── LEFT COLUMN: Navigation (Hidden on mobile) ── */}
                 <aside className="hidden lg:block lg:col-span-3 sticky top-24 h-fit">
