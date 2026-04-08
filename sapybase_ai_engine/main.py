@@ -1256,15 +1256,16 @@ def generate_insight_report(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        # ── TIER GUARD: Starter+ only ────────────────────────────────────────
+        # ── TIER GUARD: PRO+ only ───────────────────────────────────────────
         cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
         user_row = cursor.fetchone()
         if user_row:
             user_tier, user_role = user_row
-            if user_role != "SUPER_ADMIN" and (user_tier or "FREE").upper() == "FREE":
+            tier_upper = (user_tier or "FREE").upper()
+            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
                 raise HTTPException(status_code=403, detail={
                     "code": "TIER_REQUIRED",
-                    "message": "Insights reports require a Starter plan or above.",
+                    "message": "Insights reports are a premium feature requiring the Professional plan.",
                     "upgrade_url": "/app/pricing"
                 })
 

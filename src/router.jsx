@@ -16,6 +16,7 @@ const BotIntegrationDocs = lazy(() => import("./components/BotIntegrationDocs"))
 const AppLayout = lazy(() => import("./components/AppLayout"));
 const AppBotManager = lazy(() => import("./pages/AppBotManager"));
 const AppTrainAI = lazy(() => import("./pages/AppTrainAI"));
+const AppInsights = lazy(() => import("./pages/AppInsights"));
 const AppRegistration = lazy(() => import("./pages/AppRegistration"));
 const AppPricing = lazy(() => import("./pages/AppPricing"));
 const AppSettings = lazy(() => import("./pages/AppSettings"));
@@ -70,6 +71,7 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/bots" replace /> },
       { path: "bots", element: <AppBotManager /> },
       { path: "train", element: <AppTrainAI /> },
+      { path: "insights", element: <AppInsights /> },
       { path: "register", element: <AppRegistration /> },
       { path: "pricing", element: <AppPricing /> },
       { path: "docs", element: <BotIntegrationDocs standalone={true} /> },

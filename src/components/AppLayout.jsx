@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Bot, BrainCircuit, CreditCard, Settings, Building2,
     ChevronRight, User, Palette, KeyRound,
-    ChevronDown, Menu, X, ShieldCheck
+    ChevronDown, Menu, X, ShieldCheck, LineChart
 } from 'lucide-react';
 import Logo from './Logo';
 import { BotSettingsProvider } from '../context/BotSettingsContext';
@@ -23,6 +23,7 @@ const TOP_NAV = [
     { label: 'My Bots',      icon: Bot,         path: '/app/bots' },
     { label: 'Create Bot Identity', icon: Building2,    path: '/app/register' },
     { label: 'Train AI',     icon: BrainCircuit, path: '/app/train' },
+    { label: 'Insights',     icon: LineChart,    path: '/app/insights' },
     { label: 'Pricing',      icon: CreditCard,   path: '/app/pricing' },
 ];
 
@@ -30,6 +31,7 @@ const PATH_LABELS = {
     '/app/bots': 'My Bots',
     '/app/register': 'Create Bot Identity',
     '/app/train': 'Train AI',
+    '/app/insights': 'Insights Dashboard',
     '/app/pricing': 'Pricing',
     '/app/settings/account': 'Account',
     '/app/settings/billing': 'Billing',
