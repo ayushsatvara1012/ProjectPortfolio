@@ -809,6 +809,7 @@ def retrieve_knowledge(conn, company_id, query_vector, limit=5, distance_thresho
     return results
 
 class CompanyUpdate(BaseModel):
+    company_id: Optional[str] = None
     company_name: Optional[str] = None
     company_tone: Optional[str] = None
     theme_color: Optional[str] = None
@@ -844,14 +845,24 @@ def update_company_details(
     try:
         cursor = conn.cursor()
         
+        # Determine targeting: use provided company_id or fallback to primary bot
+        target_company_id = update.company_id
+        if not target_company_id:
+            cursor.execute("SELECT id FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1", (user["id"],))
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="No bot found to update.")
+            target_company_id = row[0]
+
         # Build dynamic query
         updates = []
         params = []
         
         # exclude_unset ensures we only update fields provided in the request
         for field, value in update.dict(exclude_unset=True).items():
+            if field == "company_id": continue # Skip the ID in the SET clause
+            
             # SECURITY & DATA INTEGRITY: JSON fields must be serialized to strings
-            # for psycopg2 to wrap correctly in TEXT/VARCHAR columns.
             if field == "quick_questions" and value is not None:
                 value = json.dumps(value)
             
@@ -861,17 +872,20 @@ def update_company_details(
         if not updates:
             return {"status": "no changes"}
             
+        # Target specific bot ID while ensuring ownership via user_id
+        params.append(target_company_id)
         params.append(user["id"])
-        query = f"UPDATE companies SET {', '.join(updates)} WHERE user_id = %s"
+        query = f"UPDATE companies SET {', '.join(updates)} WHERE id = %s AND user_id = %s"
         
         cursor.execute(query, tuple(params))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=403, detail="Unauthorized or bot does not exist.")
 
-        # Cache invalidation: clear ALL bots owned by this user (no company_id available here)
-        cursor.execute("DELETE FROM exact_query_cache WHERE company_id IN (SELECT id FROM companies WHERE user_id = %s)", (user["id"],))
+        # Cache invalidation: targeted clear for ONLY the specific bot
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (target_company_id,))
 
         conn.commit()
-        
-        return {"status": "success"}
+        return {"status": "success", "updated_id": target_company_id}
     except HTTPException:
         # Re-raise known HTTP exceptions (like 402/403 from our checks)
         raise
