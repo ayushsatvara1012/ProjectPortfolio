@@ -39,12 +39,12 @@ const LIMIT_CONFIG = {
 
 const ACCENT_STYLES = {
   indigo: {
-    bg: 'bg-indigo-50 dark:bg-indigo-900/20',
-    border: 'border-indigo-200 dark:border-indigo-800/50',
-    icon: 'text-indigo-600 dark:text-indigo-400',
-    iconBg: 'bg-indigo-100 dark:bg-indigo-900/40',
-    btn: 'bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500',
-    progress: 'bg-indigo-500',
+    bg: 'bg-blue-50/50 dark:bg-blue-900/10',
+    border: 'border-blue-100 dark:border-blue-900/30',
+    icon: 'text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-blue-100/50 dark:bg-blue-900/40',
+    btn: 'bg-linear-to-r from-blue-600 to-emerald-500 hover:from-blue-700 hover:to-emerald-600 transition-all shadow-lg shadow-blue-500/10',
+    progress: 'bg-linear-to-r from-blue-500 to-emerald-400',
   },
   amber: {
     bg: 'bg-amber-50 dark:bg-amber-900/20',
