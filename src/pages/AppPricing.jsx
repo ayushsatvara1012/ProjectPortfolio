@@ -201,7 +201,7 @@ const AppPricing = () => {
             </div>
 
             {/* Plan Cards — grid: 1 col on mobile, 3 cols on medium+ */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1 overflow-y-auto custom-scrollbar transition-colors duration-500 pb-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1 overflow-y-auto custom-scrollbar transition-colors duration-500">
                 {plans.map((plan, i) => (
                     <motion.div 
                         key={plan.id}

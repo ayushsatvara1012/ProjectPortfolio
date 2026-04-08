@@ -75,12 +75,12 @@ const AppInsights = () => {
 
     if (!isLoaded) {
         return (
-            <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 animate-pulse transition-colors duration-500">
+            <div className="flex flex-col h-full bg-white dark:bg-slate-900 animate-pulse transition-colors duration-500">
                 <div className="bg-white dark:bg-slate-950 px-8 py-6 border-b border-gray-100 dark:border-slate-800">
                     <div className="h-7 bg-slate-200 dark:bg-slate-800 w-48 mb-2" />
                     <div className="h-4 bg-slate-100 dark:bg-slate-800 w-72" />
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
                     {[1, 2, 3].map(i => (
                         <div key={i} className="bg-white dark:bg-slate-950 p-8">
                             <div className="h-4 bg-slate-100 dark:bg-slate-800 w-24 mb-3" />
@@ -88,7 +88,7 @@ const AppInsights = () => {
                         </div>
                     ))}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 flex-1">
                     <div className="lg:col-span-7 bg-white dark:bg-slate-950 p-8" />
                     <div className="lg:col-span-5 bg-white dark:bg-slate-950 p-8" />
                 </div>
@@ -98,7 +98,7 @@ const AppInsights = () => {
 
     if (userTier !== 'PRO') {
         return (
-            <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500">
+            <div className="flex flex-col h-full bg-white dark:bg-slate-900 transition-colors duration-500">
                 {/* Header */}
                 <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                     <div className="flex items-center gap-2 mb-1">
@@ -123,7 +123,7 @@ const AppInsights = () => {
     // ── Ghost Town ───────────────────────────────────────────────────────────
     if (isGhostTown) {
         return (
-            <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500">
+            <div className="flex flex-col h-full bg-white dark:bg-slate-900 transition-colors duration-500">
                 <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                     <div className="flex items-center gap-2 mb-1">
                         <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
@@ -165,7 +165,7 @@ const AppInsights = () => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500"
+            className="flex flex-col h-full bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-500"
         >
             {/* ── Page Header ── */}
             <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
@@ -278,7 +278,7 @@ const AppInsights = () => {
                     )}
 
                     {/* ── Main Grid ── */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 overflow-auto custom-scrollbar transition-colors duration-500 flex-1">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-auto custom-scrollbar transition-colors duration-500 flex-1">
 
                         {/* ── Left Column: Top Trends ── */}
                         <div className={`lg:col-span-7 ${cellCls} p-8 overflow-y-auto custom-scrollbar`}>
@@ -294,11 +294,11 @@ const AppInsights = () => {
                                 The most common subjects and questions your users are asking. Use these to improve your bot's knowledge.
                             </p>
 
-                            <div className="space-y-px bg-[#E8EBF0] dark:bg-slate-800 border border-gray-100 dark:border-slate-800 transition-colors duration-500">
+                            <div className="space-y-px bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-800 transition-colors duration-500">
                                 {reportData?.top_trends && reportData.top_trends.length > 0 ? (
                                     reportData.top_trends.map((trend, idx) => (
                                         <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                            <div className="w-8 h-8 shrink-0 bg-[#E8EBF0] dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400 transition-colors">
+                                            <div className="w-8 h-8 shrink-0 bg-white dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400 transition-colors">
                                                 {String(idx + 1).padStart(2, '0')}
                                             </div>
                                             <p className="text-sm font-display text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5 transition-colors">
@@ -317,7 +317,7 @@ const AppInsights = () => {
                         </div>
 
                         {/* ── Right Column: Knowledge Gaps + Advice ── */}
-                        <div className="lg:col-span-5 flex flex-col gap-px bg-[#E8EBF0] dark:bg-slate-800 transition-colors duration-500">
+                        <div className="lg:col-span-5 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500">
 
                             {/* Knowledge Gaps */}
                             <div className={`${cellCls} p-8 overflow-y-auto custom-scrollbar flex-1`}>

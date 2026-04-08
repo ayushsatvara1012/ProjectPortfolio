@@ -2,29 +2,24 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import { UserButton, useUser } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    Bot, BrainCircuit, CreditCard, Settings, Building2,
-    ChevronRight, User, Palette, KeyRound,
-    ChevronDown, Menu, X, ShieldCheck, LineChart
-} from 'lucide-react';
 import Logo from './Logo';
 import { BotSettingsProvider } from '../context/BotSettingsContext';
 import FloatingBotWidget from './FloatingBotWidget';
 import { useUserRole } from '../context/UserContext';
 
 const SETTINGS_SUB = [
-    { label: 'Account', icon: User, path: '/app/settings/account' },
-    { label: 'Billing', icon: CreditCard, path: '/app/settings/billing' },
-    { label: 'Customize Bot', icon: Palette, path: '/app/settings/customize' },
-    { label: 'API Keys', icon: KeyRound, path: '/app/settings/apikeys' },
+    { label: 'Account', icon: 'person', path: '/app/settings/account' },
+    { label: 'Billing', icon: 'payments', path: '/app/settings/billing' },
+    { label: 'Customize Bot', icon: 'palette', path: '/app/settings/customize' },
+    { label: 'API Keys', icon: 'key', path: '/app/settings/apikeys' },
 ];
 
 const TOP_NAV = [
-    { label: 'My Bots',      icon: Bot,         path: '/app/bots' },
-    { label: 'Create Bot Identity', icon: Building2,    path: '/app/register' },
-    { label: 'Train AI',     icon: BrainCircuit, path: '/app/train' },
-    { label: 'Insights',     icon: LineChart,    path: '/app/insights' },
-    { label: 'Pricing',      icon: CreditCard,   path: '/app/pricing' },
+    { label: 'My Bots', icon: 'smart_toy', path: '/app/bots' },
+    { label: 'Create Bot', icon: 'domain', path: '/app/register' },
+    { label: 'Train AI', icon: 'psychology', path: '/app/train' },
+    { label: 'Insights', icon: 'insights', path: '/app/insights' },
+    { label: 'Pricing', icon: 'payments', path: '/app/pricing' },
 ];
 
 const PATH_LABELS = {
@@ -43,7 +38,7 @@ const PATH_LABELS = {
 const TIER_LABEL = { FREE: 'Free', BASIC: 'Basic', STARTER: 'Starter', PRO: 'Pro' };
 
 // ── Sidebar nav item (sharp left-border active state) ─────────────────────────
-const SidebarItem = ({ label, icon: Icon, path, onClick }) => (
+const SidebarItem = ({ label, icon: iconName, path, onClick }) => (
     <NavLink
         to={path}
         onClick={onClick}
@@ -56,7 +51,9 @@ const SidebarItem = ({ label, icon: Icon, path, onClick }) => (
     >
         {({ isActive }) => (
             <>
-                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`} />
+                <span className={`material-symbols-outlined text-[20px] shrink-0 ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                    {iconName}
+                </span>
                 <span className="flex-1 truncate">{label}</span>
             </>
         )}
@@ -79,7 +76,7 @@ const SidebarContent = ({ user, onClose }) => {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800 lg:hidden transition-colors">
                     <div className="flex items-center gap-2" />
                     <button onClick={onClose} className="p-2 hover:bg-white dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors">
-                        <X className="w-5 h-5 text-slate-500 dark:text-slate-400 transition-colors" />
+                        <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400 transition-colors">close</span>
                     </button>
                 </div>
             )}
@@ -101,9 +98,13 @@ const SidebarContent = ({ user, onClose }) => {
                             : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
                             }`}
                     >
-                        <Settings className={`w-5 h-5 shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`} />
+                        <span className={`material-symbols-outlined text-[20px] shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                            settings
+                        </span>
                         <span className="flex-1 text-left">Settings</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+                        <span className={`material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500 transition-transform ${settingsOpen ? 'rotate-180' : ''}`}>
+                            expand_more
+                        </span>
                     </button>
 
                     <AnimatePresence>
@@ -127,7 +128,9 @@ const SidebarContent = ({ user, onClose }) => {
                                             }`
                                         }
                                     >
-                                        <item.icon className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="material-symbols-outlined text-[18px] shrink-0">
+                                            {item.icon}
+                                        </span>
                                         {item.label}
                                     </NavLink>
                                 ))}
@@ -144,7 +147,9 @@ const SidebarContent = ({ user, onClose }) => {
                                             }`
                                         }
                                     >
-                                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="material-symbols-outlined text-[18px] shrink-0">
+                                            verified_user
+                                        </span>
                                         Super Admin
                                     </NavLink>
                                 )}
@@ -184,7 +189,7 @@ const TopNav = ({ user, onMenuClick }) => {
                     className="lg:hidden p-2 hover:bg-gray-50 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                     aria-label="Open menu"
                 >
-                    <Menu className="w-5 h-5 text-slate-600 dark:text-slate-400 transition-colors" />
+                    <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">menu</span>
                 </button>
                 <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                     <Logo className="h-5 w-auto" />
@@ -194,7 +199,7 @@ const TopNav = ({ user, onMenuClick }) => {
 
             {/* Breadcrumb */}
             <div className="flex items-center gap-1.5 text-md text-slate-400 dark:text-slate-500 min-w-0 flex-1 transition-colors">
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors" />
+                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors">chevron_right</span>
                 <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-medium hidden sm:block transition-colors">
                     {user?.fullName || user?.firstName || 'My Workspace'}
                 </span>
@@ -203,7 +208,7 @@ const TopNav = ({ user, onMenuClick }) => {
                         {tierLabel}
                     </span>
                 )}
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors" />
+                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors">chevron_right</span>
                 <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-md transition-colors">{pageLabel}</span>
             </div>
         </header>
@@ -265,6 +270,25 @@ const AppLayout = () => {
                             <Outlet />
                         </Suspense>
                     </div>
+
+                    {/* Dashboard Footer */}
+                    <footer className="md:col-span-12 bg-white dark:bg-slate-950 p-8 md:p-10 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
+                        <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
+                            <p className='text-center'>© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
+                            <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
+                            <div className="flex gap-6">
+                                <a href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">PRIVACY</a>
+                                <a href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">TERMS</a>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-[16px] text-emerald-500">browse_activity</span>
+                            <span className="text-sm uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans">
+                                Status: <span className="text-emerald-600">Operational</span>
+                            </span>
+                        </div>
+                    </footer>
                 </main>
 
                 <FloatingBotWidget />
