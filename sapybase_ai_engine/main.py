@@ -1558,7 +1558,7 @@ def delete_knowledge_chunks(
 
         # Double-safety: only delete chunks that belong to THIS company_id
         cursor.execute(
-            "DELETE FROM company_knowledge WHERE id = ANY(%s) AND company_id = %s RETURNING id",
+            "DELETE FROM company_knowledge WHERE id = ANY(%s::uuid[]) AND company_id = %s RETURNING id",
             (body.chunk_ids, company_id)
         )
         deleted_ids = [str(row[0]) for row in cursor.fetchall()]
