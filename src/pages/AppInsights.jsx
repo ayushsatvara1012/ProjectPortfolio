@@ -79,11 +79,11 @@ const AppInsights = () => {
     if (!isLoaded) {
         return (
             <div className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8 animate-pulse">
-                <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-1/3 mb-4"></div>
-                <div className="h-32 bg-slate-100 dark:bg-slate-900 rounded-xl mb-6"></div>
+                <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-none w-1/3 mb-4"></div>
+                <div className="h-32 bg-slate-100 dark:bg-slate-950 rounded-none mb-6"></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="h-64 bg-slate-100 dark:bg-slate-900 rounded-xl"></div>
-                    <div className="h-64 bg-slate-100 dark:bg-slate-900 rounded-xl"></div>
+                    <div className="h-64 bg-slate-100 dark:bg-slate-950 rounded-none"></div>
+                    <div className="h-64 bg-slate-100 dark:bg-slate-950 rounded-none"></div>
                 </div>
             </div>
         );
@@ -91,7 +91,7 @@ const AppInsights = () => {
 
     if (userTier !== 'PRO') { 
         return (
-             <div className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8">
+             <div className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8 font-sans">
                  <UpgradePrompt 
                     code="DEFAULT" 
                     tier={userTier} 
@@ -107,14 +107,14 @@ const AppInsights = () => {
     if (isGhostTown) {
         return (
             <div className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8 text-center pt-24">
-                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-none flex items-center justify-center mx-auto mb-4">
                     <MessageSquareOff className="w-8 h-8 text-slate-400 dark:text-slate-500" />
                 </div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 font-display">No Conversations Yet</h2>
-                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 font-display uppercase tracking-widest">No Conversations Yet</h2>
+                <p className="text-xl font-sans text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 leading-relaxed">
                     Your bot hasn't had any conversations yet. Check back once you have some website traffic and users start interacting!
                 </p>
-                <Link to="/app/bots" className="inline-flex items-center justify-center px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-bold transition-colors rounded-lg tracking-wide uppercase text-xs">
+                <Link to="/app/bots" className="inline-flex items-center justify-center px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-bold transition-colors rounded-none tracking-widest uppercase text-xs">
                     View My Bots
                 </Link>
             </div>
@@ -130,16 +130,16 @@ const AppInsights = () => {
             {/* Header Area */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2 font-display uppercase tracking-widest">
                         <Sparkles className="w-6 h-6 text-indigo-500" />
                         SaPyBase Insights
                     </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl">
+                    <p className="text-xl font-sans text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
                         AI synthesizes your raw chat logs into actionable business intelligence.
                         Reports are generated at most once every 24 hours to track broad changes.
                     </p>
                     {lastGeneratedAt && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                        <p className="text-md font-sans text-slate-400 dark:text-slate-500 mt-2">
                             Last generated: {lastGeneratedAt}
                         </p>
                     )}
@@ -148,17 +148,17 @@ const AppInsights = () => {
                 <button
                     onClick={() => handleGenerate(false)}
                     disabled={isGenerating || !selectedBotId}
-                    className="shrink-0 min-w-[200px] flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm border border-transparent shadow-indigo-600/20 active:scale-[0.98]"
+                    className="shrink-0 min-w-[200px] flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-none border border-transparent active:scale-[0.98] text-[10px] uppercase tracking-widest"
                 >
                     {isGenerating ? (
                         <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span className="text-xs tracking-widest uppercase">Synthesizing...</span>
+                            <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                            <span>Synthesizing...</span>
                         </>
                     ) : (
                         <>
-                            <Sparkles className="w-4 h-4" />
-                            <span className="text-xs tracking-widest uppercase">Generate Report</span>
+                            <Sparkles className="w-4 h-4 text-white" />
+                            <span>Generate Report</span>
                         </>
                     )}
                 </button>
@@ -171,11 +171,11 @@ const AppInsights = () => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mb-6 overflow-hidden"
+                        className="mb-6 overflow-hidden font-sans"
                     >
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 p-4 rounded-xl flex items-start gap-3">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 p-4 rounded-none flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                            <p className="text-sm text-red-800 dark:text-red-300 font-medium">
+                            <p className="text-xl text-red-800 dark:text-red-300 font-medium">
                                 {error}
                             </p>
                         </div>
@@ -185,9 +185,9 @@ const AppInsights = () => {
 
             {/* Skeleton / Initial Blank State */}
             {!reportData && !isGenerating && !error && (
-                <div className="flex flex-col items-center justify-center p-12 lg:p-24 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20">
+                <div className="flex flex-col items-center justify-center p-12 lg:p-24 border border-dashed border-gray-100 dark:border-slate-800 rounded-none bg-white dark:bg-slate-950 transition-colors duration-500">
                     <Sparkles className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-4" />
-                    <p className="text-slate-500 dark:text-slate-400 font-medium text-center">
+                    <p className="text-xl font-sans text-slate-500 dark:text-slate-400 font-medium text-center">
                         Click "Generate Report" to analyze your latest customer conversations.
                     </p>
                 </div>
@@ -198,14 +198,14 @@ const AppInsights = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     
                     {/* Card 1 (🔥 Top Customer Trends) */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-6 flex flex-col h-full transition-colors">
+                    <div className="bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-none shadow-sm p-6 flex flex-col h-full transition-colors duration-500">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                            <div className="w-10 h-10 rounded-none bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
                                 <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-display">Top Customer Trends</h2>
-                                <p className="text-xs text-slate-500 max-w-sm">The most common subjects and questions your users are asking.</p>
+                                <h2 className="text-md font-bold text-slate-900 dark:text-slate-100 font-display uppercase tracking-widest">Top Customer Trends</h2>
+                                <p className="text-xs text-slate-500 max-w-sm font-sans">The most common subjects and questions your users are asking.</p>
                             </div>
                         </div>
                         
@@ -213,42 +213,42 @@ const AppInsights = () => {
                             {reportData?.top_trends && reportData.top_trends.length > 0 ? (
                                 reportData.top_trends.map((trend, idx) => (
                                     <div key={idx} className="flex gap-3 group">
-                                        <div className="w-6 h-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold font-mono flex items-center justify-center shrink-0 mt-0.5">
+                                        <div className="w-6 h-6 rounded-none bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold font-mono flex items-center justify-center shrink-0 mt-0.5">
                                             {idx + 1}
                                         </div>
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-sans mt-1">
+                                        <p className="text-xl font-sans text-slate-700 dark:text-slate-300 leading-relaxed mt-1">
                                             {trend}
                                         </p>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-slate-500 italic">No clear trends detected yet.</p>
+                                <p className="text-xl font-sans text-slate-500 italic">No clear trends detected yet.</p>
                             )}
                         </div>
                     </div>
 
                     {/* Card 2 (⚠️ Knowledge Gaps) */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-6 flex flex-col h-full transition-colors">
+                    <div className="bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-none shadow-sm p-6 flex flex-col h-full transition-colors duration-500">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                            <div className="w-10 h-10 rounded-none bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
                                 <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-display">Knowledge Gaps</h2>
-                                <p className="text-xs text-slate-500 max-w-sm">Specific questions your bot failed to answer. Action required.</p>
+                                <h2 className="text-md font-bold text-slate-900 dark:text-slate-100 font-display uppercase tracking-widest">Knowledge Gaps</h2>
+                                <p className="text-xs text-slate-500 max-w-sm font-sans">Specific questions your bot failed to answer. Action required.</p>
                             </div>
                         </div>
 
-                        <div className="flex-1 space-y-4">
+                        <div className="flex-1 space-y-4 font-sans">
                             {reportData?.missing_knowledge && reportData.missing_knowledge.length > 0 ? (
                                 reportData.missing_knowledge.map((gap, idx) => (
-                                    <div key={idx} className="flex justify-between items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800/60 last:border-0 last:pb-0">
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed max-w-[85%] font-medium">
+                                    <div key={idx} className="flex justify-between items-start gap-4 pb-4 border-b border-gray-50 dark:border-slate-800/60 last:border-0 last:pb-0">
+                                        <p className="text-xl text-slate-700 dark:text-slate-300 leading-relaxed max-w-[85%] font-medium">
                                             "{gap}"
                                         </p>
                                         <Link 
                                             to="/app/train"
-                                            className="shrink-0 flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1.5 rounded-md transition-colors"
+                                            className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1.5 rounded-none transition-colors"
                                         >
                                             Fix This <ChevronRight className="w-3 h-3" />
                                         </Link>
@@ -256,30 +256,30 @@ const AppInsights = () => {
                                 ))
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-center py-6">
-                                    <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mb-3">
+                                    <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 rounded-none flex items-center justify-center mb-3">
                                         <Sparkles className="w-6 h-6 text-green-600 dark:text-green-500" />
                                     </div>
-                                    <p className="text-sm font-bold text-green-700 dark:text-green-400">Your bot knows everything!</p>
-                                    <p className="text-xs text-slate-500 mt-1 max-w-[200px]">No unanswered questions were found in recent logs.</p>
+                                    <p className="text-xl font-bold text-green-700 dark:text-green-400 font-sans">Your bot knows everything!</p>
+                                    <p className="text-md text-slate-500 mt-1 max-w-[200px] font-sans">No unanswered questions were found in recent logs.</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* Card 3 (📈 Growth Strategy - Full Width) */}
-                    <div className="lg:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-8 transition-colors group">
+                    <div className="lg:col-span-2 relative overflow-hidden bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-none shadow-sm p-8 transition-colors duration-500 group">
                         {/* Subtle Gradient Backdrop */}
-                        <div className="absolute top-0 left-0 w-full h-full bg-linear-to-br from-indigo-50/50 to-transparent dark:from-indigo-900/10 dark:to-transparent pointer-events-none" />
+                        <div className="absolute top-0 left-0 w-full h-full bg-linear-to-br from-indigo-50/10 to-transparent dark:from-indigo-900/5 dark:to-transparent pointer-events-none" />
                         
                         <div className="relative z-10">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-none bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
                                     <Lightbulb className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                                 </div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-display">Actionable Advice</h2>
+                                <h2 className="text-md font-bold text-slate-900 dark:text-slate-100 font-display uppercase tracking-widest">Actionable Advice</h2>
                             </div>
                             
-                            <p className="text-slate-700 dark:text-slate-300 text-[15px] leading-relaxed max-w-4xl pl-13">
+                            <p className="text-xl font-sans text-slate-700 dark:text-slate-300 leading-relaxed max-w-4xl pl-0 sm:pl-13">
                                 {reportData?.actionable_advice || "Keep monitoring your analytics."}
                             </p>
                         </div>
@@ -292,3 +292,4 @@ const AppInsights = () => {
 };
 
 export default AppInsights;
+
