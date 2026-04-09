@@ -1,26 +1,26 @@
 export const seoConfig = {
   home: {
-    title: "SaPyBase | Custom Website & Web App Development — React & Python",
+    title: "SaPyBase | Autonomous AI Chatbots for Modern Business",
     description:
-      "SaPyBase builds high-performance custom websites, web applications, and software for businesses. Expert SEO, GEO, and AEO optimisation. Fast delivery, production-ready results.",
+      "Automate your customer support and sales with SaPyBase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.",
     canonical: "https://www.sapybase.com/",
   },
   about: {
-    title: "About SaPyBase | Full-Stack Engineering Studio",
+    title: "About SaPyBase | The Future of Autonomous AI Agents",
     description:
-      "SaPyBase is a full-stack engineering studio specialising in high-performance web development, custom software, and AI-ready SEO. Built by engineers who care about speed and results.",
+      "SaPyBase is an engineering studio dedicated to building autonomous AI infrastructure. We simplify complex AI integration for businesses of all sizes, ensuring speed and reliability.",
     canonical: "https://www.sapybase.com/about",
   },
   contact: {
-    title: "Get a Free Quote | SaPyBase",
+    title: "Build Your AI Bot | Contact SaPyBase",
     description:
-      "Ready to build? Contact SaPyBase for a free consultation on your website, web app, or SEO project. Fast response, clear pricing, no obligation.",
+      "Ready to automate? Contact SaPyBase for a consultation on deploying custom AI chatbots for your business. Scalable, intelligent, and production-ready solutions.",
     canonical: "https://www.sapybase.com/contact",
   },
   services: {
-    title: "Web Development & SEO Services | SaPyBase",
+    title: "AI Chatbot Solutions & Custom Integration | SaPyBase",
     description:
-      "Explore SaPyBase's full service catalog — custom websites, web applications, software development, and SEO/GEO/AEO optimisation. Transparent pricing, fast delivery.",
+      "Explore SaPyBase AI-driven solutions: from custom LLM training (RAG) to seamless multi-platform integration. Build intelligent systems that grow with your business.",
     canonical: "https://www.sapybase.com/services",
   },
   privacy: {

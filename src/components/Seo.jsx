@@ -1,6 +1,6 @@
 import { Helmet } from "react-helmet-async";
 
-export default function SEO({ title, description, canonical }) {
+export default function SEO({ title, description, canonical, schema }) {
     const ogImage = "https://www.sapybase.com/SB_Brand.png";
 
     return (
@@ -9,6 +9,12 @@ export default function SEO({ title, description, canonical }) {
             <meta name="description" content={description} />
             <link rel="canonical" href={canonical} />
             <meta name="robots" content="index, follow" />
+
+            {schema && (
+                <script type="application/ld+json">
+                    {JSON.stringify(schema)}
+                </script>
+            )}
 
             {/* Open Graph */}
             <meta property="og:title" content={title} />

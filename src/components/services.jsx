@@ -15,31 +15,31 @@ const Services = () => {
     },
     {
       id: "02",
-      label: "PERFORMANCE",
-      title: "Ultra-Fast Web Engines",
-      description: "React/Vite apps engineered for sub-200ms TTFB. High-end UX meeting industrial strength, V8-optimized code.",
-      icon: <span className="material-symbols-outlined text-[20px]">code</span>,
-      btnText: "VIEW DEPLOYMENT",
-      tags: ["V8_OPTIMIZED", "SSR_READY"],
-      route: "/services"
+      label: "KNOWLEDGE",
+      title: "Enterprise Knowledge Sync",
+      description: "Transform static docs, PDFs, and live databases into dynamic AI brains. Real-time synchronization for always-accurate responses.",
+      icon: <span className="material-symbols-outlined text-[20px]">database</span>,
+      btnText: "TRAIN YOUR AI",
+      tags: ["RAG_OPTIMIZED", "AUTO_SYNC"],
+      route: "/app/train"
     },
     {
       id: "03",
-      label: "INFRASTRUCTURE",
-      title: "Cloud Architect",
-      description: "AWS infrastructure design using Lambda and Serverless patterns. Scaling without friction across distributed nodes.",
-      icon: <span className="material-symbols-outlined text-[20px]">storage</span>,
-      btnText: "SYSTEM LOGS",
-      route: "/services"
+      label: "INTEGRATION",
+      title: "Seamless One-Script Deployment",
+      description: "Deploy your custom AI agent across React, Next.js, or legacy systems with one line of code. Native performance at the edge.",
+      icon: <span className="material-symbols-outlined text-[20px]">code</span>,
+      btnText: "VIEW ADAPTOR LOGS",
+      route: "/docs"
     },
     {
       id: "04",
-      label: "CONNECTIVITY",
-      title: "Global Scaling",
-      description: "CDN-first deployment for global audiences. Real-time data synchronization at the edge for edge-first applications.",
-      icon: <span className="material-symbols-outlined text-[20px]">public</span>,
-      btnText: "VIEW DEPLOYMENT LOGS",
-      route: "/app/train"
+      label: "INSIGHTS",
+      title: "Conversational Analytics",
+      description: "Monitor user intent and bot performance in real-time. Refine your AI's behavior with data-driven dashboard insights.",
+      icon: <span className="material-symbols-outlined text-[20px]">monitoring</span>,
+      btnText: "VIEW LIVE METRICS",
+      route: "/app/insights"
     }
   ];
 
