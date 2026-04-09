@@ -162,11 +162,21 @@ MODEL_MAPPING = {
     "ENTERPRISE": "gemini-3.1-pro-preview",
 }
 
+VALID_MODELS = set(MODEL_MAPPING.values()) | {
+    "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
+}
+
 def get_tier_model(tier: str, company_model: str = None):
     """
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
     """
+    # ── SECURITY: Model Allowlist Check ──
+    # Prevents arbitrary model strings from being injected via database
+    if company_model and company_model not in VALID_MODELS:
+        print(f"SECURITY WARNING: Invalid company_model detected: {company_model}. Falling back to tier default.")
+        company_model = None
+
     model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
     
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
@@ -240,6 +250,7 @@ app.state.limiter = limiter
 @app.on_event("startup")
 async def startup_event():
     """Initializes external services on app start."""
+    global r
     # 1. Initialize FastAPI Cache
     redis_url = os.getenv("REDIS_URL")
     if redis_url:
@@ -257,7 +268,32 @@ async def startup_event():
             else:
                 print(f"CACHE WARNING: Redis cache initialization failed ({e}). Running without cache.")
     else:
+        r = None # Explicitly set to None for clarify
         print("CACHE: Running without Redis cache (REDIS_URL not set).")
+
+async def check_global_llm_budget(company_id: str):
+    """
+    LLM CREDIT PROTECTION: Aborts if this tenant has spent > 20 LLM calls in the last 60s.
+    This acts as a secondary layer to prevent rapid credit depletion from automated attacks.
+    """
+    if not r: # Uses the global redis client from startup_event
+        return
+    
+    key = f"llm_burst:{company_id}"
+    try:
+        count = await r.incr(key)
+        if count == 1:
+            await r.expire(key, 60)
+        
+        if count > 20: # 20 LLM calls per minute per tenant, hard ceiling
+            raise HTTPException(
+                status_code=429, 
+                detail="LLM rate ceiling exceeded. Please wait a minute before sending more queries."
+            )
+    except (redis.RedisError, HTTPException) as e:
+        if isinstance(e, HTTPException): raise e
+        # If redis fails (e.g. connectivity), we allow the request to proceed (resiliency)
+        pass
 
     # 2. Database Migration: Ensure ai_model column exists (self-healing)
     conn = get_db_connection()
@@ -472,6 +508,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             client_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else None
         except:
             client_origin = None
+
+    if not client_origin and os.getenv("ENV") == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Origin header required in production."
+        )
     
     if client_origin:
         # Normalize: Remove trailing slash
@@ -983,14 +1025,19 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
         release_db_connection(conn)
 
 @app.post("/api/chat", response_model=ChatResponse)
-@limiter.limit("10/minute;50/hour")
-def chat_endpoint(
+@limiter.limit("10/minute;50/hour") # Per-API-Key limit (Hashed)
+@limiter.limit("30/minute", key_func=get_remote_address) # Global IP-based hard ceiling
+async def chat_endpoint(
     request: Request,
     chat_req: ChatRequest, 
     background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """Core AI Chat Endpoint with Exact-Match Cache, Basic/Paid Enforcement and Connection Pooling."""
+    # ── SECURITY: Global LLM Budget Enforcement (Redis-Backed) ──
+    # Prevents rapid credit depletion even if someone manages to bypass per-key rate limits.
+    await check_global_llm_budget(company["id"])
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
