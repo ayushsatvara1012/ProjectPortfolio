@@ -338,66 +338,77 @@ const ChatWidget = ({ apiKey }) => {
                             </div>
                         </div>
 
-                        {/* Messages Area */}
-                        <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y bg-gray-50/50 flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
-                            <AnimatePresence initial={false}>
-                                {messages.map((msg, idx) => (
-                                    <motion.div
-                                        key={idx}
-                                        variants={messageVariants}
-                                        initial="hidden"
-                                        animate="visible"
-                                        layout="position"
-                                        className={`flex gap-3 min-w-0 max-w-full sm:max-w-[88%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
-                                    >
-                                        <div className="shrink-0 mt-auto mb-1">
-                                            {msg.role === 'user' ? (
-                                                <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: THEME_COLOR }}>
-                                                    <User size={14} />
-                                                </div>
-                                            ) : (
-                                                <div className="w-6 h-6 flex items-center justify-center pointer-events-none">
-                                                    <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                                                </div>
-                                            )}
-                                        </div>
+                        {/* Messages Area Wrapper */}
+                        <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50">
+                            
+                            {/* The Animated Blue Aura (All borders) */}
+                            <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
+                                <div 
+                                    className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10"
+                                />
+                            </div>
 
-                                        <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                            {msg.role === 'bot' && (
-                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
-                                            )}
-                                            <div
-                                                className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full wrap-break-word ${msg.role === 'user'
-                                                    ? 'text-white rounded-2xl rounded-br-none'
-                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
-                                                    }`}
-                                                style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
-                                            >
+                            {/* Scrollable Messages Container */}
+                            <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
+                                <AnimatePresence initial={false}>
+                                    {messages.map((msg, idx) => (
+                                        <motion.div
+                                            key={idx}
+                                            variants={messageVariants}
+                                            initial="hidden"
+                                            animate="visible"
+                                            layout="position"
+                                            className={`flex gap-3 min-w-0 max-w-full sm:max-w-[88%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                                        >
+                                            <div className="shrink-0 mt-auto mb-1">
                                                 {msg.role === 'user' ? (
-                                                    <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                    <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: THEME_COLOR }}>
+                                                        <User size={14} />
+                                                    </div>
                                                 ) : (
-                                                    <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                    <div className="w-6 h-6 flex items-center justify-center pointer-events-none">
+                                                        <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
                                                     </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
 
-                                {isLoading && (
-                                    <motion.div
-                                        variants={messageVariants}
-                                        initial="hidden"
-                                        animate="visible"
-                                        layout="position"
-                                        className="flex flex-col items-start gap-1"
-                                    >
-                                        <ThinkingLogo size={45} className="origin-left" themeColor={THEME_COLOR} />
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                            <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
+                                            <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                {msg.role === 'bot' && (
+                                                    <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
+                                                )}
+                                                <div
+                                                    className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full wrap-break-word ${msg.role === 'user'
+                                                        ? 'text-white rounded-2xl rounded-br-none'
+                                                        : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                        }`}
+                                                    style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
+                                                >
+                                                    {msg.role === 'user' ? (
+                                                        <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                    ) : (
+                                                        <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
+                                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+
+                                    {isLoading && (
+                                        <motion.div
+                                            variants={messageVariants}
+                                            initial="hidden"
+                                            animate="visible"
+                                            layout="position"
+                                            className="flex flex-col items-start gap-1"
+                                        >
+                                            <ThinkingLogo size={45} className="origin-left" themeColor={THEME_COLOR} />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                                <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
+                            </div>
                         </div>
 
                         {/* Fixed Branding Footer */}

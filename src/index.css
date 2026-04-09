@@ -88,4 +88,3 @@
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-slate-800 hover:bg-slate-700;
   }
-}
