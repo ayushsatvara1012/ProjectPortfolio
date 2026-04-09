@@ -47,6 +47,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [activeSection, setActiveSection] = useState('setup');
     const [copied, setCopied] = useState(false);
+    const [integrationTab, setIntegrationTab] = useState('html');
 
     const handleCopy = (text) => {
         navigator.clipboard.writeText(text);
@@ -54,51 +55,70 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const CodeSnippet = ({ apiKey, apiUrl }) => (
-        <div className="font-mono text-sm leading-relaxed overflow-x-auto">
-            <div className="flex gap-2">
-                <span className="text-pink-400">&lt;script&gt;</span>
+    const SyntaxHighlightedCode = ({ code }) => {
+        // One-pass replacement to avoid double-highlighting
+        const tokens = [
+            { name: 'doctype', regex: /(&lt;!DOCTYPE html&gt;)/gi, color: 'text-blue-400' },
+            { name: 'comment', regex: /(&lt;!--[\s\S]*?--&gt;|\{\/\*[\s\S]*?\*\/\}|\/\/.*)/g, color: 'text-slate-500 italic' },
+            { name: 'string', regex: /(&quot;.*?&quot;|&#39;.*?&#39;|".*?"|'.*?'|`[\s\S]*?`)/g, color: 'text-green-400' },
+            { name: 'tag', regex: /(&lt;\/?[a-zA-Z0-9]+)/g, color: 'text-red-400' },
+            { name: 'attr', regex: /\b(lang|src|defer|href|rel|target|id|strategy|type|apiKey|apiUrl|className)\b(?==|:|\s|&gt;)/g, color: 'text-orange-300' },
+            { name: 'keyword', regex: /\b(window|SaPyBaseConfig|document|console|Script|import|export|default|function|return|const|let|var|from)\b/g, color: 'text-blue-400' }
+        ];
+
+        let escaped = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // We use a temporary map to hold segments to avoid re-processing
+        let segments = [{ text: escaped, isRaw: true }];
+
+        tokens.forEach(token => {
+            let newSegments = [];
+            segments.forEach(seg => {
+                if (!seg.isRaw) {
+                    newSegments.push(seg);
+                    return;
+                }
+
+                let lastIndex = 0;
+                let match;
+                while ((match = token.regex.exec(seg.text)) !== null) {
+                    // Pre-match text
+                    if (match.index > lastIndex) {
+                        newSegments.push({ text: seg.text.substring(lastIndex, match.index), isRaw: true });
+                    }
+                    // The match
+                    newSegments.push({
+                        text: `<span class="${token.color}">${match[0]}</span>`,
+                        isRaw: false
+                    });
+                    lastIndex = token.regex.lastIndex;
+                    if (!token.regex.global) break;
+                }
+                // Post-match text
+                if (lastIndex < seg.text.length) {
+                    newSegments.push({ text: seg.text.substring(lastIndex), isRaw: true });
+                }
+            });
+            segments = newSegments;
+        });
+
+        const finalHtml = segments.map(s => s.text).join('');
+
+        return (
+            <div className="relative group mt-4">
+                <div className="p-4 bg-slate-900 text-slate-50 text-[13px] sm:text-sm font-mono overflow-x-auto rounded-lg shadow-inner">
+                    <pre className="m-0 leading-relaxed"><code dangerouslySetInnerHTML={{ __html: finalHtml }} /></pre>
+                </div>
+                <button
+                    onClick={() => handleCopy(code)}
+                    className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-slate-800/80 hover:bg-slate-700 text-white rounded-none opacity-0 group-hover:opacity-100 transition-opacity border border-slate-700/50 backdrop-blur-sm"
+                    title="Copy to clipboard"
+                >
+                    <span className="material-symbols-outlined text-[20px] leading-none">{copied ? 'check_circle' : 'content_copy'}</span>
+                </button>
             </div>
-            <div className="pl-4">
-                <span className="text-blue-400">window</span>
-                <span className="text-slate-400">.</span>
-                <span className="text-blue-300">SaPyBaseConfig</span>
-                <span className="text-slate-400"> = {'{'}</span>
-            </div>
-            <div className="pl-8">
-                <span className="text-blue-400">apiKey</span>
-                <span className="text-slate-400">:</span>
-                <span className="text-emerald-400"> "{apiKey}"</span>
-                <span className="text-slate-400">,</span>
-            </div>
-            <div className="pl-8">
-                <span className="text-blue-400">apiUrl</span>
-                <span className="text-slate-400">:</span>
-                <span className="text-emerald-400"> "{apiUrl}"</span>
-            </div>
-            <div className="pl-4">
-                <span className="text-slate-400">{'}'};</span>
-            </div>
-            <div className="">
-                <span className="text-pink-400">&lt;/script&gt;</span>
-            </div>
-            <div className="">
-                <span className="text-pink-400">&lt;script</span>
-            </div>
-            <div className="pl-4">
-                <span className="text-blue-400">src</span>
-                <span className="text-slate-400">=</span>
-                <span className="text-emerald-400">"https://www.sapybase.com/widget.js"</span>
-            </div>
-            <div className="pl-4">
-                <span className="text-blue-400">defer</span>
-                <span className="text-pink-400">&gt;</span>
-            </div>
-            <div className="">
-                <span className="text-pink-400">&lt;/script&gt;</span>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const navLinks = [
         { id: 'setup', label: '1. Account Setup', icon: 'person_add' },
@@ -160,14 +180,14 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
                     Copy the code below and paste it onto your website. Need help? Check our <Link to="/docs" className="text-blue-600 dark:text-blue-400 font-bold underline">full guide</Link>.
                 </p>
 
-                <div className="relative group">
-                    <div className="p-6 bg-slate-900 text-blue-200 text-sm font-mono overflow-x-auto rounded-none border border-slate-900 shadow-2xl">
-                        <CodeSnippet apiKey={apiKey} apiUrl={apiUrl} />
-                    </div>
-                    <button onClick={() => handleCopy(snippet)} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all">
-                        <span className="material-symbols-outlined text-lg">{copied ? 'check_circle' : 'content_copy'}</span>
-                    </button>
-                </div>
+                <SyntaxHighlightedCode code={`<!-- Place this inside the <head> -->
+<script>
+  window.SaPyBaseConfig = {
+    apiKey: "${apiKey}",
+    apiUrl: "${apiUrl}"
+  };
+</script>
+<script src="https://www.sapybase.com/widget.js" defer></script>`} />
             </div>
         );
 
@@ -200,8 +220,8 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
                                         key={link.id}
                                         onClick={() => scrollTo(link.id)}
                                         className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl transition-colors ${activeSection === link.id
-                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                                : 'text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
                                             }`}
                                     >
                                         <span className={`material-symbols-outlined ${activeSection === link.id ? 'text-blue-600' : 'text-slate-400'}`}>{link.icon}</span>
@@ -225,8 +245,8 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
                                 key={link.id}
                                 onClick={() => scrollTo(link.id)}
                                 className={`flex items-center gap-3 w-full px-3 py-2 text-lg font-bold transition-all rounded-lg group ${activeSection === link.id
-                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                     }`}
                             >
                                 <span className={`material-symbols-outlined text-[20px] ${activeSection === link.id ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`}>
@@ -296,32 +316,195 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
                             Integrating the Chatbot
                         </h2>
 
-                        <p className="text-xl font-medium tracking-wide text-slate-600 dark:text-slate-400 leading-relaxed font-sans transition-colors">
-                            Adding the chatbot to your website is as simple as copying and pasting a single line of code.
+                        <p className="text-xl font-medium tracking-wide text-slate-600 dark:text-slate-400 leading-relaxed font-sans transition-colors mb-6">
+                            Adding the chatbot to your website is as simple as copying and pasting a single snippet of code. Select your platform below for specific instructions.
                         </p>
 
-                        <div className="bg-slate-50 dark:bg-slate-900 p-6 border border-gray-100 dark:border-slate-800 rounded-xl my-6">
-                            <p className="font-bold text-slate-900 dark:text-slate-200 mb-2">How to install:</p>
-                            <ol className="space-y-2 text-xl font-medium">
-                                <li>Copy your <strong>Script</strong> right after creation of the bot from the Bot Identity section, which is located in the sidebar.</li>
-                                <li>Copy the <strong>Embed Code</strong> shown in the above video (in the last).</li>
-                                <li>Paste it into your websites index.html or whichever file is the entry point of your website just above the <code>&lt;/body&gt;</code> tag.</li>
-                            </ol>
+                        {/* Tabs Navigation */}
+                        <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-100 dark:border-slate-800 pb-4">
+                            {[
+                                { id: 'html', label: 'Static HTML' },
+                                { id: 'react', label: 'React / Vite' },
+                                { id: 'nextjs', label: 'Next.js' },
+                                { id: 'wordpress', label: 'WordPress' },
+                                { id: 'shopify', label: 'Shopify' }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setIntegrationTab(tab.id)}
+                                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${integrationTab === tab.id
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
+                                        }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
                         </div>
+
+                        {/* Tab Content */}
+                        <div className="bg-gray-50 dark:bg-slate-900/30 p-6 rounded-xl border border-gray-100 dark:border-slate-800 mb-8">
+
+                            {integrationTab === 'html' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-black font-display tracking-tight text-slate-900 dark:text-slate-200 mb-2 mt-0">Plain HTML / Static Websites</h3>
+                                        <p className="text-lg text-slate-600 dark:text-slate-400 font-medium font-sans mb-0">For traditional websites built with HTML, CSS, and basic JavaScript.</p>
+                                    </div>
+                                    <ul className="text-lg font-medium space-y-3 font-sans mt-4">
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-blue-500 text-[20px] mt-0.5">folder</span> <span><strong>File to edit:</strong> <code>index.html</code> (or your main layout file).</span></li>
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-blue-500 text-[20px] mt-0.5">place</span> <span><strong>Where to paste:</strong> Right before the closing <code>&lt;/body&gt;</code> tag to avoid blocking your site from loading.</span></li>
+                                    </ul>
+                                    <SyntaxHighlightedCode code={`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>My Website</title>
+</head>
+<body>
+    <h1>Welcome to my business</h1>
+    <script>
+      window.SaPyBaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        apiUrl: "https://sapyai.onrender.com"
+      };
+    </script>
+    <script src="https://www.sapybase.com/widget.js" defer></script>
+</body>
+</html>`} />
+                                </div>
+                            )}
+
+                            {integrationTab === 'react' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-black font-display tracking-tight text-slate-900 dark:text-slate-200 mb-2 mt-0">React (Vite or CRA)</h3>
+                                        <p className="text-lg text-slate-600 dark:text-slate-400 font-medium font-sans mb-0">In a Single Page Application (SPA), add the script to the root HTML file that wraps your React app—<strong>not</strong> inside your React components.</p>
+                                    </div>
+                                    <ul className="text-lg font-medium space-y-3 font-sans mt-4">
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-blue-500 text-[20px] mt-0.5">folder</span> <span><strong>File to edit (Vite):</strong> <code>index.html</code> (in the root folder).</span></li>
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-blue-500 text-[20px] mt-0.5">folder</span> <span><strong>File to edit (CRA):</strong> <code>public/index.html</code>.</span></li>
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-blue-500 text-[20px] mt-0.5">place</span> <span><strong>Where to paste:</strong> Below the <code>&lt;div id="root"&gt;&lt;/div&gt;</code> tag, before the closing <code>&lt;/body&gt;</code> tag.</span></li>
+                                    </ul>
+                                    <SyntaxHighlightedCode code={`<body>
+    <div id="root"></div>
+    
+    <script>
+      window.SaPyBaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        apiUrl: "https://sapyai.onrender.com"
+      };
+    </script>
+    <script src="https://www.sapybase.com/widget.js" defer></script>
+    
+    <script type="module" src="/src/main.jsx"></script>
+</body>`} />
+                                </div>
+                            )}
+
+                            {integrationTab === 'nextjs' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-black font-display tracking-tight text-slate-900 dark:text-slate-200 mb-2 mt-0">Next.js (App Router)</h3>
+                                        <p className="text-lg text-slate-600 dark:text-slate-400 font-medium font-sans mb-0">Next.js requires the optimized <code>Script</code> component to load external files without hurting SEO or performance.</p>
+                                    </div>
+                                    <ul className="text-lg font-medium space-y-3 font-sans mt-4">
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-black dark:text-white text-[20px] mt-0.5">deployed_code</span> <span><strong>File to edit:</strong> <code>app/layout.jsx</code> or <code>app/layout.tsx</code></span></li>
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-black dark:text-white text-[20px] mt-0.5">place</span> <span><strong>Where to paste:</strong> Inside the <code>&lt;body&gt;</code> tag using <code>next/script</code>.</span></li>
+                                    </ul>
+                                    <SyntaxHighlightedCode code={`import Script from 'next/script';
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+
+        {/* SaPyBase Configuration */}
+        <Script id="sapybase-config" strategy="beforeInteractive">
+          {\`
+            window.SaPyBaseConfig = {
+              apiKey: "YOUR_API_KEY",
+              apiUrl: "https://sapyai.onrender.com"
+            };
+          \`}
+        </Script>
+        
+        {/* SaPyBase Widget Script */}
+        <Script 
+          src="https://www.sapybase.com/widget.js" 
+          strategy="lazyOnload" 
+        />
+      </body>
+    </html>
+  );
+}`} />
+                                </div>
+                            )}
+
+                            {integrationTab === 'wordpress' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-black font-display tracking-tight text-slate-900 dark:text-slate-200 mb-2 mt-0">WordPress Integration</h3>
+                                        <p className="text-lg text-slate-600 dark:text-slate-400 font-medium font-sans mb-0">There are two simple ways to add the widget to your WordPress site.</p>
+                                    </div>
+
+                                    <div className="mt-8 space-y-8">
+                                        <div className="bg-white dark:bg-slate-950 p-6 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm transition-colors duration-500">
+                                            <h4 className="text-lg font-black font-display uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-4 mt-0">Method A (No-Code Plugin)</h4>
+                                            <ul className="text-lg font-medium space-y-3 font-sans">
+                                                <li className="flex items-start gap-3"><span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5">extension</span> <span><strong>Where to go:</strong> Install the free "WPCode" (Insert Headers and Footers) plugin.</span></li>
+                                                <li className="flex items-start gap-3"><span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5">place</span> <span><strong>Where to paste:</strong> Go to <em>Code Snippets {'>'} Header & Footer</em>. Paste the entire snippet into the <strong>Footer</strong> box and hit Save.</span></li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="bg-white dark:bg-slate-950 p-6 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm transition-colors duration-500">
+                                            <h4 className="text-lg font-black font-display uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-4 mt-0">Method B (Theme Editor)</h4>
+                                            <ul className="text-lg font-medium space-y-3 font-sans">
+                                                <li className="flex items-start gap-3"><span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5">folder</span> <span><strong>File to edit:</strong> <code>footer.php</code> (via <em>Appearance {'>'} Theme File Editor</em>).</span></li>
+                                                <li className="flex items-start gap-3"><span className="material-symbols-outlined text-slate-400 text-[20px] mt-0.5">place</span> <span><strong>Where to paste:</strong> Right above the <code>&lt;/body&gt;</code> and <code>&lt;/html&gt;</code> tags.</span></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <SyntaxHighlightedCode code={`<script>
+  window.SaPyBaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    apiUrl: "https://sapyai.onrender.com"
+  };
+</script>
+<script src="https://www.sapybase.com/widget.js" defer></script>`} />
+                                </div>
+                            )}
+
+                            {integrationTab === 'shopify' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <div>
+                                        <h3 className="text-2xl font-black font-display tracking-tight text-slate-900 dark:text-slate-200 mb-2 mt-0">Shopify Store</h3>
+                                        <p className="text-lg text-slate-600 dark:text-slate-400 font-medium font-sans mb-0">For e-commerce stores running on Shopify.</p>
+                                    </div>
+                                    <ul className="text-lg font-medium space-y-3 font-sans mt-4">
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-emerald-600 text-[20px] mt-0.5">folder</span> <span><strong>File to edit:</strong> <code>theme.liquid</code></span></li>
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-emerald-600 text-[20px] mt-0.5">navigation</span> <span><strong>Where to go:</strong> Online Store {'>'} Themes {'>'} Click "..." menu {'>'} Edit Code. Find <code>theme.liquid</code> under the Layout folder.</span></li>
+                                        <li className="flex items-start gap-3"><span className="material-symbols-outlined text-emerald-600 text-[20px] mt-0.5">place</span> <span><strong>Where to paste:</strong> Scroll to the very bottom and paste right above the <code>&lt;/body&gt;</code> tag.</span></li>
+                                    </ul>
+                                    <SyntaxHighlightedCode code={`    <script>
+      window.SaPyBaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        apiUrl: "https://sapyai.onrender.com"
+      };
+    </script>
+    <script src="https://www.sapybase.com/widget.js" defer></script>
+  </body>
+</html>`} />
+                                </div>
+                            )}
+                        </div>
+
                         <DocMedia
-                            alt="Dashboard Snippet"
+                            alt="Dashboard Snippet Copy"
                             placeholderText="Screen Recording: Showing how to copy the Snippet and find the API Key in the Dashboard."
                             src="/videos/Integrate_Bot.mp4"
                         />
-                        <div className="relative group">
-                            <div className="p-6 bg-slate-900 text-blue-200 text-sm font-mono overflow-x-auto rounded-none border border-slate-900 shadow-2xl transition-all">
-                                <CodeSnippet apiKey={apiKey} apiUrl={apiUrl} />
-                            </div>
-                            <button onClick={() => handleCopy(snippet)} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all flex items-center gap-2">
-                                <span className="material-symbols-outlined text-lg">{copied ? 'check_circle' : 'content_copy'}</span>
-                            </button>
-                        </div>
-
                     </section>
 
                     {/* Section 3: Customization */}
@@ -473,8 +656,8 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
                                 key={link.id}
                                 onClick={() => scrollTo(link.id)}
                                 className={`block py-1.5 text-lg font-bold transition-all w-full text-left border-l-2 pl-4 -ml-[33px] ${activeSection === link.id
-                                        ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 bg-blue-50/30'
-                                        : 'text-slate-400 dark:text-slate-600 border-transparent hover:text-slate-900 dark:hover:text-slate-200'
+                                    ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 bg-blue-50/30'
+                                    : 'text-slate-400 dark:text-slate-600 border-transparent hover:text-slate-900 dark:hover:text-slate-200'
                                     }`}
                             >
 
