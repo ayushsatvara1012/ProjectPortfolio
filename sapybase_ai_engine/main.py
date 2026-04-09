@@ -741,7 +741,7 @@ async def require_premium_tier(user: dict = Depends(get_current_user)):
         )
     return user
 
-def get_company_by_clerk_id(clerk_id: str):
+def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
     """Retrieves company data associated with a Clerk User ID."""
     conn = get_db_connection()
     try:
@@ -755,14 +755,25 @@ def get_company_by_clerk_id(clerk_id: str):
         user_uuid = user_row[0]
         
         # 2. Get company details
-        cursor.execute(
-            """
-            SELECT id, company_name, company_tone, theme_color, allowed_origin, 
-                   api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt
-            FROM companies WHERE user_id = %s
-            """, 
-            (user_uuid,)
-        )
+        if company_id:
+            cursor.execute(
+                """
+                SELECT id, company_name, company_tone, theme_color, allowed_origin, 
+                       api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model
+                FROM companies WHERE user_id = %s AND id = %s
+                """, 
+                (user_uuid, company_id)
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id, company_name, company_tone, theme_color, allowed_origin, 
+                       api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model
+                FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
+                """, 
+                (user_uuid,)
+            )
+
         company_row = cursor.fetchone()
         
         if not company_row:
@@ -787,7 +798,9 @@ def get_company_by_clerk_id(clerk_id: str):
             "logo_url": company_row[7],
             "initial_message": company_row[8],
             "quick_questions": safe_json_loads(company_row[9]), # Safe parsing
-            "system_prompt": company_row[10]
+            "system_prompt": company_row[10],
+            "ai_model": company_row[11]
+
         }
     finally:
         release_db_connection(conn)
@@ -1981,9 +1994,9 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
         release_db_connection(conn)
 
 @app.get("/api/company/details")
-def get_company_details(user: dict = Depends(get_current_user)):
-    """Returns company status for onboarding/navbar detection."""
-    company = get_company_by_clerk_id(user["clerk_id"])
+def get_company_details(company_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Returns company status for onboarding/navbar detection, supporting bot-specific queries."""
+    company = get_company_by_clerk_id(user["clerk_id"], company_id=company_id)
     if not company:
         return {"status": "none", "role": user["role"]}
     return {"status": "success", "role": user["role"], "company": company}
