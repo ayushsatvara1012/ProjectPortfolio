@@ -358,7 +358,7 @@ const ChatWidget = ({ apiKey }) => {
                                             initial="hidden"
                                             animate="visible"
                                             layout="position"
-                                            className={`flex gap-3 min-w-0 max-w-full sm:max-w-[88%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                                            className={`flex gap-2 min-w-0 max-w-full sm:max-w-[95%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
                                         >
                                             <div className="shrink-0 mt-auto mb-1">
                                                 {msg.role === 'user' ? (
