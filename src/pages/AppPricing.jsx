@@ -172,6 +172,14 @@ const AppPricing = () => {
                         <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Plans &amp; Pricing</h1>
                     </div>
                     <p className="text-md font-display text-slate-600 dark:text-slate-400 leading-relaxed transition-colors max-w-sm md:max-w-none">Choose the plan that fits your stage. Fast & simple setup.</p>
+                    
+                    {/* Beta Notice */}
+                    <div className="mt-4 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 flex items-center gap-3 w-fit">
+                        <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[18px]">verified</span>
+                        <p className="text-xs font-sans font-bold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
+                            Beta Phase: Basic plan is currently 100% free until the next version launch
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -224,13 +232,21 @@ const AppPricing = () => {
                         <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-1.5 transition-colors uppercase tracking-tight">{plan.name}</h3>
                         <div className="flex flex-col gap-1 mb-6">
                             <div className="flex items-baseline gap-1">
-                                <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
-                                    {formatPrice(plan.price)}
-                                </span>
-                                {plan.period && <span className="text-xs text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
+                                {plan.id === 'BASIC' ? (
+                                    <span className="text-3xl md:text-4xl font-display font-black tracking-tight text-blue-600 dark:text-blue-400 transition-colors bg-blue-50 dark:bg-blue-900/30 px-4 py-1 border-l-4 border-blue-500">
+                                        FREE
+                                    </span>
+                                ) : (
+                                    <>
+                                        <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
+                                            {formatPrice(plan.price)}
+                                        </span>
+                                        {plan.period && <span className="text-xs text-slate-400 dark:text-slate-500 font-display italic mb-1 transition-colors">{plan.period}</span>}
+                                    </>
+                                )}
                             </div>
                             <span className="text-[10px] uppercase tracking-widest font-bold text-blue-600 dark:text-blue-400 font-sans mt-1">
-                                Local taxes handled at checkout
+                                {plan.id === 'BASIC' ? 'No Credit Card Required' : 'Local taxes handled at checkout'}
                             </span>
                         </div>
                         <p className="text-lg font-sans text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>

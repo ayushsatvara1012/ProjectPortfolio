@@ -278,9 +278,8 @@ const ChatWidget = ({ apiKey }) => {
                                             </div>
                                             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
                                         </div>
-                                        <div className="flex flex-col justify-center">
+                                        <div className="flex flex-row items-center justify-center">
                                             <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
-                                            <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 font-medium italic hover:text-slate-700 transition-colors">Powered by SaPyBase</a>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -353,11 +352,11 @@ const ChatWidget = ({ apiKey }) => {
                                     >
                                         <div className="shrink-0 mt-auto mb-1">
                                             {msg.role === 'user' ? (
-                                                <div className="w-9 h-9 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: THEME_COLOR }}>
-                                                    <User size={18} />
+                                                <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: THEME_COLOR }}>
+                                                    <User size={14} />
                                                 </div>
                                             ) : (
-                                                <div className="w-9 h-9 flex items-center justify-center pointer-events-none">
+                                                <div className="w-6 h-6 flex items-center justify-center pointer-events-none">
                                                     <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
                                                 </div>
                                             )}
@@ -368,9 +367,9 @@ const ChatWidget = ({ apiKey }) => {
                                                 <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
                                             )}
                                             <div
-                                                className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
+                                                className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full wrap-break-word ${msg.role === 'user'
                                                     ? 'text-white rounded-2xl rounded-br-none'
-                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                     }`}
                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                             >
@@ -399,6 +398,19 @@ const ChatWidget = ({ apiKey }) => {
                                 )}
                             </AnimatePresence>
                             <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
+                        </div>
+
+                        {/* Fixed Branding Footer */}
+                        <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 backdrop-blur-sm">
+                            <a
+                                href="https://www.sapybase.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-slate-600 transition-colors group"
+                            >
+                                <BrandLogo themeColor="currentColor" className="w-2.5 h-2.5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
+                                Powered by SaPyBase
+                            </a>
                         </div>
 
                         {/* Quick Questions & Input Area */}
