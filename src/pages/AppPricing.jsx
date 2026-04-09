@@ -172,12 +172,12 @@ const AppPricing = () => {
                         <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Plans &amp; Pricing</h1>
                     </div>
                     <p className="text-md font-display text-slate-600 dark:text-slate-400 leading-relaxed transition-colors max-w-sm md:max-w-none">Choose the plan that fits your stage. Fast & simple setup.</p>
-                    
+
                     {/* Beta Notice */}
                     <div className="mt-4 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 flex items-center gap-3 w-fit">
                         <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[18px]">verified</span>
                         <p className="text-xs font-sans font-bold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
-                            Beta Phase: Basic plan is currently 100% free until the next version launch
+                            Beta Phase: Basic plan is currently 100% free until the next version launch. 'EMAIL ME FOR STARTER PLAN PROMO CODE 100% FREE'.
                         </p>
                     </div>
                 </div>
@@ -210,7 +210,7 @@ const AppPricing = () => {
             {/* Plan Cards — grid: 1 col on mobile, 3 cols on medium+ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1 overflow-y-auto custom-scrollbar transition-colors duration-500">
                 {plans.map((plan, i) => (
-                    <motion.div 
+                    <motion.div
                         key={plan.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
