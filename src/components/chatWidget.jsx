@@ -370,7 +370,7 @@ const ChatWidget = ({ apiKey }) => {
                                             <div
                                                 className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
                                                     ? 'text-white rounded-2xl rounded-br-none'
-                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:max-w-full prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                     }`}
                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                             >
