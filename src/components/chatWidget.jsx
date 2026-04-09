@@ -363,21 +363,21 @@ const ChatWidget = ({ apiKey }) => {
                                             )}
                                         </div>
 
-                                        <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                        <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                             {msg.role === 'bot' && (
                                                 <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
                                             )}
                                             <div
-                                                className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center ${msg.role === 'user'
+                                                className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
                                                     ? 'text-white rounded-2xl rounded-br-none'
-                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold'
+                                                    : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:max-w-full prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                     }`}
                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                             >
                                                 {msg.role === 'user' ? (
-                                                    <div className="whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                    <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                 ) : (
-                                                    <div className="text-lg font-semibold font-sans leading-relaxed">
+                                                    <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
                                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                                     </div>
                                                 )}
