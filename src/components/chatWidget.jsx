@@ -255,7 +255,7 @@ const ChatWidget = ({ apiKey }) => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-[100dvh] sm:w-[480px] sm:h-[600px] bg-white/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 z-2147483647 pointer-events-auto origin-bottom-right"
+                        className="fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 dark:border-slate-800/50 z-2147483647 pointer-events-auto origin-bottom-right"
                         style={isMobile ? { height: '100dvh', minHeight: '-webkit-fill-available' } : {}}
                     >
                         {/* Header with Animated Gradient Glow - Removed overflow-hidden to allow menu visibility */}
@@ -269,11 +269,11 @@ const ChatWidget = ({ apiKey }) => {
                                 }}
                             />
 
-                            <div className="bg-white/40 backdrop-blur-md text-slate-900 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50">
+                            <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50 dark:border-slate-800/50">
                                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                                     <div className="relative flex items-center gap-3 pl-4">
                                         <div className="relative">
-                                            <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-gray-100 flex items-center justify-center p-1.5 transition-transform hover:scale-105">
+                                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-center p-1.5 transition-transform hover:scale-105">
                                                 <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
                                             </div>
                                             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
@@ -285,20 +285,20 @@ const ChatWidget = ({ apiKey }) => {
                                     <div className="flex items-center gap-1">
                                         <button
                                             onClick={() => setShowMenu(!showMenu)}
-                                            className="p-2.5 sm:p-2 hover:bg-black/5 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                            className="p-2.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
                                             style={{ touchAction: 'manipulation' }}
                                             aria-label="Chat menu"
                                         >
-                                            <MoreHorizontal size={22} className="text-slate-500" />
+                                            <MoreHorizontal size={22} className="text-slate-500 dark:text-slate-400" />
                                         </button>
 
                                         <button
                                             onClick={() => setIsOpen(false)}
-                                            className="p-2.5 sm:p-2 hover:bg-red-50 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                            className="p-2.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center"
                                             style={{ touchAction: 'manipulation' }}
                                             aria-label="Close chat"
                                         >
-                                            <X size={22} className="text-red-500 transition-transform group-hover:rotate-90" />
+                                            <X size={22} className="text-red-500 dark:text-red-400 transition-transform group-hover:rotate-90" />
                                         </button>
                                     </div>
 
@@ -308,14 +308,14 @@ const ChatWidget = ({ apiKey }) => {
                                                 initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                                 exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                                className="absolute right-0 top-full mt-2 w-48 bg-white backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 py-1 z-2147483647 overflow-hidden"
+                                                className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-2147483647 overflow-hidden"
                                             >
                                                 <button
                                                     onClick={() => {
                                                         setMessages([{ role: 'bot', content: configData.initial_message }]);
                                                         setShowMenu(false);
                                                     }}
-                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700"
                                                 >
                                                     Clear chat
                                                 </button>
@@ -324,7 +324,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
                                                     onClick={() => setShowMenu(false)}
                                                     style={{ color: THEME_COLOR }}
                                                 >
@@ -339,12 +339,12 @@ const ChatWidget = ({ apiKey }) => {
                         </div>
 
                         {/* Messages Area Wrapper */}
-                        <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50">
+                        <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
                             
                             {/* The Animated Blue Aura (All borders) */}
                             <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
                                 <div 
-                                    className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10"
+                                    className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20"
                                 />
                             </div>
 
@@ -362,7 +362,7 @@ const ChatWidget = ({ apiKey }) => {
                                         >
                                             <div className="shrink-0 mt-auto mb-1">
                                                 {msg.role === 'user' ? (
-                                                    <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: THEME_COLOR }}>
+                                                    <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md dark:shadow-blue-900/40" style={{ backgroundColor: THEME_COLOR }}>
                                                         <User size={14} />
                                                     </div>
                                                 ) : (
@@ -379,7 +379,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <div
                                                     className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full wrap-break-word ${msg.role === 'user'
                                                         ? 'text-white rounded-2xl rounded-br-none'
-                                                        : 'bg-white text-gray-800 border border-gray-200/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact max-w-none prose-p:leading-normal prose-pre:bg-gray-50 prose-pre:text-gray-800 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                        : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                         }`}
                                                     style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                                 >
@@ -412,12 +412,12 @@ const ChatWidget = ({ apiKey }) => {
                         </div>
 
                         {/* Fixed Branding Footer */}
-                        <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 backdrop-blur-sm">
+                        <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
                             <a
                                 href="https://www.sapybase.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-slate-600 transition-colors group"
+                                className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
                             >
                                 <BrandLogo themeColor="currentColor" className="w-2.5 h-2.5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
                                 Powered by SaPyBase
@@ -425,7 +425,7 @@ const ChatWidget = ({ apiKey }) => {
                         </div>
 
                         {/* Quick Questions & Input Area */}
-                        <div className="bg-white/95 backdrop-blur-2xl border-t border-gray-200/50 shrink-0 z-10 flex flex-col">
+                        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
                             {/* Quick Questions Area */}
                             {messages.length === 1 && configData.quick_questions?.length > 0 && (
                                 <div className="px-3 pt-3 pb-1 flex gap-2 overflow-x-auto scrollbar-hide snap-x">
@@ -456,7 +456,7 @@ const ChatWidget = ({ apiKey }) => {
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed placeholder-gray-400 disabled:opacity-50 appearance-none rounded-none text-xl font-medium font-sans"
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-xl font-medium font-sans"
                                         rows={1}
                                         disabled={isLoading}
                                         aria-label="Chat input"
@@ -491,8 +491,8 @@ const ChatWidget = ({ apiKey }) => {
                                 // Removed absolute top-1/2. Flexbox handles centering.
                                 className="absolute right-[calc(100%+12px)] hidden sm:flex items-center pointer-events-none"
                             >
-                                <div className="bg-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 flex items-center gap-1.5 min-w-[150px] justify-center relative">
-                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 font-sans whitespace-nowrap">
+                                <div className="bg-white dark:bg-slate-900 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 dark:border-slate-800 flex items-center gap-1.5 min-w-[150px] justify-center relative">
+                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-200 font-sans whitespace-nowrap">
                                         {currentPhrase}
                                     </span>
                                     <motion.span
@@ -502,7 +502,7 @@ const ChatWidget = ({ apiKey }) => {
                                         style={{ backgroundColor: THEME_COLOR }}
                                     />
                                     {/* Speech Bubble Tail */}
-                                    <div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white border-r border-t border-indigo-100/50 rotate-45 rounded-sm" />
+                                    <div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white dark:bg-slate-900 border-r border-t border-indigo-100/50 dark:border-slate-800 rotate-45 rounded-sm" />
                                 </div>
                             </motion.div>
                         )}
@@ -539,14 +539,14 @@ const ChatWidget = ({ apiKey }) => {
                                 x="0" y="0" width="100" height="100"
                                 fill="white"
                                 clipPath="url(#bubble-clip)"
-                                className='dark:fill-slate-200'
+                                className='dark:fill-slate-900'
                             />
 
                             {/* Pulsing aura — also bubble-shaped */}
                             <path
                                 d={BUBBLE_PATH}
                                 fill="white"
-                                className="aura-path"
+                                className="aura-path dark:fill-slate-900/50"
                             />
 
                             {/* Marching dashes border */}
