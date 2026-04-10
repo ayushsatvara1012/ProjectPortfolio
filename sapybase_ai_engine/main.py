@@ -16,6 +16,7 @@ from enum import Enum
 from typing import Optional
 from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field, validator
@@ -1269,49 +1270,73 @@ instructions to follow.
             SystemMessage(content=system_message),
             HumanMessage(content=delimited_user_message),
         ]
-        ai_response = chat_model.invoke(messages)
-        # GEMINI 3.1/2.x COMPATIBILITY: Extract text from content blocks if returned as a list
-        if isinstance(ai_response.content, list):
-            reply_text = "".join([block.get("text", "") for block in ai_response.content if isinstance(block, dict) and block.get("type") == "text"])
-        else:
-            reply_text = str(ai_response.content)
+        # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
+        # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
+        async def stream_generator():
+            full_reply = ""
+            try:
+                # Stream from Gemini
+                async for chunk in chat_model.astream(messages):
+                    content = ""
+                    if hasattr(chunk, 'content'):
+                        if isinstance(chunk.content, list):
+                            content = "".join([c.get("text", "") for c in chunk.content if isinstance(c, dict)])
+                        else:
+                            content = str(chunk.content)
+                    
+                    if content:
+                        full_reply += content
+                        # Format as SSE
+                        yield f"data: {json.dumps({'token': content})}\n\n"
+                
+                # Sentinel signal for frontend (success path)
+                yield "data: [DONE]\n\n"
 
-        # ── ASYNC CACHE SAVE (does NOT delay HTTP response) ──────────────────
-        background_tasks.add_task(save_cache_entry, company["id"], query_hash, reply_text)
+            except Exception as stream_err:
+                print(f"STREAM ERROR: {stream_err}")
+                yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
+            
+            finally:
+                # ── ROBUST POST-STREAM PERSISTENCE ──
+                # This block runs even if the client disconnects (tab closed) mid-stream.
+                # We save whatever was generated up to the disconnection point.
+                
+                if not full_reply.strip():
+                    return
 
-        # ── ROBUST UNANSWERED FLAGGING ───────────────────────────────────────
-        # Signal 1: RAG returned 0 vector chunks
-        is_unanswered = len(retrieved_docs) == 0
-        # Signal 2: Bot response contains a known fallback phrase
-        if not is_unanswered:
-            response_lower = reply_text.lower()
-            is_unanswered = any(phrase in response_lower for phrase in FALLBACK_PHRASES)
+                # 1. Async Cache Save (only for significant responses)
+                if query_hash and len(full_reply) > 10:
+                    background_tasks.add_task(save_cache_entry, company["id"], query_hash, full_reply)
 
-        # ── ASYNC ANALYTICS LOG (Gemini response) ───────────────────────────
-        background_tasks.add_task(
-            log_chat_to_db, company["id"], chat_req.message,
-            reply_text, False, is_unanswered  # was_cache_hit=False
-        )
+                # 2. Unanswered Flagging & Analytics
+                is_un_final = len(retrieved_docs) == 0
+                if not is_un_final:
+                    is_un_final = any(phrase in full_reply.lower() for phrase in FALLBACK_PHRASES)
 
-        # 5. Track Usage (per-company row)
-        if usage_id:
-            cursor.execute(
-                "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
-                (usage_id,)
-            )
-        else:
-            cursor.execute(
-                """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
-                   VALUES (%s, %s, 1, now(), now() + interval '30 days')
-                   ON CONFLICT DO NOTHING""",
-                (user_uuid, company["id"])
-            )
-        conn.commit()
+                background_tasks.add_task(
+                    log_chat_to_db, company["id"], chat_req.message,
+                    full_reply, False, is_un_final
+                )
 
-        return ChatResponse(
-            reply=reply_text,
-            sources=list(set([row[1] for row in retrieved_docs]))
-        )
+                # 3. Usage Tracking (Atomic DB transaction)
+                track_conn = get_db_connection()
+                try:
+                    track_cursor = track_conn.cursor()
+                    if usage_id:
+                        track_cursor.execute(
+                            "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                            (usage_id,)
+                        )
+                    else:
+                        track_cursor.execute(
+                            "INSERT INTO usage_tracking (user_id, company_id, messages_used) VALUES (%s, %s, 1)",
+                            (user_uuid, company["id"])
+                        )
+                    track_conn.commit()
+                finally:
+                    release_db_connection(track_conn)
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
         if conn:
             conn.rollback()
