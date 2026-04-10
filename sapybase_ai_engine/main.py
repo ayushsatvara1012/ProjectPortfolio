@@ -60,28 +60,48 @@ CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
 POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
 
-# 2. Database Connection (Supabase pgBouncer Pooler)
-# Using direct connect since the connection string uses port 6543 (transaction pooler).
+# 2. Database Connection Pool (singleton ThreadedConnectionPool)
+# Supabase pgBouncer already pools externally; this avoids reconnecting per-request.
+_db_pool = None
+
+def _get_pool():
+    global _db_pool
+    if _db_pool is None:
+        if not DB_URL:
+            raise RuntimeError("DATABASE_URL not set")
+        _db_pool = pool.ThreadedConnectionPool(
+            minconn=2,
+            maxconn=8,   # Stay within Supabase pgBouncer limits (4 workers x 2)
+            dsn=DB_URL
+        )
+    return _db_pool
+
 def get_db_connection():
-    """Establishes a connection via Supabase pgBouncer pooler (port 6543)."""
+    """Get a warm connection from the pool (~1ms vs ~50ms for new conn)."""
     try:
-        conn = psycopg2.connect(DB_URL)
+        conn = _get_pool().getconn()
         register_vector(conn)
         return conn
-    except psycopg2.OperationalError as e:
-        print(f"Database connection failed: {e}")
-        raise HTTPException(status_code=503, detail="Database connection unavailable. Please try again.")
+    except pool.PoolError:
+        raise HTTPException(status_code=503, detail="Database pool exhausted, please retry.")
     except Exception as e:
-        print(f"Unexpected connection error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        print(f"DB pool error: {e}")
+        raise HTTPException(status_code=500, detail="Database unavailable.")
 
 def release_db_connection(conn):
-    """Closes the connection, returning it to the Supabase pooler."""
-    if conn and not conn.closed:
+    """Return connection to pool — does NOT close it (keeps it warm)."""
+    if conn:
         try:
-            conn.close()
-        except:
-            pass
+            if not conn.closed:
+                _get_pool().putconn(conn)
+            else:
+                # Connection died; remove from pool cleanly
+                _get_pool().putconn(conn, close=True)
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 def validate_safe_url(url: str):
     """
@@ -278,6 +298,14 @@ async def startup_event():
     else:
         r = None # Explicitly set to None for clarify
         print("CACHE: Running without Redis cache (REDIS_URL not set).")
+
+@app.on_event("shutdown")
+def shutdown_db_pool():
+    """Close all pooled connections cleanly on server shutdown."""
+    global _db_pool
+    if _db_pool:
+        _db_pool.closeall()
+        print("DB POOL: All connections closed.")
 
 async def check_global_llm_budget(company_id: str):
     """
@@ -1528,68 +1556,153 @@ Rules:
 
 
 
-# ── MULTIMODAL DOCUMENT INTELLIGENCE: VISION-BASED PDF PARSING ────────────────
-async def process_pdf_with_vision(pdf_path: str) -> List[Document]:
+# ── RAM-EFFICIENT PDF PROCESSING ──────────────────────────────────────────────
+async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
     """
-    Issue #18: The 'Pro' Document Engine.
-    Converts PDF pages to images and uses Gemini Vision to extract tables and charts
-    as structured Markdown. This preserves layout integrity that raw OCR loses.
+    RAM-efficient PDF processing. Streams text page-by-page from the file descriptor.
+    Falls back to vision only for truly unreadable PDFs (scanned docs),
+    and even then only samples 3 representative pages to cap memory usage.
     """
-    if not convert_from_path:
-        print("[VISION] pdf2image not installed. Falling back to raw text.")
-        reader = PdfReader(pdf_path)
-        return [Document(page_content=page.extract_text(), metadata={"page": i}) for i, page in enumerate(reader.pages)]
+    docs = []
+    reader = PdfReader(pdf_path)
 
-    try:
-        # Convert PDF pages to images (limit to first 15 pages for stability)
-        images = convert_from_path(pdf_path, first_page=1, last_page=15)
-        vision_docs = []
-        
-        # Initialize Vision Model
-        vision_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_KEY)
+    total_text = ""
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text() or ""
+        total_text += text
 
-        for i, image in enumerate(images):
-            # Encode image to base64
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG")
-            img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        # Only index pages with meaningful text
+        if text.strip():
+            docs.append(Document(
+                page_content=text,
+                metadata={"source": f"page_{i + 1}"}
+            ))
 
-            # Transcription Prompt for 'Pro' accuracy
-            prompt = """Analyze this document page. 
-            Keep all tables as Markdown tables. 
-            Keep all headings as Markdown headers (# ## ###).
-            Keep all bullet points. 
-            If there are charts or diagrams, provide a brief textual summary of the data they show.
-            Output ONLY raw Markdown content."""
+    # If PDF has almost no extractable text, it's likely a scanned document.
+    # Use vision on ONLY 3 representative pages (first, middle, last) — not all.
+    if len(total_text.strip()) < 100 and convert_from_path:
+        print("[PDF] Scanned PDF detected, using vision on sample pages only")
+        try:
+            total_pages = len(reader.pages)
+            sample_indices = sorted(set([1, max(1, total_pages // 2), total_pages]))[:3]
 
-            message = HumanMessage(
-                content=[
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"},
-                    },
-                ]
+            vision_model = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash-lite",  # Cheapest model for OCR
+                google_api_key=GEMINI_KEY
             )
 
-            # Transcribe page
-            response = await vision_model.ainvoke([message])
-            page_text = str(response.content)
-            vision_docs.append(Document(page_content=page_text, metadata={"page": i+1}))
-            
-        return vision_docs
-    except Exception as e:
-        print(f"VISION EXTRACTION ERROR: {e}")
-        # Final fallback to standard text extraction
-        reader = PdfReader(pdf_path)
-        return [Document(page_content=page.extract_text(), metadata={"page": i}) for i, page in enumerate(reader.pages)]
+            for page_num in sample_indices:
+                # Convert ONE page at a time, then immediately free memory
+                images = convert_from_path(
+                    pdf_path,
+                    first_page=page_num,
+                    last_page=page_num,
+                    dpi=150  # Lower DPI = much less RAM
+                )
+                if not images:
+                    continue
+
+                img = images[0]
+                buffered = BytesIO()
+                img.save(buffered, format="JPEG", quality=60)
+                img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+                # Free the image immediately
+                del img, images, buffered
+
+                response = await vision_model.ainvoke([HumanMessage(content=[
+                    {"type": "text", "text": "Extract all text and tables from this page. Output as structured Markdown."},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
+                ])])
+
+                del img_b64  # Free base64 string
+
+                if response.content:
+                    docs.append(Document(
+                        page_content=str(response.content),
+                        metadata={"source": f"page_{page_num}_vision"}
+                    ))
+        except Exception as e:
+            print(f"[PDF] Vision fallback failed: {e}")
+
+    return docs if docs else [Document(page_content="Could not extract text from this PDF.", metadata={"source": "error"})]
 
 from langchain_text_splitters import MarkdownHeaderTextSplitter
+import uuid
+
+# ── TRAINING JOB TRACKER (in-memory; sufficient for single-worker, use Redis for multi-worker) ──
+_training_jobs: dict = {}
+
+async def run_training_job(
+    job_id: str,
+    resolved_company_id: str,
+    docs: List[Document],
+    current_user: dict,
+    limit: int,
+    source_name: str,
+):
+    """Background task: embeds and inserts chunks without blocking the HTTP response."""
+    _training_jobs[job_id] = {"status": "processing", "progress": 0, "total": 0}
+    conn = None
+    try:
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+        all_chunks = text_splitter.split_documents(docs)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
+        current_count = cursor.fetchone()[0]
+        remaining = max(0, limit - current_count)
+        chunks = all_chunks[:remaining]
+        _training_jobs[job_id]["total"] = len(chunks)
+
+        BATCH_SIZE = 10
+        for i in range(0, len(chunks), BATCH_SIZE):
+            batch = chunks[i:i + BATCH_SIZE]
+            texts = [c.page_content for c in batch]
+            embeddings_list = embeddings_model_doc.embed_documents(texts)
+
+            for chunk, embedding in zip(batch, embeddings_list):
+                if len(embedding) > 768:
+                    embedding = embedding[:768]
+                cursor.execute(
+                    "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
+                    (resolved_company_id, chunk.page_content, chunk.metadata.get("source", source_name), embedding)
+                )
+
+            conn.commit()
+            _training_jobs[job_id]["progress"] = i + len(batch)
+            await asyncio.sleep(0)  # Yield control so other requests aren't starved
+
+        # Cache invalidation after successful training
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
+        invalidate_cache(conn, resolved_company_id)
+        conn.commit()
+
+        _training_jobs[job_id] = {
+            "status": "done",
+            "chunks_added": len(chunks),
+            "total_available": len(all_chunks),
+            "truncated": len(all_chunks) > remaining,
+        }
+    except Exception as e:
+        print(f"TRAINING JOB {job_id} FAILED: {e}")
+        _training_jobs[job_id] = {"status": "error", "message": str(e)}
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        if conn:
+            release_db_connection(conn)
 
 @app.post("/api/train")
 @limiter.limit("5/minute")
 async def train_chatbot(
     request: Request,
+    background_tasks: BackgroundTasks,
     url: str = Form(None),
     file: UploadFile = File(None),
     text: str = Form(None),
@@ -1598,13 +1711,27 @@ async def train_chatbot(
     current_user: dict = Depends(get_current_user),
     _premium: dict = Depends(require_premium_tier)
 ):
-    """Secure multi-tenant training endpoint with multiple input types."""
-    # 1. Quota Check (Issue #13)
+    """Secure multi-tenant training endpoint. Returns immediately; embedding runs in background."""
+
+    # 0. Validate file size BEFORE reading into memory
+    if file:
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        MAX_SIZE = 8 * 1024 * 1024  # 8MB
+        if file_size > MAX_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"PDF too large ({file_size // 1024 // 1024}MB). Maximum is 8MB."
+            )
+
+    # 1. Quota check (fast DB query, return connection immediately)
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
-        # Identify Company: explicit company_id > api_key > user's primary company
+
         if company_id:
             cursor.execute(
                 "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
@@ -1623,7 +1750,6 @@ async def train_chatbot(
 
         cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
         current_count = cursor.fetchone()[0]
-
         plan = get_plan(current_user["tier"], role=current_user.get("role"))
         limit = plan["chunks"]
 
@@ -1636,100 +1762,67 @@ async def train_chatbot(
                 "tier": current_user["tier"],
                 "upgrade_url": "/app/pricing",
             })
-
-        docs = []
-        # --- 1A. Process Website URL (Jina Reader Refactor) ---
-        warning = None
-        if url:
-            validate_safe_url(url)
-            try:
-                # Use Jina Reader Proxy for better scraping
-                jina_url = f"https://r.jina.ai/{url}"
-                headers = {"User-Agent": "SaPyBaseBot/1.0"}
-                
-                response = requests.get(jina_url, headers=headers, timeout=15)
-                
-                if response.status_code != 200 or len(response.text) < 50:
-                    raise HTTPException(
-                        status_code=400, 
-                        detail="Failed to extract sufficient text. The website may be blocking bots."
-                    )
-                
-                docs = [Document(page_content=response.text, metadata={"source": url})]
-                source_name = url
-            except HTTPException:
-                raise
-            except Exception as e:
-                print(f"JINA EXTRACTION FAILED: {e}")
-                raise HTTPException(status_code=400, detail=f"Failed to scrape website: {str(e)}")
-
-        # --- 1B. Process PDF File (Multimodal Vision Engine) ---
-        if file:
-            if not file.filename.lower().endswith('.pdf'):
-                raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-            
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-                temp_pdf.write(file.file.read())
-                temp_pdf_path = temp_pdf.name
-            
-            try:
-                # Use the new Vision-Powered parser for tabular data accuracy
-                vision_docs = await process_pdf_with_vision(temp_pdf_path)
-                docs.extend(vision_docs)
-                source_name = file.filename
-            finally:
-                if os.path.exists(temp_pdf_path):
-                    os.remove(temp_pdf_path)
-
-        # --- 1C. Process Manual Text ---
-        if text and text.strip():
-            docs.append(Document(page_content=text.strip(), metadata={"source": "manual_entry"}))
-            source_name = "Manual Knowledge Entry"
-
-        if not docs:
-            raise HTTPException(status_code=400, detail="No content extracted.")
-
-        # --- 2. Chunk and Embed with Strict Limit Enforcement ---
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        all_chunks = text_splitter.split_documents(docs)
-        
-        # Calculate remaining capacity
-        remaining_slots = max(0, limit - current_count)
-        chunks = all_chunks[:remaining_slots]
-        
-        if len(all_chunks) > remaining_slots:
-            warning = f"Plan limit reached! Only {remaining_slots} of {len(all_chunks)} chunks were processed. Upgrade for more storage."
-
-        for chunk in chunks:
-            embedding = embeddings_model_doc.embed_query(chunk.page_content)
-            if len(embedding) > 768: embedding = embedding[:768]
-            
-            cursor.execute(
-                "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
-                (resolved_company_id, chunk.page_content, source_name, embedding)
-            )
-            current_count += 1
-        
-        # Cache invalidation: targeted clear for ONLY the specific bot
-        # This ensures that old "I don't know" answers aren't served after new training.
-        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
-        
-        # Also run global invalidation helper
-        invalidate_cache(conn, resolved_company_id)
-
-        conn.commit()
-        return {
-            "status": "success", 
-            "message": f"Trained on {len(chunks)} chunks.",
-            "warning": warning
-        }
-    except Exception as e:
-        if conn: conn.rollback()
-        if isinstance(e, HTTPException): raise e
-        print(f"TRAIN ERROR: {e}")
-        raise HTTPException(status_code=500, detail="Training failed.")
     finally:
-        release_db_connection(conn)
+        release_db_connection(conn)  # Release immediately — background job gets its own conn
+
+    # 2. Extract content (fast I/O operations)
+    docs = []
+    source_name = "unknown"
+
+    if url:
+        validate_safe_url(url)
+        try:
+            jina_url = f"https://r.jina.ai/{url}"
+            response = requests.get(jina_url, headers={"User-Agent": "SaPyBaseBot/1.0"}, timeout=15)
+            if response.status_code != 200 or len(response.text) < 50:
+                raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
+            docs = [Document(page_content=response.text, metadata={"source": url})]
+            source_name = url
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to scrape website: {str(e)}")
+
+    if file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+            temp_pdf.write(await file.read())  # async read to not block event loop
+            temp_pdf_path = temp_pdf.name
+        try:
+            pdf_docs = await process_pdf_efficiently(temp_pdf_path)
+            docs.extend(pdf_docs)
+            source_name = file.filename
+        finally:
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+
+    if text and text.strip():
+        docs.append(Document(page_content=text.strip(), metadata={"source": "manual_entry"}))
+        source_name = "Manual Entry"
+
+    if not docs:
+        raise HTTPException(status_code=400, detail="No content extracted.")
+
+    # 3. Kick off background job — return immediately to prevent Render worker timeout
+    job_id = str(uuid.uuid4())
+    _training_jobs[job_id] = {"status": "queued"}
+    background_tasks.add_task(
+        run_training_job, job_id, resolved_company_id, docs, current_user, limit, source_name
+    )
+
+    return {
+        "status": "queued",
+        "job_id": job_id,
+        "message": f"Training started for '{source_name}'. Poll /api/train/status/{job_id} to track progress.",
+    }
+
+
+@app.get("/api/train/status/{job_id}")
+async def get_training_status(job_id: str, user: dict = Depends(get_current_user)):
+    """Poll training job progress. Returns status: queued | processing | done | error."""
+    job = _training_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Training job not found or already expired.")
+    return job
 
 @app.post("/api/register")
 def register_company(

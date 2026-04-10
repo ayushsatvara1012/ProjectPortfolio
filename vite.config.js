@@ -28,10 +28,13 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
-        // Manual chunking: Moves heavy libraries into separate files
-        // to keep your main initial load as small as possible.
+        // Manual chunking: Moves heavy libraries into separate lazy-loaded files.
+        // Visitors only download what they need, keeping the initial load fast.
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom']
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['framer-motion'],          // ~140KB gzipped — split out
+          clerk: ['@clerk/clerk-react'],       // ~100KB gzipped — split out
+          query: ['@tanstack/react-query'],    // ~30KB gzipped — split out
         }
       }
     }

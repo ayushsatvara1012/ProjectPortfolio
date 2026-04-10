@@ -222,6 +222,9 @@ const AppTrainAI = () => {
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const [selectedBotId, setSelectedBotId] = useState('');
     const [upgradeError, setUpgradeError] = useState(null);
+    const [trainingJobId, setTrainingJobId] = useState(null);
+    const [trainingProgress, setTrainingProgress] = useState(null);
+    const pollRef = useRef(null); // Store interval ref for deterministic cleanup
 
     const fileRef = useRef(null);
     const baseUrl = import.meta.env.VITE_API_URL || '';
@@ -241,6 +244,9 @@ const AppTrainAI = () => {
         }
     }, [bots, selectedBotId]);
 
+    // Cleanup poll on unmount
+    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier) && userRole !== 'SUPER_ADMIN';
     const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'BASIC' || userTier === 'STARTER') && messagesUsed >= messageLimit && userRole !== 'SUPER_ADMIN';
 
@@ -249,7 +255,7 @@ const AppTrainAI = () => {
         setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
     };
 
-    // ── useMutation: train AI ──────────────────────────────────────────────────
+    // ── useMutation: train AI ──────────────────────────────────────────────
     const trainMutation = useMutation({
         mutationFn: async () => {
             const token = await getToken();
@@ -258,7 +264,6 @@ const AppTrainAI = () => {
             if (file) fd.append('file', file);
             if (trainingText.trim()) fd.append('text', trainingText.trim());
             if (selectedBotId) fd.append('company_id', selectedBotId);
-            // Use raw fetch for FormData (authFetch would set Content-Type incorrectly)
             const res = await fetch(`${baseUrl}/api/train`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
@@ -277,7 +282,48 @@ const AppTrainAI = () => {
             }
             return data;
         },
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            if (data.job_id) {
+                setTrainingJobId(data.job_id);
+                setTrainingProgress({ status: 'queued', progress: 0, total: 0 });
+                setUrl(''); setTrainingText(''); setFile(null);
+                if (fileRef.current) fileRef.current.value = '';
+
+                const token = await getToken();
+                pollRef.current = setInterval(async () => {
+                    try {
+                        const res = await fetch(`${baseUrl}/api/train/status/${data.job_id}`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+                        const status = await res.json();
+                        setTrainingProgress(status);
+
+                        if (status.status === 'done') {
+                            clearInterval(pollRef.current);
+                            pollRef.current = null;
+                            setTrainingJobId(null);
+                            queryClient.invalidateQueries({ queryKey: ['bots'] });
+                            queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
+                            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
+                            refreshUser();
+                            const msg = status.truncated
+                                ? `Training complete! ${status.chunks_added} chunks added (plan limit reached).`
+                                : `Training complete! ${status.chunks_added} chunks added to your AI's brain. 🧠`;
+                            showAlert('success', msg);
+                        } else if (status.status === 'error') {
+                            clearInterval(pollRef.current);
+                            pollRef.current = null;
+                            setTrainingJobId(null);
+                            showAlert('error', status.message || 'Training failed.');
+                        }
+                    } catch { clearInterval(pollRef.current); pollRef.current = null; }
+                }, 2000);
+
+                // Safety: stop polling after 5 minutes
+                setTimeout(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; setTrainingJobId(null); } }, 300_000);
+                return;
+            }
+            // Legacy fallback
             queryClient.invalidateQueries({ queryKey: ['bots'] });
             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
             queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
@@ -287,11 +333,8 @@ const AppTrainAI = () => {
             if (fileRef.current) fileRef.current.value = '';
         },
         onError: (err) => {
-            if (err instanceof UpgradeError) {
-                setUpgradeError(err);
-            } else {
-                showAlert('error', err.message);
-            }
+            if (err instanceof UpgradeError) setUpgradeError(err);
+            else showAlert('error', err.message);
         },
     });
 
@@ -304,7 +347,7 @@ const AppTrainAI = () => {
         trainMutation.mutate();
     };
 
-    const isTraining = trainMutation.isPending;
+    const isTraining = trainMutation.isPending || !!trainingJobId;
 
     // ── useMutation: purge knowledge ──────────────────────────────────────────
     const purgeMutation = useMutation({
@@ -488,7 +531,14 @@ const AppTrainAI = () => {
                         )}
                         <button type="submit" disabled={isTraining || isLockedOut}
                             className="w-full py-3 min-h-[44px] bg-linear-to-r from-blue-600 to-green-600 text-white text-md uppercase tracking-widest font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
-                            {isTraining ? (<><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Training...</>) : isLockedOut ? 'Quota Exceeded' : 'Start Training Sequence'}
+                            {trainingJobId ? (
+                                <>
+                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Training... {trainingProgress?.progress ?? 0} / {trainingProgress?.total || '?'} chunks
+                                </>
+                            ) : trainMutation.isPending ? (
+                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Uploading...</>
+                            ) : isLockedOut ? 'Quota Exceeded' : 'Start Training Sequence'}
                         </button>
                     </form>
                 </div>
