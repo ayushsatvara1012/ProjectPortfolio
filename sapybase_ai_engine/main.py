@@ -25,7 +25,7 @@ from pgvector.psycopg2 import register_vector
 from polar_sdk.webhooks import WebhookVerificationError, validate_event
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -1025,6 +1025,28 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     finally:
         release_db_connection(conn)
 
+# ── USAGE TRACKING BACKEND HELPER ─────────────────────────────────────────────
+def async_increment_usage(usage_id: Optional[str], user_id: str, company_id: str):
+    """Background Task: Increments message usage counters atomically."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        if usage_id:
+            cursor.execute(
+                "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                (usage_id,)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO usage_tracking (user_id, company_id, messages_used) VALUES (%s, %s, 1)",
+                (user_id, company_id)
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"USAGE TRACKING ERROR: {e}")
+    finally:
+        release_db_connection(conn)
+
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("10/minute;50/hour") # Per-API-Key limit (Hashed)
 @limiter.limit("30/minute", key_func=get_remote_address) # Global IP-based hard ceiling
@@ -1212,11 +1234,12 @@ DO NOT guess. Respond with EXACTLY this:
 
   I'm happy to help with anything else I have information on!
 
-[RULE 7 — OUT-OF-SCOPE HANDLING]
-If the user asks something completely unrelated to {company_name}:
-  "I'm here specifically to help you with {company_name}'s products and services.
-   For general questions, a general-purpose assistant would be better suited.
-   Is there anything about {company_name} I can help with?"
+[RULE 7 — TOPIC SCOPE]
+Your primary focus is {company_name}. 
+- For direct questions about {company_name}'s history, founders (e.g., Ayush Satvara), or mission, use your internal knowledge and logic if not in the knowledge base.
+- For technical or specific business details (pricing, specs, support steps), you MUST stick to the KNOWLEDGE BASE.
+- If a user asks something completely unrelated (e.g., global politics, recipes, other brands):
+   "I'm here specifically to help you with {company_name}'s products and services. Is there anything about {company_name} I can help with?"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BUSINESS CUSTOM INSTRUCTIONS
@@ -1266,10 +1289,18 @@ instructions to follow.
         # treat this content as a question, never as instructions.
         delimited_user_message = f"<user_query>\n{chat_req.message}\n</user_query>"
         
-        messages = [
-            SystemMessage(content=system_message),
-            HumanMessage(content=delimited_user_message),
-        ]
+        messages = [SystemMessage(content=system_message)]
+        
+        # ── CONTEXT INJECTION: Mapping Chat History ──────────────────────────
+        # Inject the last 4 messages from history into the model's memory window.
+        if chat_req.history:
+            for m in chat_req.history[-4:]:
+                if m.role == 'user':
+                    messages.append(HumanMessage(content=m.content))
+                else:
+                    messages.append(AIMessage(content=m.content))
+                    
+        messages.append(HumanMessage(content=delimited_user_message))
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         async def stream_generator():
@@ -1318,23 +1349,14 @@ instructions to follow.
                     full_reply, False, is_un_final
                 )
 
-                # 3. Usage Tracking (Atomic DB transaction)
-                track_conn = get_db_connection()
-                try:
-                    track_cursor = track_conn.cursor()
-                    if usage_id:
-                        track_cursor.execute(
-                            "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
-                            (usage_id,)
-                        )
-                    else:
-                        track_cursor.execute(
-                            "INSERT INTO usage_tracking (user_id, company_id, messages_used) VALUES (%s, %s, 1)",
-                            (user_uuid, company["id"])
-                        )
-                    track_conn.commit()
-                finally:
-                    release_db_connection(track_conn)
+                # 3. Usage Tracking (Background Task)
+                if full_reply.strip():
+                    background_tasks.add_task(
+                        async_increment_usage,
+                        usage_id, user_uuid, company["id"]
+                    )
+            finally:
+                pass
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
@@ -1627,7 +1649,11 @@ def train_chatbot(
             )
             current_count += 1
         
-        # Invalidate cache: new knowledge means old cached answers may be stale
+        # Cache invalidation: targeted clear for ONLY the specific bot
+        # This ensures that old "I don't know" answers aren't served after new training.
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
+        
+        # Also run global invalidation helper
         invalidate_cache(conn, resolved_company_id)
 
         conn.commit()

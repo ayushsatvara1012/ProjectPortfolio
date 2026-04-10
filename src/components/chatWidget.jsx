@@ -245,6 +245,7 @@ const ChatWidget = ({ apiKey }) => {
                                 updated[updated.length - 1] = {
                                     ...lastMsg,
                                     content: lastMsg.content + chunk,
+                                    isStreaming: true // Mark as actively streaming
                                 };
                             }
                             return updated;
@@ -484,7 +485,12 @@ const ChatWidget = ({ apiKey }) => {
                                                         <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                     ) : (
                                                         <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                            <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{msg.content}</ReactMarkdown>
+                                                            <TypewriterContent 
+                                                                key={`${idx}-${msg.content.length}`} // Unique key to force reset on content change
+                                                                content={msg.content} 
+                                                                isStreaming={msg.isStreaming} 
+                                                                onComplete={scrollToBottom}
+                                                            />
                                                         </div>
                                                     )}
                                                 </div>
@@ -666,6 +672,49 @@ const ChatWidget = ({ apiKey }) => {
                 </div>
             </div>
         </div>
+    );
+};
+
+// ── TYPEWRITER COMPONENT: Handles artificial typing for cached/chunk answers ──
+const TypewriterContent = ({ content, isStreaming, onComplete }) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const [isTyping, setIsTyping] = useState(!isStreaming);
+    const index = useRef(0);
+    const lastContent = useRef('');
+
+    // If we are actively streaming from SSE, don't use artificial typing
+    if (isStreaming) {
+        return <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{content}</ReactMarkdown>;
+    }
+
+    // Effect for artificial typewriter (for Cache Hits or older messages)
+    useEffect(() => {
+        // Only run for fresh content that isn't streaming
+        if (content !== lastContent.current) {
+            lastContent.current = content;
+            setDisplayedText('');
+            index.current = 0;
+            setIsTyping(true);
+
+            const interval = setInterval(() => {
+                if (index.current < content.length) {
+                    setDisplayedText(prev => prev + content[index.current]);
+                    index.current += 1;
+                    if (onComplete) onComplete();
+                } else {
+                    setIsTyping(false);
+                    clearInterval(interval);
+                }
+            }, 10); // Fast typing (10ms per char) for premium feel
+
+            return () => clearInterval(interval);
+        }
+    }, [content]);
+
+    return (
+        <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+            {isTyping ? displayedText : content}
+        </ReactMarkdown>
     );
 };
 
