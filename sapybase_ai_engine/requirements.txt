@@ -26,4 +26,3 @@ uvicorn
 Jinja2
 python-multipart
 polar-sdk
-pdf2image
