@@ -12,6 +12,7 @@ import socket
 import ipaddress
 import hashlib
 from psycopg2 import pool
+from enum import Enum
 from typing import Optional, List
 from urllib.parse import urlparse
 import base64
