@@ -257,9 +257,13 @@ const ChatWidget = ({ apiKey }) => {
 
                 // ── ERROR HANDLER (Infinite Retry Prevention) ────────────────
                 onerror(err) {
-                    // CACHE_HIT and HANDLED_ERROR are controlled exits, not real errors
+                    // CRITICAL: In @microsoft/fetch-event-source, `return` = RETRY.
+                    // You MUST `throw` to STOP. Every path here must throw.
+
                     if (err.message === 'CACHE_HIT' || err.message === 'HANDLED_ERROR') {
-                        return; // Do NOT retry
+                        // These are controlled exits — already handled in onopen.
+                        // Throw to stop the library from retrying.
+                        throw err;
                     }
 
                     console.error('SSE Chat Error:', err);
@@ -269,8 +273,7 @@ const ChatWidget = ({ apiKey }) => {
                     }]);
                     setIsLoading(false);
 
-                    // CRITICAL: Throwing inside onerror tells @microsoft/fetch-event-source
-                    // to STOP retrying. Without this throw, it will reconnect infinitely.
+                    // Stop the library from retrying on real errors too.
                     throw err;
                 },
 
