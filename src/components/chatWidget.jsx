@@ -447,7 +447,7 @@ const ChatWidget = ({ apiKey }) => {
                             </div>
 
                             {/* Scrollable Messages Container */}
-                            <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
+                            <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth custom-scrollbar">
                                 <AnimatePresence initial={false}>
                                     {messages.map((msg, idx) => (
                                         <motion.div

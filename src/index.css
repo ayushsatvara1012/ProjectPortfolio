@@ -74,15 +74,24 @@
   }
 
   /* Custom Scrollbar Utilities */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-slate-200) transparent;
+  }
+
+  .dark .custom-scrollbar {
+    scrollbar-color: var(--color-slate-800) transparent;
+  }
+
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-slate-200 border-2 border-transparent bg-clip-padding rounded-full hover:bg-slate-300 transition-colors;
+    @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
   }
 
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {

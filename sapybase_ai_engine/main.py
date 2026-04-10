@@ -1575,7 +1575,7 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
         if text.strip():
             docs.append(Document(
                 page_content=text,
-                metadata={"source": f"page_{i + 1}"}
+                metadata={"page": i + 1}
             ))
 
     # If PDF has almost no extractable text, it's likely a scanned document.
@@ -1620,7 +1620,7 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
                 if response.content:
                     docs.append(Document(
                         page_content=str(response.content),
-                        metadata={"source": f"page_{page_num}_vision"}
+                        metadata={"page": page_num, "method": "vision"}
                     ))
         except Exception as e:
             print(f"[PDF] Vision fallback failed: {e}")
@@ -2064,6 +2064,9 @@ def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
 class DeleteChunksRequest(BaseModel):
     chunk_ids: list[str] = Field(..., max_length=500, description="List of chunk UUIDs to delete (max 500)")
 
+class DeleteSourceRequest(BaseModel):
+    source_name: str = Field(..., description="The exact filename/URL source to delete fully.")
+
 @app.get("/api/knowledge/sources/{company_id}")
 def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user)):
     """Returns distinct knowledge sources (URLs/filenames) for a specific bot."""
@@ -2145,6 +2148,47 @@ def get_knowledge_chunks(
     finally:
         release_db_connection(conn)
 
+
+@app.delete("/api/knowledge/source/{company_id}")
+def delete_knowledge_source(
+    company_id: str,
+    body: DeleteSourceRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Deletes ALL chunks associated with a specific source (URL or filename). Fast bulk cleanup."""
+    if not body.source_name:
+        raise HTTPException(status_code=400, detail="No source name provided.")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership guard
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # Batch delete
+        cursor.execute(
+            "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
+            (company_id, body.source_name)
+        )
+        count = cursor.rowcount
+        
+        # Cache invalidation
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
+        invalidate_cache(conn, company_id)
+        
+        conn.commit()
+        return {"status": "success", "message": f"Source '{body.source_name}' removed. {count} chunks deleted."}
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"DELETE SOURCE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete source.")
+    finally:
+        release_db_connection(conn)
 
 @app.delete("/api/knowledge/chunks/{company_id}")
 def delete_knowledge_chunks(
