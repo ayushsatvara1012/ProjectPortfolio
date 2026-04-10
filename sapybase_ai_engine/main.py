@@ -1689,7 +1689,8 @@ async def run_training_job(
         for i in range(0, len(chunks), BATCH_SIZE):
             batch = chunks[i:i + BATCH_SIZE]
             texts = [c.page_content for c in batch]
-            embeddings_list = embeddings_model_doc.embed_documents(texts)
+            # ── NON-BLOCKING: Use async embedding call to keep event loop alive ──
+            embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
             for chunk, embedding in zip(batch, embeddings_list):
                 if len(embedding) > 768:
@@ -1702,7 +1703,7 @@ async def run_training_job(
             conn.commit()
             status["progress"] = i + len(batch)
             await set_job_status(job_id, status)
-            await asyncio.sleep(0)  # Yield control so other requests aren't starved
+            await asyncio.sleep(0.1)  # Yield control for better status poll responsiveness
 
         # Cache invalidation after successful training
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))

@@ -583,7 +583,7 @@ const AppTrainAI = () => {
                             {trainingJobId ? (
                                 <>
                                     <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Training... {trainingProgress?.progress ?? 0} / {trainingProgress?.total || '?'} chunks
+                                    Training... {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} chunks
                                 </>
                             ) : trainMutation.isPending ? (
                                 <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Uploading...</>
