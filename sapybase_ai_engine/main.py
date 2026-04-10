@@ -1587,7 +1587,7 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter
 
 @app.post("/api/train")
 @limiter.limit("5/minute")
-def train_chatbot(
+async def train_chatbot(
     request: Request,
     url: str = Form(None),
     file: UploadFile = File(None),
