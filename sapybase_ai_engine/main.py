@@ -1332,31 +1332,26 @@ instructions to follow.
                 # This block runs even if the client disconnects (tab closed) mid-stream.
                 # We save whatever was generated up to the disconnection point.
                 
-                if not full_reply.strip():
-                    return
-
-                # 1. Async Cache Save (only for significant responses)
-                if query_hash and len(full_reply) > 10:
-                    background_tasks.add_task(save_cache_entry, company["id"], query_hash, full_reply)
-
-                # 2. Unanswered Flagging & Analytics
-                is_un_final = len(retrieved_docs) == 0
-                if not is_un_final:
-                    is_un_final = any(phrase in full_reply.lower() for phrase in FALLBACK_PHRASES)
-
-                background_tasks.add_task(
-                    log_chat_to_db, company["id"], chat_req.message,
-                    full_reply, False, is_un_final
-                )
-
-                # 3. Usage Tracking (Background Task)
                 if full_reply.strip():
+                    # 1. Async Cache Save (only for significant responses)
+                    if query_hash and len(full_reply) > 10:
+                        background_tasks.add_task(save_cache_entry, company["id"], query_hash, full_reply)
+
+                    # 2. Unanswered Flagging & Analytics
+                    is_un_final = len(retrieved_docs) == 0
+                    if not is_un_final:
+                        is_un_final = any(phrase in full_reply.lower() for phrase in FALLBACK_PHRASES)
+
+                    background_tasks.add_task(
+                        log_chat_to_db, company["id"], chat_req.message,
+                        full_reply, False, is_un_final
+                    )
+
+                    # 3. Usage Tracking (Background Task)
                     background_tasks.add_task(
                         async_increment_usage,
                         usage_id, user_uuid, company["id"]
                     )
-            finally:
-                pass
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
