@@ -12,9 +12,15 @@ import socket
 import ipaddress
 import hashlib
 from psycopg2 import pool
-from enum import Enum
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import urlparse
+import base64
+from io import BytesIO
+from pypdf import PdfReader
+try:
+    from pdf2image import convert_from_path
+except ImportError:
+    convert_from_path = None
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -1521,6 +1527,64 @@ Rules:
 
 
 
+# ── MULTIMODAL DOCUMENT INTELLIGENCE: VISION-BASED PDF PARSING ────────────────
+async def process_pdf_with_vision(pdf_path: str) -> List[Document]:
+    """
+    Issue #18: The 'Pro' Document Engine.
+    Converts PDF pages to images and uses Gemini Vision to extract tables and charts
+    as structured Markdown. This preserves layout integrity that raw OCR loses.
+    """
+    if not convert_from_path:
+        print("[VISION] pdf2image not installed. Falling back to raw text.")
+        reader = PdfReader(pdf_path)
+        return [Document(page_content=page.extract_text(), metadata={"page": i}) for i, page in enumerate(reader.pages)]
+
+    try:
+        # Convert PDF pages to images (limit to first 15 pages for stability)
+        images = convert_from_path(pdf_path, first_page=1, last_page=15)
+        vision_docs = []
+        
+        # Initialize Vision Model
+        vision_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_KEY)
+
+        for i, image in enumerate(images):
+            # Encode image to base64
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+            # Transcription Prompt for 'Pro' accuracy
+            prompt = """Analyze this document page. 
+            Keep all tables as Markdown tables. 
+            Keep all headings as Markdown headers (# ## ###).
+            Keep all bullet points. 
+            If there are charts or diagrams, provide a brief textual summary of the data they show.
+            Output ONLY raw Markdown content."""
+
+            message = HumanMessage(
+                content=[
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"},
+                    },
+                ]
+            )
+
+            # Transcribe page
+            response = await vision_model.ainvoke([message])
+            page_text = str(response.content)
+            vision_docs.append(Document(page_content=page_text, metadata={"page": i+1}))
+            
+        return vision_docs
+    except Exception as e:
+        print(f"VISION EXTRACTION ERROR: {e}")
+        # Final fallback to standard text extraction
+        reader = PdfReader(pdf_path)
+        return [Document(page_content=page.extract_text(), metadata={"page": i}) for i, page in enumerate(reader.pages)]
+
+from langchain_text_splitters import MarkdownHeaderTextSplitter
+
 @app.post("/api/train")
 @limiter.limit("5/minute")
 def train_chatbot(
@@ -1598,7 +1662,7 @@ def train_chatbot(
                 print(f"JINA EXTRACTION FAILED: {e}")
                 raise HTTPException(status_code=400, detail=f"Failed to scrape website: {str(e)}")
 
-        # --- 1B. Process PDF File ---
+        # --- 1B. Process PDF File (Multimodal Vision Engine) ---
         if file:
             if not file.filename.lower().endswith('.pdf'):
                 raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -1608,8 +1672,9 @@ def train_chatbot(
                 temp_pdf_path = temp_pdf.name
             
             try:
-                pdf_loader = PyPDFLoader(temp_pdf_path)
-                docs.extend(pdf_loader.load())
+                # Use the new Vision-Powered parser for tabular data accuracy
+                vision_docs = await process_pdf_with_vision(temp_pdf_path)
+                docs.extend(vision_docs)
                 source_name = file.filename
             finally:
                 if os.path.exists(temp_pdf_path):

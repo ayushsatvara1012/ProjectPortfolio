@@ -675,46 +675,78 @@ const ChatWidget = ({ apiKey }) => {
     );
 };
 
-// ── TYPEWRITER COMPONENT: Handles artificial typing for cached/chunk answers ──
+// ── TYPEWRITER COMPONENT: Handles silky smooth transitions for chat text ──
 const TypewriterContent = ({ content, isStreaming, onComplete }) => {
-    const [displayedText, setDisplayedText] = useState('');
+    const [segments, setSegments] = useState([]);
     const [isTyping, setIsTyping] = useState(!isStreaming);
-    const index = useRef(0);
     const lastContent = useRef('');
 
-    // If we are actively streaming from SSE, don't use artificial typing
+    // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
+    // However, the tokens come in directly from the parent state.
     if (isStreaming) {
-        return <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{content}</ReactMarkdown>;
+        return (
+            <div className="relative overflow-hidden transition-all duration-300">
+                <ReactMarkdown 
+                    rehypePlugins={[rehypeSanitize]}
+                    components={{
+                        p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
+                        li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
+                    }}
+                >
+                    {content}
+                </ReactMarkdown>
+            </div>
+        );
     }
 
-    // Effect for artificial typewriter (for Cache Hits or older messages)
+    // Effect for artificial typewriter with "Premium Jitter"
     useEffect(() => {
-        // Only run for fresh content that isn't streaming
         if (content !== lastContent.current) {
             lastContent.current = content;
-            setDisplayedText('');
-            index.current = 0;
+            setSegments([]);
             setIsTyping(true);
 
-            const interval = setInterval(() => {
-                if (index.current < content.length) {
-                    setDisplayedText(prev => prev + content[index.current]);
-                    index.current += 1;
+            let currentIdx = 0;
+            const words = content.split(/(\s+)/); // Keep whitespace
+            
+            const typeNextWord = () => {
+                if (currentIdx < words.length) {
+                    const word = words[currentIdx];
+                    setSegments(prev => [...prev, word]);
+                    currentIdx++;
                     if (onComplete) onComplete();
+                    
+                    // Natural pacing: slightly faster for small words, slower for punctuation
+                    const delay = word.length > 5 ? 25 : 15;
+                    setTimeout(typeNextWord, delay);
                 } else {
                     setIsTyping(false);
-                    clearInterval(interval);
                 }
-            }, 10); // Fast typing (10ms per char) for premium feel
+            };
 
-            return () => clearInterval(interval);
+            typeNextWord();
         }
     }, [content]);
 
     return (
-        <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
-            {isTyping ? displayedText : content}
-        </ReactMarkdown>
+        <div className="relative transition-all duration-500">
+            <ReactMarkdown 
+                rehypePlugins={[rehypeSanitize]}
+                components={{
+                    p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0" />,
+                }}
+            >
+                {isTyping ? segments.join('') : content}
+            </ReactMarkdown>
+            {isTyping && (
+                <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 0.8, repeat: Infinity }}
+                    className="inline-block w-1.5 h-4 ml-0.5 bg-slate-400 align-middle"
+                />
+            )}
+        </div>
     );
 };
 
