@@ -1630,8 +1630,32 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 import uuid
 
-# ── TRAINING JOB TRACKER (in-memory; sufficient for single-worker, use Redis for multi-worker) ──
-_training_jobs: dict = {}
+# ── TRAINING JOB PERSISTENCE (Shared across Gunicorn workers via Redis) ──
+_training_jobs: dict = {}  # Local fallback for non-Redis envs
+
+async def set_job_status(job_id: str, status: dict):
+    """Saves job status to Redis (shared) or local dict (fallback) with 15m TTL."""
+    global r
+    try:
+        if r:
+            await r.setex(f"job:{job_id}", 900, json.dumps(status))
+        else:
+            _training_jobs[job_id] = status
+    except Exception as e:
+        print(f"REDIS STATUS ERROR: {e}")
+        _training_jobs[job_id] = status
+
+async def get_job_status(job_id: str) -> Optional[dict]:
+    """Retrieves job status from Redis or local dict."""
+    global r
+    try:
+        if r:
+            data = await r.get(f"job:{job_id}")
+            return json.loads(data) if data else None
+        return _training_jobs.get(job_id)
+    except Exception as e:
+        print(f"REDIS FETCH ERROR: {e}")
+        return _training_jobs.get(job_id)
 
 async def run_training_job(
     job_id: str,
@@ -1641,8 +1665,10 @@ async def run_training_job(
     limit: int,
     source_name: str,
 ):
-    """Background task: embeds and inserts chunks without blocking the HTTP response."""
-    _training_jobs[job_id] = {"status": "processing", "progress": 0, "total": 0}
+    """Background task: embeds and inserts chunks. State is persisted in Redis."""
+    status = {"status": "processing", "progress": 0, "total": 0}
+    await set_job_status(job_id, status)
+
     conn = None
     try:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
@@ -1655,7 +1681,9 @@ async def run_training_job(
         current_count = cursor.fetchone()[0]
         remaining = max(0, limit - current_count)
         chunks = all_chunks[:remaining]
-        _training_jobs[job_id]["total"] = len(chunks)
+        
+        status["total"] = len(chunks)
+        await set_job_status(job_id, status)
 
         BATCH_SIZE = 10
         for i in range(0, len(chunks), BATCH_SIZE):
@@ -1672,7 +1700,8 @@ async def run_training_job(
                 )
 
             conn.commit()
-            _training_jobs[job_id]["progress"] = i + len(batch)
+            status["progress"] = i + len(batch)
+            await set_job_status(job_id, status)
             await asyncio.sleep(0)  # Yield control so other requests aren't starved
 
         # Cache invalidation after successful training
@@ -1680,15 +1709,15 @@ async def run_training_job(
         invalidate_cache(conn, resolved_company_id)
         conn.commit()
 
-        _training_jobs[job_id] = {
+        await set_job_status(job_id, {
             "status": "done",
             "chunks_added": len(chunks),
             "total_available": len(all_chunks),
             "truncated": len(all_chunks) > remaining,
-        }
+        })
     except Exception as e:
         print(f"TRAINING JOB {job_id} FAILED: {e}")
-        _training_jobs[job_id] = {"status": "error", "message": str(e)}
+        await set_job_status(job_id, {"status": "error", "message": str(e)})
         if conn:
             try:
                 conn.rollback()
@@ -1804,7 +1833,7 @@ async def train_chatbot(
 
     # 3. Kick off background job — return immediately to prevent Render worker timeout
     job_id = str(uuid.uuid4())
-    _training_jobs[job_id] = {"status": "queued"}
+    await set_job_status(job_id, {"status": "queued"})
     background_tasks.add_task(
         run_training_job, job_id, resolved_company_id, docs, current_user, limit, source_name
     )
@@ -1818,8 +1847,8 @@ async def train_chatbot(
 
 @app.get("/api/train/status/{job_id}")
 async def get_training_status(job_id: str, user: dict = Depends(get_current_user)):
-    """Poll training job progress. Returns status: queued | processing | done | error."""
-    job = _training_jobs.get(job_id)
+    """Poll training job progress. Shared across workers via Redis."""
+    job = await get_job_status(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Training job not found or already expired.")
     return job
