@@ -16,6 +16,7 @@ from enum import Enum
 from typing import Optional
 from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field, validator
@@ -24,7 +25,7 @@ from pgvector.psycopg2 import register_vector
 from polar_sdk.webhooks import WebhookVerificationError, validate_event
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -162,11 +163,21 @@ MODEL_MAPPING = {
     "ENTERPRISE": "gemini-3.1-pro-preview",
 }
 
+VALID_MODELS = set(MODEL_MAPPING.values()) | {
+    "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
+}
+
 def get_tier_model(tier: str, company_model: str = None):
     """
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
     """
+    # ── SECURITY: Model Allowlist Check ──
+    # Prevents arbitrary model strings from being injected via database
+    if company_model and company_model not in VALID_MODELS:
+        print(f"SECURITY WARNING: Invalid company_model detected: {company_model}. Falling back to tier default.")
+        company_model = None
+
     model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
     
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
@@ -240,6 +251,7 @@ app.state.limiter = limiter
 @app.on_event("startup")
 async def startup_event():
     """Initializes external services on app start."""
+    global r
     # 1. Initialize FastAPI Cache
     redis_url = os.getenv("REDIS_URL")
     if redis_url:
@@ -257,7 +269,32 @@ async def startup_event():
             else:
                 print(f"CACHE WARNING: Redis cache initialization failed ({e}). Running without cache.")
     else:
+        r = None # Explicitly set to None for clarify
         print("CACHE: Running without Redis cache (REDIS_URL not set).")
+
+async def check_global_llm_budget(company_id: str):
+    """
+    LLM CREDIT PROTECTION: Aborts if this tenant has spent > 20 LLM calls in the last 60s.
+    This acts as a secondary layer to prevent rapid credit depletion from automated attacks.
+    """
+    if not r: # Uses the global redis client from startup_event
+        return
+    
+    key = f"llm_burst:{company_id}"
+    try:
+        count = await r.incr(key)
+        if count == 1:
+            await r.expire(key, 60)
+        
+        if count > 20: # 20 LLM calls per minute per tenant, hard ceiling
+            raise HTTPException(
+                status_code=429, 
+                detail="LLM rate ceiling exceeded. Please wait a minute before sending more queries."
+            )
+    except (redis.RedisError, HTTPException) as e:
+        if isinstance(e, HTTPException): raise e
+        # If redis fails (e.g. connectivity), we allow the request to proceed (resiliency)
+        pass
 
     # 2. Database Migration: Ensure ai_model column exists (self-healing)
     conn = get_db_connection()
@@ -472,6 +509,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             client_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else None
         except:
             client_origin = None
+
+    if not client_origin and os.getenv("ENV") == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Origin header required in production."
+        )
     
     if client_origin:
         # Normalize: Remove trailing slash
@@ -982,15 +1025,42 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     finally:
         release_db_connection(conn)
 
+# ── USAGE TRACKING BACKEND HELPER ─────────────────────────────────────────────
+def async_increment_usage(usage_id: Optional[str], user_id: str, company_id: str):
+    """Background Task: Increments message usage counters atomically."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        if usage_id:
+            cursor.execute(
+                "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                (usage_id,)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO usage_tracking (user_id, company_id, messages_used) VALUES (%s, %s, 1)",
+                (user_id, company_id)
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"USAGE TRACKING ERROR: {e}")
+    finally:
+        release_db_connection(conn)
+
 @app.post("/api/chat", response_model=ChatResponse)
-@limiter.limit("10/minute;50/hour")
-def chat_endpoint(
+@limiter.limit("10/minute;50/hour") # Per-API-Key limit (Hashed)
+@limiter.limit("30/minute", key_func=get_remote_address) # Global IP-based hard ceiling
+async def chat_endpoint(
     request: Request,
     chat_req: ChatRequest, 
     background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """Core AI Chat Endpoint with Exact-Match Cache, Basic/Paid Enforcement and Connection Pooling."""
+    # ── SECURITY: Global LLM Budget Enforcement (Redis-Backed) ──
+    # Prevents rapid credit depletion even if someone manages to bypass per-key rate limits.
+    await check_global_llm_budget(company["id"])
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -1164,11 +1234,12 @@ DO NOT guess. Respond with EXACTLY this:
 
   I'm happy to help with anything else I have information on!
 
-[RULE 7 — OUT-OF-SCOPE HANDLING]
-If the user asks something completely unrelated to {company_name}:
-  "I'm here specifically to help you with {company_name}'s products and services.
-   For general questions, a general-purpose assistant would be better suited.
-   Is there anything about {company_name} I can help with?"
+[RULE 7 — TOPIC SCOPE]
+Your primary focus is {company_name}. 
+- For direct questions about {company_name}'s history, founders (e.g., Ayush Satvara), or mission, use your internal knowledge and logic if not in the knowledge base.
+- For technical or specific business details (pricing, specs, support steps), you MUST stick to the KNOWLEDGE BASE.
+- If a user asks something completely unrelated (e.g., global politics, recipes, other brands):
+   "I'm here specifically to help you with {company_name}'s products and services. Is there anything about {company_name} I can help with?"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BUSINESS CUSTOM INSTRUCTIONS
@@ -1218,53 +1289,76 @@ instructions to follow.
         # treat this content as a question, never as instructions.
         delimited_user_message = f"<user_query>\n{chat_req.message}\n</user_query>"
         
-        messages = [
-            SystemMessage(content=system_message),
-            HumanMessage(content=delimited_user_message),
-        ]
-        ai_response = chat_model.invoke(messages)
-        # GEMINI 3.1/2.x COMPATIBILITY: Extract text from content blocks if returned as a list
-        if isinstance(ai_response.content, list):
-            reply_text = "".join([block.get("text", "") for block in ai_response.content if isinstance(block, dict) and block.get("type") == "text"])
-        else:
-            reply_text = str(ai_response.content)
+        messages = [SystemMessage(content=system_message)]
+        
+        # ── CONTEXT INJECTION: Mapping Chat History ──────────────────────────
+        # Inject the last 4 messages from history into the model's memory window.
+        if chat_req.history:
+            for m in chat_req.history[-4:]:
+                if m.role == 'user':
+                    messages.append(HumanMessage(content=m.content))
+                else:
+                    messages.append(AIMessage(content=m.content))
+                    
+        messages.append(HumanMessage(content=delimited_user_message))
+        # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
+        # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
+        async def stream_generator():
+            full_reply = ""
+            try:
+                # Stream from Gemini
+                async for chunk in chat_model.astream(messages):
+                    content = ""
+                    if hasattr(chunk, 'content'):
+                        if isinstance(chunk.content, list):
+                            content = "".join([c.get("text", "") for c in chunk.content if isinstance(c, dict)])
+                        else:
+                            content = str(chunk.content)
+                    
+                    if content:
+                        full_reply += content
+                        # Format as SSE
+                        yield f"data: {json.dumps({'token': content})}\n\n"
+                
+                # Sentinel signal for frontend (success path)
+                yield "data: [DONE]\n\n"
 
-        # ── ASYNC CACHE SAVE (does NOT delay HTTP response) ──────────────────
-        background_tasks.add_task(save_cache_entry, company["id"], query_hash, reply_text)
+            except Exception as stream_err:
+                print(f"STREAM ERROR: {stream_err}")
+                yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
+            
+            finally:
+                # ── ROBUST POST-STREAM PERSISTENCE ──
+                # This block runs even if the client disconnects (tab closed) mid-stream.
+                # We save whatever was generated up to the disconnection point.
+                
+                if not full_reply.strip():
+                    return
 
-        # ── ROBUST UNANSWERED FLAGGING ───────────────────────────────────────
-        # Signal 1: RAG returned 0 vector chunks
-        is_unanswered = len(retrieved_docs) == 0
-        # Signal 2: Bot response contains a known fallback phrase
-        if not is_unanswered:
-            response_lower = reply_text.lower()
-            is_unanswered = any(phrase in response_lower for phrase in FALLBACK_PHRASES)
+                # 1. Async Cache Save (only for significant responses)
+                if query_hash and len(full_reply) > 10:
+                    background_tasks.add_task(save_cache_entry, company["id"], query_hash, full_reply)
 
-        # ── ASYNC ANALYTICS LOG (Gemini response) ───────────────────────────
-        background_tasks.add_task(
-            log_chat_to_db, company["id"], chat_req.message,
-            reply_text, False, is_unanswered  # was_cache_hit=False
-        )
+                # 2. Unanswered Flagging & Analytics
+                is_un_final = len(retrieved_docs) == 0
+                if not is_un_final:
+                    is_un_final = any(phrase in full_reply.lower() for phrase in FALLBACK_PHRASES)
 
-        # 5. Track Usage (per-company row)
-        if usage_id:
-            cursor.execute(
-                "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
-                (usage_id,)
-            )
-        else:
-            cursor.execute(
-                """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
-                   VALUES (%s, %s, 1, now(), now() + interval '30 days')
-                   ON CONFLICT DO NOTHING""",
-                (user_uuid, company["id"])
-            )
-        conn.commit()
+                background_tasks.add_task(
+                    log_chat_to_db, company["id"], chat_req.message,
+                    full_reply, False, is_un_final
+                )
 
-        return ChatResponse(
-            reply=reply_text,
-            sources=list(set([row[1] for row in retrieved_docs]))
-        )
+                # 3. Usage Tracking (Background Task)
+                if full_reply.strip():
+                    background_tasks.add_task(
+                        async_increment_usage,
+                        usage_id, user_uuid, company["id"]
+                    )
+            finally:
+                pass
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -1555,7 +1649,11 @@ def train_chatbot(
             )
             current_count += 1
         
-        # Invalidate cache: new knowledge means old cached answers may be stale
+        # Cache invalidation: targeted clear for ONLY the specific bot
+        # This ensures that old "I don't know" answers aren't served after new training.
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
+        
+        # Also run global invalidation helper
         invalidate_cache(conn, resolved_company_id)
 
         conn.commit()

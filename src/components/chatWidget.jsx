@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
@@ -107,6 +109,7 @@ const ChatWidget = ({ apiKey }) => {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const menuRef = useRef(null);
+    const abortControllerRef = useRef(null);
 
     useEffect(() => {
 
@@ -144,54 +147,149 @@ const ChatWidget = ({ apiKey }) => {
         setInput('');
         setIsLoading(true);
 
+        // ── MEMORY LEAK PREVENTION: Abort any in-flight SSE stream ──
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const ctrl = new AbortController();
+        abortControllerRef.current = ctrl;
+
+        // Resolve API Key
+        const resolvedApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
+        if (!resolvedApiKey) {
+            console.warn("SaPyBase Widget: Missing API Key. Processing aborted.");
+            setMessages(prev => [...prev, { role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!" }]);
+            setIsLoading(false);
+            return;
+        }
+
+        // Build context history: last 4 messages BEFORE this new user message
+        const recentHistory = messages.slice(-4).map(m => ({ role: m.role, content: m.content }));
+
+        // Track whether we've received the first chunk (to fade out the loading aura)
+        let firstChunkReceived = false;
+
         try {
-            // Call your local FastAPI engine
-            // Prioritize Prop, then Window Object, then Vite environment variable
-            const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
-
-            if (!activeApiKey) {
-                console.warn("SaPyBase Widget: Missing API Key. Processing aborted.");
-                setMessages(prev => [...prev, { role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!" }]);
-                return;
-            }
-
-            // Build context history: last 4 messages BEFORE this new user message
-            // (messages state already includes the new user message we just pushed via setMessages)
-            // We use the pre-push snapshot to send the conversation context.
-            const recentHistory = messages.slice(-4).map(m => ({ role: m.role, content: m.content }));
-
-            const response = await fetch(`${activeApiUrl}/api/chat`, {
+            await fetchEventSource(`${activeApiUrl}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-api-key': activeApiKey
+                    'x-api-key': resolvedApiKey,
                 },
                 body: JSON.stringify({ message: userMessage, history: recentHistory }),
-            });
+                signal: ctrl.signal,
+                openWhenHidden: true, // Keep streaming even if the tab loses focus
 
-            if (!response.ok) {
-                if (response.status === 402) {
-                    let detail = null;
-                    try { detail = await response.json(); } catch { }
-                    const isMessageLimit = detail?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
+                // ── HYBRID CACHE INTERCEPTION ────────────────────────────────
+                async onopen(response) {
+                    if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
+                        // CACHE HIT: Backend returned a full JSON response instead of a stream.
+                        // Read the body, update state with the complete reply, and throw
+                        // a sentinel error to cleanly exit the SSE listener.
+                        const data = await response.json();
+                        setMessages(prev => [...prev, { role: 'bot', content: data.reply }]);
+                        setIsLoading(false);
+                        throw new Error('CACHE_HIT');
+                    }
+                    if (!response.ok) {
+                        // Handle specific HTTP errors before the stream begins
+                        if (response.status === 402) {
+                            let detail = null;
+                            try { detail = await response.json(); } catch { /* noop */ }
+                            const isMessageLimit = detail?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
+                            setMessages(prev => [...prev, {
+                                role: 'bot',
+                                content: isMessageLimit
+                                    ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
+                                    : "I'm temporarily unavailable. Please try again later.",
+                            }]);
+                            setIsLoading(false);
+                            throw new Error('HANDLED_ERROR');
+                        }
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                    // response.ok && text/event-stream → SSE stream begins normally
+                },
+
+                // ── STREAMING TOKEN HANDLER ──────────────────────────────────
+                onmessage(msg) {
+                    // Sentinel: backend signals end-of-stream
+                    if (msg.data === '[DONE]') {
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    let chunk = '';
+                    try {
+                        const parsed = JSON.parse(msg.data);
+                        chunk = parsed.token || parsed.content || parsed.text || '';
+                    } catch {
+                        // If the data isn't JSON, use the raw string directly
+                        chunk = msg.data;
+                    }
+
+                    if (!chunk) return;
+
+                    // Fade out the Apple Intelligence loading aura on first token
+                    if (!firstChunkReceived) {
+                        firstChunkReceived = true;
+                        setIsLoading(false);
+                        // Seed the bot message placeholder
+                        setMessages(prev => [...prev, { role: 'bot', content: chunk }]);
+                    } else {
+                        // Append subsequent tokens to the last (bot) message
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            const lastMsg = updated[updated.length - 1];
+                            if (lastMsg && lastMsg.role === 'bot') {
+                                updated[updated.length - 1] = {
+                                    ...lastMsg,
+                                    content: lastMsg.content + chunk,
+                                    isStreaming: true // Mark as actively streaming
+                                };
+                            }
+                            return updated;
+                        });
+                    }
+
+                    // Auto-scroll to track the streaming text
+                    scrollToBottom();
+                },
+
+                // ── ERROR HANDLER (Infinite Retry Prevention) ────────────────
+                onerror(err) {
+                    // CRITICAL: In @microsoft/fetch-event-source, `return` = RETRY.
+                    // You MUST `throw` to STOP. Every path here must throw.
+
+                    if (err.message === 'CACHE_HIT' || err.message === 'HANDLED_ERROR') {
+                        // These are controlled exits — already handled in onopen.
+                        // Throw to stop the library from retrying.
+                        throw err;
+                    }
+
+                    console.error('SSE Chat Error:', err);
                     setMessages(prev => [...prev, {
                         role: 'bot',
-                        content: isMessageLimit
-                            ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
-                            : "I'm temporarily unavailable. Please try again later.",
+                        content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.",
                     }]);
-                    return;
-                }
-                throw new Error('Network response was not ok');
+                    setIsLoading(false);
+
+                    // Stop the library from retrying on real errors too.
+                    throw err;
+                },
+
+                onclose() {
+                    // Stream closed normally by the server
+                    setIsLoading(false);
+                },
+            });
+        } catch (err) {
+            // Catch AbortError (user sent a new message mid-stream) and sentinel errors silently
+            if (err.name === 'AbortError' || err.message === 'CACHE_HIT' || err.message === 'HANDLED_ERROR') {
+                return;
             }
-
-            const data = await response.json();
-
-            setMessages(prev => [...prev, { role: 'bot', content: data.reply }]);
-        } catch (error) {
-            console.error("Chat Error:", error);
-            setMessages(prev => [...prev, { role: 'bot', content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form." }]);
-        } finally {
+            // Any other unexpected error
+            console.error('Chat Error (outer):', err);
             setIsLoading(false);
         }
     };
@@ -387,7 +485,12 @@ const ChatWidget = ({ apiKey }) => {
                                                         <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                     ) : (
                                                         <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                                            <TypewriterContent 
+                                                                key={`${idx}-${msg.content.length}`} // Unique key to force reset on content change
+                                                                content={msg.content} 
+                                                                isStreaming={msg.isStreaming} 
+                                                                onComplete={scrollToBottom}
+                                                            />
                                                         </div>
                                                     )}
                                                 </div>
@@ -569,6 +672,49 @@ const ChatWidget = ({ apiKey }) => {
                 </div>
             </div>
         </div>
+    );
+};
+
+// ── TYPEWRITER COMPONENT: Handles artificial typing for cached/chunk answers ──
+const TypewriterContent = ({ content, isStreaming, onComplete }) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const [isTyping, setIsTyping] = useState(!isStreaming);
+    const index = useRef(0);
+    const lastContent = useRef('');
+
+    // If we are actively streaming from SSE, don't use artificial typing
+    if (isStreaming) {
+        return <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{content}</ReactMarkdown>;
+    }
+
+    // Effect for artificial typewriter (for Cache Hits or older messages)
+    useEffect(() => {
+        // Only run for fresh content that isn't streaming
+        if (content !== lastContent.current) {
+            lastContent.current = content;
+            setDisplayedText('');
+            index.current = 0;
+            setIsTyping(true);
+
+            const interval = setInterval(() => {
+                if (index.current < content.length) {
+                    setDisplayedText(prev => prev + content[index.current]);
+                    index.current += 1;
+                    if (onComplete) onComplete();
+                } else {
+                    setIsTyping(false);
+                    clearInterval(interval);
+                }
+            }, 10); // Fast typing (10ms per char) for premium feel
+
+            return () => clearInterval(interval);
+        }
+    }, [content]);
+
+    return (
+        <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+            {isTyping ? displayedText : content}
+        </ReactMarkdown>
     );
 };
 
