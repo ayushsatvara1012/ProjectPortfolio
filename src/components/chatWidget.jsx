@@ -438,10 +438,10 @@ const ChatWidget = ({ apiKey }) => {
 
                         {/* Messages Area Wrapper */}
                         <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
-                            
+
                             {/* The Animated Blue Aura (All borders) */}
                             <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
-                                <div 
+                                <div
                                     className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20"
                                 />
                             </div>
@@ -456,9 +456,9 @@ const ChatWidget = ({ apiKey }) => {
                                             initial="hidden"
                                             animate="visible"
                                             layout="position"
-                                            className={`flex gap-2 min-w-0 max-w-full sm:max-w-[95%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                                            className={`flex items-center gap-2 min-w-0 max-w-full sm:max-w-[95%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
                                         >
-                                            <div className="shrink-0 mt-auto mb-1">
+                                            <div className="shrink-0">
                                                 {msg.role === 'user' ? (
                                                     <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md dark:shadow-blue-900/40" style={{ backgroundColor: THEME_COLOR }}>
                                                         <User size={14} />
@@ -485,10 +485,10 @@ const ChatWidget = ({ apiKey }) => {
                                                         <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                     ) : (
                                                         <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                            <TypewriterContent 
+                                                            <TypewriterContent
                                                                 key={`${idx}-${msg.content.length}`} // Unique key to force reset on content change
-                                                                content={msg.content} 
-                                                                isStreaming={msg.isStreaming} 
+                                                                content={msg.content}
+                                                                isStreaming={msg.isStreaming}
                                                                 onComplete={scrollToBottom}
                                                             />
                                                         </div>
@@ -686,10 +686,10 @@ const TypewriterContent = ({ content, isStreaming, onComplete }) => {
     if (isStreaming) {
         return (
             <div className="relative overflow-hidden transition-all duration-300">
-                <ReactMarkdown 
+                <ReactMarkdown
                     rehypePlugins={[rehypeSanitize]}
                     components={{
-                        p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
+                        p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
                         li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
                     }}
                 >
@@ -708,14 +708,14 @@ const TypewriterContent = ({ content, isStreaming, onComplete }) => {
 
             let currentIdx = 0;
             const words = content.split(/(\s+)/); // Keep whitespace
-            
+
             const typeNextWord = () => {
                 if (currentIdx < words.length) {
                     const word = words[currentIdx];
                     setSegments(prev => [...prev, word]);
                     currentIdx++;
                     if (onComplete) onComplete();
-                    
+
                     // Natural pacing: slightly faster for small words, slower for punctuation
                     const delay = word.length > 5 ? 25 : 15;
                     setTimeout(typeNextWord, delay);
@@ -730,10 +730,10 @@ const TypewriterContent = ({ content, isStreaming, onComplete }) => {
 
     return (
         <div className="relative transition-all duration-500">
-            <ReactMarkdown 
+            <ReactMarkdown
                 rehypePlugins={[rehypeSanitize]}
                 components={{
-                    p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0" />,
+                    p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2" />,
                 }}
             >
                 {isTyping ? segments.join('') : content}
