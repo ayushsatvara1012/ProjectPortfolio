@@ -56,6 +56,7 @@ export const BotSettingsProvider = ({ children }) => {
                     // ── v13 ──
                     logoShape: data.company.logo_shape || 'circle',
                     customLogoUrl: data.company.custom_logo_url || '',
+                    avatarBgStyle: data.company.avatar_bg_style || 'none',
                 });
             }
         } catch (err) {
@@ -89,6 +90,7 @@ export const BotSettingsProvider = ({ children }) => {
                     // ── v13 ──
                     logo_shape: botSettings.logoShape,
                     custom_logo_url: botSettings.customLogoUrl || null,
+                    avatar_bg_style: botSettings.avatarBgStyle,
                 })
             });
             const data = await res.json();

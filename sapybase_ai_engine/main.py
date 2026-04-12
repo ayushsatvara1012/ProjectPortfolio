@@ -622,7 +622,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             """
             SELECT id, company_name, company_tone, theme_color, allowed_origin, 
                    system_prompt, bot_name, logo_url, initial_message, quick_questions,
-                   logo_shape, custom_logo_url
+                   logo_shape, custom_logo_url, avatar_bg_style
             FROM companies WHERE api_key = %s
             """, 
             (hashed_key,)
@@ -650,6 +650,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "quick_questions": company_data[9] or [],
         "logo_shape": company_data[10] or "circle",
         "custom_logo_url": company_data[11],
+        "avatar_bg_style": company_data[12] or "none",
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -955,7 +956,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin, 
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url
+                       logo_shape, custom_logo_url, avatar_bg_style
                 FROM companies WHERE user_id = %s AND id = %s
                 """, 
                 (user_uuid, company_id)
@@ -965,7 +966,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin, 
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url
+                       logo_shape, custom_logo_url, avatar_bg_style
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """, 
                 (user_uuid,)
@@ -999,6 +1000,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "ai_model": company_row[11],
             "logo_shape": company_row[12] or "circle",
             "custom_logo_url": company_row[13],
+            "avatar_bg_style": company_row[14] or "none",
         }
     finally:
         release_db_connection(conn)
@@ -1034,6 +1036,7 @@ class CompanyUpdate(BaseModel):
     # ── v13 new fields ──
     logo_shape:       Optional[str]  = None   # circle | squircle | bento | sharp
     custom_logo_url:  Optional[str]  = None   # tenant-provided HTTPS image URL
+    avatar_bg_style:  Optional[str]  = None   # e.g. none, hacker, sunset
 
     @validator('logo_shape')
     def validate_logo_shape(cls, v):
@@ -1057,7 +1060,7 @@ async def update_company_details(
     # ── Tier gate: fields restricted to BASIC users ──
     if tier == "BASIC" and role != "SUPER_ADMIN":
         restricted_fields = ["system_prompt", "company_tone", "quick_questions", "ai_model",
-                             "logo_shape", "custom_logo_url"]
+                             "logo_shape", "custom_logo_url", "avatar_bg_style"]
         provided_fields = update.dict(exclude_unset=True).keys()
         forbidden = [f for f in provided_fields if f in restricted_fields]
         if forbidden:

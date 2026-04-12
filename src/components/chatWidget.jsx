@@ -42,7 +42,7 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
     const showImage = logoUrl && logoUrl.trim() && !imgFailed;
     const activeShapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-xl';
 
-    let bgProps = { backgroundColor: showImage ? (transparentBgImage ? 'transparent' : (isCustom ? themeColor : '#ffffff')) : themeColor };
+    let bgProps = { backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor };
     
     // Safety check: only apply custom gradient if it is a custom image AND gradient is selected
     if (showImage && isCustom && bgStyle && AVATAR_GRADIENTS[bgStyle]) {
@@ -61,7 +61,7 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
                 <img
                     src={logoUrl}
                     alt={`${botName} logo`}
-                    className={`m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none! ${isCustom ? 'w-full! h-full! object-cover!' : 'w-[75%]! h-[75%]! object-contain!'}`}
+                    className="w-[75%]! h-[75%]! object-contain! m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none!"
                     onError={() => setImgFailed(true)}
                     style={{ display: 'block', boxSizing: 'border-box' }}
                 />
@@ -832,11 +832,11 @@ const ChatWidget = ({ apiKey }) => {
                                 <g clipPath="url(#fab-clip)">
                                     <image
                                         href={LOGO_URL}
-                                        x={(configData.custom_logo_url ? 0 : 20) + (fabShape.x || 0)}
-                                        y={(configData.custom_logo_url ? 0 : 20) + (fabShape.y || 0)}
-                                        width={configData.custom_logo_url ? 100 : 60}
-                                        height={configData.custom_logo_url ? 100 : 60}
-                                        preserveAspectRatio={configData.custom_logo_url ? "xMidYMid slice" : "xMidYMid meet"}
+                                        x={15 + (fabShape.x || 0)}
+                                        y={15 + (fabShape.y || 0)}
+                                        width={70}
+                                        height={70}
+                                        preserveAspectRatio="xMidYMid meet"
                                         className="z-10"
                                     />
                                 </g>
