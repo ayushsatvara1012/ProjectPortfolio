@@ -103,7 +103,32 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
         deleteMutation.mutate();
     };
 
-    const isDeleting = deleteMutation.isPending;
+    // ── DELETE ENTIRE SOURCE (New Bulk Logic) ───────────────────────────────
+    const deleteSourceMutation = useMutation({
+        mutationFn: () => authFetch(`/api/knowledge/source/${selectedBotId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_name: selectedSource }),
+        }),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
+            queryClient.invalidateQueries({ queryKey: ['bots'] });
+            refreshUser();
+            setSelectedSource('');
+            showAlert('success', data?.message || 'Source deleted fully.');
+        },
+        onError: (err) => {
+            showAlert('error', err.message || 'Failed to delete entire source.');
+        },
+    });
+
+    const handleDeleteSource = () => {
+        if (!selectedSource) return;
+        if (!window.confirm(`Permanently delete the ENTIRE source "${selectedSource}" and all its chunks? This cannot be undone.`)) return;
+        deleteSourceMutation.mutate();
+    };
+
+    const isDeleting = deleteMutation.isPending || deleteSourceMutation.isPending;
 
     // If no bot selected or free tier, show placeholder
     if (isFree || !selectedBotId) {
@@ -118,39 +143,63 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
     return (
         <div className="space-y-4">
             {/* Source Dropdown */}
-            <select
-                value={selectedSource}
-                onChange={e => setSelectedSource(e.target.value)}
-                disabled={sourcesLoading || sources.length === 0}
-                className={inputCls + ' appearance-none font-mono text-xs'}
-            >
-                {sourcesLoading && <option>Loading sources...</option>}
-                {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
-                {sources.map(s => (
-                    <option key={s.source} value={s.source}>
-                        {(s.source || 'Unknown').length > 50 ? s.source.substring(0, 47) + '...' : s.source} ({s.chunk_count} chunks)
-                    </option>
-                ))}
-            </select>
+            <div className="flex gap-2">
+                <select
+                    value={selectedSource}
+                    onChange={e => setSelectedSource(e.target.value)}
+                    disabled={sourcesLoading || sources.length === 0 || isDeleting}
+                    className={inputCls + ' appearance-none font-mono text-xs flex-1'}
+                >
+                    {sourcesLoading && <option>Loading sources...</option>}
+                    {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
+                    {sources.map(s => (
+                        <option key={s.source} value={s.source}>
+                            {(s.source || 'Unknown').length > 40 ? s.source.substring(0, 37) + '...' : s.source} ({s.chunk_count} chunks)
+                        </option>
+                    ))}
+                </select>
+
+                {selectedSource && (
+                    <button
+                        onClick={handleDeleteSource}
+                        disabled={isDeleting}
+                        title="Delete this entire source (all chunks)"
+                        className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 hover:bg-red-600 hover:text-white dark:hover:bg-red-700 transition-all rounded-xs flex items-center justify-center shrink-0"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                    </button>
+                )}
+            </div>
 
             {/* Chunks List */}
             {selectedSource && (
                 <>
-                    {/* Header: Select All + Count */}
-                    <div className="flex items-center justify-between">
-                        <button
-                            onClick={toggleAll}
-                            disabled={chunks.length === 0}
-                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
-                        >
-                            <span className="material-symbols-outlined text-[16px]">
-                                {selectedChunks.size === chunks.length && chunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
+                    {/* Header: Select All + Active Source Label */}
+                    <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 border border-gray-100 dark:border-slate-800 rounded-xs">
+                        <div className="flex items-center gap-2">
+                             <span className="material-symbols-outlined text-[18px] text-blue-500">
+                                {selectedSource.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf' : 'language'}
                             </span>
-                            {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect All' : 'Select All'}
-                        </button>
-                        <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
-                            {chunksLoading ? '...' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} chunks`}
-                        </span>
+                            <span className="text-xs font-bold font-sans uppercase tracking-widest text-slate-700 dark:text-slate-300 truncate flex-1">
+                                {selectedSource}
+                            </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
+                            <button
+                                onClick={toggleAll}
+                                disabled={chunks.length === 0}
+                                className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">
+                                    {selectedChunks.size === chunks.length && chunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
+                                </span>
+                                {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect All' : 'Select All'}
+                            </button>
+                            <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500">
+                                {chunksLoading ? '...' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} segments`}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Scrollable Chunk List */}
@@ -534,7 +583,7 @@ const AppTrainAI = () => {
                             {trainingJobId ? (
                                 <>
                                     <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Training... {trainingProgress?.progress ?? 0} / {trainingProgress?.total || '?'} chunks
+                                    Training... {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} chunks
                                 </>
                             ) : trainMutation.isPending ? (
                                 <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Uploading...</>

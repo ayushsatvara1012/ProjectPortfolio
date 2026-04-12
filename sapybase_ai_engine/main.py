@@ -131,6 +131,96 @@ def validate_safe_url(url: str):
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="Could not resolve the provided URL.")
 
+async def validate_logo_url(url: str) -> None:
+    """
+    Hardened logo URL validator. Raises HTTPException on any violation.
+
+    Chain of checks:
+    1. Must start with https://
+    2. Must not match any blocked pattern (SSRF / ephemeral CDN)
+    3. HEAD request — Content-Type must start with image/
+    4. Content-Length must be under 2 MB (if header absent, stream-probe)
+    """
+    # 1. Scheme enforcement
+    if not url.startswith("https://"):
+        raise HTTPException(
+            status_code=400,
+            detail="Logo URL must start with https://. Plain http:// and data: URIs are not accepted."
+        )
+
+    # 2. Blocked pattern check
+    for pattern in BLOCKED_LOGO_URL_PATTERNS:
+        if re.search(pattern, url):
+            raise HTTPException(
+                status_code=400,
+                detail="Logo URL points to a blocked or private host. Use a public CDN (e.g. Cloudinary, Imgur, your own domain)."
+            )
+
+    # 3 & 4. HEAD request validation
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=8.0) as client:
+            head_resp = await client.head(url, headers={"User-Agent": "SaPyBase-LogoValidator/1.0"})
+
+            if head_resp.status_code >= 400:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Logo URL returned HTTP {head_resp.status_code}. Ensure the URL is publicly accessible."
+                )
+
+            content_type = head_resp.headers.get("content-type", "")
+            if not content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"URL does not point to an image (Content-Type: '{content_type}'). "
+                           "Accepted types: image/png, image/jpeg, image/gif, image/svg+xml, image/webp."
+                )
+
+            content_length_str = head_resp.headers.get("content-length")
+
+            if content_length_str:
+                # Fast path — server declared the size
+                try:
+                    size = int(content_length_str)
+                except ValueError:
+                    size = 0  # Malformed header — fall through to stream probe
+
+                if size > MAX_LOGO_BYTES:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Logo image is too large ({size // 1024} KB). Maximum allowed size is 2 MB."
+                    )
+            else:
+                # Slow path — server omitted Content-Length; probe with Range request
+                range_resp = await client.get(
+                    url,
+                    headers={
+                        "Range": f"bytes=0-{MAX_LOGO_BYTES}",
+                        "User-Agent": "SaPyBase-LogoValidator/1.0"
+                    }
+                )
+                # If the server ignored Range and returned 200 with a full body,
+                # check the actual content length of what came back.
+                body = range_resp.content  # Already buffered by httpx up to our timeout
+                if len(body) > MAX_LOGO_BYTES:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Logo image exceeds the 2 MB maximum. The server did not declare a size, "
+                               "and the content probed past the limit."
+                    )
+
+    except HTTPException:
+        raise  # Re-raise our own errors unchanged
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=400,
+            detail="Logo URL timed out (8 s). Ensure the host is publicly reachable and fast."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not validate logo URL: {str(e)}"
+        )
+
 def log_admin_action(admin_id: str, action: str, target_id: Optional[str] = None, changes: Optional[dict] = None):
     """
     Issue #17: Persistence for Administrative Audit Logging.
@@ -423,6 +513,29 @@ JAILBREAK_PATTERNS = [
     r"(?i)do\s+not\s+follow\s+(the|your|any)\s+(rules|instructions)",
 ]
 
+VALID_LOGO_SHAPES = {"circle", "squircle", "bento", "sharp"}
+
+# Regex patterns for blocked logo URL patterns (SSRF + abuse prevention)
+BLOCKED_LOGO_URL_PATTERNS = [
+    r"^data:",                              # Base64 data URIs — never allowed
+    r"(?i)localhost",                       # Loopback by name
+    r"127\.\d+\.\d+\.\d+",                 # 127.x.x.x loopback
+    r"192\.168\.\d+\.\d+",                 # RFC-1918 private class C
+    r"10\.\d+\.\d+\.\d+",                  # RFC-1918 private class A
+    r"172\.(1[6-9]|2\d|3[01])\.\d+\.\d+", # RFC-1918 private class B
+    r"169\.254\.\d+\.\d+",                 # Link-local (AWS metadata etc.)
+    r"(?i)cdn\.discordapp\.com",            # Ephemeral/expiring Discord CDNs
+    r"(?i)files\.slack\.com",              # Slack file CDN (auth-gated)
+    r"(?i)media\.giphy\.com",             # Giphy (inconsistent CORS)
+    r"0\.0\.0\.0",                         # Null route
+    r"::1",                                # IPv6 loopback
+    r"(?i)\.internal",                     # Internal service names
+    r"(?i)metadata\.google\.internal",     # GCP metadata endpoint
+    r"(?i)169\.254\.169\.254",             # AWS/Azure metadata endpoint
+]
+
+MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB hard ceiling
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -507,7 +620,8 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         cursor.execute(
             """
             SELECT id, company_name, company_tone, theme_color, allowed_origin, 
-                   system_prompt, bot_name, logo_url, initial_message, quick_questions 
+                   system_prompt, bot_name, logo_url, initial_message, quick_questions,
+                   logo_shape, custom_logo_url
             FROM companies WHERE api_key = %s
             """, 
             (hashed_key,)
@@ -532,7 +646,9 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "bot_name": company_data[6] or "Sapy AI",
         "logo_url": company_data[7] or "/SB_loading_clean.svg",
         "initial_message": company_data[8] or "Hi! How can I help you today?",
-        "quick_questions": company_data[9] or []
+        "quick_questions": company_data[9] or [],
+        "logo_shape": company_data[10] or "circle",
+        "custom_logo_url": company_data[11],
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -837,7 +953,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             cursor.execute(
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin, 
-                       api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model
+                       api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
+                       logo_shape, custom_logo_url
                 FROM companies WHERE user_id = %s AND id = %s
                 """, 
                 (user_uuid, company_id)
@@ -846,7 +963,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             cursor.execute(
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin, 
-                       api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model
+                       api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
+                       logo_shape, custom_logo_url
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """, 
                 (user_uuid,)
@@ -877,8 +995,9 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "initial_message": company_row[8],
             "quick_questions": safe_json_loads(company_row[9]), # Safe parsing
             "system_prompt": company_row[10],
-            "ai_model": company_row[11]
-
+            "ai_model": company_row[11],
+            "logo_shape": company_row[12] or "circle",
+            "custom_logo_url": company_row[13],
         }
     finally:
         release_db_connection(conn)
@@ -900,20 +1019,33 @@ def retrieve_knowledge(conn, company_id, query_vector, limit=5, distance_thresho
     return results
 
 class CompanyUpdate(BaseModel):
-    company_id: Optional[str] = None
-    company_name: Optional[str] = None
-    company_tone: Optional[str] = None
-    theme_color: Optional[str] = None
-    bot_name: Optional[str] = None
-    logo_url: Optional[str] = None
-    initial_message: Optional[str] = None
-    system_prompt: Optional[str] = None
-    allowed_origin: Optional[str] = None
-    quick_questions: Optional[list] = None
-    ai_model: Optional[str] = None
+    company_id:       Optional[str]  = None
+    company_name:     Optional[str]  = None
+    company_tone:     Optional[str]  = None
+    theme_color:      Optional[str]  = None
+    bot_name:         Optional[str]  = None
+    logo_url:         Optional[str]  = None   # existing SaPyBase default logo path
+    initial_message:  Optional[str]  = None
+    system_prompt:    Optional[str]  = None
+    allowed_origin:   Optional[str]  = None
+    quick_questions:  Optional[list] = None
+    ai_model:         Optional[str]  = None
+    # ── v13 new fields ──
+    logo_shape:       Optional[str]  = None   # circle | squircle | bento | sharp
+    custom_logo_url:  Optional[str]  = None   # tenant-provided HTTPS image URL
+
+    @validator('logo_shape')
+    def validate_logo_shape(cls, v):
+        if v is not None and v not in VALID_LOGO_SHAPES:
+            raise ValueError(f"logo_shape must be one of: {', '.join(sorted(VALID_LOGO_SHAPES))}")
+        return v
+
+    class Config:
+        extra = "forbid"
 
 @app.patch("/api/company")
-def update_company_details(
+async def update_company_details(
+    request: Request,
     update: CompanyUpdate,
     user: dict = Depends(require_premium_tier)
 ):
@@ -921,67 +1053,93 @@ def update_company_details(
     tier = user.get("tier", "FREE")
     role = user.get("role")
 
-    # Field-level protection for BASIC users (STARTER/PRO/ADMIN have full access)
+    # ── Tier gate: fields restricted to BASIC users ──
     if tier == "BASIC" and role != "SUPER_ADMIN":
-        restricted_fields = ["system_prompt", "company_tone", "quick_questions", "ai_model"]
+        restricted_fields = ["system_prompt", "company_tone", "quick_questions", "ai_model",
+                             "logo_shape", "custom_logo_url"]
         provided_fields = update.dict(exclude_unset=True).keys()
         forbidden = [f for f in provided_fields if f in restricted_fields]
         if forbidden:
             raise HTTPException(
-                status_code=402, 
+                status_code=402,
                 detail=f"Advanced customization ({', '.join(forbidden)}) requires a Starter or Pro plan."
+            )
+
+    # ── PRO-only gate: custom_logo_url ──
+    if update.custom_logo_url is not None and update.custom_logo_url.strip():
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Custom logo URL requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                }
+            )
+        # Run the hardened async validator (HEAD check + size probe)
+        await validate_logo_url(update.custom_logo_url.strip())
+
+    # ── logo_shape available to STARTER+ ──
+    if update.logo_shape is not None:
+        if tier == "BASIC" and role != "SUPER_ADMIN":
+            raise HTTPException(
+                status_code=402,
+                detail="Bot shape selection requires a Starter or Pro plan."
             )
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
-        # Determine targeting: use provided company_id or fallback to primary bot
+
+        # Resolve target bot
         target_company_id = update.company_id
         if not target_company_id:
-            cursor.execute("SELECT id FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1", (user["id"],))
+            cursor.execute(
+                "SELECT id FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1",
+                (user["id"],)
+            )
             row = cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="No bot found to update.")
             target_company_id = row[0]
 
-        # Build dynamic query
+        # Build dynamic SET clause
         updates = []
         params = []
-        
-        # exclude_unset ensures we only update fields provided in the request
+
         for field, value in update.dict(exclude_unset=True).items():
-            if field == "company_id": continue # Skip the ID in the SET clause
-            
-            # SECURITY & DATA INTEGRITY: JSON fields must be serialized to strings
+            if field == "company_id":
+                continue
             if field == "quick_questions" and value is not None:
                 value = json.dumps(value)
-            
+            # Sanitise custom_logo_url before storing
+            if field == "custom_logo_url" and value:
+                value = value.strip()
             updates.append(f"{field} = %s")
             params.append(value)
-            
+
         if not updates:
             return {"status": "no changes"}
-            
-        # Target specific bot ID while ensuring ownership via user_id
+
         params.append(target_company_id)
         params.append(user["id"])
         query = f"UPDATE companies SET {', '.join(updates)} WHERE id = %s AND user_id = %s"
-        
+
         cursor.execute(query, tuple(params))
         if cursor.rowcount == 0:
             raise HTTPException(status_code=403, detail="Unauthorized or bot does not exist.")
 
-        # Cache invalidation: targeted clear for ONLY the specific bot
+        # Invalidate exact-match cache — shape/logo change renders cached widget configs stale
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (target_company_id,))
 
         conn.commit()
         return {"status": "success", "updated_id": target_company_id}
+
     except HTTPException:
-        # Re-raise known HTTP exceptions (like 402/403 from our checks)
         raise
     except Exception as e:
-        if conn: conn.rollback()
+        if conn:
+            conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update company: {str(e)}")
     finally:
         release_db_connection(conn)
@@ -1575,7 +1733,7 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
         if text.strip():
             docs.append(Document(
                 page_content=text,
-                metadata={"source": f"page_{i + 1}"}
+                metadata={"page": i + 1}
             ))
 
     # If PDF has almost no extractable text, it's likely a scanned document.
@@ -1620,7 +1778,7 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
                 if response.content:
                     docs.append(Document(
                         page_content=str(response.content),
-                        metadata={"source": f"page_{page_num}_vision"}
+                        metadata={"page": page_num, "method": "vision"}
                     ))
         except Exception as e:
             print(f"[PDF] Vision fallback failed: {e}")
@@ -1630,8 +1788,32 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 import uuid
 
-# ── TRAINING JOB TRACKER (in-memory; sufficient for single-worker, use Redis for multi-worker) ──
-_training_jobs: dict = {}
+# ── TRAINING JOB PERSISTENCE (Shared across Gunicorn workers via Redis) ──
+_training_jobs: dict = {}  # Local fallback for non-Redis envs
+
+async def set_job_status(job_id: str, status: dict):
+    """Saves job status to Redis (shared) or local dict (fallback) with 15m TTL."""
+    global r
+    try:
+        if r:
+            await r.setex(f"job:{job_id}", 900, json.dumps(status))
+        else:
+            _training_jobs[job_id] = status
+    except Exception as e:
+        print(f"REDIS STATUS ERROR: {e}")
+        _training_jobs[job_id] = status
+
+async def get_job_status(job_id: str) -> Optional[dict]:
+    """Retrieves job status from Redis or local dict."""
+    global r
+    try:
+        if r:
+            data = await r.get(f"job:{job_id}")
+            return json.loads(data) if data else None
+        return _training_jobs.get(job_id)
+    except Exception as e:
+        print(f"REDIS FETCH ERROR: {e}")
+        return _training_jobs.get(job_id)
 
 async def run_training_job(
     job_id: str,
@@ -1641,8 +1823,10 @@ async def run_training_job(
     limit: int,
     source_name: str,
 ):
-    """Background task: embeds and inserts chunks without blocking the HTTP response."""
-    _training_jobs[job_id] = {"status": "processing", "progress": 0, "total": 0}
+    """Background task: embeds and inserts chunks. State is persisted in Redis."""
+    status = {"status": "processing", "progress": 0, "total": 0}
+    await set_job_status(job_id, status)
+
     conn = None
     try:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
@@ -1655,13 +1839,16 @@ async def run_training_job(
         current_count = cursor.fetchone()[0]
         remaining = max(0, limit - current_count)
         chunks = all_chunks[:remaining]
-        _training_jobs[job_id]["total"] = len(chunks)
+        
+        status["total"] = len(chunks)
+        await set_job_status(job_id, status)
 
         BATCH_SIZE = 10
         for i in range(0, len(chunks), BATCH_SIZE):
             batch = chunks[i:i + BATCH_SIZE]
             texts = [c.page_content for c in batch]
-            embeddings_list = embeddings_model_doc.embed_documents(texts)
+            # ── NON-BLOCKING: Use async embedding call to keep event loop alive ──
+            embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
             for chunk, embedding in zip(batch, embeddings_list):
                 if len(embedding) > 768:
@@ -1672,23 +1859,24 @@ async def run_training_job(
                 )
 
             conn.commit()
-            _training_jobs[job_id]["progress"] = i + len(batch)
-            await asyncio.sleep(0)  # Yield control so other requests aren't starved
+            status["progress"] = i + len(batch)
+            await set_job_status(job_id, status)
+            await asyncio.sleep(0.1)  # Yield control for better status poll responsiveness
 
         # Cache invalidation after successful training
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
         invalidate_cache(conn, resolved_company_id)
         conn.commit()
 
-        _training_jobs[job_id] = {
+        await set_job_status(job_id, {
             "status": "done",
             "chunks_added": len(chunks),
             "total_available": len(all_chunks),
             "truncated": len(all_chunks) > remaining,
-        }
+        })
     except Exception as e:
         print(f"TRAINING JOB {job_id} FAILED: {e}")
-        _training_jobs[job_id] = {"status": "error", "message": str(e)}
+        await set_job_status(job_id, {"status": "error", "message": str(e)})
         if conn:
             try:
                 conn.rollback()
@@ -1804,7 +1992,7 @@ async def train_chatbot(
 
     # 3. Kick off background job — return immediately to prevent Render worker timeout
     job_id = str(uuid.uuid4())
-    _training_jobs[job_id] = {"status": "queued"}
+    await set_job_status(job_id, {"status": "queued"})
     background_tasks.add_task(
         run_training_job, job_id, resolved_company_id, docs, current_user, limit, source_name
     )
@@ -1818,8 +2006,8 @@ async def train_chatbot(
 
 @app.get("/api/train/status/{job_id}")
 async def get_training_status(job_id: str, user: dict = Depends(get_current_user)):
-    """Poll training job progress. Returns status: queued | processing | done | error."""
-    job = _training_jobs.get(job_id)
+    """Poll training job progress. Shared across workers via Redis."""
+    job = await get_job_status(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Training job not found or already expired.")
     return job
@@ -2064,6 +2252,9 @@ def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
 class DeleteChunksRequest(BaseModel):
     chunk_ids: list[str] = Field(..., max_length=500, description="List of chunk UUIDs to delete (max 500)")
 
+class DeleteSourceRequest(BaseModel):
+    source_name: str = Field(..., description="The exact filename/URL source to delete fully.")
+
 @app.get("/api/knowledge/sources/{company_id}")
 def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user)):
     """Returns distinct knowledge sources (URLs/filenames) for a specific bot."""
@@ -2145,6 +2336,47 @@ def get_knowledge_chunks(
     finally:
         release_db_connection(conn)
 
+
+@app.delete("/api/knowledge/source/{company_id}")
+def delete_knowledge_source(
+    company_id: str,
+    body: DeleteSourceRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Deletes ALL chunks associated with a specific source (URL or filename). Fast bulk cleanup."""
+    if not body.source_name:
+        raise HTTPException(status_code=400, detail="No source name provided.")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership guard
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # Batch delete
+        cursor.execute(
+            "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
+            (company_id, body.source_name)
+        )
+        count = cursor.rowcount
+        
+        # Cache invalidation
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
+        invalidate_cache(conn, company_id)
+        
+        conn.commit()
+        return {"status": "success", "message": f"Source '{body.source_name}' removed. {count} chunks deleted."}
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"DELETE SOURCE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete source.")
+    finally:
+        release_db_connection(conn)
 
 @app.delete("/api/knowledge/chunks/{company_id}")
 def delete_knowledge_chunks(

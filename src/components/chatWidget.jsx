@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
@@ -7,6 +7,92 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 import BrandLogo from './brandLogo';
+
+// ── v13: Shape class map (mirrors LogoCustomizer.jsx) ─────────────────────────
+// Kept inline here so the widget bundle stays self-contained with no extra import.
+const SHAPE_CLASS_MAP = {
+    circle: 'rounded-full',
+    squircle: 'rounded-[2rem]',
+    bento: 'rounded-2xl',
+    sharp: 'rounded-lg',
+};
+
+// ── v13: BotAvatar — self-contained, handles image load errors ─────────────────
+function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow = true, transparentBgImage = false }) {
+    const [imgFailed, setImgFailed] = useState(false);
+    const prevUrlRef = useRef(logoUrl);
+
+    useEffect(() => {
+        if (logoUrl !== prevUrlRef.current) {
+            setImgFailed(false);
+            prevUrlRef.current = logoUrl;
+        }
+    }, [logoUrl]);
+
+    const initial = (botName || 'S').charAt(0).toUpperCase();
+    const showImage = logoUrl && logoUrl.trim() && !imgFailed;
+
+    return (
+        <div
+            className={`${sizeClass} rounded-xl overflow-hidden flex items-center justify-center shrink-0 dark:border-slate-700 ${hasShadow ? 'shadow-sm' : ''}`}
+            style={{ backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor }}
+        >
+            {showImage ? (
+                <img
+                    src={logoUrl}
+                    alt={`${botName} logo`}
+                    className="w-[80%] h-[80%] object-contain"
+                    onError={() => setImgFailed(true)}
+                />
+            ) : (
+                <span
+                    className="font-bold leading-none select-none text-white"
+                    style={{ fontSize: sizeClass.includes('w-10') ? '1rem' : '0.7rem' }}
+                >
+                    {initial}
+                </span>
+            )}
+        </div>
+    );
+}
+
+// ── v13: FabLogo — shapeless logo for FAB bubble ───────────────────────────────
+// Unlike BotAvatar, this renders NO border-radius, border, or shadow.
+// The outer SVG bubble path IS the shape — the logo just fills the space.
+function FabLogo({ logoUrl, botName, themeColor, sizeClass, offsetClass }) {
+    const [imgFailed, setImgFailed] = useState(false);
+    const prevUrlRef = useRef(logoUrl);
+
+    useEffect(() => {
+        if (logoUrl !== prevUrlRef.current) {
+            setImgFailed(false);
+            prevUrlRef.current = logoUrl;
+        }
+    }, [logoUrl]);
+
+    const initial = (botName || 'S').charAt(0).toUpperCase();
+    const showImage = logoUrl && logoUrl.trim() && !imgFailed;
+
+    return (
+        <div className={`${sizeClass} relative ${offsetClass} z-10 transition-all pointer-events-none flex items-center justify-center`}>
+            {showImage ? (
+                <img
+                    src={logoUrl}
+                    alt={`${botName} logo`}
+                    className="w-full h-full object-contain"
+                    onError={() => setImgFailed(true)}
+                />
+            ) : (
+                <span
+                    className="font-bold leading-none select-none"
+                    style={{ color: themeColor, fontSize: '1.5rem' }}
+                >
+                    {initial}
+                </span>
+            )}
+        </div>
+    );
+}
 
 const ChatWidget = ({ apiKey }) => {
     // 1. Resolve API Key & Base URL
@@ -22,6 +108,9 @@ const ChatWidget = ({ apiKey }) => {
         logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
         initial_message: window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
         quick_questions: window.SaPyBaseConfig?.quickQuestions || [],
+        // ── v13 ──
+        logo_shape: window.SaPyBaseConfig?.logoShape || 'circle',
+        custom_logo_url: window.SaPyBaseConfig?.customLogoUrl || '',
     };
 
     // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
@@ -44,6 +133,9 @@ const ChatWidget = ({ apiKey }) => {
                         logo_url: data.logo_url || DEFAULT_CONFIG.logo_url,
                         initial_message: data.initial_message || DEFAULT_CONFIG.initial_message,
                         quick_questions: data.quick_questions || [],
+                        // ── v13 ──
+                        logo_shape: data.logo_shape || 'circle',
+                        custom_logo_url: data.custom_logo_url || '',
                     });
                     // Update the welcome message now that we have the real one
                     setMessages([{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }]);
@@ -59,7 +151,9 @@ const ChatWidget = ({ apiKey }) => {
 
     const THEME_COLOR = configData.theme_color;
     const BOT_NAME = configData.bot_name;
-    const LOGO_URL = configData.logo_url;
+    // v13: custom_logo_url takes precedence; fall back to default logo_url
+    const LOGO_URL = configData.custom_logo_url || configData.logo_url;
+    const LOGO_SHAPE = configData.logo_shape || 'circle';
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -125,16 +219,31 @@ const ChatWidget = ({ apiKey }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMenu]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToBottom = (smooth = true) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
     };
+
+    const handleTypingComplete = useCallback((index) => {
+        setMessages(prev => {
+            const updated = [...prev];
+            if (updated[index]) {
+                updated[index] = { ...updated[index], isTyped: true };
+            }
+            return updated;
+        });
+        scrollToBottom(true);
+    }, []);
+
     useEffect(() => {
-        scrollToBottom();
+        scrollToBottom(true);
     }, [messages, isLoading]);
 
     useEffect(() => {
         if (isOpen) {
-            setTimeout(() => inputRef.current?.focus(), 100);
+            setTimeout(() => {
+                scrollToBottom(false); // Instant scroll when initializing window
+                inputRef.current?.focus();
+            }, 10);
         }
     }, [isOpen]);
 
@@ -216,6 +325,18 @@ const ChatWidget = ({ apiKey }) => {
                     // Sentinel: backend signals end-of-stream
                     if (msg.data === '[DONE]') {
                         setIsLoading(false);
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            const lastMsg = updated[updated.length - 1];
+                            if (lastMsg && lastMsg.role === 'bot') {
+                                updated[updated.length - 1] = {
+                                    ...lastMsg,
+                                    isStreaming: false,
+                                    isTyped: true // streaming text is fully assembled, prevent re-type
+                                };
+                            }
+                            return updated;
+                        });
                         return;
                     }
 
@@ -253,7 +374,7 @@ const ChatWidget = ({ apiKey }) => {
                     }
 
                     // Auto-scroll to track the streaming text
-                    scrollToBottom();
+                    scrollToBottom(true);
                 },
 
                 // ── ERROR HANDLER (Infinite Retry Prevention) ────────────────
@@ -328,21 +449,35 @@ const ChatWidget = ({ apiKey }) => {
         return null;
     }
 
-    const BUBBLE_PATH = `
-  M 22 4
-  H 78
-  Q 96 4 96 22
-  V 62
-  Q 96 80 78 80
-  H 36
-  L 18 96
-  L 22 80
-  H 22
-  Q 4 80 4 62
-  V 22
-  Q 4 4 22 4
-  Z
-`;
+    // ── v13: Dynamic FAB shapes — each logo_shape gets a unique outline ──────
+    const FAB_SHAPES = {
+        // 1. Organic round speech bubble with elegant tail (bottom-left)
+        circle: {
+            path: 'M 50 6 C 74 6 94 22 94 43 C 94 64 74 80 50 80 C 44 80 38 79 34 78 L 18 96 L 26 77 C 12 73 6 59 6 43 C 6 22 26 6 50 6 Z',
+            logoOffset: '-top-1 sm:-top-1.5',
+            logoSize: 'w-[55%] h-[55%]',
+        },
+        // 2. Squarish chat bubble with rounded corners + tail (the classic)
+        squircle: {
+            path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
+            logoOffset: '-top-1.5 sm:-top-2',
+            logoSize: 'w-[55%] h-[55%]',
+        },
+        // 3. Clean circle — no tail, modern and minimal
+        bento: {
+            path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
+            logoOffset: 'top-0',
+            logoSize: 'w-[60%] h-[60%]',
+        },
+        // 4. Sharp rectangle with slight rounding — no tail, clean edge
+        sharp: {
+            path: 'M 10 4 H 90 Q 96 4 96 10 V 90 Q 96 96 90 96 H 10 Q 4 96 4 90 V 10 Q 4 4 10 4 Z',
+            logoOffset: 'top-0',
+            logoSize: 'w-[72%] h-[72%]',
+        },
+    };
+    const fabShape = FAB_SHAPES[LOGO_SHAPE] || FAB_SHAPES.circle;
+    const FAB_PATH = fabShape.path;
 
     return (
         <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-2147483647 font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
@@ -370,11 +505,16 @@ const ChatWidget = ({ apiKey }) => {
                             <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50 dark:border-slate-800/50">
                                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                                     <div className="relative flex items-center gap-3 pl-4">
+                                        {/* ── v13: shaped avatar in header ── */}
                                         <div className="relative">
-                                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-center p-1.5 transition-transform hover:scale-105">
-                                                <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                                            </div>
-                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
+                                            <BotAvatar
+                                                shapeId={LOGO_SHAPE}
+                                                logoUrl={LOGO_URL}
+                                                botName={BOT_NAME}
+                                                themeColor={THEME_COLOR}
+                                                sizeClass="w-10 h-10"
+                                            />
                                         </div>
                                         <div className="flex flex-row items-center justify-center">
                                             <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
@@ -438,16 +578,16 @@ const ChatWidget = ({ apiKey }) => {
 
                         {/* Messages Area Wrapper */}
                         <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
-                            
+
                             {/* The Animated Blue Aura (All borders) */}
                             <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
-                                <div 
+                                <div
                                     className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20"
                                 />
                             </div>
 
                             {/* Scrollable Messages Container */}
-                            <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth">
+                            <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth custom-scrollbar">
                                 <AnimatePresence initial={false}>
                                     {messages.map((msg, idx) => (
                                         <motion.div
@@ -456,17 +596,24 @@ const ChatWidget = ({ apiKey }) => {
                                             initial="hidden"
                                             animate="visible"
                                             layout="position"
-                                            className={`flex gap-2 min-w-0 max-w-full sm:max-w-[95%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                                            className={`flex items-center gap-2 min-w-0 max-w-[85%] sm:max-w-[80%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
                                         >
-                                            <div className="shrink-0 mt-auto mb-1">
+                                            <div className="shrink-0">
                                                 {msg.role === 'user' ? (
                                                     <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md dark:shadow-blue-900/40" style={{ backgroundColor: THEME_COLOR }}>
                                                         <User size={14} />
                                                     </div>
                                                 ) : (
-                                                    <div className="w-6 h-6 flex items-center justify-center pointer-events-none">
-                                                        <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                                                    </div>
+                                                    /* ── v13: shaped avatar in message list ── */
+                                                    <BotAvatar
+                                                        shapeId={LOGO_SHAPE}
+                                                        logoUrl={LOGO_URL}
+                                                        botName={BOT_NAME}
+                                                        themeColor={THEME_COLOR}
+                                                        sizeClass="w-6 h-6"
+                                                        hasShadow={false}
+                                                        transparentBgImage={true}
+                                                    />
                                                 )}
                                             </div>
 
@@ -475,21 +622,22 @@ const ChatWidget = ({ apiKey }) => {
                                                     <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
                                                 )}
                                                 <div
-                                                    className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full wrap-break-word ${msg.role === 'user'
+                                                    className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
                                                         ? 'text-white rounded-2xl rounded-br-none'
-                                                        : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                        : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                         }`}
                                                     style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                                 >
                                                     {msg.role === 'user' ? (
-                                                        <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                        <div className="min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                     ) : (
-                                                        <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                            <TypewriterContent 
+                                                        <div className="min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
+                                                            <TypewriterContent
                                                                 key={`${idx}-${msg.content.length}`} // Unique key to force reset on content change
-                                                                content={msg.content} 
-                                                                isStreaming={msg.isStreaming} 
-                                                                onComplete={scrollToBottom}
+                                                                content={msg.content}
+                                                                isStreaming={msg.isStreaming}
+                                                                isTyped={msg.isTyped}
+                                                                onComplete={() => handleTypingComplete(idx)}
                                                             />
                                                         </div>
                                                     )}
@@ -621,7 +769,7 @@ const ChatWidget = ({ apiKey }) => {
                         className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1"
                     >
 
-                        {/* ── Single SVG layer: clip-path fill + aura + marching dashes ── */}
+                        {/* ── SVG layer: clip-path fill + aura + themed stroke ── */}
                         <svg
                             viewBox="0 0 100 100"
                             xmlns="http://www.w3.org/2000/svg"
@@ -629,44 +777,45 @@ const ChatWidget = ({ apiKey }) => {
                             overflow="visible"
                         >
                             <defs>
-                                {/* Clip mask so white fill is exactly bubble-shaped */}
-                                <clipPath id="bubble-clip">
-                                    <path d={BUBBLE_PATH} />
+                                <clipPath id="fab-clip">
+                                    <path d={FAB_PATH} />
                                 </clipPath>
-
-
                             </defs>
 
-                            {/* White fill clipped to bubble shape — replaces bg-white on the button */}
+                            {/* White fill clipped to shape */}
                             <rect
                                 x="0" y="0" width="100" height="100"
                                 fill="white"
-                                clipPath="url(#bubble-clip)"
-                                className='dark:fill-slate-900'
+                                clipPath="url(#fab-clip)"
+                                className="dark:fill-slate-900"
                             />
 
-                            {/* Pulsing aura — also bubble-shaped */}
+                            {/* Pulsing aura */}
                             <path
-                                d={BUBBLE_PATH}
+                                d={FAB_PATH}
                                 fill="white"
                                 className="aura-path dark:fill-slate-900/50"
                             />
 
-                            {/* Marching dashes border */}
+                            {/* Themed stroke border */}
                             <path
-                                d={BUBBLE_PATH}
+                                d={FAB_PATH}
                                 fill="none"
                                 stroke={THEME_COLOR}
-                                strokeWidth="1"
+                                strokeWidth="1.2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             />
                         </svg>
 
-                        {/* ── Stable Logo (Reusable BrandLogo component) ── */}
-                        <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2 flex items-center justify-center">
-                            <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                        </div>
+                        {/* ── v13: Raw logo inside bubble — no shape of its own ── */}
+                        <FabLogo
+                            logoUrl={LOGO_URL}
+                            botName={BOT_NAME}
+                            themeColor={THEME_COLOR}
+                            sizeClass={fabShape.logoSize}
+                            offsetClass={fabShape.logoOffset}
+                        />
 
                     </motion.button>
                 </div>
@@ -676,31 +825,18 @@ const ChatWidget = ({ apiKey }) => {
 };
 
 // ── TYPEWRITER COMPONENT: Handles silky smooth transitions for chat text ──
-const TypewriterContent = ({ content, isStreaming, onComplete }) => {
+const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
     const [segments, setSegments] = useState([]);
-    const [isTyping, setIsTyping] = useState(!isStreaming);
+    const [isTyping, setIsTyping] = useState(!isStreaming && !isTyped);
     const lastContent = useRef('');
-
-    // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
-    // However, the tokens come in directly from the parent state.
-    if (isStreaming) {
-        return (
-            <div className="relative overflow-hidden transition-all duration-300">
-                <ReactMarkdown 
-                    rehypePlugins={[rehypeSanitize]}
-                    components={{
-                        p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
-                        li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
-                    }}
-                >
-                    {content}
-                </ReactMarkdown>
-            </div>
-        );
-    }
 
     // Effect for artificial typewriter with "Premium Jitter"
     useEffect(() => {
+        if (!content || isTyped) {
+            setIsTyping(false);
+            return;
+        }
+
         if (content !== lastContent.current) {
             lastContent.current = content;
             setSegments([]);
@@ -708,14 +844,14 @@ const TypewriterContent = ({ content, isStreaming, onComplete }) => {
 
             let currentIdx = 0;
             const words = content.split(/(\s+)/); // Keep whitespace
-            
+
             const typeNextWord = () => {
                 if (currentIdx < words.length) {
                     const word = words[currentIdx];
                     setSegments(prev => [...prev, word]);
                     currentIdx++;
                     if (onComplete) onComplete();
-                    
+
                     // Natural pacing: slightly faster for small words, slower for punctuation
                     const delay = word.length > 5 ? 25 : 15;
                     setTimeout(typeNextWord, delay);
@@ -726,14 +862,32 @@ const TypewriterContent = ({ content, isStreaming, onComplete }) => {
 
             typeNextWord();
         }
-    }, [content]);
+    }, [content, isTyped, onComplete]);
+
+    // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
+    // However, the tokens come in directly from the parent state.
+    if (isStreaming) {
+        return (
+            <div className="relative overflow-hidden transition-all duration-300">
+                <ReactMarkdown
+                    rehypePlugins={[rehypeSanitize]}
+                    components={{
+                        p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
+                        li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
+                    }}
+                >
+                    {content}
+                </ReactMarkdown>
+            </div>
+        );
+    }
 
     return (
         <div className="relative transition-all duration-500">
-            <ReactMarkdown 
+            <ReactMarkdown
                 rehypePlugins={[rehypeSanitize]}
                 components={{
-                    p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0" />,
+                    p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2" />,
                 }}
             >
                 {isTyping ? segments.join('') : content}
