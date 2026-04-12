@@ -709,24 +709,6 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
     const [isTyping, setIsTyping] = useState(!isStreaming && !isTyped);
     const lastContent = useRef('');
 
-    // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
-    // However, the tokens come in directly from the parent state.
-    if (isStreaming) {
-        return (
-            <div className="relative overflow-hidden transition-all duration-300">
-                <ReactMarkdown
-                    rehypePlugins={[rehypeSanitize]}
-                    components={{
-                        p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
-                        li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
-                    }}
-                >
-                    {content}
-                </ReactMarkdown>
-            </div>
-        );
-    }
-
     // Effect for artificial typewriter with "Premium Jitter"
     useEffect(() => {
         if (!content || isTyped) {
@@ -759,7 +741,25 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
 
             typeNextWord();
         }
-    }, [content]);
+    }, [content, isTyped, onComplete]);
+
+    // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
+    // However, the tokens come in directly from the parent state.
+    if (isStreaming) {
+        return (
+            <div className="relative overflow-hidden transition-all duration-300">
+                <ReactMarkdown
+                    rehypePlugins={[rehypeSanitize]}
+                    components={{
+                        p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
+                        li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
+                    }}
+                >
+                    {content}
+                </ReactMarkdown>
+            </div>
+        );
+    }
 
     return (
         <div className="relative transition-all duration-500">
