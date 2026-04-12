@@ -44,10 +44,10 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
 
     let bgProps = { backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor };
     
-    // Safety check: only apply custom gradient if it is a custom image AND gradient is selected
-    if (showImage && isCustom && bgStyle && AVATAR_GRADIENTS[bgStyle]) {
+    // Safety check: apply custom gradient freely if a gradient string is selected
+    if (bgStyle && bgStyle !== 'none' && AVATAR_GRADIENTS[bgStyle]) {
         bgProps = { 
-            background: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`, 
+            backgroundImage: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`, 
             backgroundColor: 'transparent' 
         };
     }
@@ -92,9 +92,10 @@ const ChatWidget = ({ apiKey }) => {
         logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
         initial_message: window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
         quick_questions: window.SaPyBaseConfig?.quickQuestions || [],
-        // ── v13 ──
+        // ── v13 & v14 ──
         logo_shape: window.SaPyBaseConfig?.logoShape || 'circle',
         custom_logo_url: window.SaPyBaseConfig?.customLogoUrl || '',
+        avatar_bg_style: window.SaPyBaseConfig?.avatarBgStyle || 'none',
     };
 
     // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
@@ -500,7 +501,6 @@ const ChatWidget = ({ apiKey }) => {
                                                 themeColor={THEME_COLOR}
                                                 sizeClass="w-10 h-10"
                                                 isCustom={!!configData.custom_logo_url}
-                                                bgStyle={AVATAR_BG_STYLE}
                                             />
                                         </div>
                                         <div className="flex flex-row items-center justify-center">
@@ -601,7 +601,6 @@ const ChatWidget = ({ apiKey }) => {
                                                         hasShadow={false}
                                                         transparentBgImage={true}
                                                         isCustom={!!configData.custom_logo_url}
-                                                        bgStyle={AVATAR_BG_STYLE}
                                                     />
                                                 )}
                                             </div>
@@ -812,7 +811,7 @@ const ChatWidget = ({ apiKey }) => {
                                     <stop offset="100%" stopColor="#0F172A" /> {/* Slate-900 */}
                                 </linearGradient>
 
-                                {AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE] && configData.custom_logo_url && (
+                                {AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE] && (
                                     <linearGradient id="sapybase-avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
                                         <stop offset="0%" stopColor={AVATAR_GRADIENTS[AVATAR_BG_STYLE][0]} />
                                         <stop offset="100%" stopColor={AVATAR_GRADIENTS[AVATAR_BG_STYLE][1]} />
@@ -823,8 +822,8 @@ const ChatWidget = ({ apiKey }) => {
                             {/* 1. Base Layer (Solid Color or Dynamic Custom Gradient) */}
                             <path
                                 d={FAB_PATH}
-                                fill={(configData.custom_logo_url && AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "url(#sapybase-avatar-grad)" : "url(#fab-gradient)"}
-                                className={!(configData.custom_logo_url && AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "dark:fill-[url(#fab-gradient-dark)] transition-all duration-500" : "transition-all duration-500"}
+                                fill={(AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "url(#sapybase-avatar-grad)" : "url(#fab-gradient)"}
+                                className={!(AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "dark:fill-[url(#fab-gradient-dark)] transition-all duration-500" : "transition-all duration-500"}
                             />
 
                             {/* 2. Logo Image Layer (Adaptive scaling & clipping) */}
@@ -849,7 +848,7 @@ const ChatWidget = ({ apiKey }) => {
                                     y={52 + (fabShape.y || 0)}
                                     textAnchor="middle"
                                     dominantBaseline="middle"
-                                    fill={THEME_COLOR}
+                                    fill={(AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "#ffffff" : THEME_COLOR}
                                     className="font-bold select-none pointer-events-none"
                                     style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}
                                 >
