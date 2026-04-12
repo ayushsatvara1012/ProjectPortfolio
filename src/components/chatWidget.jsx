@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect,useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
@@ -125,16 +125,31 @@ const ChatWidget = ({ apiKey }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMenu]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToBottom = (smooth = true) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
     };
+
+    const handleTypingComplete = useCallback((index) => {
+        setMessages(prev => {
+            const updated = [...prev];
+            if (updated[index]) {
+                updated[index] = { ...updated[index], isTyped: true };
+            }
+            return updated;
+        });
+        scrollToBottom(true);
+    }, []);
+
     useEffect(() => {
-        scrollToBottom();
+        scrollToBottom(true);
     }, [messages, isLoading]);
 
     useEffect(() => {
         if (isOpen) {
-            setTimeout(() => inputRef.current?.focus(), 100);
+            setTimeout(() => {
+                scrollToBottom(false); // Instant scroll when initializing window
+                inputRef.current?.focus();
+            }, 10);
         }
     }, [isOpen]);
 
@@ -216,6 +231,18 @@ const ChatWidget = ({ apiKey }) => {
                     // Sentinel: backend signals end-of-stream
                     if (msg.data === '[DONE]') {
                         setIsLoading(false);
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            const lastMsg = updated[updated.length - 1];
+                            if (lastMsg && lastMsg.role === 'bot') {
+                                updated[updated.length - 1] = {
+                                    ...lastMsg,
+                                    isStreaming: false,
+                                    isTyped: true // streaming text is fully assembled, prevent re-type
+                                };
+                            }
+                            return updated;
+                        });
                         return;
                     }
 
@@ -253,7 +280,7 @@ const ChatWidget = ({ apiKey }) => {
                     }
 
                     // Auto-scroll to track the streaming text
-                    scrollToBottom();
+                    scrollToBottom(true);
                 },
 
                 // ── ERROR HANDLER (Infinite Retry Prevention) ────────────────
@@ -456,7 +483,7 @@ const ChatWidget = ({ apiKey }) => {
                                             initial="hidden"
                                             animate="visible"
                                             layout="position"
-                                            className={`flex items-center gap-2 min-w-0 max-w-full sm:max-w-[95%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                                            className={`flex items-center gap-2 min-w-0 max-w-[85%] sm:max-w-[80%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
                                         >
                                             <div className="shrink-0">
                                                 {msg.role === 'user' ? (
@@ -475,21 +502,22 @@ const ChatWidget = ({ apiKey }) => {
                                                     <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
                                                 )}
                                                 <div
-                                                    className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full wrap-break-word ${msg.role === 'user'
+                                                    className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
                                                         ? 'text-white rounded-2xl rounded-br-none'
-                                                        : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:wrap-break-word prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                        : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                         }`}
                                                     style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                                 >
                                                     {msg.role === 'user' ? (
-                                                        <div className="w-full min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                        <div className="min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
                                                     ) : (
-                                                        <div className="w-full min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
+                                                        <div className="min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
                                                             <TypewriterContent
                                                                 key={`${idx}-${msg.content.length}`} // Unique key to force reset on content change
                                                                 content={msg.content}
                                                                 isStreaming={msg.isStreaming}
-                                                                onComplete={scrollToBottom}
+                                                                isTyped={msg.isTyped}
+                                                                onComplete={() => handleTypingComplete(idx)}
                                                             />
                                                         </div>
                                                     )}
@@ -676,9 +704,9 @@ const ChatWidget = ({ apiKey }) => {
 };
 
 // ── TYPEWRITER COMPONENT: Handles silky smooth transitions for chat text ──
-const TypewriterContent = ({ content, isStreaming, onComplete }) => {
+const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
     const [segments, setSegments] = useState([]);
-    const [isTyping, setIsTyping] = useState(!isStreaming);
+    const [isTyping, setIsTyping] = useState(!isStreaming && !isTyped);
     const lastContent = useRef('');
 
     // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
@@ -701,6 +729,11 @@ const TypewriterContent = ({ content, isStreaming, onComplete }) => {
 
     // Effect for artificial typewriter with "Premium Jitter"
     useEffect(() => {
+        if (!content || isTyped) {
+            setIsTyping(false);
+            return;
+        }
+
         if (content !== lastContent.current) {
             lastContent.current = content;
             setSegments([]);
