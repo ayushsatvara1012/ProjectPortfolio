@@ -12,9 +12,12 @@ export const BotSettingsProvider = ({ children }) => {
         quickQuestions: [{ label: 'Pricing', prompt: 'Tell me about pricing' }],
         companyTone: ['Professional'],
         systemPrompt: '',
-        aiModel: '', // Default (Auto)
+        aiModel: '',
+        // ── v13: logo customization ──
+        logoShape: 'circle',        // circle | squircle | bento | sharp
+        customLogoUrl: '',          // tenant-provided HTTPS image URL
     });
-    
+
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState(null);
@@ -28,14 +31,15 @@ export const BotSettingsProvider = ({ children }) => {
         setError(null);
         try {
             const token = await getToken();
-            const url = botId 
-                ? `${baseUrl}/api/company/details?company_id=${botId}` 
+            const url = botId
+                ? `${baseUrl}/api/company/details?company_id=${botId}`
                 : `${baseUrl}/api/company/details`;
-                
+
             const res = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await res.json();
+
             if (res.ok && data.company) {
                 const parsedQuickQuestions = typeof data.company.quick_questions === 'string'
                     ? JSON.parse(data.company.quick_questions)
@@ -49,6 +53,9 @@ export const BotSettingsProvider = ({ children }) => {
                     companyTone: data.company.company_tone ? data.company.company_tone.split(',') : [],
                     systemPrompt: data.company.system_prompt || '',
                     aiModel: data.company.ai_model || '',
+                    // ── v13 ──
+                    logoShape: data.company.logo_shape || 'circle',
+                    customLogoUrl: data.company.custom_logo_url || '',
                 });
             }
         } catch (err) {
@@ -66,7 +73,7 @@ export const BotSettingsProvider = ({ children }) => {
             const token = await getToken();
             const res = await fetch(`${baseUrl}/api/company`, {
                 method: 'PATCH',
-                headers: { 
+                headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
@@ -79,10 +86,18 @@ export const BotSettingsProvider = ({ children }) => {
                     system_prompt: botSettings.systemPrompt,
                     quick_questions: botSettings.quickQuestions,
                     ai_model: botSettings.aiModel || null,
+                    // ── v13 ──
+                    logo_shape: botSettings.logoShape,
+                    custom_logo_url: botSettings.customLogoUrl || null,
                 })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Save failed');
+            if (!res.ok) {
+                const msg = typeof data.detail === 'string'
+                    ? data.detail
+                    : data.detail?.message || 'Save failed';
+                throw new Error(msg);
+            }
             return { success: true };
         } catch (err) {
             console.error("Failed to save bot settings:", err);
@@ -104,16 +119,16 @@ export const BotSettingsProvider = ({ children }) => {
         setBotSettings(prev => ({ ...prev, [key]: value }));
 
     return (
-        <BotSettingsContext.Provider value={{ 
-            botSettings, 
-            updateSetting, 
+        <BotSettingsContext.Provider value={{
+            botSettings,
+            updateSetting,
             saveSettings,
             fetchSettings,
             isLoading,
             isSaving,
             error,
-            previewOpen, 
-            setPreviewOpen 
+            previewOpen,
+            setPreviewOpen
         }}>
             {children}
         </BotSettingsContext.Provider>

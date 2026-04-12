@@ -59,5 +59,3 @@ dist-widget/
 
 # Project Specific
 public/widget.js
-*storybook.log
-storybook-static

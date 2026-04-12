@@ -8,6 +8,55 @@ import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
 import BrandLogo from './brandLogo';
 
+// ── v13: Shape class map (mirrors LogoCustomizer.jsx) ─────────────────────────
+// Kept inline here so the widget bundle stays self-contained with no extra import.
+const SHAPE_CLASS_MAP = {
+    circle:   'rounded-full',
+    squircle: 'rounded-[2rem]',
+    bento:    'rounded-2xl',
+    sharp:    'rounded-lg',
+};
+
+// ── v13: BotAvatar — self-contained, handles image load errors ─────────────────
+function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass }) {
+    const [imgFailed, setImgFailed] = useState(false);
+    const prevUrlRef = useRef(logoUrl);
+
+    useEffect(() => {
+        if (logoUrl !== prevUrlRef.current) {
+            setImgFailed(false);
+            prevUrlRef.current = logoUrl;
+        }
+    }, [logoUrl]);
+
+    const shapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-full';
+    const initial = (botName || 'S').charAt(0).toUpperCase();
+    const showImage = logoUrl && logoUrl.trim() && !imgFailed;
+
+    return (
+        <div
+            className={`${sizeClass} ${shapeClass} overflow-hidden flex items-center justify-center shrink-0 shadow-sm border border-gray-100 dark:border-slate-700`}
+            style={{ backgroundColor: showImage ? '#ffffff' : themeColor }}
+        >
+            {showImage ? (
+                <img
+                    src={logoUrl}
+                    alt={`${botName} logo`}
+                    className="w-full h-full object-cover bg-white"
+                    onError={() => setImgFailed(true)}
+                />
+            ) : (
+                <span
+                    className="font-bold leading-none select-none text-white"
+                    style={{ fontSize: sizeClass.includes('w-10') ? '1rem' : '0.7rem' }}
+                >
+                    {initial}
+                </span>
+            )}
+        </div>
+    );
+}
+
 const ChatWidget = ({ apiKey }) => {
     // 1. Resolve API Key & Base URL
     const activeApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
@@ -17,11 +66,14 @@ const ChatWidget = ({ apiKey }) => {
 
     // 2. Initialize with defaults, merging in window.SaPyBaseConfig for high-fidelity fallback
     const DEFAULT_CONFIG = {
-        theme_color: window.SaPyBaseConfig?.themeColor || '#5730F5',
-        bot_name: window.SaPyBaseConfig?.botName || 'Sapy AI',
-        logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
-        initial_message: window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
-        quick_questions: window.SaPyBaseConfig?.quickQuestions || [],
+        theme_color:      window.SaPyBaseConfig?.themeColor     || '#5730F5',
+        bot_name:         window.SaPyBaseConfig?.botName        || 'Sapy AI',
+        logo_url:         window.SaPyBaseConfig?.logoUrl        || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
+        initial_message:  window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
+        quick_questions:  window.SaPyBaseConfig?.quickQuestions || [],
+        // ── v13 ──
+        logo_shape:       window.SaPyBaseConfig?.logoShape      || 'circle',
+        custom_logo_url:  window.SaPyBaseConfig?.customLogoUrl  || '',
     };
 
     // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
@@ -39,11 +91,14 @@ const ChatWidget = ({ apiKey }) => {
                 if (res.ok) {
                     const data = await res.json();
                     setConfigData({
-                        theme_color: data.theme_color || DEFAULT_CONFIG.theme_color,
-                        bot_name: data.bot_name || DEFAULT_CONFIG.bot_name,
-                        logo_url: data.logo_url || DEFAULT_CONFIG.logo_url,
+                        theme_color:     data.theme_color     || DEFAULT_CONFIG.theme_color,
+                        bot_name:        data.bot_name        || DEFAULT_CONFIG.bot_name,
+                        logo_url:        data.logo_url        || DEFAULT_CONFIG.logo_url,
                         initial_message: data.initial_message || DEFAULT_CONFIG.initial_message,
                         quick_questions: data.quick_questions || [],
+                        // ── v13 ──
+                        logo_shape:      data.logo_shape      || 'circle',
+                        custom_logo_url: data.custom_logo_url || '',
                     });
                     // Update the welcome message now that we have the real one
                     setMessages([{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }]);
@@ -58,8 +113,10 @@ const ChatWidget = ({ apiKey }) => {
     }, [activeApiKey]);
 
     const THEME_COLOR = configData.theme_color;
-    const BOT_NAME = configData.bot_name;
-    const LOGO_URL = configData.logo_url;
+    const BOT_NAME    = configData.bot_name;
+    // v13: custom_logo_url takes precedence; fall back to default logo_url
+    const LOGO_URL    = configData.custom_logo_url || configData.logo_url;
+    const LOGO_SHAPE  = configData.logo_shape || 'circle';
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -397,11 +454,16 @@ const ChatWidget = ({ apiKey }) => {
                             <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50 dark:border-slate-800/50">
                                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                                     <div className="relative flex items-center gap-3 pl-4">
+                                        {/* ── v13: shaped avatar in header ── */}
                                         <div className="relative">
-                                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-center p-1.5 transition-transform hover:scale-105">
-                                                <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                                            </div>
-                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse" />
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
+                                            <BotAvatar
+                                                shapeId={LOGO_SHAPE}
+                                                logoUrl={LOGO_URL}
+                                                botName={BOT_NAME}
+                                                themeColor={THEME_COLOR}
+                                                sizeClass="w-10 h-10"
+                                            />
                                         </div>
                                         <div className="flex flex-row items-center justify-center">
                                             <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
@@ -491,9 +553,14 @@ const ChatWidget = ({ apiKey }) => {
                                                         <User size={14} />
                                                     </div>
                                                 ) : (
-                                                    <div className="w-6 h-6 flex items-center justify-center pointer-events-none">
-                                                        <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
-                                                    </div>
+                                                    /* ── v13: shaped avatar in message list ── */
+                                                    <BotAvatar
+                                                        shapeId={LOGO_SHAPE}
+                                                        logoUrl={LOGO_URL}
+                                                        botName={BOT_NAME}
+                                                        themeColor={THEME_COLOR}
+                                                        sizeClass="w-6 h-6"
+                                                    />
                                                 )}
                                             </div>
 
@@ -691,9 +758,15 @@ const ChatWidget = ({ apiKey }) => {
                             />
                         </svg>
 
-                        {/* ── Stable Logo (Reusable BrandLogo component) ── */}
-                        <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-2 flex items-center justify-center">
-                            <BrandLogo themeColor={THEME_COLOR} className="w-full h-full" />
+                        {/* ── v13: FAB uses shaped logo ── */}
+                        <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-1.5 flex items-center justify-center">
+                            <BotAvatar
+                                shapeId={LOGO_SHAPE}
+                                logoUrl={LOGO_URL}
+                                botName={BOT_NAME}
+                                themeColor={THEME_COLOR}
+                                sizeClass="w-full h-full"
+                            />
                         </div>
 
                     </motion.button>
