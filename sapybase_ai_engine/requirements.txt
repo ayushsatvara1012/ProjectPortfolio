@@ -23,6 +23,6 @@ pybind11
 wheel
 gunicorn
 uvicorn
-Jinja2
+jinja2
 python-multipart
 polar-sdk

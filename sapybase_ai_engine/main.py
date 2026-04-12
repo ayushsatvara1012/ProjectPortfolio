@@ -39,6 +39,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from svix.webhooks import Webhook, WebhookVerificationError
 from jose import jwt
 import requests
+import httpx
 from psycopg2.errors import UniqueViolation
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
