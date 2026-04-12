@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useRef, useEffect,useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
@@ -11,14 +11,14 @@ import BrandLogo from './brandLogo';
 // ── v13: Shape class map (mirrors LogoCustomizer.jsx) ─────────────────────────
 // Kept inline here so the widget bundle stays self-contained with no extra import.
 const SHAPE_CLASS_MAP = {
-    circle:   'rounded-full',
+    circle: 'rounded-full',
     squircle: 'rounded-[2rem]',
-    bento:    'rounded-2xl',
-    sharp:    'rounded-lg',
+    bento: 'rounded-2xl',
+    sharp: 'rounded-lg',
 };
 
 // ── v13: BotAvatar — self-contained, handles image load errors ─────────────────
-function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass }) {
+function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow = true, transparentBgImage = false }) {
     const [imgFailed, setImgFailed] = useState(false);
     const prevUrlRef = useRef(logoUrl);
 
@@ -29,26 +29,63 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass }) {
         }
     }, [logoUrl]);
 
-    const shapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-full';
     const initial = (botName || 'S').charAt(0).toUpperCase();
     const showImage = logoUrl && logoUrl.trim() && !imgFailed;
 
     return (
         <div
-            className={`${sizeClass} ${shapeClass} overflow-hidden flex items-center justify-center shrink-0 shadow-sm border border-gray-100 dark:border-slate-700`}
-            style={{ backgroundColor: showImage ? '#ffffff' : themeColor }}
+            className={`${sizeClass} rounded-xl overflow-hidden flex items-center justify-center shrink-0 dark:border-slate-700 ${hasShadow ? 'shadow-sm' : ''}`}
+            style={{ backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor }}
         >
             {showImage ? (
                 <img
                     src={logoUrl}
                     alt={`${botName} logo`}
-                    className="w-full h-full object-cover bg-white"
+                    className="w-[80%] h-[80%] object-contain"
                     onError={() => setImgFailed(true)}
                 />
             ) : (
                 <span
                     className="font-bold leading-none select-none text-white"
                     style={{ fontSize: sizeClass.includes('w-10') ? '1rem' : '0.7rem' }}
+                >
+                    {initial}
+                </span>
+            )}
+        </div>
+    );
+}
+
+// ── v13: FabLogo — shapeless logo for FAB bubble ───────────────────────────────
+// Unlike BotAvatar, this renders NO border-radius, border, or shadow.
+// The outer SVG bubble path IS the shape — the logo just fills the space.
+function FabLogo({ logoUrl, botName, themeColor, sizeClass, offsetClass }) {
+    const [imgFailed, setImgFailed] = useState(false);
+    const prevUrlRef = useRef(logoUrl);
+
+    useEffect(() => {
+        if (logoUrl !== prevUrlRef.current) {
+            setImgFailed(false);
+            prevUrlRef.current = logoUrl;
+        }
+    }, [logoUrl]);
+
+    const initial = (botName || 'S').charAt(0).toUpperCase();
+    const showImage = logoUrl && logoUrl.trim() && !imgFailed;
+
+    return (
+        <div className={`${sizeClass} relative ${offsetClass} z-10 transition-all pointer-events-none flex items-center justify-center`}>
+            {showImage ? (
+                <img
+                    src={logoUrl}
+                    alt={`${botName} logo`}
+                    className="w-full h-full object-contain"
+                    onError={() => setImgFailed(true)}
+                />
+            ) : (
+                <span
+                    className="font-bold leading-none select-none"
+                    style={{ color: themeColor, fontSize: '1.5rem' }}
                 >
                     {initial}
                 </span>
@@ -66,14 +103,14 @@ const ChatWidget = ({ apiKey }) => {
 
     // 2. Initialize with defaults, merging in window.SaPyBaseConfig for high-fidelity fallback
     const DEFAULT_CONFIG = {
-        theme_color:      window.SaPyBaseConfig?.themeColor     || '#5730F5',
-        bot_name:         window.SaPyBaseConfig?.botName        || 'Sapy AI',
-        logo_url:         window.SaPyBaseConfig?.logoUrl        || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
-        initial_message:  window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
-        quick_questions:  window.SaPyBaseConfig?.quickQuestions || [],
+        theme_color: window.SaPyBaseConfig?.themeColor || '#5730F5',
+        bot_name: window.SaPyBaseConfig?.botName || 'Sapy AI',
+        logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
+        initial_message: window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
+        quick_questions: window.SaPyBaseConfig?.quickQuestions || [],
         // ── v13 ──
-        logo_shape:       window.SaPyBaseConfig?.logoShape      || 'circle',
-        custom_logo_url:  window.SaPyBaseConfig?.customLogoUrl  || '',
+        logo_shape: window.SaPyBaseConfig?.logoShape || 'circle',
+        custom_logo_url: window.SaPyBaseConfig?.customLogoUrl || '',
     };
 
     // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
@@ -91,13 +128,13 @@ const ChatWidget = ({ apiKey }) => {
                 if (res.ok) {
                     const data = await res.json();
                     setConfigData({
-                        theme_color:     data.theme_color     || DEFAULT_CONFIG.theme_color,
-                        bot_name:        data.bot_name        || DEFAULT_CONFIG.bot_name,
-                        logo_url:        data.logo_url        || DEFAULT_CONFIG.logo_url,
+                        theme_color: data.theme_color || DEFAULT_CONFIG.theme_color,
+                        bot_name: data.bot_name || DEFAULT_CONFIG.bot_name,
+                        logo_url: data.logo_url || DEFAULT_CONFIG.logo_url,
                         initial_message: data.initial_message || DEFAULT_CONFIG.initial_message,
                         quick_questions: data.quick_questions || [],
                         // ── v13 ──
-                        logo_shape:      data.logo_shape      || 'circle',
+                        logo_shape: data.logo_shape || 'circle',
                         custom_logo_url: data.custom_logo_url || '',
                     });
                     // Update the welcome message now that we have the real one
@@ -113,10 +150,10 @@ const ChatWidget = ({ apiKey }) => {
     }, [activeApiKey]);
 
     const THEME_COLOR = configData.theme_color;
-    const BOT_NAME    = configData.bot_name;
+    const BOT_NAME = configData.bot_name;
     // v13: custom_logo_url takes precedence; fall back to default logo_url
-    const LOGO_URL    = configData.custom_logo_url || configData.logo_url;
-    const LOGO_SHAPE  = configData.logo_shape || 'circle';
+    const LOGO_URL = configData.custom_logo_url || configData.logo_url;
+    const LOGO_SHAPE = configData.logo_shape || 'circle';
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -412,21 +449,35 @@ const ChatWidget = ({ apiKey }) => {
         return null;
     }
 
-    const BUBBLE_PATH = `
-  M 22 4
-  H 78
-  Q 96 4 96 22
-  V 62
-  Q 96 80 78 80
-  H 36
-  L 18 96
-  L 22 80
-  H 22
-  Q 4 80 4 62
-  V 22
-  Q 4 4 22 4
-  Z
-`;
+    // ── v13: Dynamic FAB shapes — each logo_shape gets a unique outline ──────
+    const FAB_SHAPES = {
+        // 1. Organic round speech bubble with elegant tail (bottom-left)
+        circle: {
+            path: 'M 50 6 C 74 6 94 22 94 43 C 94 64 74 80 50 80 C 44 80 38 79 34 78 L 18 96 L 26 77 C 12 73 6 59 6 43 C 6 22 26 6 50 6 Z',
+            logoOffset: '-top-1 sm:-top-1.5',
+            logoSize: 'w-[55%] h-[55%]',
+        },
+        // 2. Squarish chat bubble with rounded corners + tail (the classic)
+        squircle: {
+            path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
+            logoOffset: '-top-1.5 sm:-top-2',
+            logoSize: 'w-[55%] h-[55%]',
+        },
+        // 3. Clean circle — no tail, modern and minimal
+        bento: {
+            path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
+            logoOffset: 'top-0',
+            logoSize: 'w-[60%] h-[60%]',
+        },
+        // 4. Sharp rectangle with slight rounding — no tail, clean edge
+        sharp: {
+            path: 'M 10 4 H 90 Q 96 4 96 10 V 90 Q 96 96 90 96 H 10 Q 4 96 4 90 V 10 Q 4 4 10 4 Z',
+            logoOffset: 'top-0',
+            logoSize: 'w-[72%] h-[72%]',
+        },
+    };
+    const fabShape = FAB_SHAPES[LOGO_SHAPE] || FAB_SHAPES.circle;
+    const FAB_PATH = fabShape.path;
 
     return (
         <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-2147483647 font-sans pointer-events-none" style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
@@ -560,6 +611,8 @@ const ChatWidget = ({ apiKey }) => {
                                                         botName={BOT_NAME}
                                                         themeColor={THEME_COLOR}
                                                         sizeClass="w-6 h-6"
+                                                        hasShadow={false}
+                                                        transparentBgImage={true}
                                                     />
                                                 )}
                                             </div>
@@ -716,7 +769,7 @@ const ChatWidget = ({ apiKey }) => {
                         className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1"
                     >
 
-                        {/* ── Single SVG layer: clip-path fill + aura + marching dashes ── */}
+                        {/* ── SVG layer: clip-path fill + aura + themed stroke ── */}
                         <svg
                             viewBox="0 0 100 100"
                             xmlns="http://www.w3.org/2000/svg"
@@ -724,50 +777,45 @@ const ChatWidget = ({ apiKey }) => {
                             overflow="visible"
                         >
                             <defs>
-                                {/* Clip mask so white fill is exactly bubble-shaped */}
-                                <clipPath id="bubble-clip">
-                                    <path d={BUBBLE_PATH} />
+                                <clipPath id="fab-clip">
+                                    <path d={FAB_PATH} />
                                 </clipPath>
-
-
                             </defs>
 
-                            {/* White fill clipped to bubble shape — replaces bg-white on the button */}
+                            {/* White fill clipped to shape */}
                             <rect
                                 x="0" y="0" width="100" height="100"
                                 fill="white"
-                                clipPath="url(#bubble-clip)"
-                                className='dark:fill-slate-900'
+                                clipPath="url(#fab-clip)"
+                                className="dark:fill-slate-900"
                             />
 
-                            {/* Pulsing aura — also bubble-shaped */}
+                            {/* Pulsing aura */}
                             <path
-                                d={BUBBLE_PATH}
+                                d={FAB_PATH}
                                 fill="white"
                                 className="aura-path dark:fill-slate-900/50"
                             />
 
-                            {/* Marching dashes border */}
+                            {/* Themed stroke border */}
                             <path
-                                d={BUBBLE_PATH}
+                                d={FAB_PATH}
                                 fill="none"
                                 stroke={THEME_COLOR}
-                                strokeWidth="1"
+                                strokeWidth="1.2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             />
                         </svg>
 
-                        {/* ── v13: FAB uses shaped logo ── */}
-                        <div className="w-4/5 h-4/5 relative -top-1.5 sm:-top-2 z-10 transition-all pointer-events-none p-1.5 flex items-center justify-center">
-                            <BotAvatar
-                                shapeId={LOGO_SHAPE}
-                                logoUrl={LOGO_URL}
-                                botName={BOT_NAME}
-                                themeColor={THEME_COLOR}
-                                sizeClass="w-full h-full"
-                            />
-                        </div>
+                        {/* ── v13: Raw logo inside bubble — no shape of its own ── */}
+                        <FabLogo
+                            logoUrl={LOGO_URL}
+                            botName={BOT_NAME}
+                            themeColor={THEME_COLOR}
+                            sizeClass={fabShape.logoSize}
+                            offsetClass={fabShape.logoOffset}
+                        />
 
                     </motion.button>
                 </div>

@@ -121,7 +121,7 @@ export function BotAvatar({ shapeId = 'circle', logoUrl = '', botName = 'S', siz
                 <img
                     src={logoUrl}
                     alt={`${botName} logo`}
-                    className="w-full h-full object-cover bg-white"
+                    className="w-[80%] h-[80%] object-contain"
                     onError={() => setImgFailed(true)}
                 />
             ) : (
@@ -306,9 +306,8 @@ export default function LogoCustomizer({
                             {/* Inline status icon */}
                             {urlInput && (
                                 <span
-                                    className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] ${
-                                        urlError ? 'text-red-500' : 'text-emerald-500'
-                                    }`}
+                                    className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] ${urlError ? 'text-red-500' : 'text-emerald-500'
+                                        }`}
                                 >
                                     {urlError ? 'error' : 'check_circle'}
                                 </span>

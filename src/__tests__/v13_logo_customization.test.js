@@ -409,7 +409,89 @@ describe('chatWidget v13 config resolution', () => {
     });
 });
 
-// ── 7. Backend response index audit ──────────────────────────────────────────────
+// ── 7. FAB_SHAPES dynamic path system ────────────────────────────────────────────
+
+const FAB_SHAPES = {
+    circle: {
+        path: 'M 22 74 A 40 40 0 1 1 38 83 Q 26 86 16 96 Q 20 84 22 74 Z',
+        logoOffset: '-top-1 sm:-top-1.5',
+        logoSize: 'w-[55%] h-[55%]',
+    },
+    squircle: {
+        path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
+        logoOffset: '-top-1.5 sm:-top-2',
+        logoSize: 'w-[55%] h-[55%]',
+    },
+    bento: {
+        path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
+        logoOffset: 'top-0',
+        logoSize: 'w-[60%] h-[60%]',
+    },
+    sharp: {
+        path: 'M 10 4 H 90 Q 96 4 96 10 V 90 Q 96 96 90 96 H 10 Q 4 96 4 90 V 10 Q 4 4 10 4 Z',
+        logoOffset: 'top-0',
+        logoSize: 'w-[72%] h-[72%]',
+    },
+};
+
+describe('FAB_SHAPES dynamic path system', () => {
+    it('has entries for all 4 valid shapes', () => {
+        expect(Object.keys(FAB_SHAPES).sort()).toEqual(['bento', 'circle', 'sharp', 'squircle']);
+    });
+
+    it('each shape has path, logoOffset, and logoSize', () => {
+        for (const [id, shape] of Object.entries(FAB_SHAPES)) {
+            expect(shape).toHaveProperty('path');
+            expect(shape).toHaveProperty('logoOffset');
+            expect(shape).toHaveProperty('logoSize');
+            expect(typeof shape.path).toBe('string');
+            expect(shape.path.length).toBeGreaterThan(20);
+        }
+    });
+
+    it('each path starts with M and ends with Z (closed path)', () => {
+        for (const [id, shape] of Object.entries(FAB_SHAPES)) {
+            expect(shape.path.trim().startsWith('M')).toBe(true);
+            expect(shape.path.trim().endsWith('Z')).toBe(true);
+        }
+    });
+
+    it('all numeric coordinates stay within 0-100 viewBox', () => {
+        for (const [id, shape] of Object.entries(FAB_SHAPES)) {
+            const numbers = shape.path.match(/[0-9]+\.?[0-9]*/g).map(Number);
+            for (const n of numbers) {
+                expect(n).toBeGreaterThanOrEqual(0);
+                expect(n).toBeLessThanOrEqual(100);
+            }
+        }
+    });
+
+    it('speech-bubble shapes (circle, squircle) have tails extending past y=90', () => {
+        for (const id of ['circle', 'squircle']) {
+            const numbers = FAB_SHAPES[id].path.match(/[0-9]+\.?[0-9]*/g).map(Number);
+            const hasLowY = numbers.some(n => n >= 90);
+            expect(hasLowY).toBe(true);
+        }
+    });
+
+    it('non-tail shapes (bento, sharp) use top-0 offset', () => {
+        expect(FAB_SHAPES.bento.logoOffset).toBe('top-0');
+        expect(FAB_SHAPES.sharp.logoOffset).toBe('top-0');
+    });
+
+    it('tail shapes (circle, squircle) use negative top offset', () => {
+        expect(FAB_SHAPES.circle.logoOffset).toContain('-top');
+        expect(FAB_SHAPES.squircle.logoOffset).toContain('-top');
+    });
+
+    it('fallback to circle when shape is unknown', () => {
+        const unknownShape = 'hexagon';
+        const fabShape = FAB_SHAPES[unknownShape] || FAB_SHAPES.circle;
+        expect(fabShape).toBe(FAB_SHAPES.circle);
+    });
+});
+
+// ── 8. Backend response index audit ──────────────────────────────────────────────
 
 describe('Backend SQL column index audit', () => {
     // verify_api_key_and_origin returns 12 columns: indices 0-11
