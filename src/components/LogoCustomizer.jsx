@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { AVATAR_GRADIENTS } from './chatWidget';
 
 // ── Shape catalogue ────────────────────────────────────────────────────────────
 // Each entry defines the Tailwind class applied to the avatar container,
@@ -10,8 +11,8 @@ const SHAPES = [
         label: 'Circle',
         twClass: 'rounded-full',
         icon: (
-            <svg viewBox="0 0 40 40" className="w-6 h-6" fill="currentColor">
-                <circle cx="20" cy="20" r="18" />
+            <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
+                <path d="M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z" />
             </svg>
         ),
     },
@@ -20,8 +21,8 @@ const SHAPES = [
         label: 'Squircle',
         twClass: 'rounded-[2rem]',
         icon: (
-            <svg viewBox="0 0 40 40" className="w-6 h-6" fill="currentColor">
-                <rect x="2" y="2" width="36" height="36" rx="14" ry="14" />
+            <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
+                <path d="M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z" />
             </svg>
         ),
     },
@@ -30,8 +31,8 @@ const SHAPES = [
         label: 'Bento',
         twClass: 'rounded-2xl',
         icon: (
-            <svg viewBox="0 0 40 40" className="w-6 h-6" fill="currentColor">
-                <rect x="2" y="2" width="36" height="36" rx="8" ry="8" />
+            <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
+                <path d="M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z" />
             </svg>
         ),
     },
@@ -40,8 +41,8 @@ const SHAPES = [
         label: 'Sharp',
         twClass: 'rounded-lg',
         icon: (
-            <svg viewBox="0 0 40 40" className="w-6 h-6" fill="currentColor">
-                <rect x="2" y="2" width="36" height="36" rx="3" ry="3" />
+            <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
+                <path d="M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z" />
             </svg>
         ),
     },
@@ -88,7 +89,7 @@ function preValidateUrl(url) {
 
 // ── BotAvatar — shared between preview and live widget ────────────────────────
 // Exported so BotPreview.jsx and chatWidget.jsx can both import it.
-export function BotAvatar({ shapeId = 'circle', logoUrl = '', botName = 'S', size = 'md', themeColor = '#5730F5' }) {
+export function BotAvatar({ shapeId = 'circle', logoUrl = '', botName = 'S', size = 'md', themeColor = '#5730F5', bgStyle = 'none' }) {
     const [imgFailed, setImgFailed] = useState(false);
     const prevUrlRef = useRef(logoUrl);
 
@@ -112,10 +113,18 @@ export function BotAvatar({ shapeId = 'circle', logoUrl = '', botName = 'S', siz
 
     const showImage = logoUrl && logoUrl.trim() && !imgFailed;
 
+    let bgProps = { backgroundColor: showImage ? '#ffffff' : themeColor };
+    if (showImage && bgStyle && AVATAR_GRADIENTS[bgStyle]) {
+        bgProps = { 
+            background: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`, 
+            backgroundColor: 'transparent' 
+        };
+    }
+
     return (
         <div
             className={`${sizeClass} ${shapeClass} overflow-hidden flex items-center justify-center shrink-0 border border-gray-100 dark:border-slate-700 shadow-sm`}
-            style={{ backgroundColor: showImage ? '#ffffff' : themeColor }}
+            style={bgProps}
         >
             {showImage ? (
                 <img
@@ -155,6 +164,8 @@ export default function LogoCustomizer({
     isProUser,
     onShapeChange,
     onUrlChange,
+    avatarBgStyle,
+    onBgStyleChange,
 }) {
     const [urlInput, setUrlInput] = useState(customLogoUrl || '');
     const [urlError, setUrlError] = useState(null);
@@ -190,6 +201,29 @@ export default function LogoCustomizer({
 
     return (
         <div className="space-y-6">
+            {/* ── Live Shape Preview (Moved to top) ── */}
+            <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800">
+                <BotAvatar
+                    shapeId={logoShape}
+                    logoUrl={(!urlError && urlInput) ? urlInput : customLogoUrl}
+                    botName={botName}
+                    themeColor={primaryColor}
+                    size="lg"
+                    isCustom={!!customLogoUrl}
+                    bgStyle={avatarBgStyle}
+                />
+                <div>
+                    <p className="text-xs font-sans font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0.5">
+                        Live Shape Preview
+                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                        {customLogoUrl && !urlError
+                            ? 'Showing your custom logo'
+                            : 'Showing initials fallback — add a logo URL below'}
+                    </p>
+                </div>
+            </div>
+
             {/* ── Shape Picker ── */}
             <div>
                 <label className={labelCls}>
@@ -201,7 +235,7 @@ export default function LogoCustomizer({
                     )}
                 </label>
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-4 py-2">
                     {SHAPES.map(shape => {
                         const isSelected = logoShape === shape.id;
                         return (
@@ -211,51 +245,86 @@ export default function LogoCustomizer({
                                 onClick={() => onShapeChange(shape.id)}
                                 disabled={!isProUser}
                                 className={`
-                                    flex flex-col items-center gap-2 p-3 border transition-all duration-200
+                                    group relative flex flex-col items-center gap-3 transition-all duration-300
                                     ${!isProUser ? 'opacity-40 cursor-not-allowed' : ''}
-                                    ${isSelected
-                                        ? 'border-slate-900 dark:border-blue-500 bg-slate-50 dark:bg-blue-900/20 text-slate-900 dark:text-blue-400'
-                                        : 'border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-400 dark:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-300'
-                                    }
                                 `}
                                 title={shape.label}
                             >
-                                {/* Shape icon */}
-                                <div className={`w-8 h-8 flex items-center justify-center`}>
+                                {/* Floating Shape icon */}
+                                <div className={`
+                                    flex items-center justify-center transition-all duration-300
+                                    ${isSelected 
+                                        ? 'text-blue-500 dark:text-blue-400 scale-110 drop-shadow-[0_8px_16px_rgba(59,130,246,0.25)]' 
+                                        : 'text-slate-300 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 group-hover:scale-105'
+                                    }
+                                `}>
                                     {shape.icon}
+                                    {isSelected && (
+                                        <div className="absolute -top-1 -right-1 bg-white dark:bg-slate-900 rounded-full">
+                                            <span className="material-symbols-outlined text-[16px] text-blue-500 dark:text-blue-400 block p-0.5">
+                                                check_circle
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
-                                <span className="text-[9px] uppercase tracking-widest font-bold font-sans">
+                                <span className={`text-[9px] uppercase tracking-widest font-bold font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
                                     {shape.label}
                                 </span>
-                                {isSelected && (
-                                    <span className="material-symbols-outlined text-[14px] text-blue-500 dark:text-blue-400 -mt-1">
-                                        check_circle
-                                    </span>
-                                )}
                             </button>
                         );
                     })}
                 </div>
             </div>
 
-            {/* ── Live Shape Preview ── */}
-            <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800">
-                <BotAvatar
-                    shapeId={logoShape}
-                    logoUrl={(!urlError && urlInput) ? urlInput : customLogoUrl}
-                    botName={botName}
-                    themeColor={primaryColor}
-                    size="lg"
-                />
-                <div>
-                    <p className="text-xs font-sans font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0.5">
-                        Live Shape Preview
-                    </p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
-                        {customLogoUrl && !urlError
-                            ? 'Showing your custom logo'
-                            : 'Showing initials fallback — add a logo URL below'}
-                    </p>
+            {/* ── Background Style ── */}
+            <div>
+                <label className={labelCls}>
+                    Avatar Background
+                    {!isProUser && (
+                        <span className="ml-2 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] rounded-full border border-amber-200 dark:border-amber-800">
+                            Pro+
+                        </span>
+                    )}
+                </label>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed mb-3">
+                    Premium gradients for transparent logo URLs.
+                </p>
+
+                <div className="flex flex-wrap gap-6 py-2">
+                    {Object.entries(AVATAR_GRADIENTS).map(([baseId, gradData]) => {
+                        const isSelected = (avatarBgStyle || 'none') === baseId;
+                        const hasGradient = gradData !== null;
+                        
+                        return (
+                            <button
+                                key={baseId}
+                                type="button"
+                                onClick={() => onBgStyleChange(baseId)}
+                                disabled={!isProUser}
+                                className={`
+                                    group relative flex flex-col items-center gap-2 transition-all duration-300
+                                    ${!isProUser ? 'opacity-40 cursor-not-allowed' : ''}
+                                `}
+                                title={`${baseId} gradient`}
+                            >
+                                <div className={`
+                                    w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center
+                                    ${isSelected ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-blue-400 scale-110 drop-shadow-md' : 'ring-1 ring-gray-200 dark:ring-slate-700 hover:scale-105 hover:ring-slate-300 dark:hover:ring-slate-500'}
+                                    ${!hasGradient ? 'bg-white dark:bg-slate-900' : ''}
+                                `}
+                                style={hasGradient ? { background: `linear-gradient(135deg, ${gradData[0]}, ${gradData[1]})` } : {}}
+                                >
+                                    {!hasGradient && <span className="material-symbols-outlined text-[16px] text-slate-400">block</span>}
+                                    {isSelected && hasGradient && (
+                                        <span className="material-symbols-outlined text-[18px] text-white drop-shadow-sm font-bold">check</span>
+                                    )}
+                                </div>
+                                <span className={`text-[9px] uppercase tracking-widest font-bold font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                    {baseId}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 

@@ -248,8 +248,10 @@ export const CustomizeSection = () => {
                                 primaryColor={botSettings.primaryColor || '#5730F5'}
                                 botName={botSettings.name || 'S'}
                                 isProUser={isProUser}
+                                avatarBgStyle={botSettings.avatarBgStyle || 'none'}
                                 onShapeChange={(shapeId) => updateSetting('logoShape', shapeId)}
                                 onUrlChange={(url) => updateSetting('customLogoUrl', url)}
+                                onBgStyleChange={(styleId) => updateSetting('avatarBgStyle', styleId)}
                             />
                         </div>
 

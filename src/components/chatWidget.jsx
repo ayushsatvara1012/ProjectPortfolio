@@ -17,8 +17,17 @@ const SHAPE_CLASS_MAP = {
     sharp: 'rounded-lg',
 };
 
+// ── v14: Avatar Gradient catalog (mirrors LogoCustomizer) ─────────────────────
+export const AVATAR_GRADIENTS = {
+    none: null,
+    cosmic: ['#c026d3', '#3b82f6'], // Fuchsia to Blue
+    sunset: ['#f97316', '#eab308'], // Orange to Yellow
+    ocean: ['#06b6d4', '#3b82f6'],  // Cyan to Blue
+    hacker: ['#22c55e', '#14b8a6'], // Green to Teal
+};
+
 // ── v13: BotAvatar — self-contained, handles image load errors ─────────────────
-function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow = true, transparentBgImage = false }) {
+function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow = true, transparentBgImage = false, isCustom = false, bgStyle = 'none' }) {
     const [imgFailed, setImgFailed] = useState(false);
     const prevUrlRef = useRef(logoUrl);
 
@@ -29,24 +38,36 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
         }
     }, [logoUrl]);
 
-    const initial = (botName || 'S').charAt(0).toUpperCase();
+    const initial = (String(botName || 'S')).charAt(0).toUpperCase();
     const showImage = logoUrl && logoUrl.trim() && !imgFailed;
+    const activeShapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-xl';
+
+    let bgProps = { backgroundColor: showImage ? (transparentBgImage ? 'transparent' : (isCustom ? themeColor : '#ffffff')) : themeColor };
+    
+    // Safety check: only apply custom gradient if it is a custom image AND gradient is selected
+    if (showImage && isCustom && bgStyle && AVATAR_GRADIENTS[bgStyle]) {
+        bgProps = { 
+            background: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`, 
+            backgroundColor: 'transparent' 
+        };
+    }
 
     return (
         <div
-            className={`${sizeClass} rounded-xl overflow-hidden flex items-center justify-center shrink-0 dark:border-slate-700 ${hasShadow ? 'shadow-sm' : ''}`}
-            style={{ backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor }}
+            className={`${sizeClass} ${activeShapeClass} overflow-hidden! flex! items-center! justify-center! shrink-0! dark:border-slate-700! ${hasShadow ? 'shadow-sm!' : ''} p-0! m-0! border-none!`}
+            style={{ ...bgProps, boxSizing: 'border-box' }}
         >
             {showImage ? (
                 <img
                     src={logoUrl}
                     alt={`${botName} logo`}
-                    className="w-[80%] h-[80%] object-contain"
+                    className={`m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none! ${isCustom ? 'w-full! h-full! object-cover!' : 'w-[75%]! h-[75%]! object-contain!'}`}
                     onError={() => setImgFailed(true)}
+                    style={{ display: 'block', boxSizing: 'border-box' }}
                 />
             ) : (
                 <span
-                    className="font-bold leading-none select-none text-white"
+                    className="font-bold! leading-none! select-none! text-white! m-0! p-0!"
                     style={{ fontSize: sizeClass.includes('w-10') ? '1rem' : '0.7rem' }}
                 >
                     {initial}
@@ -56,43 +77,6 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
     );
 }
 
-// ── v13: FabLogo — shapeless logo for FAB bubble ───────────────────────────────
-// Unlike BotAvatar, this renders NO border-radius, border, or shadow.
-// The outer SVG bubble path IS the shape — the logo just fills the space.
-function FabLogo({ logoUrl, botName, themeColor, sizeClass, offsetClass }) {
-    const [imgFailed, setImgFailed] = useState(false);
-    const prevUrlRef = useRef(logoUrl);
-
-    useEffect(() => {
-        if (logoUrl !== prevUrlRef.current) {
-            setImgFailed(false);
-            prevUrlRef.current = logoUrl;
-        }
-    }, [logoUrl]);
-
-    const initial = (botName || 'S').charAt(0).toUpperCase();
-    const showImage = logoUrl && logoUrl.trim() && !imgFailed;
-
-    return (
-        <div className={`${sizeClass} relative ${offsetClass} z-10 transition-all pointer-events-none flex items-center justify-center`}>
-            {showImage ? (
-                <img
-                    src={logoUrl}
-                    alt={`${botName} logo`}
-                    className="w-full h-full object-contain"
-                    onError={() => setImgFailed(true)}
-                />
-            ) : (
-                <span
-                    className="font-bold leading-none select-none"
-                    style={{ color: themeColor, fontSize: '1.5rem' }}
-                >
-                    {initial}
-                </span>
-            )}
-        </div>
-    );
-}
 
 const ChatWidget = ({ apiKey }) => {
     // 1. Resolve API Key & Base URL
@@ -136,6 +120,7 @@ const ChatWidget = ({ apiKey }) => {
                         // ── v13 ──
                         logo_shape: data.logo_shape || 'circle',
                         custom_logo_url: data.custom_logo_url || '',
+                        avatar_bg_style: data.avatar_bg_style || 'none',
                     });
                     // Update the welcome message now that we have the real one
                     setMessages([{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }]);
@@ -149,11 +134,11 @@ const ChatWidget = ({ apiKey }) => {
         fetchConfig();
     }, [activeApiKey]);
 
-    const THEME_COLOR = configData.theme_color;
-    const BOT_NAME = configData.bot_name;
-    // v13: custom_logo_url takes precedence; fall back to default logo_url
+    const BOT_NAME = configData.bot_name || 'SaPyBase';
+    const THEME_COLOR = configData.theme_color || '#5730F5';
     const LOGO_URL = configData.custom_logo_url || configData.logo_url;
     const LOGO_SHAPE = configData.logo_shape || 'circle';
+    const AVATAR_BG_STYLE = configData.avatar_bg_style || 'none';
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -453,27 +438,27 @@ const ChatWidget = ({ apiKey }) => {
     const FAB_SHAPES = {
         // 1. Organic round speech bubble with elegant tail (bottom-left)
         circle: {
-            path: 'M 50 6 C 74 6 94 22 94 43 C 94 64 74 80 50 80 C 44 80 38 79 34 78 L 18 96 L 26 77 C 12 73 6 59 6 43 C 6 22 26 6 50 6 Z',
-            logoOffset: '-top-1 sm:-top-1.5',
-            logoSize: 'w-[55%] h-[55%]',
+            path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
+            logoSize: 'w-full h-full',
+            x: 0, y: 0,
         },
         // 2. Squarish chat bubble with rounded corners + tail (the classic)
         squircle: {
             path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
-            logoOffset: '-top-1.5 sm:-top-2',
-            logoSize: 'w-[55%] h-[55%]',
+            logoSize: 'w-full h-full',
+            x: 0, y: -8, // Body Y range (4 to 80), Center Y = 42. SVG center is 50. Output: -8
         },
         // 3. Clean circle — no tail, modern and minimal
         bento: {
-            path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
-            logoOffset: 'top-0',
-            logoSize: 'w-[60%] h-[60%]',
+            path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z',
+            logoSize: 'w-full h-full',
+            x: 0, y: -10.5, // Body Y range (0 to 79), Center Y = 39.5. SVG center is 50. Output: -10.5
         },
         // 4. Sharp rectangle with slight rounding — no tail, clean edge
         sharp: {
-            path: 'M 10 4 H 90 Q 96 4 96 10 V 90 Q 96 96 90 96 H 10 Q 4 96 4 90 V 10 Q 4 4 10 4 Z',
-            logoOffset: 'top-0',
-            logoSize: 'w-[72%] h-[72%]',
+            path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z',
+            logoSize: 'w-full h-full',
+            x: 0, y: 0, // Body is a perfect circle centered at (50, 50). Output: 0
         },
     };
     const fabShape = FAB_SHAPES[LOGO_SHAPE] || FAB_SHAPES.circle;
@@ -514,6 +499,8 @@ const ChatWidget = ({ apiKey }) => {
                                                 botName={BOT_NAME}
                                                 themeColor={THEME_COLOR}
                                                 sizeClass="w-10 h-10"
+                                                isCustom={!!configData.custom_logo_url}
+                                                bgStyle={AVATAR_BG_STYLE}
                                             />
                                         </div>
                                         <div className="flex flex-row items-center justify-center">
@@ -613,6 +600,8 @@ const ChatWidget = ({ apiKey }) => {
                                                         sizeClass="w-6 h-6"
                                                         hasShadow={false}
                                                         transparentBgImage={true}
+                                                        isCustom={!!configData.custom_logo_url}
+                                                        bgStyle={AVATAR_BG_STYLE}
                                                     />
                                                 )}
                                             </div>
@@ -780,24 +769,112 @@ const ChatWidget = ({ apiKey }) => {
                                 <clipPath id="fab-clip">
                                     <path d={FAB_PATH} />
                                 </clipPath>
+
+                                {/* ── v3: Premium Inset Neumorphic Filter ── */}
+                                <filter id="neumorphic-3d-inset" x="-20%" y="-20%" width="140%" height="140%">
+                                    {/* A. Dark Inner Shadow (Top-Left) */}
+                                    <feComponentTransfer in="SourceAlpha">
+                                        <feFuncA type="table" tableValues="1 0" />
+                                    </feComponentTransfer>
+                                    <feGaussianBlur stdDeviation="3" />
+                                    <feOffset dx="4" dy="4" result="offsetBlurDark" />
+                                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowDark" />
+                                    <feFlood floodColor="rgba(0,0,0,0.14)" />
+                                    <feComposite operator="in" in2="innerShadowDark" result="finalDark" />
+
+                                    {/* B. Light Inner Highlight (Bottom-Right) */}
+                                    <feComponentTransfer in="SourceAlpha">
+                                        <feFuncA type="table" tableValues="1 0" />
+                                    </feComponentTransfer>
+                                    <feGaussianBlur stdDeviation="3" />
+                                    <feOffset dx="-3" dy="-3" result="offsetBlurLight" />
+                                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowLight" />
+                                    <feFlood floodColor="rgba(255,255,255,0.8)" />
+                                    <feComposite operator="in" in2="innerShadowLight" result="finalLight" />
+
+                                    {/* C. Combine Everything */}
+                                    <feMerge>
+                                        <feMergeNode in="SourceGraphic" />
+                                        <feMergeNode in="finalDark" />
+                                        <feMergeNode in="finalLight" />
+                                    </feMerge>
+                                </filter>
+
+                                {/* ── v3: Greyish Surface Gradient (Slate Tone) ── */}
+                                <linearGradient id="fab-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#FFFFFF" />
+
+                                    <stop offset="100%" stopColor="#E2E8F0" />
+                                </linearGradient>
+
+                                <linearGradient id="fab-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#1E293B" /> {/* Slate-800 */}
+                                    <stop offset="100%" stopColor="#0F172A" /> {/* Slate-900 */}
+                                </linearGradient>
+
+                                {AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE] && configData.custom_logo_url && (
+                                    <linearGradient id="sapybase-avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor={AVATAR_GRADIENTS[AVATAR_BG_STYLE][0]} />
+                                        <stop offset="100%" stopColor={AVATAR_GRADIENTS[AVATAR_BG_STYLE][1]} />
+                                    </linearGradient>
+                                )}
                             </defs>
 
-                            {/* White fill clipped to shape */}
-                            <rect
-                                x="0" y="0" width="100" height="100"
-                                fill="white"
-                                clipPath="url(#fab-clip)"
-                                className="dark:fill-slate-900"
-                            />
-
-                            {/* Pulsing aura */}
+                            {/* 1. Base Layer (Solid Color or Dynamic Custom Gradient) */}
                             <path
                                 d={FAB_PATH}
-                                fill="white"
-                                className="aura-path dark:fill-slate-900/50"
+                                fill={(configData.custom_logo_url && AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "url(#sapybase-avatar-grad)" : "url(#fab-gradient)"}
+                                className={!(configData.custom_logo_url && AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "dark:fill-[url(#fab-gradient-dark)] transition-all duration-500" : "transition-all duration-500"}
                             />
 
-                            {/* Themed stroke border */}
+                            {/* 2. Logo Image Layer (Adaptive scaling & clipping) */}
+                            {LOGO_URL && (
+                                <g clipPath="url(#fab-clip)">
+                                    <image
+                                        href={LOGO_URL}
+                                        x={(configData.custom_logo_url ? 0 : 20) + (fabShape.x || 0)}
+                                        y={(configData.custom_logo_url ? 0 : 20) + (fabShape.y || 0)}
+                                        width={configData.custom_logo_url ? 100 : 60}
+                                        height={configData.custom_logo_url ? 100 : 60}
+                                        preserveAspectRatio={configData.custom_logo_url ? "xMidYMid slice" : "xMidYMid meet"}
+                                        className="z-10"
+                                    />
+                                </g>
+                            )}
+
+                            {/* 3. Fallback Initial Layer (Clean, no filter) */}
+                            {!LOGO_URL && (
+                                <text
+                                    x={50 + (fabShape.x || 0)}
+                                    y={52 + (fabShape.y || 0)}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    fill={THEME_COLOR}
+                                    className="font-bold select-none pointer-events-none"
+                                    style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}
+                                >
+                                    {(BOT_NAME || 'S').charAt(0).toUpperCase()}
+                                </text>
+                            )}
+
+                            {/* 4. Shadow Overlay Layer (Applies 3D depth ON TOP of the content) */}
+                            <path
+                                d={FAB_PATH}
+                                fill="transparent"
+                                filter="url(#neumorphic-3d-inset)"
+                                className="pointer-events-none"
+                            />
+
+                            {/* 5. Pulsing aura (Subtle Stroke Only) */}
+                            <path
+                                d={FAB_PATH}
+                                fill="none"
+                                stroke="white"
+                                strokeWidth="0.8"
+                                className="aura-path opacity-30 dark:stroke-slate-500/30"
+                            />
+
+                            {/* 5. Themed stroke border (Subtle Outer Edge) */}
                             <path
                                 d={FAB_PATH}
                                 fill="none"
@@ -805,17 +882,11 @@ const ChatWidget = ({ apiKey }) => {
                                 strokeWidth="1.2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
+                                className="opacity-20"
                             />
                         </svg>
 
-                        {/* ── v13: Raw logo inside bubble — no shape of its own ── */}
-                        <FabLogo
-                            logoUrl={LOGO_URL}
-                            botName={BOT_NAME}
-                            themeColor={THEME_COLOR}
-                            sizeClass={fabShape.logoSize}
-                            offsetClass={fabShape.logoOffset}
-                        />
+                        {/* ── v14: Standalone LOGO was integrated into the SVG above ── */}
 
                     </motion.button>
                 </div>
