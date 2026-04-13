@@ -379,7 +379,7 @@ export default function LogoCustomizer({
                                 onChange={handleUrlChange}
                                 onBlur={handleUrlBlur}
                                 placeholder="https://your-domain.com/logo.png"
-                                className={`${inputCls} pl-9 ${urlError ? 'border-red-300 dark:border-red-700 focus:ring-red-300' : ''}`}
+                                className={`${inputCls} pl-9 pr-10 ${urlError ? 'border-red-300 dark:border-red-700 focus:ring-red-300' : ''}`}
                                 autoComplete="off"
                                 spellCheck="false"
                             />

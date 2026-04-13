@@ -327,6 +327,10 @@ const ChatWidget = ({ apiKey }) => {
     const inputRef = useRef(null);
     const menuRef = useRef(null);
     const abortControllerRef = useRef(null);
+    const scrollContainerRef = useRef(null);
+    const userHasScrolledUpRef = useRef(false);
+    const tokenBufferRef = useRef([]);
+    const rafIdRef = useRef(null);
 
     useEffect(() => {
 
@@ -342,9 +346,30 @@ const ChatWidget = ({ apiKey }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMenu]);
 
-    const scrollToBottom = (smooth = true) => {
+    // ── Zone 1: Smart Scroll with Intent Detection ───────────────────────────
+    const isNearBottom = useCallback(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return true;
+        return el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    }, []);
+
+    const scrollToBottom = useCallback((smooth = true) => {
+        if (userHasScrolledUpRef.current) return;
         messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-    };
+    }, []);
+
+    const forceScrollToBottom = useCallback((smooth = true) => {
+        userHasScrolledUpRef.current = false;
+        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    }, []);
+
+    const handleScrollContainer = useCallback(() => {
+        if (isNearBottom()) {
+            userHasScrolledUpRef.current = false;
+        } else {
+            userHasScrolledUpRef.current = true;
+        }
+    }, [isNearBottom]);
 
     const handleTypingComplete = useCallback((index) => {
         setMessages(prev => {
@@ -355,29 +380,82 @@ const ChatWidget = ({ apiKey }) => {
             return updated;
         });
         scrollToBottom(true);
-    }, []);
+    }, [scrollToBottom]);
 
+    // Only auto-scroll on new user messages or when not loading (non-stream events)
     useEffect(() => {
-        scrollToBottom(true);
-    }, [messages, isLoading]);
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'user') {
+            forceScrollToBottom(true);
+        } else if (!isLoading) {
+            scrollToBottom(true);
+        }
+    }, [messages.length, isLoading, forceScrollToBottom, scrollToBottom]);
 
     useEffect(() => {
         if (isOpen) {
             setTimeout(() => {
-                scrollToBottom(false); // Instant scroll when initializing window
+                forceScrollToBottom(false); // Instant scroll when initializing window
                 inputRef.current?.focus();
             }, 10);
         }
-    }, [isOpen]);
+    }, [isOpen, forceScrollToBottom]);
+
+    // ── Zone 2: rAF Token Drain Loop ─────────────────────────────────────────
+    const drainTokenBuffer = useCallback(() => {
+        if (tokenBufferRef.current.length === 0) {
+            rafIdRef.current = null;
+            return;
+        }
+        const chunk = tokenBufferRef.current.join('');
+        tokenBufferRef.current = [];
+
+        setMessages(prev => {
+            const updated = [...prev];
+            const lastMsg = updated[updated.length - 1];
+            if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming) {
+                updated[updated.length - 1] = {
+                    ...lastMsg,
+                    content: lastMsg.content + chunk,
+                };
+            }
+            return updated;
+        });
+
+        scrollToBottom(true);
+        rafIdRef.current = requestAnimationFrame(drainTokenBuffer);
+    }, [scrollToBottom]);
+
+    const startDrainLoop = useCallback(() => {
+        if (rafIdRef.current === null) {
+            rafIdRef.current = requestAnimationFrame(drainTokenBuffer);
+        }
+    }, [drainTokenBuffer]);
+
+    // Cleanup rAF on unmount
+    useEffect(() => {
+        return () => {
+            if (rafIdRef.current) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+            }
+        };
+    }, []);
 
     const handleSend = async (e) => {
         if (e) e.preventDefault();
         if (!input.trim()) return;
 
         const userMessage = input.trim();
-        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        // Add user message + immediately seed a bot message bubble for the thinking state
+        setMessages(prev => [
+            ...prev,
+            { role: 'user', content: userMessage },
+            { role: 'bot', content: '', isStreaming: true, isTyped: false }
+        ]);
         setInput('');
         setIsLoading(true);
+        userHasScrolledUpRef.current = false; // Reset scroll intent on new message
 
         // ── MEMORY LEAK PREVENTION: Abort any in-flight SSE stream ──
         if (abortControllerRef.current) {
@@ -390,7 +468,16 @@ const ChatWidget = ({ apiKey }) => {
         const resolvedApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
         if (!resolvedApiKey) {
             console.warn("SaPyBase Widget: Missing API Key. Processing aborted.");
-            setMessages(prev => [...prev, { role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!" }]);
+            setMessages(prev => {
+                const updated = [...prev];
+                const lastMsg = updated[updated.length - 1];
+                if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming) {
+                    updated[updated.length - 1] = { role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!", isStreaming: false, isTyped: false };
+                } else {
+                    updated.push({ role: 'bot', content: "Configure your API Key locally to start chatting with Sapy AI!" });
+                }
+                return updated;
+            });
             setIsLoading(false);
             return;
         }
@@ -419,7 +506,17 @@ const ChatWidget = ({ apiKey }) => {
                         // Read the body, update state with the complete reply, and throw
                         // a sentinel error to cleanly exit the SSE listener.
                         const data = await response.json();
-                        setMessages(prev => [...prev, { role: 'bot', content: data.reply }]);
+                        // Replace the pre-seeded empty bot message with the cached reply
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            const lastMsg = updated[updated.length - 1];
+                            if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming) {
+                                updated[updated.length - 1] = { role: 'bot', content: data.reply, isStreaming: false, isTyped: false };
+                            } else {
+                                updated.push({ role: 'bot', content: data.reply });
+                            }
+                            return updated;
+                        });
                         setIsLoading(false);
                         throw new Error('CACHE_HIT');
                     }
@@ -429,12 +526,20 @@ const ChatWidget = ({ apiKey }) => {
                             let detail = null;
                             try { detail = await response.json(); } catch { /* noop */ }
                             const isMessageLimit = detail?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
-                            setMessages(prev => [...prev, {
-                                role: 'bot',
-                                content: isMessageLimit
-                                    ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
-                                    : "I'm temporarily unavailable. Please try again later.",
-                            }]);
+                            const errorContent = isMessageLimit
+                                ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
+                                : "I'm temporarily unavailable. Please try again later.";
+                            // Replace the pre-seeded empty bot message with the error
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const lastMsg = updated[updated.length - 1];
+                                if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming) {
+                                    updated[updated.length - 1] = { role: 'bot', content: errorContent, isStreaming: false, isTyped: false };
+                                } else {
+                                    updated.push({ role: 'bot', content: errorContent });
+                                }
+                                return updated;
+                            });
                             setIsLoading(false);
                             throw new Error('HANDLED_ERROR');
                         }
@@ -443,23 +548,48 @@ const ChatWidget = ({ apiKey }) => {
                     // response.ok && text/event-stream → SSE stream begins normally
                 },
 
-                // ── STREAMING TOKEN HANDLER ──────────────────────────────────
+                // ── STREAMING TOKEN HANDLER (Zone 2: rAF-buffered) ────────────
                 onmessage(msg) {
                     // Sentinel: backend signals end-of-stream
                     if (msg.data === '[DONE]') {
+                        // Drain any remaining tokens in buffer
+                        if (tokenBufferRef.current.length > 0) {
+                            const remaining = tokenBufferRef.current.join('');
+                            tokenBufferRef.current = [];
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const lastMsg = updated[updated.length - 1];
+                                if (lastMsg && lastMsg.role === 'bot') {
+                                    updated[updated.length - 1] = {
+                                        ...lastMsg,
+                                        content: lastMsg.content + remaining,
+                                        isStreaming: false,
+                                        isTyped: true,
+                                    };
+                                }
+                                return updated;
+                            });
+                        } else {
+                            setMessages(prev => {
+                                const updated = [...prev];
+                                const lastMsg = updated[updated.length - 1];
+                                if (lastMsg && lastMsg.role === 'bot') {
+                                    updated[updated.length - 1] = {
+                                        ...lastMsg,
+                                        isStreaming: false,
+                                        isTyped: true,
+                                    };
+                                }
+                                return updated;
+                            });
+                        }
+                        // Cancel the drain loop
+                        if (rafIdRef.current) {
+                            cancelAnimationFrame(rafIdRef.current);
+                            rafIdRef.current = null;
+                        }
                         setIsLoading(false);
-                        setMessages(prev => {
-                            const updated = [...prev];
-                            const lastMsg = updated[updated.length - 1];
-                            if (lastMsg && lastMsg.role === 'bot') {
-                                updated[updated.length - 1] = {
-                                    ...lastMsg,
-                                    isStreaming: false,
-                                    isTyped: true // streaming text is fully assembled, prevent re-type
-                                };
-                            }
-                            return updated;
-                        });
+                        forceScrollToBottom(true);
                         return;
                     }
 
@@ -468,36 +598,20 @@ const ChatWidget = ({ apiKey }) => {
                         const parsed = JSON.parse(msg.data);
                         chunk = parsed.token || parsed.content || parsed.text || '';
                     } catch {
-                        // If the data isn't JSON, use the raw string directly
                         chunk = msg.data;
                     }
 
                     if (!chunk) return;
 
-                    // Fade out the Apple Intelligence loading aura on first token
+                    // Fade out the loading aura on first real token
                     if (!firstChunkReceived) {
                         firstChunkReceived = true;
                         setIsLoading(false);
-                        // Seed the bot message placeholder
-                        setMessages(prev => [...prev, { role: 'bot', content: chunk }]);
-                    } else {
-                        // Append subsequent tokens to the last (bot) message
-                        setMessages(prev => {
-                            const updated = [...prev];
-                            const lastMsg = updated[updated.length - 1];
-                            if (lastMsg && lastMsg.role === 'bot') {
-                                updated[updated.length - 1] = {
-                                    ...lastMsg,
-                                    content: lastMsg.content + chunk,
-                                    isStreaming: true // Mark as actively streaming
-                                };
-                            }
-                            return updated;
-                        });
                     }
 
-                    // Auto-scroll to track the streaming text
-                    scrollToBottom(true);
+                    // Push token into buffer and start the drain loop
+                    tokenBufferRef.current.push(chunk);
+                    startDrainLoop();
                 },
 
                 // ── ERROR HANDLER (Infinite Retry Prevention) ────────────────
@@ -512,10 +626,25 @@ const ChatWidget = ({ apiKey }) => {
                     }
 
                     console.error('SSE Chat Error:', err);
-                    setMessages(prev => [...prev, {
-                        role: 'bot',
-                        content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.",
-                    }]);
+                    // Replace the pre-seeded empty bot message with the error
+                    setMessages(prev => {
+                        const updated = [...prev];
+                        const lastMsg = updated[updated.length - 1];
+                        if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming) {
+                            updated[updated.length - 1] = {
+                                role: 'bot',
+                                content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.",
+                                isStreaming: false,
+                                isTyped: false,
+                            };
+                        } else {
+                            updated.push({
+                                role: 'bot',
+                                content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.",
+                            });
+                        }
+                        return updated;
+                    });
                     setIsLoading(false);
 
                     // Stop the library from retrying on real errors too.
@@ -685,7 +814,11 @@ const ChatWidget = ({ apiKey }) => {
                             </div>
 
                             {/* Scrollable Messages Container */}
-                            <div className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth custom-scrollbar">
+                            <div
+                                ref={scrollContainerRef}
+                                onScroll={handleScrollContainer}
+                                className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth custom-scrollbar"
+                            >
                                 <AnimatePresence initial={false}>
                                     {messages.map((msg, idx) => (
                                         <motion.div
@@ -694,36 +827,18 @@ const ChatWidget = ({ apiKey }) => {
                                             initial="hidden"
                                             animate="visible"
                                             layout="position"
-                                            className={`flex items-center gap-2 min-w-0 max-w-[85%] sm:max-w-[80%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}
+                                            className={`flex min-w-0 max-w-[96%] sm:max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
                                         >
-                                            <div className="shrink-0">
-                                                {msg.role === 'user' ? (
-                                                    <div className="w-6 h-6 rounded-full text-white flex items-center justify-center shadow-md dark:shadow-blue-900/40" style={{ backgroundColor: THEME_COLOR }}>
-                                                        <User size={14} />
-                                                    </div>
-                                                ) : (
-                                                    /* ── v13: shaped avatar in message list ── */
-                                                    <BotAvatar
-                                                        shapeId={LOGO_SHAPE}
-                                                        logoUrl={LOGO_URL}
-                                                        botName={BOT_NAME}
-                                                        themeColor={THEME_COLOR}
-                                                        sizeClass="w-6 h-6"
-                                                        hasShadow={false}
-                                                        transparentBgImage={true}
-                                                        isCustom={!!configData.custom_logo_url}
-                                                    />
-                                                )}
-                                            </div>
-
                                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                {msg.role === 'bot' && (
-                                                    <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1 ml-1 leading-none">{BOT_NAME}</span>
+                                                {msg.role === 'bot' ? (
+                                                    <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
+                                                ) : (
+                                                    <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
                                                 )}
                                                 <div
-                                                    className={`px-4 py-2 shadow-sm min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
-                                                        ? 'text-white rounded-2xl rounded-br-none'
-                                                        : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-bl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                    className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
+                                                        ? 'text-white rounded-2xl rounded-tr-none'
+                                                        : 'bg-slate-200 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                         }`}
                                                     style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                                 >
@@ -732,11 +847,11 @@ const ChatWidget = ({ apiKey }) => {
                                                     ) : (
                                                         <div className="min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
                                                             <TypewriterContent
-                                                                key={`${idx}-${msg.content.length}`} // Unique key to force reset on content change
                                                                 content={msg.content}
                                                                 isStreaming={msg.isStreaming}
                                                                 isTyped={msg.isTyped}
                                                                 onComplete={() => handleTypingComplete(idx)}
+                                                                themeColor={THEME_COLOR}
                                                             />
                                                         </div>
                                                     )}
@@ -744,18 +859,6 @@ const ChatWidget = ({ apiKey }) => {
                                             </div>
                                         </motion.div>
                                     ))}
-
-                                    {isLoading && (
-                                        <motion.div
-                                            variants={messageVariants}
-                                            initial="hidden"
-                                            animate="visible"
-                                            layout="position"
-                                            className="flex flex-col items-start gap-1"
-                                        >
-                                            <ThinkingLogo size={45} className="origin-left" themeColor={THEME_COLOR} />
-                                        </motion.div>
-                                    )}
                                 </AnimatePresence>
                                 <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
                             </div>
@@ -1005,15 +1108,59 @@ const ChatWidget = ({ apiKey }) => {
     );
 };
 
-// ── TYPEWRITER COMPONENT: Handles silky smooth transitions for chat text ──
-const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
-    const [segments, setSegments] = useState([]);
-    const [isTyping, setIsTyping] = useState(!isStreaming && !isTyped);
-    const lastContent = useRef('');
+// ── Stream-Safe Markdown Sanitizer ────────────────────────────────────────────
+// Auto-closes incomplete markdown tags during streaming to prevent layout thrash
+function sanitizeStreamMarkdown(text) {
+    if (!text) return '';
 
-    // Effect for artificial typewriter with "Premium Jitter"
+    let result = text;
+
+    // Count unclosed code fences (```)
+    const fenceMatches = result.match(/```/g);
+    if (fenceMatches && fenceMatches.length % 2 !== 0) {
+        result += '\n```';
+    }
+
+    // Count unclosed bold (**) — only outside code fences
+    const withoutFences = result.replace(/```[\s\S]*?```/g, '');
+    const boldMatches = withoutFences.match(/\*\*/g);
+    if (boldMatches && boldMatches.length % 2 !== 0) {
+        result += '**';
+    }
+
+    // Count unclosed italic (*) — careful not to match ** pairs
+    const withoutBold = withoutFences.replace(/\*\*/g, '');
+    const italicMatches = withoutBold.match(/\*/g);
+    if (italicMatches && italicMatches.length % 2 !== 0) {
+        result += '*';
+    }
+
+    // Count unclosed inline code (`)
+    const inlineCodeMatches = withoutFences.match(/(?<!`)`(?!`)/g);
+    if (inlineCodeMatches && inlineCodeMatches.length % 2 !== 0) {
+        result += '`';
+    }
+
+    return result;
+}
+
+// ── TYPEWRITER COMPONENT: Ultra-smooth streaming with cursor & crossfade ──────
+const TypewriterContent = ({ content, isStreaming, isTyped, onComplete, themeColor = '#5730F5' }) => {
+    const [segments, setSegments] = useState([]);
+    const [isTyping, setIsTyping] = useState(false);
+    const lastContent = useRef('');
+    const timerRef = useRef(null);
+
+    // Cleanup timers on unmount
     useEffect(() => {
-        if (!content || isTyped) {
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
+    }, []);
+
+    // Effect for artificial word-by-word typewriter (non-streaming messages only)
+    useEffect(() => {
+        if (isStreaming || isTyped || !content) {
             setIsTyping(false);
             return;
         }
@@ -1024,7 +1171,7 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
             setIsTyping(true);
 
             let currentIdx = 0;
-            const words = content.split(/(\s+)/); // Keep whitespace
+            const words = content.split(/(\s+)/);
 
             const typeNextWord = () => {
                 if (currentIdx < words.length) {
@@ -1032,10 +1179,8 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
                     setSegments(prev => [...prev, word]);
                     currentIdx++;
                     if (onComplete) onComplete();
-
-                    // Natural pacing: slightly faster for small words, slower for punctuation
                     const delay = word.length > 5 ? 25 : 15;
-                    setTimeout(typeNextWord, delay);
+                    timerRef.current = setTimeout(typeNextWord, delay);
                 } else {
                     setIsTyping(false);
                 }
@@ -1043,28 +1188,52 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
 
             typeNextWord();
         }
-    }, [content, isTyped, onComplete]);
+    }, [content, isTyped, isStreaming, onComplete]);
 
-    // If we are actively streaming from SSE, we still want to wrap tokens for smoothness
-    // However, the tokens come in directly from the parent state.
+    // ── Streaming: ThinkingLogo crossfade → sanitized markdown + cursor ────────
     if (isStreaming) {
+        const hasContent = content && content.length > 0;
+        const safeContent = hasContent ? sanitizeStreamMarkdown(content) : '';
+
         return (
-            <div className="relative overflow-hidden transition-all duration-300">
-                <ReactMarkdown
-                    rehypePlugins={[rehypeSanitize]}
-                    components={{
-                        p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2 transition-opacity duration-500 animate-in fade-in slide-in-from-bottom-1" />,
-                        li: ({ node, ...props }) => <li {...props} className="animate-in fade-in slide-in-from-left-1" />
-                    }}
-                >
-                    {content}
-                </ReactMarkdown>
+            <div className="relative">
+                <AnimatePresence mode="wait">
+                    {!hasContent ? (
+                        <motion.div
+                            key="thinking"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+                            className="overflow-hidden"
+                        >
+                            <ThinkingLogo size={45} className="origin-left" themeColor={themeColor} />
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="streaming"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                        >
+                            <ReactMarkdown
+                                rehypePlugins={[rehypeSanitize]}
+                                components={{
+                                    p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2" />,
+                                }}
+                            >
+                                {safeContent}
+                            </ReactMarkdown>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         );
     }
 
+    // ── Non-streaming: word-by-word typewriter with cursor ─────────────────────
     return (
-        <div className="relative transition-all duration-500">
+        <div className="relative">
             <ReactMarkdown
                 rehypePlugins={[rehypeSanitize]}
                 components={{
@@ -1073,14 +1242,6 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete }) => {
             >
                 {isTyping ? segments.join('') : content}
             </ReactMarkdown>
-            {isTyping && (
-                <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ duration: 0.8, repeat: Infinity }}
-                    className="inline-block w-1.5 h-4 ml-0.5 bg-slate-400 align-middle"
-                />
-            )}
         </div>
     );
 };
