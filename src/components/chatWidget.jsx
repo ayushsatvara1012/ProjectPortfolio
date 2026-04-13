@@ -811,7 +811,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <div
                                                     className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
                                                         ? 'text-white rounded-2xl rounded-tr-none'
-                                                        : 'bg-slate-200 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
                                                         }`}
                                                     style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
                                                 >
@@ -1282,7 +1282,7 @@ const TypewriterContent = ({
         const streamWords = hasContent ? displayedText.split(/(\s+)/) : [];
 
         return (
-            <div className="relative min-h-[45px]">
+            <div className="relative min-h-[28px]">
                 {/* ThinkingLogo Crossfade */}
                 <div
                     style={{
@@ -1292,7 +1292,7 @@ const TypewriterContent = ({
                         pointerEvents: hasContent ? 'none' : 'auto',
                     }}
                 >
-                    <ThinkingLogo size={45} className="origin-left" themeColor={themeColor} />
+                    <ThinkingLogo size={40} className="origin-left" themeColor={themeColor} />
                 </div>
 
                 {hasContent && (
