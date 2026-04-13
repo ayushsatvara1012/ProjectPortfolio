@@ -13,6 +13,7 @@ export default {
       fontFamily: {
         sans: ['"Darker Grotesque"', 'sans-serif'], // Sets Darker Grotesque as the default body font
         display: ['"Bricolage Grotesque"', 'sans-serif'], // Creates a custom font-display class for headers
+        google: ['"Google Sans"', 'sans-serif'], // New Google Sans class
       },
     },
   },
