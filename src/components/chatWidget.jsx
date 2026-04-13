@@ -382,12 +382,17 @@ const ChatWidget = ({ apiKey }) => {
         scrollToBottom(true);
     }, [scrollToBottom]);
 
-    // Only auto-scroll on new user messages or when not loading (non-stream events)
+    // Auto-scroll: force on new user messages, pre-seeded bot bubbles, and loading states
     useEffect(() => {
         const lastMsg = messages[messages.length - 1];
+        // Force scroll when user sends (last msg is user OR pre-seeded empty streaming bot)
         if (lastMsg && lastMsg.role === 'user') {
             forceScrollToBottom(true);
-        } else if (!isLoading) {
+        } else if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming && lastMsg.content === '') {
+            forceScrollToBottom(true);
+        } else if (isLoading) {
+            forceScrollToBottom(true);
+        } else {
             scrollToBottom(true);
         }
     }, [messages.length, isLoading, forceScrollToBottom, scrollToBottom]);
@@ -1178,11 +1183,15 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete, themeCol
                     const word = words[currentIdx];
                     setSegments(prev => [...prev, word]);
                     currentIdx++;
-                    if (onComplete) onComplete();
-                    const delay = word.length > 5 ? 25 : 15;
-                    timerRef.current = setTimeout(typeNextWord, delay);
+                    // Natural pacing: longer words get slightly more time,
+                    // punctuation gets a micro-pause, plus random jitter
+                    const isPunctuation = /[.!?,;:]$/.test(word);
+                    const baseDelay = isPunctuation ? 90 : (word.length > 6 ? 65 : 45);
+                    const jitter = Math.random() * 20 - 10; // ±10ms natural variation
+                    timerRef.current = setTimeout(typeNextWord, baseDelay + jitter);
                 } else {
                     setIsTyping(false);
+                    if (onComplete) onComplete();
                 }
             };
 
