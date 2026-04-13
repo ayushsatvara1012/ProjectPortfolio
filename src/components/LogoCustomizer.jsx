@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AVATAR_GRADIENTS } from './chatWidget';
+import { FabWidgetPreview } from './chatWidget';
 
 // ── Shape catalogue ────────────────────────────────────────────────────────────
 // Each entry defines the Tailwind class applied to the avatar container,
@@ -198,20 +199,19 @@ export default function LogoCustomizer({
     };
 
     const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
-    const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors";
+    const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
 
     return (
         <div className="space-y-6">
             {/* ── Live Shape Preview (Moved to top) ── */}
             <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800">
-                <BotAvatar
+                <FabWidgetPreview
                     shapeId={logoShape}
                     logoUrl={(!urlError && urlInput) ? urlInput : customLogoUrl}
                     botName={botName}
                     themeColor={primaryColor}
-                    size="lg"
-                    isCustom={!!customLogoUrl}
                     bgStyle={avatarBgStyle}
+                    isCustomUrl={!!customLogoUrl}
                 />
                 <div className="flex flex-1 items-center gap-4 ml-2">
                     <input

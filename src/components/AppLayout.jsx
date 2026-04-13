@@ -183,7 +183,7 @@ const TopNav = ({ user, onMenuClick }) => {
     return (
         <header className="fixed top-0 left-0 right-0 h-12 bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 flex items-center px-4 gap-2 z-40 transition-colors duration-500">
             {/* Left section: Hamburger (mobile) + Brand (all) */}
-            <div className="flex items-center gap-2 lg:w-[calc(208px-1rem)]">
+            <div className="flex items-center gap-2 lg:w-[calc(256px-1rem)]">
                 <button
                     onClick={onMenuClick}
                     className="lg:hidden p-2 hover:bg-gray-50 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
@@ -250,7 +250,7 @@ const AppLayout = () => {
                                 animate={{ x: 0 }}
                                 exit={{ x: '-100%' }}
                                 transition={{ type: 'spring', damping: 28, stiffness: 280, mass: 0.8 }}
-                                className="absolute top-0 left-0 bottom-0 w-52 border-r border-gray-100 dark:border-slate-800 shadow-none transition-colors"
+                                className="absolute top-0 left-0 bottom-0 w-64 border-r border-gray-100 dark:border-slate-800 shadow-none transition-colors"
                             >
                                 <SidebarContent user={user} onClose={() => setSidebarOpen(false)} />
                             </motion.aside>
@@ -259,12 +259,12 @@ const AppLayout = () => {
                 </AnimatePresence>
 
                 {/* ── Desktop sidebar ──────────────────────────────── */}
-                <aside className="hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 w-52 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500">
+                <aside className="hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 w-64 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500">
                     <SidebarContent user={user} onClose={null} />
                 </aside>
 
                 {/* ── Main Content (Flush Architectural Area) ─────────── */}
-                <main className="flex-1 mt-12 lg:ml-52 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 overflow-hidden flex flex-col transition-colors duration-500">
+                <main className="flex-1 mt-12 lg:ml-64 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 overflow-hidden flex flex-col transition-colors duration-500">
                     <div className="flex-1 flex flex-col pt-0">
                         <Suspense fallback={null}>
                             <Outlet />

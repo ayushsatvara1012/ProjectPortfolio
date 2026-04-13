@@ -77,6 +77,143 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
     );
 }
 
+// ── v13: Dynamic FAB shapes — each logo_shape gets a unique outline ──────
+export const FAB_SHAPES = {
+    // 1. Organic round speech bubble with elegant tail (bottom-left)
+    circle: {
+        path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
+        logoSize: 'w-full h-full',
+        x: 0, y: 0,
+    },
+    // 2. Squarish chat bubble with rounded corners + tail (the classic)
+    squircle: {
+        path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
+        logoSize: 'w-full h-full',
+        x: 0, y: -8, // Body Y range (4 to 80), Center Y = 42. SVG center is 50. Output: -8
+    },
+    // 3. Clean circle — no tail, modern and minimal
+    bento: {
+        path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z',
+        logoSize: 'w-full h-full',
+        x: 0, y: -10.5, // Body Y range (0 to 79), Center Y = 39.5. SVG center is 50. Output: -10.5
+    },
+    // 4. Sharp rectangle with slight rounding — no tail, clean edge
+    sharp: {
+        path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z',
+        logoSize: 'w-full h-full',
+        x: 0, y: 0, // Body is a perfect circle centered at (50, 50). Output: 0
+    },
+};
+
+export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyle, isCustomUrl = false }) => {
+    const fabShape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
+    const FAB_PATH = fabShape.path;
+    const AVATAR_BG_STYLE = bgStyle || 'none';
+    const LOGO_URL = logoUrl;
+    const THEME_COLOR = themeColor || '#5730F5';
+    const BOT_NAME = botName || 'S';
+    const idPrefix = "preview";
+
+    return (
+        <svg
+            viewBox="0 0 100 100"
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-14 h-14 shrink-0 drop-shadow-sm"
+            overflow="visible"
+        >
+            <defs>
+                <clipPath id={`${idPrefix}-fab-clip`}>
+                    <path d={FAB_PATH} />
+                </clipPath>
+
+                <filter id={`${idPrefix}-neumorphic-3d-inset`} x="-20%" y="-20%" width="140%" height="140%">
+                    <feComponentTransfer in="SourceAlpha">
+                        <feFuncA type="table" tableValues="1 0" />
+                    </feComponentTransfer>
+                    <feGaussianBlur stdDeviation="3" />
+                    <feOffset dx="4" dy="4" result="offsetBlurDark" />
+                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowDark" />
+                    <feFlood floodColor="rgba(0,0,0,0.14)" />
+                    <feComposite operator="in" in2="innerShadowDark" result="finalDark" />
+
+                    <feComponentTransfer in="SourceAlpha">
+                        <feFuncA type="table" tableValues="1 0" />
+                    </feComponentTransfer>
+                    <feGaussianBlur stdDeviation="3" />
+                    <feOffset dx="-3" dy="-3" result="offsetBlurLight" />
+                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowLight" />
+                    <feFlood floodColor="rgba(255,255,255,0.8)" />
+                    <feComposite operator="in" in2="innerShadowLight" result="finalLight" />
+
+                    <feMerge>
+                        <feMergeNode in="SourceGraphic" />
+                        <feMergeNode in="finalDark" />
+                        <feMergeNode in="finalLight" />
+                    </feMerge>
+                </filter>
+
+                <linearGradient id={`${idPrefix}-fab-gradient`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFFFFF" />
+                    <stop offset="100%" stopColor="#E2E8F0" />
+                </linearGradient>
+
+                <linearGradient id={`${idPrefix}-fab-gradient-dark`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#1E293B" /> 
+                    <stop offset="100%" stopColor="#0F172A" /> 
+                </linearGradient>
+
+                {AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE] && (
+                    <linearGradient id={`${idPrefix}-sapybase-avatar-grad`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor={AVATAR_GRADIENTS[AVATAR_BG_STYLE][0]} />
+                        <stop offset="100%" stopColor={AVATAR_GRADIENTS[AVATAR_BG_STYLE][1]} />
+                    </linearGradient>
+                )}
+            </defs>
+
+            <path
+                d={FAB_PATH}
+                fill={(AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? `url(#${idPrefix}-sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`}
+                className={!(AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : "transition-all duration-500"}
+            />
+
+            {LOGO_URL && (
+                <g clipPath={`url(#${idPrefix}-fab-clip)`}>
+                    <image
+                        href={LOGO_URL}
+                        x={isCustomUrl ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
+                        y={isCustomUrl ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
+                        width={isCustomUrl ? 100 : 70}
+                        height={isCustomUrl ? 100 : 70}
+                        preserveAspectRatio="xMidYMid meet"
+                        className="z-10"
+                    />
+                </g>
+            )}
+
+            {!LOGO_URL && (
+                <text
+                    x={50 + (fabShape.x || 0)}
+                    y={52 + (fabShape.y || 0)}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill={(AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE]) ? "#ffffff" : THEME_COLOR}
+                    className="font-bold select-none pointer-events-none"
+                    style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}
+                >
+                    {(BOT_NAME || 'S').charAt(0).toUpperCase()}
+                </text>
+            )}
+
+            <path
+                d={FAB_PATH}
+                fill="transparent"
+                filter={`url(#${idPrefix}-neumorphic-3d-inset)`}
+                className="pointer-events-none"
+            />
+        </svg>
+    );
+};
+
 
 const ChatWidget = ({ apiKey }) => {
     // 1. Resolve API Key & Base URL
@@ -435,33 +572,7 @@ const ChatWidget = ({ apiKey }) => {
         return null;
     }
 
-    // ── v13: Dynamic FAB shapes — each logo_shape gets a unique outline ──────
-    const FAB_SHAPES = {
-        // 1. Organic round speech bubble with elegant tail (bottom-left)
-        circle: {
-            path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
-            logoSize: 'w-full h-full',
-            x: 0, y: 0,
-        },
-        // 2. Squarish chat bubble with rounded corners + tail (the classic)
-        squircle: {
-            path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
-            logoSize: 'w-full h-full',
-            x: 0, y: -8, // Body Y range (4 to 80), Center Y = 42. SVG center is 50. Output: -8
-        },
-        // 3. Clean circle — no tail, modern and minimal
-        bento: {
-            path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z',
-            logoSize: 'w-full h-full',
-            x: 0, y: -10.5, // Body Y range (0 to 79), Center Y = 39.5. SVG center is 50. Output: -10.5
-        },
-        // 4. Sharp rectangle with slight rounding — no tail, clean edge
-        sharp: {
-            path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z',
-            logoSize: 'w-full h-full',
-            x: 0, y: 0, // Body is a perfect circle centered at (50, 50). Output: 0
-        },
-    };
+
     const fabShape = FAB_SHAPES[LOGO_SHAPE] || FAB_SHAPES.circle;
     const FAB_PATH = fabShape.path;
 

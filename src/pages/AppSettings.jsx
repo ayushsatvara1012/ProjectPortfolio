@@ -13,8 +13,8 @@ import { useAuthenticatedFetch } from '../hooks/useApiCall';
 import LogoCustomizer from '../components/LogoCustomizer';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors";
-const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
+const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-500 mb-1.5 transition-colors";
 const headingCls = "text-2xl font-medium text-slate-700 dark:text-slate-300 mb-4 transition-colors";
 const sectionGap = 'space-y-px';
 
@@ -26,21 +26,21 @@ export const AccountSection = () => {
         <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
             <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
                 <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Account</h2>
-                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Manage your profile and access.</p>
+                <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Manage your profile and access.</p>
             </div>
             <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">person</span>Profile</p>
+                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">person</span>Profile</p>
                 <div className="flex items-center gap-4 p-4 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors">
                     <UserButton appearance={{ elements: { avatarBox: 'w-12 h-12' } }} />
                     <div>
                         <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">{user?.fullName || 'Developer'}</p>
-                        <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">{user?.primaryEmailAddress?.emailAddress}</p>
-                        <span className="inline-flex mt-1 px-2 py-0.5 border border-gray-200 dark:border-slate-700 bg-[#FAFAFA] dark:bg-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans transition-colors">
+                        <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">{user?.primaryEmailAddress?.emailAddress}</p>
+                        <span className="inline-flex mt-1 px-2 py-0.5 border border-gray-200 dark:border-slate-700 bg-[#FAFAFA] dark:bg-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-500 font-sans transition-colors">
                             {userRole === 'SUPER_ADMIN' ? 'Platform Owner' : userRole === 'ADMIN' ? 'Admin' : 'Member'}
                         </span>
                     </div>
                 </div>
-                <p className="text-lg font-sans text-slate-400 dark:text-slate-500 font-medium mt-3 transition-colors">Click your avatar to manage name, password, and connected accounts.</p>
+                <p className="text-lg font-sans text-slate-500 dark:text-slate-500 font-medium mt-3 transition-colors">Click your avatar to manage name, password, and connected accounts.</p>
             </div>
         </div>
     );
@@ -51,7 +51,7 @@ export const BillingSection = () => (
     <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
         <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
             <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Billing</h2>
-            <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Manage your subscription and invoices.</p>
+            <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Manage your subscription and invoices.</p>
         </div>
         <div className={cellCls + ' border border-gray-100 dark:border-slate-800 transition-colors'}><ManageSubscriptions /></div>
     </div>
@@ -111,7 +111,7 @@ export const CustomizeSection = () => {
                 {/* Header */}
                 <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
                     <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Customize</h2>
-                    <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
+                    <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
                 </div>
 
                 {/* Scrollable form */}
@@ -120,9 +120,9 @@ export const CustomizeSection = () => {
                     {/* Full lock overlay (FREE / no tier) */}
                     {showFullOverlay && (
                         <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors cursor-help">
-                            <span className="material-symbols-outlined text-[32px] text-slate-400 dark:text-slate-500 mb-4 transition-colors">lock</span>
+                            <span className="material-symbols-outlined text-[32px] text-slate-500 dark:text-slate-500 mb-4 transition-colors">lock</span>
                             <h3 className="text-md font-display uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">Upgrade Required</h3>
-                            <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[260px] mb-6 transition-colors">Customizing your bot's visual identity requires an active subscription.</p>
+                            <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed max-w-[260px] mb-6 transition-colors">Customizing your bot's visual identity requires an active subscription.</p>
                             <Link to="/app/pricing" className="px-6 py-3 bg-linear-to-r from-blue-600 to-green-600 text-white text-md font-display uppercase tracking-widest font-bold hover:opacity-90 transition-all shadow-sm">
                                 View Plans
                             </Link>
@@ -157,14 +157,14 @@ export const CustomizeSection = () => {
                     {bots.length > 1 && (
                         <div className="mb-8 p-6 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors shadow-sm">
                             <div className="flex items-center justify-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500">smart_toy</span>
-                                <p className={headingCls + ' mb-0'}>Customization Target</p>
+                                <span className="material-symbols-outlined text-[14px] text-slate-500 dark:text-slate-500">smart_toy</span>
+                                <p className={headingCls + ' mb-0'}>Select your Bot</p>
                             </div>
                             <div className="relative">
                                 <select
                                     value={selectedBotId}
                                     onChange={e => setSelectedBotId(e.target.value)}
-                                    className={inputCls + " appearance-none pr-10 font-sans font-medium text-sm"}
+                                    className={inputCls + " appearance-none pr-10"}
                                 >
                                     {bots.map(b => (
                                         <option key={b.id} value={b.id}>
@@ -172,7 +172,7 @@ export const CustomizeSection = () => {
                                         </option>
                                     ))}
                                 </select>
-                                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
+                                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-500 pointer-events-none">expand_more</span>
                             </div>
                         </div>
                     )}
@@ -216,7 +216,7 @@ export const CustomizeSection = () => {
                         {/* ── Section: Logo & Shape (v13) ── */}
                         <div className="space-y-4">
                             <p className={headingCls + ' flex items-center'}>
-                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">image</span>
+                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">image</span>
                                 Logo & Avatar Shape
                             </p>
                             <LogoCustomizer
@@ -288,7 +288,7 @@ export const CustomizeSection = () => {
                                         <label className={labelCls + ' mb-0'}>Quick Questions</label>
                                         <button
                                             onClick={() => updateSetting('quickQuestions', [...botSettings.quickQuestions, { label: '', prompt: '' }])}
-                                            className="p-1 px-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors flex items-center gap-1.5"
+                                            className="p-1 px-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-500 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors flex items-center gap-1.5"
                                         >
                                             <span className="material-symbols-outlined text-[12px]">add</span> Add Question
                                         </button>
@@ -302,12 +302,12 @@ export const CustomizeSection = () => {
                                                         newQs.splice(idx, 1);
                                                         updateSetting('quickQuestions', newQs);
                                                     }}
-                                                    className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="absolute top-2 right-2 p-1.5 text-slate-500 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                                                 >
                                                     <span className="material-symbols-outlined text-[14px]">delete</span>
                                                 </button>
                                                 <div>
-                                                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 transition-colors">Label (Button Text)</p>
+                                                    <p className="text-lg uppercase tracking-widest font-bold text-slate-500 font-sans mb-1.5 transition-colors">Label (Button Text)</p>
                                                     <input
                                                         type="text"
                                                         value={q.label}
@@ -316,12 +316,12 @@ export const CustomizeSection = () => {
                                                             newQs[idx].label = e.target.value;
                                                             updateSetting('quickQuestions', newQs);
                                                         }}
-                                                        className={inputCls + ' text-sm py-2'}
+                                                        className={inputCls + ' text-md font-semibold py-2'}
                                                         placeholder="e.g. Pricing"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 transition-colors">Prompt (Hidden Message)</p>
+                                                    <p className="text-lg uppercase tracking-widest font-bold text-slate-500 font-sans mb-1.5 transition-colors">Prompt (Hidden Message)</p>
                                                     <input
                                                         type="text"
                                                         value={q.prompt}
@@ -330,7 +330,7 @@ export const CustomizeSection = () => {
                                                             newQs[idx].prompt = e.target.value;
                                                             updateSetting('quickQuestions', newQs);
                                                         }}
-                                                        className={inputCls + ' text-sm py-2'}
+                                                        className={inputCls + ' text-md font-semibold py-2'}
                                                         placeholder="e.g. Tell me about your pricing plans"
                                                     />
                                                 </div>
@@ -382,7 +382,7 @@ export const CustomizeSection = () => {
 
                 {/* Theme toggle */}
                 <div className="absolute bottom-8 lg:top-2 lg:bottom-auto left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full px-4 text-center">
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-500 font-sans">
                         Check contrast in both modes
                     </p>
                     <button
@@ -444,16 +444,16 @@ export const ApiKeysSection = () => {
         <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
             <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
                 <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">API Keys</h2>
-                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Rotate your secret API key. The old key is immediately invalidated.</p>
+                <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Rotate your secret API key. The old key is immediately invalidated.</p>
             </div>
             <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">vpn_key</span>API Key Management</p>
+                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">vpn_key</span>API Key Management</p>
                 {newKey && (
                     <div className="mb-5 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 transition-colors">
                         <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans mb-2 transition-colors">New Key — Copy Now</p>
                         <div className="flex items-center gap-2 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/50 p-3 transition-colors">
                             <span className="flex-1 truncate">{showKey ? newKey : newKey.slice(0, 8) + '••••••••••••••••'}</span>
-                            <button onClick={() => setShowKey(p => !p)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                            <button onClick={() => setShowKey(p => !p)} className="text-slate-500 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                                 {showKey ? <span className="material-symbols-outlined text-[16px]">visibility_off</span> : <span className="material-symbols-outlined text-[16px]">visibility</span>}
                             </button>
                             <button
