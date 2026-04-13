@@ -61,7 +61,7 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
                 <img
                     src={logoUrl}
                     alt={`${botName} logo`}
-                    className="w-[75%]! h-[75%]! object-contain! m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none!"
+                    className={`m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none! ${isCustom ? 'w-full! h-full! object-contain!' : 'w-[75%]! h-[75%]! object-contain!'}`}
                     onError={() => setImgFailed(true)}
                     style={{ display: 'block', boxSizing: 'border-box' }}
                 />
@@ -831,10 +831,10 @@ const ChatWidget = ({ apiKey }) => {
                                 <g clipPath="url(#fab-clip)">
                                     <image
                                         href={LOGO_URL}
-                                        x={15 + (fabShape.x || 0)}
-                                        y={15 + (fabShape.y || 0)}
-                                        width={70}
-                                        height={70}
+                                        x={configData.custom_logo_url ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
+                                        y={configData.custom_logo_url ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
+                                        width={configData.custom_logo_url ? 100 : 70}
+                                        height={configData.custom_logo_url ? 100 : 70}
                                         preserveAspectRatio="xMidYMid meet"
                                         className="z-10"
                                     />

@@ -13,9 +13,9 @@ import { useAuthenticatedFetch } from '../hooks/useApiCall';
 import LogoCustomizer from '../components/LogoCustomizer';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full text-md font-mono px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors";
-const labelCls = "block text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5 transition-colors";
-const headingCls = "text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4 transition-colors";
+const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors";
+const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+const headingCls = "text-2xl font-medium text-slate-700 dark:text-slate-300 mb-4 transition-colors";
 const sectionGap = 'space-y-px';
 
 // ── Account ────────────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ export const CustomizeSection = () => {
                     {/* Bot Selector (multi-bot) */}
                     {bots.length > 1 && (
                         <div className="mb-8 p-6 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors shadow-sm">
-                            <div className="flex items-center gap-2 mb-4">
+                            <div className="flex items-center justify-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500">smart_toy</span>
                                 <p className={headingCls + ' mb-0'}>Customization Target</p>
                             </div>
@@ -181,8 +181,8 @@ export const CustomizeSection = () => {
 
                         {/* ── Section: Bot Appearance ── */}
                         <div className="space-y-6">
-                            <p className={headingCls}>
-                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">palette</span>
+                            <p className={headingCls + ' flex items-center'}>
+                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">palette</span>
                                 Bot Appearance
                             </p>
 
@@ -208,29 +208,6 @@ export const CustomizeSection = () => {
                                 />
                             </div>
 
-                            <div>
-                                <label className={labelCls}>Primary Color</label>
-                                <div className="flex items-center gap-4">
-                                    <div
-                                        className="w-12 h-12 border border-gray-200 dark:border-slate-700 overflow-hidden cursor-pointer shrink-0 rounded-none bg-slate-100 dark:bg-slate-900 transition-colors"
-                                        style={{ background: botSettings.primaryColor }}
-                                    >
-                                        <input
-                                            type="color"
-                                            value={botSettings.primaryColor}
-                                            onChange={e => updateSetting('primaryColor', e.target.value)}
-                                            className="opacity-0 w-full h-full cursor-pointer"
-                                        />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        value={botSettings.primaryColor}
-                                        onChange={e => updateSetting('primaryColor', e.target.value)}
-                                        className={inputCls + ' uppercase text-md font-display leading-relaxed'}
-                                        placeholder="#5730F5"
-                                    />
-                                </div>
-                            </div>
                         </div>
 
                         {/* ── Divider ── */}
@@ -238,7 +215,7 @@ export const CustomizeSection = () => {
 
                         {/* ── Section: Logo & Shape (v13) ── */}
                         <div className="space-y-4">
-                            <p className={headingCls}>
+                            <p className={headingCls + ' flex items-center'}>
                                 <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-400 dark:text-slate-500 transition-colors">image</span>
                                 Logo & Avatar Shape
                             </p>
@@ -252,6 +229,7 @@ export const CustomizeSection = () => {
                                 onShapeChange={(shapeId) => updateSetting('logoShape', shapeId)}
                                 onUrlChange={(url) => updateSetting('customLogoUrl', url)}
                                 onBgStyleChange={(styleId) => updateSetting('avatarBgStyle', styleId)}
+                                onPrimaryColorChange={(val) => updateSetting('primaryColor', val)}
                             />
                         </div>
 

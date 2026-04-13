@@ -166,6 +166,7 @@ export default function LogoCustomizer({
     onUrlChange,
     avatarBgStyle,
     onBgStyleChange,
+    onPrimaryColorChange,
 }) {
     const [urlInput, setUrlInput] = useState(customLogoUrl || '');
     const [urlError, setUrlError] = useState(null);
@@ -196,8 +197,8 @@ export default function LogoCustomizer({
         }
     };
 
-    const labelCls = "block text-[10px] font-sans uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1.5 transition-colors";
-    const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 font-mono transition-colors";
+    const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+    const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors";
 
     return (
         <div className="space-y-6">
@@ -212,21 +213,31 @@ export default function LogoCustomizer({
                     isCustom={!!customLogoUrl}
                     bgStyle={avatarBgStyle}
                 />
-                <div>
-                    <p className="text-xs font-sans font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0.5">
-                        Live Shape Preview
-                    </p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
-                        {customLogoUrl && !urlError
-                            ? 'Showing your custom logo'
-                            : 'Showing initials fallback — add a logo URL below'}
-                    </p>
+                <div className="flex flex-1 items-center gap-4 ml-2">
+                    <input
+                        type="text"
+                        value={primaryColor}
+                        onChange={e => onPrimaryColorChange?.(e.target.value)}
+                        className={`${inputCls} flex-1 uppercase`}
+                        placeholder="#5730F5"
+                    />
+                    <div
+                        className="w-12 h-12 border border-gray-200 dark:border-slate-700 overflow-hidden cursor-pointer shrink-0 rounded-none bg-slate-100 dark:bg-slate-900 transition-colors"
+                        style={{ background: primaryColor }}
+                    >
+                        <input
+                            type="color"
+                            value={primaryColor}
+                            onChange={e => onPrimaryColorChange?.(e.target.value)}
+                            className="opacity-0 w-full h-full cursor-pointer"
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* ── Shape Picker ── */}
             <div>
-                <label className={labelCls}>
+                <label className={labelCls + ' flex items-center'}>
                     Bot Avatar Shape
                     {!isProUser && (
                         <span className="ml-2 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] rounded-full border border-amber-200 dark:border-amber-800">
@@ -267,7 +278,7 @@ export default function LogoCustomizer({
                                         </div>
                                     )}
                                 </div>
-                                <span className={`text-[9px] uppercase tracking-widest font-bold font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                <span className={`text-md font-medium font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
                                     {shape.label}
                                 </span>
                             </button>
@@ -286,7 +297,7 @@ export default function LogoCustomizer({
                         </span>
                     )}
                 </label>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed mb-3">
+                <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed mb-3">
                     Premium gradients for transparent logo URLs.
                 </p>
 
@@ -319,7 +330,7 @@ export default function LogoCustomizer({
                                         <span className="material-symbols-outlined text-[18px] text-white drop-shadow-sm font-bold">check</span>
                                     )}
                                 </div>
-                                <span className={`text-[9px] uppercase tracking-widest font-bold font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                <span className={`text-xs font-normal font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
                                     {baseId}
                                 </span>
                             </button>
@@ -348,7 +359,7 @@ export default function LogoCustomizer({
                         <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-slate-950/60 backdrop-blur-[1px]">
                             <Link
                                 to="/app/pricing"
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-sm"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-sm font-medium font-sans hover:opacity-90 transition-all shadow-sm"
                             >
                                 <span className="material-symbols-outlined text-[12px]">lock</span>
                                 Upgrade to Pro
@@ -393,13 +404,13 @@ export default function LogoCustomizer({
 
                         {/* Guidance notes */}
                         <div className="space-y-1.5 px-1">
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                            <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
                                 <span className="font-bold">Requirements:</span> Must be a public HTTPS URL serving an image (PNG, JPG, SVG, or WebP) under 2 MB. Your server must allow public access.
                             </p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                            <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
                                 <span className="font-bold text-amber-600 dark:text-amber-400">⚠ Avoid:</span> Discord, Slack, or Giphy links — they expire or require authentication. Use <span className="font-medium">Cloudinary, Imgur, or your own domain</span>.
                             </p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                            <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
                                 <span className="font-bold">Your responsibility:</span> Store the image in your own codebase or CDN. SaPyBase does not host or proxy images.
                             </p>
                         </div>
@@ -413,7 +424,7 @@ export default function LogoCustomizer({
                                     setUrlError(null);
                                     onUrlChange('');
                                 }}
-                                className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 transition-colors font-sans font-bold uppercase tracking-widest"
+                                className="flex items-center gap-1 text-md font-medium text-red-500 hover:text-red-700 transition-colors font-sans"
                             >
                                 <span className="material-symbols-outlined text-[12px]">close</span>
                                 Clear logo URL
