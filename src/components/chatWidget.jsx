@@ -329,8 +329,7 @@ const ChatWidget = ({ apiKey }) => {
     const abortControllerRef = useRef(null);
     const scrollContainerRef = useRef(null);
     const userHasScrolledUpRef = useRef(false);
-    const tokenBufferRef = useRef([]);
-    const rafIdRef = useRef(null);
+    const streamingCallbackRef = useRef(null);
 
     useEffect(() => {
 
@@ -355,12 +354,23 @@ const ChatWidget = ({ apiKey }) => {
 
     const scrollToBottom = useCallback((smooth = true) => {
         if (userHasScrolledUpRef.current) return;
-        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+        const el = scrollContainerRef.current;
+        if (el && !smooth) {
+            // Instant: direct scrollTop (no competing animations)
+            el.scrollTop = el.scrollHeight;
+        } else {
+            messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+        }
     }, []);
 
     const forceScrollToBottom = useCallback((smooth = true) => {
         userHasScrolledUpRef.current = false;
-        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+        const el = scrollContainerRef.current;
+        if (el && !smooth) {
+            el.scrollTop = el.scrollHeight;
+        } else {
+            messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+        }
     }, []);
 
     const handleScrollContainer = useCallback(() => {
@@ -406,46 +416,8 @@ const ChatWidget = ({ apiKey }) => {
         }
     }, [isOpen, forceScrollToBottom]);
 
-    // ── Zone 2: rAF Token Drain Loop ─────────────────────────────────────────
-    const drainTokenBuffer = useCallback(() => {
-        if (tokenBufferRef.current.length === 0) {
-            rafIdRef.current = null;
-            return;
-        }
-        const chunk = tokenBufferRef.current.join('');
-        tokenBufferRef.current = [];
-
-        setMessages(prev => {
-            const updated = [...prev];
-            const lastMsg = updated[updated.length - 1];
-            if (lastMsg && lastMsg.role === 'bot' && lastMsg.isStreaming) {
-                updated[updated.length - 1] = {
-                    ...lastMsg,
-                    content: lastMsg.content + chunk,
-                };
-            }
-            return updated;
-        });
-
-        scrollToBottom(true);
-        rafIdRef.current = requestAnimationFrame(drainTokenBuffer);
-    }, [scrollToBottom]);
-
-    const startDrainLoop = useCallback(() => {
-        if (rafIdRef.current === null) {
-            rafIdRef.current = requestAnimationFrame(drainTokenBuffer);
-        }
-    }, [drainTokenBuffer]);
-
-    // Cleanup rAF on unmount
-    useEffect(() => {
-        return () => {
-            if (rafIdRef.current) {
-                cancelAnimationFrame(rafIdRef.current);
-                rafIdRef.current = null;
-            }
-        };
-    }, []);
+    // Zone 2 removed — token buffering moved inside TypewriterContent (jitter buffer architecture)
+    // Parent state is never updated during streaming; only TypewriterContent's local state changes.
 
     const handleSend = async (e) => {
         if (e) e.preventDefault();
@@ -554,45 +526,24 @@ const ChatWidget = ({ apiKey }) => {
                 },
 
                 // ── STREAMING TOKEN HANDLER (Zone 2: rAF-buffered) ────────────
+                // ── JITTER BUFFER: tokens go directly to TypewriterContent ───
                 onmessage(msg) {
-                    // Sentinel: backend signals end-of-stream
                     if (msg.data === '[DONE]') {
-                        // Drain any remaining tokens in buffer
-                        if (tokenBufferRef.current.length > 0) {
-                            const remaining = tokenBufferRef.current.join('');
-                            tokenBufferRef.current = [];
-                            setMessages(prev => {
-                                const updated = [...prev];
-                                const lastMsg = updated[updated.length - 1];
-                                if (lastMsg && lastMsg.role === 'bot') {
-                                    updated[updated.length - 1] = {
-                                        ...lastMsg,
-                                        content: lastMsg.content + remaining,
-                                        isStreaming: false,
-                                        isTyped: true,
-                                    };
-                                }
-                                return updated;
-                            });
-                        } else {
-                            setMessages(prev => {
-                                const updated = [...prev];
-                                const lastMsg = updated[updated.length - 1];
-                                if (lastMsg && lastMsg.role === 'bot') {
-                                    updated[updated.length - 1] = {
-                                        ...lastMsg,
-                                        isStreaming: false,
-                                        isTyped: true,
-                                    };
-                                }
-                                return updated;
-                            });
-                        }
-                        // Cancel the drain loop
-                        if (rafIdRef.current) {
-                            cancelAnimationFrame(rafIdRef.current);
-                            rafIdRef.current = null;
-                        }
+                        // Flush remaining tokens & get full content from child
+                        const fullContent = streamingCallbackRef.current?.flush?.() || '';
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            const lastMsg = updated[updated.length - 1];
+                            if (lastMsg && lastMsg.role === 'bot') {
+                                updated[updated.length - 1] = {
+                                    ...lastMsg,
+                                    content: fullContent,
+                                    isStreaming: false,
+                                    isTyped: true,
+                                };
+                            }
+                            return updated;
+                        });
                         setIsLoading(false);
                         forceScrollToBottom(true);
                         return;
@@ -608,15 +559,14 @@ const ChatWidget = ({ apiKey }) => {
 
                     if (!chunk) return;
 
-                    // Fade out the loading aura on first real token
                     if (!firstChunkReceived) {
                         firstChunkReceived = true;
                         setIsLoading(false);
                     }
 
-                    // Push token into buffer and start the drain loop
-                    tokenBufferRef.current.push(chunk);
-                    startDrainLoop();
+                    // Push token directly to TypewriterContent's internal queue
+                    // NO parent state update — only TypewriterContent re-renders
+                    streamingCallbackRef.current?.push?.(chunk);
                 },
 
                 // ── ERROR HANDLER (Infinite Retry Prevention) ────────────────
@@ -679,6 +629,17 @@ const ChatWidget = ({ apiKey }) => {
         }
     };
 
+    /* 
+    @keyframes wordFadeIn {
+      from { opacity: 0; transform: translateX(-5px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .sapy-word-fade {
+      display: inline-block;
+      animation: wordFadeIn 0.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    }
+    */
+
     // Animation variants
     const windowVariants = {
         hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: "bottom right" },
@@ -700,6 +661,8 @@ const ChatWidget = ({ apiKey }) => {
         hidden: { opacity: 0, y: 10, scale: 0.95 },
         visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 25 } }
     };
+    // Track which message indices have already animated in (so re-renders don't re-trigger)
+    const animatedMsgIndices = useRef(new Set());
 
     // Completely disable rendering if no API key is found (works in both dev and production IIFE)
     if (!activeApiKey) {
@@ -822,18 +785,23 @@ const ChatWidget = ({ apiKey }) => {
                             <div
                                 ref={scrollContainerRef}
                                 onScroll={handleScrollContainer}
-                                className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative scroll-smooth custom-scrollbar"
+                                className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar"
                             >
-                                <AnimatePresence initial={false}>
-                                    {messages.map((msg, idx) => (
-                                        <motion.div
-                                            key={idx}
-                                            variants={messageVariants}
-                                            initial="hidden"
-                                            animate="visible"
-                                            layout="position"
-                                            className={`flex min-w-0 max-w-[96%] sm:max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
-                                        >
+                                <div className="flex flex-col gap-5">
+                                    <AnimatePresence initial={false}>
+                                        {messages.map((msg, idx) => {
+                                            // One-time CSS pop-in: only new messages animate
+                                            const isNew = !animatedMsgIndices.current.has(idx);
+                                            if (isNew) animatedMsgIndices.current.add(idx);
+                                            return (
+                                                <motion.div
+                                                    key={idx}
+                                                    layout={msg.isStreaming ? false : "position"}
+                                                    initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                                    className={`flex min-w-0 max-w-[96%] sm:max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
+                                                >
                                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                 {msg.role === 'bot' ? (
                                                     <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
@@ -857,14 +825,18 @@ const ChatWidget = ({ apiKey }) => {
                                                                 isTyped={msg.isTyped}
                                                                 onComplete={() => handleTypingComplete(idx)}
                                                                 themeColor={THEME_COLOR}
+                                                                streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined}
+                                                                onStreamTick={() => scrollToBottom(false)}
                                                             />
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </AnimatePresence>
+                                </div>
                                 <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
                             </div>
                         </div>
@@ -1149,21 +1121,127 @@ function sanitizeStreamMarkdown(text) {
     return result;
 }
 
-// ── TYPEWRITER COMPONENT: Ultra-smooth streaming with cursor & crossfade ──────
-const TypewriterContent = ({ content, isStreaming, isTyped, onComplete, themeColor = '#5730F5' }) => {
+// ── TYPEWRITER COMPONENT: Client-Side Jitter Buffer (Chatbase Architecture) ───
+// Streaming: SSE tokens are caught in an invisible buffer ref. A constant-cadence
+// setInterval (16ms) pulls characters out one-by-one at a perfectly steady rate,
+// completely masking network latency jitter. Only this component re-renders.
+// No framer-motion on the streaming text path — pure CSS transitions only.
+// Non-streaming: Word-by-word typewriter with stable-keyed spans for fade-in.
+
+// ── TYPEWRITER COMPONENT: High-Rate Jitter Buffer (Option A) ─────────────────
+// Streaming: SSE tokens are caught in an invisible buffer ref. A time-based
+// requestAnimationFrame (rAF) loop pulls characters out at a steady rate (~65 chars/sec),
+// scaling natively to high-refresh displays (90Hz, 120Hz, etc.).
+// Lite Path: During active streaming, text is rendered as a simple map of spans
+// for maximum performance. Swaps to full ReactMarkdown only on [DONE].
+
+const TypewriterContent = ({
+    content,
+    isStreaming,
+    isTyped,
+    onComplete,
+    themeColor = '#5730F5',
+    streamCallbackRef,
+    onStreamTick,
+}) => {
+    // ── Shared state ──────────────────────────────────────────────────────────
     const [segments, setSegments] = useState([]);
     const [isTyping, setIsTyping] = useState(false);
     const lastContent = useRef('');
-    const timerRef = useRef(null);
+    const typewriterTimerRef = useRef(null);
 
-    // Cleanup timers on unmount
+    // ── Jitter buffer state (streaming only) ──────────────────────────────────
+    const [displayedText, setDisplayedText] = useState('');
+    const bufferRef = useRef('');             // invisible bucket: ALL received chars
+    const displayIdxRef = useRef(0);          // how many chars are currently shown
+    const rafRef = useRef(null);              // high-rate loop
+    const lastTickRef = useRef(0);            // for time-based cadence
+    const onStreamTickRef = useRef(onStreamTick);
+
+    useEffect(() => {
+        onStreamTickRef.current = onStreamTick;
+    }, [onStreamTick]);
+
+    // ── Register jitter buffer callbacks on the parent ref ────────────────────
+    useEffect(() => {
+        if (isStreaming && streamCallbackRef) {
+            const drain = (timestamp) => {
+                if (!lastTickRef.current) lastTickRef.current = timestamp;
+                const delta = timestamp - lastTickRef.current;
+
+                // Targeting ~65 chars/sec constant typing speed
+                // Every ~15.4ms we want to show a character
+                if (delta >= 15.4) {
+                    lastTickRef.current = timestamp;
+
+                    const buffer = bufferRef.current;
+                    const idx = displayIdxRef.current;
+
+                    if (idx < buffer.length) {
+                        // Dynamic speed scaling (rAF version)
+                        const ahead = buffer.length - idx;
+                        let charsToAdd;
+                        if (ahead > 150) charsToAdd = 10;
+                        else if (ahead > 50) charsToAdd = 3;
+                        else if (ahead > 20) charsToAdd = 2;
+                        else charsToAdd = 1;
+
+                        const newIdx = Math.min(idx + charsToAdd, buffer.length);
+                        displayIdxRef.current = newIdx;
+                        setDisplayedText(buffer.slice(0, newIdx));
+                        onStreamTickRef.current?.();
+                    }
+                }
+                rafRef.current = requestAnimationFrame(drain);
+            };
+
+            streamCallbackRef.current = {
+                push: (token) => {
+                    bufferRef.current += token;
+                    if (!rafRef.current) {
+                        lastTickRef.current = 0;
+                        rafRef.current = requestAnimationFrame(drain);
+                    }
+                },
+                flush: () => {
+                    const full = bufferRef.current;
+                    if (rafRef.current) {
+                        cancelAnimationFrame(rafRef.current);
+                        rafRef.current = null;
+                    }
+                    displayIdxRef.current = full.length;
+                    setDisplayedText(full);
+                    return full;
+                },
+                getContent: () => bufferRef.current,
+            };
+
+            return () => {
+                if (streamCallbackRef) streamCallbackRef.current = null;
+                if (rafRef.current) {
+                    cancelAnimationFrame(rafRef.current);
+                    rafRef.current = null;
+                }
+            };
+        }
+    }, [isStreaming, streamCallbackRef]);
+
+    useEffect(() => {
+        if (isStreaming) {
+            setDisplayedText('');
+            bufferRef.current = '';
+            displayIdxRef.current = 0;
+        }
+    }, [isStreaming]);
+
     useEffect(() => {
         return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
+            if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current);
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
         };
     }, []);
 
-    // Effect for artificial word-by-word typewriter (non-streaming messages only)
+    // ── Non-streaming typewriter (fallback) ───────────────────────────────────
     useEffect(() => {
         if (isStreaming || isTyped || !content) {
             setIsTyping(false);
@@ -1183,73 +1261,76 @@ const TypewriterContent = ({ content, isStreaming, isTyped, onComplete, themeCol
                     const word = words[currentIdx];
                     setSegments(prev => [...prev, word]);
                     currentIdx++;
-                    // Natural pacing: longer words get slightly more time,
-                    // punctuation gets a micro-pause, plus random jitter
-                    const isPunctuation = /[.!?,;:]$/.test(word);
-                    const baseDelay = isPunctuation ? 90 : (word.length > 6 ? 65 : 45);
-                    const jitter = Math.random() * 20 - 10; // ±10ms natural variation
-                    timerRef.current = setTimeout(typeNextWord, baseDelay + jitter);
+                    const delay = /[.!?,;:]$/.test(word) ? 90 : 45;
+                    typewriterTimerRef.current = setTimeout(typeNextWord, delay + (Math.random() * 20 - 10));
                 } else {
                     setIsTyping(false);
                     if (onComplete) onComplete();
                 }
             };
-
             typeNextWord();
         }
     }, [content, isTyped, isStreaming, onComplete]);
 
-    // ── Streaming: ThinkingLogo crossfade → sanitized markdown + cursor ────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // RENDER: High-Performance View Logic
+    // ══════════════════════════════════════════════════════════════════════════
+    
+    // 1. ACTIVE STREAMING (Option A: Lite Render Spans)
     if (isStreaming) {
-        const hasContent = content && content.length > 0;
-        const safeContent = hasContent ? sanitizeStreamMarkdown(content) : '';
+        const hasContent = displayedText.length > 0;
+        const streamWords = hasContent ? displayedText.split(/(\s+)/) : [];
 
         return (
-            <div className="relative">
-                <AnimatePresence mode="wait">
-                    {!hasContent ? (
-                        <motion.div
-                            key="thinking"
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-                            className="overflow-hidden"
-                        >
-                            <ThinkingLogo size={45} className="origin-left" themeColor={themeColor} />
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="streaming"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.25, ease: 'easeOut' }}
-                        >
-                            <ReactMarkdown
-                                rehypePlugins={[rehypeSanitize]}
-                                components={{
-                                    p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2" />,
-                                }}
+            <div className="relative min-h-[45px]">
+                {/* ThinkingLogo Crossfade */}
+                <div
+                    style={{
+                        opacity: hasContent ? 0 : 1,
+                        position: hasContent ? 'absolute' : 'relative',
+                        transition: 'opacity 0.2s ease-out',
+                        pointerEvents: hasContent ? 'none' : 'auto',
+                    }}
+                >
+                    <ThinkingLogo size={45} className="origin-left" themeColor={themeColor} />
+                </div>
+
+                {hasContent && (
+                    <div className="sapy-stream-text-in leading-relaxed text-md">
+                        {/* Word spans: Infinite performance, no Markdown parsing overhead */}
+                        {streamWords.map((word, i) => (
+                            <span 
+                                key={i} 
+                                className="sapy-word-fade"
+                                style={{ display: 'inline-block', whiteSpace: 'pre-wrap' }}
                             >
-                                {safeContent}
-                            </ReactMarkdown>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                                {word}
+                            </span>
+                        ))}
+                        <span className="sapy-stream-cursor" style={{ backgroundColor: themeColor }} />
+                    </div>
+                )}
             </div>
         );
     }
 
-    // ── Non-streaming: word-by-word typewriter with cursor ─────────────────────
+    // 2. COMPLETED MESSAGE (Full Markdown Snap)
     return (
-        <div className="relative">
+        <div className="relative sapy-word-fade leading-relaxed text-md">
             <ReactMarkdown
                 rehypePlugins={[rehypeSanitize]}
                 components={{
-                    p: ({ node, ...props }) => <p {...props} className="first:mt-0 last:mb-0 mb-2" />,
+                    p: ({ node, children, ...props }) => (
+                        <p {...props} className="first:mt-0 last:mb-0 mb-2">{children}</p>
+                    ),
+                    pre: ({ node, children, ...props }) => (
+                        <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin">
+                            <pre {...props}>{children}</pre>
+                        </div>
+                    ),
                 }}
             >
-                {isTyping ? segments.join('') : content}
+                {content}
             </ReactMarkdown>
         </div>
     );

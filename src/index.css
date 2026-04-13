@@ -97,4 +97,77 @@
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-slate-800 hover:bg-slate-700;
   }
+
+  /* ── Chat Widget: GPU-composited word fade-in (typewriter only) ──── */
+  @keyframes wordFadeIn {
+    from {
+      opacity: 0;
+      filter: blur(4px);
+      transform: translateX(-4px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0px);
+      transform: translateX(0);
+    }
+  }
+
+  .sapy-word-fade {
+    display: inline;
+    opacity: 0;
+    animation: wordFadeIn 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    will-change: opacity, transform, filter;
+  }
+
+  /* ── Chat Widget: Streaming cursor animation ───────────────────────── */
+  @keyframes streamCursorPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  .sapy-stream-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    border-radius: 1px;
+    animation: streamCursorPulse 0.8s ease-in-out infinite;
+    will-change: opacity;
+  }
+
+  /* ── Chat Widget: Smooth bubble height transition ──────────────────── */
+  .sapy-bubble-smooth {
+    transition: height 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+                min-height 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    will-change: height;
+    overflow: hidden;
+  }
+
+  /* ── Chat Widget: New message pop-in (one-shot, GPU-composited) ──── */
+  @keyframes msgPopIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .sapy-msg-in {
+    animation: msgPopIn 0.28s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+    will-change: opacity, transform;
+  }
+
+  /* ── Chat Widget: Streaming text fade-in (simultaneous with ThinkingLogo fade-out) */
+  @keyframes streamTextIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .sapy-stream-text-in {
+    animation: streamTextIn 0.2s ease-out both;
+  }
 }
