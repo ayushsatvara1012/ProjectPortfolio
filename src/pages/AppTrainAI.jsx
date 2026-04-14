@@ -513,7 +513,7 @@ const AppTrainAI = () => {
                                     <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Total Usage</h4>
                                 </div>
                                 {(messageLimit ?? 0) >= 999999 && (
-                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
+                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
                                 )}
                             </div>
                             <div className="flex items-end gap-1 mb-3">
