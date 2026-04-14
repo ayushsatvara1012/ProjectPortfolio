@@ -455,7 +455,7 @@ const AppTrainAI = () => {
                     <>
                         {/* 1. Knowledge Chunks */}
                         <div className={`${cellCls} p-8 flex flex-col justify-center`}>
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center justify-between mb-4 flex-col">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
                                     <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Knowledge Chunks</h4>
