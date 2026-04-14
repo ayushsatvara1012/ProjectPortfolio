@@ -67,11 +67,11 @@ const AppBotManager = () => {
         </div>
 
         {plan && (
-          <div className="hidden sm:flex items-center gap-3">
-            <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-bold font-sans border rounded-none ${speedInfo.cls}`}>
+          <div className="hidden sm:flex items-center gap-3 ">
+            <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-bold font-google border rounded-none ${speedInfo.cls} dark:bg-slate-900 border dark:border-slate-800`}>
               {speedInfo.label} Speed
             </span>
-            <span className="text-md font-display text-slate-500 dark:text-slate-400">
+            <span className="text-md font-google text-slate-500 dark:text-slate-400">
               {plan.current_bots} / {plan.max_bots === 999 ? '∞' : plan.max_bots} bots
             </span>
           </div>
@@ -87,8 +87,8 @@ const AppBotManager = () => {
             { label: 'Knowledge Chunks', value: plan.chunk_limit >= 999999 ? 'Unlimited' : plan.chunk_limit.toLocaleString() },
           ].map((s, i) => (
             <div key={i} className="bg-white dark:bg-slate-950 px-6 py-4 transition-colors">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-0.5">{s.label}</p>
-              <p className="text-lg font-display font-bold text-slate-900 dark:text-slate-200">{s.value}</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-0.5">{s.label}</p>
+              <p className="text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
             </div>
           ))}
         </div>
@@ -118,8 +118,8 @@ const AppBotManager = () => {
                   <div className="p-5 flex flex-col flex-1 gap-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="text-md font-display font-bold text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mt-0.5">{bot.company_name}</p>
+                        <h3 className="text-md font-google font-bold text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
+                        <p className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mt-0.5">{bot.company_name}</p>
                       </div>
                       <div className="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800 flex items-center justify-center"
                         style={{ backgroundColor: bot.theme_color + '20' }}>
@@ -127,20 +127,20 @@ const AppBotManager = () => {
                       </div>
                     </div>
 
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans truncate">
-                      {bot.allowed_origin || 'No origin set'}
-                    </p>
+                    <a href={bot.allowed_origin} target="_blank" rel="noopener noreferrer" className="text-sm tracking-wide font-medium text-blue-600 dark:text-slate-500 font-google truncate flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px]">link</span> {bot.allowed_origin || 'No origin set'}
+                    </a>
 
                     {/* Usage bar */}
                     <div>
-                      <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1">
+                      <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-1">
                         <span>Usage</span>
                         <span>{bot.messages_used} / {plan?.message_limit >= 999999 ? '∞' : plan?.message_limit}</span>
                       </div>
                       {plan?.message_limit < 999999 && (
                         <div className="h-1 bg-slate-100 dark:bg-slate-800 w-full">
                           <div
-                            className="h-full bg-slate-900 dark:bg-indigo-500 transition-all"
+                            className="h-full bg-slate-900 dark:bg-blue-500 transition-all"
                             style={{ width: `${Math.min((bot.messages_used / (plan?.message_limit || 1)) * 100, 100)}%` }}
                           />
                         </div>
@@ -163,20 +163,20 @@ const AppBotManager = () => {
                     <div className="flex gap-2 mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
                       <button
                         onClick={() => navigate(`/app/train?bot=${bot.id}`)}
-                        className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans bg-slate-900 dark:bg-indigo-600 text-white hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors flex items-center justify-center gap-1"
+                        className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[12px]">psychology</span> Train
                       </button>
                       <button
-                        onClick={() => navigate(`/app/register?edit=${bot.id}`)}
-                        className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans border border-gray-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1"
+                        onClick={() => navigate(`/app/settings/customize?edit=${bot.id}`)}
+                        className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans border border-gray-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[12px]">settings</span> Settings
                       </button>
                       <button
                         onClick={() => handleDelete(bot.id, bot.bot_name)}
                         disabled={deletingId === bot.id || deleteMutation.isPending}
-                        className="p-2 border border-red-100 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
+                        className="flex items-center justify-center p-2 border border-red-100 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[14px]">delete</span>
                       </button>
@@ -191,17 +191,17 @@ const AppBotManager = () => {
               layout
               className={`border-2 border-dashed flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors ${
                 canAdd
-                  ? 'border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 cursor-pointer bg-white dark:bg-slate-950 group'
+                  ? 'border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer bg-white dark:bg-slate-950 group'
                   : 'border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 cursor-not-allowed'
               }`}
               onClick={() => canAdd && navigate('/app/register')}
             >
               {canAdd ? (
                 <>
-                  <div className="w-12 h-12 border border-gray-200 dark:border-slate-700 group-hover:border-indigo-300 dark:group-hover:border-indigo-600 flex items-center justify-center mb-3 transition-colors">
-                    <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">add</span>
+                  <div className="w-12 h-12 border border-gray-200 dark:border-slate-700 group-hover:border-blue-300 dark:group-hover:border-blue-600 flex items-center justify-center mb-3 transition-colors">
+                    <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">add</span>
                   </div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-center">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-center">
                     Add New Bot
                   </p>
                   {plan && (
@@ -219,7 +219,7 @@ const AppBotManager = () => {
                   <Link
                     to="/app/pricing"
                     onClick={e => e.stopPropagation()}
-                    className="mt-3 text-[10px] uppercase tracking-widest font-bold font-sans text-indigo-600 dark:text-indigo-400 hover:underline"
+                    className="mt-3 text-[10px] uppercase tracking-widest font-bold font-sans text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     Upgrade Plan →
                   </Link>
@@ -235,7 +235,7 @@ const AppBotManager = () => {
             <span className="material-symbols-outlined text-[48px] text-gray-200 dark:text-slate-700 mb-4">smart_toy</span>
             <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No bots yet</p>
             <p className="text-sm text-slate-400 dark:text-slate-600 font-display mb-6">Create your first AI assistant to get started.</p>
-            <Link to="/app/register" className="px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">
+            <Link to="/app/register" className="px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors">
               Create First Bot
             </Link>
           </div>

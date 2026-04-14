@@ -198,9 +198,9 @@ const TopNav = ({ user, onMenuClick }) => {
             </div>
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1.5 text-md text-slate-400 dark:text-slate-500 min-w-0 flex-1 transition-colors">
-                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors">chevron_right</span>
-                <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-medium hidden sm:block transition-colors">
+            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors">
+                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-400 dark:text-slate-600 transition-colors">chevron_right</span>
+                <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-google hidden sm:block transition-colors">
                     {user?.fullName || user?.firstName || 'My Workspace'}
                 </span>
                 {tierLabel && (
@@ -208,8 +208,8 @@ const TopNav = ({ user, onMenuClick }) => {
                         {tierLabel}
                     </span>
                 )}
-                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-300 dark:text-slate-600 transition-colors">chevron_right</span>
-                <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-md transition-colors">{pageLabel}</span>
+                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-400 dark:text-slate-600 transition-colors">chevron_right</span>
+                <span className="truncate text-slate-800 dark:text-slate-200 font-google text-md transition-colors">{pageLabel}</span>
             </div>
         </header>
     );
@@ -259,7 +259,7 @@ const AppLayout = () => {
                 </AnimatePresence>
 
                 {/* ── Desktop sidebar ──────────────────────────────── */}
-                <aside className="hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 w-64 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500">
+                <aside className="hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 w-64 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#fafafa] dark:bg-slate-900 transition-colors duration-500">
                     <SidebarContent user={user} onClose={null} />
                 </aside>
 

@@ -135,7 +135,7 @@ const AppRegistration = () => {
     const frontendUrl = window.location.origin;
     const backendUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || window.location.origin;
 
-    const inputCls = "w-full pl-10 pr-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500/50 dark:focus:ring-blue-500/50 focus:border-blue-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 transition-colors";
+    const inputCls = "w-full pl-10 pr-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500/50 dark:focus:ring-blue-500/50 focus:border-blue-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 transition-colors rounded-sm dark:focus:bg-slate-900";
     const cardCls = "bg-white dark:bg-slate-950 p-6 transition-colors duration-500";
     const cellCls = "bg-white dark:bg-slate-950 transition-colors duration-500";
     const GRID_BG = { background: '#E8EBF0' };
@@ -147,9 +147,9 @@ const AppRegistration = () => {
             <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 <div className="flex items-center gap-2 mb-1">
                     <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">smart_toy</span>
-                    <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Bot Identity</h1>
+                    <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Create Your Bot</h1>
                 </div>
-                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Configure your tenant and get your API integration credentials.</p>
+                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Configure your bot and get your API integration credentials.</p>
             </div>
 
             <SignedOut>
@@ -170,22 +170,18 @@ const AppRegistration = () => {
                         >
 
                             <div className={`lg:col-span-5 ${cellCls} p-10 overflow-y-auto custom-scrollbar`}>
-                                <div className="inline-flex items-center gap-2 px-2 py-1 border border-slate-100 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans mb-6 transition-colors">
-                                    <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
-                                    Account provisioned
-                                </div>
                                 <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 mb-4 transition-colors">
                                     Identity &{' '}
                                     <span className="bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Deployment</span>
                                 </h2>
-                                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">Provision your tenant, get your API key, and start chatting.</p>
+                                <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">Provision your bot, get your API key, and start chatting.</p>
                                 <div className="space-y-4">
                                     {[
-                                        { icon: 'bolt', text: 'Instant Provisioning', sub: 'Active immediately' },
+                                        { icon: 'bolt', text: 'Instant Creation', sub: 'Active immediately' },
                                         { icon: 'verified_user', text: 'Enterprise Security', sub: 'Domain-locked access' },
                                         { icon: 'code', text: 'Easy Integration', sub: 'Zero-config snippet' },
                                     ].map((f, i) => (
-                                        <div key={i} className="flex text-md font-display items-center gap-4 p-4 border border-gray-100 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 group hover:border-slate-300 dark:hover:border-slate-600 transition-all">
+                                        <div key={i} className="flex text-md font-google items-center gap-4 p-4 border border-gray-100 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 group hover:border-slate-300 dark:hover:border-slate-600 transition-all">
                                             <div className="w-10 h-10 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                                                 <span className="material-symbols-outlined text-[16px] text-slate-900 dark:text-slate-200 transition-colors">{f.icon}</span>
                                             </div>
@@ -213,8 +209,8 @@ const AppRegistration = () => {
                                 )}
 
                                 <div className={isLocked ? 'opacity-30 pointer-events-none' : ''}>
-                                    <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-1 transition-colors">Tenant Config</h3>
-                                    <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">Fill in details to generate your unique credentials.</p>
+                                    <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-1 transition-colors">AI ChatBot Config</h3>
+                                    <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">Fill in details to generate your unique credentials.</p>
 
                                     <form onSubmit={handleSubmit} className="space-y-5">
                                         {[
@@ -226,7 +222,7 @@ const AppRegistration = () => {
                                                 <div className="relative">
                                                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-600 dark:text-slate-500 transition-colors">{f.icon}</span>
                                                     <input type={f.type} name={f.name} required value={formData[f.name]}
-                                                        onChange={handleChange} className={inputCls + ' text-sm font-mono'} placeholder={f.placeholder} />
+                                                        onChange={handleChange} className={inputCls + ' text-sm font-google tracking-wide'} placeholder={f.placeholder} />
                                                 </div>
                                             </div>
                                         ))}
@@ -263,8 +259,8 @@ const AppRegistration = () => {
                                         <button type="submit" disabled={isLoading}
                                             className="w-full flex items-center justify-center gap-2 py-3 min-h-[44px] bg-linear-to-r from-blue-600 to-green-600 text-white text-md uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all active:scale-[0.99] disabled:opacity-50">
                                             {isLoading
-                                                ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Provisioning...</>
-                                                : <>Create Tenant <span className="material-symbols-outlined text-[16px]">arrow_forward</span></>
+                                                ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Provisioning...</>
+                                                : <>Create <span className="material-symbols-outlined text-[16px]">arrow_forward</span></>
                                             }
                                         </button>
                                     </form>

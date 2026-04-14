@@ -95,7 +95,7 @@ const AppPricing = () => {
             description: 'Essential AI for small projects.',
             features: [
                 '1 AI Bot',
-                '500 messages / month',
+                '500 msg / month',
                 '100 knowledge chunks',
                 'Standard response speed',
                 'SaPyBase branding',
@@ -110,7 +110,7 @@ const AppPricing = () => {
             description: 'Up to 2 bots for growing businesses.',
             features: [
                 '2 AI Bots',
-                '2,000 messages / bot / month',
+                '2,000 msg / bot / month',
                 '500 knowledge chunks per bot',
                 'Priority response speed',
                 'Custom branding & colors',
@@ -125,7 +125,7 @@ const AppPricing = () => {
             description: 'Up to 5 bots for scaling operations.',
             features: [
                 '5 AI Bots',
-                '5,000 messages / month',
+                '5,000 msg / month',
                 '2,000 knowledge chunks per bot',
                 'Dedicated response speed',
                 'Full white-label',
@@ -176,7 +176,7 @@ const AppPricing = () => {
                     {/* Beta Notice */}
                     <div className="mt-4 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 flex items-center gap-3 w-fit">
                         <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[18px]">verified</span>
-                        <p className="text-xs font-sans font-bold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
+                        <p className="text-xs font-google font-bold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
                             Beta Phase: Basic plan is currently 100% free until the next version launch. 'EMAIL ME FOR STARTER PLAN PROMO CODE 100% FREE'.
                         </p>
                     </div>
@@ -249,7 +249,7 @@ const AppPricing = () => {
                                 {plan.id === 'BASIC' ? 'No Credit Card Required' : 'Local taxes handled at checkout'}
                             </span>
                         </div>
-                        <p className="text-lg font-sans text-slate-500 dark:text-slate-400 leading-relaxed mb-8 transition-colors">{plan.description}</p>
+                        <p className="text-sm font-google text-slate-500 dark:text-slate-300 leading-relaxed mb-8 transition-colors">{plan.description}</p>
 
                         <div className="space-y-4 flex-1 mb-8">
                             {plan.features.map((f, j) => (
@@ -269,7 +269,7 @@ const AppPricing = () => {
                                 } ${(isLoading && selectedTier === plan.id) || plan.id === userTier ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>
                             {plan.id === userTier ? 'ACTIVE_PLAN' : (
                                 isLoading && selectedTier === plan.id
-                                    ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin" /> PROVISIONING...</>
+                                    ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin rounded-full" /> PROVISIONING...</>
                                     : `ACTIVATE_${plan.name.toUpperCase()}`
                             )}
                         </button>

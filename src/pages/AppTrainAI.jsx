@@ -11,13 +11,13 @@ const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:
 const TABS = [
     { id: 'url', label: 'URL', icon: 'public' },
     { id: 'pdf', label: 'PDF Upload', icon: 'description' },
-    { id: 'text', label: 'Manual Text', icon: 'notes' },
+    { id: 'text', label: 'Text', icon: 'notes' },
 ];
 
 // Grid primitives
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 transition-colors";
-const labelCls = "block text-md font-display uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
+const labelCls = "block text-md font-google uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
 
 // ── Source Browser Sub-Component ──────────────────────────────────────────────
 const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refreshUser, isFree }) => {
@@ -180,7 +180,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                              <span className="material-symbols-outlined text-[18px] text-blue-500">
                                 {selectedSource.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf' : 'language'}
                             </span>
-                            <span className="text-xs font-bold font-sans uppercase tracking-widest text-slate-700 dark:text-slate-300 truncate flex-1">
+                            <span className="text-xs font-bold font-google uppercase tracking-widest text-slate-700 dark:text-slate-300 truncate flex-1">
                                 {selectedSource}
                             </span>
                         </div>
@@ -196,7 +196,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                                 </span>
                                 {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect All' : 'Select All'}
                             </button>
-                            <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500">
+                            <span className="text-[10px] font-google font-bold text-slate-400 dark:text-slate-500">
                                 {chunksLoading ? '...' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} segments`}
                             </span>
                         </div>
@@ -206,7 +206,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                     <div className="max-h-[240px] overflow-y-auto custom-scrollbar border border-gray-100 dark:border-slate-800 divide-y divide-gray-50 dark:divide-slate-800 transition-colors">
                         {chunksLoading ? (
                             <div className="p-6 text-center">
-                                <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 animate-spin mx-auto mb-2" />
+                                <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 animate-spin mx-auto mb-2 rounded-full" />
                                 <p className="text-lg font-semibold text-slate-400">Loading chunks...</p>
                             </div>
                         ) : chunks.length === 0 ? (
@@ -434,13 +434,6 @@ const AppTrainAI = () => {
     const periodEndStr = billingPeriodEnd
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 
-    const statCards = [
-        { label: 'Knowledge Chunks', value: chunkLimit >= 999999 ? `${chunksUsed}` : `${chunksUsed}/${chunkLimit}`, icon: 'database', unit: chunkLimit >= 999999 ? '∞' : 'chunks' },
-        { label: 'AI Memory', value: totalMessages ?? 0, icon: 'vital_signs', unit: 'msgs' },
-        { label: 'System Tier', value: userTier || '—', icon: 'bolt', unit: 'plan' },
-        { label: 'Quota Used', value: `${messagesUsed ?? 0}/${messageLimit ?? 200}`, icon: 'lock', unit: 'reqs' },
-    ];
-
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
             {/* ── Page Header ── */}
@@ -455,29 +448,103 @@ const AppTrainAI = () => {
             </div>
 
             {/* ── Stats Row (tic-tac-toe grid) ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
-                {ctxLoading
-                    ? Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-8`}><StatSkeleton /></div>)
-                    : statCards.map(({ label, value, icon, unit }) => (
-                        <div key={label} className={`${cellCls} p-8`}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">
-                                    {icon}
-                                </span>
-                                <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">{label}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+                {ctxLoading ? (
+                    Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-8`}><StatSkeleton /></div>)
+                ) : (
+                    <>
+                        {/* 1. Knowledge Chunks */}
+                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
+                                    <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Knowledge Chunks</h4>
+                                </div>
+                                {chunkLimit >= 999999 && (
+                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
+                                )}
                             </div>
-                            <p className="text-2xl md:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
-                                {value} <span className="text-sm font-mono text-slate-600 dark:text-slate-400 transition-colors">{unit}</span>
+                            <div className="flex items-end gap-1 mb-3">
+                                <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
+                                {chunkLimit < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>}
+                                <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
+                            </div>
+                            {chunkPct !== null && (
+                                <>
+                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
+                                        <motion.div initial={{ width: 0 }}
+                                            animate={{ width: `${chunkPct}%` }}
+                                            className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
+                                    </div>
+                                    <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
+                                        {Math.round(chunkPct)}% Storage Used
+                                    </p>
+                                </>
+                            )}
+                        </div>
+
+                        {/* 2. AI Memory */}
+                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">vital_signs</span>
+                                <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
+                            </div>
+                            <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
+                                {totalMessages ?? 0} <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">msgs</span>
                             </p>
                         </div>
-                    ))
-                }
+
+                        {/* 3. System Tier */}
+                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">bolt</span>
+                                <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">System Tier</p>
+                            </div>
+                            <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
+                                {userTier || '—'} <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">plan</span>
+                            </p>
+                        </div>
+
+                        {/* 4. Total Usage */}
+                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                           <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">database</span>
+                                    <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Total Usage</h4>
+                                </div>
+                                {(messageLimit ?? 0) >= 999999 && (
+                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
+                                )}
+                            </div>
+                            <div className="flex items-end gap-1 mb-3">
+                                <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{messagesUsed ?? 0}</span>
+                                {(messageLimit ?? 0) < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {messageLimit}</span>}
+                                <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
+                            </div>
+                            {(messageLimit ?? 0) < 999999 && (
+                                <>
+                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
+                                        <motion.div initial={{ width: 0 }}
+                                            animate={{ width: `${Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100)}%` }}
+                                            className={`h-full ${(messagesUsed / messageLimit) >= 1 ? 'bg-red-500' : (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
+                                    </div>
+                                    <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
+                                        <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% CAP</span>
+                                        <span className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[12px]">schedule</span> {periodEndStr}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* ── Main Grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 overflow-hidden transition-colors duration-500">
                 {/* Knowledge Sources */}
-                <div className={`lg:col-span-7 ${cellCls} p-8 relative overflow-y-auto custom-scrollbar`}>
+                <div className={`lg:col-span-12 ${cellCls} p-8 relative overflow-y-auto custom-scrollbar`}>
                     {isFree && (
                         <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center gap-5 p-10 transition-colors duration-500">
                             <div className="w-12 h-12 border-2 border-slate-900 dark:border-slate-700 flex items-center justify-center transition-colors">
@@ -503,7 +570,7 @@ const AppTrainAI = () => {
                     <div className="flex border border-gray-100 dark:border-slate-800 mb-5 overflow-x-auto transition-colors">
                         {TABS.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`flex items-center gap-1.5 flex-1 py-2.5 px-3 text-sm font-display uppercase tracking-widest font-bold transition-colors min-h-[40px] shrink-0 border-b-2 ${activeTab === t.id
+                                className={`flex items-center gap-1.5 flex-1 py-2.5 px-3 text-sm font-google uppercase tracking-widest font-bold transition-colors min-h-[40px] shrink-0 border-b-2 ${activeTab === t.id
                                         ? 'border-slate-900 dark:border-blue-500 text-slate-900 dark:text-slate-200 bg-[#FAFAFA] dark:bg-slate-900'
                                         : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
                                     }`}>
@@ -534,7 +601,7 @@ const AppTrainAI = () => {
                         {activeTab === 'url' && (
                             <div>
                                 <label className={labelCls}>Source URL</label>
-                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls + ' text-sm font-mono'} placeholder="https://docs.example.com" />
+                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls + ' text-sm font-google tracking-wide'} placeholder="https://docs.example.com" />
                             </div>
                         )}
                         {activeTab === 'pdf' && (
@@ -546,16 +613,16 @@ const AppTrainAI = () => {
                                         cloud_upload
                                     </span>
                                     <div className="text-center">
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-medium transition-colors">{file ? file.name : 'Drop PDF here'}</p>
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors">{file ? file.name : 'Drop PDF here'}</p>
                                         <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
-                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
+                                        <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
                                         onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
                                 </div>
                                 {file && (
                                     <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
+                                        className="mt-2 flex items-center gap-1 text-md font-google text-red-500 hover:text-red-700">
                                         <span className="material-symbols-outlined text-[16px]">close</span> Remove {file.name}
                                     </button>
                                 )}
@@ -565,7 +632,7 @@ const AppTrainAI = () => {
                             <div>
                                 <label className={labelCls}>Knowledge Text</label>
                                 <textarea value={trainingText} onChange={e => setTrainingText(e.target.value)}
-                                    rows={6} className={inputCls + ' resize-none'} placeholder="Paste your FAQs, services, or raw knowledge here..." />
+                                    rows={6} className={inputCls + ' resize-none font-google'} placeholder="Paste your FAQs, services, or raw knowledge here..." />
                             </div>
                         )}
                         {upgradeError && (
@@ -591,86 +658,13 @@ const AppTrainAI = () => {
                         </button>
                     </form>
                 </div>
-
-                {/* Right column — Usage Stats */}
-                <div className="lg:col-span-5 gap-px flex flex-col bg-[#E8EBF0] dark:bg-slate-800 overflow-y-auto custom-scrollbar transition-colors">
-                    {/* Usage */}
-                    <div className={`${cellCls} p-8 flex flex-col justify-center min-h-[240px]`}>
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">
-                                    database
-                                </span>
-                                <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">Total Usage</h4>
-                            </div>
-                            {(messageLimit ?? 0) >= 999999 && (
-                                <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
-                            )}
-                        </div>
-                        <div className="flex items-end gap-1 mb-4">
-                            <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{messagesUsed ?? 0}</span>
-                            {(messageLimit ?? 0) < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {messageLimit}</span>}
-                            <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
-                        </div>
-                        {(messageLimit ?? 0) < 999999 && (
-                            <>
-                                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
-                                    <motion.div initial={{ width: 0 }}
-                                        animate={{ width: `${Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100)}%` }}
-                                        className={`h-full ${(messagesUsed / messageLimit) >= 1 ? 'bg-red-500' : (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
-                                </div>
-                                <div className="flex justify-between text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
-                                    <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% Capacity</span>
-                                    <span className="flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[14px]">schedule</span> Resets {periodEndStr}
-                                    </span>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Chunk Stats (compact) */}
-                    <div className={`${cellCls} p-8 flex flex-col justify-center`}>
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
-                                <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">Knowledge Chunks</h4>
-                            </div>
-                            {chunkLimit >= 999999 && (
-                                <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
-                            )}
-                        </div>
-                        {selectedBot && (
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-3 transition-colors">
-                                Bot: {selectedBot.bot_name || 'Unnamed Bot'}
-                            </p>
-                        )}
-                        <div className="flex items-end gap-1 mb-3">
-                            <span className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
-                            {chunkLimit < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>}
-                            <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
-                        </div>
-                        {chunkPct !== null && (
-                            <>
-                                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
-                                    <motion.div initial={{ width: 0 }}
-                                        animate={{ width: `${chunkPct}%` }}
-                                        className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
-                                </div>
-                                <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
-                                    {Math.round(chunkPct)}% Storage Used
-                                </p>
-                            </>
-                        )}
-                    </div>
-                </div>
             </div>
 
             {/* ── Knowledge Management (Full-Width Below Grid) ── */}
             <div className={`${cellCls} p-8 flex-1 overflow-y-auto custom-scrollbar border-t border-gray-100 dark:border-slate-800`}>
                 <div className="flex items-center gap-2 mb-5">
                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">folder_open</span>
-                    <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Manage Knowledge</h2>
+                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 transition-colors">Manage Knowledge</h2>
                 </div>
 
                 <SourceBrowser
