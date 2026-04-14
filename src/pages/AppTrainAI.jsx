@@ -455,13 +455,13 @@ const AppTrainAI = () => {
                     <>
                         {/* 1. Knowledge Chunks */}
                         <div className={`${cellCls} p-8 flex flex-col justify-center`}>
-                            <div className="flex items-center justify-between mb-4 flex-col">
+                            <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
-                                    <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Knowledge Chunks</h4>
+                                    <h4 className="text-md uppercase font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Data Storage</h4>
                                 </div>
                                 {chunkLimit >= 999999 && (
-                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">Unlimited</span>
+                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
                                 )}
                             </div>
                             <div className="flex items-end gap-1 mb-3">
