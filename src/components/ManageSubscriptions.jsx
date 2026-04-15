@@ -121,10 +121,10 @@ const ManageSubscriptions = () => {
         }
     };
 
-    const btnBase = 'w-full py-3 rounded-none text-sm uppercase tracking-widest font-bold font-display transition-all flex items-center justify-center gap-2';
-    const btnPrimary = `${btnBase} bg-linear-to-r from-blue-600 to-green-600 text-white hover:opacity-90 active:scale-[0.99] shadow-sm`;
-    const btnSecondary = `${btnBase} border border-gray-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800`;
-    const btnDanger = `${btnBase} border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20`;
+    const btnBase = 'w-full py-3.5 md:py-4 px-6 rounded-none text-[10px] md:text-sm uppercase tracking-[0.15em] font-bold font-display transition-all flex items-center justify-center gap-2.5 active:scale-[0.98]';
+    const btnPrimary = `${btnBase} bg-linear-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-md`;
+    const btnSecondary = `${btnBase} border border-gray-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-950`;
+    const btnDanger = `${btnBase} border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 bg-white dark:bg-slate-950`;
 
     const isDisabled = (key) => processing !== null;
     const label = (key, text) => processing === key ? 'Processing...' : text;
@@ -181,29 +181,29 @@ const ManageSubscriptions = () => {
                     <div className="bg-white dark:bg-slate-950 p-8 transition-colors">
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col lg:flex-row gap-px lg:gap-4 bg-gray-100 lg:bg-transparent dark:bg-slate-800 lg:dark:bg-transparent border border-gray-100 lg:border-none dark:border-slate-800 mb-6 transition-colors">
+                        <div className="flex flex-col sm:flex-row flex-wrap gap-3 md:gap-4 mb-8 transition-all">
                             {tier === 'FREE' && (
                                 <>
-                                    <div className="flex-1 bg-white dark:bg-slate-950 lg:border lg:border-gray-100 lg:dark:border-slate-800 transition-colors"><button onClick={handleUpgrade('BASIC')} disabled={isDisabled('basic')} className={btnPrimary}>{label('basic', 'Upgrade to Basic — $5/mo')}</button></div>
-                                    <div className="flex-1 bg-white dark:bg-slate-950 lg:border lg:border-gray-100 lg:dark:border-slate-800 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Starter — $10/mo')}</button></div>
-                                    <div className="flex-1 bg-white dark:bg-slate-950 lg:border lg:border-gray-100 lg:dark:border-slate-800 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Pro — $20/mo')}</button></div>
+                                    <button onClick={handleUpgrade('BASIC')} disabled={isDisabled('basic')} className={`${btnPrimary} flex-1`}>{label('basic', 'Upgrade to Basic — $5/mo')}</button>
+                                    <button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={`${btnSecondary} flex-1`}>{label('starter', 'Upgrade to Starter — $10/mo')}</button>
+                                    <button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={`${btnSecondary} flex-1`}>{label('pro', 'Upgrade to Pro — $20/mo')}</button>
                                 </>
                             )}
                             {tier === 'BASIC' && (
                                 <>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={btnPrimary}><ExternalLink className="w-3.5 h-3.5" /> {label('portal', 'Manage Billing')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={btnSecondary}>{label('starter', 'Upgrade to Professional — $10/mo')}</button></div>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={btnSecondary}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button></div>
+                                    <button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={`${btnPrimary} flex-1`}><ExternalLink className="w-4 h-4" /> {label('portal', 'Manage Billing')}</button>
+                                    <button onClick={handleUpgrade('STARTER')} disabled={isDisabled('starter')} className={`${btnSecondary} flex-1`}>{label('starter', 'Upgrade to Professional — $10/mo')}</button>
+                                    <button onClick={handleUpgrade('PRO')} disabled={isDisabled('pro')} className={`${btnSecondary} flex-1`}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button>
                                     {subscriptionStatus !== 'CANCELED' && (
-                                        <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleCancel} disabled={isDisabled('cancel')} className={btnDanger}><AlertCircle className="w-3.5 h-3.5" /> {label('cancel', 'Cancel Subscription')}</button></div>
+                                        <button onClick={handleCancel} disabled={isDisabled('cancel')} className={`${btnDanger} flex-1`}><AlertCircle className="w-4 h-4" /> {label('cancel', 'Cancel Subscription')}</button>
                                     )}
                                 </>
                             )}
                             {(tier === 'STARTER' || tier === 'PRO') && (
                                 <>
-                                    <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={btnPrimary}><ExternalLink className="w-3.5 h-3.5" /> {label('portal', 'Manage Billing')}</button></div>
+                                    <button onClick={handleBillingPortal} disabled={isDisabled('portal')} className={`${btnPrimary} flex-1`}><ExternalLink className="w-4 h-4" /> {label('portal', 'Manage Billing')}</button>
                                     {subscriptionStatus !== 'CANCELED' && (
-                                        <div className="bg-white dark:bg-slate-950 transition-colors"><button onClick={handleCancel} disabled={isDisabled('cancel')} className={btnDanger}><AlertCircle className="w-3.5 h-3.5" /> {label('cancel', 'Cancel Subscription')}</button></div>
+                                        <button onClick={handleCancel} disabled={isDisabled('cancel')} className={`${btnDanger} flex-1`}><AlertCircle className="w-4 h-4" /> {label('cancel', 'Cancel Subscription')}</button>
                                     )}
                                 </>
                             )}

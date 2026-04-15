@@ -240,8 +240,8 @@ export const CustomizeSection = () => {
                         <div className="space-y-6 relative">
                             {isAdvancedLocked && (
                                 <div className="absolute -inset-4 z-40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help transition-all hover:backdrop-blur-sm">
-                                    <div className="px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[12px]">lock</span> Starter or Pro Required
+                                    <div className="px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-sm uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">lock</span> Starter or Pro Required
                                     </div>
                                     <Link to="/app/pricing" className="mt-2 text-md font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
                                 </div>
@@ -378,7 +378,16 @@ export const CustomizeSection = () => {
             </div>
 
             {/* ── RIGHT: Preview Column ── */}
-            <div className={`overflow-visible lg:overflow-hidden border-t lg:border-t-0 lg:border-l w-full h-auto lg:h-full relative transition-colors flex flex-col items-center justify-center custom-scrollbar p-0 lg:p-8 ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
+            <div className={`overflow-hidden border-t lg:border-t-0 lg:border-l w-full h-auto lg:h-[calc(100vh-3rem)] relative transition-colors flex flex-col items-center justify-center p-0 lg:p-8 ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
+                
+                {/* Responsive Background Layer */}
+                <div 
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-100 transition-opacity duration-700"
+                    style={{ backgroundImage: "url('/nature_1.webp')" }}
+                />
+
+                {/* Glassmorphism Overlay */}
+                <div className="absolute inset-0 bg-white/50 dark:bg-slate-950/60 backdrop-blur-[1px] pointer-events-none transition-colors duration-500" />
 
                 {/* Theme toggle */}
                 <div className="absolute bottom-8 lg:top-2 lg:bottom-auto left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full px-4 text-center">

@@ -12,6 +12,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     const { getToken, isLoaded: isAuthLoaded } = useAuth();
     const location = useLocation();
 
+    const [progress, setProgress] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [onboardingState, setOnboardingState] = useState({
         tier: null,
@@ -20,22 +21,37 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     });
 
     useEffect(() => {
-        const timer = setTimeout(() => setIsLoading(false), 8000); // safety timeout
+        const timer = setTimeout(() => setIsLoading(false), 15000); // safety timeout
         
         const checkOnboardingStatus = async () => {
-            if (!isUserLoaded || !isAuthLoaded || !isSignedIn) {
-                if (isUserLoaded && isAuthLoaded) setIsLoading(false);
+            // Milestone 1: Page & Environment Initialization
+            setProgress(10);
+
+            // Milestone 2: Identity (Clerk) Initialization
+            if (!isUserLoaded || !isAuthLoaded) {
+                // Wait slightly for Clerk to boot if it hasn't
+                return;
+            }
+            setProgress(35);
+
+            if (!isSignedIn) {
+                // If not signed in, we jump to 100% and redirect
+                setProgress(100);
+                setTimeout(() => setIsLoading(false), 300);
                 return;
             }
 
             const searchParams = new URLSearchParams(window.location.search);
             const justPaid = searchParams.get('payment') === 'success';
-            const maxAttempts = justPaid ? 8 : 1;
+            const maxAttempts = justPaid ? 10 : 1;
 
             try {
                 const baseUrl = import.meta.env.VITE_API_URL || '';
                 let meData = null;
                 let companyData = null;
+
+                // Milestone 3: Core User Data Retrieval
+                setProgress(55);
 
                 // Poll /api/me to handle race conditions with Polar webhooks
                 for (let i = 0; i < maxAttempts; i++) {
@@ -45,11 +61,13 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
                     });
                     meData = meRes.ok ? await meRes.json() : null;
                     
-                    if (meData?.tier) break; // tier is set, stop polling
-                    if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, 600));
+                    if (meData?.tier) break; 
+                    if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, 800));
                 }
 
-                // Final check for company details
+                setProgress(75);
+
+                // Milestone 4: Account/Details retrieval
                 const token = await getToken();
                 const companyRes = await fetch(`${baseUrl}/api/company/details`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -61,10 +79,37 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
                     role: meData?.role || 'USER',
                     hasCompany: companyData?.status === 'success'
                 });
+
+                // Milestone 5: Image & Asset Loading Verification
+                setProgress(90);
+                
+                // Wait for all current images in the DOM to load
+                const images = Array.from(document.images);
+                const imagePromises = images.map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve; // don't block on failed images
+                    });
+                });
+
+                // Also wait for window load if not already fired
+                const windowLoadPromise = document.readyState === 'complete' 
+                    ? Promise.resolve() 
+                    : new Promise(resolve => window.addEventListener('load', resolve, { once: true }));
+
+                await Promise.all([...imagePromises, windowLoadPromise]);
+
+                // Final Milestone: Success
+                setProgress(100);
             } catch (err) {
                 console.error("Onboarding check failed:", err);
+                setProgress(100);
             } finally {
-                setIsLoading(false);
+                // Buffer to allow the 100% animation to be seen
+                setTimeout(() => {
+                    setIsLoading(false);
+                }, 500);
                 clearTimeout(timer);
             }
         };
@@ -77,7 +122,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     if (!isUserLoaded || !isAuthLoaded || (isSignedIn && isLoading)) {
         return (
             <div className="min-h-screen bg-white dark:bg-slate-950 p-8 flex items-center justify-center transition-colors duration-500">
-                <AppPageSkeleton />
+                <AppPageSkeleton pct={progress} />
             </div>
         );
     }

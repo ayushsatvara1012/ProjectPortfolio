@@ -23,7 +23,7 @@ const BotPreview = ({ theme = 'light' }) => {
     const isDark = theme === 'dark';
 
     return (
-        <div className={`relative h-full lg:h-full w-full lg:w-full flex items-center justify-center p-2 lg:p-8 transition-all duration-300 ${isDark ? 'bg-slate-950' : 'bg-[#FAFAFA]'}`}>
+        <div className="relative h-full lg:h-full w-full lg:w-full flex items-center justify-center p-2 lg:p-8 transition-all duration-300 bg-transparent">
 
             {/* ── Main Chatbot Box ── */}
             <div className={`w-full max-w-[440px] h-[600px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
