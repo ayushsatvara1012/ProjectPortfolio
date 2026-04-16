@@ -72,7 +72,7 @@ const ActivityCalendar = ({ data }) => {
                     </div>
                 </div>
                 {/* Enforce 10 columns across all devices to minimize vertical height, allowing the inspector to sit directly below on mobile */}
-                <div className="grid grid-cols-7 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden">
+                <div className="grid grid-cols-7 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden p-2.5">
                     {calendarDates.map((dateStr, i) => {
                         const cellData = dataMap[dateStr];
                         const count = cellData?.total_questions || 0;

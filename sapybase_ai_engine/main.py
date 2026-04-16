@@ -1962,6 +1962,8 @@ async def run_training_job(
         chunks = all_chunks[:remaining]
         
         status["total"] = len(chunks)
+
+
         await set_job_status(job_id, status)
 
         BATCH_SIZE = 10
@@ -2110,6 +2112,25 @@ async def train_chatbot(
 
     if not docs:
         raise HTTPException(status_code=400, detail="No content extracted.")
+
+    # 2.5. QUOTA OVERFLOW CHECK: Estimate required chunks and block if too large
+    # This addresses the requirement to warn users and block massive uploads
+    # instead of just squeezing or truncating silently.
+    total_chars = sum(len(d.page_content) for d in docs)
+    # Naive estimation: 800 chars with 100 overlap = ~700 net chars per chunk
+    estimated_chunks = max(1, int(total_chars / 700))
+    remaining_quota = max(0, limit - current_count)
+
+    if estimated_chunks > remaining_quota:
+        raise HTTPException(status_code=402, detail={
+            "code": "CHUNK_QUOTA_OVERFLOW",
+            "message": "This file exceeds your remaining chunk quota. Please use smaller files or upgrade to get more storage.",
+            "current": current_count,
+            "limit": limit,
+            "tier": current_user["tier"],
+            "upgrade_url": "/app/pricing",
+        })
+
 
     # 3. Kick off background job — return immediately to prevent Render worker timeout
     job_id = str(uuid.uuid4())
