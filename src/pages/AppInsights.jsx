@@ -9,6 +9,73 @@ import { Link } from 'react-router-dom';
 // ── Style primitives matching AppTrainAI ────────────────────────────────────
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 
+const renderHeatmap = (data) => {
+    if (!data || data.length === 0) return (
+        <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No activity data for this period.</p>
+    );
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Pre-fill matrix 7 days x 24 hrs
+    const matrix = Array(7).fill(0).map(() => Array(24).fill(0));
+    let maxCount = 0;
+    data.forEach(d => {
+        const dayIdx = d.day - 1; // ISODOW 1-7 mapped to 0-6
+        const hour = d.hour;
+        if(dayIdx >= 0 && dayIdx < 7 && hour >= 0 && hour < 24) {
+             matrix[dayIdx][hour] = d.count;
+             if (d.count > maxCount) maxCount = d.count;
+        }
+    });
+
+    return (
+        <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
+            <div className="min-w-[600px] flex flex-col gap-1">
+                {/* Header (Hours) */}
+                <div className="flex text-[10px] font-mono text-slate-400 mb-1 ml-10">
+                    {[...Array(24)].map((_, h) => (
+                        <div key={h} className="flex-1 text-center opacity-70">
+                            {h % 4 === 0 ? `${h}h` : ''}
+                        </div>
+                    ))}
+                </div>
+                {/* Days */}
+                {days.map((day, dIdx) => (
+                    <div key={day} className="flex items-center gap-2">
+                        <div className="w-8 shrink-0 text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">
+                            {day}
+                        </div>
+                        <div className="flex flex-1 gap-px">
+                            {matrix[dIdx].map((val, hIdx) => {
+                                const opacity = maxCount > 0 ? (val / maxCount) : 0;
+                                return (
+                                    <div 
+                                        key={hIdx} 
+                                        className="h-6 flex-1 rounded-sm transition-all"
+                                        style={{ 
+                                            backgroundColor: val > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
+                                            border: val === 0 ? '1px solid rgba(148, 163, 184, 0.1)' : 'none'
+                                        }}
+                                        title={`${day} ${hIdx}:00 - ${val} msgs`}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end gap-2 items-center mt-3 text-[10px] uppercase font-google tracking-widest text-slate-500">
+                <span>Less</span>
+                <div className="flex gap-px">
+                    <div className="w-3 h-3 rounded-sm border border-slate-200 dark:border-slate-800"></div>
+                    <div className="w-3 h-3 rounded-sm bg-blue-500/30"></div>
+                    <div className="w-3 h-3 rounded-sm bg-blue-500/60"></div>
+                    <div className="w-3 h-3 rounded-sm bg-blue-500"></div>
+                </div>
+                <span>More</span>
+            </div>
+        </div>
+    );
+};
+
 const AppInsights = () => {
     const { userTier, isLoading: ctxLoading } = useUserRole();
     const authFetch = useAuthenticatedFetch();
@@ -79,15 +146,15 @@ const AppInsights = () => {
                         <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
                             insights
                         </span>
-                        <h1 className="text-xl md:text-2xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
+                        <h1 className="text-xl md:text-2xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
                             SaPyBase Insights
                         </h1>
                     </div>
-                    <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
+                    <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
                         AI-synthesized business intelligence from your chat logs. Reports refresh every 24 hours.
                     </p>
                     {lastGeneratedAt && (
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mt-1.5 transition-colors">
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mt-1.5 transition-colors">
                             Last generated: {lastGeneratedAt}
                         </p>
                     )}
@@ -178,31 +245,77 @@ const AppInsights = () => {
                     </div>
                 )}
 
-                {/* ── Success/Data State ── */}
                 {userTier === 'PRO' && reportData && !isGenerating && !error && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-visible transition-colors duration-500 flex-1">
-                        {/* Left Column: Top Trends */}
-                        <div className={`lg:col-span-7 ${cellCls} p-8`}>
-                            <div className="flex items-center gap-2 mb-6">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
-                                <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
-                                    Top Customer Trends
-                                </h2>
+                    <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1">
+                        
+                        {/* ── ROI Scorecards (Top Row) ── */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800">
+                            {/* Support Hours Saved */}
+                            <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span>
+                                    <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Support Hours Saved</h3>
+                                </div>
+                                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{Math.floor((Number((reportData?.roi_metrics?.support_savings || '$0').replace(/[^0-9.-]+/g,"")) || 0) / 25)}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
+                                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
                             </div>
-                            <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                                The most common subjects and questions your users are asking.
-                            </p>
-                            <div className="space-y-px bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-800">
-                                {reportData?.top_trends?.map((trend, idx) => (
-                                    <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                        <div className="w-8 h-8 shrink-0 bg-white dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
-                                            {String(idx + 1).padStart(2, '0')}
+
+                            {/* Estimated Savings */}
+                            <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span>
+                                    <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Estimated Savings</h3>
+                                </div>
+                                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.support_savings || '$0.00'}</span></div>
+                                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
+                            </div>
+
+                            {/* Leads Captured / Potential Revenue */}
+                            <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span>
+                                    <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Potential Revenue</h3>
+                                </div>
+                                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.potential_revenue || '$0.00'}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
+                                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
+                            </div>
+                        </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-visible transition-colors duration-500 flex-1">
+                        {/* Left Column: Top Trends & Temporal */}
+                        <div className={`lg:col-span-7 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500`}>
+                            <div className={`${cellCls} p-8 flex-1`}>
+                                <div className="flex items-center gap-2 mb-6">
+                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
+                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
+                                        Top Customer Trends
+                                    </h2>
+                                </div>
+                                <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                                    The most common subjects and questions your users are asking.
+                                </p>
+                                <div className="space-y-px bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-800">
+                                    {reportData?.top_trends?.map((trend, idx) => (
+                                        <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
+                                            <div className="w-8 h-8 shrink-0 bg-white dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
+                                                {String(idx + 1).padStart(2, '0')}
+                                            </div>
+                                            <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
+                                                {trend}
+                                            </p>
                                         </div>
-                                        <p className="text-sm font-display text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
-                                            {trend}
-                                        </p>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Peak Activity Heatmap */}
+                            <div className={`${cellCls} p-8 shrink-0`}>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
+                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
+                                </div>
+                                <div className="space-y-3">
+                                    {renderHeatmap(reportData?.peak_activity_heatmap)}
+                                </div>
                             </div>
                         </div>
 
@@ -211,34 +324,80 @@ const AppInsights = () => {
                             <div className={`${cellCls} p-8 flex-1`}>
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">warning</span>
-                                    <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
-                                        Knowledge Gaps
+                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
+                                        High Value Gaps
                                     </h2>
                                 </div>
-                                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
-                                    Questions your bot failed to answer. Train these topics.
+                                <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
+                                    Questions your bot failed to answer. Train these topics to secure leads.
                                 </p>
                                 <div className="space-y-3">
-                                    {reportData?.missing_knowledge?.map((gap, idx) => (
+                                    {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap, idx) => (
                                         <div key={idx} className="flex items-start gap-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-                                            <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_outline</span>
-                                            <p className="text-sm font-display text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
-                                            <Link to="/app/train" className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 transition-colors">Fix →</Link>
+                                            <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_center</span>
+                                            <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
+                                            <Link to={`/app/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
                                         </div>
-                                    ))}
+                                    )) : (
+                                        <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No critical knowledge gaps detected.</p>
+                                    )}
                                 </div>
                             </div>
                             <div className={`${cellCls} p-8 shrink-0`}>
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
-                                    <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Actionable Advice</h2>
+                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Actionable Advice</h2>
                                 </div>
-                                <p className="text-sm font-display text-slate-600 dark:text-slate-400 leading-relaxed">
+                                <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
                                     {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
                                 </p>
                             </div>
                         </div>
                     </div>
+
+                    {/* ── Recent Conversations Log ── */}
+                    <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
+                        <div className={`${cellCls} p-8 overflow-x-auto`}>
+                            <div className="flex items-center gap-2 mb-6">
+                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span>
+                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
+                            </div>
+                            <div className="min-w-[600px]">
+                                <div className="grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
+                                    <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
+                                    <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
+                                    <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
+                                </div>
+                                <div className="space-y-1">
+                                    {reportData?.recent_conversations?.map((log, idx) => (
+                                        <div key={idx} className="grid grid-cols-12 gap-4 py-3 px-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors rounded-sm items-center">
+                                            <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300 truncate">
+                                                {log.query}
+                                            </div>
+                                            <div className="col-span-2 flex justify-center">
+                                                {log.unanswered ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-900/50 px-2 py-0.5 rounded-sm">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[-1px]"></span> Unanswered
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-900/50 px-2 py-0.5 rounded-sm">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[-1px]"></span> Handled
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="col-span-2 text-[11px] font-mono text-slate-500 dark:text-slate-400 text-right">
+                                                {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
+                                        <div className="text-center py-6 text-sm italic font-google text-slate-400">No recent activity found.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 )}
 
                 {/* ── Error Banner ── */}

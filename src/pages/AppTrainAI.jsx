@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Alert from '../components/alert';
 import { useAuth } from '@clerk/clerk-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -274,6 +275,17 @@ const AppTrainAI = () => {
     const [trainingJobId, setTrainingJobId] = useState(null);
     const [trainingProgress, setTrainingProgress] = useState(null);
     const pollRef = useRef(null); // Store interval ref for deterministic cleanup
+    const location = useLocation();
+
+    // Deep Link Pre-fill
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const queryText = params.get('query');
+        if (queryText) {
+            setActiveTab('text');
+            setTrainingText(queryText);
+        }
+    }, [location.search]);
 
     const fileRef = useRef(null);
     const baseUrl = import.meta.env.VITE_API_URL || '';
