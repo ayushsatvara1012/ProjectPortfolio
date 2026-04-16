@@ -445,10 +445,7 @@ ALLOWED_ORIGINS = {
     "https://app.sapybase.com",
     "https://admin.sapybase.com",
     "https://sapybase-deploy-test.vercel.app",
-    "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app"
-}
-
-ALLOWED_DEV_ORIGINS = {
+    "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app",
     "http://localhost:5173", 
     "http://localhost:5174",
     "http://localhost:5175",
@@ -458,7 +455,7 @@ ALLOWED_DEV_ORIGINS = {
 }
 
 # Sync middleware with our strict allowlist
-combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
+combined_origins = list(ALLOWED_ORIGINS)
 
 # ── SECURITY ARCHITECTURE NOTE ────────────────────────────────────────────────
 # allow_origins=["*"] is INTENTIONAL and REQUIRED.
@@ -1597,6 +1594,21 @@ def generate_insight_report(
                     "upgrade_url": "/app/pricing"
                 })
 
+        # ── FETCH RECENT CONVERSATIONS (ALWAYS FRESH) ────────────────────────
+        cursor.execute(
+            """SELECT user_query, is_unanswered, created_at FROM chat_logs 
+               WHERE company_id = %s ORDER BY created_at DESC LIMIT 15""",
+            (company_id,)
+        )
+        recent_rows = cursor.fetchall()
+        recent_activity = [
+            {
+                "query": r[0],
+                "unanswered": r[1],
+                "timestamp": r[2].isoformat() if r[2] else None
+            } for r in recent_rows
+        ]
+
         # ── STEP A: 24-HOUR COOLDOWN CHECK ───────────────────────────────────
         cursor.execute(
             """SELECT report_json, created_at FROM insight_reports
@@ -1607,16 +1619,66 @@ def generate_insight_report(
         recent_report = cursor.fetchone()
         if recent_report:
             print(f"[INSIGHT REPORT] Returning cached report for company={company_id}")
+            report_data = recent_report[0]
+            if isinstance(report_data, str):
+                report_data = json.loads(report_data)
+            report_data["recent_conversations"] = recent_activity
+
             return {
                 "status": "cached",
-                "report": recent_report[0],
+                "report": report_data,
                 "generated_at": recent_report[1].isoformat(),
                 "message": "Report generated within the last 24 hours. Returning cached version."
             }
 
+        # ── ROI DATA & BENCHMARKS FETCH ──────────────────────────────────────
+        cursor.execute("SELECT avg_human_cost_per_ticket, avg_lead_value FROM roi_benchmarks WHERE company_id = %s", (company_id,))
+        benchmark_row = cursor.fetchone()
+        avg_cost = float(benchmark_row[0]) if benchmark_row and benchmark_row[0] is not None else 5.00
+        avg_lead = float(benchmark_row[1]) if benchmark_row and benchmark_row[1] is not None else 50.00
+
+        # ── USING CURRENT BILLING CYCLE FOR ROI ──────────────────────────────
+        cursor.execute("SELECT period_start, period_end FROM usage_tracking WHERE company_id = %s ORDER BY period_end DESC LIMIT 1", (company_id,))
+        period_row = cursor.fetchone()
+        if period_row and period_row[0]:
+            period_start = period_row[0]
+            period_end = period_row[1] or datetime.now(timezone.utc)
+        else:
+            period_start = datetime.now(timezone.utc) - timedelta(days=30)
+            period_end = datetime.now(timezone.utc)
+
+        # Total Answered (billing cycle)
+        cursor.execute(
+            "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND is_unanswered = false AND created_at >= %s AND created_at <= %s",
+            (company_id, period_start, period_end)
+        )
+        total_answered = cursor.fetchone()[0] or 0
+
+        # Total Leads (billing cycle)
+        cursor.execute(
+            "SELECT COUNT(*) FROM lead_capture WHERE company_id = %s AND created_at >= %s AND created_at <= %s",
+            (company_id, period_start, period_end)
+        )
+        total_leads = cursor.fetchone()[0] or 0
+
+        support_savings = total_answered * avg_cost
+        potential_revenue = total_leads * avg_lead
+
+        # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
+        cursor.execute("""
+            SELECT EXTRACT(ISODOW FROM created_at) AS day_of_week, 
+                   EXTRACT(HOUR FROM created_at) AS hour_of_day, 
+                   COUNT(*) 
+            FROM chat_logs 
+            WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY day_of_week, hour_of_day
+        """, (company_id,))
+        heatmap_rows = cursor.fetchall()
+        heatmap_data = [{"day": int(r[0]), "hour": int(r[1]), "count": int(r[2])} for r in heatmap_rows]
+
         # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
         cursor.execute(
-            """SELECT user_query, is_unanswered FROM chat_logs
+            """SELECT user_query, is_unanswered, created_at FROM chat_logs
                WHERE company_id = %s
                  AND LENGTH(TRIM(user_query)) >= 3
                  AND LOWER(TRIM(user_query)) NOT IN %s
@@ -1633,23 +1695,19 @@ def generate_insight_report(
                 "message": f"Not enough chat data yet ({len(logs)} logs). At least 5 meaningful conversations are needed to generate insights."
             }
 
-        # ── PAYLOAD OPTIMIZATION: Only send query + unanswered flag ──────────
-        # bot_response is deliberately excluded to reduce LLM token cost
-        compressed_payload = "\n".join([
-            f"Q: {row[0]} | Unanswered: {row[1]}" for row in logs
-        ])
+        # ── PAYLOAD OPTIMIZATION: AI Trends (Last 200 Logs) ──────────────────
+        compressed_payload = "\n".join([f"Q: {row[0]} | Unanswered: {row[1]}" for row in logs])
 
         # ── STEP C: LLM SYNTHESIS ────────────────────────────────────────────
         synthesis_prompt = """You are a business analyst. Read these raw customer chats from an AI chatbot.
-Return a strictly formatted JSON object with exactly three keys:
-- "top_trends": array of strings (the 5-8 most common topics or questions customers ask)
-- "missing_knowledge": array of strings (specific questions the bot FAILED to answer, marked Unanswered: True)
-- "actionable_advice": string (one concise, specific recommendation for the business owner to improve their bot)
+Return a strictly formatted JSON object with exactly 3 keys:
+- "high_value_gaps": array of strings (find specific queries with sales or high-value intent that the bot FAILED to answer, marked Unanswered: True).
+- "top_trends": array of strings (the 5-8 most common topics customers ask).
+- "actionable_advice": string (one concise, specific recommendation to improve).
 
 Rules:
-- Do NOT include any PII (names, emails, phone numbers).
-- Return ONLY valid JSON. No markdown, no code fences, no explanation.
-- If there are no unanswered questions, return an empty array for missing_knowledge."""
+- Do NOT include any PII.
+- Return ONLY valid JSON. No markdown, no code fences, no explanation."""
 
         synthesis_model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash-lite",
@@ -1682,9 +1740,16 @@ Rules:
             # Fallback: wrap raw text as actionable_advice
             report_json = {
                 "top_trends": [],
-                "missing_knowledge": [],
+                "high_value_gaps": [],
                 "actionable_advice": clean_report[:500]
             }
+
+        # Inject metrics explicitly
+        report_json["roi_metrics"] = {
+            "support_savings": f"${support_savings:.2f}", 
+            "potential_revenue": f"${potential_revenue:.2f}"
+        }
+        report_json["peak_activity_heatmap"] = heatmap_data
 
         # ── SAVE REPORT TO DB ────────────────────────────────────────────────
         cursor.execute(
@@ -1692,6 +1757,9 @@ Rules:
             (company_id, json.dumps(report_json))
         )
         conn.commit()
+
+        # Inject fresh recent conversations into the final object before returning
+        report_json["recent_conversations"] = recent_activity
 
         print(f"[INSIGHT REPORT] Generated new report for company={company_id} from {len(logs)} logs")
 
