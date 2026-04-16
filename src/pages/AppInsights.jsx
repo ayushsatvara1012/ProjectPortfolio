@@ -9,54 +9,119 @@ import { Link } from 'react-router-dom';
 // ── Style primitives matching AppTrainAI ────────────────────────────────────
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 
-const renderActivityBlocks = (data) => {
+const ActivityHeatmap = ({ data }) => {
+    const [hoveredCell, setHoveredCell] = useState(null);
+
     if (!data || data.length === 0) return (
         <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No activity data for this period.</p>
     );
 
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Pre-fill matrix 7 days x 24 hrs with empty objects
+    const matrix = Array(7).fill(null).map(() => Array(24).fill({count: 0}));
+    let maxCount = 0;
+    
+    data.forEach(d => {
+        const dayIdx = d.day - 1; // ISODOW 1-7 mapped to 0-6
+        const hour = d.hour;
+        if(dayIdx >= 0 && dayIdx < 7 && hour >= 0 && hour < 24) {
+             matrix[dayIdx][hour] = d;
+             if (d.count > maxCount) maxCount = d.count;
+        }
+    });
+
+    const formatHour = (h) => {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:00 ${ampm}`;
+    };
+
     return (
-        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-            {data.slice(0, 8).map((block, i) => {
-                const dateObj = new Date(block.date);
-                const isToday = dateObj.toDateString() === new Date().toDateString();
-                const displayDate = isToday ? "Today" : dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                
-                return (
-                    <div key={i} className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-sm transition-colors group hover:shadow-sm">
+        <div className="flex flex-col gap-6">
+            <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
+                <div className="min-w-[600px] flex flex-col gap-1">
+                    {/* Header (Hours) */}
+                    <div className="flex text-[10px] font-mono text-slate-400 mb-1 ml-10">
+                        {[...Array(24)].map((_, h) => (
+                            <div key={h} className="flex-1 text-center opacity-70">
+                                {h % 4 === 0 ? `${h}h` : ''}
+                            </div>
+                        ))}
+                    </div>
+                    {/* Days */}
+                    {days.map((day, dIdx) => (
+                        <div key={day} className="flex items-center gap-2">
+                            <div className="w-8 shrink-0 text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">
+                                {day}
+                            </div>
+                            <div className="flex flex-1 gap-px">
+                                {matrix[dIdx].map((cell, hIdx) => {
+                                    const opacity = maxCount > 0 ? (cell.count / maxCount) : 0;
+                                    return (
+                                        <div 
+                                            key={hIdx} 
+                                            onMouseEnter={() => setHoveredCell({day, hour: formatHour(hIdx), ...cell})}
+                                            onMouseLeave={() => setHoveredCell(null)}
+                                            className="h-6 flex-1 rounded-sm cursor-pointer hover:border-blue-500 hover:scale-110 relative z-10 transition-all duration-75"
+                                            style={{ 
+                                                backgroundColor: cell.count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
+                                                border: cell.count === 0 ? '1px solid rgba(148, 163, 184, 0.1)' : 'none',
+                                                zIndex: hoveredCell?.day === day && hoveredCell?.hour === formatHour(hIdx) ? 20 : 10
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Hover Details Block */}
+            <div className={`transition-all duration-300 transform ${hoveredCell && hoveredCell.count > 0 ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-2'}`}>
+                {hoveredCell && hoveredCell.count > 0 ? (
+                    <div className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/50 p-5 rounded-sm shadow-sm ring-1 ring-blue-500/10">
                         <div className="flex items-center justify-between mb-4">
-                            <span className="text-xs uppercase font-bold tracking-widest text-slate-500 font-google">{displayDate}</span>
-                            <div className="flex items-center gap-1.5 opacity-60 bg-blue-500/10 px-2 py-0.5 rounded-sm border border-blue-500/20">
+                            <span className="text-xs uppercase font-bold tracking-widest text-slate-800 dark:text-slate-200 font-google">
+                                {hoveredCell.day} @ {hoveredCell.hour}
+                            </span>
+                            <div className="flex items-center gap-1.5 opacity-80 bg-blue-500/15 px-2 py-0.5 rounded-sm border border-blue-500/30">
                                 <span className="material-symbols-outlined text-[14px] text-blue-500">group</span>
-                                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{block.interacted_users} users</span>
+                                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{hoveredCell.interacted_users || 0} unique users</span>
                             </div>
                         </div>
                         
                         <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-4">
                             <div className="flex flex-col">
-                                <span className="text-3xl font-bold font-google text-slate-800 dark:text-slate-200">{block.total_questions}</span>
+                                <span className="text-3xl font-bold font-google text-slate-800 dark:text-slate-200">{hoveredCell.total_questions || 0}</span>
                                 <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1">Total Asked</span>
                             </div>
                             <div className="flex flex-col text-right">
-                                <span className="text-3xl font-bold font-google text-green-600 dark:text-green-500">{block.answered_questions}</span>
+                                <span className="text-3xl font-bold font-google text-green-600 dark:text-green-500">{hoveredCell.answered_questions || 0}</span>
                                 <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1">Successfully Answered</span>
                             </div>
                         </div>
 
                         <div className="flex-1 flex flex-col justify-end min-h-[60px]">
-                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-2 border-l-2 border-indigo-500 pl-2">Top Queries</span>
-                            {block.top_questions && block.top_questions.length > 0 ? (
+                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-2 border-l-2 border-blue-500 pl-2">Top Queries During This Block</span>
+                            {hoveredCell.top_questions && hoveredCell.top_questions.length > 0 ? (
                                 <ul className="space-y-1.5">
-                                    {block.top_questions.map((q, qIdx) => (
+                                    {hoveredCell.top_questions.map((q, qIdx) => (
                                         <li key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 truncate w-full" title={q}>- "{q}"</li>
                                     ))}
                                 </ul>
                             ) : (
-                                <span className="text-xs font-google text-slate-400 italic mt-1">No major queries logged</span>
+                                <span className="text-xs font-google text-slate-400 italic mt-1">No specific queries logged</span>
                             )}
                         </div>
                     </div>
-                );
-            })}
+                ) : (
+                    <div className="flex flex-col bg-slate-50 border-dashed dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-5 rounded-sm items-center justify-center min-h-[220px]">
+                        <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">touch_app</span>
+                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold">Hover over a blue calendar block to view activity details</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -299,7 +364,7 @@ const AppInsights = () => {
                                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
                                 </div>
                                 <div className="space-y-3">
-                                    {renderActivityBlocks(reportData?.peak_activity_blocks)}
+                                    <ActivityHeatmap data={reportData?.peak_activity_heatmap} />
                                 </div>
                             </div>
                         </div>
