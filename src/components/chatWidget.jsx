@@ -6,7 +6,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
-import BrandLogo from './brandLogo';
+import BrandLogo from '/SB_loading.svg';
 
 // ── v13: Shape class map (mirrors LogoCustomizer.jsx) ─────────────────────────
 // Kept inline here so the widget bundle stays self-contained with no extra import.
@@ -43,12 +43,12 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
     const activeShapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-xl';
 
     let bgProps = { backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor };
-    
+
     // Safety check: apply custom gradient freely if a gradient string is selected
     if (bgStyle && bgStyle !== 'none' && AVATAR_GRADIENTS[bgStyle]) {
-        bgProps = { 
-            backgroundImage: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`, 
-            backgroundColor: 'transparent' 
+        bgProps = {
+            backgroundImage: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`,
+            backgroundColor: 'transparent'
         };
     }
 
@@ -158,8 +158,8 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
                 </linearGradient>
 
                 <linearGradient id={`${idPrefix}-fab-gradient-dark`} x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#1E293B" /> 
-                    <stop offset="100%" stopColor="#0F172A" /> 
+                    <stop offset="0%" stopColor="#1E293B" />
+                    <stop offset="100%" stopColor="#0F172A" />
                 </linearGradient>
 
                 {AVATAR_BG_STYLE !== 'none' && AVATAR_GRADIENTS[AVATAR_BG_STYLE] && (
@@ -226,7 +226,7 @@ const ChatWidget = ({ apiKey }) => {
     const DEFAULT_CONFIG = {
         theme_color: window.SaPyBaseConfig?.themeColor || '#5730F5',
         bot_name: window.SaPyBaseConfig?.botName || 'Sapy AI',
-        logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading_clean.svg`,
+        logo_url: window.SaPyBaseConfig?.logoUrl || `${ASSET_BASE_URL}/SB_loading.svg`,
         initial_message: window.SaPyBaseConfig?.welcomeMessage || "Hi! I'm your AI assistant. How can I help you today?",
         quick_questions: window.SaPyBaseConfig?.quickQuestions || [],
         // ── v13 & v14 ──
@@ -802,36 +802,36 @@ const ChatWidget = ({ apiKey }) => {
                                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                                     className={`flex min-w-0 max-w-[96%] sm:max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
                                                 >
-                                            <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                {msg.role === 'bot' ? (
-                                                    <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
-                                                ) : (
-                                                    <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
-                                                )}
-                                                <div
-                                                    className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
-                                                        ? 'text-white rounded-2xl rounded-tr-none'
-                                                        : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
-                                                        }`}
-                                                    style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
-                                                >
-                                                    {msg.role === 'user' ? (
-                                                        <div className="min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
-                                                    ) : (
-                                                        <div className="min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                            <TypewriterContent
-                                                                content={msg.content}
-                                                                isStreaming={msg.isStreaming}
-                                                                isTyped={msg.isTyped}
-                                                                onComplete={() => handleTypingComplete(idx)}
-                                                                themeColor={THEME_COLOR}
-                                                                streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined}
-                                                                onStreamTick={() => scrollToBottom(false)}
-                                                            />
+                                                    <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                        {msg.role === 'bot' ? (
+                                                            <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
+                                                        ) : (
+                                                            <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
+                                                        )}
+                                                        <div
+                                                            className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
+                                                                ? 'text-white rounded-2xl rounded-tr-none'
+                                                                : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
+                                                                }`}
+                                                            style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
+                                                        >
+                                                            {msg.role === 'user' ? (
+                                                                <div className="min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                            ) : (
+                                                                <div className="min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
+                                                                    <TypewriterContent
+                                                                        content={msg.content}
+                                                                        isStreaming={msg.isStreaming}
+                                                                        isTyped={msg.isTyped}
+                                                                        onComplete={() => handleTypingComplete(idx)}
+                                                                        themeColor={THEME_COLOR}
+                                                                        streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined}
+                                                                        onStreamTick={() => scrollToBottom(false)}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                                    </div>
                                                 </motion.div>
                                             );
                                         })}
@@ -849,7 +849,7 @@ const ChatWidget = ({ apiKey }) => {
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
                             >
-                                <BrandLogo themeColor="currentColor" className="w-2.5 h-2.5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
+                                <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
                                 Powered by SaPyBase
                             </a>
                         </div>
@@ -1275,7 +1275,7 @@ const TypewriterContent = ({
     // ══════════════════════════════════════════════════════════════════════════
     // RENDER: High-Performance View Logic
     // ══════════════════════════════════════════════════════════════════════════
-    
+
     // 1. ACTIVE STREAMING (Option A: Lite Render Spans)
     if (isStreaming) {
         const hasContent = displayedText.length > 0;
@@ -1299,8 +1299,8 @@ const TypewriterContent = ({
                     <div className="sapy-stream-text-in leading-relaxed text-md">
                         {/* Word spans: Infinite performance, no Markdown parsing overhead */}
                         {streamWords.map((word, i) => (
-                            <span 
-                                key={i} 
+                            <span
+                                key={i}
                                 className="sapy-word-fade"
                                 style={{ display: 'inline-block', whiteSpace: 'pre-wrap' }}
                             >

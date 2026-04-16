@@ -116,9 +116,9 @@ export function BotAvatar({ shapeId = 'circle', logoUrl = '', botName = 'S', siz
 
     let bgProps = { backgroundColor: showImage ? '#ffffff' : themeColor };
     if (showImage && bgStyle && AVATAR_GRADIENTS[bgStyle]) {
-        bgProps = { 
-            background: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`, 
-            backgroundColor: 'transparent' 
+        bgProps = {
+            background: `linear-gradient(135deg, ${AVATAR_GRADIENTS[bgStyle][0]}, ${AVATAR_GRADIENTS[bgStyle][1]})`,
+            backgroundColor: 'transparent'
         };
     }
 
@@ -264,8 +264,8 @@ export default function LogoCustomizer({
                                 {/* Floating Shape icon */}
                                 <div className={`
                                     flex items-center justify-center transition-all duration-300
-                                    ${isSelected 
-                                        ? 'text-blue-500 dark:text-blue-400 scale-110 drop-shadow-[0_8px_16px_rgba(59,130,246,0.25)]' 
+                                    ${isSelected
+                                        ? 'text-blue-500 dark:text-blue-400 scale-110 drop-shadow-[0_8px_16px_rgba(59,130,246,0.25)]'
                                         : 'text-slate-300 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 group-hover:scale-105'
                                     }
                                 `}>
@@ -305,7 +305,7 @@ export default function LogoCustomizer({
                     {Object.entries(AVATAR_GRADIENTS).map(([baseId, gradData]) => {
                         const isSelected = (avatarBgStyle || 'none') === baseId;
                         const hasGradient = gradData !== null;
-                        
+
                         return (
                             <button
                                 key={baseId}
@@ -323,7 +323,7 @@ export default function LogoCustomizer({
                                     ${isSelected ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-blue-400 scale-110 drop-shadow-md' : 'ring-1 ring-gray-200 dark:ring-slate-700 hover:scale-105 hover:ring-slate-300 dark:hover:ring-slate-500'}
                                     ${!hasGradient ? 'bg-white dark:bg-slate-900' : ''}
                                 `}
-                                style={hasGradient ? { background: `linear-gradient(135deg, ${gradData[0]}, ${gradData[1]})` } : {}}
+                                    style={hasGradient ? { background: `linear-gradient(135deg, ${gradData[0]}, ${gradData[1]})` } : {}}
                                 >
                                     {!hasGradient && <span className="material-symbols-outlined text-[16px] text-slate-400">block</span>}
                                     {isSelected && hasGradient && (

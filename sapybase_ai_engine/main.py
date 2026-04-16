@@ -645,7 +645,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "allowed_origin": company_data[4],
         "system_prompt": company_data[5] or "You are a helpful AI assistant.",
         "bot_name": company_data[6] or "Sapy AI",
-        "logo_url": company_data[7] or "/SB_loading_clean.svg",
+        "logo_url": company_data[7] or "/SB_loading.svg",
         "initial_message": company_data[8] or "Hi! How can I help you today?",
         "quick_questions": company_data[9] or [],
         "logo_shape": company_data[10] or "circle",
