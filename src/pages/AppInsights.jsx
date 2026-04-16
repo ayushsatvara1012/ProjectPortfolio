@@ -6,6 +6,9 @@ import UpgradePrompt from '../components/UpgradePrompt';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
+// ── Style primitives matching AppTrainAI ────────────────────────────────────
+const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
+
 const ActivityCalendar = ({ data }) => {
     const [selectedCell, setSelectedCell] = useState(null);
 
