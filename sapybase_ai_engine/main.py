@@ -1666,55 +1666,68 @@ def generate_insight_report(
         potential_revenue = total_leads * avg_lead
 
         # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
-        # ── 30-DAY PEAK ACTIVITY HEATMAP (CTE) ────────────────────────────────
+        # ── 30-DAY PEAK ACTIVITY BLOCKS (CTE) ────────────────────────────────
         cursor.execute("""
-            WITH HourlyStats AS (
+            WITH DailyStats AS (
                 SELECT 
-                    EXTRACT(ISODOW FROM created_at) AS day_of_week, 
-                    EXTRACT(HOUR FROM created_at) AS hour_of_day,
+                    DATE(created_at) AS log_date,
                     COUNT(DISTINCT session_id) as interacted_users,
                     COUNT(id) as total_questions,
-                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions
+                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
+                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
                 FROM chat_logs
                 WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY day_of_week, hour_of_day
+                GROUP BY DATE(created_at)
             ),
-            HourlyQuestions AS (
+            DailyTopQueries AS (
                 SELECT 
-                    EXTRACT(ISODOW FROM created_at) AS day_of_week, 
-                    EXTRACT(HOUR FROM created_at) AS hour_of_day,
+                    DATE(created_at) AS log_date,
                     user_query,
                     COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY EXTRACT(ISODOW FROM created_at), EXTRACT(HOUR FROM created_at) ORDER BY COUNT(*) DESC) as rn
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
                 FROM chat_logs
                 WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY day_of_week, hour_of_day, user_query
+                GROUP BY DATE(created_at), user_query
+            ),
+            DailyTopUnanswered AS (
+                SELECT 
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
+                GROUP BY DATE(created_at), user_query
             )
             SELECT 
-                s.day_of_week,
-                s.hour_of_day,
+                s.log_date,
                 s.interacted_users,
                 s.total_questions,
                 s.answered_questions,
+                s.unanswered_questions,
                 q1.user_query as top_q1,
-                q2.user_query as top_q2
-            FROM HourlyStats s
-            LEFT JOIN HourlyQuestions q1 ON s.day_of_week = q1.day_of_week AND s.hour_of_day = q1.hour_of_day AND q1.rn = 1
-            LEFT JOIN HourlyQuestions q2 ON s.day_of_week = q2.day_of_week AND s.hour_of_day = q2.hour_of_day AND q2.rn = 2
-            ORDER BY s.day_of_week, s.hour_of_day;
-        """, (company_id, company_id))
+                q2.user_query as top_q2,
+                u1.user_query as top_unanswered1,
+                u2.user_query as top_unanswered2
+            FROM DailyStats s
+            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
+            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
+            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
+            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
+            ORDER BY s.log_date DESC;
+        """, (company_id, company_id, company_id))
         
-        heatmap_rows = cursor.fetchall()
-        heatmap_data = []
-        for r in heatmap_rows:
-            heatmap_data.append({
-                "day": int(r[0]),
-                "hour": int(r[1]),
-                "count": int(r[3]), # count for coloring
-                "interacted_users": int(r[2]) if r[2] else 0,
-                "total_questions": int(r[3]) if r[3] else 0,
-                "answered_questions": int(r[4]) if r[4] else 0,
-                "top_questions": [q for q in [r[5], r[6]] if q]
+        blocks_rows = cursor.fetchall()
+        peak_activity_blocks = []
+        for r in blocks_rows:
+            peak_activity_blocks.append({
+                "date": r[0].isoformat() if r[0] else None,
+                "interacted_users": int(r[1]) if r[1] else 0,
+                "total_questions": int(r[2]) if r[2] else 0,
+                "answered_questions": int(r[3]) if r[3] else 0,
+                "unanswered_questions": int(r[4]) if r[4] else 0,
+                "top_questions": [q for q in [r[5], r[6]] if q],
+                "top_unanswered": [q for q in [r[7], r[8]] if q]
             })
 
         # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
@@ -1790,7 +1803,7 @@ Rules:
             "support_savings": f"${support_savings:.2f}", 
             "potential_revenue": f"${potential_revenue:.2f}"
         }
-        report_json["peak_activity_heatmap"] = heatmap_data
+        report_json["peak_activity_blocks"] = peak_activity_blocks
 
         # ── SAVE REPORT TO DB ────────────────────────────────────────────────
         cursor.execute(

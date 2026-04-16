@@ -6,119 +6,143 @@ import UpgradePrompt from '../components/UpgradePrompt';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
-// ── Style primitives matching AppTrainAI ────────────────────────────────────
-const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
+const ActivityCalendar = ({ data }) => {
+    const [selectedCell, setSelectedCell] = useState(null);
 
-const ActivityHeatmap = ({ data }) => {
-    const [hoveredCell, setHoveredCell] = useState(null);
-
-    if (!data || data.length === 0) return (
-        <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No activity data for this period.</p>
-    );
-
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    // Pre-fill matrix 7 days x 24 hrs with empty objects
-    const matrix = Array(7).fill(null).map(() => Array(24).fill({count: 0}));
-    let maxCount = 0;
-    
-    data.forEach(d => {
-        const dayIdx = d.day - 1; // ISODOW 1-7 mapped to 0-6
-        const hour = d.hour;
-        if(dayIdx >= 0 && dayIdx < 7 && hour >= 0 && hour < 24) {
-             matrix[dayIdx][hour] = d;
-             if (d.count > maxCount) maxCount = d.count;
+    // Build the grid mapping the last 30 days exactly
+    const generateLast30Days = () => {
+        const days = [];
+        const today = new Date();
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            days.push(d.toISOString().split('T')[0]); // YYYY-MM-DD
         }
-    });
+        return days;
+    };
 
-    const formatHour = (h) => {
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        return `${h12}:00 ${ampm}`;
+    const calendarDates = generateLast30Days();
+    
+    // Map existing data to dictionary for fast lookup
+    const dataMap = {};
+    let maxCount = 0;
+    if (data && data.length > 0) {
+        data.forEach(d => {
+            if (d.date) {
+                dataMap[d.date] = d;
+                if (d.total_questions > maxCount) maxCount = d.total_questions;
+            }
+        });
+    }
+
+    // Default to today if it exists in data, else most recent, else null
+    React.useEffect(() => {
+        if (data && data.length > 0 && !selectedCell) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (dataMap[todayStr]) {
+                setSelectedCell(dataMap[todayStr]);
+            } else {
+                setSelectedCell(data[0]); // Most recent since ordered DESC
+            }
+        }
+    }, [data]);
+
+    const formatDateStr = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
-                <div className="min-w-[600px] flex flex-col gap-1">
-                    {/* Header (Hours) */}
-                    <div className="flex text-[10px] font-mono text-slate-400 mb-1 ml-10">
-                        {[...Array(24)].map((_, h) => (
-                            <div key={h} className="flex-1 text-center opacity-70">
-                                {h % 4 === 0 ? `${h}h` : ''}
-                            </div>
-                        ))}
-                    </div>
-                    {/* Days */}
-                    {days.map((day, dIdx) => (
-                        <div key={day} className="flex items-center gap-2">
-                            <div className="w-8 shrink-0 text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">
-                                {day}
-                            </div>
-                            <div className="flex flex-1 gap-px">
-                                {matrix[dIdx].map((cell, hIdx) => {
-                                    const opacity = maxCount > 0 ? (cell.count / maxCount) : 0;
-                                    return (
-                                        <div 
-                                            key={hIdx} 
-                                            onMouseEnter={() => setHoveredCell({day, hour: formatHour(hIdx), ...cell})}
-                                            onMouseLeave={() => setHoveredCell(null)}
-                                            className="h-6 flex-1 rounded-sm cursor-pointer hover:border-blue-500 hover:scale-110 relative z-10 transition-all duration-75"
-                                            style={{ 
-                                                backgroundColor: cell.count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
-                                                border: cell.count === 0 ? '1px solid rgba(148, 163, 184, 0.1)' : 'none',
-                                                zIndex: hoveredCell?.day === day && hoveredCell?.hour === formatHour(hIdx) ? 20 : 10
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
+        <div className="flex flex-col lg:flex-row gap-6 w-full">
+            {/* Calendar Grid (Left / Top) */}
+            <div className="w-full lg:w-1/2 flex flex-col gap-2">
+                <span className="text-[10px] font-google uppercase tracking-widest font-bold text-slate-500 mb-2">Past 30 Days</span>
+                <div className="grid grid-cols-7 gap-1.5 w-full max-w-[320px]">
+                    {calendarDates.map((dateStr, i) => {
+                        const cellData = dataMap[dateStr];
+                        const count = cellData?.total_questions || 0;
+                        const opacity = maxCount > 0 ? (count / maxCount) : 0;
+                        const isSelected = selectedCell?.date === dateStr;
+                        
+                        return (
+                            <div 
+                                key={dateStr}
+                                onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
+                                onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
+                                className={`aspect-square rounded-sm cursor-pointer transition-all duration-150 border relative ${isSelected ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-800 z-10 scale-110' : 'hover:scale-110 z-0'}`}
+                                style={{ 
+                                    backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
+                                    borderColor: count === 0 ? 'rgba(148, 163, 184, 0.2)' : 'rgba(59, 130, 246, 0.3)',
+                                }}
+                                title={formatDateStr(dateStr)}
+                            />
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Hover Details Block */}
-            <div className={`transition-all duration-300 transform ${hoveredCell && hoveredCell.count > 0 ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-2'}`}>
-                {hoveredCell && hoveredCell.count > 0 ? (
-                    <div className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/50 p-5 rounded-sm shadow-sm ring-1 ring-blue-500/10">
-                        <div className="flex items-center justify-between mb-4">
+            {/* Selected Details Block (Right / Bottom) */}
+            <div className="w-full lg:w-1/2 flex flex-col">
+                {selectedCell && (selectedCell.total_questions > 0 || selectedCell.count === 0) ? (
+                    <div className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/50 p-5 rounded-sm shadow-sm flex-1">
+                        <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3">
                             <span className="text-xs uppercase font-bold tracking-widest text-slate-800 dark:text-slate-200 font-google">
-                                {hoveredCell.day} @ {hoveredCell.hour}
+                                {formatDateStr(selectedCell.date)}
                             </span>
                             <div className="flex items-center gap-1.5 opacity-80 bg-blue-500/15 px-2 py-0.5 rounded-sm border border-blue-500/30">
                                 <span className="material-symbols-outlined text-[14px] text-blue-500">group</span>
-                                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{hoveredCell.interacted_users || 0} unique users</span>
+                                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{selectedCell.interacted_users || 0} unique users</span>
                             </div>
                         </div>
                         
-                        <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+                        <div className="grid grid-cols-3 gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-4">
                             <div className="flex flex-col">
-                                <span className="text-3xl font-bold font-google text-slate-800 dark:text-slate-200">{hoveredCell.total_questions || 0}</span>
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1">Total Asked</span>
+                                <span className="text-2xl font-bold font-google text-slate-800 dark:text-slate-200">{selectedCell.total_questions || 0}</span>
+                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1 leading-tight">Total<br/>Asked</span>
                             </div>
-                            <div className="flex flex-col text-right">
-                                <span className="text-3xl font-bold font-google text-green-600 dark:text-green-500">{hoveredCell.answered_questions || 0}</span>
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1">Successfully Answered</span>
+                            <div className="flex flex-col">
+                                <span className="text-2xl font-bold font-google text-green-600 dark:text-green-500">{selectedCell.answered_questions || 0}</span>
+                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1 leading-tight">Successfully<br/>Answered</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className={`text-2xl font-bold font-google ${selectedCell.unanswered_questions > 0 ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}>{selectedCell.unanswered_questions || 0}</span>
+                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1 leading-tight">Failed to<br/>Answer</span>
                             </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col justify-end min-h-[60px]">
-                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-2 border-l-2 border-blue-500 pl-2">Top Queries During This Block</span>
-                            {hoveredCell.top_questions && hoveredCell.top_questions.length > 0 ? (
-                                <ul className="space-y-1.5">
-                                    {hoveredCell.top_questions.map((q, qIdx) => (
-                                        <li key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 truncate w-full" title={q}>- "{q}"</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <span className="text-xs font-google text-slate-400 italic mt-1">No specific queries logged</span>
+                        <div className="flex-1 flex flex-col min-h-[60px] gap-4">
+                            {/* Top Queries */}
+                            <div className="flex flex-col">
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-1.5 border-l-2 border-blue-500 pl-2">Top Queries</span>
+                                {selectedCell.top_questions && selectedCell.top_questions.length > 0 ? (
+                                    <ul className="space-y-1">
+                                        {selectedCell.top_questions.map((q, qIdx) => (
+                                            <li key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 truncate w-full" title={q}>- "{q}"</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <span className="text-xs font-google text-slate-400 italic">No queries logged</span>
+                                )}
+                            </div>
+
+                            {/* Top Unanswered */}
+                            {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered && selectedCell.top_unanswered.length > 0 && (
+                                <div className="flex flex-col mt-auto pt-2 border-t border-red-500/10">
+                                    <span className="text-[10px] uppercase tracking-widest text-red-400 font-bold font-google mb-1.5 border-l-2 border-red-500 pl-2 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">warning</span> Unanswered Queries</span>
+                                    <ul className="space-y-1">
+                                        {selectedCell.top_unanswered.map((q, qIdx) => (
+                                            <li key={qIdx} className="text-xs font-google text-red-500/80 truncate w-full" title={q}>- "{q}"</li>
+                                        ))}
+                                    </ul>
+                                </div>
                             )}
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-col bg-slate-50 border-dashed dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-5 rounded-sm items-center justify-center min-h-[220px]">
+                    <div className="flex flex-col bg-slate-50 border-dashed dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-5 rounded-sm items-center justify-center h-full min-h-[220px]">
                         <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">touch_app</span>
-                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold">Hover over a blue calendar block to view activity details</p>
+                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold text-center">Interact with a block<br/>to view daily activity</p>
                     </div>
                 )}
             </div>
@@ -364,7 +388,7 @@ const AppInsights = () => {
                                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
                                 </div>
                                 <div className="space-y-3">
-                                    <ActivityHeatmap data={reportData?.peak_activity_heatmap} />
+                                    <ActivityCalendar data={reportData?.peak_activity_blocks} />
                                 </div>
                             </div>
                         </div>
@@ -381,7 +405,7 @@ const AppInsights = () => {
                                 <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
                                     Questions your bot failed to answer. Train these topics to secure leads.
                                 </p>
-                                <div className="space-y-3">
+                                <div className="space-y-3 mb-8">
                                     {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap, idx) => (
                                         <div key={idx} className="flex items-start gap-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
                                             <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_center</span>
@@ -392,8 +416,7 @@ const AppInsights = () => {
                                         <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No critical knowledge gaps detected.</p>
                                     )}
                                 </div>
-                            </div>
-                            <div className={`${cellCls} p-8 shrink-0`}>
+
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
                                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Actionable Advice</h2>
