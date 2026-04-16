@@ -238,6 +238,7 @@ const ChatWidget = ({ apiKey }) => {
     // ── CONFIG STATE: starts with defaults, then gets overwritten by /api/config ──
     const [configData, setConfigData] = useState(DEFAULT_CONFIG);
     const [configLoaded, setConfigLoaded] = useState(false);
+    const [sessionId] = useState(() => window.crypto?.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
 
     // ── FETCH BOT-SPECIFIC CONFIG FROM BACKEND ────────────────────────────────
     useEffect(() => {
@@ -472,7 +473,7 @@ const ChatWidget = ({ apiKey }) => {
                     'Content-Type': 'application/json',
                     'x-api-key': resolvedApiKey,
                 },
-                body: JSON.stringify({ message: userMessage, history: recentHistory }),
+                body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId }),
                 signal: ctrl.signal,
                 openWhenHidden: true, // Keep streaming even if the tab loses focus
 

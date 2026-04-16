@@ -9,69 +9,54 @@ import { Link } from 'react-router-dom';
 // ── Style primitives matching AppTrainAI ────────────────────────────────────
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 
-const renderHeatmap = (data) => {
+const renderActivityBlocks = (data) => {
     if (!data || data.length === 0) return (
         <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No activity data for this period.</p>
     );
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    // Pre-fill matrix 7 days x 24 hrs
-    const matrix = Array(7).fill(0).map(() => Array(24).fill(0));
-    let maxCount = 0;
-    data.forEach(d => {
-        const dayIdx = d.day - 1; // ISODOW 1-7 mapped to 0-6
-        const hour = d.hour;
-        if(dayIdx >= 0 && dayIdx < 7 && hour >= 0 && hour < 24) {
-             matrix[dayIdx][hour] = d.count;
-             if (d.count > maxCount) maxCount = d.count;
-        }
-    });
 
     return (
-        <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
-            <div className="min-w-[600px] flex flex-col gap-1">
-                {/* Header (Hours) */}
-                <div className="flex text-[10px] font-mono text-slate-400 mb-1 ml-10">
-                    {[...Array(24)].map((_, h) => (
-                        <div key={h} className="flex-1 text-center opacity-70">
-                            {h % 4 === 0 ? `${h}h` : ''}
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+            {data.slice(0, 8).map((block, i) => {
+                const dateObj = new Date(block.date);
+                const isToday = dateObj.toDateString() === new Date().toDateString();
+                const displayDate = isToday ? "Today" : dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                
+                return (
+                    <div key={i} className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-sm transition-colors group hover:shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs uppercase font-bold tracking-widest text-slate-500 font-google">{displayDate}</span>
+                            <div className="flex items-center gap-1.5 opacity-60 bg-blue-500/10 px-2 py-0.5 rounded-sm border border-blue-500/20">
+                                <span className="material-symbols-outlined text-[14px] text-blue-500">group</span>
+                                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{block.interacted_users} users</span>
+                            </div>
                         </div>
-                    ))}
-                </div>
-                {/* Days */}
-                {days.map((day, dIdx) => (
-                    <div key={day} className="flex items-center gap-2">
-                        <div className="w-8 shrink-0 text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">
-                            {day}
+                        
+                        <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+                            <div className="flex flex-col">
+                                <span className="text-3xl font-bold font-google text-slate-800 dark:text-slate-200">{block.total_questions}</span>
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1">Total Asked</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                                <span className="text-3xl font-bold font-google text-green-600 dark:text-green-500">{block.answered_questions}</span>
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1">Successfully Answered</span>
+                            </div>
                         </div>
-                        <div className="flex flex-1 gap-px">
-                            {matrix[dIdx].map((val, hIdx) => {
-                                const opacity = maxCount > 0 ? (val / maxCount) : 0;
-                                return (
-                                    <div 
-                                        key={hIdx} 
-                                        className="h-6 flex-1 rounded-sm transition-all"
-                                        style={{ 
-                                            backgroundColor: val > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
-                                            border: val === 0 ? '1px solid rgba(148, 163, 184, 0.1)' : 'none'
-                                        }}
-                                        title={`${day} ${hIdx}:00 - ${val} msgs`}
-                                    />
-                                );
-                            })}
+
+                        <div className="flex-1 flex flex-col justify-end min-h-[60px]">
+                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-2 border-l-2 border-indigo-500 pl-2">Top Queries</span>
+                            {block.top_questions && block.top_questions.length > 0 ? (
+                                <ul className="space-y-1.5">
+                                    {block.top_questions.map((q, qIdx) => (
+                                        <li key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 truncate w-full" title={q}>- "{q}"</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <span className="text-xs font-google text-slate-400 italic mt-1">No major queries logged</span>
+                            )}
                         </div>
                     </div>
-                ))}
-            </div>
-            <div className="flex justify-end gap-2 items-center mt-3 text-[10px] uppercase font-google tracking-widest text-slate-500">
-                <span>Less</span>
-                <div className="flex gap-px">
-                    <div className="w-3 h-3 rounded-sm border border-slate-200 dark:border-slate-800"></div>
-                    <div className="w-3 h-3 rounded-sm bg-blue-500/30"></div>
-                    <div className="w-3 h-3 rounded-sm bg-blue-500/60"></div>
-                    <div className="w-3 h-3 rounded-sm bg-blue-500"></div>
-                </div>
-                <span>More</span>
-            </div>
+                );
+            })}
         </div>
     );
 };
@@ -314,7 +299,7 @@ const AppInsights = () => {
                                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
                                 </div>
                                 <div className="space-y-3">
-                                    {renderHeatmap(reportData?.peak_activity_heatmap)}
+                                    {renderActivityBlocks(reportData?.peak_activity_blocks)}
                                 </div>
                             </div>
                         </div>
@@ -362,19 +347,20 @@ const AppInsights = () => {
                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span>
                                 <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
                             </div>
-                            <div className="min-w-[600px]">
-                                <div className="grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
+                            <div className="w-full">
+                                <div className="hidden md:grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
                                     <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
                                     <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
                                     <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-3 md:space-y-1">
                                     {reportData?.recent_conversations?.map((log, idx) => (
-                                        <div key={idx} className="grid grid-cols-12 gap-4 py-3 px-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors rounded-sm items-center">
-                                            <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300 truncate">
+                                        <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-4 bg-slate-50 md:bg-transparent dark:bg-slate-900/50 md:dark:bg-transparent rounded-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors md:items-center">
+                                            <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300 md:truncate">
                                                 {log.query}
                                             </div>
-                                            <div className="col-span-2 flex justify-center">
+                                            <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
+                                                <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
                                                 {log.unanswered ? (
                                                     <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-900/50 px-2 py-0.5 rounded-sm">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[-1px]"></span> Unanswered
@@ -385,8 +371,11 @@ const AppInsights = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="col-span-2 text-[11px] font-mono text-slate-500 dark:text-slate-400 text-right">
-                                                {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
+                                            <div className="col-span-2 flex items-center md:justify-end gap-3 md:gap-0 mt-1 md:mt-0">
+                                                <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Time:</span>
+                                                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                                    {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
+                                                </span>
                                             </div>
                                         </div>
                                     ))}

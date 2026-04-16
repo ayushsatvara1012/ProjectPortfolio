@@ -541,6 +541,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
     history: Optional[list[ChatMessage]] = Field(None, description="Last N chat messages for context-aware caching")
+    session_id: Optional[str] = Field(None, description="Client-side session tracking id")
 
     @validator('message')
     def sanitize_jailbreak_patterns(cls, v):
@@ -1201,16 +1202,16 @@ FALLBACK_PHRASES = [
     "i'm here specifically to help you with",
 ]
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool):
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered)
-               VALUES (%s, %s, %s, %s, %s)""",
-            (company_id, user_query, bot_response, was_cache_hit, is_unanswered)
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id)
         )
         conn.commit()
     except Exception as e:
@@ -1334,7 +1335,7 @@ async def chat_endpoint(
                 # ── ASYNC ANALYTICS LOG (cache hit) ──────────────────────────
                 background_tasks.add_task(
                     log_chat_to_db, company["id"], chat_req.message,
-                    cached_response, True, False  # was_cache_hit=True, is_unanswered=False
+                    cached_response, True, False, chat_req.session_id
                 )
 
                 return ChatResponse(
@@ -1533,7 +1534,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
                     background_tasks.add_task(
                         log_chat_to_db, company["id"], chat_req.message,
-                        full_reply, False, is_un_final
+                        full_reply, False, is_un_final, chat_req.session_id
                     )
 
                     # 3. Usage Tracking (Background Task)
@@ -1665,6 +1666,7 @@ def generate_insight_report(
         potential_revenue = total_leads * avg_lead
 
         # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
+        # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
         cursor.execute("""
             SELECT EXTRACT(ISODOW FROM created_at) AS day_of_week, 
                    EXTRACT(HOUR FROM created_at) AS hour_of_day, 
@@ -1675,6 +1677,52 @@ def generate_insight_report(
         """, (company_id,))
         heatmap_rows = cursor.fetchall()
         heatmap_data = [{"day": int(r[0]), "hour": int(r[1]), "count": int(r[2])} for r in heatmap_rows]
+
+        # ── 30-DAY PEAK ACTIVITY BLOCKS (CTE) ────────────────────────────────
+        cursor.execute("""
+            WITH DailyStats AS (
+                SELECT 
+                    DATE(created_at) as log_date,
+                    COUNT(DISTINCT session_id) as interacted_users,
+                    COUNT(id) as total_questions,
+                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at)
+            ),
+            DailyQuestions AS (
+                SELECT 
+                    DATE(created_at) as log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at), user_query
+            )
+            SELECT 
+                s.log_date,
+                s.interacted_users,
+                s.total_questions,
+                s.answered_questions,
+                q1.user_query as top_q1,
+                q2.user_query as top_q2
+            FROM DailyStats s
+            LEFT JOIN DailyQuestions q1 ON s.log_date = q1.log_date AND q1.rn = 1
+            LEFT JOIN DailyQuestions q2 ON s.log_date = q2.log_date AND q2.rn = 2
+            ORDER BY s.log_date DESC;
+        """, (company_id, company_id))
+        
+        peak_blocks_rows = cursor.fetchall()
+        peak_activity_blocks = []
+        for r in peak_blocks_rows:
+            peak_activity_blocks.append({
+                "date": r[0].isoformat() if r[0] else None,
+                "interacted_users": int(r[1]) if r[1] else 0,
+                "total_questions": int(r[2]) if r[2] else 0,
+                "answered_questions": int(r[3]) if r[3] else 0,
+                "top_questions": [q for q in [r[4], r[5]] if q]
+            })
 
         # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
         cursor.execute(
@@ -1750,6 +1798,7 @@ Rules:
             "potential_revenue": f"${potential_revenue:.2f}"
         }
         report_json["peak_activity_heatmap"] = heatmap_data
+        report_json["peak_activity_blocks"] = peak_activity_blocks
 
         # ── SAVE REPORT TO DB ────────────────────────────────────────────────
         cursor.execute(
