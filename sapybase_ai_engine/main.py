@@ -451,12 +451,11 @@ ALLOWED_ORIGINS = {
     "http://localhost:5175",
     "http://localhost:5176",
     "http://localhost:3000", 
-    "http://127.0.0.1:5173",
-    "https://sapybase-deploy-test.vercel.app",
+    "http://127.0.0.1:5173"
 }
 
 # Sync middleware with our strict allowlist
-combined_origins = list(ALLOWED_ORIGINS | ALLOWED_DEV_ORIGINS)
+combined_origins = list(ALLOWED_ORIGINS)
 
 # ── SECURITY ARCHITECTURE NOTE ────────────────────────────────────────────────
 # allow_origins=["*"] is INTENTIONAL and REQUIRED.
