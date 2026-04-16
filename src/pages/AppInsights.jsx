@@ -71,8 +71,8 @@ const ActivityCalendar = ({ data }) => {
                          </div>
                     </div>
                 </div>
-                {/* 10 columns fits 30 days in 3 clean rows, with gap-4 as requested */}
-                <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-4 w-full">
+                {/* Enforce 10 columns across all devices to minimize vertical height, allowing the inspector to sit directly below on mobile */}
+                <div className="grid grid-cols-10 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden">
                     {calendarDates.map((dateStr, i) => {
                         const cellData = dataMap[dateStr];
                         const count = cellData?.total_questions || 0;
@@ -84,7 +84,7 @@ const ActivityCalendar = ({ data }) => {
                                 key={dateStr}
                                 onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
                                 onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-square w-full max-w-[40px] rounded-md cursor-pointer transition-all duration-200 border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
+                                className={`aspect-square w-full min-w-[20px] max-w-[40px] rounded-md cursor-pointer transition-all duration-200 border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
                                 style={{ 
                                     backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
                                     borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
@@ -417,16 +417,6 @@ const AppInsights = () => {
                                     ))}
                                 </div>
                             </div>
-                            {/* Peak Activity Heatmap */}
-                            <div className={`${cellCls} p-8 shrink-0`}>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
-                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
-                                </div>
-                                <div className="space-y-3">
-                                    <ActivityCalendar data={reportData?.peak_activity_blocks} />
-                                </div>
-                            </div>
                         </div>
 
                         {/* Right Column: Knowledge Gaps + Advice */}
@@ -441,7 +431,7 @@ const AppInsights = () => {
                                 <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
                                     Questions your bot failed to answer. Train these topics to secure leads.
                                 </p>
-                                <div className="space-y-3 mb-8">
+                                <div className="space-y-2 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar pr-1">
                                     {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap, idx) => (
                                         <div key={idx} className="flex items-start gap-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
                                             <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_center</span>
@@ -460,6 +450,20 @@ const AppInsights = () => {
                                 <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
                                     {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
                                 </p>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    {/* ── Peak Activity Full Row ── */}
+                    <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
+                        <div className={`${cellCls} p-8`}>
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
+                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
+                            </div>
+                            <div className="w-full">
+                                <ActivityCalendar data={reportData?.peak_activity_blocks} />
                             </div>
                         </div>
                     </div>
