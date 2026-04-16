@@ -6,7 +6,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './thinkLogo';
-import BrandLogo from '/SB_loading.svg';
+const BrandLogo = '/SB_loading.svg';
 
 // ── v13: Shape class map (mirrors LogoCustomizer.jsx) ─────────────────────────
 // Kept inline here so the widget bundle stays self-contained with no extra import.
