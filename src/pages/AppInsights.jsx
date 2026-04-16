@@ -72,7 +72,7 @@ const ActivityCalendar = ({ data }) => {
                     </div>
                 </div>
                 {/* Enforce 10 columns across all devices to minimize vertical height, allowing the inspector to sit directly below on mobile */}
-                <div className="grid grid-cols-10 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden">
+                <div className="grid grid-cols-7 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden">
                     {calendarDates.map((dateStr, i) => {
                         const cellData = dataMap[dateStr];
                         const count = cellData?.total_questions || 0;
@@ -84,14 +84,17 @@ const ActivityCalendar = ({ data }) => {
                                 key={dateStr}
                                 onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
                                 onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-square w-full min-w-[20px] max-w-[40px] rounded-md cursor-pointer transition-all duration-200 border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
+                                className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-md cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
                                 style={{ 
                                     backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
                                     borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
                                 }}
                             >
-                                <span className={`text-[10px] font-mono font-bold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-300 dark:text-slate-700'}`}>
+                                <span className={`text-[11px] sm:text-[14px] leading-none font-mono font-bold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
                                     {new Date(dateStr).getDate()}
+                                </span>
+                                <span className={`text-[7px] sm:text-[9px] uppercase tracking-widest font-google font-bold leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>
+                                    {new Date(dateStr).toLocaleDateString(undefined, { month: 'short' })}
                                 </span>
                             </div>
                         );
