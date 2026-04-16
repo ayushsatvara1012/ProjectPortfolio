@@ -38,14 +38,14 @@ const ActivityCalendar = ({ data }) => {
         });
     }
 
-    // Default to today if it exists in data, else most recent, else null
+    // Default to today or most recent
     React.useEffect(() => {
         if (data && data.length > 0 && !selectedCell) {
             const todayStr = new Date().toISOString().split('T')[0];
             if (dataMap[todayStr]) {
                 setSelectedCell(dataMap[todayStr]);
             } else {
-                setSelectedCell(data[0]); // Most recent since ordered DESC
+                setSelectedCell(data[0]); 
             }
         }
     }, [data]);
@@ -57,11 +57,22 @@ const ActivityCalendar = ({ data }) => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 w-full">
-            {/* Calendar Grid (Left / Top) */}
-            <div className="w-full lg:w-1/2 flex flex-col gap-2">
-                <span className="text-[10px] font-google uppercase tracking-widest font-bold text-slate-500 mb-2">Past 30 Days</span>
-                <div className="grid grid-cols-7 gap-1.5 w-full max-w-[320px]">
+        <div className="flex flex-col lg:flex-row gap-8 w-full p-1">
+            {/* Calendar Grid (50%) */}
+            <div className="w-full lg:w-1/2 flex flex-col gap-4">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">Activity Overview</span>
+                    <div className="flex items-center gap-4">
+                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                            <div className="w-2 h-2 rounded-full border border-slate-200" /> IDLE
+                         </div>
+                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                            <div className="w-2 h-2 rounded-full bg-blue-500/50" /> ACTIVE
+                         </div>
+                    </div>
+                </div>
+                {/* 10 columns fits 30 days in 3 clean rows, with gap-4 as requested */}
+                <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-4 w-full">
                     {calendarDates.map((dateStr, i) => {
                         const cellData = dataMap[dateStr];
                         const count = cellData?.total_questions || 0;
@@ -73,79 +84,101 @@ const ActivityCalendar = ({ data }) => {
                                 key={dateStr}
                                 onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
                                 onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-square rounded-sm cursor-pointer transition-all duration-150 border relative ${isSelected ? 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-slate-800 z-10 scale-110' : 'hover:scale-110 z-0'}`}
+                                className={`aspect-square w-full max-w-[40px] rounded-md cursor-pointer transition-all duration-200 border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
                                 style={{ 
                                     backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
-                                    borderColor: count === 0 ? 'rgba(148, 163, 184, 0.2)' : 'rgba(59, 130, 246, 0.3)',
+                                    borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
                                 }}
-                                title={formatDateStr(dateStr)}
-                            />
+                            >
+                                <span className={`text-[10px] font-mono font-bold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-300 dark:text-slate-700'}`}>
+                                    {new Date(dateStr).getDate()}
+                                </span>
+                            </div>
                         );
                     })}
                 </div>
             </div>
 
-            {/* Selected Details Block (Right / Bottom) */}
+            {/* Inspector Panel (50%) */}
             <div className="w-full lg:w-1/2 flex flex-col">
-                {selectedCell && (selectedCell.total_questions > 0 || selectedCell.count === 0) ? (
-                    <div className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/50 p-5 rounded-sm shadow-sm flex-1">
-                        <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3">
-                            <span className="text-xs uppercase font-bold tracking-widest text-slate-800 dark:text-slate-200 font-google">
+                {selectedCell ? (
+                    <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        key={selectedCell.date}
+                        className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/40 p-6 rounded-lg shadow-sm flex-1 ring-1 ring-blue-500/5"
+                    >
+                        <div className="flex flex-col gap-1 mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
+                            <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-blue-500 dark:text-blue-400 font-google">Daily Inspector</span>
+                            <span className="text-lg font-bold text-slate-900 dark:text-slate-100 font-google">
                                 {formatDateStr(selectedCell.date)}
                             </span>
-                            <div className="flex items-center gap-1.5 opacity-80 bg-blue-500/15 px-2 py-0.5 rounded-sm border border-blue-500/30">
-                                <span className="material-symbols-outlined text-[14px] text-blue-500">group</span>
-                                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{selectedCell.interacted_users || 0} unique users</span>
-                            </div>
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-2 mb-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-                            <div className="flex flex-col">
-                                <span className="text-2xl font-bold font-google text-slate-800 dark:text-slate-200">{selectedCell.total_questions || 0}</span>
-                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1 leading-tight">Total<br/>Asked</span>
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="flex flex-col p-3 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-sm">
+                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google">Total Activity</span>
+                                <span className="text-2xl font-bold font-google text-slate-900 dark:text-slate-100 mt-1">{selectedCell.total_questions || 0}</span>
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-2xl font-bold font-google text-green-600 dark:text-green-500">{selectedCell.answered_questions || 0}</span>
-                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1 leading-tight">Successfully<br/>Answered</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className={`text-2xl font-bold font-google ${selectedCell.unanswered_questions > 0 ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}>{selectedCell.unanswered_questions || 0}</span>
-                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google mt-1 leading-tight">Failed to<br/>Answer</span>
+                            <div className="flex flex-col p-3 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-sm">
+                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google">Unique Users</span>
+                                <span className="text-2xl font-bold font-google text-blue-600 dark:text-blue-400 mt-1">{selectedCell.interacted_users || 0}</span>
                             </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col min-h-[60px] gap-4">
-                            {/* Top Queries */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-2">
+                                <span className="text-xs font-google text-slate-500 dark:text-slate-400">Answered Correct</span>
+                                <span className="text-sm font-bold text-green-600 dark:text-green-500">{selectedCell.answered_questions || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between p-2">
+                                <span className="text-xs font-google text-slate-500 dark:text-slate-400">Failed Response</span>
+                                <span className={`text-sm font-bold ${selectedCell.unanswered_questions > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                    {selectedCell.unanswered_questions || 0}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex-1 flex flex-col gap-5">
                             <div className="flex flex-col">
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-1.5 border-l-2 border-blue-500 pl-2">Top Queries</span>
-                                {selectedCell.top_questions && selectedCell.top_questions.length > 0 ? (
-                                    <ul className="space-y-1">
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-3 flex items-center gap-2">
+                                    <span className="w-1 h-3 bg-blue-500 rounded-full" />
+                                    Top Questions
+                                </span>
+                                {selectedCell.top_questions?.length > 0 ? (
+                                    <div className="space-y-2">
                                         {selectedCell.top_questions.map((q, qIdx) => (
-                                            <li key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 truncate w-full" title={q}>- "{q}"</li>
+                                            <p key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-slate-800/50 p-2 rounded-sm border border-slate-100 dark:border-slate-800">
+                                                "{q}"
+                                            </p>
                                         ))}
-                                    </ul>
+                                    </div>
                                 ) : (
-                                    <span className="text-xs font-google text-slate-400 italic">No queries logged</span>
+                                    <span className="text-xs font-google text-slate-400 italic">No activity recorded</span>
                                 )}
                             </div>
 
-                            {/* Top Unanswered */}
-                            {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered && selectedCell.top_unanswered.length > 0 && (
-                                <div className="flex flex-col mt-auto pt-2 border-t border-red-500/10">
-                                    <span className="text-[10px] uppercase tracking-widest text-red-400 font-bold font-google mb-1.5 border-l-2 border-red-500 pl-2 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">warning</span> Unanswered Queries</span>
-                                    <ul className="space-y-1">
+                            {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered?.length > 0 && (
+                                <div className="flex flex-col border-t border-red-500/10 pt-5">
+                                    <span className="text-[10px] uppercase tracking-widest text-red-400 font-bold font-google mb-3 flex items-center gap-2">
+                                        <span className="w-1 h-3 bg-red-500 rounded-full" />
+                                        Unanswered Queries
+                                    </span>
+                                    <div className="space-y-2">
                                         {selectedCell.top_unanswered.map((q, qIdx) => (
-                                            <li key={qIdx} className="text-xs font-google text-red-500/80 truncate w-full" title={q}>- "{q}"</li>
+                                            <p key={qIdx} className="text-xs font-google text-red-500/80 leading-relaxed border-l-2 border-red-500/30 pl-3">
+                                                "{q}"
+                                            </p>
                                         ))}
-                                    </ul>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </motion.div>
                 ) : (
-                    <div className="flex flex-col bg-slate-50 border-dashed dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-5 rounded-sm items-center justify-center h-full min-h-[220px]">
-                        <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">touch_app</span>
-                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold text-center">Interact with a block<br/>to view daily activity</p>
+                    <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 p-8 rounded-lg items-center justify-center h-full">
+                        <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">radar</span>
+                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold text-center">Select a day<br/>to inspect activity</p>
                     </div>
                 )}
             </div>
