@@ -349,8 +349,14 @@ const ChatWidget = ({ apiKey }) => {
                         // ── v14 ──
                         lead_capture_enabled: data.lead_capture_enabled || false,
                     });
-                    // Update the welcome message now that we have the real one
-                    setMessages([{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }]);
+                    leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
+                    // Only update the welcome message if the user hasn't started chatting yet
+                    setMessages(prev => {
+                        if (prev.length === 1 && prev[0].role === 'bot') {
+                            return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }];
+                        }
+                        return prev;
+                    });
                 }
             } catch (err) {
                 console.warn('[SaPyBase] Could not load bot config:', err);
@@ -371,6 +377,7 @@ const ChatWidget = ({ apiKey }) => {
     const leadCapturedRef = useRef(false);
     const leadFormShownRef = useRef(false);
     const userMessageCountRef = useRef(0);
+    const leadCaptureEnabledRef = useRef(false);
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -435,8 +442,8 @@ const ChatWidget = ({ apiKey }) => {
 
         if (showMenu) {
             document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
         }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMenu]);
 
     // ── Zone 1: Smart Scroll with Intent Detection ───────────────────────────
@@ -509,6 +516,12 @@ const ChatWidget = ({ apiKey }) => {
             }, 10);
         }
     }, [isOpen, forceScrollToBottom]);
+
+    useEffect(() => {
+        if (!inputRef.current) return;
+        inputRef.current.style.height = 'auto';
+        inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+    }, [input]);
 
     // Zone 2 removed — token buffering moved inside TypewriterContent (jitter buffer architecture)
     // Parent state is never updated during streaming; only TypewriterContent's local state changes.
@@ -643,12 +656,20 @@ const ChatWidget = ({ apiKey }) => {
                         forceScrollToBottom(true);
 
                         // ── LEAD CAPTURE TRIGGER LOGIC ──
-                        if (configData.lead_capture_enabled && !leadCapturedRef.current && !leadFormShownRef.current) {
+                        if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current) {
                             const lowerReply = fullContent.toLowerCase();
+                            const lowerUserMsg = userMessage.toLowerCase();
                             const intentWords = [
                                 "contact us", "reach out", "get in touch", "schedule", "book a", "free trial",
                                 "pricing", "get started", "sign up", "demo", "consultation", "quote",
                                 "let us know", "our team will", "speak with", "talk to"
+                            ];
+                            // Buying-signal words in the user's own message
+                            const userIntentWords = [
+                                "quote", "price", "pricing", "cost", "how much", "rate", "package",
+                                "buy", "purchase", "hire", "get started", "book", "order", "interested",
+                                "want to", "i need", "can you build", "can you make", "can you create",
+                                "build me", "make me", "create me", "help me build", "looking for"
                             ];
                             const fallbackPhrases = [
                                 "does not appear in my knowledge base",
@@ -656,12 +677,13 @@ const ChatWidget = ({ apiKey }) => {
                                 "please reach out to",
                                 "contact our support"
                             ];
-                            
+
                             const isIntent = intentWords.some(w => lowerReply.includes(w));
+                            const isUserIntent = userIntentWords.some(w => lowerUserMsg.includes(w));
                             const isFallback = fallbackPhrases.some(w => lowerReply.includes(w));
                             const isThirdMessage = userMessageCountRef.current === 3;
                             
-                            if (isIntent || isFallback || isThirdMessage) {
+                            if (isIntent || isUserIntent || isFallback || isThirdMessage) {
                                 leadFormShownRef.current = true;
                                 setTimeout(() => {
                                     setMessages(prev => {
@@ -670,7 +692,7 @@ const ChatWidget = ({ apiKey }) => {
                                         return [...prev, { role: 'lead_capture', id: 'lead-form' }];
                                     });
                                     setTimeout(() => forceScrollToBottom(true), 100);
-                                }, isIntent ? 1500 : 2000);
+                                }, (isIntent || isUserIntent) ? 1500 : 2000);
                             }
                         }
 
@@ -753,6 +775,7 @@ const ChatWidget = ({ apiKey }) => {
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
+            if (isLoading) return;
             handleSend();
         }
     };
@@ -874,6 +897,10 @@ const ChatWidget = ({ apiKey }) => {
                                                 <button
                                                     onClick={() => {
                                                         setMessages([{ role: 'bot', content: configData.initial_message }]);
+                                                        userMessageCountRef.current = 0;
+                                                        leadCapturedRef.current = false;
+                                                        leadFormShownRef.current = false;
+                                                        animatedMsgIndices.current.clear();
                                                         setShowMenu(false);
                                                     }}
                                                     className="w-full text-left px-4 py-2 text-md font-bold font-sans text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700"
@@ -938,15 +965,15 @@ const ChatWidget = ({ apiKey }) => {
                                                             contextString={messages.slice(Math.max(0, idx - 4), idx).filter(m => m.role === 'user').map(m => m.content).join(' || ')}
                                                             onSubmit={(name) => {
                                                                 leadCapturedRef.current = true;
-                                                                setMessages(prev => {
-                                                                    const copy = [...prev];
-                                                                    copy[idx] = { role: 'bot', content: `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉` };
-                                                                    return copy;
-                                                                });
+                                                                setMessages(prev => prev.map(m =>
+                                                                    m.id === 'lead-form'
+                                                                        ? { role: 'bot', content: `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉` }
+                                                                        : m
+                                                                ));
                                                             }}
                                                             onDismiss={() => {
                                                                 leadCapturedRef.current = true;
-                                                                setMessages(prev => prev.filter((_, i) => i !== idx));
+                                                                setMessages(prev => prev.filter(m => m.id !== 'lead-form'));
                                                             }}
                                                         />
                                                     ) : (
@@ -1003,31 +1030,31 @@ const ChatWidget = ({ apiKey }) => {
                             </a>
                         </div>
 
-                        {/* Quick Questions & Input Area */}
+                        {/* Quick Questions — float above input, right-aligned in message area */}
+                        {messages.length === 1 && !input.trim() && configData.quick_questions?.length > 0 && (
+                            <div className="shrink-0 flex flex-col items-end gap-2 px-3 pb-3 pt-1">
+                                {configData.quick_questions.map((q, qidx) => {
+                                    const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
+                                    if (!label) return null;
+                                    return (
+                                    <button
+                                        key={qidx}
+                                        onClick={() => { setInput(label); inputRef.current?.focus(); }}
+                                        className="px-4 py-2.5 border rounded-full text-sm font-semibold font-sans transition-colors whitespace-nowrap bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 shadow-sm"
+                                        style={{ touchAction: 'manipulation' }}
+                                    >
+                                        {label}
+                                    </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Input Area */}
                         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
-                            {/* Quick Questions Area */}
-                            {messages.length === 1 && configData.quick_questions?.length > 0 && (
-                                <div className="px-3 pt-3 pb-1 flex gap-2 overflow-x-auto scrollbar-hide snap-x">
-                                    {configData.quick_questions.map((q, qidx) => (
-                                        <button
-                                            key={qidx}
-                                            onClick={() => { setInput(q.prompt); inputRef.current?.focus(); }}
-                                            className="shrink-0 snap-start px-3 py-1.5 border text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-colors whitespace-nowrap"
-                                            style={{
-                                                touchAction: 'manipulation',
-                                                color: THEME_COLOR,
-                                                borderColor: THEME_COLOR.startsWith('#') ? `${THEME_COLOR}33` : THEME_COLOR,
-                                                backgroundColor: THEME_COLOR.startsWith('#') ? `${THEME_COLOR}15` : 'transparent'
-                                            }}
-                                        >
-                                            {q.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
 
                             {/* Actual Input Box with Safe Area Support */}
-                            <div className="p-2 sm:p-2 w-full pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
+                            <div className="p-2 sm:p-2 w-full shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
                                 <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                                     <textarea
                                         ref={inputRef}

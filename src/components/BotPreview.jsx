@@ -112,24 +112,25 @@ const BotPreview = ({ theme = 'light' }) => {
                     <div className="flex-1" />
                 </div>
 
-                {/* ── Footer ── */}
-                <div className={`backdrop-blur-2xl border-t shrink-0 p-4 pt-2 ${isDark ? 'bg-slate-900/95 border-slate-800/50' : 'bg-white/95 border-gray-200/50'}`}>
-                    <div className="pb-4 flex gap-2 overflow-x-auto no-scrollbar">
+                {/* ── Quick Questions — float above footer, right-aligned ── */}
+                {(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []).filter(q => typeof q === 'string' ? q : q.label).length > 0 && (
+                    <div className="flex flex-col items-end gap-2 px-3 pb-3 pt-1 shrink-0">
                         {(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : [])
-                            .filter(q => q.label)
-                            .map((q, idx) => (
+                            .map(q => typeof q === 'string' ? q : (q.label || ''))
+                            .filter(Boolean)
+                            .map((label, idx) => (
                                 <button
                                     key={idx}
-                                    className={`shrink-0 px-4 py-2 border text-[10px] uppercase tracking-widest font-bold font-sans rounded-full transition-all active:scale-95 whitespace-nowrap shadow-sm ${isDark ? 'bg-slate-800 hover:opacity-80' : 'bg-white hover:opacity-80'}`}
-                                    style={{
-                                        borderColor: `${THEME_COLOR}30`,
-                                        color: THEME_COLOR
-                                    }}
+                                    className={`px-4 py-2.5 border rounded-full text-sm font-semibold font-sans whitespace-nowrap shadow-sm transition-colors ${isDark ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-slate-500' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-400'}`}
                                 >
-                                    {q.label}
+                                    {label}
                                 </button>
                             ))}
                     </div>
+                )}
+
+                {/* ── Footer ── */}
+                <div className={`backdrop-blur-2xl border-t shrink-0 p-4 pt-2 ${isDark ? 'bg-slate-900/95 border-slate-800/50' : 'bg-white/95 border-gray-200/50'}`}>
                     <div className={`flex items-center gap-2 border rounded-xl px-4 py-2.5 shadow-xs ${isDark ? 'bg-slate-950 border-slate-800/60' : 'bg-[#FAFAFA] border-gray-200/60'}`}>
                         <input
                             readOnly

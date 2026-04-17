@@ -604,6 +604,27 @@ embeddings_model_query = GoogleGenerativeAIEmbeddings(model="models/gemini-embed
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 
 
+def safe_json_loads(val):
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except Exception:
+            return []
+    return val or []
+
+
+def normalize_quick_questions(raw):
+    """Convert stored quick_questions (old {label,prompt} or new plain string) to list[str]."""
+    items = safe_json_loads(raw)
+    result = []
+    for item in items:
+        if isinstance(item, dict):
+            result.append(item.get("label") or item.get("prompt") or "")
+        elif isinstance(item, str):
+            result.append(item)
+    return [q for q in result if q]
+
+
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
     """
     ── THE IRONCLAD SECURITY SHIELD ──────────────────────────────────────────
@@ -665,7 +686,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "bot_name": company_data[6] or "Sapy AI",
         "logo_url": company_data[7] or "/SB_loading.svg",
         "initial_message": company_data[8] or "Hi! How can I help you today?",
-        "quick_questions": company_data[9] or [],
+        "quick_questions": normalize_quick_questions(company_data[9]),
         "logo_shape": company_data[10] or "circle",
         "custom_logo_url": company_data[11],
         "avatar_bg_style": company_data[12] or "none",
@@ -996,14 +1017,6 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
         if not company_row:
             return None
 
-        def safe_json_loads(val):
-            if isinstance(val, str):
-                try:
-                    return json.loads(val)
-                except:
-                    return []
-            return val or []
-
         return {
             "id": company_row[0],
             "company_name": company_row[1],
@@ -1014,7 +1027,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "bot_name": company_row[6],
             "logo_url": company_row[7],
             "initial_message": company_row[8],
-            "quick_questions": safe_json_loads(company_row[9]), # Safe parsing
+            "quick_questions": normalize_quick_questions(company_row[9]),
             "system_prompt": company_row[10],
             "ai_model": company_row[11],
             "logo_shape": company_row[12] or "circle",
@@ -1134,7 +1147,14 @@ async def update_company_details(
             if field == "company_id":
                 continue
             if field == "quick_questions" and value is not None:
-                value = json.dumps(value)
+                # Normalise to plain string list before storing
+                normalised = []
+                for item in value:
+                    if isinstance(item, dict):
+                        normalised.append(item.get("label") or item.get("prompt") or "")
+                    elif isinstance(item, str):
+                        normalised.append(item)
+                value = json.dumps([q for q in normalised if q])
             # Sanitise custom_logo_url before storing
             if field == "custom_logo_url" and value:
                 value = value.strip()
