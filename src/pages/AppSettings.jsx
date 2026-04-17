@@ -284,56 +284,40 @@ export const CustomizeSection = () => {
 
                                 {/* Quick Questions */}
                                 <div>
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center justify-between mb-1.5">
                                         <label className={labelCls + ' mb-0'}>Quick Questions</label>
                                         <button
-                                            onClick={() => updateSetting('quickQuestions', [...botSettings.quickQuestions, { label: '', prompt: '' }])}
+                                            onClick={() => updateSetting('quickQuestions', [...(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []), ''])}
                                             className="p-1 px-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-500 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors flex items-center gap-1.5"
                                         >
-                                            <span className="material-symbols-outlined text-[12px]">add</span> Add Question
+                                            <span className="material-symbols-outlined text-[12px]">add</span> Add
                                         </button>
                                     </div>
-                                    <div className="space-y-3">
+                                    <p className="text-md font-sans text-slate-400 dark:text-slate-500 mb-3">Each chip appears in the chat as a quick question. The text is both the label and the message sent to the bot.</p>
+                                    <div className="space-y-2">
                                         {(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []).map((q, idx) => (
-                                            <div key={idx} className="p-4 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 space-y-3 relative group transition-colors">
+                                            <div key={idx} className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={typeof q === 'string' ? q : (q.label || '')}
+                                                    onChange={e => {
+                                                        const newQs = [...botSettings.quickQuestions];
+                                                        newQs[idx] = e.target.value;
+                                                        updateSetting('quickQuestions', newQs);
+                                                    }}
+                                                    className={inputCls + ' text-md font-semibold py-2'}
+                                                    placeholder="e.g. What are your pricing plans?"
+                                                />
                                                 <button
                                                     onClick={() => {
                                                         const newQs = [...botSettings.quickQuestions];
                                                         newQs.splice(idx, 1);
                                                         updateSetting('quickQuestions', newQs);
                                                     }}
-                                                    className="absolute top-2 right-2 p-1.5 text-slate-500 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors shrink-0"
                                                 >
-                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                    <span className="material-symbols-outlined text-[16px]">delete</span>
                                                 </button>
-                                                <div>
-                                                    <p className="text-lg uppercase tracking-widest font-bold text-slate-500 font-sans mb-1.5 transition-colors">Label (Button Text)</p>
-                                                    <input
-                                                        type="text"
-                                                        value={q.label}
-                                                        onChange={e => {
-                                                            const newQs = [...botSettings.quickQuestions];
-                                                            newQs[idx].label = e.target.value;
-                                                            updateSetting('quickQuestions', newQs);
-                                                        }}
-                                                        className={inputCls + ' text-md font-semibold py-2'}
-                                                        placeholder="e.g. Pricing"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <p className="text-lg uppercase tracking-widest font-bold text-slate-500 font-sans mb-1.5 transition-colors">Prompt (Hidden Message)</p>
-                                                    <input
-                                                        type="text"
-                                                        value={q.prompt}
-                                                        onChange={e => {
-                                                            const newQs = [...botSettings.quickQuestions];
-                                                            newQs[idx].prompt = e.target.value;
-                                                            updateSetting('quickQuestions', newQs);
-                                                        }}
-                                                        className={inputCls + ' text-md font-semibold py-2'}
-                                                        placeholder="e.g. Tell me about your pricing plans"
-                                                    />
-                                                </div>
                                             </div>
                                         ))}
                                     </div>
