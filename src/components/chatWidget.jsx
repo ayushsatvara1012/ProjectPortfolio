@@ -214,6 +214,92 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
     );
 };
 
+const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey, contextString, error }) => {
+    const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [localError, setLocalError] = useState(error || '');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLocalError('');
+        
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!email.match(emailRegex)) {
+            setLocalError('Please enter a valid email address.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const res = await fetch(`${activeApiUrl}/api/leads/capture`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                },
+                body: JSON.stringify({ email, name, context: contextString })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to submit.');
+            onSubmit(name);
+        } catch (err) {
+            setLocalError('Something went wrong. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
+            <h4 className="text-md font-sans font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+                Leave your details<br/>and we'll follow up!
+            </h4>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                <input
+                    type="text"
+                    placeholder="Name (optional)"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
+                    style={{ '--tw-ring-color': themeColor }}
+                />
+                <div className="flex flex-col gap-1">
+                    <input
+                        type="email"
+                        placeholder="Email address (required)"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        required
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
+                        style={{ '--tw-ring-color': themeColor }}
+                    />
+                    {localError && <span className="text-[11px] text-red-500 font-bold px-1">{localError}</span>}
+                </div>
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full mt-1 rounded-xl py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    style={{ backgroundColor: themeColor }}
+                >
+                    {isSubmitting ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : 'Submit'}
+                </button>
+            </form>
+            <div className="text-center mt-3">
+                <button 
+                    onClick={onDismiss}
+                    type="button"
+                    className="text-[11px] text-slate-400 hover:text-slate-500 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                >
+                    No thanks
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 const ChatWidget = ({ apiKey }) => {
     // 1. Resolve API Key & Base URL
@@ -260,6 +346,8 @@ const ChatWidget = ({ apiKey }) => {
                         logo_shape: data.logo_shape || 'circle',
                         custom_logo_url: data.custom_logo_url || '',
                         avatar_bg_style: data.avatar_bg_style || 'none',
+                        // ── v14 ──
+                        lead_capture_enabled: data.lead_capture_enabled || false,
                     });
                     // Update the welcome message now that we have the real one
                     setMessages([{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }]);
@@ -278,6 +366,11 @@ const ChatWidget = ({ apiKey }) => {
     const LOGO_URL = configData.custom_logo_url || configData.logo_url;
     const LOGO_SHAPE = configData.logo_shape || 'circle';
     const AVATAR_BG_STYLE = configData.avatar_bg_style || 'none';
+
+    // ── LEAD CAPTURE REFS ──
+    const leadCapturedRef = useRef(false);
+    const leadFormShownRef = useRef(false);
+    const userMessageCountRef = useRef(0);
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -425,6 +518,7 @@ const ChatWidget = ({ apiKey }) => {
         if (!input.trim()) return;
 
         const userMessage = input.trim();
+        userMessageCountRef.current += 1;
         // Add user message + immediately seed a bot message bubble for the thinking state
         setMessages(prev => [
             ...prev,
@@ -547,6 +641,39 @@ const ChatWidget = ({ apiKey }) => {
                         });
                         setIsLoading(false);
                         forceScrollToBottom(true);
+
+                        // ── LEAD CAPTURE TRIGGER LOGIC ──
+                        if (configData.lead_capture_enabled && !leadCapturedRef.current && !leadFormShownRef.current) {
+                            const lowerReply = fullContent.toLowerCase();
+                            const intentWords = [
+                                "contact us", "reach out", "get in touch", "schedule", "book a", "free trial",
+                                "pricing", "get started", "sign up", "demo", "consultation", "quote",
+                                "let us know", "our team will", "speak with", "talk to"
+                            ];
+                            const fallbackPhrases = [
+                                "does not appear in my knowledge base",
+                                "don't have information on that",
+                                "please reach out to",
+                                "contact our support"
+                            ];
+                            
+                            const isIntent = intentWords.some(w => lowerReply.includes(w));
+                            const isFallback = fallbackPhrases.some(w => lowerReply.includes(w));
+                            const isThirdMessage = userMessageCountRef.current === 3;
+                            
+                            if (isIntent || isFallback || isThirdMessage) {
+                                leadFormShownRef.current = true;
+                                setTimeout(() => {
+                                    setMessages(prev => {
+                                        // Ensure it hasn't been added already (race condition check)
+                                        if (prev.some(m => m.role === 'lead_capture')) return prev;
+                                        return [...prev, { role: 'lead_capture', id: 'lead-form' }];
+                                    });
+                                    setTimeout(() => forceScrollToBottom(true), 100);
+                                }, isIntent ? 1500 : 2000);
+                            }
+                        }
+
                         return;
                     }
 
@@ -803,6 +930,26 @@ const ChatWidget = ({ apiKey }) => {
                                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                                     className={`flex min-w-0 max-w-[96%] sm:max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
                                                 >
+                                                    {msg.role === 'lead_capture' ? (
+                                                        <LeadCaptureForm
+                                                            themeColor={THEME_COLOR}
+                                                            activeApiUrl={activeApiUrl}
+                                                            apiKey={activeApiKey}
+                                                            contextString={messages.slice(Math.max(0, idx - 4), idx).filter(m => m.role === 'user').map(m => m.content).join(' || ')}
+                                                            onSubmit={(name) => {
+                                                                leadCapturedRef.current = true;
+                                                                setMessages(prev => {
+                                                                    const copy = [...prev];
+                                                                    copy[idx] = { role: 'bot', content: `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉` };
+                                                                    return copy;
+                                                                });
+                                                            }}
+                                                            onDismiss={() => {
+                                                                leadCapturedRef.current = true;
+                                                                setMessages(prev => prev.filter((_, i) => i !== idx));
+                                                            }}
+                                                        />
+                                                    ) : (
                                                     <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                         {msg.role === 'bot' ? (
                                                             <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
@@ -833,6 +980,7 @@ const ChatWidget = ({ apiKey }) => {
                                                             )}
                                                         </div>
                                                     </div>
+                                                    )}
                                                 </motion.div>
                                             );
                                         })}

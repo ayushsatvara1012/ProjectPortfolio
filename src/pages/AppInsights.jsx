@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useUserRole } from '../context/UserContext';
 import { useAuthenticatedFetch } from '../hooks/useApiCall';
 import UpgradePrompt from '../components/UpgradePrompt';
+import LeadsPanel from '../components/LeadsPanel';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -189,8 +190,10 @@ const ActivityCalendar = ({ data }) => {
     );
 };
 
+const AUTHORIZED_TIERS = new Set(['PRO', 'ENTERPRISE']);
+
 const AppInsights = () => {
-    const { userTier, isLoading: ctxLoading } = useUserRole();
+    const { userTier, userRole, isLoading: ctxLoading } = useUserRole();
     const authFetch = useAuthenticatedFetch();
 
     const { data: botsData, isLoading: botsLoading } = useQuery({
@@ -212,11 +215,12 @@ const AppInsights = () => {
     const [error, setError] = useState('');
     const [isGhostTown, setIsGhostTown] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState(null);
+    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' or 'leads'
 
     // Silently try to load a cached report on mount
     useEffect(() => {
-        if (selectedBotId && userTier === 'PRO') handleGenerate(true);
-    }, [selectedBotId, userTier]);
+        if (selectedBotId && AUTHORIZED_TIERS.has(userTier)) handleGenerate(true);
+    }, [selectedBotId, userTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleGenerate = async (silentLoad = false) => {
         if (!selectedBotId) return;
@@ -266,17 +270,17 @@ const AppInsights = () => {
                     <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
                         AI-synthesized business intelligence from your chat logs. Reports refresh every 24 hours.
                     </p>
-                    {lastGeneratedAt && (
+                    {lastGeneratedAt && activeTab === 'analytics' && (
                         <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mt-1.5 transition-colors">
                             Last generated: {lastGeneratedAt}
                         </p>
                     )}
                 </div>
-                {userTier === 'PRO' && (
+                {AUTHORIZED_TIERS.has(userTier) && activeTab === 'analytics' && (
                     <button
                         onClick={() => handleGenerate(false)}
                         disabled={isGenerating || !selectedBotId}
-                        className="shrink-0 px-8 py-3 min-h-[44px] bg-slate-900 dark:bg-indigo-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        className="shrink-0 px-8 py-3 min-h-[44px] bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                         {isGenerating ? (
                             <>
@@ -293,8 +297,8 @@ const AppInsights = () => {
                 )}
             </div>
 
-            {/* Persistent Bot Selector (Fixed issue: visible even in Ghost Town) */}
-            {userTier === 'PRO' && bots.length > 1 && (
+            {/* Persistent Bot Selector */}
+            {AUTHORIZED_TIERS.has(userTier) && bots.length > 1 && (
                 <div className="mt-5 pt-5 border-t border-gray-50 dark:border-slate-800/50 flex items-center gap-4 shrink-0 transition-colors duration-500">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
                         Reporting for
@@ -302,7 +306,7 @@ const AppInsights = () => {
                     <select
                         value={selectedBotId}
                         onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 max-w-xs px-3 py-2 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-indigo-500/50 text-sm font-mono text-slate-900 dark:text-slate-200 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
+                        className="flex-1 max-w-xs px-3 py-2 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 text-sm font-mono text-slate-900 dark:text-slate-200 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
                     >
                         {bots.map(b => (
                             <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
@@ -310,6 +314,30 @@ const AppInsights = () => {
                     </select>
                 </div>
             )}
+            
+            {/* Tabs */}
+            <div className="mt-6 flex items-center gap-6 border-b border-gray-100 dark:border-slate-800">
+                <button
+                    onClick={() => setActiveTab('analytics')}
+                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 ${
+                        activeTab === 'analytics' 
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    Analytics Report
+                </button>
+                <button
+                    onClick={() => setActiveTab('leads')}
+                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
+                        activeTab === 'leads' 
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    Leads CRM
+                </button>
+            </div>
         </div>
     );
 
@@ -351,18 +379,29 @@ const AppInsights = () => {
             {/* Content Area */}
             <div className="flex-1 overflow-auto custom-scrollbar flex flex-col">
                 
-                {/* ── Tier Gate ── */}
-                {userTier !== 'PRO' && (
-                    <div className="p-8">
-                        <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
-                    </div>
+                {activeTab === 'leads' && (
+                    <LeadsPanel
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        userTier={userTier}
+                        userRole={userRole}
+                    />
                 )}
 
-                {userTier === 'PRO' && reportData && !isGenerating && !error && (
-                    <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1">
-                        
-                        {/* ── ROI Scorecards (Top Row) ── */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800">
+                {activeTab === 'analytics' && (
+                    <>
+                        {/* ── Tier Gate ── */}
+                        {!AUTHORIZED_TIERS.has(userTier) && (
+                            <div className="p-8">
+                                <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
+                            </div>
+                        )}
+
+                        {AUTHORIZED_TIERS.has(userTier) && reportData && !isGenerating && !error && (
+                            <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1">
+                                
+                                {/* ── ROI Scorecards (Top Row) ── */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800">
                             {/* Support Hours Saved */}
                             <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                                 <div className="flex items-center gap-2 mb-3">
@@ -521,7 +560,7 @@ const AppInsights = () => {
                 )}
 
                 {/* ── Error Banner ── */}
-                {userTier === 'PRO' && error && (
+                {AUTHORIZED_TIERS.has(userTier) && error && (
                     <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-8 py-4 flex items-start gap-3 shrink-0">
                         <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
                         <p className="text-md font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
@@ -530,7 +569,7 @@ const AppInsights = () => {
                 )}
 
                 {/* ── Ghost Town ── */}
-                {userTier === 'PRO' && isGhostTown && !isGenerating && (
+                {AUTHORIZED_TIERS.has(userTier) && isGhostTown && !isGenerating && (
                     <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-12 text-center`}>
                         <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                             <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
@@ -539,12 +578,12 @@ const AppInsights = () => {
                         <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
                             Your bot hasn't had any conversations yet. Check back once users start interacting!
                         </p>
-                        <Link to="/app/bots" className="px-8 py-3 bg-slate-900 dark:bg-indigo-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-all active:scale-95">View My Bots</Link>
+                        <Link to="/app/bots" className="px-8 py-3 bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-all active:scale-95">View My Bots</Link>
                     </div>
                 )}
 
                 {/* ── Empty State ── */}
-                {userTier === 'PRO' && !reportData && !isGenerating && !error && !isGhostTown && (
+                {AUTHORIZED_TIERS.has(userTier) && !reportData && !isGenerating && !error && !isGhostTown && (
                     <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-12 text-center`}>
                         <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                             <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
@@ -555,12 +594,14 @@ const AppInsights = () => {
                 )}
 
                 {/* ── Loading Spinner ── */}
-                {userTier === 'PRO' && isGenerating && (
+                {AUTHORIZED_TIERS.has(userTier) && isGenerating && (
                     <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-12 text-center`}>
-                        <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-indigo-500 animate-spin mb-5" />
+                        <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5" />
                         <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
                         <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
                     </div>
+                )}
+                </>
                 )}
             </div>
         </motion.div>
