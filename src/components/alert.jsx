@@ -55,7 +55,7 @@ const Alert = ({ message, isOpen, onClose, title, type = 'success' }) => {
         </div>
 
         {/* Close Button */}
-        <button onClick={onClose} className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors">
+        <button onClick={onClose} className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-colors flex items-center justify-center">
           <span className="material-symbols-outlined text-[16px] text-slate-400 dark:hover:text-white">close</span>
         </button>
       </div>

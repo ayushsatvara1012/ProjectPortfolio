@@ -29,6 +29,13 @@ const LIMIT_CONFIG = {
     tip: (tier, limit) =>
       `Your ${tier} plan allows ${limit?.toLocaleString()} knowledge chunks. Upgrade to train on more data.`,
   },
+  CHUNK_QUOTA_OVERFLOW: {
+    icon: Database,
+    title: 'File Too Large for Plan',
+    accent: 'rose',
+    tip: () => 'This file exceeds your remaining chunk quota. Please use smaller files or upgrade to get more storage.',
+  },
+
   DEFAULT: {
     icon: Zap,
     title: 'Plan Limit Reached',

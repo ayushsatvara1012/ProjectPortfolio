@@ -541,6 +541,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
     history: Optional[list[ChatMessage]] = Field(None, description="Last N chat messages for context-aware caching")
+    session_id: Optional[str] = Field(None, description="Client-side session tracking id")
 
     @validator('message')
     def sanitize_jailbreak_patterns(cls, v):
@@ -557,6 +558,19 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     sources: list[str]
+
+class LeadCaptureRequest(BaseModel):
+    email: str = Field(..., max_length=255)
+    name: Optional[str] = Field(None, max_length=100)
+    context: Optional[str] = Field(None, max_length=500)
+    
+    @validator('email')
+    def validate_email(cls, v):
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, v.strip()):
+            raise ValueError('Invalid email address')
+        return v.strip().lower()
 
 class SubscriptionRequest(BaseModel):
     tier: str # Starter, Pro, Enterprise
@@ -617,10 +631,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT id, company_name, company_tone, theme_color, allowed_origin, 
-                   system_prompt, bot_name, logo_url, initial_message, quick_questions,
-                   logo_shape, custom_logo_url, avatar_bg_style
-            FROM companies WHERE api_key = %s
+            SELECT c.id, c.company_name, c.company_tone, c.theme_color, c.allowed_origin, 
+                   c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
+                   c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role
+            FROM companies c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.api_key = %s
             """, 
             (hashed_key,)
         )
@@ -632,6 +648,11 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     if not company_data:
         # SECURITY: Do NOT log any part of the key or hash in production.
         raise HTTPException(status_code=401, detail="Invalid API Key.")
+
+    # Determine if lead capture is enabled for this company
+    tier = (company_data[13] or "FREE").upper()
+    role = company_data[14]
+    lead_capture_enabled = tier in ["PRO", "ENTERPRISE"] or role == "SUPER_ADMIN"
 
     # Package the company data
     company = {
@@ -648,6 +669,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "logo_shape": company_data[10] or "circle",
         "custom_logo_url": company_data[11],
         "avatar_bg_style": company_data[12] or "none",
+        "lead_capture_enabled": lead_capture_enabled,
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -1201,16 +1223,16 @@ FALLBACK_PHRASES = [
     "i'm here specifically to help you with",
 ]
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool):
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered)
-               VALUES (%s, %s, %s, %s, %s)""",
-            (company_id, user_query, bot_response, was_cache_hit, is_unanswered)
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id)
         )
         conn.commit()
     except Exception as e:
@@ -1334,7 +1356,7 @@ async def chat_endpoint(
                 # ── ASYNC ANALYTICS LOG (cache hit) ──────────────────────────
                 background_tasks.add_task(
                     log_chat_to_db, company["id"], chat_req.message,
-                    cached_response, True, False  # was_cache_hit=True, is_unanswered=False
+                    cached_response, True, False, chat_req.session_id
                 )
 
                 return ChatResponse(
@@ -1533,7 +1555,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
                     background_tasks.add_task(
                         log_chat_to_db, company["id"], chat_req.message,
-                        full_reply, False, is_un_final
+                        full_reply, False, is_un_final, chat_req.session_id
                     )
 
                     # 3. Usage Tracking (Background Task)
@@ -1550,6 +1572,215 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail="Internal connection error")
+    finally:
+        release_db_connection(conn)
+
+# ── LEAD CAPTURE ENDPOINTS ────────────────────────────────────────────────────
+
+@app.post("/api/leads/capture")
+@limiter.limit("3/minute", key_func=get_remote_address)
+def capture_lead(
+    request: Request,
+    payload: LeadCaptureRequest,
+    company: dict = Depends(verify_api_key_and_origin)
+):
+    """Public endpoint to capture leads from the widget."""
+    if not company.get("lead_capture_enabled"):
+        raise HTTPException(status_code=403, detail="Lead capture requires a Pro plan.")
+    
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # Deduplication check (24 hours)
+        cursor.execute(
+            """
+            SELECT id FROM lead_capture 
+            WHERE company_id = %s AND email = %s AND created_at > NOW() - INTERVAL '24 hours'
+            """,
+            (company["id"], payload.email)
+        )
+        if cursor.fetchone():
+            return {"status": "duplicate", "message": "Lead already captured recently"}
+
+        cursor.execute(
+            """
+            INSERT INTO lead_capture (company_id, email, name, context) 
+            VALUES (%s, %s, %s, %s) RETURNING id
+            """,
+            (company["id"], payload.email, payload.name, payload.context)
+        )
+        lead_id = cursor.fetchone()[0]
+        conn.commit()
+        return {"status": "success", "lead_id": str(lead_id)}
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"LEAD CAPTURE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/leads/{company_id}")
+def list_leads(
+    company_id: str,
+    page: int = 1,
+    limit: int = 50,
+    user: dict = Depends(get_current_user)
+):
+    """Fetch paginated leads for the dashboard."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # Verify ownership
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+            
+        # Tier gate
+        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
+        user_row = cursor.fetchone()
+        if user_row:
+            user_tier, user_role = user_row
+            tier_upper = (user_tier or "FREE").upper()
+            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
+                raise HTTPException(status_code=402, detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Lead management requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                })
+
+        offset = (page - 1) * limit
+        cursor.execute("SELECT COUNT(*) FROM lead_capture WHERE company_id = %s", (company_id,))
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT id, email, name, context, created_at 
+            FROM lead_capture 
+            WHERE company_id = %s 
+            ORDER BY created_at DESC 
+            LIMIT %s OFFSET %s
+            """,
+            (company_id, limit, offset)
+        )
+        rows = cursor.fetchall()
+        
+        leads = []
+        for r in rows:
+            leads.append({
+                "id": r[0],
+                "email": r[1],
+                "name": r[2],
+                "context": r[3],
+                "created_at": r[4].isoformat() if r[4] else None
+            })
+            
+        return {
+            "leads": leads,
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit
+        }
+    finally:
+        release_db_connection(conn)
+
+@app.delete("/api/leads/{company_id}/{lead_id}")
+def delete_lead(
+    company_id: str,
+    lead_id: str,
+    user: dict = Depends(get_current_user)
+):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM lead_capture 
+            WHERE id = %s AND company_id = %s 
+            AND company_id IN (SELECT id FROM companies WHERE user_id = %s)
+            RETURNING id
+            """,
+            (lead_id, company_id, user["id"])
+        )
+        deleted = cursor.fetchone()
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Lead not found or unauthorized.")
+            
+        log_admin_action(cursor, user["id"], "DELETE_LEAD", f"Lead ID: {lead_id}")
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise e
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/leads/{company_id}/export")
+def export_leads(
+    company_id: str,
+    user: dict = Depends(get_current_user)
+):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Verify ownership
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+            
+        # Tier gate
+        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
+        user_row = cursor.fetchone()
+        if user_row:
+            user_tier, user_role = user_row
+            tier_upper = (user_tier or "FREE").upper()
+            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
+                raise HTTPException(status_code=402, detail="Export requires Pro plan.")
+
+        cursor.execute(
+            """
+            SELECT email, name, context, created_at 
+            FROM lead_capture 
+            WHERE company_id = %s 
+            ORDER BY created_at DESC
+            """,
+            (company_id,)
+        )
+        leads = cursor.fetchall()
+        
+        import csv, io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Email', 'Name', 'Context', 'Captured At'])
+        
+        def safe_csv(val):
+            if val is None: return ''
+            s = str(val)
+            if s and s[0] in ('=', '+', '-', '@'):
+                return "'" + s
+            return s
+
+        for row in leads:
+            writer.writerow([
+                safe_csv(row[0]),
+                safe_csv(row[1]),
+                safe_csv(row[2]),
+                row[3].isoformat() if row[3] else ''
+            ])
+
+        response_string = output.getvalue()
+        return StreamingResponse(
+            iter([response_string]), 
+            media_type="text/csv", 
+            headers={"Content-Disposition": f'attachment; filename="leads_{company_id[:8]}.csv"'}
+        )
     finally:
         release_db_connection(conn)
 
@@ -1665,16 +1896,69 @@ def generate_insight_report(
         potential_revenue = total_leads * avg_lead
 
         # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
+        # ── 30-DAY PEAK ACTIVITY BLOCKS (CTE) ────────────────────────────────
         cursor.execute("""
-            SELECT EXTRACT(ISODOW FROM created_at) AS day_of_week, 
-                   EXTRACT(HOUR FROM created_at) AS hour_of_day, 
-                   COUNT(*) 
-            FROM chat_logs 
-            WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-            GROUP BY day_of_week, hour_of_day
-        """, (company_id,))
-        heatmap_rows = cursor.fetchall()
-        heatmap_data = [{"day": int(r[0]), "hour": int(r[1]), "count": int(r[2])} for r in heatmap_rows]
+            WITH DailyStats AS (
+                SELECT 
+                    DATE(created_at) AS log_date,
+                    COUNT(DISTINCT session_id) as interacted_users,
+                    COUNT(id) as total_questions,
+                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
+                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at)
+            ),
+            DailyTopQueries AS (
+                SELECT 
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at), user_query
+            ),
+            DailyTopUnanswered AS (
+                SELECT 
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
+                GROUP BY DATE(created_at), user_query
+            )
+            SELECT 
+                s.log_date,
+                s.interacted_users,
+                s.total_questions,
+                s.answered_questions,
+                s.unanswered_questions,
+                q1.user_query as top_q1,
+                q2.user_query as top_q2,
+                u1.user_query as top_unanswered1,
+                u2.user_query as top_unanswered2
+            FROM DailyStats s
+            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
+            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
+            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
+            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
+            ORDER BY s.log_date DESC;
+        """, (company_id, company_id, company_id))
+        
+        blocks_rows = cursor.fetchall()
+        peak_activity_blocks = []
+        for r in blocks_rows:
+            peak_activity_blocks.append({
+                "date": r[0].isoformat() if r[0] else None,
+                "interacted_users": int(r[1]) if r[1] else 0,
+                "total_questions": int(r[2]) if r[2] else 0,
+                "answered_questions": int(r[3]) if r[3] else 0,
+                "unanswered_questions": int(r[4]) if r[4] else 0,
+                "top_questions": [q for q in [r[5], r[6]] if q],
+                "top_unanswered": [q for q in [r[7], r[8]] if q]
+            })
 
         # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
         cursor.execute(
@@ -1749,7 +2033,7 @@ Rules:
             "support_savings": f"${support_savings:.2f}", 
             "potential_revenue": f"${potential_revenue:.2f}"
         }
-        report_json["peak_activity_heatmap"] = heatmap_data
+        report_json["peak_activity_blocks"] = peak_activity_blocks
 
         # ── SAVE REPORT TO DB ────────────────────────────────────────────────
         cursor.execute(
@@ -1908,6 +2192,8 @@ async def run_training_job(
         chunks = all_chunks[:remaining]
         
         status["total"] = len(chunks)
+
+
         await set_job_status(job_id, status)
 
         BATCH_SIZE = 10
@@ -2056,6 +2342,25 @@ async def train_chatbot(
 
     if not docs:
         raise HTTPException(status_code=400, detail="No content extracted.")
+
+    # 2.5. QUOTA OVERFLOW CHECK: Estimate required chunks and block if too large
+    # This addresses the requirement to warn users and block massive uploads
+    # instead of just squeezing or truncating silently.
+    total_chars = sum(len(d.page_content) for d in docs)
+    # Naive estimation: 800 chars with 100 overlap = ~700 net chars per chunk
+    estimated_chunks = max(1, int(total_chars / 700))
+    remaining_quota = max(0, limit - current_count)
+
+    if estimated_chunks > remaining_quota:
+        raise HTTPException(status_code=402, detail={
+            "code": "CHUNK_QUOTA_OVERFLOW",
+            "message": "This file exceeds your remaining chunk quota. Please use smaller files or upgrade to get more storage.",
+            "current": current_count,
+            "limit": limit,
+            "tier": current_user["tier"],
+            "upgrade_url": "/app/pricing",
+        })
+
 
     # 3. Kick off background job — return immediately to prevent Render worker timeout
     job_id = str(uuid.uuid4())
