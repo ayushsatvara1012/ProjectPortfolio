@@ -107,8 +107,69 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
                 </div>
             ) : (
                 <div className={`${cellCls} flex-1 flex flex-col overflow-hidden`}>
-                    <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
-                        <table className="w-full text-left border-collapse sm:min-w-[800px]">
+
+                    {/* ── Mobile card list (hidden on sm+) ── */}
+                    <div className="sm:hidden flex-1 overflow-y-auto custom-scrollbar divide-y divide-gray-100 dark:divide-slate-800/50">
+                        {leads.map(lead => (
+                            <div key={lead.id} className="p-4 flex flex-col gap-3">
+                                {/* Contact row */}
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                        <span className="font-semibold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
+                                        {lead.name && (
+                                            <span className="text-sm text-slate-500 dark:text-slate-400 font-google tracking-wide">{lead.name}</span>
+                                        )}
+                                    </div>
+                                    {/* Delete action */}
+                                    {deleteConfirm === lead.id ? (
+                                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                            <span className="text-[10px] uppercase font-bold text-red-500 dark:text-red-400 animate-pulse">Confirm?</span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => deleteMutation.mutate(lead.id)}
+                                                    disabled={deleteMutation.isPending}
+                                                    className="text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded-sm disabled:opacity-50 transition-colors"
+                                                >
+                                                    Yes
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteConfirm(null)}
+                                                    className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-2 py-1 transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setDeleteConfirm(lead.id)}
+                                            className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                            title="Delete Lead"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Context */}
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">Context / Query</span>
+                                    <p className="text-sm font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap wrap-break-word">
+                                        {lead.context || "No context provided."}
+                                    </p>
+                                </div>
+
+                                {/* Captured at */}
+                                <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                                    {new Date(lead.created_at).toLocaleDateString()} &middot; {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* ── Desktop table (hidden on mobile) ── */}
+                    <div className="hidden sm:flex flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left border-collapse min-w-[800px]">
                             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900/90 shadow-sm transition-colors border-b border-gray-100 dark:border-slate-800 backdrop-blur-sm">
                                 <tr>
                                     <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50">Contact Info</th>
@@ -122,12 +183,12 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
                                     <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-slate-900/30 transition-colors">
                                         <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
                                             <div className="flex flex-col gap-0.5">
-                                                <span className="font-bold font-sans text-slate-900 dark:text-slate-100 text-sm break-all">{lead.email}</span>
-                                                {lead.name && <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tracking-wide">{lead.name}</span>}
+                                                <span className="font-bold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
+                                                {lead.name && <span className="text-md text-slate-500 dark:text-slate-400 font-mono tracking-wide">{lead.name}</span>}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
-                                            <p className="text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap break-words">
+                                            <p className="text-md font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap break-words">
                                                 {lead.context || "No context provided."}
                                             </p>
                                         </td>
@@ -143,14 +204,14 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
                                                 <div className="flex flex-col items-center gap-2">
                                                     <span className="text-[10px] uppercase font-bold text-red-500 dark:text-red-400 animate-pulse">Confirm?</span>
                                                     <div className="flex gap-2">
-                                                        <button 
+                                                        <button
                                                             onClick={() => deleteMutation.mutate(lead.id)}
                                                             disabled={deleteMutation.isPending}
                                                             className="text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded-sm disabled:opacity-50 transition-colors"
                                                         >
                                                             Yes
                                                         </button>
-                                                        <button 
+                                                        <button
                                                             onClick={() => setDeleteConfirm(null)}
                                                             className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-2 py-1 transition-colors"
                                                         >
