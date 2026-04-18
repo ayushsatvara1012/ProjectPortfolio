@@ -35,7 +35,8 @@ from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
 from polar_sdk.webhooks import WebhookVerificationError, validate_event
 from urllib.parse import urlparse
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader
@@ -609,8 +610,8 @@ class AdminUpdateUserRequest(BaseModel):
         extra = "forbid" # Prevents extra fields in the request
 
 # 5. Initialize Google AI Models
-embeddings_model_doc = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_document")
-embeddings_model_query = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GEMINI_KEY, task_type="retrieval_query")
+embeddings_model_doc = get_embedding_model("retrieval_document")
+embeddings_model_query = get_embedding_model("retrieval_query")
 
 # Deprecated: use get_tier_model(tier) instead
 
@@ -929,9 +930,10 @@ async def get_current_user(request: Request):
                 
                 # 4. Role Sync & "Only 1 Super Admin" Enforcement
                 # CRITICAL: Ensures no one else can EVER have the SUPER_ADMIN role.
-                admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
+                admin_emails_str = os.getenv("ADMIN_EMAILS") or os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL") or ""
+                admin_emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
                 
-                if user_email == admin_email:
+                if user_email in admin_emails:
                     # Auto-promote authorized Super Admin
                     if role != 'SUPER_ADMIN' or tier != 'PRO':
                         cursor.execute("UPDATE users SET role = 'SUPER_ADMIN', tier = 'PRO' WHERE id = %s", (user_id,))
@@ -971,12 +973,13 @@ async def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="Authentication failed")
 
 async def get_admin_user(user: dict = Depends(get_current_user)):
-    """Dependency to ensure the current user is the platform Super Admin."""
-    admin_email = os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL")
-    if user.get("role") != "SUPER_ADMIN" or user.get("email") != admin_email:
+    """Dependency to ensure the current user is a platform Super Admin."""
+    admin_emails_str = os.getenv("ADMIN_EMAILS") or os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL") or ""
+    admin_emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
+    if user.get("role") != "SUPER_ADMIN" or user.get("email") not in admin_emails:
         raise HTTPException(
             status_code=403, 
-            detail="Forbidden: This endpoint is restricted to the platform Super Admin."
+            detail="Forbidden: This endpoint is restricted to platform Super Admins."
         )
     return user
 
@@ -2631,8 +2634,8 @@ async def run_training_job(
             embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
             for chunk, embedding in zip(batch, embeddings_list):
-                if len(embedding) > 768:
-                    embedding = embedding[:768]
+                if len(embedding) > EMBEDDING_DIMENSIONS:
+                    embedding = embedding[:EMBEDDING_DIMENSIONS]
                 cursor.execute(
                     "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
                     (resolved_company_id, chunk.page_content, chunk.metadata.get("source", source_name), embedding)

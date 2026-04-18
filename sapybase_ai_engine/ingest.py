@@ -3,7 +3,7 @@ import psycopg2
 from pgvector.psycopg2 import register_vector
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
 
 # Load environment variables from .env
 load_dotenv()
@@ -25,12 +25,8 @@ def ingest_knowledge():
     chunks = splitter.split_text(raw_text)
     print(f"✂️ Split document into {len(chunks)} chunks.")
 
-    # 3. Initialize Gemini Embeddings
-    embeddings_model = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001", 
-        google_api_key=GEMINI_KEY,
-        task_type="retrieval_document"
-    )
+    # 3. Initialize Embeddings
+    embeddings_model = get_embedding_model("retrieval_document")
 
     # 4. Connect to Neon Database
     conn = psycopg2.connect(DB_URL)
@@ -44,14 +40,12 @@ def ingest_knowledge():
     
     # 5. Embed and Insert each chunk
     for i, chunk in enumerate(chunks):
-        # Generate the 768-dimension vector
         vector = embeddings_model.embed_query(chunk)
         if i == 0:
             print(f"📏 Vector dimension: {len(vector)}")
-        
-        # Truncate if necessary (some models return larger vectors by default)
-        if len(vector) > 768:
-            vector = vector[:768]
+
+        if len(vector) > EMBEDDING_DIMENSIONS:
+            vector = vector[:EMBEDDING_DIMENSIONS]
         
         # Insert into database
         cursor.execute(

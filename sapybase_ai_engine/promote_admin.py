@@ -8,11 +8,11 @@ import sys
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
-DB_URL = os.getenv("NEON_DATABASE_URL")
+DB_URL = os.getenv("DATABASE_URL")
 
-def promote_user(id_or_email, role="ADMIN"):
+def promote_user(id_or_email, role="SUPER_ADMIN"):
     if not DB_URL:
-        print("Error: NEON_DATABASE_URL not found in .env")
+        print("Error: DATABASE_URL not found in .env")
         return
 
     try:
@@ -47,5 +47,5 @@ if __name__ == "__main__":
         sys.exit(1)
     
     target = sys.argv[1]
-    role = sys.argv[2] if len(sys.argv) > 2 else "ADMIN"
+    role = sys.argv[2] if len(sys.argv) > 2 else "SUPER_ADMIN"
     promote_user(target, role)
