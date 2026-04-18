@@ -223,7 +223,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLocalError('');
-        
+
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!email.match(emailRegex)) {
             setLocalError('Please enter a valid email address.');
@@ -252,8 +252,8 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
 
     return (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
-            <h4 className="text-md font-sans font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
-                Leave your details<br/>and we'll follow up!
+            <h4 className="text-md font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+                Leave your details<br />and we'll follow up!
             </h4>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
                 <input
@@ -261,7 +261,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                     placeholder="Name (optional)"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
                     style={{ '--tw-ring-color': themeColor }}
                 />
                 <div className="flex flex-col gap-1">
@@ -271,7 +271,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         required
-                        className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
                         style={{ '--tw-ring-color': themeColor }}
                     />
                     {localError && <span className="text-[11px] text-red-500 font-bold px-1">{localError}</span>}
@@ -279,7 +279,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full mt-1 rounded-xl py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    className="w-full mt-1 rounded-xl py-2 text-md font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
                     style={{ backgroundColor: themeColor }}
                 >
                     {isSubmitting ? (
@@ -288,10 +288,80 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                 </button>
             </form>
             <div className="text-center mt-3">
-                <button 
+                <button
                     onClick={onDismiss}
                     type="button"
-                    className="text-[11px] text-slate-400 hover:text-slate-500 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                    className="text-md font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                >
+                    No thanks
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
+const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
+    const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!email.match(emailRegex)) {
+            setError('Please enter a valid email address.');
+            return;
+        }
+        setIsSubmitting(true);
+        await onSubmit(email.trim().toLowerCase(), name.trim());
+        setIsSubmitting(false);
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
+            <h4 className="text-md font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+                Share your details<br />so our team can reach you
+            </h4>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                <input
+                    type="text"
+                    placeholder="Name (optional)"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
+                    style={{ '--tw-ring-color': themeColor }}
+                />
+                <div className="flex flex-col gap-1">
+                    <input
+                        type="email"
+                        placeholder="Email address (required)"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        required
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1"
+                        style={{ '--tw-ring-color': themeColor }}
+                    />
+                    {error && <span className="text-[11px] text-red-500 font-bold px-1">{error}</span>}
+                </div>
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full mt-1 rounded-xl py-2 text-md font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    style={{ backgroundColor: themeColor }}
+                >
+                    {isSubmitting ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : 'Notify the team'}
+                </button>
+            </form>
+            <div className="text-center mt-3">
+                <button
+                    onClick={onDismiss}
+                    type="button"
+                    className="text-md font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
                 >
                     No thanks
                 </button>
@@ -381,6 +451,7 @@ const ChatWidget = ({ apiKey }) => {
 
     const [isOpen, setIsOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [handoffSent, setHandoffSent] = useState(false);
     const [messages, setMessages] = useState([
         { role: 'bot', content: DEFAULT_CONFIG.initial_message }
     ]);
@@ -526,11 +597,18 @@ const ChatWidget = ({ apiKey }) => {
     // Zone 2 removed — token buffering moved inside TypewriterContent (jitter buffer architecture)
     // Parent state is never updated during streaming; only TypewriterContent's local state changes.
 
-    const handleSend = async (e) => {
-        if (e) e.preventDefault();
-        if (!input.trim()) return;
+    const sendMessage = async (text) => {
+        const userMessage = text.trim();
+        if (!userMessage || isLoading) return;
+        setInput('');
+        await handleSend(null, userMessage);
+    };
 
-        const userMessage = input.trim();
+    const handleSend = async (e, overrideText) => {
+        if (e) e.preventDefault();
+        if (!overrideText && !input.trim()) return;
+
+        const userMessage = overrideText || input.trim();
         userMessageCountRef.current += 1;
         // Add user message + immediately seed a bot message bubble for the thinking state
         setMessages(prev => [
@@ -682,7 +760,7 @@ const ChatWidget = ({ apiKey }) => {
                             const isUserIntent = userIntentWords.some(w => lowerUserMsg.includes(w));
                             const isFallback = fallbackPhrases.some(w => lowerReply.includes(w));
                             const isThirdMessage = userMessageCountRef.current === 3;
-                            
+
                             if (isIntent || isUserIntent || isFallback || isThirdMessage) {
                                 leadFormShownRef.current = true;
                                 setTimeout(() => {
@@ -769,6 +847,52 @@ const ChatWidget = ({ apiKey }) => {
             // Any other unexpected error
             console.error('Chat Error (outer):', err);
             setIsLoading(false);
+        }
+    };
+
+    const handleHandoff = () => {
+        setShowMenu(false);
+        if (handoffSent) return;
+        // Show the contact form inline in the chat
+        setMessages(prev => [
+            ...prev,
+            { role: 'bot', content: "I'll connect you with our team! Share your email so they can reply to you directly. 👇", isTyped: false },
+            { role: 'handoff_form', id: 'handoff-form' },
+        ]);
+    };
+
+    const submitHandoff = async (visitorEmail, visitorName) => {
+        setHandoffSent(true);
+        const resolvedApiKey = apiKey || window.SaPyBaseConfig?.apiKey;
+        const transcript = messages
+            .filter(m => m.role === 'user' || m.role === 'bot')
+            .map(m => ({ role: m.role, content: m.content || '' }));
+        try {
+            const res = await fetch(`${activeApiUrl}/api/handoff`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': resolvedApiKey },
+                body: JSON.stringify({ transcript, visitor_email: visitorEmail, visitor_name: visitorName || null }),
+            });
+            const data = res.ok ? await res.json() : {};
+            const redirectUrl = data.handoff_redirect_url;
+            setMessages(prev => prev.map(m =>
+                m.id === 'handoff-form'
+                    ? {
+                        role: 'handoff_confirmed',
+                        visitorEmail,
+                        redirectUrl,
+                        id: 'handoff-confirmed',
+                    }
+                    : m
+            ));
+        } catch (err) {
+            console.warn('[SaPyBase] Handoff request failed:', err);
+            setMessages(prev => prev.map(m =>
+                m.id === 'handoff-form'
+                    ? { role: 'bot', content: "Something went wrong. Please try again.", isTyped: false }
+                    : m
+            ));
+            setHandoffSent(false);
         }
     };
 
@@ -894,6 +1018,16 @@ const ChatWidget = ({ apiKey }) => {
                                                 exit={{ opacity: 0, scale: 0.95, y: -10 }}
                                                 className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-2147483647 overflow-hidden"
                                             >
+                                                {configData.lead_capture_enabled && (
+                                                <button
+                                                    onClick={handleHandoff}
+                                                    disabled={handoffSent}
+                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50"
+                                                >
+                                                    {handoffSent ? 'Team notified ✓' : 'Talk to a human'}
+                                                    <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                                                </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         setMessages([{ role: 'bot', content: configData.initial_message }]);
@@ -901,23 +1035,25 @@ const ChatWidget = ({ apiKey }) => {
                                                         leadCapturedRef.current = false;
                                                         leadFormShownRef.current = false;
                                                         animatedMsgIndices.current.clear();
+                                                        setHandoffSent(false);
                                                         setShowMenu(false);
                                                     }}
-                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700"
+                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between"
                                                 >
                                                     Clear chat
+                                                    <span className="material-symbols-outlined">refresh</span>
                                                 </button>
 
                                                 <a
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full text-left px-4 py-2 text-md font-bold font-sans hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
+                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
                                                     onClick={() => setShowMenu(false)}
                                                     style={{ color: THEME_COLOR }}
                                                 >
                                                     Add to your site
-                                                    <span className="text-sm font-bold font-sans opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+                                                    <span className="material-symbols-outlined text-sm font-medium font-google opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
                                                 </a>
                                             </motion.div>
                                         )}
@@ -955,9 +1091,38 @@ const ChatWidget = ({ apiKey }) => {
                                                     initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                                    className={`flex min-w-0 max-w-[96%] sm:max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
+                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}`}
                                                 >
-                                                    {msg.role === 'lead_capture' ? (
+                                                    {msg.role === 'handoff_form' ? (
+                                                        <HandoffContactForm
+                                                            themeColor={THEME_COLOR}
+                                                            onSubmit={submitHandoff}
+                                                            onDismiss={() => {
+                                                                setMessages(prev => prev.filter(m => m.id !== 'handoff-form'));
+                                                            }}
+                                                        />
+                                                    ) : msg.role === 'handoff_confirmed' ? (
+                                                        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm w-full self-start text-left mt-2 space-y-3">
+                                                            <p className="text-sm font-google font-bold text-emerald-600 dark:text-emerald-400 text-center">✅ Team notified!</p>
+                                                            <p className="text-xs font-google text-slate-500 dark:text-slate-400 text-center">
+                                                                {msg.visitorEmail
+                                                                    ? <>Our team will reply to <b className="text-slate-700 dark:text-slate-300">{msg.visitorEmail}</b> shortly.</>
+                                                                    : 'Our team has been notified and will follow up shortly.'}
+                                                            </p>
+                                                            {msg.redirectUrl && (
+                                                                <a
+                                                                    href={msg.redirectUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-sm font-google font-bold text-white transition-opacity hover:opacity-90"
+                                                                    style={{ backgroundColor: THEME_COLOR }}
+                                                                >
+                                                                    Connect instantly
+                                                                    <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    ) : msg.role === 'lead_capture' ? (
                                                         <LeadCaptureForm
                                                             themeColor={THEME_COLOR}
                                                             activeApiUrl={activeApiUrl}
@@ -977,42 +1142,61 @@ const ChatWidget = ({ apiKey }) => {
                                                             }}
                                                         />
                                                     ) : (
-                                                    <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                        {msg.role === 'bot' ? (
-                                                            <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
-                                                        ) : (
-                                                            <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
-                                                        )}
-                                                        <div
-                                                            className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
-                                                                ? 'text-white rounded-2xl rounded-tr-none'
-                                                                : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-semibold prose-img:max-w-full prose-img:rounded-lg'
-                                                                }`}
-                                                            style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
-                                                        >
-                                                            {msg.role === 'user' ? (
-                                                                <div className="min-w-0 max-w-full whitespace-pre-wrap text-lg font-semibold font-sans leading-relaxed">{msg.content}</div>
+                                                        <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                            {msg.role === 'bot' ? (
+                                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
                                                             ) : (
-                                                                <div className="min-w-0 max-w-full text-lg font-semibold font-sans leading-relaxed">
-                                                                    <TypewriterContent
-                                                                        content={msg.content}
-                                                                        isStreaming={msg.isStreaming}
-                                                                        isTyped={msg.isTyped}
-                                                                        onComplete={() => handleTypingComplete(idx)}
-                                                                        themeColor={THEME_COLOR}
-                                                                        streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined}
-                                                                        onStreamTick={() => scrollToBottom(false)}
-                                                                    />
-                                                                </div>
+                                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
                                                             )}
+                                                            <div
+                                                                className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
+                                                                    ? 'text-white rounded-2xl rounded-tr-none'
+                                                                    : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'
+                                                                    }`}
+                                                                style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
+                                                            >
+                                                                {msg.role === 'user' ? (
+                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap text-md font-google leading-relaxed">{msg.content}</div>
+                                                                ) : (
+                                                                    <div className="min-w-0 max-w-full text-md font-google leading-relaxed">
+                                                                        <TypewriterContent
+                                                                            content={msg.content}
+                                                                            isStreaming={msg.isStreaming}
+                                                                            isTyped={msg.isTyped}
+                                                                            onComplete={() => handleTypingComplete(idx)}
+                                                                            themeColor={THEME_COLOR}
+                                                                            streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined}
+                                                                            onStreamTick={() => scrollToBottom(false)}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
                                                     )}
                                                 </motion.div>
                                             );
                                         })}
                                     </AnimatePresence>
                                 </div>
+                                {/* Quick Questions — inside messages container, right-aligned */}
+                                {messages.length === 1 && !input.trim() && configData.quick_questions?.length > 0 && (
+                                    <div className="flex flex-col items-end gap-2 px-3 pb-2 pt-1">
+                                        {configData.quick_questions.map((q, qidx) => {
+                                            const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
+                                            if (!label) return null;
+                                            return (
+                                                <button
+                                                    key={qidx}
+                                                    onClick={() => sendMessage(label)}
+                                                    className="px-4 py-2.5 border rounded-md text-md font-regular font-google transition-colors whitespace-nowrap bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
+                                                    style={{ touchAction: 'manipulation' }}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                                 <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
                             </div>
                         </div>
@@ -1029,26 +1213,6 @@ const ChatWidget = ({ apiKey }) => {
                                 Powered by SaPyBase
                             </a>
                         </div>
-
-                        {/* Quick Questions — float above input, right-aligned in message area */}
-                        {messages.length === 1 && !input.trim() && configData.quick_questions?.length > 0 && (
-                            <div className="shrink-0 flex flex-col items-end gap-2 px-3 pb-3 pt-1">
-                                {configData.quick_questions.map((q, qidx) => {
-                                    const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
-                                    if (!label) return null;
-                                    return (
-                                    <button
-                                        key={qidx}
-                                        onClick={() => { setInput(label); inputRef.current?.focus(); }}
-                                        className="px-4 py-2.5 border rounded-full text-sm font-semibold font-sans transition-colors whitespace-nowrap bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 shadow-sm"
-                                        style={{ touchAction: 'manipulation' }}
-                                    >
-                                        {label}
-                                    </button>
-                                    );
-                                })}
-                            </div>
-                        )}
 
                         {/* Input Area */}
                         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
