@@ -394,6 +394,22 @@ async def startup_event():
         r = None # Explicitly set to None for clarify
         print("CACHE: Running without Redis cache (REDIS_URL not set).")
 
+    # 2. Database Migration: Ensure ai_model column exists (self-healing)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100)")
+        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS webhook_url TEXT")
+        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS handoff_redirect_url TEXT")
+        conn.commit()
+        cursor.close()
+        print("MIGRATION: ai_model, webhook_url, and handoff_redirect_url column checks complete.")
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"MIGRATION WARNING: DB column verification failed: {e}")
+    finally:
+        release_db_connection(conn)
+
 @app.on_event("shutdown")
 def shutdown_db_pool():
     """Close all pooled connections cleanly on server shutdown."""
@@ -425,22 +441,6 @@ async def check_global_llm_budget(company_id: str):
         if isinstance(e, HTTPException): raise e
         # If redis fails (e.g. connectivity), we allow the request to proceed (resiliency)
         pass
-
-    # 2. Database Migration: Ensure ai_model column exists (self-healing)
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100)")
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS webhook_url TEXT")
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS handoff_redirect_url TEXT")
-        conn.commit()
-        cursor.close()
-        print("MIGRATION: ai_model, webhook_url, and handoff_redirect_url column checks complete.")
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f"MIGRATION WARNING: DB column verification failed: {e}")
-    finally:
-        release_db_connection(conn)
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
