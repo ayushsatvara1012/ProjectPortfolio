@@ -4,6 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 
+const TYPEWRITER_WORDS = ['Businesses', 'Freelancers', 'Portfolios'];
+const TYPING_SPEED = 80;
+const DELETING_SPEED = 50;
+const PAUSE_AFTER_TYPE = 1800;
+const PAUSE_AFTER_DELETE = 400;
+
 const HeroSection = () => {
   const navigate = useNavigate();
   const { isSignedIn } = useUser();
@@ -11,6 +17,38 @@ const HeroSection = () => {
   const [view, setView] = useState('configure'); // 'train' | 'configure'
   const [botColor, setBotColor] = useState('#5730F5');
   const [isTraining, setIsTraining] = useState(false);
+
+  const [displayText, setDisplayText] = useState('');
+  const [wordIndex, setWordIndex] = useState(0);
+  const [phase, setPhase] = useState('typing'); // 'typing' | 'pausing' | 'deleting' | 'pause-before-type'
+
+  useEffect(() => {
+    const currentWord = TYPEWRITER_WORDS[wordIndex];
+    let timeout;
+
+    if (phase === 'typing') {
+      if (displayText.length < currentWord.length) {
+        timeout = setTimeout(() => {
+          setDisplayText(currentWord.slice(0, displayText.length + 1));
+        }, TYPING_SPEED);
+      } else {
+        timeout = setTimeout(() => setPhase('deleting'), PAUSE_AFTER_TYPE);
+      }
+    } else if (phase === 'deleting') {
+      if (displayText.length > 0) {
+        timeout = setTimeout(() => {
+          setDisplayText(prev => prev.slice(0, -1));
+        }, DELETING_SPEED);
+      } else {
+        timeout = setTimeout(() => {
+          setWordIndex(i => (i + 1) % TYPEWRITER_WORDS.length);
+          setPhase('typing');
+        }, PAUSE_AFTER_DELETE);
+      }
+    }
+
+    return () => clearTimeout(timeout);
+  }, [displayText, phase, wordIndex]);
 
   // Lifecycle for training indicator
   useEffect(() => {
@@ -35,7 +73,19 @@ const HeroSection = () => {
 
           <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
             Autonomous <br /> <span className="text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600">AI Chat Bots</span> <br />
-            For Modern <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600">Businesses</span>
+            For Modern <br />{' '}
+            <span className="inline-block relative">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-pink-600">
+                {displayText}
+              </span>
+              <span
+                className="inline-block w-[3px] h-[0.85em] ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-sm"
+                style={{
+                  animation: 'caretBlink 1s step-start infinite',
+                  verticalAlign: 'middle',
+                }}
+              />
+            </span>
           </h1>
 
           <p className="text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
@@ -43,12 +93,6 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-1 w-fit transition-colors">
-            {/* <button
-              onClick={() => navigate('/services')}
-              className="bg-slate-900 dark:bg-slate-900 px-8 py-4 text-white text-sm font-display tracking-widest hover:bg-slate-800 dark:hover:bg-black transition-colors flex items-center gap-2 rounded-none"
-            >
-              Get Your AI Bot<span className='material-symbols-outlined'>arrow_forward</span>
-            </button> */}
             <button
               onClick={() => isSignedIn ? navigate('/app') : openSignUp()}
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-display tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"

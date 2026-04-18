@@ -98,21 +98,18 @@ const DuoPortfolio = () => {
         <div className="flex flex-col items-center text-center mb-24 space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 mb-2">
             <Zap size={14} className="text-indigo-600" />
-            <span className="text-md uppercase tracking-widest font-bold font-sans text-indigo-600">The Synergy Protocol</span>
+            <span className="text-md uppercase tracking-widest font-bold font-sans text-indigo-600">Engineer Profile</span>
           </div>
           <h1 className="text-5xl md:text-8xl font-display font-black text-slate-900 dark:text-slate-200 tracking-tight leading-none">
-            ENGINEER <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">NODES.</span>
+            ENGINEER <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-500">NODE.</span>
           </h1>
           <p className="max-w-2xl text-md font-mono text-slate-500 dark:text-slate-400 leading-relaxed">
             Bridging theoretical computer science with production-grade full-stack engineering.
-            Two nodes, one unified digital ecosystem.
           </p>
         </div>
 
-        {/* BENTO GRID DUO */}
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
-
-          {/* NODE 01: THE ARCHITECT */}
+        {/* RESUME NODE */}
+        <div className="max-w-3xl mx-auto w-full">
           <ResumeNode
             name="Ayush P. Satvara"
             role="Software Development Engineer"
@@ -123,20 +120,6 @@ const DuoPortfolio = () => {
               { title: "SaPyBase Portfolio", tech: "React • Vite • Tailwind v4 • SEO" },
               { title: "LuminaLib AI", tech: "FastAPI • pgvector • RAG" },
               { title: "V-Comm: Community Management", tech: "IAM • S3 • EC2 • Route53" }
-            ]}
-          />
-
-          {/* NODE 02: THE CREATIVE ENGINEER */}
-          <ResumeNode
-            name="Kathan Pandya"
-            role="Full-Stack Engineer"
-            accentColor="text-violet-600 dark:text-violet-400"
-            education={{ degree: "BTech Information Technology", univ: "LDRP Institute of Technology", gpa: "3.9/4.0" }}
-            stack={["TypeScript", "SvelteKit", "Angular", "Node.js", "MongoDB", "Figma", "SCSS"]}
-            experience={[
-              { title: "Community Management", tech: "React • Supabase • CRUD" },
-              { title: "UI/UX Design System", tech: "Figma • Atomic Design" },
-              { title: "Real-time Dashboards", tech: "WebSockets • Redis" }
             ]}
           />
         </div>

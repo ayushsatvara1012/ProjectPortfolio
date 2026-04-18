@@ -100,6 +100,12 @@
     @apply bg-slate-800 hover:bg-slate-700;
   }
 
+  /* ── Hero typewriter caret blink ──── */
+  @keyframes caretBlink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
   /* ── Chat Widget: GPU-composited word fade-in (typewriter only) ──── */
   @keyframes wordFadeIn {
     from {

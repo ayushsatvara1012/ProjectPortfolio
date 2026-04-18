@@ -1091,7 +1091,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[96%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}`}
+                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[85%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}`}
                                                 >
                                                     {msg.role === 'handoff_form' ? (
                                                         <HandoffContactForm
@@ -1149,14 +1149,14 @@ const ChatWidget = ({ apiKey }) => {
                                                                 <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
                                                             )}
                                                             <div
-                                                                className={`px-4 py-2 min-h-[38px] flex items-center max-w-full break-words ${msg.role === 'user'
+                                                                className={`px-4 py-2 min-h-[38px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere ${msg.role === 'user'
                                                                     ? 'text-white rounded-2xl rounded-tr-none'
                                                                     : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'
                                                                     }`}
-                                                                style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}
+                                                                style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}
                                                             >
                                                                 {msg.role === 'user' ? (
-                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap text-md font-google leading-relaxed">{msg.content}</div>
+                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-md font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                                                 ) : (
                                                                     <div className="min-w-0 max-w-full text-md font-google leading-relaxed">
                                                                         <TypewriterContent
@@ -1188,7 +1188,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <button
                                                     key={qidx}
                                                     onClick={() => sendMessage(label)}
-                                                    className="px-4 py-2.5 border rounded-md text-md font-regular font-google transition-colors whitespace-nowrap bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
+                                                    className="px-4 py-2.5 border rounded-md text-md font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
                                                     style={{ touchAction: 'manipulation' }}
                                                 >
                                                     {label}

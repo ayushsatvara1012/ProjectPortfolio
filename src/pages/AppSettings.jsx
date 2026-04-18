@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react';
-import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CreditCard, Zap, Rocket, Shield, AlertCircle, ExternalLink } from 'lucide-react';
 import Alert from '../components/alert';
-import ManageSubscriptions from '../components/ManageSubscriptions';
 import { useBotSettings } from '../context/BotSettingsContext';
 import { useUserRole } from '../context/UserContext';
 import BotPreview from '../components/BotPreview';
 import { useAuthenticatedFetch } from '../hooks/useApiCall';
-// ── v13 ──
 import LogoCustomizer from '../components/LogoCustomizer';
+import { SkeletonBase } from '../components/SkeletonLoader';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
@@ -18,44 +18,489 @@ const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:te
 const headingCls = "text-xl font-medium font-google mb-4 transition-colors text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-600 dark:from-blue-400 dark:to-green-500";
 const sectionGap = 'space-y-px';
 
-// ── Account ────────────────────────────────────────────────────────────────────
-export const AccountSection = () => {
+// ── Tier metadata ──────────────────────────────────────────────────────────────
+const TIER_META = {
+    FREE:    { label: 'Free',         color: 'text-slate-500',   badge: 'bg-slate-100 dark:bg-slate-800 text-slate-500',    icon: Shield },
+    BASIC:   { label: 'Basic',        color: 'text-blue-600',    badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600',     icon: Zap },
+    STARTER: { label: 'Professional', color: 'text-emerald-600', badge: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600', icon: Rocket },
+    PRO:     { label: 'Enterprise',   color: 'text-cyan-600',    badge: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600',    icon: Shield },
+};
+
+const POLAR_URLS = {
+    BASIC:   import.meta.env.VITE_POLAR_BASIC_URL,
+    STARTER: import.meta.env.VITE_POLAR_STARTER_URL,
+    PRO:     import.meta.env.VITE_POLAR_PRO_URL,
+};
+
+// ── Account Tabs ───────────────────────────────────────────────────────────────
+const ACCOUNT_TABS = [
+    { id: 'profile',  label: 'Profile',  icon: 'person' },
+    { id: 'billing',  label: 'Billing',  icon: 'credit_card' },
+    { id: 'apikeys',  label: 'API Keys', icon: 'vpn_key' },
+];
+
+// ── Profile Tab ────────────────────────────────────────────────────────────────
+const ProfileTab = () => {
     const { user } = useUser();
     const { userRole } = useUserRole();
+
+    const roleDisplay = userRole === 'SUPER_ADMIN'
+        ? { label: 'Platform Owner', cls: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/40' }
+        : userRole === 'ADMIN'
+        ? { label: 'Admin', cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40' }
+        : { label: 'Member', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' };
+
     return (
-        <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
-            <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Account</h2>
-                <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Manage your profile and access.</p>
-            </div>
-            <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">person</span>Profile</p>
-                <div className="flex items-center gap-4 p-4 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors">
-                    <UserButton appearance={{ elements: { avatarBox: 'w-12 h-12' } }} />
-                    <div>
-                        <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">{user?.fullName || 'Developer'}</p>
-                        <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">{user?.primaryEmailAddress?.emailAddress}</p>
-                        <span className="inline-flex mt-1 px-2 py-0.5 border border-gray-200 dark:border-slate-700 bg-[#FAFAFA] dark:bg-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-500 font-sans transition-colors">
-                            {userRole === 'SUPER_ADMIN' ? 'Platform Owner' : userRole === 'ADMIN' ? 'Admin' : 'Member'}
-                        </span>
-                    </div>
+        <div className="space-y-6">
+            {/* Avatar card */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-6 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border border-gray-100 dark:border-slate-800 transition-colors">
+                <div className="relative shrink-0">
+                    <UserButton appearance={{ elements: { avatarBox: 'w-16 h-16' } }} />
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-950 rounded-full" title="Online" />
                 </div>
-                <p className="text-lg font-sans text-slate-500 dark:text-slate-500 font-medium mt-3 transition-colors">Click your avatar to manage name, password, and connected accounts.</p>
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-2xl font-display font-bold text-slate-900 dark:text-slate-100 truncate transition-colors">
+                        {user?.fullName || 'Developer'}
+                    </h3>
+                    <p className="text-md font-display text-slate-500 dark:text-slate-400 mt-0.5 truncate transition-colors">
+                        {user?.primaryEmailAddress?.emailAddress}
+                    </p>
+                    <span className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 border text-[10px] uppercase tracking-widest font-bold font-sans transition-colors ${roleDisplay.cls}`}>
+                        <span className="material-symbols-outlined text-[11px]">
+                            {userRole === 'SUPER_ADMIN' ? 'verified_user' : userRole === 'ADMIN' ? 'shield_person' : 'person'}
+                        </span>
+                        {roleDisplay.label}
+                    </span>
+                </div>
+            </div>
+
+            {/* Connected accounts hint */}
+            <div className="p-5 border border-dashed border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 flex items-start gap-3 transition-colors">
+                <span className="material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500 mt-0.5 shrink-0">info</span>
+                <div>
+                    <p className="text-md font-display font-semibold text-slate-700 dark:text-slate-300 transition-colors">Click your avatar to manage your profile</p>
+                    <p className="text-md font-display text-slate-500 dark:text-slate-500 mt-0.5 leading-relaxed transition-colors">
+                        Update your name, password, profile photo, and connected social accounts (Google, GitHub) from the Clerk profile panel.
+                    </p>
+                </div>
+            </div>
+
+            {/* Account metadata grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-100 dark:bg-slate-800">
+                <div className="bg-white dark:bg-slate-950 p-5 transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Full Name</p>
+                    <p className="text-md font-display font-semibold text-slate-800 dark:text-slate-200 truncate transition-colors">
+                        {user?.fullName || '—'}
+                    </p>
+                </div>
+                <div className="bg-white dark:bg-slate-950 p-5 transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Primary Email</p>
+                    <p className="text-md font-display font-semibold text-slate-800 dark:text-slate-200 truncate transition-colors">
+                        {user?.primaryEmailAddress?.emailAddress || '—'}
+                    </p>
+                </div>
+                <div className="bg-white dark:bg-slate-950 p-5 transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Account Created</p>
+                    <p className="text-md font-display font-semibold text-slate-800 dark:text-slate-200 transition-colors">
+                        {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </p>
+                </div>
+                <div className="bg-white dark:bg-slate-950 p-5 transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Role</p>
+                    <p className={`text-md font-display font-semibold transition-colors ${
+                        userRole === 'SUPER_ADMIN' ? 'text-rose-600 dark:text-rose-400' :
+                        userRole === 'ADMIN' ? 'text-amber-600 dark:text-amber-400' :
+                        'text-slate-800 dark:text-slate-200'
+                    }`}>
+                        {roleDisplay.label}
+                    </p>
+                </div>
             </div>
         </div>
     );
 };
 
-// ── Billing ────────────────────────────────────────────────────────────────────
-export const BillingSection = () => (
-    <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
-        <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
-            <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Billing</h2>
-            <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Manage your subscription and invoices.</p>
+// ── Billing Tab ────────────────────────────────────────────────────────────────
+const BillingTab = () => {
+    const { getToken } = useAuth();
+    const navigate = useNavigate();
+    const {
+        userTier, subscriptionStatus, billingPeriodEnd, isLoading, refreshUser,
+    } = useUserRole();
+
+    const [alert, setAlert] = useState({ open: false, type: 'success', title: '', msg: '' });
+    const [processing, setProcessing] = useState(null);
+
+    const tier = userTier || 'FREE';
+    const meta = TIER_META[tier] || TIER_META.FREE;
+    const TierIcon = meta.icon;
+
+    const formattedPeriodEnd = billingPeriodEnd
+        ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '—';
+
+    const showAlert = useCallback((type, title, msg) => {
+        setAlert({ open: true, type, title, msg });
+        setTimeout(() => setAlert(prev => ({ ...prev, open: false })), 8000);
+    }, []);
+
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+
+    const handleUpgrade = (targetTier) => async () => {
+        setProcessing(targetTier.toLowerCase());
+        try {
+            const token = await getToken();
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const userId = payload.sub;
+            const returnUrl = `${window.location.origin}/app/register?payment=success`;
+            const checkoutUrl = `${POLAR_URLS[targetTier]}?customer_external_id=${userId}&success_url=${encodeURIComponent(returnUrl)}`;
+            window.location.href = checkoutUrl;
+        } catch {
+            showAlert('error', 'Error', 'Could not initiate checkout. Please try again.');
+            setProcessing(null);
+        }
+    };
+
+    const handleBillingPortal = async () => {
+        setProcessing('portal');
+        try {
+            const token = await getToken();
+            const res = await fetch(`${baseUrl}/api/billing/portal`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail);
+            window.open(data.url, '_blank');
+        } catch (e) {
+            showAlert('error', 'Portal Error', e.message || 'Could not open billing portal.');
+        } finally { setProcessing(null); }
+    };
+
+    const handleCancel = async () => {
+        if (!window.confirm('Are you sure you want to cancel? You will retain access until the end of the billing period.')) return;
+        setProcessing('cancel');
+        try {
+            const token = await getToken();
+            const res = await fetch(`${baseUrl}/api/user/subscription/cancel`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail);
+            showAlert('warning', 'Cancellation Scheduled', 'Your subscription will end at the close of your billing period.');
+            await refreshUser();
+        } catch (e) {
+            showAlert('error', 'Error', e.message || 'Cancellation failed. Please try again.');
+        } finally { setProcessing(null); }
+    };
+
+    const isDisabled = () => processing !== null;
+    const label = (key, text) => processing === key ? 'Processing...' : text;
+
+    const btnBase = 'py-3 px-5 text-[10px] uppercase tracking-[0.15em] font-bold font-display transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 min-h-[44px]';
+    const btnPrimary = `${btnBase} bg-gradient-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-md`;
+    const btnSecondary = `${btnBase} border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-950`;
+    const btnDanger = `${btnBase} border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 bg-white dark:bg-slate-950`;
+
+    if (isLoading) return (
+        <div className="space-y-4 animate-pulse">
+            <SkeletonBase className="h-20 w-full" />
+            <div className="grid grid-cols-3 gap-px">
+                {[1,2,3].map(i => <SkeletonBase key={i} className="h-20" />)}
+            </div>
+            <SkeletonBase className="h-12 w-full" />
         </div>
-        <div className={cellCls + ' border border-gray-100 dark:border-slate-800 transition-colors'}><ManageSubscriptions /></div>
-    </div>
-);
+    );
+
+    return (
+        <div className="space-y-6">
+            {/* Current plan hero */}
+            <div className="p-6 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4 transition-colors">
+                <div>
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1">Current Plan</p>
+                    <div className="flex items-center gap-2.5">
+                        <TierIcon className={`w-5 h-5 ${meta.color}`} />
+                        <span className={`text-2xl font-display font-bold ${meta.color}`}>{meta.label}</span>
+                    </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-widest font-bold font-display border border-current/10 ${meta.badge} transition-colors`}>
+                        <TierIcon className="w-3 h-3" />
+                        {meta.label}
+                    </span>
+                    <span className={`text-[10px] uppercase tracking-widest font-bold font-sans ${
+                        subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
+                        subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
+                        'text-amber-500 dark:text-amber-400'
+                    }`}>
+                        {subscriptionStatus || 'Active'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-3 gap-px bg-gray-100 dark:bg-slate-800">
+                <div className="bg-white dark:bg-slate-950 p-5 text-center transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Plan</p>
+                    <p className={`text-lg font-display font-bold ${meta.color}`}>{meta.label}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-950 p-5 text-center transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Status</p>
+                    <p className={`text-lg font-display font-bold ${
+                        subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
+                        subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
+                        'text-amber-500 dark:text-amber-400'
+                    }`}>
+                        {subscriptionStatus || 'Active'}
+                    </p>
+                </div>
+                <div className="bg-white dark:bg-slate-950 p-5 text-center transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">
+                        {tier === 'FREE' ? '—' : 'Renews'}
+                    </p>
+                    <p className="text-lg font-display font-bold text-slate-900 dark:text-slate-100">
+                        {tier === 'FREE' ? 'N/A' : formattedPeriodEnd}
+                    </p>
+                </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                {tier === 'FREE' && (
+                    <>
+                        <button onClick={handleUpgrade('BASIC')} disabled={isDisabled()} className={`${btnPrimary} flex-1`}>{label('basic', 'Upgrade to Basic — $5/mo')}</button>
+                        <button onClick={handleUpgrade('STARTER')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('starter', 'Upgrade to Starter — $10/mo')}</button>
+                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('pro', 'Upgrade to Pro — $20/mo')}</button>
+                    </>
+                )}
+                {tier === 'BASIC' && (
+                    <>
+                        <button onClick={handleBillingPortal} disabled={isDisabled()} className={`${btnPrimary} flex-1`}><ExternalLink className="w-4 h-4" />{label('portal', 'Manage Billing')}</button>
+                        <button onClick={handleUpgrade('STARTER')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('starter', 'Upgrade to Professional — $10/mo')}</button>
+                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button>
+                        {subscriptionStatus !== 'CANCELED' && (
+                            <button onClick={handleCancel} disabled={isDisabled()} className={`${btnDanger} flex-1`}><AlertCircle className="w-4 h-4" />{label('cancel', 'Cancel Subscription')}</button>
+                        )}
+                    </>
+                )}
+                {(tier === 'STARTER' || tier === 'PRO') && (
+                    <>
+                        <button onClick={handleBillingPortal} disabled={isDisabled()} className={`${btnPrimary} flex-1`}><ExternalLink className="w-4 h-4" />{label('portal', 'Manage Billing')}</button>
+                        {subscriptionStatus !== 'CANCELED' && (
+                            <button onClick={handleCancel} disabled={isDisabled()} className={`${btnDanger} flex-1`}><AlertCircle className="w-4 h-4" />{label('cancel', 'Cancel Subscription')}</button>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Pricing CTA for free users */}
+            {tier === 'FREE' && (
+                <div className="p-4 border border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-900/10 flex items-center justify-between gap-3 transition-colors">
+                    <p className="text-md font-display text-slate-600 dark:text-slate-400 transition-colors">See full feature comparison across all plans.</p>
+                    <button
+                        onClick={() => navigate('/app/pricing')}
+                        className="shrink-0 text-[10px] uppercase tracking-widest font-bold font-sans text-blue-600 dark:text-blue-400 hover:underline underline-offset-4 transition-colors"
+                    >
+                        View Pricing →
+                    </button>
+                </div>
+            )}
+
+            <Alert isOpen={alert.open} type={alert.type} title={alert.title} message={alert.msg} onClose={() => setAlert(prev => ({ ...prev, open: false }))} />
+        </div>
+    );
+};
+
+// ── API Keys Tab ───────────────────────────────────────────────────────────────
+const ApiKeysTab = () => {
+    const { getToken } = useAuth();
+    const authFetch = useAuthenticatedFetch();
+    const [isRotating, setIsRotating] = useState(false);
+    const [newKey, setNewKey] = useState('');
+    const [showKey, setShowKey] = useState(false);
+    const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+
+    const { data: botsData, isLoading: botsLoading } = useQuery({
+        queryKey: ['bots'],
+        queryFn: () => authFetch('/api/companies'),
+    });
+    const bots = botsData?.bots || [];
+
+    const showAlertMsg = (type, msg) => {
+        setAlert({ open: true, type, msg });
+        setTimeout(() => setAlert(p => ({ ...p, open: false })), 6000);
+    };
+
+    const handleRotate = async () => {
+        if (!window.confirm('Rotating your API key will immediately invalidate the current key and any integrations using it. Continue?')) return;
+        setIsRotating(true);
+        setNewKey('');
+        setShowKey(false);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${baseUrl}/api/company/rotate-key`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Key rotation failed.');
+            setNewKey(data.new_key);
+            showAlertMsg('success', 'Key rotated. Copy it now — it will not be shown again.');
+        } catch (e) {
+            showAlertMsg('error', e.message);
+        } finally { setIsRotating(false); }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Warning banner */}
+            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 transition-colors">
+                <span className="material-symbols-outlined text-[18px] text-amber-500 mt-0.5 shrink-0">warning</span>
+                <div>
+                    <p className="text-md font-display font-semibold text-amber-800 dark:text-amber-300 transition-colors">Rotating invalidates immediately</p>
+                    <p className="text-md font-display text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed transition-colors">
+                        Your old API key will stop working instantly. Update any embeddings, webhook configs, or integrations before rotating if you're in production.
+                    </p>
+                </div>
+            </div>
+
+            {/* New key reveal */}
+            <AnimatePresence>
+                {newKey && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.2 }}
+                        className="p-5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 transition-colors"
+                    >
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans">New Key — Copy Now (shown once)</p>
+                        </div>
+                        <div className="flex items-center gap-2 font-mono text-sm text-slate-900 dark:text-slate-200 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/50 p-3 transition-colors">
+                            <span className="flex-1 truncate select-all">{showKey ? newKey : newKey.slice(0, 8) + '••••••••••••••••'}</span>
+                            <button onClick={() => setShowKey(p => !p)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1">
+                                <span className="material-symbols-outlined text-[16px]">{showKey ? 'visibility_off' : 'visibility'}</span>
+                            </button>
+                            <button
+                                onClick={() => { navigator.clipboard.writeText(newKey); showAlertMsg('success', 'Copied to clipboard!'); }}
+                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all flex items-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-[12px]">content_copy</span>
+                                Copy
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Bots list — shows which bot this key applies to */}
+            {bots.length > 0 && (
+                <div>
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-3">Your Bots</p>
+                    <div className="space-y-px bg-gray-100 dark:bg-slate-800">
+                        {botsLoading ? (
+                            [1,2].map(i => <SkeletonBase key={i} className="h-14 w-full" />)
+                        ) : bots.map((bot) => (
+                            <div key={bot.id} className="bg-white dark:bg-slate-950 px-5 py-3.5 flex items-center justify-between gap-3 transition-colors">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <span className="material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500 shrink-0">smart_toy</span>
+                                    <div className="min-w-0">
+                                        <p className="text-md font-display font-semibold text-slate-800 dark:text-slate-200 truncate transition-colors">{bot.bot_name || 'Unnamed Bot'}</p>
+                                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">{bot.allowed_origin || 'No domain set'}</p>
+                                    </div>
+                                </div>
+                                <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold font-sans px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                    Active
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Rotate button */}
+            <div className="pt-2">
+                <button
+                    onClick={handleRotate}
+                    disabled={isRotating}
+                    className="flex items-center gap-2.5 px-6 py-3 min-h-[48px] bg-gradient-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-md disabled:opacity-50 active:scale-[0.99]"
+                >
+                    {isRotating
+                        ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Rotating Key...</>
+                        : <><span className="material-symbols-outlined text-[16px]">refresh</span> Rotate API Key</>
+                    }
+                </button>
+                <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-widest">
+                    All bots share one secret key per account
+                </p>
+            </div>
+
+            <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />
+        </div>
+    );
+};
+
+// ── Account (unified) ──────────────────────────────────────────────────────────
+export const AccountSection = ({ initialTab }) => {
+    const [activeTab, setActiveTab] = useState(initialTab || 'profile');
+
+    return (
+        <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors duration-500">
+            {/* Page header */}
+            <div className="px-6 py-6 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 transition-colors">
+                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Account</h2>
+                <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">
+                    Manage your profile, subscription, and API credentials.
+                </p>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex items-center border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 px-6 gap-1 transition-colors overflow-x-auto">
+                {ACCOUNT_TABS.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-2 px-4 py-3.5 text-[11px] uppercase tracking-widest font-bold font-sans border-b-2 transition-all whitespace-nowrap ${
+                            activeTab === tab.id
+                                ? 'border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100'
+                                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        <span className={`material-symbols-outlined text-[16px] ${activeTab === tab.id ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                            {tab.icon}
+                        </span>
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Tab content */}
+            <div className="p-6 md:p-8 max-w-3xl">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeTab}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
+                    >
+                        {activeTab === 'profile' && <ProfileTab />}
+                        {activeTab === 'billing' && <BillingTab />}
+                        {activeTab === 'apikeys' && <ApiKeysTab />}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+        </div>
+    );
+};
+
+// ── Billing (standalone redirect shim — keeps old route alive) ─────────────────
+export const BillingSection = () => <AccountSection initialTab="billing" />;
+
+// ── API Keys (standalone redirect shim — keeps old route alive) ────────────────
+export const ApiKeysSection = () => <AccountSection initialTab="apikeys" />;
 
 // ── Customize ─────────────────────────────────────────────────────────────────
 export const CustomizeSection = () => {
@@ -418,9 +863,9 @@ export const CustomizeSection = () => {
 
             {/* ── RIGHT: Preview Column ── */}
             <div className={`overflow-hidden border-t lg:border-t-0 lg:border-l w-full h-auto lg:h-[calc(100vh-3rem)] relative transition-colors flex flex-col items-center justify-center p-0 lg:p-8 ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
-                
+
                 {/* Responsive Background Layer */}
-                <div 
+                <div
                     className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-100 transition-opacity duration-700"
                     style={{ backgroundImage: "url('/nature_1.webp')" }}
                 />
@@ -453,78 +898,6 @@ export const CustomizeSection = () => {
                     <BotPreview theme={isDark ? 'dark' : 'light'} />
                 </div>
             </div>
-        </div>
-    );
-};
-
-// ── API Keys ────────────────────────────────────────────────────────────────────
-export const ApiKeysSection = () => {
-    const { getToken } = useAuth();
-    const [isLoading, setIsLoading] = useState(false);
-    const [newKey, setNewKey] = useState('');
-    const [showKey, setShowKey] = useState(false);
-    const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
-    const baseUrl = import.meta.env.VITE_API_URL || '';
-
-    const showAlertMsg = (type, msg) => {
-        setAlert({ open: true, type, msg });
-        setTimeout(() => setAlert(p => ({ ...p, open: false })), 6000);
-    };
-
-    const handleRotate = async () => {
-        if (!window.confirm('Rotating your key will invalidate the old one. Continue?')) return;
-        setIsLoading(true);
-        try {
-            const token = await getToken();
-            const res = await fetch(`${baseUrl}/api/company/rotate-key`, {
-                method: 'POST', headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Key rotation failed.');
-            setNewKey(data.new_key);
-            showAlertMsg('success', 'Key rotated. Copy it now — it will not be shown again.');
-        } catch (e) {
-            showAlertMsg('error', e.message);
-        } finally { setIsLoading(false); }
-    };
-
-    return (
-        <div className={sectionGap + ' p-8 bg-white dark:bg-slate-900 transition-colors duration-500'}>
-            <div className={`${cellCls} px-6 py-5 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">API Keys</h2>
-                <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Rotate your secret API key. The old key is immediately invalidated.</p>
-            </div>
-            <div className={`${cellCls} p-6 border border-gray-100 dark:border-slate-800 transition-colors`}>
-                <p className={headingCls}><span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">vpn_key</span>API Key Management</p>
-                {newKey && (
-                    <div className="mb-5 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 transition-colors">
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans mb-2 transition-colors">New Key — Copy Now</p>
-                        <div className="flex items-center gap-2 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/50 p-3 transition-colors">
-                            <span className="flex-1 truncate">{showKey ? newKey : newKey.slice(0, 8) + '••••••••••••••••'}</span>
-                            <button onClick={() => setShowKey(p => !p)} className="text-slate-500 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-                                {showKey ? <span className="material-symbols-outlined text-[16px]">visibility_off</span> : <span className="material-symbols-outlined text-[16px]">visibility</span>}
-                            </button>
-                            <button
-                                onClick={() => { navigator.clipboard.writeText(newKey); showAlertMsg('success', 'Copied!'); }}
-                                className="px-2 py-1 bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-sm"
-                            >
-                                Copy
-                            </button>
-                        </div>
-                    </div>
-                )}
-                <button
-                    onClick={handleRotate}
-                    disabled={isLoading}
-                    className="px-5 py-2.5 min-h-[44px] bg-linear-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-md disabled:opacity-50 flex items-center gap-2 active:scale-[0.99]"
-                >
-                    {isLoading
-                        ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Rotating...</>
-                        : 'Rotate API Key'
-                    }
-                </button>
-            </div>
-            <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />
         </div>
     );
 };
