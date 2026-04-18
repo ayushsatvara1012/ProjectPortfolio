@@ -258,7 +258,7 @@ const AppInsights = () => {
 
     // ── Rendering Helpers ────────────────────────────────────────────────────
     const renderHeader = () => (
-        <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+        <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -282,7 +282,7 @@ const AppInsights = () => {
                     <button
                         onClick={() => handleGenerate(false)}
                         disabled={isGenerating || !selectedBotId}
-                        className="shrink-0 px-8 py-3 min-h-[44px] bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        className="w-full sm:w-auto shrink-0 px-8 py-3 min-h-[44px] bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                         {isGenerating ? (
                             <>
@@ -301,7 +301,7 @@ const AppInsights = () => {
 
             {/* Persistent Bot Selector */}
             {AUTHORIZED_TIERS.has(userTier) && bots.length > 1 && (
-                <div className="mt-5 pt-5 border-t border-gray-50 dark:border-slate-800/50 flex items-center gap-4 shrink-0 transition-colors duration-500">
+                <div className="mt-5 pt-5 border-t border-gray-50 dark:border-slate-800/50 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
                         Reporting for
                     </span>
@@ -318,7 +318,8 @@ const AppInsights = () => {
             )}
             
             {/* Tabs */}
-            <div className="mt-6 flex items-center gap-6 border-b border-gray-100 dark:border-slate-800">
+            <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
+            <div className="flex items-center gap-4 sm:gap-6 border-b border-gray-100 dark:border-slate-800 px-4 sm:px-0 min-w-max sm:min-w-0">
                 <button
                     onClick={() => setActiveTab('analytics')}
                     className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 ${
@@ -361,6 +362,7 @@ const AppInsights = () => {
                     ROI
                 </button>
             </div>
+            </div>
         </div>
     );
 
@@ -370,21 +372,21 @@ const AppInsights = () => {
     if (!isLoaded) {
         return (
             <div className="flex flex-col h-full bg-white dark:bg-slate-900 animate-pulse transition-colors duration-500">
-                <div className="bg-white dark:bg-slate-950 px-8 py-6 border-b border-gray-100 dark:border-slate-800">
+                <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 border-b border-gray-100 dark:border-slate-800">
                     <div className="h-7 bg-slate-200 dark:bg-slate-800 w-48 mb-2" />
                     <div className="h-4 bg-slate-100 dark:bg-slate-800 w-72" />
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="bg-white dark:bg-slate-950 p-8">
+                        <div key={i} className="bg-white dark:bg-slate-950 p-4 sm:p-8">
                             <div className="h-4 bg-slate-100 dark:bg-slate-800 w-24 mb-3" />
                             <div className="h-10 bg-slate-100 dark:bg-slate-800 w-16" />
                         </div>
                     ))}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 flex-1">
-                    <div className="lg:col-span-7 bg-white dark:bg-slate-950 p-8" />
-                    <div className="lg:col-span-5 bg-white dark:bg-slate-950 p-8" />
+                    <div className="lg:col-span-7 bg-white dark:bg-slate-950 p-4 sm:p-8" />
+                    <div className="lg:col-span-5 bg-white dark:bg-slate-950 p-4 sm:p-8" />
                 </div>
             </div>
         );
@@ -444,7 +446,7 @@ const AppInsights = () => {
                                 {/* ── ROI Scorecards (Top Row) ── */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800">
                             {/* Support Hours Saved */}
-                            <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                 <div className="flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span>
                                     <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Support Hours Saved</h3>
@@ -454,7 +456,7 @@ const AppInsights = () => {
                             </div>
 
                             {/* Estimated Savings */}
-                            <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                 <div className="flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span>
                                     <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Estimated Savings</h3>
@@ -464,7 +466,7 @@ const AppInsights = () => {
                             </div>
 
                             {/* Leads Captured / Potential Revenue */}
-                            <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                 <div className="flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span>
                                     <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Potential Revenue</h3>
@@ -477,7 +479,7 @@ const AppInsights = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-visible transition-colors duration-500 flex-1">
                         {/* Left Column: Top Trends & Temporal */}
                         <div className={`lg:col-span-7 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500`}>
-                            <div className={`${cellCls} p-8 flex-1`}>
+                            <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
                                 <div className="flex items-center gap-2 mb-6">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
                                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
@@ -504,7 +506,7 @@ const AppInsights = () => {
 
                         {/* Right Column: Knowledge Gaps + Advice */}
                         <div className="lg:col-span-5 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500">
-                            <div className={`${cellCls} p-8 flex-1`}>
+                            <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">warning</span>
                                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
@@ -540,7 +542,7 @@ const AppInsights = () => {
 
                     {/* ── Peak Activity Full Row ── */}
                     <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
-                        <div className={`${cellCls} p-8`}>
+                        <div className={`${cellCls} p-4 sm:p-8`}>
                             <div className="flex items-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
                                 <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
@@ -553,7 +555,7 @@ const AppInsights = () => {
 
                     {/* ── Recent Conversations Log ── */}
                     <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
-                        <div className={`${cellCls} p-8 overflow-x-auto`}>
+                        <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto`}>
                             <div className="flex items-center gap-2 mb-6">
                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span>
                                 <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
@@ -602,7 +604,7 @@ const AppInsights = () => {
 
                 {/* ── Error Banner ── */}
                 {AUTHORIZED_TIERS.has(userTier) && error && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-8 py-4 flex items-start gap-3 shrink-0">
+                    <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 shrink-0">
                         <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
                         <p className="text-md font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
                         <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
@@ -611,7 +613,7 @@ const AppInsights = () => {
 
                 {/* ── Ghost Town ── */}
                 {AUTHORIZED_TIERS.has(userTier) && isGhostTown && !isGenerating && (
-                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-12 text-center`}>
+                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                         <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                             <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
                         </div>
@@ -625,7 +627,7 @@ const AppInsights = () => {
 
                 {/* ── Empty State ── */}
                 {AUTHORIZED_TIERS.has(userTier) && !reportData && !isGenerating && !error && !isGhostTown && (
-                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-12 text-center`}>
+                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                         <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                             <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
                         </div>
@@ -636,7 +638,7 @@ const AppInsights = () => {
 
                 {/* ── Loading Spinner ── */}
                 {AUTHORIZED_TIERS.has(userTier) && isGenerating && (
-                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-12 text-center`}>
+                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                         <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5" />
                         <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
                         <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>

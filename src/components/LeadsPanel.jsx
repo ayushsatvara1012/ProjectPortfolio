@@ -76,7 +76,7 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
     return (
         <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 transition-colors duration-500 overflow-hidden">
             {/* Header / Actions */}
-            <div className={`${cellCls} p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
+            <div className={`${cellCls} p-4 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
                 <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">group</span>
                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
