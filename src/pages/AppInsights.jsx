@@ -4,6 +4,8 @@ import { useUserRole } from '../context/UserContext';
 import { useAuthenticatedFetch } from '../hooks/useApiCall';
 import UpgradePrompt from '../components/UpgradePrompt';
 import LeadsPanel from '../components/LeadsPanel';
+import ConversationsPanel from '../components/ConversationsPanel';
+import ROIPanel from '../components/ROIPanel';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -330,12 +332,33 @@ const AppInsights = () => {
                 <button
                     onClick={() => setActiveTab('leads')}
                     className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
-                        activeTab === 'leads' 
-                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                        activeTab === 'leads'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                             : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                 >
                     Leads CRM
+                </button>
+                <button
+                    onClick={() => setActiveTab('conversations')}
+                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
+                        activeTab === 'conversations'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    Conversations
+                </button>
+                <button
+                    onClick={() => setActiveTab('roi')}
+                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
+                        activeTab === 'roi'
+                            ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    <span className="material-symbols-outlined text-[14px]">savings</span>
+                    ROI
                 </button>
             </div>
         </div>
@@ -381,6 +404,24 @@ const AppInsights = () => {
                 
                 {activeTab === 'leads' && (
                     <LeadsPanel
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        userTier={userTier}
+                        userRole={userRole}
+                    />
+                )}
+
+                {activeTab === 'conversations' && (
+                    <ConversationsPanel
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        userTier={userTier}
+                        userRole={userRole}
+                    />
+                )}
+
+                {activeTab === 'roi' && (
+                    <ROIPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
                         userTier={userTier}

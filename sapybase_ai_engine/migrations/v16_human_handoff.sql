@@ -1,0 +1,3 @@
+-- v16: No schema changes required for human handoff.
+-- The feature uses existing tables (companies, users) and fires emails via SMTP.
+-- Ensure SMTP_USER and SMTP_PASS are set in .env before deploying.

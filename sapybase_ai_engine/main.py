@@ -11,6 +11,10 @@ import secrets
 import socket
 import ipaddress
 import hashlib
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from psycopg2 import pool
 from enum import Enum
 from typing import Optional, List
@@ -575,6 +579,15 @@ class LeadCaptureRequest(BaseModel):
 class SubscriptionRequest(BaseModel):
     tier: str # Starter, Pro, Enterprise
 
+class HandoffMessage(BaseModel):
+    role: str
+    content: str
+
+class HandoffRequest(BaseModel):
+    transcript: List[HandoffMessage]
+    visitor_email: Optional[str] = None
+    visitor_name: Optional[str] = None
+
 class UserRole(str, Enum):
     SUPER_ADMIN = "SUPER_ADMIN"
     ADMIN = "ADMIN"
@@ -652,9 +665,10 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT c.id, c.company_name, c.company_tone, c.theme_color, c.allowed_origin, 
+            SELECT c.id, c.company_name, c.company_tone, c.theme_color, c.allowed_origin,
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
-                   c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role
+                   c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
+                   u.email, c.handoff_redirect_url
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -691,6 +705,9 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "custom_logo_url": company_data[11],
         "avatar_bg_style": company_data[12] or "none",
         "lead_capture_enabled": lead_capture_enabled,
+        "webhook_url": company_data[15],
+        "owner_email": company_data[16],
+        "handoff_redirect_url": company_data[17],
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -994,26 +1011,26 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
         if company_id:
             cursor.execute(
                 """
-                SELECT id, company_name, company_tone, theme_color, allowed_origin, 
+                SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url
                 FROM companies WHERE user_id = %s AND id = %s
-                """, 
+                """,
                 (user_uuid, company_id)
             )
         else:
             cursor.execute(
                 """
-                SELECT id, company_name, company_tone, theme_color, allowed_origin, 
+                SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
-                """, 
+                """,
                 (user_uuid,)
             )
 
         company_row = cursor.fetchone()
-        
+
         if not company_row:
             return None
 
@@ -1033,6 +1050,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "logo_shape": company_row[12] or "circle",
             "custom_logo_url": company_row[13],
             "avatar_bg_style": company_row[14] or "none",
+            "webhook_url": company_row[15],
+            "handoff_redirect_url": company_row[16],
         }
     finally:
         release_db_connection(conn)
@@ -1069,6 +1088,24 @@ class CompanyUpdate(BaseModel):
     logo_shape:       Optional[str]  = None   # circle | squircle | bento | sharp
     custom_logo_url:  Optional[str]  = None   # tenant-provided HTTPS image URL
     avatar_bg_style:  Optional[str]  = None   # e.g. none, hacker, sunset
+    # ── v15 integrations ──
+    webhook_url:           Optional[str]  = None   # HTTPS URL for lead capture webhooks
+    # ── v17 human handoff ──
+    handoff_redirect_url:  Optional[str]  = None   # WhatsApp/Calendly/etc link shown after handoff
+
+    @validator('webhook_url')
+    def validate_webhook_url(cls, v):
+        if v is not None and v.strip():
+            if not v.strip().startswith('https://'):
+                raise ValueError("webhook_url must start with https://")
+        return v.strip() if v else v
+
+    @validator('handoff_redirect_url')
+    def validate_handoff_redirect_url(cls, v):
+        if v is not None and v.strip():
+            if not v.strip().startswith('https://'):
+                raise ValueError("handoff_redirect_url must start with https://")
+        return v.strip() if v else v
 
     @validator('logo_shape')
     def validate_logo_shape(cls, v):
@@ -1099,6 +1136,30 @@ async def update_company_details(
             raise HTTPException(
                 status_code=402,
                 detail=f"Advanced customization ({', '.join(forbidden)}) requires a Starter or Pro plan."
+            )
+
+    # ── PRO-only gate: webhook_url ──
+    if update.webhook_url is not None and update.webhook_url.strip():
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Webhook integration requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                }
+            )
+
+    # ── PRO-only gate: handoff_redirect_url ──
+    if update.handoff_redirect_url is not None and update.handoff_redirect_url.strip():
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Human handoff link requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                }
             )
 
     # ── PRO-only gate: custom_logo_url ──
@@ -1597,11 +1658,72 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
 # ── LEAD CAPTURE ENDPOINTS ────────────────────────────────────────────────────
 
+async def _fire_webhook(webhook_url: str, lead_data: dict):
+    """Fire lead payload to the business owner's configured webhook URL."""
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            await client.post(webhook_url, json=lead_data, headers={"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"WEBHOOK FIRE ERROR: {e}")
+
+
+async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None):
+    """Email the chat transcript to the business owner when a visitor requests human support."""
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    if not smtp_user or not smtp_pass or not owner_email:
+        print("HANDOFF EMAIL: SMTP_USER/SMTP_PASS not configured, skipping email.")
+        return
+
+    rows = []
+    for msg in transcript:
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+        if role == "user":
+            rows.append(f"<tr><td style='padding:8px 12px;background:#f1f5f9;border-radius:8px;max-width:360px'><b>Visitor:</b> {content}</td></tr>")
+        elif role == "bot":
+            rows.append(f"<tr><td style='padding:8px 12px;background:#eff6ff;border-radius:8px;max-width:360px'><b>{bot_name}:</b> {content}</td></tr>")
+
+    transcript_html = "<table style='border-collapse:separate;border-spacing:0 6px;width:100%'>" + "".join(rows) + "</table>"
+
+    visitor_label = visitor_name or visitor_email or "Anonymous visitor"
+    reply_note = f"Reply directly to this email to reach <b>{visitor_label}</b> at <b>{visitor_email}</b>." if visitor_email else "The visitor did not share their email. Use your bot's lead capture or contact page to follow up."
+
+    html = f"""
+    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1e293b">
+      <h2 style="margin:0 0 4px">🙋 Human Handoff Request</h2>
+      <p style="color:#64748b;margin:0 0 8px"><b>{visitor_label}</b> on <b>{bot_name}</b> has requested to speak with a human.</p>
+      <p style="color:#64748b;margin:0 0 20px">{reply_note}</p>
+      {transcript_html}
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px">Sent by SaPyBase</p>
+    </div>
+    """
+
+    email_msg = MIMEMultipart("alternative")
+    email_msg["Subject"] = f"[{bot_name}] {visitor_label} requested human support"
+    email_msg["From"] = smtp_user
+    email_msg["To"] = owner_email
+    if visitor_email:
+        email_msg["Reply-To"] = visitor_email
+    email_msg.attach(MIMEText(html, "html"))
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, owner_email, email_msg.as_string())
+    except Exception as e:
+        print(f"HANDOFF EMAIL ERROR: {e}")
+
+
 @app.post("/api/leads/capture")
 @limiter.limit("3/minute", key_func=get_remote_address)
-def capture_lead(
+async def capture_lead(
     request: Request,
     payload: LeadCaptureRequest,
+    background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """Public endpoint to capture leads from the widget."""
@@ -1632,6 +1754,20 @@ def capture_lead(
         )
         lead_id = cursor.fetchone()[0]
         conn.commit()
+
+        # Fire webhook in background if configured
+        webhook_url = company.get("webhook_url")
+        if webhook_url:
+            background_tasks.add_task(_fire_webhook, webhook_url, {
+                "event": "lead.captured",
+                "lead_id": str(lead_id),
+                "email": payload.email,
+                "name": payload.name,
+                "context": payload.context,
+                "bot_id": str(company["id"]),
+                "bot_name": company.get("bot_name", ""),
+            })
+
         return {"status": "success", "lead_id": str(lead_id)}
     except Exception as e:
         if conn: conn.rollback()
@@ -1639,6 +1775,25 @@ def capture_lead(
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         release_db_connection(conn)
+
+@app.post("/api/handoff")
+async def request_human_handoff(
+    payload: HandoffRequest,
+    background_tasks: BackgroundTasks,
+    company: dict = Depends(verify_api_key_and_origin)
+):
+    """Widget calls this when a visitor clicks 'Talk to a human'. Emails the transcript to the owner."""
+    if not company.get("lead_capture_enabled"):
+        raise HTTPException(status_code=402, detail="Human handoff requires the Pro plan.")
+    transcript = [{"role": m.role, "content": m.content} for m in payload.transcript]
+    owner_email = company.get("owner_email")
+    bot_name = company.get("bot_name", "AI Assistant")
+    background_tasks.add_task(
+        _send_handoff_email, owner_email, bot_name, transcript,
+        payload.visitor_email, payload.visitor_name
+    )
+    return {"status": "ok", "handoff_redirect_url": company.get("handoff_redirect_url")}
+
 
 @app.get("/api/leads/{company_id}")
 def list_leads(
@@ -1801,6 +1956,256 @@ def export_leads(
             media_type="text/csv", 
             headers={"Content-Disposition": f'attachment; filename="leads_{company_id[:8]}.csv"'}
         )
+    finally:
+        release_db_connection(conn)
+
+
+# ── CONVERSATIONS ENDPOINT ─────────────────────────────────────────────────────
+
+@app.get("/api/conversations/{company_id}")
+def list_conversations(
+    company_id: str,
+    page: int = 1,
+    limit: int = 20,
+    filter: str = "all",  # "all" | "unanswered"
+    user: dict = Depends(get_current_user)
+):
+    """Fetch paginated chat sessions grouped by session_id for the dashboard."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Verify ownership
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # Tier gate — same as leads (PRO/ENTERPRISE)
+        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
+        user_row = cursor.fetchone()
+        if user_row:
+            user_tier, user_role = user_row
+            tier_upper = (user_tier or "FREE").upper()
+            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
+                raise HTTPException(status_code=402, detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Conversation transcripts require the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                })
+
+        unanswered_clause = "AND cl.is_unanswered = true" if filter == "unanswered" else ""
+
+        # Count total distinct sessions (NULL session_ids count individually)
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) FROM (
+                SELECT COALESCE(session_id::text, id::text) AS grp
+                FROM chat_logs cl
+                WHERE company_id = %s {unanswered_clause}
+                GROUP BY grp
+            ) sub
+            """,
+            (company_id,)
+        )
+        total = cursor.fetchone()[0]
+
+        offset = (page - 1) * limit
+
+        # Fetch session groups ordered by most recent activity
+        cursor.execute(
+            f"""
+            SELECT
+                COALESCE(session_id::text, id::text) AS grp,
+                MAX(created_at) AS last_active,
+                COUNT(*) AS message_count,
+                BOOL_OR(is_unanswered) AS has_unanswered
+            FROM chat_logs cl
+            WHERE company_id = %s {unanswered_clause}
+            GROUP BY grp
+            ORDER BY last_active DESC
+            LIMIT %s OFFSET %s
+            """,
+            (company_id, limit, offset)
+        )
+        session_rows = cursor.fetchall()
+
+        sessions = []
+        for grp, last_active, msg_count, has_unanswered in session_rows:
+            # Fetch the actual messages for this session
+            cursor.execute(
+                """
+                SELECT user_query, bot_response, is_unanswered, created_at
+                FROM chat_logs
+                WHERE company_id = %s
+                  AND COALESCE(session_id::text, id::text) = %s
+                ORDER BY created_at ASC
+                LIMIT 50
+                """,
+                (company_id, grp)
+            )
+            messages = [
+                {
+                    "user_query": r[0],
+                    "bot_response": r[1],
+                    "is_unanswered": r[2],
+                    "timestamp": r[3].isoformat() if r[3] else None,
+                }
+                for r in cursor.fetchall()
+            ]
+            sessions.append({
+                "session_id": grp,
+                "last_active": last_active.isoformat() if last_active else None,
+                "message_count": msg_count,
+                "has_unanswered": has_unanswered,
+                "messages": messages,
+            })
+
+        return {
+            "sessions": sessions,
+            "total": total,
+            "page": page,
+            "pages": max(1, (total + limit - 1) // limit),
+        }
+    finally:
+        release_db_connection(conn)
+
+
+# ── ROI BENCHMARKS ENDPOINTS ──────────────────────────────────────────────────
+
+class RoiBenchmarkUpdate(BaseModel):
+    avg_human_cost_per_ticket: float
+    avg_lead_value: float
+
+
+@app.get("/api/roi-benchmarks/{company_id}")
+def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
+    """Returns current ROI benchmarks and live 30-day stats for the ROI dashboard."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
+        user_row = cursor.fetchone()
+        if user_row:
+            user_tier, user_role = user_row
+            tier_upper = (user_tier or "FREE").upper()
+            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
+                raise HTTPException(status_code=402, detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "ROI Dashboard requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                })
+
+        # Benchmarks (defaults if not yet set)
+        cursor.execute(
+            "SELECT avg_human_cost_per_ticket, avg_lead_value FROM roi_benchmarks WHERE company_id = %s",
+            (company_id,)
+        )
+        bm_row = cursor.fetchone()
+        avg_cost = float(bm_row[0]) if bm_row and bm_row[0] is not None else 5.00
+        avg_lead = float(bm_row[1]) if bm_row and bm_row[1] is not None else 50.00
+
+        # Live 30-day stats
+        cursor.execute(
+            "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND is_unanswered = false AND created_at >= NOW() - INTERVAL '30 days'",
+            (company_id,)
+        )
+        answered_30d = cursor.fetchone()[0] or 0
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'",
+            (company_id,)
+        )
+        total_30d = cursor.fetchone()[0] or 0
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM lead_capture WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'",
+            (company_id,)
+        )
+        leads_30d = cursor.fetchone()[0] or 0
+
+        support_savings = round(answered_30d * avg_cost, 2)
+        potential_revenue = round(leads_30d * avg_lead, 2)
+        total_roi = round(support_savings + potential_revenue, 2)
+
+        return {
+            "benchmarks": {
+                "avg_human_cost_per_ticket": avg_cost,
+                "avg_lead_value": avg_lead,
+            },
+            "stats": {
+                "answered_queries_30d": answered_30d,
+                "total_queries_30d": total_30d,
+                "leads_30d": leads_30d,
+            },
+            "roi": {
+                "support_savings": support_savings,
+                "potential_revenue": potential_revenue,
+                "total_roi": total_roi,
+            }
+        }
+    finally:
+        release_db_connection(conn)
+
+
+@app.put("/api/roi-benchmarks/{company_id}")
+def update_roi_benchmarks(
+    company_id: str,
+    payload: RoiBenchmarkUpdate,
+    user: dict = Depends(get_current_user)
+):
+    """Upsert ROI benchmark values for a bot."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
+        user_row = cursor.fetchone()
+        if user_row:
+            user_tier, user_role = user_row
+            tier_upper = (user_tier or "FREE").upper()
+            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
+                raise HTTPException(status_code=402, detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "ROI Dashboard requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                })
+
+        cursor.execute(
+            """
+            INSERT INTO roi_benchmarks (company_id, avg_human_cost_per_ticket, avg_lead_value, updated_at)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (company_id) DO UPDATE
+                SET avg_human_cost_per_ticket = EXCLUDED.avg_human_cost_per_ticket,
+                    avg_lead_value = EXCLUDED.avg_lead_value,
+                    updated_at = NOW()
+            """,
+            (company_id, payload.avg_human_cost_per_ticket, payload.avg_lead_value)
+        )
+        conn.commit()
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         release_db_connection(conn)
 

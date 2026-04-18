@@ -198,8 +198,8 @@ export default function LogoCustomizer({
         }
     };
 
-    const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
-    const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
+    const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+    const inputCls = "w-full text-md font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
 
     return (
         <div className="space-y-6">
@@ -297,7 +297,7 @@ export default function LogoCustomizer({
                         </span>
                     )}
                 </label>
-                <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed mb-3">
+                <p className="text-md text-slate-400 dark:text-slate-500 font-google leading-relaxed mb-3">
                     Premium gradients for transparent logo URLs.
                 </p>
 
@@ -330,7 +330,7 @@ export default function LogoCustomizer({
                                         <span className="material-symbols-outlined text-[18px] text-white drop-shadow-sm font-bold">check</span>
                                     )}
                                 </div>
-                                <span className={`text-xs font-normal font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                <span className={`text-sm font-normal font-google transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
                                     {baseId}
                                 </span>
                             </button>
@@ -404,13 +404,13 @@ export default function LogoCustomizer({
 
                         {/* Guidance notes */}
                         <div className="space-y-1.5 px-1">
-                            <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                            <p className="text-sm text-slate-400 dark:text-slate-500 font-google leading-relaxed">
                                 <span className="font-bold">Requirements:</span> Must be a public HTTPS URL serving an image (PNG, JPG, SVG, or WebP) under 2 MB. Your server must allow public access.
                             </p>
-                            <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                            <p className="text-sm text-slate-400 dark:text-slate-500 font-google leading-relaxed">
                                 <span className="font-bold text-amber-600 dark:text-amber-400">⚠ Avoid:</span> Discord, Slack, or Giphy links — they expire or require authentication. Use <span className="font-medium">Cloudinary, Imgur, or your own domain</span>.
                             </p>
-                            <p className="text-md font-medium text-slate-400 dark:text-slate-500 font-sans leading-relaxed">
+                            <p className="text-sm text-slate-400 dark:text-slate-500 font-google leading-relaxed">
                                 <span className="font-bold">Your responsibility:</span> Store the image in your own codebase or CDN. SaPyBase does not host or proxy images.
                             </p>
                         </div>

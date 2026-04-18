@@ -13,9 +13,9 @@ import { useAuthenticatedFetch } from '../hooks/useApiCall';
 import LogoCustomizer from '../components/LogoCustomizer';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full text-lg font-medium font-sans px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
-const labelCls = "block text-lg font-semibold text-slate-600 dark:text-slate-500 mb-1.5 transition-colors";
-const headingCls = "text-2xl font-medium text-slate-700 dark:text-slate-300 mb-4 transition-colors";
+const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
+const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+const headingCls = "text-xl font-medium font-google mb-4 transition-colors text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-600 dark:from-blue-400 dark:to-green-500";
 const sectionGap = 'space-y-px';
 
 // ── Account ────────────────────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ export const CustomizeSection = () => {
                                                     }}
                                                     className="w-4 h-4 accent-slate-900 dark:accent-blue-600"
                                                 />
-                                                <span className="text-lg font-sans font-medium text-slate-700 dark:text-slate-300">{tone}</span>
+                                                <span className="text-lg font-google text-slate-700 dark:text-slate-300">{tone}</span>
                                             </label>
                                         ))}
                                     </div>
@@ -293,7 +293,7 @@ export const CustomizeSection = () => {
                                             <span className="material-symbols-outlined text-[12px]">add</span> Add
                                         </button>
                                     </div>
-                                    <p className="text-md font-sans text-slate-400 dark:text-slate-500 mb-3">Each chip appears in the chat as a quick question. The text is both the label and the message sent to the bot.</p>
+                                    <p className="text-md font-google text-slate-400 dark:text-slate-500 mb-3">Each chip appears in the chat as a quick question. The text is both the label and the message sent to the bot.</p>
                                     <div className="space-y-2">
                                         {(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []).map((q, idx) => (
                                             <div key={idx} className="flex items-center gap-2">
@@ -320,6 +320,61 @@ export const CustomizeSection = () => {
                                                 </button>
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Divider ── */}
+                        <div className="border-t border-gray-100 dark:border-slate-800 transition-colors" />
+
+                        {/* ── Section: Integrations (PRO) ── */}
+                        <div className="space-y-4 relative">
+                            {!isProUser && (
+                                <div className="absolute -inset-4 z-40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help transition-all hover:backdrop-blur-sm">
+                                    <div className="px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-sm uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">lock</span> Pro Required
+                                    </div>
+                                    <Link to="/app/pricing" className="mt-2 text-md font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
+                                </div>
+                            )}
+                            <div className={!isProUser ? 'opacity-40 grayscale-[0.5] pointer-events-none filter blur-[0.5px]' : ''}>
+                                <p className={headingCls + ' flex items-center'}>
+                                    <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">webhook</span>
+                                    Integrations
+                                </p>
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className={labelCls}>Lead Capture Webhook URL</label>
+                                        <p className="text-md font-google text-yellow-600 mb-3">
+                                            When a lead is captured, we'll POST the lead data to this URL. Works with Zapier, Make, Slack, HubSpot, and any HTTPS endpoint.
+                                        </p>
+                                        <input
+                                            type="url"
+                                            value={botSettings.webhookUrl || ''}
+                                            onChange={e => updateSetting('webhookUrl', e.target.value)}
+                                            className={inputCls}
+                                            placeholder="https://hooks.zapier.com/hooks/catch/..."
+                                        />
+                                        <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-widest">
+                                            Payload: event, lead_id, email, name, context, bot_id, bot_name
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Human Handoff — Instant Contact Link</label>
+                                        <p className="text-md font-google text-yellow-600 mb-3">
+                                            When a visitor requests a human, show them a direct link after the email is sent. Use a WhatsApp link, Calendly booking page, or any HTTPS URL.
+                                        </p>
+                                        <input
+                                            type="url"
+                                            value={botSettings.handoffRedirectUrl || ''}
+                                            onChange={e => updateSetting('handoffRedirectUrl', e.target.value)}
+                                            className={inputCls}
+                                            placeholder="https://wa.me/1234567890  or  https://calendly.com/yourname"
+                                        />
+                                        <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-widest">
+                                            Shown as a "Connect instantly" button after handoff is requested
+                                        </p>
                                     </div>
                                 </div>
                             </div>

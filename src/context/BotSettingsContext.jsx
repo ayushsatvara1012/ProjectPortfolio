@@ -16,6 +16,10 @@ export const BotSettingsProvider = ({ children }) => {
         // ── v13: logo customization ──
         logoShape: 'circle',        // circle | squircle | bento | sharp
         customLogoUrl: '',          // tenant-provided HTTPS image URL
+        // ── v15: integrations ──
+        webhookUrl: '',
+        // ── v17: human handoff ──
+        handoffRedirectUrl: '',
     });
 
     const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +64,10 @@ export const BotSettingsProvider = ({ children }) => {
                     logoShape: data.company.logo_shape || 'circle',
                     customLogoUrl: data.company.custom_logo_url || '',
                     avatarBgStyle: data.company.avatar_bg_style || 'none',
+                    // ── v15 ──
+                    webhookUrl: data.company.webhook_url || '',
+                    // ── v17 ──
+                    handoffRedirectUrl: data.company.handoff_redirect_url || '',
                 });
             }
         } catch (err) {
@@ -94,6 +102,10 @@ export const BotSettingsProvider = ({ children }) => {
                     logo_shape: botSettings.logoShape,
                     custom_logo_url: botSettings.customLogoUrl || null,
                     avatar_bg_style: botSettings.avatarBgStyle,
+                    // ── v15 ──
+                    webhook_url: botSettings.webhookUrl || null,
+                    // ── v17 ──
+                    handoff_redirect_url: botSettings.handoffRedirectUrl || null,
                 })
             });
             const data = await res.json();
