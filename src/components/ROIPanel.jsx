@@ -150,7 +150,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
             </div>
 
             {/* ── Benchmark Editor ── */}
-            <div className={`${cellCls} p-8`}>
+            <div className={`${cellCls} p-4 sm:p-8`}>
                 <div className="flex items-center gap-2 mb-1">
                     <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400">tune</span>
                     <h3 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Calibrate Your Benchmarks</h3>
@@ -197,7 +197,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
                 <button
                     onClick={() => saveMutation.mutate()}
                     disabled={saveMutation.isPending}
-                    className="px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white text-xs font-bold font-google uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2 active:scale-[0.98]"
+                    className="w-full sm:w-auto px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white text-xs font-bold font-google uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                 >
                     {saveMutation.isPending ? (
                         <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Saving...</>

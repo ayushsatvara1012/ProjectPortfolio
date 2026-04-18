@@ -431,9 +431,11 @@ async def check_global_llm_budget(company_id: str):
     try:
         cursor = conn.cursor()
         cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100)")
+        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS webhook_url TEXT")
+        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS handoff_redirect_url TEXT")
         conn.commit()
         cursor.close()
-        print("MIGRATION: ai_model column check complete.")
+        print("MIGRATION: ai_model, webhook_url, and handoff_redirect_url column checks complete.")
     except Exception as e:
         if conn: conn.rollback()
         print(f"MIGRATION WARNING: DB column verification failed: {e}")
