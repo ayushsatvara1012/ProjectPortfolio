@@ -14,13 +14,6 @@ const AboutPage = () => {
             image: "/IMG_9145.webp",
             skills: ["Python", "FastAPI", "PostGres", "GenAI"],
             desc: "AWS Certified Solutions Architect specializes in building high-performance digital ecosystems featuring AI-driven semantic search and projects achieving 99 Lighthouse performance scores. Excelling at optimizing frontend latency and architecting scalable backend ETL pipelines for large-scale datasets. His technical expertise is further validated by specialized certifications in Generative AI, Machine Learning, and Data Science."
-        },
-        {
-            name: "Kathan Pandya",
-            role: "Frontend Developer",
-            image: "/IMG_9163.webp",
-            skills: ["React", "JS", "RestAPI", "Typescript"],
-            desc: "Spearheaded the development of high-performance, scalable web interfaces using Angular, TypeScript, and JavaScript. Architected and implemented responsive, data-intensive dashboards using HTML5 and Advanced CSS/SCSS. Integrate complex REST APIs, optimizing frontend performance and ensuring Type-safe application architecture through TypeScript. Focused on enhancing user experience (UX) maintaining high standards for cross-browser compatibility and mobile responsiveness."
         }
     ];
 
@@ -121,17 +114,17 @@ const AboutPage = () => {
                                 <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-200">Sapybase_v2.0</span>
                             </div>
                             <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 relative z-10">
-                                THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECTS</span> <br /> OF CODE.
+                                THE <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1">ARCHITECT</span> <br /> OF CODE.
                             </h1>
                             <p className="text-md font-display text-slate-500 leading-relaxed max-w-md relative z-10">
-                                We engineer scalable ecosystems that bridge business vision and technical reality.
+                                I engineer scalable ecosystems that bridge business vision and technical reality.
                             </p>
                         </div>
 
                         {/* RIGHT: Informative UI Module */}
                         <div className="lg:col-span-7 bg-slate-50 dark:bg-slate-900/40 rounded-4xl md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-6 md:p-8 relative overflow-hidden h-auto min-h-[500px] lg:min-h-[600px] mt-8 lg:mt-0 pb-12 lg:pb-8">
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
+                            <div className="grid grid-cols-1 gap-6 pt-4 max-w-sm mx-auto w-full">
                                 {/* Partner Cards */}
                                 {partners.map((p, i) => (
                                     <div
