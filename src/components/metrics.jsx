@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion'; // eslint-disable-line no-unused-vars
 
 const PerformanceMetrics = () => {
   const gridRef = useRef(null);
@@ -27,58 +27,58 @@ const PerformanceMetrics = () => {
   const gridData = [
     {
       type: "metric",
-      eyebrow: "GLOBAL EDGE LATENCY",
-      value: "< 50ms",
-      subtext: "Average response time across CDN nodes.",
-      icon: <span className="material-symbols-outlined text-[14px]">public</span>
+      eyebrow: "BOT RESPONSE TIME",
+      value: "< 2s",
+      subtext: "Your visitors get answers instantly — faster than any human support agent.",
+      icon: <span className="material-symbols-outlined text-[14px]">bolt</span>
     },
     {
       type: "text",
-      heading: "Autonomous RAG",
-      body: "Upload documentation; our pipeline generates semantic embeddings instantly. Deploy context-aware agents sans manual pipelines."
+      heading: "Trained on Your Content",
+      body: "Upload your PDFs, paste your website URL, or type your FAQs directly. SaPyBase reads everything and turns it into a smart knowledge base — no coding, no manual Q&A pairs needed."
     },
     {
       type: "metric",
-      eyebrow: "CORE WEB VITALS",
-      value: "100/100",
-      subtext: "Perfect Lighthouse performance benchmarks.",
-      icon: <span className="material-symbols-outlined text-[14px]">vital_signs</span>
+      eyebrow: "DEPLOY TIME",
+      value: "< 10 min",
+      subtext: "From zero to a live chatbot on your website in under ten minutes.",
+      icon: <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
     },
     {
       type: "text",
-      heading: "Modern Stacks",
-      body: "Engineered with React 19 + Tailwind v4 for max speed. Atomic components ensure zero redundant CSS and fast paint cycles."
+      heading: "Works on Any Website",
+      body: "One script tag is all it takes. Paste it into Shopify, Webflow, WordPress, Next.js, or plain HTML — the bot appears instantly, styled to match your brand colors and name."
     },
     {
       type: "metric",
-      eyebrow: "DATABASE READ-WRITE",
-      value: "10x",
-      subtext: "Accelerated ingestion via Supabase indexing.",
-      icon: <span className="material-symbols-outlined text-[14px]">database</span>
-    },
-    {
-      type: "text",
-      heading: "Scalable Infrastructure",
-      body: "FastAPI backends optimized for high-concurrency. Seamless Supabase integration ensures real-time sync at scale."
-    },
-    {
-      type: "metric",
-      eyebrow: "AUTHENTICATION UPTIME",
+      eyebrow: "CHATBOT UPTIME",
       value: "99.9%",
-      subtext: "Resilient Clerk-managed identity layer.",
+      subtext: "Your AI support agent never sleeps, never calls in sick, never goes on holiday.",
       icon: <span className="material-symbols-outlined text-[14px]">verified_user</span>
     },
     {
       type: "text",
-      heading: "Enterprise Security",
-      body: "End-to-end encryption for data-at-rest. Strict CORS policies and origin validation prevent unauthorized access."
+      heading: "Answers Stay Accurate",
+      body: "The bot only uses the content you provide — it never invents answers. When something is outside its knowledge, it says so and hands the conversation to you instead of guessing."
     },
     {
       type: "metric",
-      eyebrow: "JAVASCRIPT BUNDLE",
-      value: "< 12KB",
-      subtext: "Minified production footprint per route.",
-      icon: <span className="material-symbols-outlined text-[14px]">layers</span>
+      eyebrow: "PLATFORMS SUPPORTED",
+      value: "Any HTML",
+      subtext: "React, Next.js, Webflow, Shopify, WordPress — if it renders HTML, it works.",
+      icon: <span className="material-symbols-outlined text-[14px]">devices</span>
+    },
+    {
+      type: "text",
+      heading: "You Stay in Control",
+      body: "Retrain the bot any time your content changes. Adjust its tone, name, and brand color from your dashboard. Watch live conversations, see what questions customers are asking, and improve over time."
+    },
+    {
+      type: "metric",
+      eyebrow: "KNOWLEDGE SOURCES",
+      value: "PDF · URL · Text",
+      subtext: "Three ways to feed your bot — whichever fits your workflow best.",
+      icon: <span className="material-symbols-outlined text-[14px]">database</span>
     }
   ];
 

@@ -1,81 +1,86 @@
 import { useNavigate } from 'react-router-dom';
 
+const INSIGHT_MODULES = [
+  {
+    id: "01",
+    label: "ANALYTICS REPORT",
+    icon: "monitoring",
+    accent: "text-blue-600 dark:text-blue-400",
+    title: "AI-Synthesized Analytics",
+    description: "Your bot's chat logs converted into a plain-English business report — top customer trends, knowledge gaps, actionable advice, and a 30-day activity heatmap. Refreshed every 24 hours automatically.",
+    tags: ["TOP_TRENDS", "DAILY_HEATMAP", "AI_SYNTHESIS"],
+    route: "/app/insights"
+  },
+  {
+    id: "02",
+    label: "LEADS CRM",
+    icon: "contacts",
+    accent: "text-violet-600 dark:text-violet-400",
+    title: "Leads Captured by Your Bot",
+    description: "Every visitor who shared their name, email, or phone with the chatbot lands here automatically. View, filter, and export your pipeline of bot-qualified leads without lifting a finger.",
+    tags: ["AUTO_CAPTURE", "EXPORT_CSV"],
+    route: "/app/insights"
+  },
+  {
+    id: "03",
+    label: "CONVERSATIONS",
+    icon: "forum",
+    accent: "text-cyan-600 dark:text-cyan-400",
+    title: "Full Conversation History",
+    description: "Browse every chat session your bot has ever had — full transcript, timestamps, and answered vs. unanswered status. See exactly how visitors talk to your business in their own words.",
+    tags: ["FULL_TRANSCRIPTS", "STATUS_FILTER"],
+    route: "/app/insights"
+  },
+  {
+    id: "04",
+    label: "ROI CALCULATOR",
+    icon: "savings",
+    accent: "text-emerald-600 dark:text-emerald-400",
+    title: "Your Return on Investment",
+    description: "See the real dollar value your chatbot delivers — support hours saved, cost avoided against human agent rates, and revenue potential from leads captured. Know exactly what the bot earns you.",
+    tags: ["HOURS_SAVED", "COST_AVOIDED", "REVENUE_POTENTIAL"],
+    route: "/app/insights"
+  }
+];
+
 const Services = () => {
   const navigate = useNavigate();
-
-  const services = [
-    {
-      id: "01",
-      label: "INTELLIGENCE",
-      title: "AI & Neural Integration",
-      description: "Deploying RAG-optimized LLMs and custom machine learning models that evolve with your data. We architect context-aware intelligence.",
-      icon: <span className="material-symbols-outlined text-[20px]">psychology</span>,
-      btnText: "EXPLORE ARCHITECTURE",
-      route: "/services"
-    },
-    {
-      id: "02",
-      label: "KNOWLEDGE",
-      title: "Enterprise Knowledge Sync",
-      description: "Transform static docs, PDFs, and live databases into dynamic AI brains. Real-time synchronization for always-accurate responses.",
-      icon: <span className="material-symbols-outlined text-[20px]">database</span>,
-      btnText: "TRAIN YOUR AI",
-      tags: ["RAG_OPTIMIZED", "AUTO_SYNC"],
-      route: "/app/train"
-    },
-    {
-      id: "03",
-      label: "INTEGRATION",
-      title: "Seamless One-Script Deployment",
-      description: "Deploy your custom AI agent across React, Next.js, or legacy systems with one line of code. Native performance at the edge.",
-      icon: <span className="material-symbols-outlined text-[20px]">code</span>,
-      btnText: "VIEW ADAPTOR LOGS",
-      route: "/docs"
-    },
-    {
-      id: "04",
-      label: "INSIGHTS",
-      title: "Conversational Analytics",
-      description: "Monitor user intent and bot performance in real-time. Refine your AI's behavior with data-driven dashboard insights.",
-      icon: <span className="material-symbols-outlined text-[20px]">monitoring</span>,
-      btnText: "VIEW LIVE METRICS",
-      route: "/app/insights"
-    }
-  ];
 
   return (
     <section id="services" className="bg-white dark:bg-slate-950 py-12 overflow-hidden transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 md:px-3">
-        
-        {/* Tic-Tac-Toe Grid Architecture */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 rounded-none overflow-hidden transition-colors duration-500">
-          
-          {/* 1. HEADER CELL (Full Width) */}
-          <div className="md:col-span-2 bg-white dark:bg-slate-950 p-12 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-12 group/header transition-colors duration-500">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-500">
+
+          {/* HEADER CELL */}
+          <div className="md:col-span-2 bg-white dark:bg-slate-950 p-12 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-12 group/header transition-colors duration-500">
             <div className="max-w-2xl space-y-8">
               <div className="flex items-center gap-3 text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
-                <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 transition-colors">vital_signs</span>
-                <span>Service_Module_Registry</span>
+                <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 transition-colors">insights</span>
+                <span>Insight_Module_Registry</span>
               </div>
               <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase transition-colors">
-                ENGINEERING <br />
-                <span className="text-blue-600 dark:text-blue-400">Super-Structures.</span>
+                YOUR BOT'S <br />
+                <span className="text-blue-600 dark:text-blue-400">Business Intelligence.</span>
               </h2>
+              <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl transition-colors">
+                Every conversation your AI handles generates data. The Insights dashboard turns that data into decisions — who visited, what they asked, what was missed, and what it's worth to you.
+              </p>
             </div>
-            
-            {/* Architectural Legend */}
-            <div className="border-x border-gray-200 dark:border-slate-800 p-6 md:p-8 space-y-4 min-w-[240px] transition-colors duration-500 group-hover/header:border-indigo-100 dark:group-hover/header:border-indigo-900/40">
-              <div className="flex justify-between items-center text-md  uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
-                <span>System_Version</span>
-                <span className="text-slate-900 dark:text-slate-200 font-sans transition-colors">2.0.6</span>
+
+            {/* Live Stats Legend */}
+            <div className="border-x border-gray-200 dark:border-slate-800 p-6 md:p-8 space-y-4 min-w-[240px] transition-colors duration-500 group-hover/header:border-blue-100 dark:group-hover/header:border-blue-900/40">
+              <div className="flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+                <span>Report Cadence</span>
+                <span className="text-slate-900 dark:text-slate-200 font-sans transition-colors">24h</span>
               </div>
-              <div className="flex justify-between items-center text-md  uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
-                <span>Uptime</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-sans transition-colors">99.99%</span>
+              <div className="flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
+                <span>Data Modules</span>
+                <span className="text-blue-600 dark:text-blue-400 font-sans transition-colors">4</span>
               </div>
-              <div className="flex justify-between items-center text-md  uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
-                <span>Protocol</span>
-                <span className="text-slate-900 dark:text-slate-200 transition-colors">HP_SECURE</span>
+              <div className="flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
+                <span>Access</span>
+                <span className="text-emerald-600 dark:text-emerald-400 transition-colors">PRO+</span>
               </div>
               <div className="pt-4 border-t border-gray-100 dark:border-slate-800 flex gap-1 transition-colors">
                 {[1, 2, 3, 4, 5].map(i => (
@@ -85,51 +90,54 @@ const Services = () => {
             </div>
           </div>
 
-          {/* 2. MODULE CELLS (4 Services) */}
-          {services.map((service, idx) => (
-            <div key={service.id} className="bg-white dark:bg-slate-950 p-5 md:p-10 flex flex-col justify-between gap-12 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 border-t dark:border-slate-800">
-              <div className="space-y-8">
-                {/* Eyebrow Label */}
-                <div className="flex items-center gap-2 text-md font-display tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
-                  <span className="text-blue-600 dark:text-blue-400">{`MODULE_${service.id}`}</span>
-                  <span className="text-slate-500 dark:text-slate-600">//</span>
-                  <span>{service.label}</span>
-                </div>
+          {/* MODULE CELLS */}
+          {INSIGHT_MODULES.map((mod) => (
+            <div key={mod.id} className="relative bg-white dark:bg-slate-950 p-8 md:p-10 flex flex-col justify-between gap-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 border-t dark:border-slate-800 overflow-hidden">
 
-                {/* Sharp Icon Square */}
-                <div className="w-12 h-12 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-slate-900 dark:text-slate-200 bg-white dark:bg-slate-900 group-hover/cell:border-indigo-200 dark:group-hover/cell:border-indigo-700 group-hover/cell:text-indigo-600 dark:group-hover/cell:text-indigo-400 transition-all duration-500">
-                  {service.icon}
+              {/* Ghost icon watermark */}
+              <span
+                className={`material-symbols-outlined absolute select-none pointer-events-none z-0 opacity-[0.4] group-hover/cell:opacity-[0.7] transition-opacity duration-500 ${mod.accent}`}
+                style={{ fontSize: "180px", top: "24px", right: "24px", lineHeight: 1 }}
+              >
+                {mod.icon}
+              </span>
+
+              <div className="space-y-8 relative z-10">
+
+                {/* Eyebrow */}
+                <div className="flex items-center gap-2 text-md font-display tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+                  <span className={`text-blue-600 dark:text-blue-400`}>{`MODULE_${mod.id}`}</span>
+                  <span className="text-slate-500 dark:text-slate-600">//</span>
+                  <span>{mod.label}</span>
                 </div>
 
                 {/* Content */}
                 <div className="space-y-4">
-                  <h3 className="text-xl md:text-4xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">
-                    {service.title.split(' & ').join(' \n& ')}
+                  <h3 className="text-xl md:text-3xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">
+                    {mod.title}
                   </h3>
                   <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm transition-colors">
-                    {service.description}
+                    {mod.description}
                   </p>
                 </div>
 
-                {/* Tags for specific modules */}
-                {service.tags && (
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {service.tags.map(tag => (
-                      <span key={tag} className="border-l border-gray-300 dark:border-slate-700 bg-transparent px-2 py-1 text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {/* Tags */}
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {mod.tags.map(tag => (
+                    <span key={tag} className="border-l border-gray-300 dark:border-slate-700 bg-transparent px-2 py-1 text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
 
-              {/* Action Button */}
-              <div className="pt-8 border-t border-gray-100 dark:border-slate-800 mt-auto transition-colors">
-                <button 
-                  onClick={() => navigate(service.route)}
-                  className="w-full md:w-auto px-8 py-5 bg-slate-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 text-md font-sans uppercase tracking-widest font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 group/btn"
+              {/* CTA */}
+              <div className="pt-8 border-t border-gray-100 dark:border-slate-800 mt-auto transition-colors relative z-10">
+                <button
+                  onClick={() => navigate(mod.route)}
+                  className="w-full md:w-auto px-8 py-5 bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 text-md font-sans uppercase tracking-widest font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 group/btn"
                 >
-                  {service.btnText}
+                  VIEW {mod.label}
                   <span className="material-symbols-outlined text-[14px] opacity-40 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all">chevron_right</span>
                 </button>
               </div>

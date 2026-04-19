@@ -178,4 +178,51 @@
   .sapy-stream-text-in {
     animation: streamTextIn 0.2s ease-out both;
   }
+
+  /* ── About page: horizontal beam slide ───────────────────────────────
+     Translates from -60% (off left) to 160% (off right) so the beam
+     enters and exits cleanly. Uses only `transform` for GPU compositing.
+     Each beam div gets `sapy-beam-slide` + inline animation-duration/delay. */
+  @keyframes beamSlide {
+    0%   { transform: translateX(-60%); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateX(160vw); opacity: 0; }
+  }
+
+  .sapy-beam-slide {
+    animation: beamSlide linear infinite;
+    will-change: transform;
+  }
+
+  /* ── About page: vertical beam slide ─────────────────────────────────
+     Same principle, but top→bottom. */
+  @keyframes beamSlideVert {
+    0%   { transform: translateY(-60%); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(160vh); opacity: 0; }
+  }
+
+  .sapy-beam-slide-vert {
+    animation: beamSlideVert linear infinite;
+    will-change: transform;
+  }
+
+  /* ── About page: tech-stack marquee ──────────────────────────────────
+     The track div is duplicated in JSX (items × 2), so translating by
+     exactly -50% produces a seamless infinite loop. */
+  @keyframes marqueeScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  .sapy-marquee-track {
+    animation: marqueeScroll 28s linear infinite;
+    will-change: transform;
+  }
+
+  .sapy-marquee-track:hover {
+    animation-play-state: paused;
+  }
 }
