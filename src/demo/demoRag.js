@@ -167,7 +167,7 @@ export function retrieveChunks(allChunks, question) {
 
 // ── Gemini API Call ───────────────────────────────────────────────────────────
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 export async function askGemini(question, contextChunks, botConfig, messageCount) {
     if (messageCount >= DEMO_MSG_CAP) {
