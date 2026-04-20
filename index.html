@@ -42,7 +42,7 @@
     }
 
     html {
-      scrollbar-gutter: stable;
+      /* Removed scrollbar-gutter: stable as it causes horizontal overflow on mobile overlay scrollbars */
     }
 
     body {
@@ -528,6 +528,20 @@
       apiUrl: "https://sapyai.onrender.com",
     };
   </script>
+
+  <!-- Demo mode: PDF.js for in-browser PDF parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script defer>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    });
+  </script>
+
+  <!-- Demo mode: SheetJS for in-browser Excel parsing -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" defer></script>
 </body>
 
 </html>

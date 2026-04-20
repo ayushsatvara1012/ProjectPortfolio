@@ -12,6 +12,7 @@ const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:
 const TABS = [
     { id: 'url', label: 'URL', icon: 'public' },
     { id: 'pdf', label: 'PDF Upload', icon: 'description' },
+    { id: 'csv', label: 'CSV / Excel', icon: 'table_chart' },
     { id: 'text', label: 'Text', icon: 'notes' },
 ];
 
@@ -179,7 +180,9 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                     <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 border border-gray-100 dark:border-slate-800 rounded-xs">
                         <div className="flex items-center gap-2">
                              <span className="material-symbols-outlined text-[18px] text-blue-500">
-                                {selectedSource.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf' : 'language'}
+                                {selectedSource.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf'
+                                    : ['.csv', '.xlsx', '.xls'].some(ext => selectedSource.toLowerCase().endsWith(ext)) ? 'table_chart'
+                                    : 'language'}
                             </span>
                             <span className="text-xs font-bold font-google uppercase tracking-widest text-slate-700 dark:text-slate-300 truncate flex-1">
                                 {selectedSource}
@@ -268,7 +271,9 @@ const AppTrainAI = () => {
     const [activeTab, setActiveTab] = useState('url');
     const [url, setUrl] = useState('');
     const [file, setFile] = useState(null);
+    const [csvFile, setCsvFile] = useState(null);
     const [trainingText, setTrainingText] = useState('');
+    const [textLabel, setTextLabel] = useState('');
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const [selectedBotId, setSelectedBotId] = useState('');
     const [upgradeError, setUpgradeError] = useState(null);
@@ -288,6 +293,7 @@ const AppTrainAI = () => {
     }, [location.search]);
 
     const fileRef = useRef(null);
+    const csvFileRef = useRef(null);
     const baseUrl = import.meta.env.VITE_API_URL || '';
 
     // ── useQuery: shared ['bots'] cache with AppBotManager ─────────────────
@@ -323,7 +329,9 @@ const AppTrainAI = () => {
             const fd = new FormData();
             if (url.trim()) fd.append('url', url.trim());
             if (file) fd.append('file', file);
+            if (csvFile) fd.append('csv_file', csvFile);
             if (trainingText.trim()) fd.append('text', trainingText.trim());
+            if (trainingText.trim() && textLabel.trim()) fd.append('text_label', textLabel.trim());
             if (selectedBotId) fd.append('company_id', selectedBotId);
             const res = await fetch(`${baseUrl}/api/train`, {
                 method: 'POST',
@@ -347,8 +355,9 @@ const AppTrainAI = () => {
             if (data.job_id) {
                 setTrainingJobId(data.job_id);
                 setTrainingProgress({ status: 'queued', progress: 0, total: 0 });
-                setUrl(''); setTrainingText(''); setFile(null);
+                setUrl(''); setTrainingText(''); setFile(null); setCsvFile(null); setTextLabel('');
                 if (fileRef.current) fileRef.current.value = '';
+                if (csvFileRef.current) csvFileRef.current.value = '';
 
                 const token = await getToken();
                 pollRef.current = setInterval(async () => {
@@ -367,9 +376,10 @@ const AppTrainAI = () => {
                             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
                             queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
                             refreshUser();
+                            const action = status.is_upsert ? 'Source updated!' : 'Training complete!';
                             const msg = status.truncated
-                                ? `Training complete! ${status.chunks_added} chunks added (plan limit reached).`
-                                : `Training complete! ${status.chunks_added} chunks added to your AI's brain. 🧠`;
+                                ? `${action} ${status.chunks_added} chunks added (plan limit reached).`
+                                : `${action} ${status.chunks_added} chunks committed to your bot's knowledge base.`;
                             showAlert('success', msg);
                         } else if (status.status === 'error') {
                             clearInterval(pollRef.current);
@@ -390,8 +400,9 @@ const AppTrainAI = () => {
             queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
             refreshUser();
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
-            setUrl(''); setTrainingText(''); setFile(null);
+            setUrl(''); setTrainingText(''); setFile(null); setCsvFile(null);
             if (fileRef.current) fileRef.current.value = '';
+            if (csvFileRef.current) csvFileRef.current.value = '';
         },
         onError: (err) => {
             if (err instanceof UpgradeError) setUpgradeError(err);
@@ -401,8 +412,8 @@ const AppTrainAI = () => {
 
     const handleTrain = (e) => {
         e.preventDefault();
-        if (!url.trim() && !file && !trainingText.trim()) {
-            showAlert('error', 'Provide a URL, PDF file, or manual text.');
+        if (!url.trim() && !file && !csvFile && !trainingText.trim()) {
+            showAlert('error', 'Provide a URL, PDF file, CSV/Excel file, or manual text.');
             return;
         }
         trainMutation.mutate();
@@ -449,7 +460,7 @@ const AppTrainAI = () => {
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
             {/* ── Page Header ── */}
-            <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+            <div className="bg-white dark:bg-slate-950 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 <div className="flex items-center gap-2 mb-1">
                     <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
                         psychology
@@ -462,11 +473,11 @@ const AppTrainAI = () => {
             {/* ── Stats Row (tic-tac-toe grid) ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 {ctxLoading ? (
-                    Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-8`}><StatSkeleton /></div>)
+                    Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-4 md:p-8`}><StatSkeleton /></div>)
                 ) : (
                     <>
                         {/* 1. Knowledge Chunks */}
-                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
@@ -496,7 +507,7 @@ const AppTrainAI = () => {
                         </div>
 
                         {/* 2. AI Memory */}
-                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">vital_signs</span>
                                 <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
@@ -507,7 +518,7 @@ const AppTrainAI = () => {
                         </div>
 
                         {/* 3. System Tier */}
-                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">bolt</span>
                                 <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">System Tier</p>
@@ -518,7 +529,7 @@ const AppTrainAI = () => {
                         </div>
 
                         {/* 4. Total Usage */}
-                        <div className={`${cellCls} p-8 flex flex-col justify-center`}>
+                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
                            <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">database</span>
@@ -556,9 +567,9 @@ const AppTrainAI = () => {
             {/* ── Main Grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 overflow-hidden transition-colors duration-500">
                 {/* Knowledge Sources */}
-                <div className={`lg:col-span-12 ${cellCls} p-8 relative overflow-y-auto custom-scrollbar`}>
+                <div className={`lg:col-span-12 ${cellCls} p-4 md:p-8 relative overflow-y-auto custom-scrollbar`}>
                     {isFree && (
-                        <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center gap-5 p-10 transition-colors duration-500">
+                        <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center gap-5 p-6 md:p-10 transition-colors duration-500">
                             <div className="w-12 h-12 border-2 border-slate-900 dark:border-slate-700 flex items-center justify-center transition-colors">
                                 <span className="material-symbols-outlined text-[28px] text-slate-900 dark:text-slate-200 transition-colors">
                                     lock
@@ -582,13 +593,12 @@ const AppTrainAI = () => {
                     <div className="flex border border-gray-100 dark:border-slate-800 mb-5 overflow-x-auto transition-colors">
                         {TABS.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`flex items-center gap-1.5 flex-1 py-2.5 px-3 text-sm font-google uppercase tracking-widest font-bold transition-colors min-h-[40px] shrink-0 border-b-2 ${activeTab === t.id
+                                className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 px-2 md:px-3 text-sm font-google uppercase tracking-widest font-bold transition-colors min-h-[44px] shrink-0 border-b-2 ${activeTab === t.id
                                         ? 'border-slate-900 dark:border-blue-500 text-slate-900 dark:text-slate-200 bg-[#FAFAFA] dark:bg-slate-900'
                                         : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
                                     }`}>
-                                <span className="material-symbols-outlined text-[18px]">
-                                    {t.icon}
-                                </span>{t.label}
+                                <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
+                                <span className="hidden sm:inline">{t.label}</span>
                             </button>
                         ))}
                     </div>
@@ -620,12 +630,12 @@ const AppTrainAI = () => {
                             <div>
                                 <label className={labelCls}>PDF Archive</label>
                                 <div onClick={() => fileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-6 py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
                                     <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">
                                         cloud_upload
                                     </span>
-                                    <div className="text-center">
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors">{file ? file.name : 'Drop PDF here'}</p>
+                                    <div className="text-center w-full">
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">{file ? file.name : 'Drop PDF here'}</p>
                                         <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
                                         <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
                                     </div>
@@ -640,11 +650,72 @@ const AppTrainAI = () => {
                                 )}
                             </div>
                         )}
-                        {activeTab === 'text' && (
+                        {activeTab === 'csv' && (
                             <div>
-                                <label className={labelCls}>Knowledge Text</label>
-                                <textarea value={trainingText} onChange={e => setTrainingText(e.target.value)}
-                                    rows={6} className={inputCls + ' resize-none font-google'} placeholder="Paste your FAQs, services, or raw knowledge here..." />
+                                <label className={labelCls}>CSV / Excel File</label>
+                                <div onClick={() => csvFileRef.current?.click()}
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
+                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">table_chart</span>
+                                    <div className="text-center w-full">
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">
+                                            {csvFile ? csvFile.name : 'Drop CSV or Excel file here'}
+                                        </p>
+                                        <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
+                                        <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">.csv, .xlsx, .xls — max 5 MB</p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={csvFileRef}
+                                        className="hidden"
+                                        accept=".csv,.xlsx,.xls"
+                                        onChange={e => {
+                                            const f = e.target.files?.[0];
+                                            if (!f) return;
+                                            const ok = ['.csv', '.xlsx', '.xls'].some(ext => f.name.toLowerCase().endsWith(ext));
+                                            if (!ok) { showAlert('error', 'Please select a .csv, .xlsx, or .xls file.'); return; }
+                                            if (f.size > 5 * 1024 * 1024) { showAlert('error', 'File exceeds 5 MB limit.'); return; }
+                                            setCsvFile(f);
+                                        }}
+                                    />
+                                </div>
+                                {csvFile && (
+                                    <button type="button" onClick={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }}
+                                        className="mt-2 flex items-center gap-1 text-md font-google text-red-500 hover:text-red-700">
+                                        <span className="material-symbols-outlined text-[16px]">close</span> Remove {csvFile.name}
+                                    </button>
+                                )}
+                                {csvFile && (
+                                    <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 flex items-start gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-blue-500 mt-0.5 shrink-0">info</span>
+                                        <p className="text-xs text-blue-700 dark:text-blue-300 font-google leading-relaxed">
+                                            Each row becomes one knowledge chunk. Make sure your file has a <span className="font-bold">header row</span> (column names in row 1). Re-uploading the same filename will safely replace the previous version.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {activeTab === 'text' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className={labelCls}>Source Label <span className="normal-case text-slate-400 dark:text-slate-500 font-normal tracking-normal">(optional)</span></label>
+                                    <input
+                                        type="text"
+                                        value={textLabel}
+                                        onChange={e => setTextLabel(e.target.value)}
+                                        className={inputCls + ' font-mono text-xs'}
+                                        placeholder="e.g. faq-returns, pricing-2025"
+                                    />
+                                    <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 font-google leading-relaxed">
+                                        {textLabel.trim()
+                                            ? <>Re-uploading with label <span className="font-mono font-bold text-slate-600 dark:text-slate-300">"{textLabel.trim()}"</span> will safely replace only that source.</>
+                                            : 'Without a label, re-submitting will overwrite all previous unlabelled text entries.'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Knowledge Text</label>
+                                    <textarea value={trainingText} onChange={e => setTrainingText(e.target.value)}
+                                        rows={6} className={inputCls + ' resize-none font-google'} placeholder="Paste your FAQs, services, or raw knowledge here..." />
+                                </div>
                             </div>
                         )}
                         {upgradeError && (
@@ -673,7 +744,7 @@ const AppTrainAI = () => {
             </div>
 
             {/* ── Knowledge Management (Full-Width Below Grid) ── */}
-            <div className={`${cellCls} p-8 flex-1 overflow-y-auto custom-scrollbar border-t border-gray-100 dark:border-slate-800`}>
+            <div className={`${cellCls} p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar border-t border-gray-100 dark:border-slate-800`}>
                 <div className="flex items-center gap-2 mb-5">
                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">folder_open</span>
                     <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 transition-colors">Manage Knowledge</h2>

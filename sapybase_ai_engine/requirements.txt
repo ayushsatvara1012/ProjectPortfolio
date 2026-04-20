@@ -26,3 +26,5 @@ uvicorn
 jinja2
 python-multipart
 polar-sdk
+pandas
+openpyxl

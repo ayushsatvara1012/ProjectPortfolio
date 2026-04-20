@@ -119,6 +119,13 @@ const HeroSection = () => {
               </span>
               Read Docs
             </Button>
+
+            <Button onClick={() => navigate('/demo')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-xl font-sans text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-none flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-[18px]">
+                experiment
+              </span>
+              Try Demo
+            </Button>
           </div>
         </div>
 

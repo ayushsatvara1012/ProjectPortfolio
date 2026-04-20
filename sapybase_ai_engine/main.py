@@ -137,6 +137,138 @@ def validate_safe_url(url: str):
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="Could not resolve the provided URL.")
 
+_URL_TRACKING_PARAMS = frozenset({
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "ref", "fbclid", "gclid", "msclkid", "mc_cid", "mc_eid",
+})
+
+def normalize_source_url(url: str) -> str:
+    """
+    Canonicalise a URL so that re-training the same page always produces the
+    same source_name, regardless of tracking params, trailing slashes, or
+    minor scheme differences.
+
+    Rules applied (in order):
+      1. Lowercase scheme + host.
+      2. Strip well-known tracking query parameters.
+      3. Remove a trailing slash from the path (unless it is the root "/").
+      4. Drop an empty query string or fragment.
+    """
+    from urllib.parse import urlparse, urlencode, urlunparse, parse_qsl
+    parsed = urlparse(url)
+    clean_params = [
+        (k, v) for k, v in parse_qsl(parsed.query)
+        if k.lower() not in _URL_TRACKING_PARAMS
+    ]
+    clean_query = urlencode(clean_params)
+    clean_path = parsed.path.rstrip("/") or "/"
+    normalised = urlunparse((
+        parsed.scheme.lower(),
+        parsed.netloc.lower(),
+        clean_path,
+        parsed.params,
+        clean_query,
+        "",          # strip fragment — irrelevant for server-side scraping
+    ))
+    return normalised
+
+
+def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) -> List[Document]:
+    """
+    Convert a CSV or Excel file into a list of LangChain Documents suitable for
+    vector embedding.  Each non-empty data row becomes one Document so that a
+    question about a specific row (e.g. a product SKU or an FAQ entry) retrieves
+    exactly that row rather than a mixed-bag chunk.
+
+    Chunk format per row:
+        <header1>: <value1> | <header2>: <value2> | ...
+
+    Edge cases handled:
+      - CSV: tries UTF-8, then latin-1 (covers Windows-exported files).
+      - Excel: reads the first sheet; skips sheets that are entirely empty.
+      - Rows where every cell is blank/NaN are dropped.
+      - Values are coerced to str and stripped; NaN → empty string.
+      - Files with no header row (all columns unnamed) raise a clear error.
+      - Files with zero usable data rows raise a clear error.
+      - Very long cell values are truncated at 500 chars to prevent
+        oversized chunks that degrade embedding quality.
+      - Duplicate column names get a numeric suffix (_1, _2 …) so
+        key:value pairs remain unambiguous.
+    """
+    import pandas as pd
+    from io import BytesIO
+
+    ext = filename.rsplit(".", 1)[-1].lower()
+    MAX_CELL_CHARS = 500
+
+    def _load_df() -> pd.DataFrame:
+        if ext == "csv":
+            for enc in ("utf-8", "utf-8-sig", "latin-1", "cp1252"):
+                try:
+                    return pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc, keep_default_na=False)
+                except UnicodeDecodeError:
+                    continue
+            raise ValueError("CSV file encoding could not be detected. Save as UTF-8 and retry.")
+        elif ext in ("xlsx", "xls"):
+            try:
+                return pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False, engine="openpyxl" if ext == "xlsx" else None)
+            except Exception as e:
+                raise ValueError(f"Could not parse Excel file: {e}")
+        else:
+            raise ValueError(f"Unsupported tabular format: .{ext}")
+
+    df = _load_df()
+
+    # Deduplicate column names (pandas already does this with .1/.2 suffix by default,
+    # but we normalise to underscore style for cleaner output).
+    seen: dict = {}
+    new_cols = []
+    for col in df.columns:
+        col_str = str(col).strip()
+        if col_str in seen:
+            seen[col_str] += 1
+            new_cols.append(f"{col_str}_{seen[col_str]}")
+        else:
+            seen[col_str] = 0
+            new_cols.append(col_str)
+    df.columns = new_cols
+
+    # Reject files where every column name is "Unnamed: N" (no real header).
+    real_headers = [c for c in df.columns if not c.startswith("Unnamed:")]
+    if not real_headers:
+        raise ValueError(
+            "The file has no header row. Add column names in the first row (e.g. 'Product', 'Price', 'Description') and re-upload."
+        )
+
+    # Drop completely blank rows.
+    df = df.replace("", float("nan")).dropna(how="all").fillna("")
+
+    if df.empty:
+        raise ValueError("The file contains no data rows after removing blank lines.")
+
+    docs: List[Document] = []
+    for _, row in df.iterrows():
+        parts = []
+        for col in df.columns:
+            val = str(row[col]).strip()
+            if not val:
+                continue
+            if len(val) > MAX_CELL_CHARS:
+                val = val[:MAX_CELL_CHARS] + "…"
+            parts.append(f"{col}: {val}")
+
+        if not parts:
+            continue  # entire row was empty after stripping — skip
+
+        chunk_text = " | ".join(parts)
+        docs.append(Document(page_content=chunk_text, metadata={"source": source_name}))
+
+    if not docs:
+        raise ValueError("No usable data rows found in the file.")
+
+    return docs
+
+
 async def validate_logo_url(url: str) -> None:
     """
     Hardened logo URL validator. Raises HTTPException on any violation.
@@ -408,6 +540,26 @@ async def startup_event():
     except Exception as e:
         if conn: conn.rollback()
         print(f"MIGRATION WARNING: DB column verification failed: {e}")
+    finally:
+        release_db_connection(conn)
+
+    # 3. Sweep orphaned temp chunks left by jobs that crashed mid-swap.
+    #    Temp rows use the prefix "__temp_" and are safe to remove if they are
+    #    older than 1 hour (well beyond any realistic training duration).
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM company_knowledge WHERE url LIKE '__temp_%%' AND created_at < NOW() - INTERVAL '1 hour'"
+        )
+        swept = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        if swept:
+            print(f"STARTUP SWEEP: Removed {swept} orphaned temp chunk(s) from a previous crashed job.")
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"STARTUP SWEEP WARNING: Orphan cleanup failed ({e}). Non-critical — continuing.")
     finally:
         release_db_connection(conn)
 
@@ -2603,34 +2755,68 @@ async def run_training_job(
     current_user: dict,
     limit: int,
     source_name: str,
+    is_upsert: bool = False,
+    lock_key: str = "",
+    skip_splitting: bool = False,
 ):
-    """Background task: embeds and inserts chunks. State is persisted in Redis."""
+    """
+    Background task: embeds and inserts knowledge chunks using a safe swap pattern.
+
+    Swap sequence (upsert path):
+      1. Insert all new chunks under a unique temp key  (__temp_{job_id}_{source_name}).
+      2. Verify every batch committed successfully.
+      3. Atomically rename temp rows → real source_name  (single UPDATE, no gap).
+      4. Delete old rows that still carry the original source_name.
+      5. Invalidate the query cache.
+
+    On any failure the temp rows are deleted and the original data is untouched,
+    so the bot keeps serving correct (if stale) answers throughout.
+    """
+    temp_source_name = f"__temp_{job_id}_{source_name}"
     status = {"status": "processing", "progress": 0, "total": 0}
     await set_job_status(job_id, status)
 
     conn = None
+    chunks_committed = 0
     try:
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-        all_chunks = text_splitter.split_documents(docs)
+        if skip_splitting:
+            # Tabular files: each Document is already one row-chunk; splitting would
+            # shred the key:value structure and destroy retrieval accuracy.
+            all_chunks = docs
+        else:
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+            all_chunks = text_splitter.split_documents(docs)
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
-        current_count = cursor.fetchone()[0]
-        remaining = max(0, limit - current_count)
+        # Re-compute remaining capacity using effective count (excluding old source).
+        # This mirrors the pre-check in train_chatbot and guards against quota drift
+        # between queue time and execution time.
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s",
+            (resolved_company_id,)
+        )
+        total_count = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            (resolved_company_id, source_name)
+        )
+        old_source_count = cursor.fetchone()[0]
+
+        effective_count = total_count - old_source_count
+        remaining = max(0, limit - effective_count)
         chunks = all_chunks[:remaining]
-        
+
         status["total"] = len(chunks)
-
-
         await set_job_status(job_id, status)
 
+        # ── Phase 1: Insert under temp key ───────────────────────────────────
         BATCH_SIZE = 10
         for i in range(0, len(chunks), BATCH_SIZE):
             batch = chunks[i:i + BATCH_SIZE]
             texts = [c.page_content for c in batch]
-            # ── NON-BLOCKING: Use async embedding call to keep event loop alive ──
             embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
             for chunk, embedding in zip(batch, embeddings_list):
@@ -2638,36 +2824,103 @@ async def run_training_job(
                     embedding = embedding[:EMBEDDING_DIMENSIONS]
                 cursor.execute(
                     "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
-                    (resolved_company_id, chunk.page_content, chunk.metadata.get("source", source_name), embedding)
+                    (resolved_company_id, chunk.page_content, temp_source_name, embedding)
                 )
 
             conn.commit()
-            status["progress"] = i + len(batch)
+            chunks_committed += len(batch)
+            status["progress"] = chunks_committed
             await set_job_status(job_id, status)
-            await asyncio.sleep(0.1)  # Yield control for better status poll responsiveness
+            await asyncio.sleep(0.1)  # yield to event loop between batches
 
-        # Cache invalidation after successful training
+        # ── Phase 2: Atomic rename temp → real source_name ───────────────────
+        cursor.execute(
+            "UPDATE company_knowledge SET url = %s WHERE company_id = %s AND url = %s",
+            (source_name, resolved_company_id, temp_source_name)
+        )
+        conn.commit()
+
+        # ── Phase 3: Delete old chunks (only runs after rename succeeds) ─────
+        if is_upsert and old_source_count > 0:
+            # After the rename above, rows with the real source_name are the NEW
+            # ones. Old rows that were already named source_name before this job
+            # started are identified by their creation timestamp being older than
+            # any row inserted in this job. We delete by excluding the temp batch
+            # that was just renamed — the safest approach is to count: we inserted
+            # `chunks_committed` rows, so the total for this source should now be
+            # exactly that many if we delete the excess.
+            #
+            # Simpler and equally correct: delete rows where created_at is older
+            # than the oldest row in the temp batch (now renamed). Since postgres
+            # assigns created_at at insert time and all new rows were inserted after
+            # the old ones, we can identify old rows as those that existed before
+            # this job's first insert. We capture that boundary via a subquery.
+            cursor.execute(
+                """
+                DELETE FROM company_knowledge
+                WHERE company_id = %s
+                  AND url = %s
+                  AND id NOT IN (
+                      SELECT id FROM company_knowledge
+                      WHERE company_id = %s AND url = %s
+                      ORDER BY created_at DESC
+                      LIMIT %s
+                  )
+                """,
+                (
+                    resolved_company_id, source_name,
+                    resolved_company_id, source_name,
+                    chunks_committed,
+                )
+            )
+            deleted_old = cursor.rowcount
+            conn.commit()
+            print(f"UPSERT JOB {job_id}: Swapped source '{source_name}' — {chunks_committed} new chunks in, {deleted_old} old chunks removed.")
+
+        # ── Phase 4: Cache invalidation ──────────────────────────────────────
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
         invalidate_cache(conn, resolved_company_id)
         conn.commit()
 
         await set_job_status(job_id, {
             "status": "done",
-            "chunks_added": len(chunks),
+            "chunks_added": chunks_committed,
             "total_available": len(all_chunks),
             "truncated": len(all_chunks) > remaining,
+            "is_upsert": is_upsert,
         })
+
     except Exception as e:
         print(f"TRAINING JOB {job_id} FAILED: {e}")
         await set_job_status(job_id, {"status": "error", "message": str(e)})
+
+        # Roll back any uncommitted batch, then clean up any temp rows that were
+        # already committed — old data is preserved and bot remains functional.
         if conn:
             try:
                 conn.rollback()
             except Exception:
                 pass
+            try:
+                cleanup_cursor = conn.cursor()
+                cleanup_cursor.execute(
+                    "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
+                    (resolved_company_id, temp_source_name)
+                )
+                conn.commit()
+                print(f"TRAINING JOB {job_id}: Temp chunks cleaned up after failure — original source preserved.")
+            except Exception as cleanup_err:
+                print(f"TRAINING JOB {job_id}: Temp cleanup also failed ({cleanup_err}). Orphan sweep will handle on next restart.")
+
     finally:
         if conn:
             release_db_connection(conn)
+        # Always release the concurrent-job lock so the owner can retry.
+        if lock_key and r:
+            try:
+                await r.delete(lock_key)
+            except Exception:
+                pass
 
 @app.post("/api/train")
 @limiter.limit("5/minute")
@@ -2676,29 +2929,55 @@ async def train_chatbot(
     background_tasks: BackgroundTasks,
     url: str = Form(None),
     file: UploadFile = File(None),
+    csv_file: UploadFile = File(None),
     text: str = Form(None),
+    text_label: str = Form(None),
     api_key: str = Form(None),
     company_id: str = Form(None),
     current_user: dict = Depends(get_current_user),
     _premium: dict = Depends(require_premium_tier)
 ):
-    """Secure multi-tenant training endpoint. Returns immediately; embedding runs in background."""
+    """
+    Secure multi-tenant training endpoint. Returns immediately; embedding runs in background.
 
-    # 0. Validate file size BEFORE reading into memory
+    Supports safe source upsert: if a source with the same name already exists for this
+    bot, the new content is inserted under a temporary key first. Only after all chunks
+    are committed successfully does the system atomically rename them and purge the old
+    ones. The bot keeps serving stale-but-correct answers until the swap completes.
+    """
+
+    # ── 0. File validation (before any memory allocation) ────────────────────
     if file:
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported.")
         file.file.seek(0, 2)
         file_size = file.file.tell()
         file.file.seek(0)
-        MAX_SIZE = 8 * 1024 * 1024  # 8MB
+        MAX_SIZE = 8 * 1024 * 1024  # 8 MB
         if file_size > MAX_SIZE:
             raise HTTPException(
                 status_code=400,
-                detail=f"PDF too large ({file_size // 1024 // 1024}MB). Maximum is 8MB."
+                detail=f"PDF too large ({file_size // 1024 // 1024} MB). Maximum is 8 MB."
             )
 
-    # 1. Quota check (fast DB query, return connection immediately)
+    TABULAR_EXTENSIONS = (".csv", ".xlsx", ".xls")
+    TABULAR_MAX_BYTES = 5 * 1024 * 1024  # 5 MB — tabular files rarely exceed this
+    if csv_file:
+        fname_lower = csv_file.filename.lower()
+        if not any(fname_lower.endswith(ext) for ext in TABULAR_EXTENSIONS):
+            raise HTTPException(status_code=400, detail="Only .csv, .xlsx, or .xls files are accepted for tabular upload.")
+        csv_file.file.seek(0, 2)
+        csv_size = csv_file.file.tell()
+        csv_file.file.seek(0)
+        if csv_size > TABULAR_MAX_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tabular file too large ({csv_size // 1024} KB). Maximum is 5 MB."
+            )
+        if csv_size == 0:
+            raise HTTPException(status_code=400, detail="Uploaded tabular file is empty.")
+
+    # ── 1. Resolve company and build the canonical source_name ───────────────
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -2719,90 +2998,195 @@ async def train_chatbot(
             raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
         resolved_company_id = company_row[0]
 
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
-        current_count = cursor.fetchone()[0]
         plan = get_plan(current_user["tier"], role=current_user.get("role"))
         limit = plan["chunks"]
 
-        if current_count >= limit:
+        # Determine source_name early so we can query existing chunk count for it.
+        # Normalisation happens here — before any DB or scraping work — so the
+        # upsert detection is always comparing apples to apples.
+        pending_source_name: str
+        if url:
+            pending_source_name = normalize_source_url(url.strip())
+        elif file:
+            pending_source_name = file.filename.lower().strip()
+        elif csv_file:
+            pending_source_name = csv_file.filename.lower().strip()
+        elif text and text.strip():
+            # text_label lets owners give a stable identity to manual text blocks.
+            # Without it, every manual submission shares the same key and would
+            # overwrite previous manual entries — we warn about this in the response.
+            pending_source_name = text_label.strip() if text_label and text_label.strip() else "Manual Entry"
+        else:
+            raise HTTPException(status_code=400, detail="Provide a URL, PDF file, CSV/Excel file, or text content.")
+
+        # Count ALL existing chunks for this bot, then subtract the ones that
+        # belong to the source being replaced. This gives the true "slots in use"
+        # so a re-upload does not hit a false quota ceiling.
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s",
+            (resolved_company_id,)
+        )
+        total_count = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            (resolved_company_id, pending_source_name)
+        )
+        existing_source_count = cursor.fetchone()[0]
+        is_upsert = existing_source_count > 0
+
+        # Effective slots already in use, excluding the source about to be replaced.
+        effective_count = total_count - existing_source_count
+
+        if effective_count >= limit:
             raise HTTPException(status_code=402, detail={
                 "code": "CHUNK_LIMIT_EXCEEDED",
                 "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
-                "current": current_count,
+                "current": total_count,
                 "limit": limit,
                 "tier": current_user["tier"],
                 "upgrade_url": "/app/pricing",
             })
     finally:
-        release_db_connection(conn)  # Release immediately — background job gets its own conn
+        release_db_connection(conn)
 
-    # 2. Extract content (fast I/O operations)
+    # ── 2. Concurrent-job guard (per company + source) ───────────────────────
+    # Prevents two simultaneous uploads of the same source from racing each
+    # other and leaving the knowledge base in an inconsistent state.
+    lock_key = f"training_lock:{resolved_company_id}:{pending_source_name}"
+    lock_acquired = False
+    if r:
+        try:
+            # NX = only set if not exists; EX = 10-minute TTL as a dead-man switch.
+            lock_acquired = await r.set(lock_key, "1", nx=True, ex=600)
+            if not lock_acquired:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"'{pending_source_name}' is already being trained. Please wait for the current job to finish."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            # Redis unavailable — allow the request through rather than blocking
+            # legitimate training. The swap pattern still guarantees consistency.
+            pass
+
+    # ── 3. Extract content (I/O — after lock is held) ────────────────────────
     docs = []
-    source_name = "unknown"
 
     if url:
-        validate_safe_url(url)
+        validate_safe_url(url.strip())
         try:
-            jina_url = f"https://r.jina.ai/{url}"
+            jina_url = f"https://r.jina.ai/{url.strip()}"
             response = requests.get(jina_url, headers={"User-Agent": "SaPyBaseBot/1.0"}, timeout=15)
             if response.status_code != 200 or len(response.text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
-            docs = [Document(page_content=response.text, metadata={"source": url})]
-            source_name = url
+            # Store with the normalised URL so metadata.source matches source_name.
+            docs = [Document(page_content=response.text, metadata={"source": pending_source_name})]
         except HTTPException:
+            if r and lock_acquired:
+                await r.delete(lock_key)
             raise
         except Exception as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
             raise HTTPException(status_code=400, detail=f"Failed to scrape website: {str(e)}")
 
     if file:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-            temp_pdf.write(await file.read())  # async read to not block event loop
+            temp_pdf.write(await file.read())
             temp_pdf_path = temp_pdf.name
         try:
             pdf_docs = await process_pdf_efficiently(temp_pdf_path)
             docs.extend(pdf_docs)
-            source_name = file.filename
+        except Exception as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
         finally:
             if os.path.exists(temp_pdf_path):
                 os.remove(temp_pdf_path)
 
+    if csv_file:
+        try:
+            csv_bytes = await csv_file.read()
+            tabular_docs = parse_tabular_to_docs(csv_bytes, csv_file.filename, pending_source_name)
+            docs.extend(tabular_docs)
+        except ValueError as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=500, detail=f"Failed to process tabular file: {str(e)}")
+
     if text and text.strip():
-        docs.append(Document(page_content=text.strip(), metadata={"source": "manual_entry"}))
-        source_name = "Manual Entry"
+        docs.append(Document(page_content=text.strip(), metadata={"source": pending_source_name}))
 
     if not docs:
-        raise HTTPException(status_code=400, detail="No content extracted.")
+        if r and lock_acquired:
+            await r.delete(lock_key)
+        raise HTTPException(status_code=400, detail="No content could be extracted from the provided source.")
 
-    # 2.5. QUOTA OVERFLOW CHECK: Estimate required chunks and block if too large
-    # This addresses the requirement to warn users and block massive uploads
-    # instead of just squeezing or truncating silently.
-    total_chars = sum(len(d.page_content) for d in docs)
-    # Naive estimation: 800 chars with 100 overlap = ~700 net chars per chunk
-    estimated_chunks = max(1, int(total_chars / 700))
-    remaining_quota = max(0, limit - current_count)
+    # ── 4. Quota overflow check against effective (post-replacement) capacity ─
+    # For tabular files each Document is already one final chunk (one row), so
+    # we use len(docs) directly. For prose (URL/PDF/text) we estimate via char
+    # count since the text splitter hasn't run yet at this point.
+    if csv_file:
+        estimated_chunks = len(docs)
+    else:
+        total_chars = sum(len(d.page_content) for d in docs)
+        estimated_chunks = max(1, int(total_chars / 700))   # ~700 net chars per 800-char chunk
+    effective_remaining = max(0, limit - effective_count)
 
-    if estimated_chunks > remaining_quota:
+    if estimated_chunks > effective_remaining:
+        if r and lock_acquired:
+            await r.delete(lock_key)
         raise HTTPException(status_code=402, detail={
             "code": "CHUNK_QUOTA_OVERFLOW",
-            "message": "This file exceeds your remaining chunk quota. Please use smaller files or upgrade to get more storage.",
-            "current": current_count,
+            "message": (
+                "This source is too large for your remaining chunk quota. "
+                "Use a smaller file or upgrade your plan to get more storage."
+            ),
+            "current": total_count,
             "limit": limit,
             "tier": current_user["tier"],
             "upgrade_url": "/app/pricing",
         })
 
-
-    # 3. Kick off background job — return immediately to prevent Render worker timeout
+    # ── 5. Queue background job — return immediately ──────────────────────────
     job_id = str(uuid.uuid4())
     await set_job_status(job_id, {"status": "queued"})
     background_tasks.add_task(
-        run_training_job, job_id, resolved_company_id, docs, current_user, limit, source_name
+        run_training_job,
+        job_id,
+        resolved_company_id,
+        docs,
+        current_user,
+        limit,
+        pending_source_name,
+        is_upsert,
+        lock_key,
+        bool(csv_file),   # skip_splitting: tabular rows must not be re-split
+    )
+
+    upsert_msg = (
+        "Updating existing source — your bot will keep using the old data until the update is fully committed."
+        if is_upsert else
+        f"Training started for '{pending_source_name}'."
+    )
+    manual_entry_warning = (
+        " Note: re-submitting text without a label will overwrite all previous unlabelled manual entries."
+        if pending_source_name == "Manual Entry" else ""
     )
 
     return {
         "status": "queued",
         "job_id": job_id,
-        "message": f"Training started for '{source_name}'. Poll /api/train/status/{job_id} to track progress.",
+        "is_upsert": is_upsert,
+        "source_name": pending_source_name,
+        "message": f"{upsert_msg}{manual_entry_warning} Poll /api/train/status/{job_id} to track progress.",
     }
 
 

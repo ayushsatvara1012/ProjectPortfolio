@@ -27,6 +27,15 @@ const AppSettingsBilling = lazy(() => import("./pages/AppSettings").then(m => ({
 const AppSettingsCustomize = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.CustomizeSection })));
 const AppSettingsApiKeys = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.ApiKeysSection })));
 
+// ── Demo pages (fully public, no auth) ─────────────────────────────────────────
+const DemoLayout = lazy(() => import("./demo/DemoLayout"));
+const DemoTrainAI = lazy(() => import("./demo/DemoTrainAI"));
+const DemoMyBots = lazy(() => import("./demo/DemoMyBots"));
+const DemoCreateBot = lazy(() => import("./demo/DemoCreateBot"));
+const DemoInsights = lazy(() => import("./demo/DemoInsights"));
+const DemoCustomize = lazy(() => import("./demo/DemoCustomize"));
+const DemoChat = lazy(() => import("./demo/DemoChat"));
+
 import { AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import ErrorPage from "./pages/ErrorPage";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -87,6 +96,25 @@ const router = createBrowserRouter([
           { path: "admin", element: <AdminDashboard /> },
         ],
       },
+    ],
+  },
+  // ── Demo Shell (fully public, no auth, no ProtectedRoute) ────────────────────
+  {
+    path: "/demo",
+    element: (
+      <Suspense fallback={null}>
+        <DemoLayout />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <Navigate to="/demo/train" replace /> },
+      { path: "train", element: <DemoTrainAI /> },
+      { path: "bots", element: <DemoMyBots /> },
+      { path: "register", element: <DemoCreateBot /> },
+      { path: "insights", element: <DemoInsights /> },
+      { path: "customize", element: <DemoCustomize /> },
+      { path: "chat", element: <DemoChat /> },
     ],
   },
 ]);

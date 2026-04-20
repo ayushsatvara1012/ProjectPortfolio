@@ -100,6 +100,15 @@
     @apply bg-slate-800 hover:bg-slate-700;
   }
 
+  /* Hidden scrollbar — scrollable but no visible bar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* ── Hero typewriter caret blink ──── */
   @keyframes caretBlink {
     0%, 100% { opacity: 1; }
