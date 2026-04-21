@@ -1360,7 +1360,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1370,7 +1370,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1399,6 +1399,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "avatar_bg_style": company_row[14] or "none",
             "webhook_url": company_row[15],
             "handoff_redirect_url": company_row[16],
+            "hide_branding": bool(company_row[17]),
         }
     finally:
         release_db_connection(conn)
