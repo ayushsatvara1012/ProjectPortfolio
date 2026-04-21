@@ -1093,7 +1093,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[85%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}`}
+                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[85%] ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}
                                                 >
                                                     {msg.role === 'handoff_form' ? (
                                                         <HandoffContactForm
@@ -1203,26 +1203,27 @@ const ChatWidget = ({ apiKey }) => {
                             </div>
                         </div>
 
-                        {/* Branding Footer — hidden for white-label plans (STARTER+) */}
-                        {!configData.white_label_enabled && (
-                            <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
-                                <a
-                                    href="https://www.sapybase.com"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
-                                >
-                                    <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    Powered by SaPyBase
-                                </a>
-                            </div>
-                        )}
 
                         {/* Input Area */}
                         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
+                            
+                            {/* Branding integrated into input area */}
+                            {!configData.white_label_enabled && (
+                                <div className="shrink-0 pt-2 flex justify-center items-center">
+                                    <a
+                                        href="https://www.sapybase.com"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
+                                    >
+                                        <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
+                                        Powered by SaPyBase
+                                    </a>
+                                </div>
+                            )}
 
                             {/* Actual Input Box with Safe Area Support */}
-                            <div className="p-2 sm:p-2 w-full shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
+                            <div className="px-2 sm:px-2 w-full shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
                                 <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                                     <textarea
                                         ref={inputRef}
@@ -1465,19 +1466,27 @@ function sanitizeStreamMarkdown(text) {
     return result;
 }
 
-// ── TYPEWRITER COMPONENT: Client-Side Jitter Buffer (Chatbase Architecture) ───
-// Streaming: SSE tokens are caught in an invisible buffer ref. A constant-cadence
-// setInterval (16ms) pulls characters out one-by-one at a perfectly steady rate,
-// completely masking network latency jitter. Only this component re-renders.
-// No framer-motion on the streaming text path — pure CSS transitions only.
-// Non-streaming: Word-by-word typewriter with stable-keyed spans for fade-in.
+// ── Shared Markdown renderer config (used in both streaming crossfade and final render) ──
+const MD_COMPONENTS = {
+    p: ({ node, children, ...props }) => (
+        <p {...props} className="first:mt-0 last:mb-0 mb-2">{children}</p>
+    ),
+    pre: ({ node, children, ...props }) => (
+        <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin">
+            <pre {...props}>{children}</pre>
+        </div>
+    ),
+};
 
-// ── TYPEWRITER COMPONENT: High-Rate Jitter Buffer (Option A) ─────────────────
-// Streaming: SSE tokens are caught in an invisible buffer ref. A time-based
-// requestAnimationFrame (rAF) loop pulls characters out at a steady rate (~65 chars/sec),
-// scaling natively to high-refresh displays (90Hz, 120Hz, etc.).
-// Lite Path: During active streaming, text is rendered as a simple map of spans
-// for maximum performance. Swaps to full ReactMarkdown only on [DONE].
+// Crossfade duration in ms — must match the CSS transition below
+const CROSSFADE_MS = 180;
+
+// ── TYPEWRITER COMPONENT ──────────────────────────────────────────────────────
+// Streaming path: SSE tokens land in a ref-based jitter buffer. A rAF loop
+// drains them at ~65 chars/sec, masking network jitter on any refresh rate.
+// On [DONE]: a CROSSFADE_MS opacity crossfade bridges the raw-span layer and
+// the ReactMarkdown layer — no layout snap, no cursor pop.
+// Non-streaming path: word-by-word typewriter that ends with the same crossfade.
 
 const TypewriterContent = ({
     content,
@@ -1496,11 +1505,19 @@ const TypewriterContent = ({
 
     // ── Jitter buffer state (streaming only) ──────────────────────────────────
     const [displayedText, setDisplayedText] = useState('');
-    const bufferRef = useRef('');             // invisible bucket: ALL received chars
-    const displayIdxRef = useRef(0);          // how many chars are currently shown
-    const rafRef = useRef(null);              // high-rate loop
-    const lastTickRef = useRef(0);            // for time-based cadence
+    const bufferRef = useRef('');
+    const displayIdxRef = useRef(0);
+    const rafRef = useRef(null);
+    const lastTickRef = useRef(0);
     const onStreamTickRef = useRef(onStreamTick);
+
+    // ── Crossfade bridge state ────────────────────────────────────────────────
+    // isFinalizing: true during the CROSSFADE_MS window between raw spans and Markdown
+    const [isFinalizing, setIsFinalizing] = useState(false);
+    // frozenText: the full text snapshot captured at [DONE] / typewriter end,
+    // held steady while the crossfade plays so neither layer changes mid-transition
+    const frozenTextRef = useRef('');
+    const finalizeTimerRef = useRef(null);
 
     useEffect(() => {
         onStreamTickRef.current = onStreamTick;
@@ -1513,22 +1530,17 @@ const TypewriterContent = ({
                 if (!lastTickRef.current) lastTickRef.current = timestamp;
                 const delta = timestamp - lastTickRef.current;
 
-                // Targeting ~65 chars/sec constant typing speed
-                // Every ~15.4ms we want to show a character
-                if (delta >= 15.4) {
+                // ~38 chars/sec at 60fps: one tick every ~26ms, 1 char normally,
+                // up to 3 when significantly backlogged (gentle catch-up only)
+                if (delta >= 26) {
                     lastTickRef.current = timestamp;
 
                     const buffer = bufferRef.current;
                     const idx = displayIdxRef.current;
 
                     if (idx < buffer.length) {
-                        // Dynamic speed scaling (rAF version)
                         const ahead = buffer.length - idx;
-                        let charsToAdd;
-                        if (ahead > 150) charsToAdd = 10;
-                        else if (ahead > 50) charsToAdd = 3;
-                        else if (ahead > 20) charsToAdd = 2;
-                        else charsToAdd = 1;
+                        const charsToAdd = ahead > 80 ? 3 : ahead > 30 ? 2 : 1;
 
                         const newIdx = Math.min(idx + charsToAdd, buffer.length);
                         displayIdxRef.current = newIdx;
@@ -1553,8 +1565,10 @@ const TypewriterContent = ({
                         cancelAnimationFrame(rafRef.current);
                         rafRef.current = null;
                     }
+                    // Do NOT call setDisplayedText here — that would flash the full
+                    // content for one paint cycle before isStreaming flips false.
+                    // The crossfade bridge reads from frozenTextRef/content instead.
                     displayIdxRef.current = full.length;
-                    setDisplayedText(full);
                     return full;
                 },
                 getContent: () => bufferRef.current,
@@ -1570,22 +1584,49 @@ const TypewriterContent = ({
         }
     }, [isStreaming, streamCallbackRef]);
 
+    // Reset buffer when a new stream starts
     useEffect(() => {
         if (isStreaming) {
             setDisplayedText('');
+            setIsFinalizing(false);
+            frozenTextRef.current = '';
             bufferRef.current = '';
             displayIdxRef.current = 0;
         }
     }, [isStreaming]);
 
+    // Detect stream completion: isStreaming just flipped false with content present.
+    // If text was actually displayed (displayedText non-empty), run the crossfade bridge.
+    // If nothing was shown (cache hit, instant error before first token), skip straight
+    // to the non-streaming typewriter by leaving isFinalizing false and isTyped false.
+    const prevIsStreamingRef = useRef(isStreaming);
+    useEffect(() => {
+        const wasStreaming = prevIsStreamingRef.current;
+        prevIsStreamingRef.current = isStreaming;
+
+        if (wasStreaming && !isStreaming && content) {
+            if (displayedText.length > 0) {
+                // Normal stream end: crossfade from what was shown into settled Markdown
+                frozenTextRef.current = content;
+                setIsFinalizing(true);
+                finalizeTimerRef.current = setTimeout(() => {
+                    setIsFinalizing(false);
+                }, CROSSFADE_MS);
+            }
+            // else: nothing was displayed (cache hit / pre-first-token error).
+            // isTyped is false, so the non-streaming typewriter will take over naturally.
+        }
+    }, [isStreaming, content, displayedText]);
+
     useEffect(() => {
         return () => {
             if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current);
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
         };
     }, []);
 
-    // ── Non-streaming typewriter (fallback) ───────────────────────────────────
+    // ── Non-streaming typewriter ───────────────────────────────────────────────
     useEffect(() => {
         if (isStreaming || isTyped || !content) {
             setIsTyping(false);
@@ -1596,6 +1637,7 @@ const TypewriterContent = ({
             lastContent.current = content;
             setSegments([]);
             setIsTyping(true);
+            frozenTextRef.current = '';
 
             let currentIdx = 0;
             const words = content.split(/(\s+)/);
@@ -1609,7 +1651,13 @@ const TypewriterContent = ({
                     typewriterTimerRef.current = setTimeout(typeNextWord, delay + (Math.random() * 20 - 10));
                 } else {
                     setIsTyping(false);
-                    if (onComplete) onComplete();
+                    // Crossfade into Markdown instead of snapping
+                    frozenTextRef.current = content;
+                    setIsFinalizing(true);
+                    finalizeTimerRef.current = setTimeout(() => {
+                        setIsFinalizing(false);
+                        if (onComplete) onComplete();
+                    }, CROSSFADE_MS);
                 }
             };
             typeNextWord();
@@ -1617,17 +1665,56 @@ const TypewriterContent = ({
     }, [content, isTyped, isStreaming, onComplete]);
 
     // ══════════════════════════════════════════════════════════════════════════
-    // RENDER: High-Performance View Logic
+    // RENDER
     // ══════════════════════════════════════════════════════════════════════════
 
-    // 1. ACTIVE STREAMING (Option A: Lite Render Spans)
+    // ── Shared Markdown output (rendered in both crossfade and final states) ──
+    const markdownNode = (
+        <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+            {frozenTextRef.current || content}
+        </ReactMarkdown>
+    );
+
+    // 1. CROSSFADE BRIDGE — active for CROSSFADE_MS after typing ends.
+    //    Both layers render identical Markdown so geometry is the same.
+    //    The outgoing layer fades from 1→0 while the incoming fades 0→1.
+    //    The incoming layer is in normal flow to hold container height stable.
+    if (isFinalizing) {
+        return (
+            <div className="relative leading-relaxed text-md">
+                {/* Incoming layer: in flow, anchors height, fades IN */}
+                <div style={{ opacity: 0, animation: `sapy-fade-in ${CROSSFADE_MS}ms ease-out forwards` }}>
+                    {markdownNode}
+                </div>
+                {/* Outgoing layer: absolutely stacked, identical Markdown, fades OUT with cursor */}
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%',
+                        opacity: 1,
+                        animation: `sapy-fade-out ${CROSSFADE_MS}ms ease-out forwards`,
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+                        {frozenTextRef.current || content}
+                    </ReactMarkdown>
+                    <span
+                        className="sapy-stream-cursor"
+                        style={{ backgroundColor: themeColor, animation: `sapy-fade-out ${CROSSFADE_MS}ms ease-out forwards` }}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // 2. ACTIVE STREAMING — live Markdown render so geometry matches the final settled state
     if (isStreaming) {
         const hasContent = displayedText.length > 0;
-        const streamWords = hasContent ? displayedText.split(/(\s+)/) : [];
 
         return (
             <div className="relative min-h-[28px]">
-                {/* ThinkingLogo Crossfade */}
+                {/* ThinkingLogo crossfades out when first char arrives */}
                 <div
                     style={{
                         opacity: hasContent ? 0 : 1,
@@ -1640,17 +1727,10 @@ const TypewriterContent = ({
                 </div>
 
                 {hasContent && (
-                    <div className="sapy-stream-text-in leading-relaxed text-md">
-                        {/* Word spans: Infinite performance, no Markdown parsing overhead */}
-                        {streamWords.map((word, i) => (
-                            <span
-                                key={i}
-                                className="sapy-word-fade"
-                                style={{ display: 'inline-block', whiteSpace: 'pre-wrap' }}
-                            >
-                                {word}
-                            </span>
-                        ))}
+                    <div className="leading-relaxed text-md">
+                        <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+                            {sanitizeStreamMarkdown(displayedText)}
+                        </ReactMarkdown>
                         <span className="sapy-stream-cursor" style={{ backgroundColor: themeColor }} />
                     </div>
                 )}
@@ -1658,24 +1738,30 @@ const TypewriterContent = ({
         );
     }
 
-    // 2. COMPLETED MESSAGE (Full Markdown Snap)
+    // 3. NON-STREAMING TYPEWRITER — render the revealed portion as live Markdown
+    //    so geometry stays identical when the crossfade bridge fires.
+    if (isTyping && segments.length > 0) {
+        const revealedText = segments.join('');
+        return (
+            <div className="relative leading-relaxed text-md">
+                <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+                    {sanitizeStreamMarkdown(revealedText)}
+                </ReactMarkdown>
+            </div>
+        );
+    }
+
+    // Pre-typewriter guard: content exists but the useEffect hasn't fired yet to
+    // set isTyping=true. Without this, Case 4 renders the full message for one
+    // frame before the word-by-word effect starts — causing the flash.
+    if (content && !isTyped && !isTyping) {
+        return <div className="relative min-h-[28px]" />;
+    }
+
+    // 4. COMPLETED MESSAGE — full Markdown, already settled (isTyped: true)
     return (
-        <div className="relative sapy-word-fade leading-relaxed text-md">
-            <ReactMarkdown
-                rehypePlugins={[rehypeSanitize]}
-                components={{
-                    p: ({ node, children, ...props }) => (
-                        <p {...props} className="first:mt-0 last:mb-0 mb-2">{children}</p>
-                    ),
-                    pre: ({ node, children, ...props }) => (
-                        <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin">
-                            <pre {...props}>{children}</pre>
-                        </div>
-                    ),
-                }}
-            >
-                {content}
-            </ReactMarkdown>
+        <div className="relative leading-relaxed text-md">
+            {markdownNode}
         </div>
     );
 };

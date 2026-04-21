@@ -3961,24 +3961,28 @@ def get_all_users(admin: dict = Depends(get_admin_user)):
                 u.clerk_id, u.email, u.role, u.tier, u.created_at,
                 COALESCE(u.status, 'active') AS status,
                 u.custom_plan_config,
-                COALESCE(SUM(ut.messages_used), 0) AS messages_used,
                 COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id',             c.id::text,
-                            'bot_name',       c.bot_name,
-                            'company_name',   c.company_name,
-                            'allowed_origin', c.allowed_origin,
-                            'is_active',      c.is_active,
-                            'created_at',     c.created_at
-                        ) ORDER BY c.created_at ASC
-                    ) FILTER (WHERE c.id IS NOT NULL),
+                    (SELECT SUM(ut.messages_used) FROM usage_tracking ut WHERE ut.user_id = u.id),
+                    0
+                ) AS messages_used,
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id',             c.id::text,
+                                'bot_name',       c.bot_name,
+                                'company_name',   c.company_name,
+                                'allowed_origin', c.allowed_origin,
+                                'is_active',      c.is_active,
+                                'created_at',     c.created_at
+                            ) ORDER BY c.created_at ASC
+                        )
+                        FROM companies c
+                        WHERE c.user_id = u.id
+                    ),
                     '[]'::json
                 ) AS companies
             FROM users u
-            LEFT JOIN usage_tracking ut ON ut.user_id = u.id
-            LEFT JOIN companies c ON c.user_id = u.id
-            GROUP BY u.clerk_id, u.email, u.role, u.tier, u.created_at, u.status, u.custom_plan_config
             ORDER BY u.created_at DESC
         """)
         rows = cursor.fetchall()

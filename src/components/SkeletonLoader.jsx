@@ -12,8 +12,8 @@ export const SkeletonBase = ({ className = "" }) => (
 );
 
 export const StatsSkeleton = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4 sm:p-5 rounded-xl flex flex-col justify-between h-[104px]">
                 <div className="flex items-center gap-2 mb-3">
                     <SkeletonBase className="w-3.5 h-3.5 rounded-md" />

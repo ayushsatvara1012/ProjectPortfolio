@@ -117,23 +117,15 @@
 
   /* ── Chat Widget: GPU-composited word fade-in (typewriter only) ──── */
   @keyframes wordFadeIn {
-    from {
-      opacity: 0;
-      filter: blur(4px);
-      transform: translateX(-4px);
-    }
-    to {
-      opacity: 1;
-      filter: blur(0px);
-      transform: translateX(0);
-    }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
   .sapy-word-fade {
     display: inline;
     opacity: 0;
-    animation: wordFadeIn 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-    will-change: opacity, transform, filter;
+    animation: wordFadeIn 0.18s ease-out forwards;
+    will-change: opacity;
   }
 
   /* ── Chat Widget: Streaming cursor animation ───────────────────────── */
@@ -186,6 +178,17 @@
 
   .sapy-stream-text-in {
     animation: streamTextIn 0.2s ease-out both;
+  }
+
+  /* ── Chat Widget: Crossfade bridge (stream/typewriter → Markdown) ──── */
+  @keyframes sapy-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes sapy-fade-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
   }
 
   /* ── About page: horizontal beam slide ───────────────────────────────

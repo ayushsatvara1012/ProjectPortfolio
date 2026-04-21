@@ -10,39 +10,39 @@ import { useAuthenticatedFetch } from '../hooks/useApiCall';
 const TIERS = ['FREE', 'BASIC', 'STARTER', 'PRO', 'ENTERPRISE', 'CUSTOM'];
 
 const TIER_STYLE = {
-    FREE:        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700',
-    BASIC:       'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 border border-sky-200 dark:border-sky-800',
-    STARTER:     'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
-    PRO:         'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
-    ENTERPRISE:  'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 border border-violet-200 dark:border-violet-800',
-    CUSTOM:      'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
+    FREE: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700',
+    BASIC: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 border border-sky-200 dark:border-sky-800',
+    STARTER: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
+    PRO: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
+    ENTERPRISE: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 border border-violet-200 dark:border-violet-800',
+    CUSTOM: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
     SUPER_ADMIN: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800',
 };
 
 const GEMINI_MODELS = [
     { value: '', label: 'Use tier default' },
     { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (cheapest)' },
-    { value: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash (balanced)' },
-    { value: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro (flagship)' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (balanced)' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (flagship)' },
     { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview (next-gen)' },
 ];
 
 const TOKEN_OPTIONS = [
     { value: '', label: 'Use tier default' },
-    { value: 400,  label: '400 tokens (concise)' },
-    { value: 600,  label: '600 tokens' },
-    { value: 800,  label: '800 tokens' },
+    { value: 400, label: '400 tokens (concise)' },
+    { value: 600, label: '600 tokens' },
+    { value: 800, label: '800 tokens' },
     { value: 1200, label: '1,200 tokens (detailed)' },
     { value: 2048, label: '2,048 tokens (maximum)' },
 ];
 
 const FEATURE_FLAGS = [
     { key: 'human_handoff', label: 'Human Handoff', icon: 'support_agent', desc: 'Talk-to-human button + transcript email' },
-    { key: 'lead_capture',  label: 'Lead Capture',  icon: 'contact_mail',  desc: 'Collect visitor email/name in widget' },
-    { key: 'white_label',   label: 'White Label',   icon: 'branding_watermark', desc: 'Remove "Powered by SaPyBase"' },
-    { key: 'webhook',       label: 'Webhooks',      icon: 'webhook',       desc: 'Zapier / Make integration' },
-    { key: 'custom_logo',   label: 'Custom Logo',   icon: 'image',         desc: 'Upload own logo URL' },
-    { key: 'analytics',     label: 'Analytics',     icon: 'bar_chart',     desc: 'Insights & ROI reports' },
+    { key: 'lead_capture', label: 'Lead Capture', icon: 'contact_mail', desc: 'Collect visitor email/name in widget' },
+    { key: 'white_label', label: 'White Label', icon: 'branding_watermark', desc: 'Remove "Powered by SaPyBase"' },
+    { key: 'webhook', label: 'Webhooks', icon: 'webhook', desc: 'Zapier / Make integration' },
+    { key: 'custom_logo', label: 'Custom Logo', icon: 'image', desc: 'Upload own logo URL' },
+    { key: 'analytics', label: 'Analytics', icon: 'bar_chart', desc: 'Insights & ROI reports' },
 ];
 
 const BLANK_CUSTOM_CONFIG = {
@@ -247,7 +247,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                 className="ml-auto relative z-10 flex flex-col w-full max-w-lg h-full bg-white dark:bg-slate-950 border-l border-gray-100 dark:border-slate-800 shadow-2xl overflow-y-auto"
             >
                 {/* Header */}
-                <div className="flex items-start justify-between p-6 border-b border-gray-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
+                <div className="flex items-start justify-between p-4 pt-15 sm:p-6 border-b border-gray-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                             <TierBadge tier={draft.custom_plan_enabled ? 'CUSTOM' : draft.tier} />
@@ -263,7 +263,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 p-6 space-y-6">
+                <div className="flex-1 p-4 sm:p-6 space-y-6">
 
                     {/* Access Tier */}
                     <div>
@@ -285,11 +285,10 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                             type="button"
                             onClick={() => set('status', draft.status === 'suspended' ? 'active' : 'suspended')}
                             disabled={isSaving}
-                            className={`w-full flex items-center justify-between px-4 py-3 border text-sm font-google font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                                draft.status === 'suspended'
+                            className={`w-full flex items-center justify-between px-4 py-3 border text-sm font-google font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${draft.status === 'suspended'
                                     ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'
                                     : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                            }`}
+                                }`}
                         >
                             <span className="flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[16px]">{draft.status === 'suspended' ? 'block' : 'check_circle'}</span>
@@ -332,7 +331,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                                     <div className="px-4 pb-4 space-y-5 border-t border-gray-100 dark:border-slate-800 pt-4">
 
                                         {/* Plan identity */}
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div className="col-span-2">
                                                 <SectionLabel>Plan Label</SectionLabel>
                                                 <input
@@ -362,7 +361,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                                                 <span className="material-symbols-outlined text-[12px]">tune</span>
                                                 Resource Limits
                                             </p>
-                                            <div className="grid grid-cols-3 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                 <NumInput
                                                     label="Max Bots"
                                                     value={draft.cfg.max_bots}
@@ -393,7 +392,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                                                 <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
                                                 AI Model Configuration
                                             </p>
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
                                                     <SectionLabel>Gemini Model</SectionLabel>
                                                     <select
@@ -472,7 +471,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }) => {
                                                 <span className="material-symbols-outlined text-[12px]">preview</span>
                                                 Plan Summary
                                             </p>
-                                            <div className="grid grid-cols-3 gap-2 text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
                                                 <span>{draft.cfg.max_bots || '—'} bots</span>
                                                 <span>{draft.cfg.max_messages ? Number(draft.cfg.max_messages).toLocaleString() : '—'} msg/mo</span>
                                                 <span>{draft.cfg.max_chunks ? Number(draft.cfg.max_chunks).toLocaleString() : '—'} chunks</span>
@@ -703,10 +702,10 @@ const AdminDashboard = () => {
     const FILTER_TIERS = ['ALL', ...TIERS];
 
     return (
-        <div className="grid gap-px bg-gray-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+        <div className="w-full max-w-full overflow-x-hidden flex flex-col bg-gray-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500 font-sans">
 
             {/* Header */}
-            <div className="bg-white dark:bg-slate-950 p-8 lg:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6 transition-colors duration-500">
+            <div className="bg-white dark:bg-slate-950 px-4 py-8 md:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6 transition-colors duration-500">
                 <div>
                     <div className="px-2 py-0.5 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 text-sm uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display flex items-center gap-2 w-fit mb-4 rounded-none transition-colors">
                         <span className="material-symbols-outlined text-[14px]">verified_user</span>
@@ -718,48 +717,48 @@ const AdminDashboard = () => {
                     <p className="text-md font-mono text-slate-500 dark:text-slate-400 leading-relaxed mt-2 transition-colors">Monitor ecosystem health and manage user subscriptions.</p>
                 </div>
 
-                <div className="flex items-center gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 transition-colors duration-500">
-                    <div className="bg-white dark:bg-slate-950 relative flex items-center transition-colors">
+                <div className="w-full md:w-auto flex items-center gap-px bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-800 transition-colors duration-500 overflow-hidden min-w-0">
+                    <div className="bg-white dark:bg-slate-950 relative flex items-center transition-colors flex-1 md:flex-none">
                         <span className="material-symbols-outlined absolute left-3 text-[14px] text-slate-400 dark:text-slate-500">search</span>
                         <input
                             type="text"
-                            placeholder="Search users, bots, plan names..."
+                            placeholder="Search users..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 pr-4 py-2.5 bg-transparent border-none focus:outline-none text-sm text-slate-900 dark:text-slate-200 font-medium w-64 rounded-none transition-colors"
+                            className="pl-9 pr-4 py-2.5 bg-transparent border-none focus:outline-none text-sm text-slate-900 dark:text-slate-200 font-medium w-full md:w-64 rounded-none transition-colors"
                         />
                     </div>
                     <button
                         onClick={refetchAll}
                         disabled={isLoading}
-                        className="p-3 bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                        className="p-3 bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 disabled:opacity-50 transition-colors shrink-0"
                     >
-                        <span className="material-symbols-outlined text-[16px]">monitoring</span>
+                        <span className="material-symbols-outlined text-[16px]">refresh</span>
                     </button>
                 </div>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-px bg-gray-100 dark:bg-slate-800 border-t border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-gray-100 dark:bg-slate-800 border-t border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 {isLoading ? (
                     <div className="col-span-5 bg-white dark:bg-slate-950 p-8 transition-colors"><SkeletonLoader.Stats /></div>
                 ) : (
                     [
-                        { label: 'Total Users',     value: stats.total_users,                                     icon: 'group',     color: 'text-slate-900 dark:text-slate-200' },
-                        { label: 'Total Bots',      value: stats.total_companies,                                 icon: 'smart_toy', color: 'text-slate-900 dark:text-slate-200' },
-                        { label: 'Active Bots',     value: stats.active_bots,                                     icon: 'bolt',      color: 'text-emerald-600 dark:text-emerald-400' },
-                        { label: 'Total Messages',  value: stats.total_messages?.toLocaleString() ?? '0',         icon: 'forum',     color: 'text-blue-600 dark:text-blue-400' },
-                        { label: 'Custom Plans',    value: stats.custom_plan_count,                               icon: 'build',     color: 'text-emerald-600 dark:text-emerald-400' },
+                        { label: 'Total Users', value: stats.total_users, icon: 'group', color: 'text-slate-900 dark:text-slate-200' },
+                        { label: 'Total Bots', value: stats.total_companies, icon: 'smart_toy', color: 'text-slate-900 dark:text-slate-200' },
+                        { label: 'Active Bots', value: stats.active_bots, icon: 'bolt', color: 'text-emerald-600 dark:text-emerald-400' },
+                        { label: 'Total Messages', value: stats.total_messages?.toLocaleString() ?? '0', icon: 'forum', color: 'text-blue-600 dark:text-blue-400' },
+                        { label: 'Custom Plans', value: stats.custom_plan_count, icon: 'build', color: 'text-emerald-600 dark:text-emerald-400' },
                     ].map((s, i) => (
-                        <div key={i} className="bg-white dark:bg-slate-950 p-8 transition-colors duration-500">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className={`p-2 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 rounded-none transition-colors ${s.color}`}>
-                                    <span className="material-symbols-outlined text-[16px] transition-colors">{s.icon}</span>
+                        <div key={i} className="bg-white dark:bg-slate-950 p-3 sm:p-5 md:p-8 transition-colors duration-500">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className={`p-1.5 sm:p-2 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 rounded-none transition-colors ${s.color}`}>
+                                    <span className="material-symbols-outlined text-[14px] sm:text-[16px] transition-colors">{s.icon}</span>
                                 </div>
-                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display transition-colors">Live</span>
+                                <span className="text-[10px] sm:text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display transition-colors">Live</span>
                             </div>
-                            <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-1 transition-colors">{s.label}</p>
-                            <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">{s.value}</h3>
+                            <p className="text-[9px] sm:text-[11px] md:text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-1 transition-colors truncate">{s.label}</p>
+                            <h3 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">{s.value}</h3>
                         </div>
                     ))
                 )}
@@ -767,16 +766,15 @@ const AdminDashboard = () => {
 
             {/* Tier filter tabs */}
             {!isLoading && !hasError && (
-                <div className="bg-white dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 px-6 lg:px-8 pt-4 flex gap-1 flex-wrap transition-colors duration-500">
+                <div className="bg-white dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 px-4 pt-4 pb-1 flex gap-1 overflow-x-auto scrollbar-hide transition-colors duration-500 min-w-0">
                     {FILTER_TIERS.map(t => (
                         <button
                             key={t}
                             onClick={() => setTierFilter(t)}
-                            className={`px-3 py-1.5 text-[10px] font-google font-bold uppercase tracking-widest transition-colors ${
-                                tierFilter === t
+                            className={`px-3 py-1.5 text-[10px] font-google font-bold uppercase tracking-widest transition-colors ${tierFilter === t
                                     ? 'bg-slate-900 dark:bg-blue-600 text-white'
                                     : 'text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-900'
-                            }`}
+                                }`}
                         >
                             {t}
                             {t !== 'ALL' && (
@@ -791,7 +789,7 @@ const AdminDashboard = () => {
 
             {/* Main Content */}
             <div className="bg-white dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 transition-colors duration-500">
-                <div className="p-6 lg:p-8">
+                <div className="px-4 py-8 md:p-10">
                     {isLoading ? (
                         <SkeletonLoader.Table />
                     ) : hasError ? (
