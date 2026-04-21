@@ -14,7 +14,9 @@ export const UserProvider = ({ children }) => {
         messageLimit: 0,
         totalDocuments: 0,
         totalMessages: 0,
-        billingPeriodEnd: null
+        billingPeriodEnd: null,
+        customPlanName: null,
+        customPlanFeatures: null,
     });
     const [isLoading, setIsLoading] = useState(true);
 
@@ -40,7 +42,9 @@ export const UserProvider = ({ children }) => {
                     messageLimit: data.message_limit || 0,
                     totalDocuments: data.total_documents || 0,
                     totalMessages: data.total_messages || 0,
-                    billingPeriodEnd: data.billing_period_end
+                    billingPeriodEnd: data.billing_period_end,
+                    customPlanName: data.custom_plan_name || null,
+                    customPlanFeatures: data.custom_plan_features || null,
                 });
             }
         } catch (error) {

@@ -73,13 +73,18 @@ async function extractCsvText(file) {
     if (!raw) return '';
     const lines = raw.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) return raw;
-    const headers = parseCsvLine(lines[0]);
+
+    // Heuristic: find the real header row among the first 15 rows
+    const rows2d = lines.slice(0, 15).map(parseCsvLine);
+    const headerIdx = _findHeaderRow(rows2d);
+    const headers = rows2d[headerIdx].map(h => h.trim());
+
     const rows = [];
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = headerIdx + 1; i < lines.length; i++) {
         const vals = parseCsvLine(lines[i]);
         const parts = headers.map((h, idx) => {
             const v = (vals[idx] || '').trim().slice(0, MAX_CELL_CHARS);
-            return v ? `${h}: ${v}` : null;
+            return (h && v) ? `${h}: ${v}` : null;
         }).filter(Boolean);
         if (parts.length) rows.push(parts.join(' | '));
     }
@@ -110,6 +115,28 @@ async function tryReadWithEncodings(file) {
     return '';
 }
 
+function _rowTextDensity(rowArr) {
+    // Count cells that look like labels (non-empty, non-pure-numeric)
+    let count = 0;
+    for (const v of rowArr) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s || s.toLowerCase() === 'nan') continue;
+        if (isNaN(Number(s))) count++; // non-numeric = likely a label
+    }
+    return count;
+}
+
+function _findHeaderRow(rows2d, scanLimit = 15) {
+    // rows2d: array of arrays (raw sheet rows). Returns 0-based index of best header row.
+    const probe = rows2d.slice(0, scanLimit);
+    let bestIdx = 0, bestScore = -1;
+    for (let i = 0; i < probe.length; i++) {
+        const score = _rowTextDensity(probe[i]);
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+    }
+    return bestIdx;
+}
+
 async function extractExcelText(file) {
     // Dynamic import of SheetJS if available via CDN window.XLSX
     if (typeof window !== 'undefined' && window.XLSX) {
@@ -118,15 +145,22 @@ async function extractExcelText(file) {
             const wb = window.XLSX.read(buf, { type: 'array' });
             const sheetName = wb.SheetNames[0];
             const ws = wb.Sheets[sheetName];
-            const jsonData = window.XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-            const rows = jsonData.map(row => {
-                const parts = Object.entries(row)
-                    .map(([k, v]) => {
-                        const val = String(v).trim().slice(0, MAX_CELL_CHARS);
-                        return val ? `${k}: ${val}` : null;
-                    }).filter(Boolean);
-                return parts.join(' | ');
-            }).filter(Boolean);
+
+            // Read as raw 2-D array so we can locate the true header row
+            const raw = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+            if (!raw.length) return '';
+
+            const headerIdx = _findHeaderRow(raw);
+            const headers = raw[headerIdx].map(h => String(h).trim());
+            const rows = [];
+            for (let i = headerIdx + 1; i < raw.length; i++) {
+                const vals = raw[i];
+                const parts = headers.map((h, idx) => {
+                    const val = String(vals[idx] == null ? '' : vals[idx]).trim().slice(0, MAX_CELL_CHARS);
+                    return (h && val) ? `${h}: ${val}` : null;
+                }).filter(Boolean);
+                if (parts.length) rows.push(parts.join(' | '));
+            }
             return rows.join('\n');
         } catch { /* fall through */ }
     }

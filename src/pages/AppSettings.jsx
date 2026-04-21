@@ -544,8 +544,12 @@ export const CustomizeSection = () => {
     const isAdvancedLocked = (isFree || isBasic) && userRole !== 'SUPER_ADMIN';
     const showFullOverlay = (isTotallyLocked || isFree) && userRole !== 'SUPER_ADMIN';
 
-    // Pro user = PRO, ENTERPRISE, or SUPER_ADMIN
-    const isProUser = userTier === 'PRO' || userTier === 'ENTERPRISE' || userRole === 'SUPER_ADMIN';
+    // White-label = STARTER, PRO, BUSINESS, ENTERPRISE, CUSTOM, or SUPER_ADMIN
+    const isWhiteLabelUser = !isFree && !isBasic && !!userTier && userTier !== 'null';
+    const canHideBranding = isWhiteLabelUser || userRole === 'SUPER_ADMIN';
+
+    // Pro user = PRO, BUSINESS, ENTERPRISE, or SUPER_ADMIN
+    const isProUser = ['PRO', 'BUSINESS', 'ENTERPRISE'].includes(userTier) || userRole === 'SUPER_ADMIN';
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-auto lg:h-[calc(100vh-3rem)] bg-[#E8EBF0] dark:bg-slate-900 overflow-visible lg:overflow-hidden transition-colors duration-500">
@@ -651,6 +655,40 @@ export const CustomizeSection = () => {
                                     className={inputCls}
                                     placeholder="Hi! How can I help you today?"
                                 />
+                            </div>
+
+                            {/* ── Branding Toggle (STARTER+) ── */}
+                            <div className="relative">
+                                <div className={`flex items-start justify-between gap-4 p-4 border transition-colors ${canHideBranding ? 'border-gray-200 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900' : 'border-gray-100 dark:border-slate-800/50 bg-gray-50 dark:bg-slate-900/40 opacity-50'}`}>
+                                    <div className="min-w-0">
+                                        <p className="text-md font-semibold font-google text-slate-800 dark:text-slate-200 transition-colors">
+                                            Remove "Powered by SaPyBase" branding
+                                        </p>
+                                        <p className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                                            {canHideBranding
+                                                ? 'Hide the SaPyBase footer from your widget. Your brand, fully.'
+                                                : 'Available on Starter plan and above.'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={botSettings.hideBranding}
+                                        disabled={!canHideBranding}
+                                        onClick={() => canHideBranding && updateSetting('hideBranding', !botSettings.hideBranding)}
+                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${botSettings.hideBranding && canHideBranding ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'} ${!canHideBranding ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${botSettings.hideBranding && canHideBranding ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    </button>
+                                </div>
+                                {!canHideBranding && (
+                                    <div className="mt-1 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[11px] text-blue-500">lock</span>
+                                        <Link to="/app/pricing" className="text-[10px] font-bold font-sans uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:underline underline-offset-2">
+                                            Upgrade to Starter to unlock
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
 
                         </div>

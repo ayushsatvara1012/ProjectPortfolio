@@ -186,6 +186,8 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
     Edge cases handled:
       - CSV: tries UTF-8, then latin-1 (covers Windows-exported files).
       - Excel: reads the first sheet; skips sheets that are entirely empty.
+      - Dirty files: heuristic scan of first 15 rows to find the true header row,
+        discarding title/logo/metadata rows above it.
       - Rows where every cell is blank/NaN are dropped.
       - Values are coerced to str and stripped; NaN → empty string.
       - Files with no header row (all columns unnamed) raise a clear error.
@@ -200,18 +202,81 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
 
     ext = filename.rsplit(".", 1)[-1].lower()
     MAX_CELL_CHARS = 500
+    HEADER_SCAN_ROWS = 15  # number of leading rows to probe for the true header
+
+    def _row_text_density(row_values) -> int:
+        """Count non-empty, non-numeric-looking cells in a row — good headers are text-rich."""
+        count = 0
+        for v in row_values:
+            s = str(v).strip()
+            if not s or s.lower() in ("nan", "none", ""):
+                continue
+            # Prefer rows whose cells look like labels, not pure numbers/dates
+            try:
+                float(s)
+            except ValueError:
+                count += 1
+            else:
+                # numeric cell still counts as populated, just weighted less
+                count += 0  # do not count pure-number cells toward header score
+        return count
+
+    def _find_header_row(raw_df: pd.DataFrame) -> int:
+        """
+        Scan up to HEADER_SCAN_ROWS rows of a DataFrame that was loaded with
+        header=None (all rows are data).  Return the 0-based index of the row
+        most likely to be the real column-header row.
+
+        Heuristics (evaluated together):
+          1. Most non-empty text cells (highest label density).
+          2. Tie-break: earliest row (prefer closer to top).
+          3. A row is disqualified if it has ≤1 populated cell (title rows).
+          4. If the very first row already looks like a proper header
+             (≥2 text cells, no unnamed gaps), we skip the scan entirely.
+        """
+        probe = raw_df.iloc[:HEADER_SCAN_ROWS]
+        best_idx = 0
+        best_score = -1
+        for i, (_, row) in enumerate(probe.iterrows()):
+            score = _row_text_density(row.values)
+            if score > best_score:
+                best_score = score
+                best_idx = i
+        # If first row wins outright and has ≥2 text labels, trust it
+        return best_idx
 
     def _load_df() -> pd.DataFrame:
         if ext == "csv":
             for enc in ("utf-8", "utf-8-sig", "latin-1", "cp1252"):
                 try:
-                    return pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc, keep_default_na=False)
+                    # Load without assuming row-0 is the header so we can probe
+                    raw = pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc,
+                                      keep_default_na=False, header=None)
+                    header_row = _find_header_row(raw)
+                    if header_row == 0:
+                        # Fast path: re-read normally (avoids an extra copy)
+                        return pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc,
+                                           keep_default_na=False)
+                    return pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc,
+                                       keep_default_na=False, skiprows=header_row,
+                                       header=0)
                 except UnicodeDecodeError:
                     continue
             raise ValueError("CSV file encoding could not be detected. Save as UTF-8 and retry.")
         elif ext in ("xlsx", "xls"):
             try:
-                return pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False, engine="openpyxl" if ext == "xlsx" else None)
+                engine = "openpyxl" if ext == "xlsx" else None
+                # Load without a header row to probe for the real one
+                raw = pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False,
+                                    engine=engine, header=None)
+                header_row = _find_header_row(raw)
+                if header_row == 0:
+                    return pd.read_excel(BytesIO(file_bytes), dtype=str,
+                                         keep_default_na=False, engine=engine)
+                return pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False,
+                                     engine=engine, skiprows=header_row, header=0)
+            except ValueError:
+                raise
             except Exception as e:
                 raise ValueError(f"Could not parse Excel file: {e}")
         else:
@@ -234,7 +299,7 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
     df.columns = new_cols
 
     # Reject files where every column name is "Unnamed: N" (no real header).
-    real_headers = [c for c in df.columns if not c.startswith("Unnamed:")]
+    real_headers = [c for c in df.columns if not re.match(r"^(\d+|Unnamed: \d+)$", c)]
     if not real_headers:
         raise ValueError(
             "The file has no header row. Add column names in the first row (e.g. 'Product', 'Price', 'Description') and re-upload."
@@ -401,20 +466,22 @@ def require_fresh_admin(request: Request):
 
 # ── Plan Definitions ────────────────────────────────────────────────────────
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0, "messages": 0,    "chunks": 0,    "speed": "none"},
-    "BASIC":      {"max_bots": 1, "messages": 500,  "chunks": 100,  "speed": "standard"},
-    "STARTER":    {"max_bots": 2, "messages": 2000, "chunks": 500,  "speed": "priority"},
-    "PRO":        {"max_bots": 5, "messages": 5000, "chunks": 2000, "speed": "dedicated"},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 10000, "speed": "dedicated"},
+    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
+    "BASIC":      {"max_bots": 1,   "messages": 500,    "chunks": 100,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
+    "STARTER":    {"max_bots": 2,   "messages": 2000,   "chunks": 500,   "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": False, "analytics": False},
+    "PRO":        {"max_bots": 5,   "messages": 5000,   "chunks": 2000,  "speed": "dedicated", "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
+    "BUSINESS":   {"max_bots": 15,  "messages": 15000,  "chunks": 10000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
 }
 
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
-    "FREE":       "gemini-2.5-flash-lite", 
-    "BASIC":      "gemini-2.5-flash-lite",  # Ultra-low cost, lightning fast
-    "STARTER":    "gemini-2.5-flash",       # Core workhorse, great reasoning
-    "PRO":        "gemini-2.5-pro",         # Stable 2026 flagship for deep reasoning
+    "FREE":       "gemini-2.5-flash-lite",
+    "BASIC":      "gemini-2.5-flash-lite",
+    "STARTER":    "gemini-2.5-flash",
+    "PRO":        "gemini-2.5-pro",
+    "BUSINESS":   "gemini-2.5-pro",
     "ENTERPRISE": "gemini-3.1-pro-preview",
 }
 
@@ -422,7 +489,7 @@ VALID_MODELS = set(MODEL_MAPPING.values()) | {
     "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
 }
 
-def get_tier_model(tier: str, company_model: str = None):
+def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dict = None):
     """
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
@@ -433,8 +500,14 @@ def get_tier_model(tier: str, company_model: str = None):
         print(f"SECURITY WARNING: Invalid company_model detected: {company_model}. Falling back to tier default.")
         company_model = None
 
+    # For CUSTOM tier, prefer the plan-level model override then the bot-level override
+    if tier == "CUSTOM" and custom_plan_config:
+        plan_model = custom_plan_config.get("gemini_model")
+        if plan_model and plan_model in VALID_MODELS:
+            company_model = company_model or plan_model
+
     model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
-    
+
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
     # Output tokens are expensive. We cap them based on user tier to prevent
     # unintentional overruns while keeping the interface snappy.
@@ -443,9 +516,13 @@ def get_tier_model(tier: str, company_model: str = None):
         "BASIC": 600,
         "STARTER": 800,
         "PRO": 1200,
-        "ENTERPRISE": 2048
+        "BUSINESS": 1600,
+        "ENTERPRISE": 2048,
+        "CUSTOM": 1200,
     }
     max_tokens = token_limits.get(tier or "FREE", 600)
+    if tier == "CUSTOM" and custom_plan_config and custom_plan_config.get("max_output_tokens"):
+        max_tokens = custom_plan_config["max_output_tokens"]
 
     return ChatGoogleGenerativeAI(
         model=model_name,
@@ -456,10 +533,30 @@ def get_tier_model(tier: str, company_model: str = None):
 
 UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
 
-def get_plan(tier: str, role: str = None) -> dict:
+def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> dict:
     if role == "SUPER_ADMIN":
         return UNLIMITED_PLAN
-    return PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+    if tier == "CUSTOM" and custom_plan_config:
+        cfg = {**CUSTOM_PLAN_DEFAULTS, **custom_plan_config}
+        return {
+            "max_bots": cfg.get("max_bots") or 1,
+            "messages": cfg.get("max_messages") or 500,
+            "chunks": cfg.get("max_chunks") or 100,
+            "speed": "dedicated",
+            # Feature flags carried through so callers can inspect them
+            "human_handoff": bool(cfg.get("human_handoff")),
+            "lead_capture": bool(cfg.get("lead_capture")),
+            "white_label": bool(cfg.get("white_label")),
+            "webhook": bool(cfg.get("webhook")),
+            "custom_logo": bool(cfg.get("custom_logo")),
+            "analytics": bool(cfg.get("analytics")),
+            "gemini_model": cfg.get("gemini_model"),
+            "max_output_tokens": cfg.get("max_output_tokens"),
+            "plan_name": cfg.get("plan_name", "Custom Plan"),
+            "monthly_price_usd": cfg.get("monthly_price_usd", 0),
+        }
+    plan = PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+    return plan
 
 # 3. Initialize FastAPI App
 app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
@@ -754,12 +851,68 @@ class UserTier(str, Enum):
     STARTER = "STARTER"
     PRO = "PRO"
     ENTERPRISE = "ENTERPRISE"
+    CUSTOM = "CUSTOM"
+
+# ── Custom plan feature flag keys (canonical list) ───────────────────────────
+CUSTOM_PLAN_FEATURE_KEYS = {
+    "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics"
+}
+
+CUSTOM_PLAN_DEFAULTS = {
+    "plan_name": "Custom Plan",
+    "monthly_price_usd": 0,
+    "max_bots": 1,
+    "max_messages": 500,
+    "max_chunks": 100,
+    "gemini_model": None,
+    "max_output_tokens": None,
+    "human_handoff": False,
+    "lead_capture": False,
+    "white_label": False,
+    "webhook": False,
+    "custom_logo": False,
+    "analytics": False,
+    "notes": "",
+}
+
+class CustomPlanConfig(BaseModel):
+    plan_name: Optional[str] = "Custom Plan"
+    monthly_price_usd: Optional[float] = 0
+    max_bots: Optional[int] = None
+    max_messages: Optional[int] = None
+    max_chunks: Optional[int] = None
+    gemini_model: Optional[str] = None
+    max_output_tokens: Optional[int] = None
+    human_handoff: Optional[bool] = False
+    lead_capture: Optional[bool] = False
+    white_label: Optional[bool] = False
+    webhook: Optional[bool] = False
+    custom_logo: Optional[bool] = False
+    analytics: Optional[bool] = False
+    notes: Optional[str] = ""
+
+    @validator("gemini_model")
+    def validate_model(cls, v):
+        if v and v not in VALID_MODELS:
+            raise ValueError(f"gemini_model must be one of: {', '.join(sorted(VALID_MODELS))}")
+        return v
+
+    @validator("max_bots", "max_messages", "max_chunks", "max_output_tokens", pre=True)
+    def non_negative(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Must be 0 or greater")
+        return v
+
+    class Config:
+        extra = "forbid"
 
 class AdminUpdateUserRequest(BaseModel):
     tier: Optional[UserTier] = None
+    status: Optional[str] = None
+    custom_plan_config: Optional[CustomPlanConfig] = None
 
     class Config:
-        extra = "forbid" # Prevents extra fields in the request
+        extra = "forbid"
 
 # 5. Initialize Google AI Models
 embeddings_model_doc = get_embedding_model("retrieval_document")
@@ -823,7 +976,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             SELECT c.id, c.company_name, c.company_tone, c.theme_color, c.allowed_origin,
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
-                   u.email, c.handoff_redirect_url
+                   u.email, c.handoff_redirect_url, c.hide_branding
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -839,10 +992,38 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         # SECURITY: Do NOT log any part of the key or hash in production.
         raise HTTPException(status_code=401, detail="Invalid API Key.")
 
-    # Determine if lead capture is enabled for this company
+    # Determine if lead capture / handoff is enabled for this company
     tier = (company_data[13] or "FREE").upper()
     role = company_data[14]
-    lead_capture_enabled = tier in ["PRO", "ENTERPRISE"] or role == "SUPER_ADMIN"
+    if tier == "CUSTOM":
+        # custom_plan_config is fetched below; we do a targeted lookup here
+        _conn2 = get_db_connection()
+        try:
+            _cur2 = _conn2.cursor()
+            _cur2.execute(
+                "SELECT custom_plan_config FROM users u JOIN companies c ON c.user_id = u.id WHERE c.api_key = %s",
+                (hashed_key,)
+            )
+            _cfg_row = _cur2.fetchone()
+            _cur2.close()
+            _custom_cfg = (_cfg_row[0] if _cfg_row and isinstance(_cfg_row[0], dict) else {})
+        finally:
+            release_db_connection(_conn2)
+        lead_capture_enabled  = bool(_custom_cfg.get("lead_capture"))
+        human_handoff_enabled = bool(_custom_cfg.get("human_handoff"))
+        webhook_enabled       = bool(_custom_cfg.get("webhook"))
+        white_label_enabled   = bool(_custom_cfg.get("white_label"))
+        custom_logo_enabled   = bool(_custom_cfg.get("custom_logo"))
+        analytics_enabled     = bool(_custom_cfg.get("analytics"))
+    else:
+        _plan = PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+        _super = role == "SUPER_ADMIN"
+        lead_capture_enabled  = _super or bool(_plan.get("lead_capture"))
+        human_handoff_enabled = _super or bool(_plan.get("human_handoff"))
+        webhook_enabled       = _super or bool(_plan.get("webhook"))
+        white_label_enabled   = _super or bool(_plan.get("white_label"))
+        custom_logo_enabled   = _super or bool(_plan.get("white_label"))
+        analytics_enabled     = _super or bool(_plan.get("analytics"))
 
     # Package the company data
     company = {
@@ -859,10 +1040,17 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "logo_shape": company_data[10] or "circle",
         "custom_logo_url": company_data[11],
         "avatar_bg_style": company_data[12] or "none",
-        "lead_capture_enabled": lead_capture_enabled,
+        "lead_capture_enabled":  lead_capture_enabled,
+        "human_handoff_enabled": human_handoff_enabled,
+        "webhook_enabled":       webhook_enabled,
+        # white_label_enabled is True when the plan supports it AND the user has toggled hide_branding on
+        "white_label_enabled":   white_label_enabled and bool(company_data[18]),
+        "custom_logo_enabled":   custom_logo_enabled,
+        "analytics_enabled":     analytics_enabled,
         "webhook_url": company_data[15],
         "owner_email": company_data[16],
         "handoff_redirect_url": company_data[17],
+        "hide_branding": bool(company_data[18]),
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -1065,20 +1253,20 @@ async def get_current_user(request: Request):
                         print(f"RECONCILIATION: Merged pending data into existing real account.")
 
             # Now fetch the final consolidated state
-            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
+            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config FROM users WHERE clerk_id = %s", (clerk_id,))
             row = cursor.fetchone()
 
             if not row and email != "unknown@email.com":
                 # Final fallback: provision new row if still none exists
                 cursor.execute(
-                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
+                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config",
                     (clerk_id, email)
                 )
                 row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
             if row:
                 # Assign variables correctly from the expanded query before use
-                user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end = row
+                user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
                 
                 # 4. Role Sync & "Only 1 Super Admin" Enforcement
                 # CRITICAL: Ensures no one else can EVER have the SUPER_ADMIN role.
@@ -1105,18 +1293,20 @@ async def get_current_user(request: Request):
         
         if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
 
-        user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end = row
+        user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
+        custom_plan_cfg = custom_plan_config_raw if isinstance(custom_plan_config_raw, dict) else None
         # Return updated values if they were changed by self-healing
         return {
-            "id": user_id, 
-            "clerk_id": clerk_id, 
-            "role": role, 
-            "email": user_email, 
-            "tier": tier, 
+            "id": user_id,
+            "clerk_id": clerk_id,
+            "role": role,
+            "email": user_email,
+            "tier": tier,
             "subscription_status": subscription_status,
             "trial_end_date": trial_end_date,
             "polar_customer_id": polar_cust_id,
-            "billing_period_end": billing_end
+            "billing_period_end": billing_end,
+            "custom_plan_config": custom_plan_cfg,
         }
         
     except HTTPException: raise
@@ -1249,6 +1439,8 @@ class CompanyUpdate(BaseModel):
     webhook_url:           Optional[str]  = None   # HTTPS URL for lead capture webhooks
     # ── v17 human handoff ──
     handoff_redirect_url:  Optional[str]  = None   # WhatsApp/Calendly/etc link shown after handoff
+    # ── v18 white-label ──
+    hide_branding:         Optional[bool] = None   # True = remove "Powered by SaPyBase" footer
 
     @validator('webhook_url')
     def validate_webhook_url(cls, v):
@@ -1296,8 +1488,10 @@ async def update_company_details(
             )
 
     # ── PRO-only gate: webhook_url ──
+    custom_plan_cfg = user.get("custom_plan_config") or {}
     if update.webhook_url is not None and update.webhook_url.strip():
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+        custom_webhook_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("webhook"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_webhook_ok:
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -1309,7 +1503,8 @@ async def update_company_details(
 
     # ── PRO-only gate: handoff_redirect_url ──
     if update.handoff_redirect_url is not None and update.handoff_redirect_url.strip():
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+        custom_handoff_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("human_handoff"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_handoff_ok:
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -1321,7 +1516,8 @@ async def update_company_details(
 
     # ── PRO-only gate: custom_logo_url ──
     if update.custom_logo_url is not None and update.custom_logo_url.strip():
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+        custom_logo_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("custom_logo"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_logo_ok:
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -1339,6 +1535,20 @@ async def update_company_details(
             raise HTTPException(
                 status_code=402,
                 detail="Bot shape selection requires a Starter or Pro plan."
+            )
+
+    # ── hide_branding available to STARTER+ (white-label plans) ──
+    if update.hide_branding is True:
+        _plan_wl = PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+        custom_wl_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("white_label"))
+        if not _plan_wl.get("white_label") and role != "SUPER_ADMIN" and not custom_wl_ok:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Removing SaPyBase branding requires the Starter plan or higher.",
+                    "upgrade_url": "/app/pricing"
+                }
             )
 
     conn = get_db_connection()
@@ -1536,7 +1746,7 @@ async def chat_endpoint(
             raise HTTPException(status_code=404, detail="Subscription data not found.")
 
         tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
-        plan = get_plan(tier, role=user_role)
+        plan = get_plan(tier, role=user_role, custom_plan_config=company.get("custom_plan_config"))
         current_limit = plan["messages"]
 
         # Billing check: ensure the subscription is currently active (case-insensitive).
@@ -1940,8 +2150,8 @@ async def request_human_handoff(
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """Widget calls this when a visitor clicks 'Talk to a human'. Emails the transcript to the owner."""
-    if not company.get("lead_capture_enabled"):
-        raise HTTPException(status_code=402, detail="Human handoff requires the Pro plan.")
+    if not company.get("human_handoff_enabled"):
+        raise HTTPException(status_code=402, detail="Human handoff is not enabled on this plan.")
     transcript = [{"role": m.role, "content": m.content} for m in payload.transcript]
     owner_email = company.get("owner_email")
     bot_name = company.get("bot_name", "AI Assistant")
@@ -2998,7 +3208,7 @@ async def train_chatbot(
             raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
         resolved_company_id = company_row[0]
 
-        plan = get_plan(current_user["tier"], role=current_user.get("role"))
+        plan = get_plan(current_user["tier"], role=current_user.get("role"), custom_plan_config=current_user.get("custom_plan_config"))
         limit = plan["chunks"]
 
         # Determine source_name early so we can query existing chunk count for it.
@@ -3203,7 +3413,7 @@ def register_company(
 reg: RegisterRequest, user: dict = Depends(get_current_user)):
     """Multi-bot registration with per-plan bot count enforcement."""
     tier = user.get("tier") or "FREE"
-    plan = get_plan(tier, role=user.get("role"))
+    plan = get_plan(tier, role=user.get("role"), custom_plan_config=user.get("custom_plan_config"))
 
     if plan["max_bots"] == 0:
         raise HTTPException(status_code=402, detail={
@@ -3326,7 +3536,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
             (user["id"],)
         )
         rows = cursor.fetchall()
-        plan = get_plan(user.get("tier"), role=user.get("role"))
+        plan = get_plan(user.get("tier"), role=user.get("role"), custom_plan_config=user.get("custom_plan_config"))
         return {
             "status": "success",
             "bots": [
@@ -3639,17 +3849,24 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
         )
         usage = cursor.fetchone()
 
-        plan = get_plan(current_user.get("tier"), role=current_user.get("role"))
+        plan = get_plan(
+            current_user.get("tier"),
+            role=current_user.get("role"),
+            custom_plan_config=current_user.get("custom_plan_config"),
+        )
 
         trial_days_left = None
         if current_user.get("trial_end_date"):
             delta = current_user["trial_end_date"] - datetime.now(timezone.utc)
             trial_days_left = max(0, delta.days)
 
+        tier = current_user["tier"]
+        custom_cfg = current_user.get("custom_plan_config") or {}
+
         return {
             "status": "success",
             "role": current_user["role"],
-            "tier": current_user["tier"],
+            "tier": tier,
             "email": current_user["email"],
             "messages_used": usage[0] if usage else 0,
             "message_limit": plan["messages"],
@@ -3659,6 +3876,12 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
             "max_bots": plan["max_bots"],
             "speed_tier": plan["speed"],
             "chunk_limit": plan["chunks"],
+            # Custom plan metadata (only populated when tier == CUSTOM)
+            "custom_plan_name": plan.get("plan_name") if tier == "CUSTOM" else None,
+            "custom_plan_features": {
+                k: plan.get(k, False)
+                for k in CUSTOM_PLAN_FEATURE_KEYS
+            } if tier == "CUSTOM" else None,
         }
     finally:
         release_db_connection(conn)
@@ -3683,7 +3906,19 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
         user_count = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM companies")
         company_count = cursor.fetchone()[0]
-        return {"total_users": user_count, "total_companies": company_count}
+        cursor.execute("SELECT COUNT(*) FROM companies WHERE is_active = true")
+        active_bot_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COALESCE(SUM(messages_used), 0) FROM usage_tracking")
+        total_messages = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM users WHERE tier = 'CUSTOM'")
+        custom_plan_count = cursor.fetchone()[0]
+        return {
+            "total_users": user_count,
+            "total_companies": company_count,
+            "active_bots": active_bot_count,
+            "total_messages": int(total_messages),
+            "custom_plan_count": custom_plan_count,
+        }
     finally:
         release_db_connection(conn)
 
@@ -3716,13 +3951,56 @@ def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_c
 
 @app.get("/api/admin/users")
 def get_all_users(admin: dict = Depends(get_admin_user)):
-    """Admin-only list of all platform users."""
+    """Admin-only list of all platform users with usage and bots."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT clerk_id, email, role, tier, created_at FROM users ORDER BY created_at DESC")
-        users = cursor.fetchall()
-        return [{"clerk_id": u[0], "email": u[1], "role": u[2], "tier": u[3], "created_at": u[4]} for u in users]
+        cursor.execute("""
+            SELECT
+                u.clerk_id, u.email, u.role, u.tier, u.created_at,
+                COALESCE(u.status, 'active') AS status,
+                u.custom_plan_config,
+                COALESCE(SUM(ut.messages_used), 0) AS messages_used,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id',             c.id::text,
+                            'bot_name',       c.bot_name,
+                            'company_name',   c.company_name,
+                            'allowed_origin', c.allowed_origin,
+                            'is_active',      c.is_active,
+                            'created_at',     c.created_at
+                        ) ORDER BY c.created_at ASC
+                    ) FILTER (WHERE c.id IS NOT NULL),
+                    '[]'::json
+                ) AS companies
+            FROM users u
+            LEFT JOIN usage_tracking ut ON ut.user_id = u.id
+            LEFT JOIN companies c ON c.user_id = u.id
+            GROUP BY u.clerk_id, u.email, u.role, u.tier, u.created_at, u.status, u.custom_plan_config
+            ORDER BY u.created_at DESC
+        """)
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            tier = r[3] or "FREE"
+            custom_cfg = r[6] if isinstance(r[6], dict) else None
+            plan = get_plan(tier, role=r[2], custom_plan_config=custom_cfg)
+            result.append({
+                "clerk_id": r[0],
+                "email": r[1],
+                "role": r[2],
+                "tier": tier,
+                "created_at": r[4],
+                "status": r[5] or "active",
+                "custom_plan_config": custom_cfg,
+                "usage_tracking": {
+                    "messages_used": r[7],
+                    "message_limit": plan["messages"],
+                },
+                "companies": r[8] if isinstance(r[8], list) else [],
+            })
+        return result
     finally:
         release_db_connection(conn)
 
@@ -3733,42 +4011,78 @@ def update_user_admin(
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
 ):
-    """Super Admin: Hardened update of user role/tier with Audit Logging."""
+    """Super Admin: Hardened update of user tier, status, and custom plan config with Audit Logging."""
     updates = []
     params = []
-    
-    # Track changes for audit log
     changes = {}
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
-        # Fetch current state for audit
-        cursor.execute("SELECT role, tier FROM users WHERE clerk_id = %s", (clerk_id,))
-        old_state = cursor.fetchone()
-        
-        if req.tier is not None:
-            updates.append("tier = %s")
-            params.append(req.tier.value)
-            if old_state: changes["tier"] = {"old": old_state[1], "new": req.tier.value}
 
-        if not updates: return {"message": "No changes provided"}
+        # Fetch current state for audit
+        cursor.execute("SELECT role, tier, COALESCE(status, 'active'), custom_plan_config FROM users WHERE clerk_id = %s", (clerk_id,))
+        old_state = cursor.fetchone()
+        if not old_state:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        if req.tier is not None:
+            new_tier = req.tier.value
+            updates.append("tier = %s")
+            params.append(new_tier)
+            if old_state: changes["tier"] = {"old": old_state[1], "new": new_tier}
+            # If demoting away from CUSTOM, clear the config
+            if new_tier != "CUSTOM":
+                updates.append("custom_plan_config = NULL")
+                changes["custom_plan_config"] = {"old": old_state[3], "new": None}
+
+        if req.status is not None:
+            allowed_statuses = {"active", "suspended"}
+            if req.status not in allowed_statuses:
+                raise HTTPException(status_code=400, detail=f"status must be one of: {allowed_statuses}")
+            updates.append("status = %s")
+            params.append(req.status)
+            if old_state: changes["status"] = {"old": old_state[2], "new": req.status}
+
+        if req.custom_plan_config is not None:
+            config_dict = req.custom_plan_config.dict(exclude_none=False)
+            updates.append("custom_plan_config = %s")
+            params.append(json.dumps(config_dict))
+            # Auto-promote tier to CUSTOM when a config is saved
+            if "tier = %s" not in updates:
+                updates.append("tier = %s")
+                params.append("CUSTOM")
+                changes["tier"] = {"old": old_state[1], "new": "CUSTOM"}
+            changes["custom_plan_config"] = {"new": config_dict}
+
+        if not updates:
+            return {"message": "No changes provided"}
 
         query = f"UPDATE users SET {', '.join(updates)} WHERE clerk_id = %s"
         params.append(clerk_id)
         cursor.execute(query, tuple(params))
         conn.commit()
-        
-        # Issue #17: Log the action
+
         log_admin_action(admin["clerk_id"], "UPDATE_USER_PROFILE", clerk_id, changes)
-        
+
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail="Update failed.")
     finally:
         release_db_connection(conn)
+
+@app.patch("/api/admin/users/{clerk_id}/limits")
+def update_user_limits(
+    clerk_id: str,
+    req: AdminUpdateUserRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Alias endpoint used by the Admin Dashboard plan builder UI."""
+    return update_user_admin(clerk_id, req, admin, _fresh)
 
 @app.delete("/api/admin/companies/{company_id}")
 def delete_company_admin(

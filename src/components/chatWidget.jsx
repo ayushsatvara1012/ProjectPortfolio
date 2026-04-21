@@ -418,6 +418,8 @@ const ChatWidget = ({ apiKey }) => {
                         avatar_bg_style: data.avatar_bg_style || 'none',
                         // ── v14 ──
                         lead_capture_enabled: data.lead_capture_enabled || false,
+                        // ── white-label: hide footer for STARTER+ plans ──
+                        white_label_enabled: data.white_label_enabled === true,
                     });
                     leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
                     // Only update the welcome message if the user hasn't started chatting yet
@@ -1201,18 +1203,20 @@ const ChatWidget = ({ apiKey }) => {
                             </div>
                         </div>
 
-                        {/* Fixed Branding Footer */}
-                        <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
-                            <a
-                                href="https://www.sapybase.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
-                            >
-                                <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
-                                Powered by SaPyBase
-                            </a>
-                        </div>
+                        {/* Branding Footer — hidden for white-label plans (STARTER+) */}
+                        {!configData.white_label_enabled && (
+                            <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
+                                <a
+                                    href="https://www.sapybase.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
+                                >
+                                    <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
+                                    Powered by SaPyBase
+                                </a>
+                            </div>
+                        )}
 
                         {/* Input Area */}
                         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
