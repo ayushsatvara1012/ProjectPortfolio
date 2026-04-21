@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -509,8 +509,11 @@ export const CustomizeSection = () => {
     const authFetch = useAuthenticatedFetch();
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
 
+    const [searchParams] = useSearchParams();
+    const editBotId = searchParams.get('edit');
+
     // Bot Selection
-    const [selectedBotId, setSelectedBotId] = useState('');
+    const [selectedBotId, setSelectedBotId] = useState(editBotId || '');
     const { data: botsData } = useQuery({
         queryKey: ['bots'],
         queryFn: () => authFetch('/api/companies'),
@@ -519,9 +522,17 @@ export const CustomizeSection = () => {
 
     useEffect(() => {
         if (bots.length > 0 && !selectedBotId) {
-            setSelectedBotId(bots[0].id);
+            if (editBotId && bots.some(b => b.id === editBotId)) {
+                setSelectedBotId(editBotId);
+            } else {
+                setSelectedBotId(bots[0].id);
+            }
+        } else if (bots.length > 0 && selectedBotId && editBotId && selectedBotId !== editBotId) {
+            if (bots.some(b => b.id === editBotId)) {
+                setSelectedBotId(editBotId);
+            }
         }
-    }, [bots, selectedBotId]);
+    }, [bots, selectedBotId, editBotId]);
 
     useEffect(() => {
         if (selectedBotId) {
