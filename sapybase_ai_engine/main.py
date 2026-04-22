@@ -1404,14 +1404,18 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
     finally:
         release_db_connection(conn)
 
-def retrieve_knowledge(conn, company_id, query_vector, limit=5, distance_threshold=0.45):
-    """Performs Cosine Similarity search using pgvector for a SPECIFIC company with a strict distance threshold."""
+def retrieve_knowledge(conn, company_id, query_vector, limit=15, distance_threshold=0.55):
+    """
+    Fetches top-N candidate chunks via cosine similarity.
+    Threshold is intentionally wider (0.55) to give the reranker more candidates to score.
+    The reranker then narrows this to the true top-5 by semantic relevance.
+    """
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT content, url FROM company_knowledge 
+        SELECT content, url FROM company_knowledge
         WHERE company_id = %s AND embedding <=> %s::vector < %s
-        ORDER BY embedding <=> %s::vector 
+        ORDER BY embedding <=> %s::vector
         LIMIT %s
         """,
         (company_id, query_vector, distance_threshold, query_vector, limit)
@@ -1419,6 +1423,57 @@ def retrieve_knowledge(conn, company_id, query_vector, limit=5, distance_thresho
     results = cursor.fetchall()
     cursor.close()
     return results
+
+
+async def rerank_chunks(query: str, candidates: list, top_k: int = 5) -> list:
+    """
+    LLM-based reranker using Gemini Flash Lite (fast + cheap).
+    Scores each candidate chunk 0-10 for relevance to the query,
+    then returns the top_k highest-scoring chunks.
+
+    Falls back to returning the first top_k candidates unchanged if reranking fails,
+    so the chat endpoint is never blocked by a reranker error.
+    """
+    if not candidates or len(candidates) <= top_k:
+        return candidates
+
+    try:
+        rerank_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=200,
+            temperature=0.0,
+        )
+
+        numbered = "\n\n".join(
+            [f"[{i}] {chunk[0][:400]}" for i, chunk in enumerate(candidates)]
+        )
+        rerank_prompt = f"""You are a relevance scoring engine. Score each passage below from 0 to 10 based on how directly and completely it answers the query.
+
+Query: {query}
+
+Passages:
+{numbered}
+
+Respond ONLY with a JSON array of integers in the same order as the passages. Example: [8, 3, 9, 1, 7, 2, 6, 4, 0, 5]
+Output nothing else."""
+
+        response = await rerank_model.ainvoke([HumanMessage(content=rerank_prompt)])
+        raw = response.content.strip()
+
+        # Parse JSON array — strip markdown fences if present
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        scores = json.loads(raw)
+
+        if not isinstance(scores, list) or len(scores) != len(candidates):
+            raise ValueError("Score list length mismatch")
+
+        ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
+        return [chunk for _, chunk in ranked[:top_k]]
+
+    except Exception as e:
+        print(f"[RERANKER] Failed, using raw retrieval order: {e}")
+        return candidates[:top_k]
 
 class CompanyUpdate(BaseModel):
     company_id:       Optional[str]  = None
@@ -1814,12 +1869,14 @@ async def chat_endpoint(
                 )
         # ── END CACHE LOOKUP (miss — continue to full RAG + Gemini) ──────────
 
-        # 2. Vector Search (RAG)
+        # 2. Vector Search (RAG) + Reranking
         query_vector = embeddings_model_query.embed_query(chat_req.message)
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
-            
-        retrieved_docs = retrieve_knowledge(conn, company["id"], query_vector)
+
+        # Fetch wider candidate pool (top-15), then rerank to top-5 by true relevance
+        candidate_docs = retrieve_knowledge(conn, company["id"], query_vector)
+        retrieved_docs = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
         # ── Runtime values from company record ─────────────────────────────────
         bot_name        = company.get("bot_name") or "Sapy AI"
@@ -1881,10 +1938,24 @@ End your response with a single line: 📎 Source: [url]
 If no URL is available, omit this line entirely.
 
 [RULE 5 — ESCALATION TRIGGERS]
-If the user's message contains any of these signals, append the escalation note:
-  Signals: "urgent", "not working", "broken", "billing", "charge", "refund",
-           "my account", "transaction", "order", "complaint", or visible frustration.
-  Escalation note: "💬 Need immediate help? Contact {company_name} support directly."
+Escalation ONLY fires when the user is expressing a PROBLEM or DISTRESS — NOT when they are asking for information.
+
+ESCALATE when the user's message shows one of these active distress signals:
+  • Reporting a failure: "not working", "broken", "stopped working", "error", "crash", "bug"
+  • Disputing a charge: "wrong charge", "overcharged", "double charged", "didn't authorize"
+  • Requesting a refund: "refund", "cancel my subscription", "want my money back"
+  • Account emergency: "locked out", "can't log in", "account suspended", "account deleted"
+  • Explicit complaint: "this is unacceptable", "terrible", "very frustrated", "angry"
+  • Urgency marker alongside a problem: "urgent" + a problem description
+
+DO NOT escalate for:
+  • Informational questions about pricing, plans, or costs ("what does X cost?", "how much is the Pro plan?")
+  • General "how do I" questions
+  • Feature comparisons
+  • Billing questions that are informational ("when does my billing cycle reset?", "what payment methods do you accept?")
+
+When escalation IS triggered, append ONLY this single line at the end:
+  "💬 Need immediate help? Contact {company_name} support directly."
 
 [RULE 6 — FALLBACK PROTOCOL]
 When the KNOWLEDGE BASE is empty OR contains no relevant answer:

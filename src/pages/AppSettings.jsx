@@ -27,9 +27,10 @@ const TIER_META = {
 };
 
 const POLAR_URLS = {
-    BASIC:   import.meta.env.VITE_POLAR_BASIC_URL,
-    STARTER: import.meta.env.VITE_POLAR_STARTER_URL,
-    PRO:     import.meta.env.VITE_POLAR_PRO_URL,
+    BASIC:    import.meta.env.VITE_POLAR_BASIC_URL,
+    STARTER:  import.meta.env.VITE_POLAR_STARTER_URL,
+    PRO:      import.meta.env.VITE_POLAR_PRO_URL,
+    BUSINESS: import.meta.env.VITE_POLAR_BUSINESS_URL,
 };
 
 // ── Account Tabs ───────────────────────────────────────────────────────────────
@@ -135,9 +136,17 @@ const BillingTab = () => {
     const meta = TIER_META[tier] || TIER_META.FREE;
     const TierIcon = meta.icon;
 
+    const isPaid = tier !== 'FREE';
+    const isCanceled = subscriptionStatus === 'CANCELED';
+
     const formattedPeriodEnd = billingPeriodEnd
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : '—';
+        : null;
+
+    // Days remaining until renewal/expiry
+    const daysRemaining = billingPeriodEnd
+        ? Math.max(0, Math.ceil((new Date(billingPeriodEnd) - new Date()) / (1000 * 60 * 60 * 24)))
+        : null;
 
     const showAlert = useCallback((type, title, msg) => {
         setAlert({ open: true, type, title, msg });
@@ -161,6 +170,10 @@ const BillingTab = () => {
         }
     };
 
+    const handleContactCustom = () => {
+        window.location.href = `mailto:ayushsatvara2002@gmail.com?subject=Custom%20Plan%20Enquiry&body=Hi%20Ayush%2C%0A%0AI'm%20interested%20in%20a%20custom%20plan%20for%20my%20agency%2Fbusiness.%0A%0AOrganisation%3A%0AExpected%20bots%3A%0AExpected%20monthly%20messages%3A%0AKey%20features%20needed%3A%0A`;
+    };
+
     const handleBillingPortal = async () => {
         setProcessing('portal');
         try {
@@ -170,9 +183,9 @@ const BillingTab = () => {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail);
-            window.open(data.url, '_blank');
-        } catch (e) {
-            showAlert('error', 'Portal Error', e.message || 'Could not open billing portal.');
+            window.open(data.url || 'https://polar.sh/sapybase-llc/portal', '_blank');
+        } catch {
+            window.open('https://polar.sh/sapybase-llc/portal', '_blank');
         } finally { setProcessing(null); }
     };
 
@@ -197,15 +210,17 @@ const BillingTab = () => {
     const isDisabled = () => processing !== null;
     const label = (key, text) => processing === key ? 'Processing...' : text;
 
-    const btnBase = 'py-3 px-5 text-[10px] uppercase tracking-[0.15em] font-bold font-display transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 min-h-[44px]';
+    const btnBase = 'py-3 px-4 text-[10px] uppercase tracking-[0.15em] font-bold font-display transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 min-h-[44px]';
     const btnPrimary = `${btnBase} bg-gradient-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-md`;
     const btnSecondary = `${btnBase} border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-950`;
+    const btnBusiness = `${btnBase} bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:opacity-90 shadow-md`;
+    const btnCustom = `${btnBase} border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 bg-white dark:bg-slate-950`;
     const btnDanger = `${btnBase} border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 bg-white dark:bg-slate-950`;
 
     if (isLoading) return (
         <div className="space-y-4 animate-pulse">
             <SkeletonBase className="h-20 w-full" />
-            <div className="grid grid-cols-3 gap-px">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-px">
                 {[1,2,3].map(i => <SkeletonBase key={i} className="h-20" />)}
             </div>
             <SkeletonBase className="h-12 w-full" />
@@ -213,17 +228,17 @@ const BillingTab = () => {
     );
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
             {/* Current plan hero */}
-            <div className="p-6 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4 transition-colors">
+            <div className="p-4 sm:p-6 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
                 <div>
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1">Current Plan</p>
                     <div className="flex items-center gap-2.5">
                         <TierIcon className={`w-5 h-5 ${meta.color}`} />
-                        <span className={`text-2xl font-display font-bold ${meta.color}`}>{meta.label}</span>
+                        <span className={`text-xl sm:text-2xl font-display font-bold ${meta.color}`}>{meta.label}</span>
                     </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3 sm:gap-2">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-widest font-bold font-display border border-current/10 ${meta.badge} transition-colors`}>
                         <TierIcon className="w-3 h-3" />
                         {meta.label}
@@ -238,15 +253,55 @@ const BillingTab = () => {
                 </div>
             </div>
 
-            {/* Stats grid */}
-            <div className="grid grid-cols-3 gap-px bg-gray-100 dark:bg-slate-800">
-                <div className="bg-white dark:bg-slate-950 p-5 text-center transition-colors">
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Plan</p>
-                    <p className={`text-lg font-display font-bold ${meta.color}`}>{meta.label}</p>
+            {/* Subscription end date — prominent banner for paid plans */}
+            {isPaid && formattedPeriodEnd && (
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-l-4 transition-colors ${
+                    isCanceled
+                        ? 'bg-red-50 dark:bg-red-900/10 border-red-500 dark:border-red-400'
+                        : daysRemaining !== null && daysRemaining <= 7
+                            ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-500 dark:border-amber-400'
+                            : 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-500 dark:border-emerald-400'
+                }`}>
+                    <div className="flex items-start sm:items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] shrink-0 ${
+                            isCanceled ? 'text-red-500' : daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-500' : 'text-emerald-500'
+                        }`}>
+                            {isCanceled ? 'event_busy' : 'event_available'}
+                        </span>
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest font-bold font-sans text-slate-400 dark:text-slate-500 mb-0.5">
+                                {isCanceled ? 'Access Ends' : 'Subscription Renews'}
+                            </p>
+                            <p className={`text-lg font-display font-bold ${
+                                isCanceled ? 'text-red-600 dark:text-red-400' :
+                                daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-600 dark:text-amber-400' :
+                                'text-emerald-600 dark:text-emerald-400'
+                            }`}>
+                                {formattedPeriodEnd}
+                            </p>
+                        </div>
+                    </div>
+                    {daysRemaining !== null && (
+                        <span className={`self-start sm:self-auto shrink-0 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold font-sans border ${
+                            isCanceled ? 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400' :
+                            daysRemaining <= 7 ? 'bg-amber-100 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400' :
+                            'bg-emerald-100 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                            {daysRemaining === 0 ? 'Today' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`}
+                        </span>
+                    )}
                 </div>
-                <div className="bg-white dark:bg-slate-950 p-5 text-center transition-colors">
+            )}
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100 dark:bg-slate-800">
+                <div className="bg-white dark:bg-slate-950 p-4 sm:p-5 text-center transition-colors">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Plan</p>
+                    <p className={`text-base sm:text-lg font-display font-bold ${meta.color}`}>{meta.label}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-950 p-4 sm:p-5 text-center transition-colors">
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Status</p>
-                    <p className={`text-lg font-display font-bold ${
+                    <p className={`text-base sm:text-lg font-display font-bold ${
                         subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
                         subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
                         'text-amber-500 dark:text-amber-400'
@@ -254,52 +309,116 @@ const BillingTab = () => {
                         {subscriptionStatus || 'Active'}
                     </p>
                 </div>
-                <div className="bg-white dark:bg-slate-950 p-5 text-center transition-colors">
+                <div className="bg-white dark:bg-slate-950 p-4 sm:p-5 text-center transition-colors">
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">
-                        {tier === 'FREE' ? '—' : 'Renews'}
+                        {!isPaid ? 'Billing' : isCanceled ? 'Expires' : 'Renews'}
                     </p>
-                    <p className="text-lg font-display font-bold text-slate-900 dark:text-slate-100">
-                        {tier === 'FREE' ? 'N/A' : formattedPeriodEnd}
+                    <p className={`text-base sm:text-lg font-display font-bold ${
+                        !isPaid ? 'text-slate-400 dark:text-slate-500' :
+                        isCanceled ? 'text-red-500 dark:text-red-400' :
+                        'text-slate-900 dark:text-slate-100'
+                    }`}>
+                        {!isPaid ? 'N/A' : formattedPeriodEnd ?? '—'}
                     </p>
                 </div>
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+            <div className="flex flex-col gap-2.5">
+                {/* Manage Billing — always shown for paid tiers */}
+                {isPaid && (
+                    <button onClick={handleBillingPortal} disabled={isDisabled()} className={`${btnPrimary} w-full`}>
+                        <ExternalLink className="w-4 h-4 shrink-0" />
+                        {label('portal', 'Manage Billing — View invoices & payment method')}
+                    </button>
+                )}
+
+                {/* Upgrade options — shown when user can still go higher */}
                 {tier === 'FREE' && (
-                    <>
-                        <button onClick={handleUpgrade('BASIC')} disabled={isDisabled()} className={`${btnPrimary} flex-1`}>{label('basic', 'Upgrade to Basic — $5/mo')}</button>
-                        <button onClick={handleUpgrade('STARTER')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('starter', 'Upgrade to Starter — $10/mo')}</button>
-                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('pro', 'Upgrade to Pro — $20/mo')}</button>
-                    </>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button onClick={handleUpgrade('BASIC')} disabled={isDisabled()} className={btnPrimary}>
+                            {label('basic', 'Upgrade to Basic — $9/mo')}
+                        </button>
+                        <button onClick={handleUpgrade('STARTER')} disabled={isDisabled()} className={btnSecondary}>
+                            {label('starter', 'Upgrade to Starter — $19/mo')}
+                        </button>
+                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={btnSecondary}>
+                            {label('pro', 'Upgrade to Pro — $49/mo')}
+                        </button>
+                        <button onClick={handleUpgrade('BUSINESS')} disabled={isDisabled()} className={btnBusiness}>
+                            {label('business', 'Upgrade to Business — $99/mo')}
+                        </button>
+                    </div>
                 )}
+
                 {tier === 'BASIC' && (
-                    <>
-                        <button onClick={handleBillingPortal} disabled={isDisabled()} className={`${btnPrimary} flex-1`}><ExternalLink className="w-4 h-4" />{label('portal', 'Manage Billing')}</button>
-                        <button onClick={handleUpgrade('STARTER')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('starter', 'Upgrade to Professional — $10/mo')}</button>
-                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={`${btnSecondary} flex-1`}>{label('pro', 'Upgrade to Enterprise — $20/mo')}</button>
-                        {subscriptionStatus !== 'CANCELED' && (
-                            <button onClick={handleCancel} disabled={isDisabled()} className={`${btnDanger} flex-1`}><AlertCircle className="w-4 h-4" />{label('cancel', 'Cancel Subscription')}</button>
-                        )}
-                    </>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button onClick={handleUpgrade('STARTER')} disabled={isDisabled()} className={btnPrimary}>
+                            {label('starter', 'Upgrade to Starter — $19/mo')}
+                        </button>
+                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={btnSecondary}>
+                            {label('pro', 'Upgrade to Pro — $49/mo')}
+                        </button>
+                        <button onClick={handleUpgrade('BUSINESS')} disabled={isDisabled()} className={btnBusiness}>
+                            {label('business', 'Upgrade to Business — $99/mo')}
+                        </button>
+                        <button onClick={handleContactCustom} disabled={isDisabled()} className={btnCustom}>
+                            <ExternalLink className="w-4 h-4 shrink-0" />
+                            {label('custom', 'Contact for Custom Plan')}
+                        </button>
+                    </div>
                 )}
-                {(tier === 'STARTER' || tier === 'PRO') && (
-                    <>
-                        <button onClick={handleBillingPortal} disabled={isDisabled()} className={`${btnPrimary} flex-1`}><ExternalLink className="w-4 h-4" />{label('portal', 'Manage Billing')}</button>
-                        {subscriptionStatus !== 'CANCELED' && (
-                            <button onClick={handleCancel} disabled={isDisabled()} className={`${btnDanger} flex-1`}><AlertCircle className="w-4 h-4" />{label('cancel', 'Cancel Subscription')}</button>
-                        )}
-                    </>
+
+                {tier === 'STARTER' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button onClick={handleUpgrade('PRO')} disabled={isDisabled()} className={btnPrimary}>
+                            {label('pro', 'Upgrade to Pro — $49/mo')}
+                        </button>
+                        <button onClick={handleUpgrade('BUSINESS')} disabled={isDisabled()} className={btnBusiness}>
+                            {label('business', 'Upgrade to Business — $99/mo')}
+                        </button>
+                        <button onClick={handleContactCustom} disabled={isDisabled()} className={`${btnCustom} sm:col-span-2`}>
+                            <ExternalLink className="w-4 h-4 shrink-0" />
+                            {label('custom', 'Contact for Custom / Agency Plan')}
+                        </button>
+                    </div>
+                )}
+
+                {tier === 'PRO' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <button onClick={handleUpgrade('BUSINESS')} disabled={isDisabled()} className={btnBusiness}>
+                            {label('business', 'Upgrade to Business — $99/mo')}
+                        </button>
+                        <button onClick={handleContactCustom} disabled={isDisabled()} className={btnCustom}>
+                            <ExternalLink className="w-4 h-4 shrink-0" />
+                            {label('custom', 'Contact for Custom Plan')}
+                        </button>
+                    </div>
+                )}
+
+                {tier === 'BUSINESS' && (
+                    <button onClick={handleContactCustom} disabled={isDisabled()} className={`${btnCustom} w-full`}>
+                        <ExternalLink className="w-4 h-4 shrink-0" />
+                        {label('custom', 'Contact for Custom / Agency Plan')}
+                    </button>
+                )}
+
+                {/* Cancel — for all paid, non-canceled subscriptions */}
+                {isPaid && !isCanceled && (
+                    <button onClick={handleCancel} disabled={isDisabled()} className={`${btnDanger} w-full mt-1`}>
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {label('cancel', 'Cancel Subscription')}
+                    </button>
                 )}
             </div>
 
             {/* Pricing CTA for free users */}
             {tier === 'FREE' && (
-                <div className="p-4 border border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-900/10 flex items-center justify-between gap-3 transition-colors">
-                    <p className="text-md font-display text-slate-600 dark:text-slate-400 transition-colors">See full feature comparison across all plans.</p>
+                <div className="p-4 border border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-900/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
+                    <p className="text-sm font-display text-slate-600 dark:text-slate-400 transition-colors">See full feature comparison across all plans.</p>
                     <button
                         onClick={() => navigate('/app/pricing')}
-                        className="shrink-0 text-[10px] uppercase tracking-widest font-bold font-sans text-blue-600 dark:text-blue-400 hover:underline underline-offset-4 transition-colors"
+                        className="shrink-0 text-[10px] uppercase tracking-widest font-bold font-sans text-blue-600 dark:text-blue-400 hover:underline underline-offset-4 transition-colors self-start sm:self-auto"
                     >
                         View Pricing →
                     </button>

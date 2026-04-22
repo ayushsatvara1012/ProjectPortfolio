@@ -1078,7 +1078,8 @@ const ChatWidget = ({ apiKey }) => {
                             <div
                                 ref={scrollContainerRef}
                                 onScroll={handleScrollContainer}
-                                className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar"
+                                data-lenis-prevent
+                                className="flex-1 p-4 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar"
                             >
                                 <div className="flex flex-col gap-5">
                                     <AnimatePresence initial={false}>

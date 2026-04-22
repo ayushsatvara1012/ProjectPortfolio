@@ -16,6 +16,8 @@ export default function useLenis() {
       mouseMultiplier: 1,
       touchMultiplier: 1.5,
       infinite: false,
+      // Skip any element (or its ancestors) marked with data-lenis-prevent
+      prevent: (node) => node.hasAttribute?.('data-lenis-prevent'),
     });
 
     lenisInstance = lenis;
