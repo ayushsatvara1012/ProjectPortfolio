@@ -35,17 +35,17 @@ const Navbar = () => {
     {
       label: "Build",
       items: [
-        { title: "Custom AI Chatbot", desc: "LLM-powered support & sales agents", price: "From $3,000", icon: <Bot size={15} /> },
-        { title: "RAG Pipeline Architecture", desc: "pgvector · document retrieval · FastAPI", price: "From $2,500", icon: <BrainCircuit size={15} /> },
-        { title: "Full-Stack Web App", desc: "React · FastAPI · PostgreSQL · AWS", price: "From $2,500", icon: <Code2 size={15} /> },
+        { title: "Custom AI Chatbot", desc: "LLM-powered support & sales agents", price: "From $3,000"},
+        { title: "RAG Pipeline Architecture", desc: "pgvector · document retrieval · FastAPI", price: "From $2,500"},
+        { title: "Full-Stack Web App", desc: "React · FastAPI · PostgreSQL · AWS", price: "From $2,500"},
       ],
     },
     {
       label: "Optimize",
       items: [
-        { title: "AI Integration & LLM Consulting", desc: "Embed AI into existing products", price: "Custom", icon: <Zap size={15} /> },
-        { title: "Performance & SEO", desc: "Core Web Vitals · Technical SEO", price: "From $300", icon: <GlobeIcon size={15} /> },
-        { title: "Cloud Infrastructure", desc: "AWS · S3 · EC2 · Route53 · Lambda", price: "From $400", icon: <Cloud size={15} /> },
+        { title: "AI Integration & LLM Consulting", desc: "Embed AI into existing products", price: "Custom"},
+        { title: "Performance & SEO", desc: "Core Web Vitals · Technical SEO", price: "From $300"},
+        { title: "Cloud Infrastructure", desc: "AWS · S3 · EC2 · Route53 · Lambda", price: "From $400"},
       ],
     },
   ];
@@ -54,6 +54,7 @@ const Navbar = () => {
     { name: "Home", href: "#home", id: "home" },
     { name: "Projects", href: "/about#projects", id: "projects" },
     { name: "Services", href: "#services", id: "services", dropdown: true },
+    { name: "Pricing", href: "/pricing", id: "pricing" },
     { name: "Docs", href: "/docs", id: "docs" },
     { name: "Contact", href: "/contact", id: "contact" },
     { name: "About", href: "/about", id: "about" },
@@ -135,13 +136,13 @@ const Navbar = () => {
                                 onClick={(e) => handleLinkClick(e, '#services')}
                                 className="bg-white dark:bg-slate-950 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-3 group/item"
                               >
-                                <div className="w-7 h-7 mt-0.5 shrink-0 border border-gray-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover/item:border-blue-200 dark:group-hover/item:border-blue-800 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors">
+                                {/* <div className="w-7 h-7 mt-0.5 shrink-0 border border-gray-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover/item:border-blue-200 dark:group-hover/item:border-blue-800 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors">
                                   {service.icon}
-                                </div>
+                                </div> */}
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-display font-bold text-slate-900 dark:text-slate-200 leading-tight">{service.title}</p>
-                                  <p className="text-[11px] font-google text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{service.desc}</p>
-                                  <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors mt-1 inline-block">{service.price}</span>
+                                  <p className="text-sm font-google font-bold text-slate-900 dark:text-slate-200 leading-tight">{service.title}</p>
+                                  <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{service.desc}</p>
+                                  <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors mt-1 inline-block">{service.price}</span>
                                 </div>
                               </a>
                             ))}
@@ -258,7 +259,7 @@ const Navbar = () => {
                   {/* Services toggle row */}
                   <button
                     onClick={() => setIsServicesOpen(p => !p)}
-                    className="w-full px-8 py-5 flex items-center justify-between text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                    className="w-full px-8 py-5 flex items-center justify-between text-lg font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
                   >
                     <span>{link.name}</span>
                     <ChevronDown size={16} className={`opacity-40 transition-transform duration-200 ${isServicesOpen ? 'rotate-180' : ''}`} />
@@ -271,7 +272,7 @@ const Navbar = () => {
                         <div key={group.label}>
                           {/* Partition label */}
                           <div className="px-8 py-2 bg-slate-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
-                            <span className="text-[9px] uppercase tracking-widest font-bold font-display text-slate-400 dark:text-slate-500">{group.label}</span>
+                            <span className="text-sm uppercase tracking-widest font-bold font-display text-slate-400 dark:text-slate-500">{group.label}</span>
                           </div>
                           {group.items.map((service, idx) => (
                             <a
@@ -284,10 +285,10 @@ const Navbar = () => {
                                 {service.icon}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-display font-bold text-slate-800 dark:text-slate-200 leading-tight">{service.title}</p>
-                                <p className="text-[11px] font-google text-slate-500 dark:text-slate-400 truncate mt-0.5">{service.desc}</p>
+                                <p className="text-md font-google font-bold text-slate-800 dark:text-slate-200 leading-tight">{service.title}</p>
+                                <p className="text-sm font-google text-slate-500 dark:text-slate-400 truncate mt-0.5">{service.desc}</p>
                               </div>
-                              <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0">{service.price}</span>
+                              <span className="text-sm font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0">{service.price}</span>
                             </a>
                           ))}
                         </div>

@@ -48,6 +48,8 @@ const AppPricing = () => {
         BUSINESS: { USD: 99, INR: 7999 },
     };
 
+    const BASIC_COUPON = 'SAPYAI2026';
+
     const formatPrice = (val) =>
         new Intl.NumberFormat(CURRENCIES[currency].locale, {
             style: 'currency',
@@ -208,11 +210,13 @@ const AppPricing = () => {
                             <h1 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Plans &amp; Pricing</h1>
                         </div>
                         <p className="text-sm font-display text-slate-600 dark:text-slate-400 leading-relaxed transition-colors max-w-sm">Choose the plan that fits your stage. Fast &amp; simple setup.</p>
-                        <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 flex items-center gap-2 w-fit">
-                            <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[16px]">verified</span>
-                            <p className="text-[10px] font-google font-bold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
-                                Beta: Basic plan free until next version · Email for Starter promo code
-                            </p>
+                        <div className="mt-3 flex flex-col gap-2">
+                            <div className="px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-emerald-500 flex items-center gap-2 w-fit">
+                                <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[16px]">local_offer</span>
+                                <p className="text-[10px] font-google font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-widest">
+                                    Basic plan is $9/mo — use coupon <span className="bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 rounded font-mono tracking-normal">SAPYAI2026</span> at checkout for 100% off
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -271,9 +275,23 @@ const AppPricing = () => {
                                 <div className="flex flex-col gap-0.5 mb-4">
                                     <div className="flex items-baseline gap-1">
                                         {plan.id === 'BASIC' ? (
-                                            <span className="text-2xl sm:text-3xl font-display font-black tracking-tight text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-0.5 border-l-4 border-blue-500">
-                                                FREE
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-sm font-display font-bold tracking-tight text-slate-400 dark:text-slate-500 line-through">
+                                                        {formatPrice(plan.price)}/mo
+                                                    </span>
+                                                    <span className="text-2xl sm:text-3xl font-display font-black tracking-tight text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-0.5 border-l-4 border-emerald-500">
+                                                        FREE
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-[11px] text-emerald-600 dark:text-emerald-400">local_offer</span>
+                                                    <span className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 tracking-normal">
+                                                        {BASIC_COUPON}
+                                                    </span>
+                                                    <span className="text-[9px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans">100% off</span>
+                                                </div>
+                                            </div>
                                         ) : (
                                             <>
                                                 <span className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
@@ -284,7 +302,7 @@ const AppPricing = () => {
                                         )}
                                     </div>
                                     <span className="text-[9px] uppercase tracking-widest font-bold text-blue-600 dark:text-blue-400 font-sans">
-                                        {plan.id === 'BASIC' ? 'No credit card required' : 'Local taxes handled at checkout'}
+                                        {plan.id === 'BASIC' ? 'Apply coupon at checkout' : 'Local taxes handled at checkout'}
                                     </span>
                                 </div>
 

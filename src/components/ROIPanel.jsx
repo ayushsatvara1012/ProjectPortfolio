@@ -200,7 +200,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }) => {
                     className="w-full sm:w-auto px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white text-xs font-bold font-google uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                 >
                     {saveMutation.isPending ? (
-                        <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Saving...</>
+                        <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Saving...</>
                     ) : saved ? (
                         <><span className="material-symbols-outlined text-[14px]">check</span> Saved</>
                     ) : (

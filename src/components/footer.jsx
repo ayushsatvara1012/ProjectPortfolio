@@ -183,7 +183,7 @@ const ModernFooter = () => {
             <div className="space-y-8 relative z-10">
               <div className="flex items-center gap-3">
                 <span className="text-xl min-[1011px]:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 uppercase">
-                  SaPy<span className="text-indigo-600">Base</span>
+                  SaPy<span className="text-blue-600">Base</span>
                 </span>
                 <div className="h-px w-8 bg-gray-100 dark:bg-slate-800" />
                 <span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">Protocol_V4.2</span>
@@ -191,14 +191,14 @@ const ModernFooter = () => {
               
               <h2 className="text-4xl min-[1011px]:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase">
                 Ready to architect your <br />
-                <span className="text-slate-600 dark:text-slate-400 transition-colors duration-500 group-hover/brand:text-indigo-600">next Digital Frontier?</span>
+                <span className="text-slate-600 dark:text-slate-400 transition-colors duration-500 group-hover/brand:text-transparent bg-clip-text bg-linear-to-r from-orange-600 via-green-600 to-blue-600">next Digital Frontier?</span>
               </h2>
             </div>
 
             <div className="flex flex-wrap gap-4 relative z-10">
               <button
                 onClick={() => navigate('/services')}
-                className="bg-slate-900 dark:bg-indigo-600 text-white px-8 py-4 rounded-none text-sm uppercase tracking-widest font-bold font-sans hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-all active:scale-95 flex items-center gap-3 group/btn"
+                className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-4 rounded-none text-sm uppercase tracking-widest font-bold font-sans hover:bg-blue-600 dark:hover:bg-blue-500 transition-all active:scale-95 flex items-center gap-3 group/btn"
               >
                 Start_Project <Zap size={14} className="opacity-40 group-hover/btn:opacity-100" />
               </button>
@@ -211,7 +211,7 @@ const ModernFooter = () => {
             {/* PLATFORM MODULE */}
             <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
               <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
-                <div className="h-1.5 w-1.5 rounded-none bg-indigo-600" />
+                <div className="h-1.5 w-1.5 rounded-none bg-blue-600" />
                 <span>Platform</span>
               </div>
               <ul className="space-y-4">

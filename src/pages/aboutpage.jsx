@@ -109,30 +109,54 @@ const AboutPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-colors duration-500">
 
             {/* ── CELL A · HERO ─────────────────────────────────────────── */}
-            <Cell className="lg:col-span-2 min-h-[420px] justify-between group hover:bg-slate-50/60 dark:hover:bg-slate-900/60">
-              <div>
-                <Label icon="person">Founder · Lead Engineer</Label>
-                <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-100 mb-6">
-                  Built by One.<br />
-                  <span className="text-blue-600">Scaled for</span><br />
-                  the World.
-                </h1>
-                <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-md">
-                  I'm <strong className="text-slate-900 dark:text-slate-200 font-bold">Ayush Satvara</strong> — the solo architect, engineer, and founder
-                  behind SaPyBase. Every line of infrastructure, from the RAG pipeline to the
-                  React UI, was designed and shipped by one person.
-                </p>
+            <div
+              className="lg:col-span-2 min-h-[420px] sm:min-h-[500px] lg:min-h-[480px] relative overflow-hidden flex flex-col justify-between group"
+              style={{
+                backgroundImage: 'url(/about-vec.webp)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            >
+              {/* Scrim — heavier at bottom so text stays readable on every screen */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white/85 via-white/75 to-white/95 dark:from-slate-950/85 dark:via-slate-950/75 dark:to-slate-950/95 transition-colors duration-500" />
+
+              {/* Globe — decorative, pinned to bottom-right, scales with screen */}
+              <div className="absolute -top-65 -right-60 w-[32rem] h-[32rem] sm:w-[40rem] sm:h-[40rem] md:w-[48rem] md:h-[48rem] lg:w-[56rem] lg:h-[56rem] opacity-20 dark:opacity-10 pointer-events-none select-none translate-x-20 translate-y-20 sm:translate-x-28 sm:translate-y-28">
+                <img
+                  src="/globe.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="w-full h-full object-contain"
+                />
               </div>
-              <div className="mt-10 flex flex-col sm:flex-row gap-3">
-                <a
-                  href="/contact"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 text-sm font-display font-bold uppercase tracking-wider transition-colors duration-200 hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white"
-                >
-                  Start a Project
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                </a>
+
+              {/* Content sits above the scrim and globe */}
+              <div className="relative z-10 flex flex-col justify-between flex-1 p-8 lg:p-12">
+                <div>
+                  <Label icon="person">Founder · Lead Engineer</Label>
+                  <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-100 mb-6">
+                    Built by One.<br />
+                    <span className="text-blue-600">Scaled for</span><br />
+                    the World.
+                  </h1>
+                  <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-md">
+                    I'm <strong className="text-slate-900 dark:text-slate-200 font-bold">Ayush Satvara</strong> — the solo architect, engineer, and founder
+                    behind SaPyBase. Every line of infrastructure, from the RAG pipeline to the
+                    React UI, was designed and shipped by one person.
+                  </p>
+                </div>
+                <div className="mt-10 flex flex-col sm:flex-row gap-3">
+                  <a
+                    href="/contact"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 text-sm font-display font-bold uppercase tracking-wider transition-colors duration-200 hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white"
+                  >
+                    Start a Project
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </a>
+                </div>
               </div>
-            </Cell>
+            </div>
 
             {/* ── CELL B · PROFILE IMAGE ─────────────────────────────────── */}
             <Cell className="items-center justify-center min-h-[360px] lg:min-h-0 p-0 overflow-hidden relative bg-slate-50 dark:bg-slate-900">

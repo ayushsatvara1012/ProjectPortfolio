@@ -8,6 +8,7 @@ const Contactpage = lazy(() => import("./pages/contactpage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const BotIntegrationDocs = lazy(() => import("./components/BotIntegrationDocs"));
 
@@ -57,8 +58,7 @@ const router = createBrowserRouter([
       { path: "/docs", element: <Suspense fallback={<PageLoader />}><BotIntegrationDocs standalone={true} /></Suspense> },
       { path: "/sso-callback", element: <AuthenticateWithRedirectCallback /> },
 
-      // Legacy routes — redirect to AppLayout equivalents
-      { path: "/pricing", element: <Navigate to="/app/pricing" replace /> },
+      { path: "/pricing", element: <Suspense fallback={<PageLoader />}><PricingPage /></Suspense> },
       {
         path: "/admin",
         element: <Navigate to="/app/settings/admin" replace />,
