@@ -2620,7 +2620,7 @@ def generate_insight_report(
 
         # ── FETCH RECENT CONVERSATIONS (ALWAYS FRESH) ────────────────────────
         cursor.execute(
-            """SELECT user_query, is_unanswered, created_at FROM chat_logs 
+            """SELECT user_query, is_unanswered, created_at FROM chat_logs
                WHERE company_id = %s ORDER BY created_at DESC LIMIT 15""",
             (company_id,)
         )
@@ -2632,6 +2632,68 @@ def generate_insight_report(
                 "timestamp": r[2].isoformat() if r[2] else None
             } for r in recent_rows
         ]
+
+        # ── FETCH PEAK ACTIVITY BLOCKS (ALWAYS FRESH) ────────────────────────
+        cursor.execute("""
+            WITH DailyStats AS (
+                SELECT
+                    DATE(created_at) AS log_date,
+                    COUNT(DISTINCT session_id) as interacted_users,
+                    COUNT(id) as total_questions,
+                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
+                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at)
+            ),
+            DailyTopQueries AS (
+                SELECT
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at), user_query
+            ),
+            DailyTopUnanswered AS (
+                SELECT
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
+                GROUP BY DATE(created_at), user_query
+            )
+            SELECT
+                s.log_date,
+                s.interacted_users,
+                s.total_questions,
+                s.answered_questions,
+                s.unanswered_questions,
+                q1.user_query as top_q1,
+                q2.user_query as top_q2,
+                u1.user_query as top_unanswered1,
+                u2.user_query as top_unanswered2
+            FROM DailyStats s
+            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
+            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
+            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
+            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
+            ORDER BY s.log_date DESC;
+        """, (company_id, company_id, company_id))
+        fresh_peak_blocks = []
+        for r in cursor.fetchall():
+            fresh_peak_blocks.append({
+                "date": r[0].isoformat() if r[0] else None,
+                "interacted_users": int(r[1]) if r[1] else 0,
+                "total_questions": int(r[2]) if r[2] else 0,
+                "answered_questions": int(r[3]) if r[3] else 0,
+                "unanswered_questions": int(r[4]) if r[4] else 0,
+                "top_questions": [q for q in [r[5], r[6]] if q],
+                "top_unanswered": [q for q in [r[7], r[8]] if q]
+            })
 
         # ── STEP A: 24-HOUR COOLDOWN CHECK ───────────────────────────────────
         cursor.execute(
@@ -2647,6 +2709,7 @@ def generate_insight_report(
             if isinstance(report_data, str):
                 report_data = json.loads(report_data)
             report_data["recent_conversations"] = recent_activity
+            report_data["peak_activity_blocks"] = fresh_peak_blocks
 
             return {
                 "status": "cached",
@@ -2687,71 +2750,6 @@ def generate_insight_report(
 
         support_savings = total_answered * avg_cost
         potential_revenue = total_leads * avg_lead
-
-        # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
-        # ── 30-DAY PEAK ACTIVITY BLOCKS (CTE) ────────────────────────────────
-        cursor.execute("""
-            WITH DailyStats AS (
-                SELECT 
-                    DATE(created_at) AS log_date,
-                    COUNT(DISTINCT session_id) as interacted_users,
-                    COUNT(id) as total_questions,
-                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
-                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(created_at)
-            ),
-            DailyTopQueries AS (
-                SELECT 
-                    DATE(created_at) AS log_date,
-                    user_query,
-                    COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(created_at), user_query
-            ),
-            DailyTopUnanswered AS (
-                SELECT 
-                    DATE(created_at) AS log_date,
-                    user_query,
-                    COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
-                GROUP BY DATE(created_at), user_query
-            )
-            SELECT 
-                s.log_date,
-                s.interacted_users,
-                s.total_questions,
-                s.answered_questions,
-                s.unanswered_questions,
-                q1.user_query as top_q1,
-                q2.user_query as top_q2,
-                u1.user_query as top_unanswered1,
-                u2.user_query as top_unanswered2
-            FROM DailyStats s
-            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
-            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
-            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
-            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
-            ORDER BY s.log_date DESC;
-        """, (company_id, company_id, company_id))
-        
-        blocks_rows = cursor.fetchall()
-        peak_activity_blocks = []
-        for r in blocks_rows:
-            peak_activity_blocks.append({
-                "date": r[0].isoformat() if r[0] else None,
-                "interacted_users": int(r[1]) if r[1] else 0,
-                "total_questions": int(r[2]) if r[2] else 0,
-                "answered_questions": int(r[3]) if r[3] else 0,
-                "unanswered_questions": int(r[4]) if r[4] else 0,
-                "top_questions": [q for q in [r[5], r[6]] if q],
-                "top_unanswered": [q for q in [r[7], r[8]] if q]
-            })
 
         # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
         cursor.execute(
@@ -2826,16 +2824,15 @@ Rules:
             "support_savings": f"${support_savings:.2f}", 
             "potential_revenue": f"${potential_revenue:.2f}"
         }
-        report_json["peak_activity_blocks"] = peak_activity_blocks
-
-        # ── SAVE REPORT TO DB ────────────────────────────────────────────────
+        # Save the AI report WITHOUT peak_activity_blocks (those are always re-fetched fresh)
         cursor.execute(
             "INSERT INTO insight_reports (company_id, report_json) VALUES (%s, %s)",
             (company_id, json.dumps(report_json))
         )
         conn.commit()
 
-        # Inject fresh recent conversations into the final object before returning
+        # Inject always-fresh data after saving (not persisted in cache)
+        report_json["peak_activity_blocks"] = fresh_peak_blocks
         report_json["recent_conversations"] = recent_activity
 
         print(f"[INSIGHT REPORT] Generated new report for company={company_id} from {len(logs)} logs")
