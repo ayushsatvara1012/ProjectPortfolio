@@ -57,11 +57,12 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
-  }
-  
-  body {
+    scroll-behavior: auto;
     overflow-x: hidden;
+  }
+
+  body {
+    overflow-x: clip;
     max-width: 100vw;
     position: relative;
   }

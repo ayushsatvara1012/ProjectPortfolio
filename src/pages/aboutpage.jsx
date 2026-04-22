@@ -2,6 +2,7 @@ import { useState } from 'react';
 import SEO from '../components/Seo';
 import seoConfig from '../seo/seoConfig';
 import Projects from '../components/projectSection';
+import ScrollReveal from '../components/ScrollReveal';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DATA — all resume/about content lives here, deconstructed into grid cells
@@ -43,10 +44,12 @@ const PROJECTS = [
 ];
 
 const CERTIFICATIONS = [
-  { name: 'AWS Certified Solutions Architect',    issuer: 'Amazon Web Services' },
-  { name: 'Generative AI Specialisation',         issuer: 'DeepLearning.AI'     },
-  { name: 'Machine Learning Specialisation',      issuer: 'Coursera / Stanford'  },
-  { name: 'Data Science Professional Certificate',issuer: 'IBM'                  },
+  { name: 'AWS Certified Solutions Architect', issuer: 'Amazon Web Services' },
+  { name: 'Generative AI: Prompt Engineering', issuer: 'IBM' },
+  { name: 'Machine Learning with Python', issuer: 'IBM' },
+  { name: 'Intermediate Machine Learning', issuer: 'Kaggle' },
+  { name: 'Python Programming', issuer: 'Kaggle' },
+  { name: 'Android Studio Masterclass', issuer: 'Udemy' },
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +85,7 @@ const AboutPage = () => {
   return (
     <>
       <SEO {...seoConfig.about} />
-      <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-hidden transition-colors duration-500">
+      <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-clip transition-colors duration-500">
 
         {/* ══════════════════════════════════════════════════════════════════
             HEADER STRIP — mirrors the contact page label convention
@@ -119,10 +122,10 @@ const AboutPage = () => {
               }}
             >
               {/* Scrim — heavier at bottom so text stays readable on every screen */}
-              <div className="absolute inset-0 bg-gradient-to-b from-white/85 via-white/75 to-white/95 dark:from-slate-950/85 dark:via-slate-950/75 dark:to-slate-950/95 transition-colors duration-500" />
+              <div className="absolute inset-0 bg-linear-to-b from-white/85 via-white/75 to-white/95 dark:from-slate-950/85 dark:via-slate-950/75 dark:to-slate-950/95 transition-colors duration-500" />
 
               {/* Globe — decorative, pinned to bottom-right, scales with screen */}
-              <div className="absolute -top-65 -right-60 w-[32rem] h-[32rem] sm:w-[40rem] sm:h-[40rem] md:w-[48rem] md:h-[48rem] lg:w-[56rem] lg:h-[56rem] opacity-20 dark:opacity-10 pointer-events-none select-none translate-x-20 translate-y-20 sm:translate-x-28 sm:translate-y-28">
+              <div className="absolute -top-65 -right-60 w-lg h-lg sm:w-160 sm:h-160 md:w-3xl md:h-3xl lg:w-4xl lg:h-4xl opacity-20 dark:opacity-10 pointer-events-none select-none translate-x-20 translate-y-20 sm:translate-x-28 sm:translate-y-28">
                 <img
                   src="/globe.svg"
                   alt=""
@@ -136,7 +139,7 @@ const AboutPage = () => {
                 <div>
                   <Label icon="person">Founder · Lead Engineer</Label>
                   <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-100 mb-6">
-                    Built by One.<br />
+                    Built by One<br />
                     <span className="text-blue-600">Scaled for</span><br />
                     the World.
                   </h1>
@@ -163,7 +166,7 @@ const AboutPage = () => {
               <img
                 src="/IMG_9145.webp"
                 alt="Ayush Satvara"
-                className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700 min-h-[300px] lg:min-h-full"
+                className="w-full h-full object-cover transition-all duration-700 min-h-[300px] lg:min-h-full"
                 style={{ objectPosition: 'center top' }}
               />
               {/* Overlay badge */}
@@ -181,7 +184,7 @@ const AboutPage = () => {
         {/* ══════════════════════════════════════════════════════════════════
             ROW 2 — METRICS STRIP (4 stats, mirroring metrics.jsx rhythm)
         ══════════════════════════════════════════════════════════════════ */}
-        <div className="max-w-8xl mx-auto px-6 md:px-12">
+        <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800 border-x border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
             {[
               { eyebrow: 'Bot Response Time',   value: '<2s',        icon: 'bolt',          accent: 'text-blue-500'   },
@@ -200,12 +203,12 @@ const AboutPage = () => {
               </div>
             ))}
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* ══════════════════════════════════════════════════════════════════
             ROW 3 — TECH STACK · PROJECTS
         ══════════════════════════════════════════════════════════════════ */}
-        <div className="max-w-8xl mx-auto px-6 md:px-12">
+        <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 border-x border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
 
             {/* ── CELL · TECH STACK ──────────────────────────────────────── */}
@@ -288,12 +291,12 @@ const AboutPage = () => {
             </Cell>
 
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* ══════════════════════════════════════════════════════════════════
             ROW 4 — EDUCATION · CERTIFICATIONS · PHILOSOPHY
         ══════════════════════════════════════════════════════════════════ */}
-        <div className="max-w-8xl mx-auto px-6 md:px-12">
+        <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 border-x border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
 
             {/* ── CELL · EDUCATION ──────────────────────────────────────── */}
@@ -322,6 +325,9 @@ const AboutPage = () => {
                   <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-1">
                     KSV University
                   </p>
+                  <div className="inline-flex items-center gap-1.5 mt-3 px-2 py-0.5 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                    <span className="text-xs font-display font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">CGPA 7.52 / 10</span>
+                  </div>
                 </div>
               </div>
             </Cell>
@@ -385,17 +391,17 @@ const AboutPage = () => {
             </Cell>
 
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* ══════════════════════════════════════════════════════════════════
             ROW 5 — PROJECT PORTFOLIO
         ══════════════════════════════════════════════════════════════════ */}
-        <Projects />
+        <ScrollReveal><Projects /></ScrollReveal>
 
         {/* ══════════════════════════════════════════════════════════════════
             ROW 6 — CTA STRIP (full-width, dark, matches site footer energy)
         ══════════════════════════════════════════════════════════════════ */}
-        <div className="max-w-8xl mx-auto px-6 md:px-12">
+        <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
           <div className="border-x border-b border-slate-200 dark:border-slate-800 bg-slate-950 dark:bg-slate-950 p-12 md:p-20 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 transition-colors duration-500">
             <div>
               <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-500 mb-4">
@@ -423,7 +429,7 @@ const AboutPage = () => {
               </a>
             </div>
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* Bottom spacer — matches the page rhythm */}
         <div className="h-px bg-slate-200 dark:bg-slate-800 max-w-8xl mx-auto px-6 md:px-12" />

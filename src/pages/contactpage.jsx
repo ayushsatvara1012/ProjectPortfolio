@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Alert from '../components/alert';
 import SEO from '../components/Seo';
 import seoConfig from '../seo/seoConfig';
+import ScrollReveal from '../components/ScrollReveal';
 
 function ContactPage() {
   const [activeFaq, setActiveFaq] = useState(null);
@@ -44,6 +45,7 @@ function ContactPage() {
             </h1>
           </div>
 
+          <ScrollReveal>
           <div className="flex flex-col-reverse lg:grid lg:grid-cols-2 gap-8 lg:gap-16 items-start">
             {/* LEFT: FAQ & Contact Nodes */}
             <div className="w-full space-y-6">
@@ -103,6 +105,7 @@ function ContactPage() {
               </div>
             </div>
           </div>
+          </ScrollReveal>
 
         </div>
 

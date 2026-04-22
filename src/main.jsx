@@ -8,6 +8,7 @@ import router from "./router";
 import { useAuth } from "@clerk/clerk-react";
 import "./index.css";
 import { UserProvider } from "./context/UserContext";
+import useLenis from "./hooks/useLenis";
 
 // ── TanStack Query client (module-scope singleton) ──────────────────────────────
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ if (!PUBLISHABLE_KEY) {
 
 const Root = () => {
   const { isLoaded: isAuthLoaded } = useAuth();
+  useLenis();
 
   useEffect(() => {
     if (isAuthLoaded) {

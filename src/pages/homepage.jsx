@@ -4,6 +4,7 @@ import Metrics from "../components/metrics";
 import HowItWorks from "../components/HowItWorks";
 import SEO from "../components/Seo";
 import { seoConfig } from "../seo/seoConfig";
+import ScrollReveal from "../components/ScrollReveal";
 
 function homepage() {
   const schema = {
@@ -39,9 +40,9 @@ function homepage() {
     <>
       <SEO {...seoConfig.home} schema={schema} />
       <HeroSection/>
-      <HowItWorks />
-      <Metrics />
-      <Services />
+      <ScrollReveal><HowItWorks /></ScrollReveal>
+      <ScrollReveal delay={0.05}><Metrics /></ScrollReveal>
+      <ScrollReveal delay={0.05}><Services /></ScrollReveal>
     </>
   );
 }
