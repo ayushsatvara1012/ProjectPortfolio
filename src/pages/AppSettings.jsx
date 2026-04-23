@@ -20,24 +20,24 @@ const sectionGap = 'space-y-px';
 
 // ── Tier metadata ──────────────────────────────────────────────────────────────
 const TIER_META = {
-    FREE:    { label: 'Free',         color: 'text-slate-500',   badge: 'bg-slate-100 dark:bg-slate-800 text-slate-500',    icon: Shield },
-    BASIC:   { label: 'Basic',        color: 'text-blue-600',    badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600',     icon: Zap },
+    FREE: { label: 'Free', color: 'text-slate-500', badge: 'bg-slate-100 dark:bg-slate-800 text-slate-500', icon: Shield },
+    BASIC: { label: 'Basic', color: 'text-blue-600', badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600', icon: Zap },
     STARTER: { label: 'Professional', color: 'text-emerald-600', badge: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600', icon: Rocket },
-    PRO:     { label: 'Enterprise',   color: 'text-cyan-600',    badge: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600',    icon: Shield },
+    PRO: { label: 'Enterprise', color: 'text-cyan-600', badge: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600', icon: Shield },
 };
 
 const POLAR_URLS = {
-    BASIC:    import.meta.env.VITE_POLAR_BASIC_URL,
-    STARTER:  import.meta.env.VITE_POLAR_STARTER_URL,
-    PRO:      import.meta.env.VITE_POLAR_PRO_URL,
+    BASIC: import.meta.env.VITE_POLAR_BASIC_URL,
+    STARTER: import.meta.env.VITE_POLAR_STARTER_URL,
+    PRO: import.meta.env.VITE_POLAR_PRO_URL,
     BUSINESS: import.meta.env.VITE_POLAR_BUSINESS_URL,
 };
 
 // ── Account Tabs ───────────────────────────────────────────────────────────────
 const ACCOUNT_TABS = [
-    { id: 'profile',  label: 'Profile',  icon: 'person' },
-    { id: 'billing',  label: 'Billing',  icon: 'credit_card' },
-    { id: 'apikeys',  label: 'API Keys', icon: 'vpn_key' },
+    { id: 'profile', label: 'Profile', icon: 'person' },
+    { id: 'billing', label: 'Billing', icon: 'credit_card' },
+    { id: 'apikeys', label: 'API Keys', icon: 'vpn_key' },
 ];
 
 // ── Profile Tab ────────────────────────────────────────────────────────────────
@@ -48,8 +48,8 @@ const ProfileTab = () => {
     const roleDisplay = userRole === 'SUPER_ADMIN'
         ? { label: 'Platform Owner', cls: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/40' }
         : userRole === 'ADMIN'
-        ? { label: 'Admin', cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40' }
-        : { label: 'Member', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' };
+            ? { label: 'Admin', cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40' }
+            : { label: 'Member', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700' };
 
     return (
         <div className="space-y-6">
@@ -108,11 +108,10 @@ const ProfileTab = () => {
                 </div>
                 <div className="bg-white dark:bg-slate-950 p-5 transition-colors">
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Role</p>
-                    <p className={`text-md font-display font-semibold transition-colors ${
-                        userRole === 'SUPER_ADMIN' ? 'text-rose-600 dark:text-rose-400' :
-                        userRole === 'ADMIN' ? 'text-amber-600 dark:text-amber-400' :
-                        'text-slate-800 dark:text-slate-200'
-                    }`}>
+                    <p className={`text-md font-display font-semibold transition-colors ${userRole === 'SUPER_ADMIN' ? 'text-rose-600 dark:text-rose-400' :
+                            userRole === 'ADMIN' ? 'text-amber-600 dark:text-amber-400' :
+                                'text-slate-800 dark:text-slate-200'
+                        }`}>
                         {roleDisplay.label}
                     </p>
                 </div>
@@ -221,7 +220,7 @@ const BillingTab = () => {
         <div className="space-y-4 animate-pulse">
             <SkeletonBase className="h-20 w-full" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-px">
-                {[1,2,3].map(i => <SkeletonBase key={i} className="h-20" />)}
+                {[1, 2, 3].map(i => <SkeletonBase key={i} className="h-20" />)}
             </div>
             <SkeletonBase className="h-12 w-full" />
         </div>
@@ -243,11 +242,10 @@ const BillingTab = () => {
                         <TierIcon className="w-3 h-3" />
                         {meta.label}
                     </span>
-                    <span className={`text-[10px] uppercase tracking-widest font-bold font-sans ${
-                        subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
-                        subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
-                        'text-amber-500 dark:text-amber-400'
-                    }`}>
+                    <span className={`text-[10px] uppercase tracking-widest font-bold font-sans ${subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
+                            subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
+                                'text-amber-500 dark:text-amber-400'
+                        }`}>
                         {subscriptionStatus || 'Active'}
                     </span>
                 </div>
@@ -255,38 +253,34 @@ const BillingTab = () => {
 
             {/* Subscription end date — prominent banner for paid plans */}
             {isPaid && formattedPeriodEnd && (
-                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-l-4 transition-colors ${
-                    isCanceled
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-l-4 transition-colors ${isCanceled
                         ? 'bg-red-50 dark:bg-red-900/10 border-red-500 dark:border-red-400'
                         : daysRemaining !== null && daysRemaining <= 7
                             ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-500 dark:border-amber-400'
                             : 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-500 dark:border-emerald-400'
-                }`}>
+                    }`}>
                     <div className="flex items-start sm:items-center gap-3">
-                        <span className={`material-symbols-outlined text-[20px] shrink-0 ${
-                            isCanceled ? 'text-red-500' : daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-500' : 'text-emerald-500'
-                        }`}>
+                        <span className={`material-symbols-outlined text-[20px] shrink-0 ${isCanceled ? 'text-red-500' : daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-500' : 'text-emerald-500'
+                            }`}>
                             {isCanceled ? 'event_busy' : 'event_available'}
                         </span>
                         <div>
                             <p className="text-[10px] uppercase tracking-widest font-bold font-sans text-slate-400 dark:text-slate-500 mb-0.5">
                                 {isCanceled ? 'Access Ends' : 'Subscription Renews'}
                             </p>
-                            <p className={`text-lg font-display font-bold ${
-                                isCanceled ? 'text-red-600 dark:text-red-400' :
-                                daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-600 dark:text-amber-400' :
-                                'text-emerald-600 dark:text-emerald-400'
-                            }`}>
+                            <p className={`text-lg font-display font-bold ${isCanceled ? 'text-red-600 dark:text-red-400' :
+                                    daysRemaining !== null && daysRemaining <= 7 ? 'text-amber-600 dark:text-amber-400' :
+                                        'text-emerald-600 dark:text-emerald-400'
+                                }`}>
                                 {formattedPeriodEnd}
                             </p>
                         </div>
                     </div>
                     {daysRemaining !== null && (
-                        <span className={`self-start sm:self-auto shrink-0 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold font-sans border ${
-                            isCanceled ? 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400' :
-                            daysRemaining <= 7 ? 'bg-amber-100 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400' :
-                            'bg-emerald-100 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
-                        }`}>
+                        <span className={`self-start sm:self-auto shrink-0 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold font-sans border ${isCanceled ? 'bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400' :
+                                daysRemaining <= 7 ? 'bg-amber-100 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400' :
+                                    'bg-emerald-100 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                            }`}>
                             {daysRemaining === 0 ? 'Today' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`}
                         </span>
                     )}
@@ -301,11 +295,10 @@ const BillingTab = () => {
                 </div>
                 <div className="bg-white dark:bg-slate-950 p-4 sm:p-5 text-center transition-colors">
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">Status</p>
-                    <p className={`text-base sm:text-lg font-display font-bold ${
-                        subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
-                        subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
-                        'text-amber-500 dark:text-amber-400'
-                    }`}>
+                    <p className={`text-base sm:text-lg font-display font-bold ${subscriptionStatus === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' :
+                            subscriptionStatus === 'CANCELED' ? 'text-red-500 dark:text-red-400' :
+                                'text-amber-500 dark:text-amber-400'
+                        }`}>
                         {subscriptionStatus || 'Active'}
                     </p>
                 </div>
@@ -313,11 +306,10 @@ const BillingTab = () => {
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1.5">
                         {!isPaid ? 'Billing' : isCanceled ? 'Expires' : 'Renews'}
                     </p>
-                    <p className={`text-base sm:text-lg font-display font-bold ${
-                        !isPaid ? 'text-slate-400 dark:text-slate-500' :
-                        isCanceled ? 'text-red-500 dark:text-red-400' :
-                        'text-slate-900 dark:text-slate-100'
-                    }`}>
+                    <p className={`text-base sm:text-lg font-display font-bold ${!isPaid ? 'text-slate-400 dark:text-slate-500' :
+                            isCanceled ? 'text-red-500 dark:text-red-400' :
+                                'text-slate-900 dark:text-slate-100'
+                        }`}>
                         {!isPaid ? 'N/A' : formattedPeriodEnd ?? '—'}
                     </p>
                 </div>
@@ -604,11 +596,10 @@ export const AccountSection = ({ initialTab }) => {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-4 py-3.5 text-[11px] uppercase tracking-widest font-bold font-sans border-b-2 transition-all whitespace-nowrap ${
-                            activeTab === tab.id
+                        className={`flex items-center gap-2 px-4 py-3.5 text-[11px] uppercase tracking-widest font-bold font-sans border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id
                                 ? 'border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100'
                                 : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                        }`}
+                            }`}
                     >
                         <span className={`material-symbols-outlined text-[16px] ${activeTab === tab.id ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
                             {tab.icon}
@@ -760,7 +751,7 @@ export const CustomizeSection = () => {
                         <div className="mb-8 p-6 bg-[#FAFAFA] dark:bg-slate-900 border border-gray-100 dark:border-slate-800 transition-colors shadow-sm">
                             <div className="flex items-center justify-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-[14px] text-slate-500 dark:text-slate-500">smart_toy</span>
-                                <p className={headingCls + ' mb-0'}>Select your Bot</p>
+                                <p className={headingCls + ' flex items-center'}>Select your Bot</p>
                             </div>
                             <div className="relative">
                                 <select
