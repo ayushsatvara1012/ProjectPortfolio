@@ -252,7 +252,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
 
     return (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
-            <h4 className="text-md font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+            <h4 className="text-sm font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
                 Leave your details<br />and we'll follow up!
             </h4>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -279,7 +279,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full mt-1 rounded-xl py-2 text-md font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
                     style={{ backgroundColor: themeColor }}
                 >
                     {isSubmitting ? (
@@ -291,7 +291,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                 <button
                     onClick={onDismiss}
                     type="button"
-                    className="text-md font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                    className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
                 >
                     No thanks
                 </button>
@@ -322,7 +322,7 @@ const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
 
     return (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
-            <h4 className="text-md font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+            <h4 className="text-sm font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
                 Share your details<br />so our team can reach you
             </h4>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -349,7 +349,7 @@ const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full mt-1 rounded-xl py-2 text-md font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
                     style={{ backgroundColor: themeColor }}
                 >
                     {isSubmitting ? (
@@ -361,7 +361,7 @@ const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
                 <button
                     onClick={onDismiss}
                     type="button"
-                    className="text-md font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                    className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
                 >
                     No thanks
                 </button>
@@ -1024,7 +1024,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <button
                                                     onClick={handleHandoff}
                                                     disabled={handoffSent}
-                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium font-google text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50"
                                                 >
                                                     {handoffSent ? 'Team notified ✓' : 'Talk to a human'}
                                                     <span className="material-symbols-outlined text-[18px]">support_agent</span>
@@ -1040,7 +1040,7 @@ const ChatWidget = ({ apiKey }) => {
                                                         setHandoffSent(false);
                                                         setShowMenu(false);
                                                     }}
-                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between"
                                                 >
                                                     Clear chat
                                                     <span className="material-symbols-outlined">refresh</span>
@@ -1050,7 +1050,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
                                                     onClick={() => setShowMenu(false)}
                                                     style={{ color: THEME_COLOR }}
                                                 >
@@ -1147,9 +1147,9 @@ const ChatWidget = ({ apiKey }) => {
                                                     ) : (
                                                         <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                             {msg.role === 'bot' ? (
-                                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
+                                                                <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
                                                             ) : (
-                                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
+                                                                <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
                                                             )}
                                                             <div
                                                                 className={`px-4 py-2 min-h-[38px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere ${msg.role === 'user'
@@ -1159,9 +1159,9 @@ const ChatWidget = ({ apiKey }) => {
                                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}
                                                             >
                                                                 {msg.role === 'user' ? (
-                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-md font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
+                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-sm font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                                                 ) : (
-                                                                    <div className="min-w-0 max-w-full text-md font-google leading-relaxed">
+                                                                    <div className="min-w-0 max-w-full text-sm font-google leading-relaxed">
                                                                         <TypewriterContent
                                                                             content={msg.content}
                                                                             isStreaming={msg.isStreaming}
@@ -1191,7 +1191,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <button
                                                     key={qidx}
                                                     onClick={() => sendMessage(label)}
-                                                    className="px-4 py-2.5 border rounded-md text-md font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
+                                                    className="px-4 py-2.5 border rounded-md text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
                                                     style={{ touchAction: 'manipulation' }}
                                                 >
                                                     {label}
@@ -1217,7 +1217,7 @@ const ChatWidget = ({ apiKey }) => {
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
                                     >
-                                        <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
+                                        <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity " />
                                         Powered by SaPyBase
                                     </a>
                                 </div>
@@ -1682,7 +1682,7 @@ const TypewriterContent = ({
     //    The incoming layer is in normal flow to hold container height stable.
     if (isFinalizing) {
         return (
-            <div className="relative leading-relaxed text-md">
+            <div className="relative leading-relaxed text-sm">
                 {/* Incoming layer: in flow, anchors height, fades IN */}
                 <div style={{ opacity: 0, animation: `sapy-fade-in ${CROSSFADE_MS}ms ease-out forwards` }}>
                     {markdownNode}
@@ -1728,7 +1728,7 @@ const TypewriterContent = ({
                 </div>
 
                 {hasContent && (
-                    <div className="leading-relaxed text-md">
+                    <div className="leading-relaxed text-sm">
                         <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
                             {sanitizeStreamMarkdown(displayedText)}
                         </ReactMarkdown>
@@ -1744,7 +1744,7 @@ const TypewriterContent = ({
     if (isTyping && segments.length > 0) {
         const revealedText = segments.join('');
         return (
-            <div className="relative leading-relaxed text-md">
+            <div className="relative leading-relaxed text-sm">
                 <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
                     {sanitizeStreamMarkdown(revealedText)}
                 </ReactMarkdown>
@@ -1761,7 +1761,7 @@ const TypewriterContent = ({
 
     // 4. COMPLETED MESSAGE — full Markdown, already settled (isTyped: true)
     return (
-        <div className="relative leading-relaxed text-md">
+        <div className="relative leading-relaxed text-sm">
             {markdownNode}
         </div>
     );
