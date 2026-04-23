@@ -436,7 +436,9 @@ const ApiKeysTab = () => {
     const authFetch = useAuthenticatedFetch();
     const [isRotating, setIsRotating] = useState(false);
     const [newKey, setNewKey] = useState('');
+    const [newKeyBotId, setNewKeyBotId] = useState('');
     const [showKey, setShowKey] = useState(false);
+    const [selectedBotId, setSelectedBotId] = useState('');
     const [alert, setAlert] = useState({ open: false, type: 'success', msg: '' });
     const baseUrl = import.meta.env.VITE_API_URL || '';
 
@@ -446,25 +448,36 @@ const ApiKeysTab = () => {
     });
     const bots = botsData?.bots || [];
 
+    useEffect(() => {
+        if (bots.length > 0 && !selectedBotId) setSelectedBotId(bots[0].id);
+    }, [bots, selectedBotId]);
+
     const showAlertMsg = (type, msg) => {
         setAlert({ open: true, type, msg });
         setTimeout(() => setAlert(p => ({ ...p, open: false })), 6000);
     };
 
+    const selectedBot = bots.find(b => b.id === selectedBotId);
+
     const handleRotate = async () => {
-        if (!window.confirm('Rotating your API key will immediately invalidate the current key and any integrations using it. Continue?')) return;
+        const botLabel = selectedBot?.bot_name || 'this bot';
+        if (!window.confirm(`Rotating the API key for "${botLabel}" will immediately invalidate the current key and break any live integrations using it. Continue?`)) return;
         setIsRotating(true);
         setNewKey('');
+        setNewKeyBotId('');
         setShowKey(false);
         try {
             const token = await getToken();
             const res = await fetch(`${baseUrl}/api/company/rotate-key`, {
-                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bot_id: selectedBotId }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Key rotation failed.');
             setNewKey(data.new_key);
-            showAlertMsg('success', 'Key rotated. Copy it now — it will not be shown again.');
+            setNewKeyBotId(selectedBotId);
+            showAlertMsg('success', `Key rotated for "${botLabel}". Copy it now — it will not be shown again.`);
         } catch (e) {
             showAlertMsg('error', e.message);
         } finally { setIsRotating(false); }
@@ -478,25 +491,60 @@ const ApiKeysTab = () => {
                 <div>
                     <p className="text-md font-display font-semibold text-amber-800 dark:text-amber-300 transition-colors">Rotating invalidates immediately</p>
                     <p className="text-md font-display text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed transition-colors">
-                        Your old API key will stop working instantly. Update any embeddings, webhook configs, or integrations before rotating if you're in production.
+                        The old key stops working instantly. Update any embeddings, webhook configs, or integrations for that specific bot before rotating if you're in production.
                     </p>
                 </div>
             </div>
+
+            {/* Bot selector */}
+            {botsLoading ? (
+                <SkeletonBase className="h-16 w-full" />
+            ) : bots.length > 0 && (
+                <div>
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-3">Select Bot to Rotate Key</p>
+                    <div className="space-y-px bg-gray-100 dark:bg-slate-800">
+                        {bots.map((bot) => (
+                            <button
+                                key={bot.id}
+                                onClick={() => { setSelectedBotId(bot.id); setNewKey(''); setNewKeyBotId(''); }}
+                                className={`w-full bg-white dark:bg-slate-950 px-5 py-3.5 flex items-center justify-between gap-3 transition-colors text-left border-l-2 ${selectedBotId === bot.id ? 'border-blue-600 dark:border-blue-400' : 'border-transparent hover:bg-gray-50 dark:hover:bg-slate-900'}`}
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <span className={`material-symbols-outlined text-[18px] shrink-0 ${selectedBotId === bot.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>smart_toy</span>
+                                    <div className="min-w-0">
+                                        <p className="text-md font-display font-semibold text-slate-800 dark:text-slate-200 truncate transition-colors">{bot.bot_name || 'Unnamed Bot'}</p>
+                                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">{bot.allowed_origin || 'No domain set'}</p>
+                                    </div>
+                                </div>
+                                {selectedBotId === bot.id && (
+                                    <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold font-sans px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                        Selected
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* New key reveal */}
             <AnimatePresence>
                 {newKey && (
                     <motion.div
+                        key={newKeyBotId}
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.2 }}
                         className="p-5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 transition-colors"
                     >
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-1">
                             <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
                             <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-sans">New Key — Copy Now (shown once)</p>
                         </div>
+                        <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-widest">
+                            For: {bots.find(b => b.id === newKeyBotId)?.bot_name || 'Bot'}
+                        </p>
                         <div className="flex items-center gap-2 font-mono text-sm text-slate-900 dark:text-slate-200 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-900/50 p-3 transition-colors">
                             <span className="flex-1 truncate select-all">{showKey ? newKey : newKey.slice(0, 8) + '••••••••••••••••'}</span>
                             <button onClick={() => setShowKey(p => !p)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1">
@@ -514,45 +562,20 @@ const ApiKeysTab = () => {
                 )}
             </AnimatePresence>
 
-            {/* Bots list — shows which bot this key applies to */}
-            {bots.length > 0 && (
-                <div>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-3">Your Bots</p>
-                    <div className="space-y-px bg-gray-100 dark:bg-slate-800">
-                        {botsLoading ? (
-                            [1,2].map(i => <SkeletonBase key={i} className="h-14 w-full" />)
-                        ) : bots.map((bot) => (
-                            <div key={bot.id} className="bg-white dark:bg-slate-950 px-5 py-3.5 flex items-center justify-between gap-3 transition-colors">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <span className="material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500 shrink-0">smart_toy</span>
-                                    <div className="min-w-0">
-                                        <p className="text-md font-display font-semibold text-slate-800 dark:text-slate-200 truncate transition-colors">{bot.bot_name || 'Unnamed Bot'}</p>
-                                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">{bot.allowed_origin || 'No domain set'}</p>
-                                    </div>
-                                </div>
-                                <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold font-sans px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                    Active
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {/* Rotate button */}
             <div className="pt-2">
                 <button
                     onClick={handleRotate}
-                    disabled={isRotating}
+                    disabled={isRotating || !selectedBotId}
                     className="flex items-center gap-2.5 px-6 py-3 min-h-[48px] bg-gradient-to-r from-blue-600 to-green-600 text-white text-[10px] uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all shadow-md disabled:opacity-50 active:scale-[0.99]"
                 >
                     {isRotating
                         ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Rotating Key...</>
-                        : <><span className="material-symbols-outlined text-[16px]">refresh</span> Rotate API Key</>
+                        : <><span className="material-symbols-outlined text-[16px]">refresh</span> Rotate Key for {selectedBot?.bot_name || 'Selected Bot'}</>
                     }
                 </button>
                 <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-widest">
-                    All bots share one secret key per account
+                    Each bot has its own independent API key
                 </p>
             </div>
 

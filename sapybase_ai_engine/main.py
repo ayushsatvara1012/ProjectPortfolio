@@ -3785,30 +3785,50 @@ reg: RegisterRequest, user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/company/rotate-key")
-async def rotate_api_key(user: dict = Depends(get_current_user)):
+async def rotate_api_key(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
     """
-    Issue #15: API Key Rotation Mechanism.
-    Identifies the company via the user profile and generates a fresh, secure key.
+    Issue #15: API Key Rotation — per-bot.
+    Accepts optional JSON body { "bot_id": "<uuid>" } to target a specific bot.
+    When bot_id is omitted, falls back to the first bot owned by the user.
     """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    bot_id = body.get("bot_id") if body else None
+
     new_key = f"sb_{secrets.token_urlsafe(32)}"
     hashed_key = hashlib.sha256(new_key.encode()).hexdigest()
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # 1. Update the key (stored as hash)
-        cursor.execute(
-            "UPDATE companies SET api_key = %s WHERE user_id = %s RETURNING id",
-            (hashed_key, user["id"])
-        )
+        if bot_id:
+            # Rotate key for a specific bot — ownership check included
+            cursor.execute(
+                "UPDATE companies SET api_key = %s WHERE id = %s AND user_id = %s RETURNING id",
+                (hashed_key, bot_id, user["id"])
+            )
+        else:
+            # Legacy single-bot path: target the earliest bot owned by this user
+            cursor.execute(
+                """UPDATE companies SET api_key = %s
+                   WHERE id = (
+                       SELECT id FROM companies WHERE user_id = %s ORDER BY created_at LIMIT 1
+                   )
+                   RETURNING id""",
+                (hashed_key, user["id"])
+            )
         row = cursor.fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="No company found for this user.")
-        
+            raise HTTPException(status_code=404, detail="Bot not found or does not belong to your account.")
+
         conn.commit()
-        
-        # 2. Audit the rotation
-        log_admin_action(user["clerk_id"], "ROTATE_API_KEY", str(row[0]), {"method": "MANUAL_ROTATION"})
-        
+        log_admin_action(user["clerk_id"], "ROTATE_API_KEY", str(row[0]), {"method": "MANUAL_ROTATION", "bot_id": bot_id})
         return {"status": "success", "new_key": new_key}
     except Exception as e:
         if conn: conn.rollback()
