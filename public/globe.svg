@@ -4,8 +4,14 @@
 <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
  width="600.000000pt" height="417.000000pt" viewBox="0 0 600.000000 417.000000"
  preserveAspectRatio="xMidYMid meet">
+<style>
+  .globe-paths { fill: #000000; }
+  @media (prefers-color-scheme: dark) {
+    .globe-paths { fill: #ffffff; }
+  }
+</style>
 <g transform="translate(0.000000,417.000000) scale(0.100000,-0.100000)"
-fill="#000000" stroke="none">
+ class="globe-paths" stroke="none">
 <path d="M2735 4054 c-501 -39 -957 -265 -1283 -635 -377 -426 -540 -1016
 -436 -1573 17 -91 66 -264 94 -337 100 -253 295 -536 489 -710 95 -84 243
 -190 259 -184 7 3 11 1 8 -4 -7 -10 45 -42 164 -102 123 -61 241 -104 380

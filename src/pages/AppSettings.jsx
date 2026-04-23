@@ -705,10 +705,10 @@ export const CustomizeSection = () => {
     const isProUser = ['PRO', 'BUSINESS', 'ENTERPRISE'].includes(userTier) || userRole === 'SUPER_ADMIN';
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px h-auto lg:h-[calc(100vh-3rem)] bg-[#E8EBF0] dark:bg-slate-900 overflow-visible lg:overflow-hidden transition-colors duration-500">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500">
 
             {/* ── LEFT: Settings Form ── */}
-            <div className="bg-white dark:bg-slate-950 flex flex-col lg:overflow-hidden relative transition-colors h-auto lg:h-full">
+            <div className="bg-white dark:bg-slate-950 flex flex-col relative transition-colors">
 
                 {/* Header */}
                 <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
@@ -716,8 +716,8 @@ export const CustomizeSection = () => {
                     <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
                 </div>
 
-                {/* Scrollable form */}
-                <div className={`p-8 lg:flex-1 relative ${showFullOverlay ? 'overflow-hidden select-none' : 'lg:overflow-y-auto custom-scrollbar'}`}>
+                {/* Scrollable form — explicit max-height anchored to viewport minus topnav (48px) minus this header (~105px) */}
+                <div className={`p-8 relative ${showFullOverlay ? 'overflow-hidden select-none' : 'overflow-y-auto custom-scrollbar'} lg:max-h-[calc(100vh-9.5rem)]`}>
 
                     {/* Full lock overlay (FREE / no tier) */}
                     {showFullOverlay && (
@@ -1053,7 +1053,7 @@ export const CustomizeSection = () => {
             </div>
 
             {/* ── RIGHT: Preview Column ── */}
-            <div className={`overflow-hidden border-t lg:border-t-0 lg:border-l w-full h-auto lg:h-[calc(100vh-3rem)] relative transition-colors flex flex-col items-center justify-center p-0 lg:p-8 ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
+            <div className={`overflow-hidden border-t lg:border-t-0 lg:border-l w-full relative transition-colors flex flex-col items-center justify-center p-0 lg:p-8 lg:min-h-[calc(100vh-3rem)] ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
 
                 {/* Responsive Background Layer */}
                 <div
@@ -1085,7 +1085,7 @@ export const CustomizeSection = () => {
                     </button>
                 </div>
 
-                <div className="w-full lg:h-full lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0">
+                <div className="w-full lg:min-h-[calc(100vh-3rem)] lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0">
                     <BotPreview theme={isDark ? 'dark' : 'light'} />
                 </div>
             </div>

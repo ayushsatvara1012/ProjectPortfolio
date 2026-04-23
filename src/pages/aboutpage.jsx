@@ -125,7 +125,7 @@ const AboutPage = () => {
               <div className="absolute inset-0 bg-linear-to-b from-white/85 via-white/75 to-white/95 dark:from-slate-950/85 dark:via-slate-950/75 dark:to-slate-950/95 transition-colors duration-500" />
 
               {/* Globe — decorative, pinned to bottom-right, scales with screen */}
-              <div className="absolute -top-65 -right-60 w-lg h-lg sm:w-160 sm:h-160 md:w-3xl md:h-3xl lg:w-4xl lg:h-4xl opacity-20 dark:opacity-10 pointer-events-none select-none translate-x-20 translate-y-20 sm:translate-x-28 sm:translate-y-28">
+              <div className="absolute -top-65 -right-60 w-lg h-lg sm:w-160 sm:h-160 md:w-3xl md:h-3xl lg:w-4xl lg:h-4xl opacity-20 dark:opacity-20 pointer-events-none select-none translate-x-20 translate-y-20 sm:translate-x-28 sm:translate-y-28">
                 <img
                   src="/globe.svg"
                   alt=""
