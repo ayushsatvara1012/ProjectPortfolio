@@ -918,6 +918,31 @@ class AdminUpdateUserRequest(BaseModel):
 embeddings_model_doc = get_embedding_model("retrieval_document")
 embeddings_model_query = get_embedding_model("retrieval_query")
 
+# Cached at startup — avoids an information_schema query on every chat request.
+# Set to True once migration v20 has been applied (adds content_tsv column).
+_HAS_FTS_COLUMN: Optional[bool] = None
+
+def _check_fts_column() -> bool:
+    global _HAS_FTS_COLUMN
+    if _HAS_FTS_COLUMN is not None:
+        return _HAS_FTS_COLUMN
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'company_knowledge' AND column_name = 'content_tsv'
+            LIMIT 1
+            """
+        )
+        _HAS_FTS_COLUMN = cursor.fetchone() is not None
+        cursor.close()
+        release_db_connection(conn)
+    except Exception:
+        _HAS_FTS_COLUMN = False
+    return _HAS_FTS_COLUMN
+
 # Deprecated: use get_tier_model(tier) instead
 
 # --- AUTHENTICATION & SECURITY SHIELD ---
@@ -1404,22 +1429,103 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
     finally:
         release_db_connection(conn)
 
-def retrieve_knowledge(conn, company_id, query_vector, limit=15, distance_threshold=0.55):
+def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", limit=15):
     """
-    Fetches top-N candidate chunks via cosine similarity.
-    Threshold is intentionally wider (0.55) to give the reranker more candidates to score.
-    The reranker then narrows this to the true top-5 by semantic relevance.
+    Hybrid retrieval (BM25 + pgvector cosine) merged via Reciprocal Rank Fusion,
+    with parent-child resolution.
+
+    Search targets CHILD rows only (they hold the embeddings and FTS index).
+    After ranking, each child's parent content is fetched and returned to the LLM
+    instead of the small child text — giving precise matching with rich context.
+
+    For legacy flat chunks (parent_id IS NULL), the child's own content is used,
+    so old un-re-ingested sources continue to work without any data migration.
+
+    RRF score = 1/(60 + rank_vector) + 1/(60 + rank_bm25)
+
+    Falls back to pure vector search when the FTS column is not yet present
+    (i.e. before migration v20 has been applied).
     """
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT content, url FROM company_knowledge
-        WHERE company_id = %s AND embedding <=> %s::vector < %s
-        ORDER BY embedding <=> %s::vector
-        LIMIT %s
-        """,
-        (company_id, query_vector, distance_threshold, query_vector, limit)
-    )
+    has_fts = _check_fts_column()
+
+    if has_fts and query_text.strip():
+        cursor.execute(
+            """
+            WITH vector_ranked AS (
+                SELECT
+                    id,
+                    parent_id,
+                    content,
+                    url,
+                    ROW_NUMBER() OVER (ORDER BY embedding <=> %s::vector) AS rank
+                FROM company_knowledge
+                WHERE company_id = %s
+                  AND chunk_type = 'child'
+                  AND embedding <=> %s::vector < 0.7
+                LIMIT 30
+            ),
+            bm25_ranked AS (
+                SELECT
+                    id,
+                    parent_id,
+                    content,
+                    url,
+                    ROW_NUMBER() OVER (
+                        ORDER BY ts_rank_cd(content_tsv, plainto_tsquery('english', %s)) DESC
+                    ) AS rank
+                FROM company_knowledge
+                WHERE company_id = %s
+                  AND chunk_type = 'child'
+                  AND content_tsv @@ plainto_tsquery('english', %s)
+                LIMIT 30
+            ),
+            rrf AS (
+                SELECT
+                    COALESCE(v.id,        b.id)        AS child_id,
+                    COALESCE(v.parent_id, b.parent_id) AS parent_id,
+                    COALESCE(v.content,   b.content)   AS child_content,
+                    COALESCE(v.url,       b.url)        AS url,
+                    COALESCE(1.0 / (60 + v.rank), 0.0)
+                  + COALESCE(1.0 / (60 + b.rank), 0.0) AS rrf_score
+                FROM vector_ranked v
+                FULL OUTER JOIN bm25_ranked b USING (id)
+            )
+            SELECT
+                -- Return parent content when available (richer context for the LLM),
+                -- fall back to child content for legacy flat chunks.
+                COALESCE(p.content, rrf.child_content) AS context_content,
+                rrf.url
+            FROM rrf
+            LEFT JOIN company_knowledge p
+                   ON p.id = rrf.parent_id
+            ORDER BY rrf.rrf_score DESC
+            LIMIT %s
+            """,
+            (
+                query_vector, company_id, query_vector,   # vector_ranked
+                query_text, company_id, query_text,       # bm25_ranked
+                limit,
+            )
+        )
+    else:
+        # Pre-v20 fallback or empty query: pure vector search with parent resolution
+        cursor.execute(
+            """
+            SELECT
+                COALESCE(p.content, ck.content) AS context_content,
+                ck.url
+            FROM company_knowledge ck
+            LEFT JOIN company_knowledge p ON p.id = ck.parent_id
+            WHERE ck.company_id = %s
+              AND ck.chunk_type = 'child'
+              AND ck.embedding <=> %s::vector < 0.55
+            ORDER BY ck.embedding <=> %s::vector
+            LIMIT %s
+            """,
+            (company_id, query_vector, query_vector, limit)
+        )
+
     results = cursor.fetchall()
     cursor.close()
     return results
@@ -1874,8 +1980,8 @@ async def chat_endpoint(
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
 
-        # Fetch wider candidate pool (top-15), then rerank to top-5 by true relevance
-        candidate_docs = retrieve_knowledge(conn, company["id"], query_vector)
+        # Hybrid retrieval (BM25 + vector via RRF), then rerank to top-5 by true relevance
+        candidate_docs = retrieve_knowledge(conn, company["id"], query_vector, query_text=chat_req.message)
         retrieved_docs = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
         # ── Runtime values from company record ─────────────────────────────────
@@ -3039,101 +3145,188 @@ async def run_training_job(
     skip_splitting: bool = False,
 ):
     """
-    Background task: embeds and inserts knowledge chunks using a safe swap pattern.
+    Background task: embeds and inserts knowledge chunks using a safe swap pattern
+    with parent-child chunking (small-to-big retrieval).
+
+    Parent-child strategy:
+      - Each document is first split into PARENT chunks (1500 chars, 150 overlap).
+        Parents are stored in the DB but NOT embedded — they carry the full context.
+      - Each parent is then split into CHILD chunks (300 chars, 50 overlap).
+        Children ARE embedded and searched (vector + BM25).
+      - At retrieval time, the child's parent content is returned to the LLM,
+        giving precise matching with rich, coherent context.
+
+    Quota counts only child rows (chunk_type = 'child') — parents are free storage.
 
     Swap sequence (upsert path):
-      1. Insert all new chunks under a unique temp key  (__temp_{job_id}_{source_name}).
+      1. Insert all new parent+child rows under a unique temp key.
       2. Verify every batch committed successfully.
-      3. Atomically rename temp rows → real source_name  (single UPDATE, no gap).
+      3. Atomically rename temp rows → real source_name (single UPDATE, no gap).
       4. Delete old rows that still carry the original source_name.
       5. Invalidate the query cache.
 
-    On any failure the temp rows are deleted and the original data is untouched,
-    so the bot keeps serving correct (if stale) answers throughout.
+    On any failure the temp rows are deleted and the original data is untouched.
+
+    Tabular files (skip_splitting=True) use a flat single-chunk-per-row layout
+    because splitting CSV rows destroys their key:value structure. They are stored
+    as 'child' rows with no parent.
     """
     temp_source_name = f"__temp_{job_id}_{source_name}"
     status = {"status": "processing", "progress": 0, "total": 0}
     await set_job_status(job_id, status)
 
     conn = None
-    chunks_committed = 0
-    try:
-        if skip_splitting:
-            # Tabular files: each Document is already one row-chunk; splitting would
-            # shred the key:value structure and destroy retrieval accuracy.
-            all_chunks = docs
-        else:
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-            all_chunks = text_splitter.split_documents(docs)
+    # child_chunks_committed: only child rows, used for quota accounting and upsert cleanup.
+    child_chunks_committed = 0
+    # total_rows_committed: parent + child rows, used for the upsert DELETE boundary.
+    total_rows_committed = 0
 
+    try:
+        # ── Splitting ────────────────────────────────────────────────────────────
+        if skip_splitting:
+            # Tabular: each Document is already one final row-chunk.
+            # Store as flat children with no parent.
+            child_only_chunks = docs
+            parent_child_pairs = []  # [(parent_text, [child_text, ...])]
+        else:
+            # Step 1: split into large parent chunks for rich LLM context
+            parent_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1500, chunk_overlap=150
+            )
+            parent_docs = parent_splitter.split_documents(docs)
+
+            # Step 2: split each parent into small child chunks for precise embedding
+            child_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=300, chunk_overlap=50
+            )
+            parent_child_pairs = []
+            for parent_doc in parent_docs:
+                child_texts = child_splitter.split_text(parent_doc.page_content)
+                if child_texts:
+                    parent_child_pairs.append((parent_doc.page_content, child_texts))
+            child_only_chunks = []  # not used when parent_child_pairs is populated
+
+        # ── Quota: count only child rows ─────────────────────────────────────────
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Re-compute remaining capacity using effective count (excluding old source).
-        # This mirrors the pre-check in train_chatbot and guards against quota drift
-        # between queue time and execution time.
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s",
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
             (resolved_company_id,)
         )
-        total_count = cursor.fetchone()[0]
+        total_child_count = cursor.fetchone()[0]
 
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
             (resolved_company_id, source_name)
         )
-        old_source_count = cursor.fetchone()[0]
+        old_child_count = cursor.fetchone()[0]
 
-        effective_count = total_count - old_source_count
-        remaining = max(0, limit - effective_count)
-        chunks = all_chunks[:remaining]
+        effective_child_count = total_child_count - old_child_count
+        remaining = max(0, limit - effective_child_count)
 
-        status["total"] = len(chunks)
+        # Flatten child texts for quota cap and progress tracking
+        if skip_splitting:
+            all_child_texts_flat = [(None, doc) for doc in child_only_chunks]
+            # (parent_db_id, child_Document)
+        else:
+            all_child_texts_flat = []
+            for parent_text, child_texts in parent_child_pairs:
+                for ct in child_texts:
+                    all_child_texts_flat.append((parent_text, ct))
+
+        # Cap to remaining quota (child count)
+        capped_pairs = all_child_texts_flat[:remaining]
+
+        status["total"] = len(capped_pairs)
         await set_job_status(job_id, status)
 
-        # ── Phase 1: Insert under temp key ───────────────────────────────────
+        # ── Phase 1: Insert under temp key ───────────────────────────────────────
+        # For parent-child: insert parent first, capture its DB id, then insert children
+        # pointing to it. All rows use temp_source_name until the atomic rename.
+        #
+        # For tabular (skip_splitting): insert flat child rows directly.
+
         BATCH_SIZE = 10
-        for i in range(0, len(chunks), BATCH_SIZE):
-            batch = chunks[i:i + BATCH_SIZE]
-            texts = [c.page_content for c in batch]
-            embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
-            for chunk, embedding in zip(batch, embeddings_list):
-                if len(embedding) > EMBEDDING_DIMENSIONS:
-                    embedding = embedding[:EMBEDDING_DIMENSIONS]
-                cursor.execute(
-                    "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
-                    (resolved_company_id, chunk.page_content, temp_source_name, embedding)
-                )
+        if skip_splitting:
+            # Flat child-only insertion (tabular files)
+            for i in range(0, len(capped_pairs), BATCH_SIZE):
+                batch = capped_pairs[i:i + BATCH_SIZE]
+                texts = [pair[1].page_content for pair in batch]
+                embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
-            conn.commit()
-            chunks_committed += len(batch)
-            status["progress"] = chunks_committed
-            await set_job_status(job_id, status)
-            await asyncio.sleep(0.1)  # yield to event loop between batches
+                for (_, doc), embedding in zip(batch, embeddings_list):
+                    if len(embedding) > EMBEDDING_DIMENSIONS:
+                        embedding = embedding[:EMBEDDING_DIMENSIONS]
+                    cursor.execute(
+                        """INSERT INTO company_knowledge
+                               (company_id, content, url, embedding, chunk_type, parent_id)
+                           VALUES (%s, %s, %s, %s, 'child', NULL)""",
+                        (resolved_company_id, doc.page_content, temp_source_name, embedding)
+                    )
 
-        # ── Phase 2: Atomic rename temp → real source_name ───────────────────
+                conn.commit()
+                child_chunks_committed += len(batch)
+                total_rows_committed += len(batch)
+                status["progress"] = child_chunks_committed
+                await set_job_status(job_id, status)
+                await asyncio.sleep(0.1)
+        else:
+            # Parent-child insertion
+            # Group capped children back by parent to minimise parent inserts
+            # (a parent is only inserted if at least one of its children survived the cap).
+            seen_parents: dict[str, str] = {}  # parent_text -> parent DB id (as str)
+
+            for i in range(0, len(capped_pairs), BATCH_SIZE):
+                batch = capped_pairs[i:i + BATCH_SIZE]
+                # Embed only child texts (parents are not embedded)
+                child_texts = [ct for (_, ct) in batch]
+                embeddings_list = await embeddings_model_doc.aembed_documents(child_texts)
+
+                for (parent_text, child_text), embedding in zip(batch, embeddings_list):
+                    # Insert parent row on first encounter of this parent text
+                    if parent_text not in seen_parents:
+                        cursor.execute(
+                            """INSERT INTO company_knowledge
+                                   (company_id, content, url, embedding, chunk_type, parent_id)
+                               VALUES (%s, %s, %s, NULL, 'parent', NULL)
+                               RETURNING id""",
+                            (resolved_company_id, parent_text, temp_source_name)
+                        )
+                        parent_db_id = cursor.fetchone()[0]
+                        seen_parents[parent_text] = parent_db_id
+                        total_rows_committed += 1
+                    else:
+                        parent_db_id = seen_parents[parent_text]
+
+                    if len(embedding) > EMBEDDING_DIMENSIONS:
+                        embedding = embedding[:EMBEDDING_DIMENSIONS]
+                    cursor.execute(
+                        """INSERT INTO company_knowledge
+                               (company_id, content, url, embedding, chunk_type, parent_id)
+                           VALUES (%s, %s, %s, %s, 'child', %s)""",
+                        (resolved_company_id, child_text, temp_source_name, embedding, parent_db_id)
+                    )
+                    child_chunks_committed += 1
+                    total_rows_committed += 1
+
+                conn.commit()
+                status["progress"] = child_chunks_committed
+                await set_job_status(job_id, status)
+                await asyncio.sleep(0.1)
+
+        # ── Phase 2: Atomic rename temp → real source_name ───────────────────────
         cursor.execute(
             "UPDATE company_knowledge SET url = %s WHERE company_id = %s AND url = %s",
             (source_name, resolved_company_id, temp_source_name)
         )
         conn.commit()
 
-        # ── Phase 3: Delete old chunks (only runs after rename succeeds) ─────
-        if is_upsert and old_source_count > 0:
-            # After the rename above, rows with the real source_name are the NEW
-            # ones. Old rows that were already named source_name before this job
-            # started are identified by their creation timestamp being older than
-            # any row inserted in this job. We delete by excluding the temp batch
-            # that was just renamed — the safest approach is to count: we inserted
-            # `chunks_committed` rows, so the total for this source should now be
-            # exactly that many if we delete the excess.
-            #
-            # Simpler and equally correct: delete rows where created_at is older
-            # than the oldest row in the temp batch (now renamed). Since postgres
-            # assigns created_at at insert time and all new rows were inserted after
-            # the old ones, we can identify old rows as those that existed before
-            # this job's first insert. We capture that boundary via a subquery.
+        # ── Phase 3: Delete old chunks (only runs after rename succeeds) ─────────
+        if is_upsert and old_child_count > 0:
+            # Rows inserted in this job are the newest `total_rows_committed` rows.
+            # All rows (parent + child) with source_name older than these are stale.
             cursor.execute(
                 """
                 DELETE FROM company_knowledge
@@ -3149,23 +3342,23 @@ async def run_training_job(
                 (
                     resolved_company_id, source_name,
                     resolved_company_id, source_name,
-                    chunks_committed,
+                    total_rows_committed,
                 )
             )
             deleted_old = cursor.rowcount
             conn.commit()
-            print(f"UPSERT JOB {job_id}: Swapped source '{source_name}' — {chunks_committed} new chunks in, {deleted_old} old chunks removed.")
+            print(f"UPSERT JOB {job_id}: Swapped '{source_name}' — {child_chunks_committed} new child chunks in, {deleted_old} old rows removed.")
 
-        # ── Phase 4: Cache invalidation ──────────────────────────────────────
+        # ── Phase 4: Cache invalidation ──────────────────────────────────────────
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
         invalidate_cache(conn, resolved_company_id)
         conn.commit()
 
         await set_job_status(job_id, {
             "status": "done",
-            "chunks_added": chunks_committed,
-            "total_available": len(all_chunks),
-            "truncated": len(all_chunks) > remaining,
+            "chunks_added": child_chunks_committed,
+            "total_available": len(all_child_texts_flat),
+            "truncated": len(all_child_texts_flat) > remaining,
             "is_upsert": is_upsert,
         })
 
@@ -3173,8 +3366,6 @@ async def run_training_job(
         print(f"TRAINING JOB {job_id} FAILED: {e}")
         await set_job_status(job_id, {"status": "error", "message": str(e)})
 
-        # Roll back any uncommitted batch, then clean up any temp rows that were
-        # already committed — old data is preserved and bot remains functional.
         if conn:
             try:
                 conn.rollback()
@@ -3182,19 +3373,20 @@ async def run_training_job(
                 pass
             try:
                 cleanup_cursor = conn.cursor()
+                # Deleting temp parent rows will cascade-delete their temp children
+                # via the ON DELETE CASCADE FK on parent_id.
                 cleanup_cursor.execute(
                     "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
                     (resolved_company_id, temp_source_name)
                 )
                 conn.commit()
-                print(f"TRAINING JOB {job_id}: Temp chunks cleaned up after failure — original source preserved.")
+                print(f"TRAINING JOB {job_id}: Temp rows cleaned up — original source preserved.")
             except Exception as cleanup_err:
-                print(f"TRAINING JOB {job_id}: Temp cleanup also failed ({cleanup_err}). Orphan sweep will handle on next restart.")
+                print(f"TRAINING JOB {job_id}: Temp cleanup also failed ({cleanup_err}). Orphan sweep will handle on restart.")
 
     finally:
         if conn:
             release_db_connection(conn)
-        # Always release the concurrent-job lock so the owner can retry.
         if lock_key and r:
             try:
                 await r.delete(lock_key)
@@ -3298,23 +3490,23 @@ async def train_chatbot(
         else:
             raise HTTPException(status_code=400, detail="Provide a URL, PDF file, CSV/Excel file, or text content.")
 
-        # Count ALL existing chunks for this bot, then subtract the ones that
-        # belong to the source being replaced. This gives the true "slots in use"
-        # so a re-upload does not hit a false quota ceiling.
+        # Quota counts ONLY child rows — parent rows are free storage.
+        # Subtract the child rows belonging to the source being replaced so that
+        # a re-upload does not hit a false quota ceiling.
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s",
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
             (resolved_company_id,)
         )
         total_count = cursor.fetchone()[0]
 
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
             (resolved_company_id, pending_source_name)
         )
         existing_source_count = cursor.fetchone()[0]
         is_upsert = existing_source_count > 0
 
-        # Effective slots already in use, excluding the source about to be replaced.
+        # Effective child slots in use, excluding the source about to be replaced.
         effective_count = total_count - existing_source_count
 
         if effective_count >= limit:
@@ -3409,14 +3601,15 @@ async def train_chatbot(
         raise HTTPException(status_code=400, detail="No content could be extracted from the provided source.")
 
     # ── 4. Quota overflow check against effective (post-replacement) capacity ─
-    # For tabular files each Document is already one final chunk (one row), so
-    # we use len(docs) directly. For prose (URL/PDF/text) we estimate via char
-    # count since the text splitter hasn't run yet at this point.
+    # Quota counts child chunks only. With parent-child chunking each parent
+    # (~1500 chars) produces ~5 children (~300 chars each), so the child count
+    # is estimated as total_chars / 300 (conservative — better to allow and cap
+    # inside run_training_job than to reject valid uploads prematurely).
     if csv_file:
         estimated_chunks = len(docs)
     else:
         total_chars = sum(len(d.page_content) for d in docs)
-        estimated_chunks = max(1, int(total_chars / 700))   # ~700 net chars per 800-char chunk
+        estimated_chunks = max(1, int(total_chars / 250))   # ~300 chars per child, 250 = safe undercount
     effective_remaining = max(0, limit - effective_count)
 
     if estimated_chunks > effective_remaining:
@@ -3597,7 +3790,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                       c.created_at, c.ai_model,
                       COALESCE(ut.messages_used, 0) as messages_used,
                       COALESCE(ut.period_end, now() + interval '30 days') as period_end,
-                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id) as chunks_used
+                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id AND ck.chunk_type = 'child') as chunks_used
                FROM companies c
                LEFT JOIN usage_tracking ut ON ut.company_id = c.id
                WHERE c.user_id = %s AND c.is_active = true
@@ -3734,8 +3927,16 @@ def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
+        # chunk_count shows only child rows — parents are internal and not counted toward quota.
+        # Filter out temp rows (prefixed __temp_) that belong to in-progress jobs.
         cursor.execute(
-            "SELECT DISTINCT url, COUNT(*) as chunk_count FROM company_knowledge WHERE company_id = %s GROUP BY url ORDER BY url",
+            """SELECT url, COUNT(*) as chunk_count
+               FROM company_knowledge
+               WHERE company_id = %s
+                 AND chunk_type = 'child'
+                 AND url NOT LIKE '__temp_%%'
+               GROUP BY url
+               ORDER BY url""",
             (company_id,)
         )
         rows = cursor.fetchall()
@@ -3773,15 +3974,16 @@ def get_knowledge_chunks(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
+        # Show only child rows in the UI preview — parents are large blobs not useful for display.
         cursor.execute(
-            "SELECT id, content, created_at FROM company_knowledge WHERE company_id = %s AND url = %s ORDER BY created_at DESC LIMIT %s",
+            "SELECT id, content, created_at FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child' ORDER BY created_at DESC LIMIT %s",
             (company_id, source, limit)
         )
         rows = cursor.fetchall()
 
-        # Get total count for this source (may exceed limit)
+        # Total child chunk count for this source
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
             (company_id, source)
         )
         total = cursor.fetchone()[0]
