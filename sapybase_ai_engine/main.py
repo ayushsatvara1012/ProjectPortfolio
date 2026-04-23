@@ -1429,6 +1429,44 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
     finally:
         release_db_connection(conn)
 
+async def hyde_expand(query: str) -> str:
+    """
+    HyDE (Hypothetical Document Embeddings): generates a short hypothetical answer
+    to the query, then returns that text for embedding instead of the raw query.
+
+    Why this helps: embedding a hypothetical answer places the vector closer to
+    real answer chunks in the embedding space than the short question itself does.
+    For example, "what is the price?" embeds far from pricing paragraphs, but a
+    hypothetical answer like "The Pro plan costs $X per month..." embeds right
+    next to the real pricing chunk.
+
+    BM25 is unaffected — it always uses the original user query (keyword matching
+    doesn't benefit from a hypothetical answer).
+
+    Falls back to the original query silently if the LLM call fails, so this
+    never blocks or degrades the chat response.
+    """
+    try:
+        hyde_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=120,
+            temperature=0.0,
+        )
+        prompt = (
+            f"Write a single short paragraph (2-4 sentences) that directly answers "
+            f"the following question as if you were an expert with full knowledge. "
+            f"Be specific and factual. Do not say 'I' or 'As an AI'.\n\nQuestion: {query}"
+        )
+        response = await hyde_model.ainvoke([HumanMessage(content=prompt)])
+        expanded = response.content.strip()
+        if expanded:
+            return expanded
+    except Exception as e:
+        print(f"[HyDE] Expansion failed, using raw query: {e}")
+    return query
+
+
 def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", limit=15):
     """
     Hybrid retrieval (BM25 + pgvector cosine) merged via Reciprocal Rank Fusion,
@@ -1975,12 +2013,13 @@ async def chat_endpoint(
                 )
         # ── END CACHE LOOKUP (miss — continue to full RAG + Gemini) ──────────
 
-        # 2. Vector Search (RAG) + Reranking
-        query_vector = embeddings_model_query.embed_query(chat_req.message)
+        # 2. HyDE query expansion + Vector Search (RAG) + Reranking
+        hyde_text = await hyde_expand(chat_req.message)
+        query_vector = embeddings_model_query.embed_query(hyde_text)
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
 
-        # Hybrid retrieval (BM25 + vector via RRF), then rerank to top-5 by true relevance
+        # Hybrid retrieval (BM25 uses original query; vector uses HyDE-expanded embedding)
         candidate_docs = retrieve_knowledge(conn, company["id"], query_vector, query_text=chat_req.message)
         retrieved_docs = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
@@ -4900,6 +4939,312 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
             release_db_connection(conn)
 
         return {"status": "success", "message": "Subscription will cancel at the end of the billing period."}
+
+# ── EVALUATION PIPELINE ───────────────────────────────────────────────────────
+
+class EvalQuestion(BaseModel):
+    question: str = Field(..., max_length=1000)
+    expected_answer: str = Field(..., max_length=3000)
+
+class EvalRunRequest(BaseModel):
+    company_id: str
+    run_label: str = Field(..., max_length=100, description="A short label for this run, e.g. 'after-hyde'")
+    questions: List[EvalQuestion] = Field(..., min_items=1, max_items=50)
+
+
+async def _judge_single(
+    question: str,
+    expected_answer: str,
+    retrieved_chunks: str,
+    actual_answer: str,
+) -> dict:
+    """
+    Uses Gemini as an LLM judge to score one Q&A pair on two axes:
+
+    retrieval_score (0-10):
+        Did the retrieved chunks actually contain information needed to answer?
+        10 = chunks directly contain the answer.
+        0  = chunks are completely irrelevant.
+
+    faithfulness_score (0-10):
+        Does the actual_answer match the expected_answer in meaning?
+        10 = same meaning, no contradictions.
+        0  = wrong, hallucinated, or contradicts the expected answer.
+
+    Returns a dict with both scores and one-line reasons for each.
+    """
+    judge_model = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash-lite",
+        google_api_key=GEMINI_KEY,
+        max_output_tokens=300,
+        temperature=0.0,
+    )
+    prompt = f"""You are an impartial RAG evaluation judge. Score the following case.
+
+QUESTION: {question}
+
+EXPECTED ANSWER (ground truth): {expected_answer}
+
+RETRIEVED CHUNKS (what the RAG pipeline fetched):
+{retrieved_chunks or "(nothing retrieved)"}
+
+ACTUAL ANSWER (what the bot replied): {actual_answer or "(no answer)"}
+
+Score on two axes from 0 to 10 (integers only):
+
+retrieval_score: Did the retrieved chunks contain information sufficient to answer the question?
+faithfulness_score: Does the actual answer match the expected answer in meaning and correctness?
+
+Respond ONLY with valid JSON in exactly this format:
+{{
+  "retrieval_score": <0-10>,
+  "retrieval_reason": "<one sentence>",
+  "faithfulness_score": <0-10>,
+  "faithfulness_reason": "<one sentence>"
+}}"""
+
+    try:
+        response = await judge_model.ainvoke([HumanMessage(content=prompt)])
+        raw = response.content.strip()
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        result = json.loads(raw)
+        return {
+            "retrieval_score": float(result.get("retrieval_score", 0)),
+            "retrieval_reason": str(result.get("retrieval_reason", "")),
+            "faithfulness_score": float(result.get("faithfulness_score", 0)),
+            "faithfulness_reason": str(result.get("faithfulness_reason", "")),
+        }
+    except Exception as e:
+        print(f"[EVAL JUDGE] Failed for question '{question[:50]}': {e}")
+        return {
+            "retrieval_score": 0.0,
+            "retrieval_reason": f"Judge error: {e}",
+            "faithfulness_score": 0.0,
+            "faithfulness_reason": f"Judge error: {e}",
+        }
+
+
+@app.post("/api/eval/run")
+async def run_eval(
+    body: EvalRunRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Runs the full RAG pipeline on a set of test questions, scores each one using
+    Gemini as an LLM judge, and persists the results for trend comparison.
+
+    Each question is scored on:
+      - retrieval_score (0-10): did the RAG pipeline fetch relevant chunks?
+      - faithfulness_score (0-10): does the bot's answer match the expected answer?
+
+    Results are stored in eval_runs + eval_results tables (migration v22).
+    Use GET /api/eval/results/{company_id} to compare runs over time.
+
+    Limit: 50 questions per run (enforced by Pydantic).
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership check
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (body.company_id, current_user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+    finally:
+        release_db_connection(conn)
+
+    result_rows = []
+    for eq in body.questions:
+        # 1. HyDE expand
+        hyde_text = await hyde_expand(eq.question)
+
+        # 2. Embed
+        query_vector = embeddings_model_query.embed_query(hyde_text)
+        if len(query_vector) > 768:
+            query_vector = query_vector[:768]
+
+        # 3. Retrieve + rerank (same pipeline as live chat)
+        conn = get_db_connection()
+        try:
+            candidates = retrieve_knowledge(conn, body.company_id, query_vector, query_text=eq.question)
+        finally:
+            release_db_connection(conn)
+
+        top_chunks = await rerank_chunks(eq.question, candidates, top_k=5)
+        retrieved_text = "\n\n".join([f"[{i+1}] {c[0][:400]}" for i, c in enumerate(top_chunks)])
+
+        # 4. Generate answer with the same system prompt structure as live chat
+        answer_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=400,
+            temperature=0.3,
+        )
+        knowledge_block = (
+            f"KNOWLEDGE BASE:\n{retrieved_text}"
+            if top_chunks
+            else "KNOWLEDGE BASE: (Empty — no relevant knowledge found)"
+        )
+        eval_system = (
+            f"You are a helpful AI assistant. Answer the question using ONLY "
+            f"the knowledge base below. If the answer is not in the knowledge base, "
+            f"say you don't have that information.\n\n{knowledge_block}"
+        )
+        try:
+            ans_response = await answer_model.ainvoke([
+                SystemMessage(content=eval_system),
+                HumanMessage(content=eq.question),
+            ])
+            actual_answer = ans_response.content.strip()
+        except Exception as e:
+            actual_answer = f"(generation error: {e})"
+
+        # 5. Judge
+        scores = await _judge_single(eq.question, eq.expected_answer, retrieved_text, actual_answer)
+
+        result_rows.append({
+            "question": eq.question,
+            "expected_answer": eq.expected_answer,
+            "retrieved_chunks": retrieved_text,
+            "actual_answer": actual_answer,
+            **scores,
+        })
+
+        await asyncio.sleep(0.2)  # avoid rate-limiting the judge model
+
+    # 6. Persist run summary + individual results
+    if not result_rows:
+        raise HTTPException(status_code=400, detail="No results generated.")
+
+    avg_ret = sum(r["retrieval_score"] for r in result_rows) / len(result_rows)
+    avg_fai = sum(r["faithfulness_score"] for r in result_rows) / len(result_rows)
+    avg_com = (avg_ret + avg_fai) / 2
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO eval_runs
+                   (company_id, run_label, triggered_by, total_questions,
+                    avg_retrieval_score, avg_faithfulness_score, avg_combined_score)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (body.company_id, body.run_label, current_user.get("clerk_id"),
+             len(result_rows), round(avg_ret, 2), round(avg_fai, 2), round(avg_com, 2))
+        )
+        run_id = cursor.fetchone()[0]
+
+        for r in result_rows:
+            cursor.execute(
+                """INSERT INTO eval_results
+                       (run_id, company_id, question, expected_answer, retrieved_chunks,
+                        actual_answer, retrieval_score, faithfulness_score,
+                        retrieval_reason, faithfulness_reason)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (run_id, body.company_id, r["question"], r["expected_answer"],
+                 r["retrieved_chunks"], r["actual_answer"],
+                 r["retrieval_score"], r["faithfulness_score"],
+                 r["retrieval_reason"], r["faithfulness_reason"])
+            )
+        conn.commit()
+    finally:
+        release_db_connection(conn)
+
+    return {
+        "status": "done",
+        "run_id": str(run_id),
+        "run_label": body.run_label,
+        "total_questions": len(result_rows),
+        "avg_retrieval_score": round(avg_ret, 2),
+        "avg_faithfulness_score": round(avg_fai, 2),
+        "avg_combined_score": round(avg_com, 2),
+        "results": result_rows,
+    }
+
+
+@app.get("/api/eval/results/{company_id}")
+async def get_eval_results(
+    company_id: str,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Returns the last N evaluation run summaries for a bot, ordered newest first.
+    Use this to compare avg_combined_score across runs labelled with each improvement.
+    Individual question-level results are also included for the most recent run.
+    """
+    if limit > 20:
+        limit = 20
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership check
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, current_user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # Run summaries
+        cursor.execute(
+            """SELECT id, run_label, total_questions, avg_retrieval_score,
+                      avg_faithfulness_score, avg_combined_score, created_at
+               FROM eval_runs
+               WHERE company_id = %s
+               ORDER BY created_at DESC
+               LIMIT %s""",
+            (company_id, limit)
+        )
+        run_rows = cursor.fetchall()
+        if not run_rows:
+            return {"runs": [], "latest_results": []}
+
+        runs = [
+            {
+                "run_id": str(r[0]),
+                "run_label": r[1],
+                "total_questions": r[2],
+                "avg_retrieval_score": float(r[3]) if r[3] else None,
+                "avg_faithfulness_score": float(r[4]) if r[4] else None,
+                "avg_combined_score": float(r[5]) if r[5] else None,
+                "created_at": r[6].isoformat() if r[6] else None,
+            }
+            for r in run_rows
+        ]
+
+        # Detailed question results for the most recent run only
+        latest_run_id = run_rows[0][0]
+        cursor.execute(
+            """SELECT question, expected_answer, actual_answer,
+                      retrieval_score, faithfulness_score,
+                      retrieval_reason, faithfulness_reason
+               FROM eval_results
+               WHERE run_id = %s
+               ORDER BY retrieval_score ASC""",  # worst first so failures are obvious
+            (latest_run_id,)
+        )
+        detail_rows = cursor.fetchall()
+        latest_results = [
+            {
+                "question": d[0],
+                "expected_answer": d[1],
+                "actual_answer": d[2],
+                "retrieval_score": float(d[3]) if d[3] else None,
+                "faithfulness_score": float(d[4]) if d[4] else None,
+                "retrieval_reason": d[5],
+                "faithfulness_reason": d[6],
+            }
+            for d in detail_rows
+        ]
+
+        return {"runs": runs, "latest_results": latest_results}
+    finally:
+        release_db_connection(conn)
+
 
 @app.get("/")
 def read_root(): return {"status": "SaPyBase AI Engine Running"}

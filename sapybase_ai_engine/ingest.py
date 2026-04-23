@@ -11,6 +11,19 @@ DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 COMPANY_ID = os.getenv("SAPYBASE_COMPANY_ID")
 
+
+def list_companies():
+    """Run this to find your real company ID if ingest fails with FK violation."""
+    conn = psycopg2.connect(DB_URL)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, company_name, allowed_origin FROM companies ORDER BY created_at DESC LIMIT 10")
+    rows = cursor.fetchall()
+    print("=== Companies in DB ===")
+    for row in rows:
+        print(f"  id={row[0]}  name={row[1]}  origin={row[2]}")
+    cursor.close()
+    conn.close()
+
 SOURCE_URL = "sapybase.com/core-services"
 
 PARENT_CHUNK_SIZE = 1500
