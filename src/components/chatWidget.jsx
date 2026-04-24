@@ -1159,9 +1159,9 @@ const ChatWidget = ({ apiKey }) => {
                                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}
                                                             >
                                                                 {msg.role === 'user' ? (
-                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-sm font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
+                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                                                 ) : (
-                                                                    <div className="min-w-0 max-w-full text-sm font-google leading-relaxed">
+                                                                    <div className="min-w-0 max-w-full text-base font-google leading-relaxed">
                                                                         <TypewriterContent
                                                                             content={msg.content}
                                                                             isStreaming={msg.isStreaming}
@@ -1232,7 +1232,7 @@ const ChatWidget = ({ apiKey }) => {
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-xl font-medium font-sans"
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-sm font-medium font-google"
                                         rows={1}
                                         disabled={isLoading}
                                         aria-label="Chat input"
