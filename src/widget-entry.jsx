@@ -92,18 +92,22 @@ if (document.getElementById(CONTAINER_ID)) {
   // propagate through the Shadow boundary (e.g. font-size, line-height).
   const resetStyle = document.createElement('style');
   resetStyle.textContent = `
-    *, *::before, *::after {
-      box-sizing: border-box !important;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      font-family: inherit;
-      font-weight: inherit;
-      direction: ltr;
-      text-align: left;
-    }
     :host {
       all: initial;
-      font-family: 'Darker Grotesque', 'Bricolage Grotesque', 'Google Sans', system-ui, sans-serif !important;
+      /* Re-declare all font CSS variables here so Tailwind's var(--font-*) calls
+         resolve correctly inside the Shadow DOM on any host website. */
+      --font-sans: "Google Sans", "Darker Grotesque", system-ui, sans-serif;
+      --font-display: "Bricolage Grotesque", "Google Sans", system-ui, sans-serif;
+      --font-google: "Google Sans", system-ui, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --font-weight-light: 300;
+      --font-weight-normal: 400;
+      --font-weight-medium: 500;
+      --font-weight-semibold: 600;
+      --font-weight-bold: 700;
+      --font-weight-extrabold: 800;
+      --font-weight-black: 900;
+      font-family: "Google Sans", "Darker Grotesque", system-ui, sans-serif !important;
       font-size: 16px !important;
       font-weight: 500 !important;
       line-height: 1.5 !important;
@@ -113,6 +117,15 @@ if (document.getElementById(CONTAINER_ID)) {
       -webkit-text-size-adjust: 100% !important;
       -webkit-font-smoothing: antialiased !important;
       -moz-osx-font-smoothing: grayscale !important;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-family: inherit;
+      font-weight: inherit;
+      direction: ltr;
+      text-align: left;
     }
   `;
   shadow.appendChild(resetStyle);
