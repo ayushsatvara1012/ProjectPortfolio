@@ -95,7 +95,9 @@ if (document.getElementById(CONTAINER_ID)) {
     *, *::before, *::after {
       box-sizing: border-box !important;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       font-family: inherit;
+      font-weight: inherit;
       direction: ltr;
       text-align: left;
     }
@@ -103,11 +105,14 @@ if (document.getElementById(CONTAINER_ID)) {
       all: initial;
       font-family: 'Darker Grotesque', 'Bricolage Grotesque', 'Google Sans', system-ui, sans-serif !important;
       font-size: 16px !important;
+      font-weight: 500 !important;
       line-height: 1.5 !important;
       color: #0f172a !important;
       direction: ltr !important;
       text-align: left !important;
       -webkit-text-size-adjust: 100% !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
     }
   `;
   shadow.appendChild(resetStyle);
