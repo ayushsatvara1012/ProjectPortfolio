@@ -9,7 +9,7 @@ const Button: React.FC<ButtonProps> = ({ className = "", children, ...props }) =
     return (
         <button
             {...props}
-            className={`relative flex items-center px-6 py-3 overflow-hidden font-medium transition-all bg-blue-950 group dark:bg-blue-600 dark:hover:bg-blue-700 text-white ${className}`}
+            className={`relative flex items-center px-6 py-3 overflow-hidden font-medium transition-all bg-blue-950 group dark:bg-blue-600 dark:hover:bg-blue-700 ${className}`}
         >
             <span
                 className="absolute top-0 right-0 inline-block w-4 h-4 transition-all duration-500 ease-in-out bg-blue-900 group-hover:-mr-4 group-hover:-mt-4"

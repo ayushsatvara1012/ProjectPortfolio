@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "concurrently -k \"next dev -p 3000\" \"npm run dev:backend\"",
     "dev:backend": "cd sapybase_ai_engine && source venv/bin/activate && uvicorn main:app --reload --port 8000",
-    "dev:all": "concurrently -k \"npm run dev\" \"npm run dev:backend\"",
+    "dev:all": "npm run dev",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
