@@ -20,6 +20,8 @@ export const BotSettingsProvider = ({ children }) => {
         webhookUrl: '',
         // ── v17: human handoff ──
         handoffRedirectUrl: '',
+        // ── v19: white-label branding ──
+        hideBranding: false,
     });
 
     const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +70,8 @@ export const BotSettingsProvider = ({ children }) => {
                     webhookUrl: data.company.webhook_url || '',
                     // ── v17 ──
                     handoffRedirectUrl: data.company.handoff_redirect_url || '',
+                    // ── v19 ──
+                    hideBranding: data.company.hide_branding === true,
                 });
             }
         } catch (err) {
@@ -106,6 +110,8 @@ export const BotSettingsProvider = ({ children }) => {
                     webhook_url: botSettings.webhookUrl || null,
                     // ── v17 ──
                     handoff_redirect_url: botSettings.handoffRedirectUrl || null,
+                    // ── v19 ──
+                    hide_branding: botSettings.hideBranding,
                 })
             });
             const data = await res.json();

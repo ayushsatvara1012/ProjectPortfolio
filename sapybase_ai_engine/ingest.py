@@ -5,63 +5,101 @@ from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
 
-# Load environment variables from .env
 load_dotenv()
 
 DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
-COMPANY_ID = os.getenv("SAPYBASE_COMPANY_ID") # The UUID from Neon
+COMPANY_ID = os.getenv("SAPYBASE_COMPANY_ID")
+
+
+def list_companies():
+    """Run this to find your real company ID if ingest fails with FK violation."""
+    conn = psycopg2.connect(DB_URL)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, company_name, allowed_origin FROM companies ORDER BY created_at DESC LIMIT 10")
+    rows = cursor.fetchall()
+    print("=== Companies in DB ===")
+    for row in rows:
+        print(f"  id={row[0]}  name={row[1]}  origin={row[2]}")
+    cursor.close()
+    conn.close()
+
+SOURCE_URL = "sapybase.com/core-services"
+
+PARENT_CHUNK_SIZE = 1500
+PARENT_CHUNK_OVERLAP = 150
+CHILD_CHUNK_SIZE = 300
+CHILD_CHUNK_OVERLAP = 50
+
 
 def ingest_knowledge():
-    print("🚀 Starting Ingestion Pipeline...")
+    print("Starting Ingestion Pipeline (parent-child chunking)...")
 
-    # 1. Read the raw Markdown text
     with open("sapybase_core.md", "r", encoding="utf-8") as file:
         raw_text = file.read()
 
-    # 2. Chunk the text
-    # 500 characters per chunk, with a 50 character overlap to keep context
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_text(raw_text)
-    print(f"✂️ Split document into {len(chunks)} chunks.")
+    parent_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=PARENT_CHUNK_SIZE, chunk_overlap=PARENT_CHUNK_OVERLAP
+    )
+    child_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHILD_CHUNK_SIZE, chunk_overlap=CHILD_CHUNK_OVERLAP
+    )
 
-    # 3. Initialize Embeddings
+    parent_texts = parent_splitter.split_text(raw_text)
+    print(f"Split into {len(parent_texts)} parent chunks.")
+
     embeddings_model = get_embedding_model("retrieval_document")
 
-    # 4. Connect to Neon Database
     conn = psycopg2.connect(DB_URL)
-    register_vector(conn) # Enable pgvector support in psycopg2
+    register_vector(conn)
     cursor = conn.cursor()
 
-    # Clear existing knowledge for this company to prevent duplicates on re-runs
-    cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (COMPANY_ID,))
-    
-    print("🧠 Generating Vectors and pushing to Neon...")
-    
-    # 5. Embed and Insert each chunk
-    for i, chunk in enumerate(chunks):
-        vector = embeddings_model.embed_query(chunk)
-        if i == 0:
-            print(f"📏 Vector dimension: {len(vector)}")
+    # Clear existing rows for this source before re-ingesting
+    cursor.execute(
+        "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
+        (COMPANY_ID, SOURCE_URL)
+    )
+    conn.commit()
+    print("Cleared existing rows for this source.")
 
-        if len(vector) > EMBEDDING_DIMENSIONS:
-            vector = vector[:EMBEDDING_DIMENSIONS]
-        
-        # Insert into database
+    total_parents = 0
+    total_children = 0
+
+    for p_idx, parent_text in enumerate(parent_texts):
+        # Insert parent row (no embedding — not searched, only returned as context)
         cursor.execute(
             """
-            INSERT INTO company_knowledge (company_id, url, content, embedding)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO company_knowledge (company_id, url, content, embedding, chunk_type, parent_id)
+            VALUES (%s, %s, %s, NULL, 'parent', NULL)
+            RETURNING id
             """,
-            (COMPANY_ID, "sapybase.com/core-services", chunk, vector)
+            (COMPANY_ID, SOURCE_URL, parent_text)
         )
-        print(f"✅ Chunk {i+1}/{len(chunks)} ingested.")
+        parent_id = cursor.fetchone()[0]
+        total_parents += 1
 
-    # Commit and close
-    conn.commit()
+        child_texts = child_splitter.split_text(parent_text)
+        for c_idx, child_text in enumerate(child_texts):
+            vector = embeddings_model.embed_query(child_text)
+            if len(vector) > EMBEDDING_DIMENSIONS:
+                vector = vector[:EMBEDDING_DIMENSIONS]
+
+            cursor.execute(
+                """
+                INSERT INTO company_knowledge (company_id, url, content, embedding, chunk_type, parent_id)
+                VALUES (%s, %s, %s, %s, 'child', %s)
+                """,
+                (COMPANY_ID, SOURCE_URL, child_text, vector, parent_id)
+            )
+            total_children += 1
+            print(f"  Parent {p_idx + 1}/{len(parent_texts)}, child {c_idx + 1}/{len(child_texts)} ingested.")
+
+        conn.commit()
+
     cursor.close()
     conn.close()
-    print("🎉 Ingestion Complete! Your AI's memory is now active.")
+    print(f"Ingestion complete. {total_parents} parents, {total_children} child chunks.")
+
 
 if __name__ == "__main__":
     ingest_knowledge()

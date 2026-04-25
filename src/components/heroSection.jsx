@@ -15,7 +15,7 @@ const HeroSection = () => {
   const { isSignedIn } = useUser();
   const { openSignUp } = useClerk();
   const [view, setView] = useState('configure'); // 'train' | 'configure'
-  const [botColor, setBotColor] = useState('#5730F5');
+  const [botColor, setBotColor] = useState('#0000FF');
   const [isTraining, setIsTraining] = useState(false);
 
   const [displayText, setDisplayText] = useState('');
@@ -79,7 +79,7 @@ const HeroSection = () => {
                 {displayText}
               </span>
               <span
-                className="inline-block w-[3px] h-[0.85em] ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-sm"
+                className="inline-block w-[3px] h-[0.85em] ml-1 align-middle bg-blue-500 dark:bg-blue-400 rounded-sm"
                 style={{
                   animation: 'caretBlink 1s step-start infinite',
                   verticalAlign: 'middle',
@@ -118,6 +118,13 @@ const HeroSection = () => {
                 docs
               </span>
               Read Docs
+            </Button>
+
+            <Button onClick={() => navigate('/demo')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-xl font-sans text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-none flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-[18px]">
+                experiment
+              </span>
+              Try Demo
             </Button>
           </div>
         </div>
@@ -190,7 +197,7 @@ const HeroSection = () => {
                         <div className="grid grid-cols-2 gap-8 mb-6">
                           <div className="space-y-4">
                             <h4 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">
-                              Identity & <span className="text-indigo-600 dark:text-indigo-400">Deployment</span>
+                              Identity & <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-green-600 dark:from-orange-400 dark:to-green-400">Deployment</span>
                             </h4>
 
                             <div className="space-y-3">
@@ -218,7 +225,7 @@ const HeroSection = () => {
                               <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
                                 {['Next.js', 'React', 'Flutter', 'Angular'].map(tech => (
                                   <li key={tech} className="flex items-center gap-1.5 text-md font-sans text-slate-600 tracking-wider dark:text-slate-300 font-semibold transition-colors">
-                                    <div className="w-1 h-1 bg-indigo-500" /> {tech}
+                                    <div className="w-1 h-1 bg-emerald-500" /> {tech}
                                   </li>
                                 ))}
                               </ul>
@@ -244,8 +251,8 @@ const HeroSection = () => {
                                 />
                               </div>
                             </div>
-                            <button className="w-full py-3 bg-slate-900 dark:bg-indigo-600 outline-1 outline-transparent text-[10px] uppercase tracking-widest font-bold text-white font-sans hover:bg-slate-800 dark:hover:bg-indigo-500 transition-colors">
-                              Create Tenant
+                            <button className="w-full py-3 bg-slate-900 dark:bg-blue-600 outline-1 outline-transparent text-[10px] uppercase tracking-widest font-bold text-white font-sans hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors">
+                              Create Your Bot
                             </button>
                           </div>
                         </div>
@@ -257,7 +264,7 @@ const HeroSection = () => {
                             <p className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors">Quick Embed Snippet</p>
                           </div>
                           <div className="relative group">
-                            <pre className="p-4 bg-slate-900 text-[#F8F8F2] border border-slate-900 text-sm font-mono overflow-hidden shadow-2xl rounded-none group-hover:border-indigo-500/30 transition-colors">
+                            <pre className="p-4 bg-slate-900 text-[#F8F8F2] border border-slate-900 text-sm font-mono overflow-hidden shadow-2xl rounded-none group-hover:border-blue-500/30 transition-colors">
                               <code>
                                 <span className="text-[#6272A4]">&lt;</span>
                                 <span className="text-[#FF79C6]">script</span>
@@ -323,7 +330,7 @@ const HeroSection = () => {
                             <span className="material-symbols-outlined text-[24px] text-gray-300 dark:text-slate-600">public</span>
                             <p className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">https://docs.sapybase.com</p>
                           </div>
-                          <button className="w-full py-3 bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-[10px] uppercase tracking-widest font-bold text-white font-sans transition-colors">
+                          <button className="w-full py-3 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-500 text-[10px] uppercase tracking-widest font-bold text-white font-sans transition-colors">
                             Start Training Sequence
                           </button>
                         </div>
@@ -337,38 +344,48 @@ const HeroSection = () => {
             {/* ── FREE-FLOATING BOT PREVIEW (Outside Window) ─────────────────── */}
             {view === 'train' && (
               <div className="absolute right-4 top-24 w-[310px] z-20 bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 shadow-[0_40px_80px_rgba(0,0,0,0.18)] dark:shadow-[0_40px_80px_rgba(0,0,0,0.6)] overflow-hidden rounded-2xl transition-colors duration-500">
-                {/* Chat Header - Natively Scaled */}
-                <div className="px-4.5 py-3.5 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 bg-linear-to-r from-[#F3E8FF] via-[#F5F3FF] to-[#FFF7ED] dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-[#22C55E]" />
-                    <div className="flex flex-col">
-                      <p className="text-[10px] uppercase tracking-widest font-bold text-[#4F46E5] dark:text-indigo-400 font-sans">Sapy AI</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 font-medium italic opacity-80 transition-colors">Powered by SaPyBase</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[16px] text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 transition-colors">more_horiz</span>
-                    <div className="w-5 h-5 flex items-center justify-center text-red-500 cursor-pointer hover:text-red-700 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                {/* Chat Header - Exact Match */}
+                <div className="relative shrink-0">
+                  <div
+                    className="absolute inset-0 animate-gradient-x opacity-20"
+                    style={{
+                      background: `linear-gradient(90deg, ${botColor}, #f97316, ${botColor})`,
+                      backgroundSize: '200% 200%'
+                    }}
+                  />
+                  <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md text-slate-900 dark:text-slate-100 p-2 flex justify-end items-center relative z-10 border-b border-gray-200/50 dark:border-slate-800/50 transition-colors duration-500">
+                    <div className="relative flex flex-row justify-between items-center w-full">
+                      <div className="relative flex items-center gap-3 pl-2">
+                        <div className="relative">
+                          <div className="absolute -bottom-0.5 -right-0.5 w-2 flex h-2 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
+                          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 shadow-sm border-none p-0 m-0" style={{ backgroundColor: botColor }}>
+                            <span className="font-bold leading-none select-none text-white text-[12px] m-0 p-0">S</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-row items-center justify-center">
+                          <p className="text-sm font-display font-bold" style={{ color: botColor }}>Sapy AI</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="p-1.5 rounded-full flex items-center justify-center min-w-[32px] min-h-[32px]">
+                          <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">more_horiz</span>
+                        </div>
+                        <div className="p-1.5 rounded-full flex items-center justify-center min-w-[32px] min-h-[32px]">
+                          <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Chat Body - Natively Scaled */}
-                <div className="p-4.5 h-[250px] bg-white dark:bg-slate-950 space-y-5 overflow-hidden transition-colors duration-500">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                      <div className="w-full h-full bg-indigo-50 dark:bg-slate-900 border border-indigo-100 dark:border-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 transition-colors">
-                        <span className='material-symbols-outlined' style={{ color: botColor }}>smart_toy</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1 flex-1">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans ml-1 transition-colors">Sapy AI</span>
-                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-3 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-300 leading-relaxed shadow-[0_4px_12px_rgba(0,0,0,0.03)] dark:shadow-none border-b-2 border-b-gray-50 dark:border-b-slate-900 transition-colors">
-                        Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?
-                      </div>
+                {/* Chat Body - Exact Match */}
+                <div className="h-[300px] p-4 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 flex flex-col gap-5 overflow-hidden transition-colors duration-500">
+                  <div className="flex flex-col items-start min-w-0 max-w-[85%] self-start">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">Sapy AI</span>
+                    <div className="px-3 py-2 min-h-[36px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden text-xs font-google leading-relaxed">
+                      Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?
                     </div>
                   </div>
 
@@ -376,29 +393,52 @@ const HeroSection = () => {
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 p-3 bg-gray-50/50 dark:bg-slate-900/50 border border-dashed border-indigo-200 dark:border-indigo-800/50 mt-4 rounded-xl transition-colors"
+                      className="flex items-center gap-3 p-3 bg-white/50 dark:bg-slate-900/50 border border-dashed border-blue-200 dark:border-blue-800/50 mt-1 rounded-xl transition-colors"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-indigo-600 animate-spin" style={{ color: botColor }}>settings</span>
+                      <span className="material-symbols-outlined text-[16px] text-blue-600 animate-spin" style={{ color: botColor }}>settings</span>
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans transition-colors">Training Active</span>
                         <span className="text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans animate-pulse transition-colors">Syncing knowledge base...</span>
                       </div>
                     </motion.div>
                   )}
+
+                  {!isTraining && (
+                    <div className="flex flex-col items-end gap-2 px-1 pb-2 pt-1 self-end w-full mt-auto">
+                      {['Services', 'About'].map((btn, qidx) => (
+                        <div
+                          key={qidx}
+                          className="px-3 py-1.5 border rounded-md text-[11px] font-regular font-google transition-colors w-fit text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+                        >
+                          {btn}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* Chat Footer - Natively Scaled */}
-                <div className="px-4.5 py-4 border-t border-gray-50 dark:border-slate-800 bg-white dark:bg-slate-950 transition-colors duration-500">
-                  <div className="flex gap-2 mb-3">
-                    {['Services', 'About'].map(btn => (
-                       <div key={btn} className="px-4 py-2 bg-[#EEF2FF] dark:bg-indigo-900/40 text-[#4F46E5] dark:text-indigo-300 text-[10px] uppercase tracking-widest font-bold font-sans rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer border border-indigo-50 dark:border-indigo-800/50 shadow-sm">
-                        {btn}
-                      </div>
-                    ))}
+                {/* Fixed Branding Footer */}
+                <div className="shrink-0 py-1 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm border-t border-gray-200/50 dark:border-slate-800/50">
+                  <div className="flex items-center gap-1.5 text-[5px] font-sans font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                    <img src="/SB_loading.svg" alt="SaPyBase" className="w-3.5 h-3.5 grayscale opacity-50" />
+                    Powered by SaPyBase
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">Ask anything...</div>
-                    <span className="material-symbols-outlined text-[16px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer" style={{ color: botColor }}>send</span>
+                </div>
+
+                {/* Input Area - Exact Match */}
+                <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
+                  <div className="p-1 w-full shadow-sm" style={{ paddingBottom: '6px' }}>
+                    <div className="relative flex items-center gap-1 pb-0.5">
+                      <div className="flex-1 min-h-[30px] bg-transparent px-2.5 py-1 text-slate-400 dark:text-slate-500 text-xs font-medium font-sans flex items-center">
+                        Ask anything...
+                      </div>
+                      <div
+                        className="p-1.5 shrink-0 rounded-lg min-w-[28px] min-h-[28px] flex items-center justify-center opacity-50"
+                        style={{ color: botColor }}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">send</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

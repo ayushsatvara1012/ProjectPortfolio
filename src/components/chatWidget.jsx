@@ -252,7 +252,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
 
     return (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
-            <h4 className="text-md font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+            <h4 className="text-sm font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
                 Leave your details<br />and we'll follow up!
             </h4>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -279,7 +279,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full mt-1 rounded-xl py-2 text-md font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
                     style={{ backgroundColor: themeColor }}
                 >
                     {isSubmitting ? (
@@ -291,7 +291,7 @@ const LeadCaptureForm = ({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
                 <button
                     onClick={onDismiss}
                     type="button"
-                    className="text-md font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                    className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
                 >
                     No thanks
                 </button>
@@ -322,7 +322,7 @@ const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
 
     return (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
-            <h4 className="text-md font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
+            <h4 className="text-sm font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
                 Share your details<br />so our team can reach you
             </h4>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -349,7 +349,7 @@ const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full mt-1 rounded-xl py-2 text-md font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+                    className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
                     style={{ backgroundColor: themeColor }}
                 >
                     {isSubmitting ? (
@@ -361,7 +361,7 @@ const HandoffContactForm = ({ themeColor, onSubmit, onDismiss }) => {
                 <button
                     onClick={onDismiss}
                     type="button"
-                    className="text-md font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
+                    className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full"
                 >
                     No thanks
                 </button>
@@ -418,6 +418,8 @@ const ChatWidget = ({ apiKey }) => {
                         avatar_bg_style: data.avatar_bg_style || 'none',
                         // ── v14 ──
                         lead_capture_enabled: data.lead_capture_enabled || false,
+                        // ── white-label: hide footer for STARTER+ plans ──
+                        white_label_enabled: data.white_label_enabled === true,
                     });
                     leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
                     // Only update the welcome message if the user hasn't started chatting yet
@@ -1022,7 +1024,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <button
                                                     onClick={handleHandoff}
                                                     disabled={handoffSent}
-                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium font-google text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50"
                                                 >
                                                     {handoffSent ? 'Team notified ✓' : 'Talk to a human'}
                                                     <span className="material-symbols-outlined text-[18px]">support_agent</span>
@@ -1038,7 +1040,7 @@ const ChatWidget = ({ apiKey }) => {
                                                         setHandoffSent(false);
                                                         setShowMenu(false);
                                                     }}
-                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between"
                                                 >
                                                     Clear chat
                                                     <span className="material-symbols-outlined">refresh</span>
@@ -1048,7 +1050,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     href="https://www.sapybase.com"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full text-left px-4 py-2 text-md font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
+                                                    className="w-full text-left px-4 py-2 text-sm font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
                                                     onClick={() => setShowMenu(false)}
                                                     style={{ color: THEME_COLOR }}
                                                 >
@@ -1076,7 +1078,8 @@ const ChatWidget = ({ apiKey }) => {
                             <div
                                 ref={scrollContainerRef}
                                 onScroll={handleScrollContainer}
-                                className="flex-1 p-4 overflow-y-auto overscroll-none touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar"
+                                data-lenis-prevent
+                                className="flex-1 p-4 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar"
                             >
                                 <div className="flex flex-col gap-5">
                                     <AnimatePresence initial={false}>
@@ -1091,7 +1094,7 @@ const ChatWidget = ({ apiKey }) => {
                                                     initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[85%] ${msg.role === 'user' ? 'self-end text-right' : 'self-start text-left'}`}`}
+                                                    className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[85%] ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}
                                                 >
                                                     {msg.role === 'handoff_form' ? (
                                                         <HandoffContactForm
@@ -1144,9 +1147,9 @@ const ChatWidget = ({ apiKey }) => {
                                                     ) : (
                                                         <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                             {msg.role === 'bot' ? (
-                                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
+                                                                <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
                                                             ) : (
-                                                                <span className="text-md uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
+                                                                <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>
                                                             )}
                                                             <div
                                                                 className={`px-4 py-2 min-h-[38px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere ${msg.role === 'user'
@@ -1156,9 +1159,9 @@ const ChatWidget = ({ apiKey }) => {
                                                                 style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}
                                                             >
                                                                 {msg.role === 'user' ? (
-                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-md font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
+                                                                    <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                                                 ) : (
-                                                                    <div className="min-w-0 max-w-full text-md font-google leading-relaxed">
+                                                                    <div className="min-w-0 max-w-full text-base font-google leading-relaxed">
                                                                         <TypewriterContent
                                                                             content={msg.content}
                                                                             isStreaming={msg.isStreaming}
@@ -1188,7 +1191,7 @@ const ChatWidget = ({ apiKey }) => {
                                                 <button
                                                     key={qidx}
                                                     onClick={() => sendMessage(label)}
-                                                    className="px-4 py-2.5 border rounded-md text-md font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
+                                                    className="px-4 py-2.5 border rounded-md text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500"
                                                     style={{ touchAction: 'manipulation' }}
                                                 >
                                                     {label}
@@ -1201,24 +1204,27 @@ const ChatWidget = ({ apiKey }) => {
                             </div>
                         </div>
 
-                        {/* Fixed Branding Footer */}
-                        <div className="shrink-0 py-1.5 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm">
-                            <a
-                                href="https://www.sapybase.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
-                            >
-                                <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50 group-hover:opacity-100 transition-opacity" />
-                                Powered by SaPyBase
-                            </a>
-                        </div>
 
                         {/* Input Area */}
                         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
+                            
+                            {/* Branding integrated into input area */}
+                            {!configData.white_label_enabled && (
+                                <div className="shrink-0 pt-2 flex justify-center items-center">
+                                    <a
+                                        href="https://www.sapybase.com"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group"
+                                    >
+                                        <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity " />
+                                        Powered by SaPyBase
+                                    </a>
+                                </div>
+                            )}
 
                             {/* Actual Input Box with Safe Area Support */}
-                            <div className="p-2 sm:p-2 w-full shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
+                            <div className="px-2 sm:px-2 w-full shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
                                 <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                                     <textarea
                                         ref={inputRef}
@@ -1226,7 +1232,7 @@ const ChatWidget = ({ apiKey }) => {
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         placeholder="Ask anything..."
-                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-xl font-medium font-sans"
+                                        className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-sm font-medium font-google"
                                         rows={1}
                                         disabled={isLoading}
                                         aria-label="Chat input"
@@ -1461,19 +1467,27 @@ function sanitizeStreamMarkdown(text) {
     return result;
 }
 
-// ── TYPEWRITER COMPONENT: Client-Side Jitter Buffer (Chatbase Architecture) ───
-// Streaming: SSE tokens are caught in an invisible buffer ref. A constant-cadence
-// setInterval (16ms) pulls characters out one-by-one at a perfectly steady rate,
-// completely masking network latency jitter. Only this component re-renders.
-// No framer-motion on the streaming text path — pure CSS transitions only.
-// Non-streaming: Word-by-word typewriter with stable-keyed spans for fade-in.
+// ── Shared Markdown renderer config (used in both streaming crossfade and final render) ──
+const MD_COMPONENTS = {
+    p: ({ node, children, ...props }) => (
+        <p {...props} className="first:mt-0 last:mb-0 mb-2">{children}</p>
+    ),
+    pre: ({ node, children, ...props }) => (
+        <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin">
+            <pre {...props}>{children}</pre>
+        </div>
+    ),
+};
 
-// ── TYPEWRITER COMPONENT: High-Rate Jitter Buffer (Option A) ─────────────────
-// Streaming: SSE tokens are caught in an invisible buffer ref. A time-based
-// requestAnimationFrame (rAF) loop pulls characters out at a steady rate (~65 chars/sec),
-// scaling natively to high-refresh displays (90Hz, 120Hz, etc.).
-// Lite Path: During active streaming, text is rendered as a simple map of spans
-// for maximum performance. Swaps to full ReactMarkdown only on [DONE].
+// Crossfade duration in ms — must match the CSS transition below
+const CROSSFADE_MS = 180;
+
+// ── TYPEWRITER COMPONENT ──────────────────────────────────────────────────────
+// Streaming path: SSE tokens land in a ref-based jitter buffer. A rAF loop
+// drains them at ~65 chars/sec, masking network jitter on any refresh rate.
+// On [DONE]: a CROSSFADE_MS opacity crossfade bridges the raw-span layer and
+// the ReactMarkdown layer — no layout snap, no cursor pop.
+// Non-streaming path: word-by-word typewriter that ends with the same crossfade.
 
 const TypewriterContent = ({
     content,
@@ -1492,11 +1506,19 @@ const TypewriterContent = ({
 
     // ── Jitter buffer state (streaming only) ──────────────────────────────────
     const [displayedText, setDisplayedText] = useState('');
-    const bufferRef = useRef('');             // invisible bucket: ALL received chars
-    const displayIdxRef = useRef(0);          // how many chars are currently shown
-    const rafRef = useRef(null);              // high-rate loop
-    const lastTickRef = useRef(0);            // for time-based cadence
+    const bufferRef = useRef('');
+    const displayIdxRef = useRef(0);
+    const rafRef = useRef(null);
+    const lastTickRef = useRef(0);
     const onStreamTickRef = useRef(onStreamTick);
+
+    // ── Crossfade bridge state ────────────────────────────────────────────────
+    // isFinalizing: true during the CROSSFADE_MS window between raw spans and Markdown
+    const [isFinalizing, setIsFinalizing] = useState(false);
+    // frozenText: the full text snapshot captured at [DONE] / typewriter end,
+    // held steady while the crossfade plays so neither layer changes mid-transition
+    const frozenTextRef = useRef('');
+    const finalizeTimerRef = useRef(null);
 
     useEffect(() => {
         onStreamTickRef.current = onStreamTick;
@@ -1509,22 +1531,17 @@ const TypewriterContent = ({
                 if (!lastTickRef.current) lastTickRef.current = timestamp;
                 const delta = timestamp - lastTickRef.current;
 
-                // Targeting ~65 chars/sec constant typing speed
-                // Every ~15.4ms we want to show a character
-                if (delta >= 15.4) {
+                // ~38 chars/sec at 60fps: one tick every ~26ms, 1 char normally,
+                // up to 3 when significantly backlogged (gentle catch-up only)
+                if (delta >= 26) {
                     lastTickRef.current = timestamp;
 
                     const buffer = bufferRef.current;
                     const idx = displayIdxRef.current;
 
                     if (idx < buffer.length) {
-                        // Dynamic speed scaling (rAF version)
                         const ahead = buffer.length - idx;
-                        let charsToAdd;
-                        if (ahead > 150) charsToAdd = 10;
-                        else if (ahead > 50) charsToAdd = 3;
-                        else if (ahead > 20) charsToAdd = 2;
-                        else charsToAdd = 1;
+                        const charsToAdd = ahead > 80 ? 3 : ahead > 30 ? 2 : 1;
 
                         const newIdx = Math.min(idx + charsToAdd, buffer.length);
                         displayIdxRef.current = newIdx;
@@ -1549,8 +1566,10 @@ const TypewriterContent = ({
                         cancelAnimationFrame(rafRef.current);
                         rafRef.current = null;
                     }
+                    // Do NOT call setDisplayedText here — that would flash the full
+                    // content for one paint cycle before isStreaming flips false.
+                    // The crossfade bridge reads from frozenTextRef/content instead.
                     displayIdxRef.current = full.length;
-                    setDisplayedText(full);
                     return full;
                 },
                 getContent: () => bufferRef.current,
@@ -1566,22 +1585,49 @@ const TypewriterContent = ({
         }
     }, [isStreaming, streamCallbackRef]);
 
+    // Reset buffer when a new stream starts
     useEffect(() => {
         if (isStreaming) {
             setDisplayedText('');
+            setIsFinalizing(false);
+            frozenTextRef.current = '';
             bufferRef.current = '';
             displayIdxRef.current = 0;
         }
     }, [isStreaming]);
 
+    // Detect stream completion: isStreaming just flipped false with content present.
+    // If text was actually displayed (displayedText non-empty), run the crossfade bridge.
+    // If nothing was shown (cache hit, instant error before first token), skip straight
+    // to the non-streaming typewriter by leaving isFinalizing false and isTyped false.
+    const prevIsStreamingRef = useRef(isStreaming);
+    useEffect(() => {
+        const wasStreaming = prevIsStreamingRef.current;
+        prevIsStreamingRef.current = isStreaming;
+
+        if (wasStreaming && !isStreaming && content) {
+            if (displayedText.length > 0) {
+                // Normal stream end: crossfade from what was shown into settled Markdown
+                frozenTextRef.current = content;
+                setIsFinalizing(true);
+                finalizeTimerRef.current = setTimeout(() => {
+                    setIsFinalizing(false);
+                }, CROSSFADE_MS);
+            }
+            // else: nothing was displayed (cache hit / pre-first-token error).
+            // isTyped is false, so the non-streaming typewriter will take over naturally.
+        }
+    }, [isStreaming, content, displayedText]);
+
     useEffect(() => {
         return () => {
             if (typewriterTimerRef.current) clearTimeout(typewriterTimerRef.current);
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
         };
     }, []);
 
-    // ── Non-streaming typewriter (fallback) ───────────────────────────────────
+    // ── Non-streaming typewriter ───────────────────────────────────────────────
     useEffect(() => {
         if (isStreaming || isTyped || !content) {
             setIsTyping(false);
@@ -1592,6 +1638,7 @@ const TypewriterContent = ({
             lastContent.current = content;
             setSegments([]);
             setIsTyping(true);
+            frozenTextRef.current = '';
 
             let currentIdx = 0;
             const words = content.split(/(\s+)/);
@@ -1605,7 +1652,13 @@ const TypewriterContent = ({
                     typewriterTimerRef.current = setTimeout(typeNextWord, delay + (Math.random() * 20 - 10));
                 } else {
                     setIsTyping(false);
-                    if (onComplete) onComplete();
+                    // Crossfade into Markdown instead of snapping
+                    frozenTextRef.current = content;
+                    setIsFinalizing(true);
+                    finalizeTimerRef.current = setTimeout(() => {
+                        setIsFinalizing(false);
+                        if (onComplete) onComplete();
+                    }, CROSSFADE_MS);
                 }
             };
             typeNextWord();
@@ -1613,17 +1666,56 @@ const TypewriterContent = ({
     }, [content, isTyped, isStreaming, onComplete]);
 
     // ══════════════════════════════════════════════════════════════════════════
-    // RENDER: High-Performance View Logic
+    // RENDER
     // ══════════════════════════════════════════════════════════════════════════
 
-    // 1. ACTIVE STREAMING (Option A: Lite Render Spans)
+    // ── Shared Markdown output (rendered in both crossfade and final states) ──
+    const markdownNode = (
+        <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+            {frozenTextRef.current || content}
+        </ReactMarkdown>
+    );
+
+    // 1. CROSSFADE BRIDGE — active for CROSSFADE_MS after typing ends.
+    //    Both layers render identical Markdown so geometry is the same.
+    //    The outgoing layer fades from 1→0 while the incoming fades 0→1.
+    //    The incoming layer is in normal flow to hold container height stable.
+    if (isFinalizing) {
+        return (
+            <div className="relative leading-relaxed text-sm">
+                {/* Incoming layer: in flow, anchors height, fades IN */}
+                <div style={{ opacity: 0, animation: `sapy-fade-in ${CROSSFADE_MS}ms ease-out forwards` }}>
+                    {markdownNode}
+                </div>
+                {/* Outgoing layer: absolutely stacked, identical Markdown, fades OUT with cursor */}
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%',
+                        opacity: 1,
+                        animation: `sapy-fade-out ${CROSSFADE_MS}ms ease-out forwards`,
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+                        {frozenTextRef.current || content}
+                    </ReactMarkdown>
+                    <span
+                        className="sapy-stream-cursor"
+                        style={{ backgroundColor: themeColor, animation: `sapy-fade-out ${CROSSFADE_MS}ms ease-out forwards` }}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // 2. ACTIVE STREAMING — live Markdown render so geometry matches the final settled state
     if (isStreaming) {
         const hasContent = displayedText.length > 0;
-        const streamWords = hasContent ? displayedText.split(/(\s+)/) : [];
 
         return (
             <div className="relative min-h-[28px]">
-                {/* ThinkingLogo Crossfade */}
+                {/* ThinkingLogo crossfades out when first char arrives */}
                 <div
                     style={{
                         opacity: hasContent ? 0 : 1,
@@ -1636,17 +1728,10 @@ const TypewriterContent = ({
                 </div>
 
                 {hasContent && (
-                    <div className="sapy-stream-text-in leading-relaxed text-md">
-                        {/* Word spans: Infinite performance, no Markdown parsing overhead */}
-                        {streamWords.map((word, i) => (
-                            <span
-                                key={i}
-                                className="sapy-word-fade"
-                                style={{ display: 'inline-block', whiteSpace: 'pre-wrap' }}
-                            >
-                                {word}
-                            </span>
-                        ))}
+                    <div className="leading-relaxed text-sm">
+                        <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+                            {sanitizeStreamMarkdown(displayedText)}
+                        </ReactMarkdown>
                         <span className="sapy-stream-cursor" style={{ backgroundColor: themeColor }} />
                     </div>
                 )}
@@ -1654,24 +1739,30 @@ const TypewriterContent = ({
         );
     }
 
-    // 2. COMPLETED MESSAGE (Full Markdown Snap)
+    // 3. NON-STREAMING TYPEWRITER — render the revealed portion as live Markdown
+    //    so geometry stays identical when the crossfade bridge fires.
+    if (isTyping && segments.length > 0) {
+        const revealedText = segments.join('');
+        return (
+            <div className="relative leading-relaxed text-sm">
+                <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+                    {sanitizeStreamMarkdown(revealedText)}
+                </ReactMarkdown>
+            </div>
+        );
+    }
+
+    // Pre-typewriter guard: content exists but the useEffect hasn't fired yet to
+    // set isTyping=true. Without this, Case 4 renders the full message for one
+    // frame before the word-by-word effect starts — causing the flash.
+    if (content && !isTyped && !isTyping) {
+        return <div className="relative min-h-[28px]" />;
+    }
+
+    // 4. COMPLETED MESSAGE — full Markdown, already settled (isTyped: true)
     return (
-        <div className="relative sapy-word-fade leading-relaxed text-md">
-            <ReactMarkdown
-                rehypePlugins={[rehypeSanitize]}
-                components={{
-                    p: ({ node, children, ...props }) => (
-                        <p {...props} className="first:mt-0 last:mb-0 mb-2">{children}</p>
-                    ),
-                    pre: ({ node, children, ...props }) => (
-                        <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin">
-                            <pre {...props}>{children}</pre>
-                        </div>
-                    ),
-                }}
-            >
-                {content}
-            </ReactMarkdown>
+        <div className="relative leading-relaxed text-sm">
+            {markdownNode}
         </div>
     );
 };

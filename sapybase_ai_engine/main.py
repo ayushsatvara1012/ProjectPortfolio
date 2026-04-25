@@ -137,6 +137,203 @@ def validate_safe_url(url: str):
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="Could not resolve the provided URL.")
 
+_URL_TRACKING_PARAMS = frozenset({
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "ref", "fbclid", "gclid", "msclkid", "mc_cid", "mc_eid",
+})
+
+def normalize_source_url(url: str) -> str:
+    """
+    Canonicalise a URL so that re-training the same page always produces the
+    same source_name, regardless of tracking params, trailing slashes, or
+    minor scheme differences.
+
+    Rules applied (in order):
+      1. Lowercase scheme + host.
+      2. Strip well-known tracking query parameters.
+      3. Remove a trailing slash from the path (unless it is the root "/").
+      4. Drop an empty query string or fragment.
+    """
+    from urllib.parse import urlparse, urlencode, urlunparse, parse_qsl
+    parsed = urlparse(url)
+    clean_params = [
+        (k, v) for k, v in parse_qsl(parsed.query)
+        if k.lower() not in _URL_TRACKING_PARAMS
+    ]
+    clean_query = urlencode(clean_params)
+    clean_path = parsed.path.rstrip("/") or "/"
+    normalised = urlunparse((
+        parsed.scheme.lower(),
+        parsed.netloc.lower(),
+        clean_path,
+        parsed.params,
+        clean_query,
+        "",          # strip fragment — irrelevant for server-side scraping
+    ))
+    return normalised
+
+
+def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) -> List[Document]:
+    """
+    Convert a CSV or Excel file into a list of LangChain Documents suitable for
+    vector embedding.  Each non-empty data row becomes one Document so that a
+    question about a specific row (e.g. a product SKU or an FAQ entry) retrieves
+    exactly that row rather than a mixed-bag chunk.
+
+    Chunk format per row:
+        <header1>: <value1> | <header2>: <value2> | ...
+
+    Edge cases handled:
+      - CSV: tries UTF-8, then latin-1 (covers Windows-exported files).
+      - Excel: reads the first sheet; skips sheets that are entirely empty.
+      - Dirty files: heuristic scan of first 15 rows to find the true header row,
+        discarding title/logo/metadata rows above it.
+      - Rows where every cell is blank/NaN are dropped.
+      - Values are coerced to str and stripped; NaN → empty string.
+      - Files with no header row (all columns unnamed) raise a clear error.
+      - Files with zero usable data rows raise a clear error.
+      - Very long cell values are truncated at 500 chars to prevent
+        oversized chunks that degrade embedding quality.
+      - Duplicate column names get a numeric suffix (_1, _2 …) so
+        key:value pairs remain unambiguous.
+    """
+    import pandas as pd
+    from io import BytesIO
+
+    ext = filename.rsplit(".", 1)[-1].lower()
+    MAX_CELL_CHARS = 500
+    HEADER_SCAN_ROWS = 15  # number of leading rows to probe for the true header
+
+    def _row_text_density(row_values) -> int:
+        """Count non-empty, non-numeric-looking cells in a row — good headers are text-rich."""
+        count = 0
+        for v in row_values:
+            s = str(v).strip()
+            if not s or s.lower() in ("nan", "none", ""):
+                continue
+            # Prefer rows whose cells look like labels, not pure numbers/dates
+            try:
+                float(s)
+            except ValueError:
+                count += 1
+            else:
+                # numeric cell still counts as populated, just weighted less
+                count += 0  # do not count pure-number cells toward header score
+        return count
+
+    def _find_header_row(raw_df: pd.DataFrame) -> int:
+        """
+        Scan up to HEADER_SCAN_ROWS rows of a DataFrame that was loaded with
+        header=None (all rows are data).  Return the 0-based index of the row
+        most likely to be the real column-header row.
+
+        Heuristics (evaluated together):
+          1. Most non-empty text cells (highest label density).
+          2. Tie-break: earliest row (prefer closer to top).
+          3. A row is disqualified if it has ≤1 populated cell (title rows).
+          4. If the very first row already looks like a proper header
+             (≥2 text cells, no unnamed gaps), we skip the scan entirely.
+        """
+        probe = raw_df.iloc[:HEADER_SCAN_ROWS]
+        best_idx = 0
+        best_score = -1
+        for i, (_, row) in enumerate(probe.iterrows()):
+            score = _row_text_density(row.values)
+            if score > best_score:
+                best_score = score
+                best_idx = i
+        # If first row wins outright and has ≥2 text labels, trust it
+        return best_idx
+
+    def _load_df() -> pd.DataFrame:
+        if ext == "csv":
+            for enc in ("utf-8", "utf-8-sig", "latin-1", "cp1252"):
+                try:
+                    # Load without assuming row-0 is the header so we can probe
+                    raw = pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc,
+                                      keep_default_na=False, header=None)
+                    header_row = _find_header_row(raw)
+                    if header_row == 0:
+                        # Fast path: re-read normally (avoids an extra copy)
+                        return pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc,
+                                           keep_default_na=False)
+                    return pd.read_csv(BytesIO(file_bytes), dtype=str, encoding=enc,
+                                       keep_default_na=False, skiprows=header_row,
+                                       header=0)
+                except UnicodeDecodeError:
+                    continue
+            raise ValueError("CSV file encoding could not be detected. Save as UTF-8 and retry.")
+        elif ext in ("xlsx", "xls"):
+            try:
+                engine = "openpyxl" if ext == "xlsx" else None
+                # Load without a header row to probe for the real one
+                raw = pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False,
+                                    engine=engine, header=None)
+                header_row = _find_header_row(raw)
+                if header_row == 0:
+                    return pd.read_excel(BytesIO(file_bytes), dtype=str,
+                                         keep_default_na=False, engine=engine)
+                return pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False,
+                                     engine=engine, skiprows=header_row, header=0)
+            except ValueError:
+                raise
+            except Exception as e:
+                raise ValueError(f"Could not parse Excel file: {e}")
+        else:
+            raise ValueError(f"Unsupported tabular format: .{ext}")
+
+    df = _load_df()
+
+    # Deduplicate column names (pandas already does this with .1/.2 suffix by default,
+    # but we normalise to underscore style for cleaner output).
+    seen: dict = {}
+    new_cols = []
+    for col in df.columns:
+        col_str = str(col).strip()
+        if col_str in seen:
+            seen[col_str] += 1
+            new_cols.append(f"{col_str}_{seen[col_str]}")
+        else:
+            seen[col_str] = 0
+            new_cols.append(col_str)
+    df.columns = new_cols
+
+    # Reject files where every column name is "Unnamed: N" (no real header).
+    real_headers = [c for c in df.columns if not re.match(r"^(\d+|Unnamed: \d+)$", c)]
+    if not real_headers:
+        raise ValueError(
+            "The file has no header row. Add column names in the first row (e.g. 'Product', 'Price', 'Description') and re-upload."
+        )
+
+    # Drop completely blank rows.
+    df = df.replace("", float("nan")).dropna(how="all").fillna("")
+
+    if df.empty:
+        raise ValueError("The file contains no data rows after removing blank lines.")
+
+    docs: List[Document] = []
+    for _, row in df.iterrows():
+        parts = []
+        for col in df.columns:
+            val = str(row[col]).strip()
+            if not val:
+                continue
+            if len(val) > MAX_CELL_CHARS:
+                val = val[:MAX_CELL_CHARS] + "…"
+            parts.append(f"{col}: {val}")
+
+        if not parts:
+            continue  # entire row was empty after stripping — skip
+
+        chunk_text = " | ".join(parts)
+        docs.append(Document(page_content=chunk_text, metadata={"source": source_name}))
+
+    if not docs:
+        raise ValueError("No usable data rows found in the file.")
+
+    return docs
+
+
 async def validate_logo_url(url: str) -> None:
     """
     Hardened logo URL validator. Raises HTTPException on any violation.
@@ -269,20 +466,22 @@ def require_fresh_admin(request: Request):
 
 # ── Plan Definitions ────────────────────────────────────────────────────────
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0, "messages": 0,    "chunks": 0,    "speed": "none"},
-    "BASIC":      {"max_bots": 1, "messages": 500,  "chunks": 100,  "speed": "standard"},
-    "STARTER":    {"max_bots": 2, "messages": 2000, "chunks": 500,  "speed": "priority"},
-    "PRO":        {"max_bots": 5, "messages": 5000, "chunks": 2000, "speed": "dedicated"},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 10000, "speed": "dedicated"},
+    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
+    "BASIC":      {"max_bots": 1,   "messages": 500,    "chunks": 100,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
+    "STARTER":    {"max_bots": 2,   "messages": 2000,   "chunks": 500,   "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": False, "analytics": False},
+    "PRO":        {"max_bots": 5,   "messages": 5000,   "chunks": 2000,  "speed": "dedicated", "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
+    "BUSINESS":   {"max_bots": 15,  "messages": 15000,  "chunks": 10000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
 }
 
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
-    "FREE":       "gemini-2.5-flash-lite", 
-    "BASIC":      "gemini-2.5-flash-lite",  # Ultra-low cost, lightning fast
-    "STARTER":    "gemini-2.5-flash",       # Core workhorse, great reasoning
-    "PRO":        "gemini-2.5-pro",         # Stable 2026 flagship for deep reasoning
+    "FREE":       "gemini-2.5-flash-lite",
+    "BASIC":      "gemini-2.5-flash-lite",
+    "STARTER":    "gemini-2.5-flash",
+    "PRO":        "gemini-2.5-pro",
+    "BUSINESS":   "gemini-2.5-pro",
     "ENTERPRISE": "gemini-3.1-pro-preview",
 }
 
@@ -290,7 +489,7 @@ VALID_MODELS = set(MODEL_MAPPING.values()) | {
     "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
 }
 
-def get_tier_model(tier: str, company_model: str = None):
+def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dict = None):
     """
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
@@ -301,8 +500,14 @@ def get_tier_model(tier: str, company_model: str = None):
         print(f"SECURITY WARNING: Invalid company_model detected: {company_model}. Falling back to tier default.")
         company_model = None
 
+    # For CUSTOM tier, prefer the plan-level model override then the bot-level override
+    if tier == "CUSTOM" and custom_plan_config:
+        plan_model = custom_plan_config.get("gemini_model")
+        if plan_model and plan_model in VALID_MODELS:
+            company_model = company_model or plan_model
+
     model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
-    
+
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
     # Output tokens are expensive. We cap them based on user tier to prevent
     # unintentional overruns while keeping the interface snappy.
@@ -311,9 +516,13 @@ def get_tier_model(tier: str, company_model: str = None):
         "BASIC": 600,
         "STARTER": 800,
         "PRO": 1200,
-        "ENTERPRISE": 2048
+        "BUSINESS": 1600,
+        "ENTERPRISE": 2048,
+        "CUSTOM": 1200,
     }
     max_tokens = token_limits.get(tier or "FREE", 600)
+    if tier == "CUSTOM" and custom_plan_config and custom_plan_config.get("max_output_tokens"):
+        max_tokens = custom_plan_config["max_output_tokens"]
 
     return ChatGoogleGenerativeAI(
         model=model_name,
@@ -324,10 +533,30 @@ def get_tier_model(tier: str, company_model: str = None):
 
 UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
 
-def get_plan(tier: str, role: str = None) -> dict:
+def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> dict:
     if role == "SUPER_ADMIN":
         return UNLIMITED_PLAN
-    return PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+    if tier == "CUSTOM" and custom_plan_config:
+        cfg = {**CUSTOM_PLAN_DEFAULTS, **custom_plan_config}
+        return {
+            "max_bots": cfg.get("max_bots") or 1,
+            "messages": cfg.get("max_messages") or 500,
+            "chunks": cfg.get("max_chunks") or 100,
+            "speed": "dedicated",
+            # Feature flags carried through so callers can inspect them
+            "human_handoff": bool(cfg.get("human_handoff")),
+            "lead_capture": bool(cfg.get("lead_capture")),
+            "white_label": bool(cfg.get("white_label")),
+            "webhook": bool(cfg.get("webhook")),
+            "custom_logo": bool(cfg.get("custom_logo")),
+            "analytics": bool(cfg.get("analytics")),
+            "gemini_model": cfg.get("gemini_model"),
+            "max_output_tokens": cfg.get("max_output_tokens"),
+            "plan_name": cfg.get("plan_name", "Custom Plan"),
+            "monthly_price_usd": cfg.get("monthly_price_usd", 0),
+        }
+    plan = PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+    return plan
 
 # 3. Initialize FastAPI App
 app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
@@ -408,6 +637,26 @@ async def startup_event():
     except Exception as e:
         if conn: conn.rollback()
         print(f"MIGRATION WARNING: DB column verification failed: {e}")
+    finally:
+        release_db_connection(conn)
+
+    # 3. Sweep orphaned temp chunks left by jobs that crashed mid-swap.
+    #    Temp rows use the prefix "__temp_" and are safe to remove if they are
+    #    older than 1 hour (well beyond any realistic training duration).
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM company_knowledge WHERE url LIKE '__temp_%%' AND created_at < NOW() - INTERVAL '1 hour'"
+        )
+        swept = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        if swept:
+            print(f"STARTUP SWEEP: Removed {swept} orphaned temp chunk(s) from a previous crashed job.")
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"STARTUP SWEEP WARNING: Orphan cleanup failed ({e}). Non-critical — continuing.")
     finally:
         release_db_connection(conn)
 
@@ -602,16 +851,97 @@ class UserTier(str, Enum):
     STARTER = "STARTER"
     PRO = "PRO"
     ENTERPRISE = "ENTERPRISE"
+    CUSTOM = "CUSTOM"
+
+# ── Custom plan feature flag keys (canonical list) ───────────────────────────
+CUSTOM_PLAN_FEATURE_KEYS = {
+    "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics"
+}
+
+CUSTOM_PLAN_DEFAULTS = {
+    "plan_name": "Custom Plan",
+    "monthly_price_usd": 0,
+    "max_bots": 1,
+    "max_messages": 500,
+    "max_chunks": 100,
+    "gemini_model": None,
+    "max_output_tokens": None,
+    "human_handoff": False,
+    "lead_capture": False,
+    "white_label": False,
+    "webhook": False,
+    "custom_logo": False,
+    "analytics": False,
+    "notes": "",
+}
+
+class CustomPlanConfig(BaseModel):
+    plan_name: Optional[str] = "Custom Plan"
+    monthly_price_usd: Optional[float] = 0
+    max_bots: Optional[int] = None
+    max_messages: Optional[int] = None
+    max_chunks: Optional[int] = None
+    gemini_model: Optional[str] = None
+    max_output_tokens: Optional[int] = None
+    human_handoff: Optional[bool] = False
+    lead_capture: Optional[bool] = False
+    white_label: Optional[bool] = False
+    webhook: Optional[bool] = False
+    custom_logo: Optional[bool] = False
+    analytics: Optional[bool] = False
+    notes: Optional[str] = ""
+
+    @validator("gemini_model")
+    def validate_model(cls, v):
+        if v and v not in VALID_MODELS:
+            raise ValueError(f"gemini_model must be one of: {', '.join(sorted(VALID_MODELS))}")
+        return v
+
+    @validator("max_bots", "max_messages", "max_chunks", "max_output_tokens", pre=True)
+    def non_negative(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Must be 0 or greater")
+        return v
+
+    class Config:
+        extra = "forbid"
 
 class AdminUpdateUserRequest(BaseModel):
     tier: Optional[UserTier] = None
+    status: Optional[str] = None
+    custom_plan_config: Optional[CustomPlanConfig] = None
 
     class Config:
-        extra = "forbid" # Prevents extra fields in the request
+        extra = "forbid"
 
 # 5. Initialize Google AI Models
 embeddings_model_doc = get_embedding_model("retrieval_document")
 embeddings_model_query = get_embedding_model("retrieval_query")
+
+# Cached at startup — avoids an information_schema query on every chat request.
+# Set to True once migration v20 has been applied (adds content_tsv column).
+_HAS_FTS_COLUMN: Optional[bool] = None
+
+def _check_fts_column() -> bool:
+    global _HAS_FTS_COLUMN
+    if _HAS_FTS_COLUMN is not None:
+        return _HAS_FTS_COLUMN
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'company_knowledge' AND column_name = 'content_tsv'
+            LIMIT 1
+            """
+        )
+        _HAS_FTS_COLUMN = cursor.fetchone() is not None
+        cursor.close()
+        release_db_connection(conn)
+    except Exception:
+        _HAS_FTS_COLUMN = False
+    return _HAS_FTS_COLUMN
 
 # Deprecated: use get_tier_model(tier) instead
 
@@ -671,7 +1001,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             SELECT c.id, c.company_name, c.company_tone, c.theme_color, c.allowed_origin,
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
-                   u.email, c.handoff_redirect_url
+                   u.email, c.handoff_redirect_url, c.hide_branding
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -687,10 +1017,38 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         # SECURITY: Do NOT log any part of the key or hash in production.
         raise HTTPException(status_code=401, detail="Invalid API Key.")
 
-    # Determine if lead capture is enabled for this company
+    # Determine if lead capture / handoff is enabled for this company
     tier = (company_data[13] or "FREE").upper()
     role = company_data[14]
-    lead_capture_enabled = tier in ["PRO", "ENTERPRISE"] or role == "SUPER_ADMIN"
+    if tier == "CUSTOM":
+        # custom_plan_config is fetched below; we do a targeted lookup here
+        _conn2 = get_db_connection()
+        try:
+            _cur2 = _conn2.cursor()
+            _cur2.execute(
+                "SELECT custom_plan_config FROM users u JOIN companies c ON c.user_id = u.id WHERE c.api_key = %s",
+                (hashed_key,)
+            )
+            _cfg_row = _cur2.fetchone()
+            _cur2.close()
+            _custom_cfg = (_cfg_row[0] if _cfg_row and isinstance(_cfg_row[0], dict) else {})
+        finally:
+            release_db_connection(_conn2)
+        lead_capture_enabled  = bool(_custom_cfg.get("lead_capture"))
+        human_handoff_enabled = bool(_custom_cfg.get("human_handoff"))
+        webhook_enabled       = bool(_custom_cfg.get("webhook"))
+        white_label_enabled   = bool(_custom_cfg.get("white_label"))
+        custom_logo_enabled   = bool(_custom_cfg.get("custom_logo"))
+        analytics_enabled     = bool(_custom_cfg.get("analytics"))
+    else:
+        _plan = PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+        _super = role == "SUPER_ADMIN"
+        lead_capture_enabled  = _super or bool(_plan.get("lead_capture"))
+        human_handoff_enabled = _super or bool(_plan.get("human_handoff"))
+        webhook_enabled       = _super or bool(_plan.get("webhook"))
+        white_label_enabled   = _super or bool(_plan.get("white_label"))
+        custom_logo_enabled   = _super or bool(_plan.get("white_label"))
+        analytics_enabled     = _super or bool(_plan.get("analytics"))
 
     # Package the company data
     company = {
@@ -707,10 +1065,17 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "logo_shape": company_data[10] or "circle",
         "custom_logo_url": company_data[11],
         "avatar_bg_style": company_data[12] or "none",
-        "lead_capture_enabled": lead_capture_enabled,
+        "lead_capture_enabled":  lead_capture_enabled,
+        "human_handoff_enabled": human_handoff_enabled,
+        "webhook_enabled":       webhook_enabled,
+        # white_label_enabled is True when the plan supports it AND the user has toggled hide_branding on
+        "white_label_enabled":   white_label_enabled and bool(company_data[18]),
+        "custom_logo_enabled":   custom_logo_enabled,
+        "analytics_enabled":     analytics_enabled,
         "webhook_url": company_data[15],
         "owner_email": company_data[16],
         "handoff_redirect_url": company_data[17],
+        "hide_branding": bool(company_data[18]),
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -913,20 +1278,20 @@ async def get_current_user(request: Request):
                         print(f"RECONCILIATION: Merged pending data into existing real account.")
 
             # Now fetch the final consolidated state
-            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end FROM users WHERE clerk_id = %s", (clerk_id,))
+            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config FROM users WHERE clerk_id = %s", (clerk_id,))
             row = cursor.fetchone()
 
             if not row and email != "unknown@email.com":
                 # Final fallback: provision new row if still none exists
                 cursor.execute(
-                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end",
+                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config",
                     (clerk_id, email)
                 )
                 row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
             if row:
                 # Assign variables correctly from the expanded query before use
-                user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end = row
+                user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
                 
                 # 4. Role Sync & "Only 1 Super Admin" Enforcement
                 # CRITICAL: Ensures no one else can EVER have the SUPER_ADMIN role.
@@ -953,18 +1318,20 @@ async def get_current_user(request: Request):
         
         if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
 
-        user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end = row
+        user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
+        custom_plan_cfg = custom_plan_config_raw if isinstance(custom_plan_config_raw, dict) else None
         # Return updated values if they were changed by self-healing
         return {
-            "id": user_id, 
-            "clerk_id": clerk_id, 
-            "role": role, 
-            "email": user_email, 
-            "tier": tier, 
+            "id": user_id,
+            "clerk_id": clerk_id,
+            "role": role,
+            "email": user_email,
+            "tier": tier,
             "subscription_status": subscription_status,
             "trial_end_date": trial_end_date,
             "polar_customer_id": polar_cust_id,
-            "billing_period_end": billing_end
+            "billing_period_end": billing_end,
+            "custom_plan_config": custom_plan_cfg,
         }
         
     except HTTPException: raise
@@ -1018,7 +1385,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1028,7 +1395,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1057,25 +1424,200 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "avatar_bg_style": company_row[14] or "none",
             "webhook_url": company_row[15],
             "handoff_redirect_url": company_row[16],
+            "hide_branding": bool(company_row[17]),
         }
     finally:
         release_db_connection(conn)
 
-def retrieve_knowledge(conn, company_id, query_vector, limit=5, distance_threshold=0.45):
-    """Performs Cosine Similarity search using pgvector for a SPECIFIC company with a strict distance threshold."""
+async def hyde_expand(query: str) -> str:
+    """
+    HyDE (Hypothetical Document Embeddings): generates a short hypothetical answer
+    to the query, then returns that text for embedding instead of the raw query.
+
+    Why this helps: embedding a hypothetical answer places the vector closer to
+    real answer chunks in the embedding space than the short question itself does.
+    For example, "what is the price?" embeds far from pricing paragraphs, but a
+    hypothetical answer like "The Pro plan costs $X per month..." embeds right
+    next to the real pricing chunk.
+
+    BM25 is unaffected — it always uses the original user query (keyword matching
+    doesn't benefit from a hypothetical answer).
+
+    Falls back to the original query silently if the LLM call fails, so this
+    never blocks or degrades the chat response.
+    """
+    try:
+        hyde_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=120,
+            temperature=0.0,
+        )
+        prompt = (
+            f"Write a single short paragraph (2-4 sentences) that directly answers "
+            f"the following question as if you were an expert with full knowledge. "
+            f"Be specific and factual. Do not say 'I' or 'As an AI'.\n\nQuestion: {query}"
+        )
+        response = await hyde_model.ainvoke([HumanMessage(content=prompt)])
+        expanded = response.content.strip()
+        if expanded:
+            return expanded
+    except Exception as e:
+        print(f"[HyDE] Expansion failed, using raw query: {e}")
+    return query
+
+
+def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", limit=15):
+    """
+    Hybrid retrieval (BM25 + pgvector cosine) merged via Reciprocal Rank Fusion,
+    with parent-child resolution.
+
+    Search targets CHILD rows only (they hold the embeddings and FTS index).
+    After ranking, each child's parent content is fetched and returned to the LLM
+    instead of the small child text — giving precise matching with rich context.
+
+    For legacy flat chunks (parent_id IS NULL), the child's own content is used,
+    so old un-re-ingested sources continue to work without any data migration.
+
+    RRF score = 1/(60 + rank_vector) + 1/(60 + rank_bm25)
+
+    Falls back to pure vector search when the FTS column is not yet present
+    (i.e. before migration v20 has been applied).
+    """
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT content, url FROM company_knowledge 
-        WHERE company_id = %s AND embedding <=> %s::vector < %s
-        ORDER BY embedding <=> %s::vector 
-        LIMIT %s
-        """,
-        (company_id, query_vector, distance_threshold, query_vector, limit)
-    )
+    has_fts = _check_fts_column()
+
+    if has_fts and query_text.strip():
+        cursor.execute(
+            """
+            WITH vector_ranked AS (
+                SELECT
+                    id,
+                    parent_id,
+                    content,
+                    url,
+                    ROW_NUMBER() OVER (ORDER BY embedding <=> %s::vector) AS rank
+                FROM company_knowledge
+                WHERE company_id = %s
+                  AND chunk_type = 'child'
+                  AND embedding <=> %s::vector < 0.7
+                LIMIT 30
+            ),
+            bm25_ranked AS (
+                SELECT
+                    id,
+                    parent_id,
+                    content,
+                    url,
+                    ROW_NUMBER() OVER (
+                        ORDER BY ts_rank_cd(content_tsv, plainto_tsquery('english', %s)) DESC
+                    ) AS rank
+                FROM company_knowledge
+                WHERE company_id = %s
+                  AND chunk_type = 'child'
+                  AND content_tsv @@ plainto_tsquery('english', %s)
+                LIMIT 30
+            ),
+            rrf AS (
+                SELECT
+                    COALESCE(v.id,        b.id)        AS child_id,
+                    COALESCE(v.parent_id, b.parent_id) AS parent_id,
+                    COALESCE(v.content,   b.content)   AS child_content,
+                    COALESCE(v.url,       b.url)        AS url,
+                    COALESCE(1.0 / (60 + v.rank), 0.0)
+                  + COALESCE(1.0 / (60 + b.rank), 0.0) AS rrf_score
+                FROM vector_ranked v
+                FULL OUTER JOIN bm25_ranked b USING (id)
+            )
+            SELECT
+                -- Return parent content when available (richer context for the LLM),
+                -- fall back to child content for legacy flat chunks.
+                COALESCE(p.content, rrf.child_content) AS context_content,
+                rrf.url
+            FROM rrf
+            LEFT JOIN company_knowledge p
+                   ON p.id = rrf.parent_id
+            ORDER BY rrf.rrf_score DESC
+            LIMIT %s
+            """,
+            (
+                query_vector, company_id, query_vector,   # vector_ranked
+                query_text, company_id, query_text,       # bm25_ranked
+                limit,
+            )
+        )
+    else:
+        # Pre-v20 fallback or empty query: pure vector search with parent resolution
+        cursor.execute(
+            """
+            SELECT
+                COALESCE(p.content, ck.content) AS context_content,
+                ck.url
+            FROM company_knowledge ck
+            LEFT JOIN company_knowledge p ON p.id = ck.parent_id
+            WHERE ck.company_id = %s
+              AND ck.chunk_type = 'child'
+              AND ck.embedding <=> %s::vector < 0.55
+            ORDER BY ck.embedding <=> %s::vector
+            LIMIT %s
+            """,
+            (company_id, query_vector, query_vector, limit)
+        )
+
     results = cursor.fetchall()
     cursor.close()
     return results
+
+
+async def rerank_chunks(query: str, candidates: list, top_k: int = 5) -> list:
+    """
+    LLM-based reranker using Gemini Flash Lite (fast + cheap).
+    Scores each candidate chunk 0-10 for relevance to the query,
+    then returns the top_k highest-scoring chunks.
+
+    Falls back to returning the first top_k candidates unchanged if reranking fails,
+    so the chat endpoint is never blocked by a reranker error.
+    """
+    if not candidates or len(candidates) <= top_k:
+        return candidates
+
+    try:
+        rerank_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=200,
+            temperature=0.0,
+        )
+
+        numbered = "\n\n".join(
+            [f"[{i}] {chunk[0][:400]}" for i, chunk in enumerate(candidates)]
+        )
+        rerank_prompt = f"""You are a relevance scoring engine. Score each passage below from 0 to 10 based on how directly and completely it answers the query.
+
+Query: {query}
+
+Passages:
+{numbered}
+
+Respond ONLY with a JSON array of integers in the same order as the passages. Example: [8, 3, 9, 1, 7, 2, 6, 4, 0, 5]
+Output nothing else."""
+
+        response = await rerank_model.ainvoke([HumanMessage(content=rerank_prompt)])
+        raw = response.content.strip()
+
+        # Parse JSON array — strip markdown fences if present
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        scores = json.loads(raw)
+
+        if not isinstance(scores, list) or len(scores) != len(candidates):
+            raise ValueError("Score list length mismatch")
+
+        ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
+        return [chunk for _, chunk in ranked[:top_k]]
+
+    except Exception as e:
+        print(f"[RERANKER] Failed, using raw retrieval order: {e}")
+        return candidates[:top_k]
 
 class CompanyUpdate(BaseModel):
     company_id:       Optional[str]  = None
@@ -1097,6 +1639,8 @@ class CompanyUpdate(BaseModel):
     webhook_url:           Optional[str]  = None   # HTTPS URL for lead capture webhooks
     # ── v17 human handoff ──
     handoff_redirect_url:  Optional[str]  = None   # WhatsApp/Calendly/etc link shown after handoff
+    # ── v18 white-label ──
+    hide_branding:         Optional[bool] = None   # True = remove "Powered by SaPyBase" footer
 
     @validator('webhook_url')
     def validate_webhook_url(cls, v):
@@ -1144,8 +1688,10 @@ async def update_company_details(
             )
 
     # ── PRO-only gate: webhook_url ──
+    custom_plan_cfg = user.get("custom_plan_config") or {}
     if update.webhook_url is not None and update.webhook_url.strip():
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+        custom_webhook_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("webhook"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_webhook_ok:
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -1157,7 +1703,8 @@ async def update_company_details(
 
     # ── PRO-only gate: handoff_redirect_url ──
     if update.handoff_redirect_url is not None and update.handoff_redirect_url.strip():
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+        custom_handoff_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("human_handoff"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_handoff_ok:
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -1169,7 +1716,8 @@ async def update_company_details(
 
     # ── PRO-only gate: custom_logo_url ──
     if update.custom_logo_url is not None and update.custom_logo_url.strip():
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN":
+        custom_logo_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("custom_logo"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_logo_ok:
             raise HTTPException(
                 status_code=402,
                 detail={
@@ -1187,6 +1735,20 @@ async def update_company_details(
             raise HTTPException(
                 status_code=402,
                 detail="Bot shape selection requires a Starter or Pro plan."
+            )
+
+    # ── hide_branding available to STARTER+ (white-label plans) ──
+    if update.hide_branding is True:
+        _plan_wl = PLAN_LIMITS.get(tier or "FREE", PLAN_LIMITS["FREE"])
+        custom_wl_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("white_label"))
+        if not _plan_wl.get("white_label") and role != "SUPER_ADMIN" and not custom_wl_ok:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Removing SaPyBase branding requires the Starter plan or higher.",
+                    "upgrade_url": "/app/pricing"
+                }
             )
 
     conn = get_db_connection()
@@ -1384,7 +1946,7 @@ async def chat_endpoint(
             raise HTTPException(status_code=404, detail="Subscription data not found.")
 
         tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
-        plan = get_plan(tier, role=user_role)
+        plan = get_plan(tier, role=user_role, custom_plan_config=company.get("custom_plan_config"))
         current_limit = plan["messages"]
 
         # Billing check: ensure the subscription is currently active (case-insensitive).
@@ -1451,12 +2013,15 @@ async def chat_endpoint(
                 )
         # ── END CACHE LOOKUP (miss — continue to full RAG + Gemini) ──────────
 
-        # 2. Vector Search (RAG)
-        query_vector = embeddings_model_query.embed_query(chat_req.message)
+        # 2. HyDE query expansion + Vector Search (RAG) + Reranking
+        hyde_text = await hyde_expand(chat_req.message)
+        query_vector = embeddings_model_query.embed_query(hyde_text)
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
-            
-        retrieved_docs = retrieve_knowledge(conn, company["id"], query_vector)
+
+        # Hybrid retrieval (BM25 uses original query; vector uses HyDE-expanded embedding)
+        candidate_docs = retrieve_knowledge(conn, company["id"], query_vector, query_text=chat_req.message)
+        retrieved_docs = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
         # ── Runtime values from company record ─────────────────────────────────
         bot_name        = company.get("bot_name") or "Sapy AI"
@@ -1518,10 +2083,24 @@ End your response with a single line: 📎 Source: [url]
 If no URL is available, omit this line entirely.
 
 [RULE 5 — ESCALATION TRIGGERS]
-If the user's message contains any of these signals, append the escalation note:
-  Signals: "urgent", "not working", "broken", "billing", "charge", "refund",
-           "my account", "transaction", "order", "complaint", or visible frustration.
-  Escalation note: "💬 Need immediate help? Contact {company_name} support directly."
+Escalation ONLY fires when the user is expressing a PROBLEM or DISTRESS — NOT when they are asking for information.
+
+ESCALATE when the user's message shows one of these active distress signals:
+  • Reporting a failure: "not working", "broken", "stopped working", "error", "crash", "bug"
+  • Disputing a charge: "wrong charge", "overcharged", "double charged", "didn't authorize"
+  • Requesting a refund: "refund", "cancel my subscription", "want my money back"
+  • Account emergency: "locked out", "can't log in", "account suspended", "account deleted"
+  • Explicit complaint: "this is unacceptable", "terrible", "very frustrated", "angry"
+  • Urgency marker alongside a problem: "urgent" + a problem description
+
+DO NOT escalate for:
+  • Informational questions about pricing, plans, or costs ("what does X cost?", "how much is the Pro plan?")
+  • General "how do I" questions
+  • Feature comparisons
+  • Billing questions that are informational ("when does my billing cycle reset?", "what payment methods do you accept?")
+
+When escalation IS triggered, append ONLY this single line at the end:
+  "💬 Need immediate help? Contact {company_name} support directly."
 
 [RULE 6 — FALLBACK PROTOCOL]
 When the KNOWLEDGE BASE is empty OR contains no relevant answer:
@@ -1788,8 +2367,8 @@ async def request_human_handoff(
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """Widget calls this when a visitor clicks 'Talk to a human'. Emails the transcript to the owner."""
-    if not company.get("lead_capture_enabled"):
-        raise HTTPException(status_code=402, detail="Human handoff requires the Pro plan.")
+    if not company.get("human_handoff_enabled"):
+        raise HTTPException(status_code=402, detail="Human handoff is not enabled on this plan.")
     transcript = [{"role": m.role, "content": m.content} for m in payload.transcript]
     owner_email = company.get("owner_email")
     bot_name = company.get("bot_name", "AI Assistant")
@@ -2257,7 +2836,7 @@ def generate_insight_report(
 
         # ── FETCH RECENT CONVERSATIONS (ALWAYS FRESH) ────────────────────────
         cursor.execute(
-            """SELECT user_query, is_unanswered, created_at FROM chat_logs 
+            """SELECT user_query, is_unanswered, created_at FROM chat_logs
                WHERE company_id = %s ORDER BY created_at DESC LIMIT 15""",
             (company_id,)
         )
@@ -2269,6 +2848,68 @@ def generate_insight_report(
                 "timestamp": r[2].isoformat() if r[2] else None
             } for r in recent_rows
         ]
+
+        # ── FETCH PEAK ACTIVITY BLOCKS (ALWAYS FRESH) ────────────────────────
+        cursor.execute("""
+            WITH DailyStats AS (
+                SELECT
+                    DATE(created_at) AS log_date,
+                    COUNT(DISTINCT session_id) as interacted_users,
+                    COUNT(id) as total_questions,
+                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
+                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at)
+            ),
+            DailyTopQueries AS (
+                SELECT
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY DATE(created_at), user_query
+            ),
+            DailyTopUnanswered AS (
+                SELECT
+                    DATE(created_at) AS log_date,
+                    user_query,
+                    COUNT(*) as query_count,
+                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                FROM chat_logs
+                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
+                GROUP BY DATE(created_at), user_query
+            )
+            SELECT
+                s.log_date,
+                s.interacted_users,
+                s.total_questions,
+                s.answered_questions,
+                s.unanswered_questions,
+                q1.user_query as top_q1,
+                q2.user_query as top_q2,
+                u1.user_query as top_unanswered1,
+                u2.user_query as top_unanswered2
+            FROM DailyStats s
+            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
+            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
+            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
+            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
+            ORDER BY s.log_date DESC;
+        """, (company_id, company_id, company_id))
+        fresh_peak_blocks = []
+        for r in cursor.fetchall():
+            fresh_peak_blocks.append({
+                "date": r[0].isoformat() if r[0] else None,
+                "interacted_users": int(r[1]) if r[1] else 0,
+                "total_questions": int(r[2]) if r[2] else 0,
+                "answered_questions": int(r[3]) if r[3] else 0,
+                "unanswered_questions": int(r[4]) if r[4] else 0,
+                "top_questions": [q for q in [r[5], r[6]] if q],
+                "top_unanswered": [q for q in [r[7], r[8]] if q]
+            })
 
         # ── STEP A: 24-HOUR COOLDOWN CHECK ───────────────────────────────────
         cursor.execute(
@@ -2284,6 +2925,7 @@ def generate_insight_report(
             if isinstance(report_data, str):
                 report_data = json.loads(report_data)
             report_data["recent_conversations"] = recent_activity
+            report_data["peak_activity_blocks"] = fresh_peak_blocks
 
             return {
                 "status": "cached",
@@ -2324,71 +2966,6 @@ def generate_insight_report(
 
         support_savings = total_answered * avg_cost
         potential_revenue = total_leads * avg_lead
-
-        # ── 30-DAY SQL HEATMAP AGGREGATION ───────────────────────────────────
-        # ── 30-DAY PEAK ACTIVITY BLOCKS (CTE) ────────────────────────────────
-        cursor.execute("""
-            WITH DailyStats AS (
-                SELECT 
-                    DATE(created_at) AS log_date,
-                    COUNT(DISTINCT session_id) as interacted_users,
-                    COUNT(id) as total_questions,
-                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
-                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(created_at)
-            ),
-            DailyTopQueries AS (
-                SELECT 
-                    DATE(created_at) AS log_date,
-                    user_query,
-                    COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(created_at), user_query
-            ),
-            DailyTopUnanswered AS (
-                SELECT 
-                    DATE(created_at) AS log_date,
-                    user_query,
-                    COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
-                GROUP BY DATE(created_at), user_query
-            )
-            SELECT 
-                s.log_date,
-                s.interacted_users,
-                s.total_questions,
-                s.answered_questions,
-                s.unanswered_questions,
-                q1.user_query as top_q1,
-                q2.user_query as top_q2,
-                u1.user_query as top_unanswered1,
-                u2.user_query as top_unanswered2
-            FROM DailyStats s
-            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
-            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
-            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
-            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
-            ORDER BY s.log_date DESC;
-        """, (company_id, company_id, company_id))
-        
-        blocks_rows = cursor.fetchall()
-        peak_activity_blocks = []
-        for r in blocks_rows:
-            peak_activity_blocks.append({
-                "date": r[0].isoformat() if r[0] else None,
-                "interacted_users": int(r[1]) if r[1] else 0,
-                "total_questions": int(r[2]) if r[2] else 0,
-                "answered_questions": int(r[3]) if r[3] else 0,
-                "unanswered_questions": int(r[4]) if r[4] else 0,
-                "top_questions": [q for q in [r[5], r[6]] if q],
-                "top_unanswered": [q for q in [r[7], r[8]] if q]
-            })
 
         # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
         cursor.execute(
@@ -2463,16 +3040,15 @@ Rules:
             "support_savings": f"${support_savings:.2f}", 
             "potential_revenue": f"${potential_revenue:.2f}"
         }
-        report_json["peak_activity_blocks"] = peak_activity_blocks
-
-        # ── SAVE REPORT TO DB ────────────────────────────────────────────────
+        # Save the AI report WITHOUT peak_activity_blocks (those are always re-fetched fresh)
         cursor.execute(
             "INSERT INTO insight_reports (company_id, report_json) VALUES (%s, %s)",
             (company_id, json.dumps(report_json))
         )
         conn.commit()
 
-        # Inject fresh recent conversations into the final object before returning
+        # Inject always-fresh data after saving (not persisted in cache)
+        report_json["peak_activity_blocks"] = fresh_peak_blocks
         report_json["recent_conversations"] = recent_activity
 
         print(f"[INSIGHT REPORT] Generated new report for company={company_id} from {len(logs)} logs")
@@ -2603,71 +3179,258 @@ async def run_training_job(
     current_user: dict,
     limit: int,
     source_name: str,
+    is_upsert: bool = False,
+    lock_key: str = "",
+    skip_splitting: bool = False,
 ):
-    """Background task: embeds and inserts chunks. State is persisted in Redis."""
+    """
+    Background task: embeds and inserts knowledge chunks using a safe swap pattern
+    with parent-child chunking (small-to-big retrieval).
+
+    Parent-child strategy:
+      - Each document is first split into PARENT chunks (1500 chars, 150 overlap).
+        Parents are stored in the DB but NOT embedded — they carry the full context.
+      - Each parent is then split into CHILD chunks (300 chars, 50 overlap).
+        Children ARE embedded and searched (vector + BM25).
+      - At retrieval time, the child's parent content is returned to the LLM,
+        giving precise matching with rich, coherent context.
+
+    Quota counts only child rows (chunk_type = 'child') — parents are free storage.
+
+    Swap sequence (upsert path):
+      1. Insert all new parent+child rows under a unique temp key.
+      2. Verify every batch committed successfully.
+      3. Atomically rename temp rows → real source_name (single UPDATE, no gap).
+      4. Delete old rows that still carry the original source_name.
+      5. Invalidate the query cache.
+
+    On any failure the temp rows are deleted and the original data is untouched.
+
+    Tabular files (skip_splitting=True) use a flat single-chunk-per-row layout
+    because splitting CSV rows destroys their key:value structure. They are stored
+    as 'child' rows with no parent.
+    """
+    temp_source_name = f"__temp_{job_id}_{source_name}"
     status = {"status": "processing", "progress": 0, "total": 0}
     await set_job_status(job_id, status)
 
     conn = None
-    try:
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-        all_chunks = text_splitter.split_documents(docs)
+    # child_chunks_committed: only child rows, used for quota accounting and upsert cleanup.
+    child_chunks_committed = 0
+    # total_rows_committed: parent + child rows, used for the upsert DELETE boundary.
+    total_rows_committed = 0
 
+    try:
+        # ── Splitting ────────────────────────────────────────────────────────────
+        if skip_splitting:
+            # Tabular: each Document is already one final row-chunk.
+            # Store as flat children with no parent.
+            child_only_chunks = docs
+            parent_child_pairs = []  # [(parent_text, [child_text, ...])]
+        else:
+            # Step 1: split into large parent chunks for rich LLM context
+            parent_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1500, chunk_overlap=150
+            )
+            parent_docs = parent_splitter.split_documents(docs)
+
+            # Step 2: split each parent into small child chunks for precise embedding
+            child_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=300, chunk_overlap=50
+            )
+            parent_child_pairs = []
+            for parent_doc in parent_docs:
+                child_texts = child_splitter.split_text(parent_doc.page_content)
+                if child_texts:
+                    parent_child_pairs.append((parent_doc.page_content, child_texts))
+            child_only_chunks = []  # not used when parent_child_pairs is populated
+
+        # ── Quota: count only child rows ─────────────────────────────────────────
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
-        current_count = cursor.fetchone()[0]
-        remaining = max(0, limit - current_count)
-        chunks = all_chunks[:remaining]
-        
-        status["total"] = len(chunks)
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+            (resolved_company_id,)
+        )
+        total_child_count = cursor.fetchone()[0]
 
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+            (resolved_company_id, source_name)
+        )
+        old_child_count = cursor.fetchone()[0]
 
+        effective_child_count = total_child_count - old_child_count
+        remaining = max(0, limit - effective_child_count)
+
+        # Flatten child texts for quota cap and progress tracking
+        if skip_splitting:
+            all_child_texts_flat = [(None, doc) for doc in child_only_chunks]
+            # (parent_db_id, child_Document)
+        else:
+            all_child_texts_flat = []
+            for parent_text, child_texts in parent_child_pairs:
+                for ct in child_texts:
+                    all_child_texts_flat.append((parent_text, ct))
+
+        # Cap to remaining quota (child count)
+        capped_pairs = all_child_texts_flat[:remaining]
+
+        status["total"] = len(capped_pairs)
         await set_job_status(job_id, status)
 
+        # ── Phase 1: Insert under temp key ───────────────────────────────────────
+        # For parent-child: insert parent first, capture its DB id, then insert children
+        # pointing to it. All rows use temp_source_name until the atomic rename.
+        #
+        # For tabular (skip_splitting): insert flat child rows directly.
+
         BATCH_SIZE = 10
-        for i in range(0, len(chunks), BATCH_SIZE):
-            batch = chunks[i:i + BATCH_SIZE]
-            texts = [c.page_content for c in batch]
-            # ── NON-BLOCKING: Use async embedding call to keep event loop alive ──
-            embeddings_list = await embeddings_model_doc.aembed_documents(texts)
 
-            for chunk, embedding in zip(batch, embeddings_list):
-                if len(embedding) > EMBEDDING_DIMENSIONS:
-                    embedding = embedding[:EMBEDDING_DIMENSIONS]
-                cursor.execute(
-                    "INSERT INTO company_knowledge (company_id, content, url, embedding) VALUES (%s, %s, %s, %s)",
-                    (resolved_company_id, chunk.page_content, chunk.metadata.get("source", source_name), embedding)
+        if skip_splitting:
+            # Flat child-only insertion (tabular files)
+            for i in range(0, len(capped_pairs), BATCH_SIZE):
+                batch = capped_pairs[i:i + BATCH_SIZE]
+                texts = [pair[1].page_content for pair in batch]
+                embeddings_list = await embeddings_model_doc.aembed_documents(texts)
+
+                for (_, doc), embedding in zip(batch, embeddings_list):
+                    if len(embedding) > EMBEDDING_DIMENSIONS:
+                        embedding = embedding[:EMBEDDING_DIMENSIONS]
+                    cursor.execute(
+                        """INSERT INTO company_knowledge
+                               (company_id, content, url, embedding, chunk_type, parent_id)
+                           VALUES (%s, %s, %s, %s, 'child', NULL)""",
+                        (resolved_company_id, doc.page_content, temp_source_name, embedding)
+                    )
+
+                conn.commit()
+                child_chunks_committed += len(batch)
+                total_rows_committed += len(batch)
+                status["progress"] = child_chunks_committed
+                await set_job_status(job_id, status)
+                await asyncio.sleep(0.1)
+        else:
+            # Parent-child insertion
+            # Group capped children back by parent to minimise parent inserts
+            # (a parent is only inserted if at least one of its children survived the cap).
+            seen_parents: dict[str, str] = {}  # parent_text -> parent DB id (as str)
+
+            for i in range(0, len(capped_pairs), BATCH_SIZE):
+                batch = capped_pairs[i:i + BATCH_SIZE]
+                # Embed only child texts (parents are not embedded)
+                child_texts = [ct for (_, ct) in batch]
+                embeddings_list = await embeddings_model_doc.aembed_documents(child_texts)
+
+                for (parent_text, child_text), embedding in zip(batch, embeddings_list):
+                    # Insert parent row on first encounter of this parent text
+                    if parent_text not in seen_parents:
+                        cursor.execute(
+                            """INSERT INTO company_knowledge
+                                   (company_id, content, url, embedding, chunk_type, parent_id)
+                               VALUES (%s, %s, %s, NULL, 'parent', NULL)
+                               RETURNING id""",
+                            (resolved_company_id, parent_text, temp_source_name)
+                        )
+                        parent_db_id = cursor.fetchone()[0]
+                        seen_parents[parent_text] = parent_db_id
+                        total_rows_committed += 1
+                    else:
+                        parent_db_id = seen_parents[parent_text]
+
+                    if len(embedding) > EMBEDDING_DIMENSIONS:
+                        embedding = embedding[:EMBEDDING_DIMENSIONS]
+                    cursor.execute(
+                        """INSERT INTO company_knowledge
+                               (company_id, content, url, embedding, chunk_type, parent_id)
+                           VALUES (%s, %s, %s, %s, 'child', %s)""",
+                        (resolved_company_id, child_text, temp_source_name, embedding, parent_db_id)
+                    )
+                    child_chunks_committed += 1
+                    total_rows_committed += 1
+
+                conn.commit()
+                status["progress"] = child_chunks_committed
+                await set_job_status(job_id, status)
+                await asyncio.sleep(0.1)
+
+        # ── Phase 2: Atomic rename temp → real source_name ───────────────────────
+        cursor.execute(
+            "UPDATE company_knowledge SET url = %s WHERE company_id = %s AND url = %s",
+            (source_name, resolved_company_id, temp_source_name)
+        )
+        conn.commit()
+
+        # ── Phase 3: Delete old chunks (only runs after rename succeeds) ─────────
+        if is_upsert and old_child_count > 0:
+            # Rows inserted in this job are the newest `total_rows_committed` rows.
+            # All rows (parent + child) with source_name older than these are stale.
+            cursor.execute(
+                """
+                DELETE FROM company_knowledge
+                WHERE company_id = %s
+                  AND url = %s
+                  AND id NOT IN (
+                      SELECT id FROM company_knowledge
+                      WHERE company_id = %s AND url = %s
+                      ORDER BY created_at DESC
+                      LIMIT %s
+                  )
+                """,
+                (
+                    resolved_company_id, source_name,
+                    resolved_company_id, source_name,
+                    total_rows_committed,
                 )
-
+            )
+            deleted_old = cursor.rowcount
             conn.commit()
-            status["progress"] = i + len(batch)
-            await set_job_status(job_id, status)
-            await asyncio.sleep(0.1)  # Yield control for better status poll responsiveness
+            print(f"UPSERT JOB {job_id}: Swapped '{source_name}' — {child_chunks_committed} new child chunks in, {deleted_old} old rows removed.")
 
-        # Cache invalidation after successful training
+        # ── Phase 4: Cache invalidation ──────────────────────────────────────────
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (resolved_company_id,))
         invalidate_cache(conn, resolved_company_id)
         conn.commit()
 
         await set_job_status(job_id, {
             "status": "done",
-            "chunks_added": len(chunks),
-            "total_available": len(all_chunks),
-            "truncated": len(all_chunks) > remaining,
+            "chunks_added": child_chunks_committed,
+            "total_available": len(all_child_texts_flat),
+            "truncated": len(all_child_texts_flat) > remaining,
+            "is_upsert": is_upsert,
         })
+
     except Exception as e:
         print(f"TRAINING JOB {job_id} FAILED: {e}")
         await set_job_status(job_id, {"status": "error", "message": str(e)})
+
         if conn:
             try:
                 conn.rollback()
             except Exception:
                 pass
+            try:
+                cleanup_cursor = conn.cursor()
+                # Deleting temp parent rows will cascade-delete their temp children
+                # via the ON DELETE CASCADE FK on parent_id.
+                cleanup_cursor.execute(
+                    "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
+                    (resolved_company_id, temp_source_name)
+                )
+                conn.commit()
+                print(f"TRAINING JOB {job_id}: Temp rows cleaned up — original source preserved.")
+            except Exception as cleanup_err:
+                print(f"TRAINING JOB {job_id}: Temp cleanup also failed ({cleanup_err}). Orphan sweep will handle on restart.")
+
     finally:
         if conn:
             release_db_connection(conn)
+        if lock_key and r:
+            try:
+                await r.delete(lock_key)
+            except Exception:
+                pass
 
 @app.post("/api/train")
 @limiter.limit("5/minute")
@@ -2676,29 +3439,55 @@ async def train_chatbot(
     background_tasks: BackgroundTasks,
     url: str = Form(None),
     file: UploadFile = File(None),
+    csv_file: UploadFile = File(None),
     text: str = Form(None),
+    text_label: str = Form(None),
     api_key: str = Form(None),
     company_id: str = Form(None),
     current_user: dict = Depends(get_current_user),
     _premium: dict = Depends(require_premium_tier)
 ):
-    """Secure multi-tenant training endpoint. Returns immediately; embedding runs in background."""
+    """
+    Secure multi-tenant training endpoint. Returns immediately; embedding runs in background.
 
-    # 0. Validate file size BEFORE reading into memory
+    Supports safe source upsert: if a source with the same name already exists for this
+    bot, the new content is inserted under a temporary key first. Only after all chunks
+    are committed successfully does the system atomically rename them and purge the old
+    ones. The bot keeps serving stale-but-correct answers until the swap completes.
+    """
+
+    # ── 0. File validation (before any memory allocation) ────────────────────
     if file:
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported.")
         file.file.seek(0, 2)
         file_size = file.file.tell()
         file.file.seek(0)
-        MAX_SIZE = 8 * 1024 * 1024  # 8MB
+        MAX_SIZE = 8 * 1024 * 1024  # 8 MB
         if file_size > MAX_SIZE:
             raise HTTPException(
                 status_code=400,
-                detail=f"PDF too large ({file_size // 1024 // 1024}MB). Maximum is 8MB."
+                detail=f"PDF too large ({file_size // 1024 // 1024} MB). Maximum is 8 MB."
             )
 
-    # 1. Quota check (fast DB query, return connection immediately)
+    TABULAR_EXTENSIONS = (".csv", ".xlsx", ".xls")
+    TABULAR_MAX_BYTES = 5 * 1024 * 1024  # 5 MB — tabular files rarely exceed this
+    if csv_file:
+        fname_lower = csv_file.filename.lower()
+        if not any(fname_lower.endswith(ext) for ext in TABULAR_EXTENSIONS):
+            raise HTTPException(status_code=400, detail="Only .csv, .xlsx, or .xls files are accepted for tabular upload.")
+        csv_file.file.seek(0, 2)
+        csv_size = csv_file.file.tell()
+        csv_file.file.seek(0)
+        if csv_size > TABULAR_MAX_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tabular file too large ({csv_size // 1024} KB). Maximum is 5 MB."
+            )
+        if csv_size == 0:
+            raise HTTPException(status_code=400, detail="Uploaded tabular file is empty.")
+
+    # ── 1. Resolve company and build the canonical source_name ───────────────
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -2719,90 +3508,196 @@ async def train_chatbot(
             raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
         resolved_company_id = company_row[0]
 
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (resolved_company_id,))
-        current_count = cursor.fetchone()[0]
-        plan = get_plan(current_user["tier"], role=current_user.get("role"))
+        plan = get_plan(current_user["tier"], role=current_user.get("role"), custom_plan_config=current_user.get("custom_plan_config"))
         limit = plan["chunks"]
 
-        if current_count >= limit:
+        # Determine source_name early so we can query existing chunk count for it.
+        # Normalisation happens here — before any DB or scraping work — so the
+        # upsert detection is always comparing apples to apples.
+        pending_source_name: str
+        if url:
+            pending_source_name = normalize_source_url(url.strip())
+        elif file:
+            pending_source_name = file.filename.lower().strip()
+        elif csv_file:
+            pending_source_name = csv_file.filename.lower().strip()
+        elif text and text.strip():
+            # text_label lets owners give a stable identity to manual text blocks.
+            # Without it, every manual submission shares the same key and would
+            # overwrite previous manual entries — we warn about this in the response.
+            pending_source_name = text_label.strip() if text_label and text_label.strip() else "Manual Entry"
+        else:
+            raise HTTPException(status_code=400, detail="Provide a URL, PDF file, CSV/Excel file, or text content.")
+
+        # Quota counts ONLY child rows — parent rows are free storage.
+        # Subtract the child rows belonging to the source being replaced so that
+        # a re-upload does not hit a false quota ceiling.
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+            (resolved_company_id,)
+        )
+        total_count = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+            (resolved_company_id, pending_source_name)
+        )
+        existing_source_count = cursor.fetchone()[0]
+        is_upsert = existing_source_count > 0
+
+        # Effective child slots in use, excluding the source about to be replaced.
+        effective_count = total_count - existing_source_count
+
+        if effective_count >= limit:
             raise HTTPException(status_code=402, detail={
                 "code": "CHUNK_LIMIT_EXCEEDED",
                 "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
-                "current": current_count,
+                "current": total_count,
                 "limit": limit,
                 "tier": current_user["tier"],
                 "upgrade_url": "/app/pricing",
             })
     finally:
-        release_db_connection(conn)  # Release immediately — background job gets its own conn
+        release_db_connection(conn)
 
-    # 2. Extract content (fast I/O operations)
+    # ── 2. Concurrent-job guard (per company + source) ───────────────────────
+    # Prevents two simultaneous uploads of the same source from racing each
+    # other and leaving the knowledge base in an inconsistent state.
+    lock_key = f"training_lock:{resolved_company_id}:{pending_source_name}"
+    lock_acquired = False
+    if r:
+        try:
+            # NX = only set if not exists; EX = 10-minute TTL as a dead-man switch.
+            lock_acquired = await r.set(lock_key, "1", nx=True, ex=600)
+            if not lock_acquired:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"'{pending_source_name}' is already being trained. Please wait for the current job to finish."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            # Redis unavailable — allow the request through rather than blocking
+            # legitimate training. The swap pattern still guarantees consistency.
+            pass
+
+    # ── 3. Extract content (I/O — after lock is held) ────────────────────────
     docs = []
-    source_name = "unknown"
 
     if url:
-        validate_safe_url(url)
+        validate_safe_url(url.strip())
         try:
-            jina_url = f"https://r.jina.ai/{url}"
+            jina_url = f"https://r.jina.ai/{url.strip()}"
             response = requests.get(jina_url, headers={"User-Agent": "SaPyBaseBot/1.0"}, timeout=15)
             if response.status_code != 200 or len(response.text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
-            docs = [Document(page_content=response.text, metadata={"source": url})]
-            source_name = url
+            # Store with the normalised URL so metadata.source matches source_name.
+            docs = [Document(page_content=response.text, metadata={"source": pending_source_name})]
         except HTTPException:
+            if r and lock_acquired:
+                await r.delete(lock_key)
             raise
         except Exception as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
             raise HTTPException(status_code=400, detail=f"Failed to scrape website: {str(e)}")
 
     if file:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-            temp_pdf.write(await file.read())  # async read to not block event loop
+            temp_pdf.write(await file.read())
             temp_pdf_path = temp_pdf.name
         try:
             pdf_docs = await process_pdf_efficiently(temp_pdf_path)
             docs.extend(pdf_docs)
-            source_name = file.filename
+        except Exception as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
         finally:
             if os.path.exists(temp_pdf_path):
                 os.remove(temp_pdf_path)
 
+    if csv_file:
+        try:
+            csv_bytes = await csv_file.read()
+            tabular_docs = parse_tabular_to_docs(csv_bytes, csv_file.filename, pending_source_name)
+            docs.extend(tabular_docs)
+        except ValueError as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=500, detail=f"Failed to process tabular file: {str(e)}")
+
     if text and text.strip():
-        docs.append(Document(page_content=text.strip(), metadata={"source": "manual_entry"}))
-        source_name = "Manual Entry"
+        docs.append(Document(page_content=text.strip(), metadata={"source": pending_source_name}))
 
     if not docs:
-        raise HTTPException(status_code=400, detail="No content extracted.")
+        if r and lock_acquired:
+            await r.delete(lock_key)
+        raise HTTPException(status_code=400, detail="No content could be extracted from the provided source.")
 
-    # 2.5. QUOTA OVERFLOW CHECK: Estimate required chunks and block if too large
-    # This addresses the requirement to warn users and block massive uploads
-    # instead of just squeezing or truncating silently.
-    total_chars = sum(len(d.page_content) for d in docs)
-    # Naive estimation: 800 chars with 100 overlap = ~700 net chars per chunk
-    estimated_chunks = max(1, int(total_chars / 700))
-    remaining_quota = max(0, limit - current_count)
+    # ── 4. Quota overflow check against effective (post-replacement) capacity ─
+    # Quota counts child chunks only. With parent-child chunking each parent
+    # (~1500 chars) produces ~5 children (~300 chars each), so the child count
+    # is estimated as total_chars / 300 (conservative — better to allow and cap
+    # inside run_training_job than to reject valid uploads prematurely).
+    if csv_file:
+        estimated_chunks = len(docs)
+    else:
+        total_chars = sum(len(d.page_content) for d in docs)
+        estimated_chunks = max(1, int(total_chars / 250))   # ~300 chars per child, 250 = safe undercount
+    effective_remaining = max(0, limit - effective_count)
 
-    if estimated_chunks > remaining_quota:
+    if estimated_chunks > effective_remaining:
+        if r and lock_acquired:
+            await r.delete(lock_key)
         raise HTTPException(status_code=402, detail={
             "code": "CHUNK_QUOTA_OVERFLOW",
-            "message": "This file exceeds your remaining chunk quota. Please use smaller files or upgrade to get more storage.",
-            "current": current_count,
+            "message": (
+                "This source is too large for your remaining chunk quota. "
+                "Use a smaller file or upgrade your plan to get more storage."
+            ),
+            "current": total_count,
             "limit": limit,
             "tier": current_user["tier"],
             "upgrade_url": "/app/pricing",
         })
 
-
-    # 3. Kick off background job — return immediately to prevent Render worker timeout
+    # ── 5. Queue background job — return immediately ──────────────────────────
     job_id = str(uuid.uuid4())
     await set_job_status(job_id, {"status": "queued"})
     background_tasks.add_task(
-        run_training_job, job_id, resolved_company_id, docs, current_user, limit, source_name
+        run_training_job,
+        job_id,
+        resolved_company_id,
+        docs,
+        current_user,
+        limit,
+        pending_source_name,
+        is_upsert,
+        lock_key,
+        bool(csv_file),   # skip_splitting: tabular rows must not be re-split
+    )
+
+    upsert_msg = (
+        "Updating existing source — your bot will keep using the old data until the update is fully committed."
+        if is_upsert else
+        f"Training started for '{pending_source_name}'."
+    )
+    manual_entry_warning = (
+        " Note: re-submitting text without a label will overwrite all previous unlabelled manual entries."
+        if pending_source_name == "Manual Entry" else ""
     )
 
     return {
         "status": "queued",
         "job_id": job_id,
-        "message": f"Training started for '{source_name}'. Poll /api/train/status/{job_id} to track progress.",
+        "is_upsert": is_upsert,
+        "source_name": pending_source_name,
+        "message": f"{upsert_msg}{manual_entry_warning} Poll /api/train/status/{job_id} to track progress.",
     }
 
 
@@ -2819,7 +3714,7 @@ def register_company(
 reg: RegisterRequest, user: dict = Depends(get_current_user)):
     """Multi-bot registration with per-plan bot count enforcement."""
     tier = user.get("tier") or "FREE"
-    plan = get_plan(tier, role=user.get("role"))
+    plan = get_plan(tier, role=user.get("role"), custom_plan_config=user.get("custom_plan_config"))
 
     if plan["max_bots"] == 0:
         raise HTTPException(status_code=402, detail={
@@ -2890,30 +3785,50 @@ reg: RegisterRequest, user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/company/rotate-key")
-async def rotate_api_key(user: dict = Depends(get_current_user)):
+async def rotate_api_key(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
     """
-    Issue #15: API Key Rotation Mechanism.
-    Identifies the company via the user profile and generates a fresh, secure key.
+    Issue #15: API Key Rotation — per-bot.
+    Accepts optional JSON body { "bot_id": "<uuid>" } to target a specific bot.
+    When bot_id is omitted, falls back to the first bot owned by the user.
     """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    bot_id = body.get("bot_id") if body else None
+
     new_key = f"sb_{secrets.token_urlsafe(32)}"
     hashed_key = hashlib.sha256(new_key.encode()).hexdigest()
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # 1. Update the key (stored as hash)
-        cursor.execute(
-            "UPDATE companies SET api_key = %s WHERE user_id = %s RETURNING id",
-            (hashed_key, user["id"])
-        )
+        if bot_id:
+            # Rotate key for a specific bot — ownership check included
+            cursor.execute(
+                "UPDATE companies SET api_key = %s WHERE id = %s AND user_id = %s RETURNING id",
+                (hashed_key, bot_id, user["id"])
+            )
+        else:
+            # Legacy single-bot path: target the earliest bot owned by this user
+            cursor.execute(
+                """UPDATE companies SET api_key = %s
+                   WHERE id = (
+                       SELECT id FROM companies WHERE user_id = %s ORDER BY created_at LIMIT 1
+                   )
+                   RETURNING id""",
+                (hashed_key, user["id"])
+            )
         row = cursor.fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="No company found for this user.")
-        
+            raise HTTPException(status_code=404, detail="Bot not found or does not belong to your account.")
+
         conn.commit()
-        
-        # 2. Audit the rotation
-        log_admin_action(user["clerk_id"], "ROTATE_API_KEY", str(row[0]), {"method": "MANUAL_ROTATION"})
-        
+        log_admin_action(user["clerk_id"], "ROTATE_API_KEY", str(row[0]), {"method": "MANUAL_ROTATION", "bot_id": bot_id})
         return {"status": "success", "new_key": new_key}
     except Exception as e:
         if conn: conn.rollback()
@@ -2934,7 +3849,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                       c.created_at, c.ai_model,
                       COALESCE(ut.messages_used, 0) as messages_used,
                       COALESCE(ut.period_end, now() + interval '30 days') as period_end,
-                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id) as chunks_used
+                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id AND ck.chunk_type = 'child') as chunks_used
                FROM companies c
                LEFT JOIN usage_tracking ut ON ut.company_id = c.id
                WHERE c.user_id = %s AND c.is_active = true
@@ -2942,7 +3857,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
             (user["id"],)
         )
         rows = cursor.fetchall()
-        plan = get_plan(user.get("tier"), role=user.get("role"))
+        plan = get_plan(user.get("tier"), role=user.get("role"), custom_plan_config=user.get("custom_plan_config"))
         return {
             "status": "success",
             "bots": [
@@ -3071,8 +3986,16 @@ def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
+        # chunk_count shows only child rows — parents are internal and not counted toward quota.
+        # Filter out temp rows (prefixed __temp_) that belong to in-progress jobs.
         cursor.execute(
-            "SELECT DISTINCT url, COUNT(*) as chunk_count FROM company_knowledge WHERE company_id = %s GROUP BY url ORDER BY url",
+            """SELECT url, COUNT(*) as chunk_count
+               FROM company_knowledge
+               WHERE company_id = %s
+                 AND chunk_type = 'child'
+                 AND url NOT LIKE '__temp_%%'
+               GROUP BY url
+               ORDER BY url""",
             (company_id,)
         )
         rows = cursor.fetchall()
@@ -3110,15 +4033,16 @@ def get_knowledge_chunks(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
+        # Show only child rows in the UI preview — parents are large blobs not useful for display.
         cursor.execute(
-            "SELECT id, content, created_at FROM company_knowledge WHERE company_id = %s AND url = %s ORDER BY created_at DESC LIMIT %s",
+            "SELECT id, content, created_at FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child' ORDER BY created_at DESC LIMIT %s",
             (company_id, source, limit)
         )
         rows = cursor.fetchall()
 
-        # Get total count for this source (may exceed limit)
+        # Total child chunk count for this source
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s",
+            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
             (company_id, source)
         )
         total = cursor.fetchone()[0]
@@ -3255,17 +4179,24 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
         )
         usage = cursor.fetchone()
 
-        plan = get_plan(current_user.get("tier"), role=current_user.get("role"))
+        plan = get_plan(
+            current_user.get("tier"),
+            role=current_user.get("role"),
+            custom_plan_config=current_user.get("custom_plan_config"),
+        )
 
         trial_days_left = None
         if current_user.get("trial_end_date"):
             delta = current_user["trial_end_date"] - datetime.now(timezone.utc)
             trial_days_left = max(0, delta.days)
 
+        tier = current_user["tier"]
+        custom_cfg = current_user.get("custom_plan_config") or {}
+
         return {
             "status": "success",
             "role": current_user["role"],
-            "tier": current_user["tier"],
+            "tier": tier,
             "email": current_user["email"],
             "messages_used": usage[0] if usage else 0,
             "message_limit": plan["messages"],
@@ -3275,6 +4206,12 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
             "max_bots": plan["max_bots"],
             "speed_tier": plan["speed"],
             "chunk_limit": plan["chunks"],
+            # Custom plan metadata (only populated when tier == CUSTOM)
+            "custom_plan_name": plan.get("plan_name") if tier == "CUSTOM" else None,
+            "custom_plan_features": {
+                k: plan.get(k, False)
+                for k in CUSTOM_PLAN_FEATURE_KEYS
+            } if tier == "CUSTOM" else None,
         }
     finally:
         release_db_connection(conn)
@@ -3299,7 +4236,19 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
         user_count = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM companies")
         company_count = cursor.fetchone()[0]
-        return {"total_users": user_count, "total_companies": company_count}
+        cursor.execute("SELECT COUNT(*) FROM companies WHERE is_active = true")
+        active_bot_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COALESCE(SUM(messages_used), 0) FROM usage_tracking")
+        total_messages = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM users WHERE tier = 'CUSTOM'")
+        custom_plan_count = cursor.fetchone()[0]
+        return {
+            "total_users": user_count,
+            "total_companies": company_count,
+            "active_bots": active_bot_count,
+            "total_messages": int(total_messages),
+            "custom_plan_count": custom_plan_count,
+        }
     finally:
         release_db_connection(conn)
 
@@ -3332,13 +4281,60 @@ def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_c
 
 @app.get("/api/admin/users")
 def get_all_users(admin: dict = Depends(get_admin_user)):
-    """Admin-only list of all platform users."""
+    """Admin-only list of all platform users with usage and bots."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT clerk_id, email, role, tier, created_at FROM users ORDER BY created_at DESC")
-        users = cursor.fetchall()
-        return [{"clerk_id": u[0], "email": u[1], "role": u[2], "tier": u[3], "created_at": u[4]} for u in users]
+        cursor.execute("""
+            SELECT
+                u.clerk_id, u.email, u.role, u.tier, u.created_at,
+                COALESCE(u.status, 'active') AS status,
+                u.custom_plan_config,
+                COALESCE(
+                    (SELECT SUM(ut.messages_used) FROM usage_tracking ut WHERE ut.user_id = u.id),
+                    0
+                ) AS messages_used,
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id',             c.id::text,
+                                'bot_name',       c.bot_name,
+                                'company_name',   c.company_name,
+                                'allowed_origin', c.allowed_origin,
+                                'is_active',      c.is_active,
+                                'created_at',     c.created_at
+                            ) ORDER BY c.created_at ASC
+                        )
+                        FROM companies c
+                        WHERE c.user_id = u.id
+                    ),
+                    '[]'::json
+                ) AS companies
+            FROM users u
+            ORDER BY u.created_at DESC
+        """)
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            tier = r[3] or "FREE"
+            custom_cfg = r[6] if isinstance(r[6], dict) else None
+            plan = get_plan(tier, role=r[2], custom_plan_config=custom_cfg)
+            result.append({
+                "clerk_id": r[0],
+                "email": r[1],
+                "role": r[2],
+                "tier": tier,
+                "created_at": r[4],
+                "status": r[5] or "active",
+                "custom_plan_config": custom_cfg,
+                "usage_tracking": {
+                    "messages_used": r[7],
+                    "message_limit": plan["messages"],
+                },
+                "companies": r[8] if isinstance(r[8], list) else [],
+            })
+        return result
     finally:
         release_db_connection(conn)
 
@@ -3349,42 +4345,78 @@ def update_user_admin(
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
 ):
-    """Super Admin: Hardened update of user role/tier with Audit Logging."""
+    """Super Admin: Hardened update of user tier, status, and custom plan config with Audit Logging."""
     updates = []
     params = []
-    
-    # Track changes for audit log
     changes = {}
 
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        
-        # Fetch current state for audit
-        cursor.execute("SELECT role, tier FROM users WHERE clerk_id = %s", (clerk_id,))
-        old_state = cursor.fetchone()
-        
-        if req.tier is not None:
-            updates.append("tier = %s")
-            params.append(req.tier.value)
-            if old_state: changes["tier"] = {"old": old_state[1], "new": req.tier.value}
 
-        if not updates: return {"message": "No changes provided"}
+        # Fetch current state for audit
+        cursor.execute("SELECT role, tier, COALESCE(status, 'active'), custom_plan_config FROM users WHERE clerk_id = %s", (clerk_id,))
+        old_state = cursor.fetchone()
+        if not old_state:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        if req.tier is not None:
+            new_tier = req.tier.value
+            updates.append("tier = %s")
+            params.append(new_tier)
+            if old_state: changes["tier"] = {"old": old_state[1], "new": new_tier}
+            # If demoting away from CUSTOM, clear the config
+            if new_tier != "CUSTOM":
+                updates.append("custom_plan_config = NULL")
+                changes["custom_plan_config"] = {"old": old_state[3], "new": None}
+
+        if req.status is not None:
+            allowed_statuses = {"active", "suspended"}
+            if req.status not in allowed_statuses:
+                raise HTTPException(status_code=400, detail=f"status must be one of: {allowed_statuses}")
+            updates.append("status = %s")
+            params.append(req.status)
+            if old_state: changes["status"] = {"old": old_state[2], "new": req.status}
+
+        if req.custom_plan_config is not None:
+            config_dict = req.custom_plan_config.dict(exclude_none=False)
+            updates.append("custom_plan_config = %s")
+            params.append(json.dumps(config_dict))
+            # Auto-promote tier to CUSTOM when a config is saved
+            if "tier = %s" not in updates:
+                updates.append("tier = %s")
+                params.append("CUSTOM")
+                changes["tier"] = {"old": old_state[1], "new": "CUSTOM"}
+            changes["custom_plan_config"] = {"new": config_dict}
+
+        if not updates:
+            return {"message": "No changes provided"}
 
         query = f"UPDATE users SET {', '.join(updates)} WHERE clerk_id = %s"
         params.append(clerk_id)
         cursor.execute(query, tuple(params))
         conn.commit()
-        
-        # Issue #17: Log the action
+
         log_admin_action(admin["clerk_id"], "UPDATE_USER_PROFILE", clerk_id, changes)
-        
+
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail="Update failed.")
     finally:
         release_db_connection(conn)
+
+@app.patch("/api/admin/users/{clerk_id}/limits")
+def update_user_limits(
+    clerk_id: str,
+    req: AdminUpdateUserRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Alias endpoint used by the Admin Dashboard plan builder UI."""
+    return update_user_admin(clerk_id, req, admin, _fresh)
 
 @app.delete("/api/admin/companies/{company_id}")
 def delete_company_admin(
@@ -3927,6 +4959,312 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
             release_db_connection(conn)
 
         return {"status": "success", "message": "Subscription will cancel at the end of the billing period."}
+
+# ── EVALUATION PIPELINE ───────────────────────────────────────────────────────
+
+class EvalQuestion(BaseModel):
+    question: str = Field(..., max_length=1000)
+    expected_answer: str = Field(..., max_length=3000)
+
+class EvalRunRequest(BaseModel):
+    company_id: str
+    run_label: str = Field(..., max_length=100, description="A short label for this run, e.g. 'after-hyde'")
+    questions: List[EvalQuestion] = Field(..., min_items=1, max_items=50)
+
+
+async def _judge_single(
+    question: str,
+    expected_answer: str,
+    retrieved_chunks: str,
+    actual_answer: str,
+) -> dict:
+    """
+    Uses Gemini as an LLM judge to score one Q&A pair on two axes:
+
+    retrieval_score (0-10):
+        Did the retrieved chunks actually contain information needed to answer?
+        10 = chunks directly contain the answer.
+        0  = chunks are completely irrelevant.
+
+    faithfulness_score (0-10):
+        Does the actual_answer match the expected_answer in meaning?
+        10 = same meaning, no contradictions.
+        0  = wrong, hallucinated, or contradicts the expected answer.
+
+    Returns a dict with both scores and one-line reasons for each.
+    """
+    judge_model = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash-lite",
+        google_api_key=GEMINI_KEY,
+        max_output_tokens=300,
+        temperature=0.0,
+    )
+    prompt = f"""You are an impartial RAG evaluation judge. Score the following case.
+
+QUESTION: {question}
+
+EXPECTED ANSWER (ground truth): {expected_answer}
+
+RETRIEVED CHUNKS (what the RAG pipeline fetched):
+{retrieved_chunks or "(nothing retrieved)"}
+
+ACTUAL ANSWER (what the bot replied): {actual_answer or "(no answer)"}
+
+Score on two axes from 0 to 10 (integers only):
+
+retrieval_score: Did the retrieved chunks contain information sufficient to answer the question?
+faithfulness_score: Does the actual answer match the expected answer in meaning and correctness?
+
+Respond ONLY with valid JSON in exactly this format:
+{{
+  "retrieval_score": <0-10>,
+  "retrieval_reason": "<one sentence>",
+  "faithfulness_score": <0-10>,
+  "faithfulness_reason": "<one sentence>"
+}}"""
+
+    try:
+        response = await judge_model.ainvoke([HumanMessage(content=prompt)])
+        raw = response.content.strip()
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        result = json.loads(raw)
+        return {
+            "retrieval_score": float(result.get("retrieval_score", 0)),
+            "retrieval_reason": str(result.get("retrieval_reason", "")),
+            "faithfulness_score": float(result.get("faithfulness_score", 0)),
+            "faithfulness_reason": str(result.get("faithfulness_reason", "")),
+        }
+    except Exception as e:
+        print(f"[EVAL JUDGE] Failed for question '{question[:50]}': {e}")
+        return {
+            "retrieval_score": 0.0,
+            "retrieval_reason": f"Judge error: {e}",
+            "faithfulness_score": 0.0,
+            "faithfulness_reason": f"Judge error: {e}",
+        }
+
+
+@app.post("/api/eval/run")
+async def run_eval(
+    body: EvalRunRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Runs the full RAG pipeline on a set of test questions, scores each one using
+    Gemini as an LLM judge, and persists the results for trend comparison.
+
+    Each question is scored on:
+      - retrieval_score (0-10): did the RAG pipeline fetch relevant chunks?
+      - faithfulness_score (0-10): does the bot's answer match the expected answer?
+
+    Results are stored in eval_runs + eval_results tables (migration v22).
+    Use GET /api/eval/results/{company_id} to compare runs over time.
+
+    Limit: 50 questions per run (enforced by Pydantic).
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership check
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (body.company_id, current_user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+    finally:
+        release_db_connection(conn)
+
+    result_rows = []
+    for eq in body.questions:
+        # 1. HyDE expand
+        hyde_text = await hyde_expand(eq.question)
+
+        # 2. Embed
+        query_vector = embeddings_model_query.embed_query(hyde_text)
+        if len(query_vector) > 768:
+            query_vector = query_vector[:768]
+
+        # 3. Retrieve + rerank (same pipeline as live chat)
+        conn = get_db_connection()
+        try:
+            candidates = retrieve_knowledge(conn, body.company_id, query_vector, query_text=eq.question)
+        finally:
+            release_db_connection(conn)
+
+        top_chunks = await rerank_chunks(eq.question, candidates, top_k=5)
+        retrieved_text = "\n\n".join([f"[{i+1}] {c[0][:400]}" for i, c in enumerate(top_chunks)])
+
+        # 4. Generate answer with the same system prompt structure as live chat
+        answer_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=400,
+            temperature=0.3,
+        )
+        knowledge_block = (
+            f"KNOWLEDGE BASE:\n{retrieved_text}"
+            if top_chunks
+            else "KNOWLEDGE BASE: (Empty — no relevant knowledge found)"
+        )
+        eval_system = (
+            f"You are a helpful AI assistant. Answer the question using ONLY "
+            f"the knowledge base below. If the answer is not in the knowledge base, "
+            f"say you don't have that information.\n\n{knowledge_block}"
+        )
+        try:
+            ans_response = await answer_model.ainvoke([
+                SystemMessage(content=eval_system),
+                HumanMessage(content=eq.question),
+            ])
+            actual_answer = ans_response.content.strip()
+        except Exception as e:
+            actual_answer = f"(generation error: {e})"
+
+        # 5. Judge
+        scores = await _judge_single(eq.question, eq.expected_answer, retrieved_text, actual_answer)
+
+        result_rows.append({
+            "question": eq.question,
+            "expected_answer": eq.expected_answer,
+            "retrieved_chunks": retrieved_text,
+            "actual_answer": actual_answer,
+            **scores,
+        })
+
+        await asyncio.sleep(0.2)  # avoid rate-limiting the judge model
+
+    # 6. Persist run summary + individual results
+    if not result_rows:
+        raise HTTPException(status_code=400, detail="No results generated.")
+
+    avg_ret = sum(r["retrieval_score"] for r in result_rows) / len(result_rows)
+    avg_fai = sum(r["faithfulness_score"] for r in result_rows) / len(result_rows)
+    avg_com = (avg_ret + avg_fai) / 2
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO eval_runs
+                   (company_id, run_label, triggered_by, total_questions,
+                    avg_retrieval_score, avg_faithfulness_score, avg_combined_score)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               RETURNING id""",
+            (body.company_id, body.run_label, current_user.get("clerk_id"),
+             len(result_rows), round(avg_ret, 2), round(avg_fai, 2), round(avg_com, 2))
+        )
+        run_id = cursor.fetchone()[0]
+
+        for r in result_rows:
+            cursor.execute(
+                """INSERT INTO eval_results
+                       (run_id, company_id, question, expected_answer, retrieved_chunks,
+                        actual_answer, retrieval_score, faithfulness_score,
+                        retrieval_reason, faithfulness_reason)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (run_id, body.company_id, r["question"], r["expected_answer"],
+                 r["retrieved_chunks"], r["actual_answer"],
+                 r["retrieval_score"], r["faithfulness_score"],
+                 r["retrieval_reason"], r["faithfulness_reason"])
+            )
+        conn.commit()
+    finally:
+        release_db_connection(conn)
+
+    return {
+        "status": "done",
+        "run_id": str(run_id),
+        "run_label": body.run_label,
+        "total_questions": len(result_rows),
+        "avg_retrieval_score": round(avg_ret, 2),
+        "avg_faithfulness_score": round(avg_fai, 2),
+        "avg_combined_score": round(avg_com, 2),
+        "results": result_rows,
+    }
+
+
+@app.get("/api/eval/results/{company_id}")
+async def get_eval_results(
+    company_id: str,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Returns the last N evaluation run summaries for a bot, ordered newest first.
+    Use this to compare avg_combined_score across runs labelled with each improvement.
+    Individual question-level results are also included for the most recent run.
+    """
+    if limit > 20:
+        limit = 20
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership check
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, current_user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        # Run summaries
+        cursor.execute(
+            """SELECT id, run_label, total_questions, avg_retrieval_score,
+                      avg_faithfulness_score, avg_combined_score, created_at
+               FROM eval_runs
+               WHERE company_id = %s
+               ORDER BY created_at DESC
+               LIMIT %s""",
+            (company_id, limit)
+        )
+        run_rows = cursor.fetchall()
+        if not run_rows:
+            return {"runs": [], "latest_results": []}
+
+        runs = [
+            {
+                "run_id": str(r[0]),
+                "run_label": r[1],
+                "total_questions": r[2],
+                "avg_retrieval_score": float(r[3]) if r[3] else None,
+                "avg_faithfulness_score": float(r[4]) if r[4] else None,
+                "avg_combined_score": float(r[5]) if r[5] else None,
+                "created_at": r[6].isoformat() if r[6] else None,
+            }
+            for r in run_rows
+        ]
+
+        # Detailed question results for the most recent run only
+        latest_run_id = run_rows[0][0]
+        cursor.execute(
+            """SELECT question, expected_answer, actual_answer,
+                      retrieval_score, faithfulness_score,
+                      retrieval_reason, faithfulness_reason
+               FROM eval_results
+               WHERE run_id = %s
+               ORDER BY retrieval_score ASC""",  # worst first so failures are obvious
+            (latest_run_id,)
+        )
+        detail_rows = cursor.fetchall()
+        latest_results = [
+            {
+                "question": d[0],
+                "expected_answer": d[1],
+                "actual_answer": d[2],
+                "retrieval_score": float(d[3]) if d[3] else None,
+                "faithfulness_score": float(d[4]) if d[4] else None,
+                "retrieval_reason": d[5],
+                "faithfulness_reason": d[6],
+            }
+            for d in detail_rows
+        ]
+
+        return {"runs": runs, "latest_results": latest_results}
+    finally:
+        release_db_connection(conn)
+
 
 @app.get("/")
 def read_root(): return {"status": "SaPyBase AI Engine Running"}

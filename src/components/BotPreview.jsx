@@ -8,7 +8,7 @@ const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
 
 const BotPreview = ({ theme = 'light' }) => {
     const { botSettings } = useBotSettings();
-    const { name, primaryColor, greeting, logoShape, customLogoUrl, avatarBgStyle, quickQuestions } = botSettings;
+    const { name, primaryColor, greeting, logoShape, customLogoUrl, avatarBgStyle, quickQuestions, hideBranding } = botSettings;
 
     const BOT_NAME = name || 'Sapy AI';
     const THEME_COLOR = primaryColor || '#5730F5';
@@ -116,13 +116,15 @@ const BotPreview = ({ theme = 'light' }) => {
                     <div className="flex-1" />
                 </div>
 
-                {/* ── Branding Strip ── */}
-                <div className={`shrink-0 py-1.5 flex justify-center items-center backdrop-blur-sm ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
-                    <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50" />
-                        Powered by SaPyBase
-                    </span>
-                </div>
+                {/* ── Branding Strip — hidden when hide_branding is on ── */}
+                {!hideBranding && (
+                    <div className={`shrink-0 py-1.5 flex justify-center items-center backdrop-blur-sm ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
+                        <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50" />
+                            Powered by SaPyBase
+                        </span>
+                    </div>
+                )}
 
                 {/* ── Input Area ── */}
                 <div className={`backdrop-blur-2xl border-t shrink-0 z-10 flex flex-col ${isDark ? 'bg-slate-900/95 border-slate-800/50' : 'bg-white/95 border-gray-200/50'}`}>

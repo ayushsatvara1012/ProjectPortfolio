@@ -172,33 +172,33 @@ const ModernFooter = () => {
       <div className="max-w-8xl mx-auto">
         
         {/* Tic-Tac-Toe Grid Architecture */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-px bg-gray-200 dark:bg-slate-800 border-x border-gray-200 dark:border-slate-800">
+        <div className="grid grid-cols-1 min-[1011px]:grid-cols-12 gap-px bg-gray-200 dark:bg-slate-800 border-x border-gray-200 dark:border-slate-800">
           
           {/* 1. BRANDING CELL (md:col-span-5) */}
-          <div className="md:col-span-5 bg-white dark:bg-slate-950 p-12 md:p-16 flex flex-col justify-between gap-12 group/brand relative overflow-hidden transition-colors">
+          <div className="min-[1011px]:col-span-5 bg-white dark:bg-slate-950 p-12 min-[1011px]:p-16 flex flex-col justify-between gap-12 group/brand relative overflow-hidden transition-colors">
             
             {/* THE "TITLE BLOCK" INTERACTIVE SVG BACKGROUND */}
             <InteractiveSchematic />
 
             <div className="space-y-8 relative z-10">
               <div className="flex items-center gap-3">
-                <span className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 uppercase">
-                  SaPy<span className="text-indigo-600">Base</span>
+                <span className="text-xl min-[1011px]:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 uppercase">
+                  SaPy<span className="text-blue-600">Base</span>
                 </span>
                 <div className="h-px w-8 bg-gray-100 dark:bg-slate-800" />
                 <span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">Protocol_V4.2</span>
               </div>
               
-              <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase">
+              <h2 className="text-4xl min-[1011px]:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase">
                 Ready to architect your <br />
-                <span className="text-slate-600 dark:text-slate-400 transition-colors duration-500 group-hover/brand:text-indigo-600">next Digital Frontier?</span>
+                <span className="text-slate-600 dark:text-slate-400 transition-colors duration-500 group-hover/brand:text-transparent bg-clip-text bg-linear-to-r from-orange-600 via-green-600 to-blue-600">next Digital Frontier?</span>
               </h2>
             </div>
 
             <div className="flex flex-wrap gap-4 relative z-10">
               <button
                 onClick={() => navigate('/services')}
-                className="bg-slate-900 dark:bg-indigo-600 text-white px-8 py-4 rounded-none text-sm uppercase tracking-widest font-bold font-sans hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-all active:scale-95 flex items-center gap-3 group/btn"
+                className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-4 rounded-none text-sm uppercase tracking-widest font-bold font-sans hover:bg-blue-600 dark:hover:bg-blue-500 transition-all active:scale-95 flex items-center gap-3 group/btn"
               >
                 Start_Project <Zap size={14} className="opacity-40 group-hover/btn:opacity-100" />
               </button>
@@ -206,12 +206,12 @@ const ModernFooter = () => {
           </div>
 
           {/* 2. NAVIGATION GRID (md:col-span-7) */}
-          <div className="md:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200 dark:bg-slate-800">
+          <div className="min-[1011px]:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200 dark:bg-slate-800">
             
             {/* PLATFORM MODULE */}
-            <div className="bg-white dark:bg-slate-950 p-10 md:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+            <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
               <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
-                <div className="h-1.5 w-1.5 rounded-none bg-indigo-600" />
+                <div className="h-1.5 w-1.5 rounded-none bg-blue-600" />
                 <span>Platform</span>
               </div>
               <ul className="space-y-4">
@@ -230,7 +230,7 @@ const ModernFooter = () => {
             </div>
 
             {/* STACK MODULE */}
-            <div className="bg-white dark:bg-slate-950 p-10 md:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+            <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
               <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
                 <div className="h-1.5 w-1.5 rounded-none bg-slate-900 dark:bg-slate-200" />
                 <span>Tech_Stack</span>
@@ -245,7 +245,7 @@ const ModernFooter = () => {
             </div>
 
             {/* SOCIAL MODULE */}
-            <div className="bg-white dark:bg-slate-950 p-6 md:p-12 space-y-6 md:space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 relative overflow-hidden">
+            <div className="bg-white dark:bg-slate-950 p-6 min-[1011px]:p-12 space-y-6 min-[1011px]:space-y-10 group/cell transition-colors duration-500 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 relative overflow-hidden">
 
 
               <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans relative z-10">
@@ -265,7 +265,7 @@ const ModernFooter = () => {
                         href={social.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="bg-white dark:bg-slate-950 p-6 flex flex-row md:flex-col items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white transition-all gap-2 group/social"
+                        className="bg-white dark:bg-slate-950 p-6 flex flex-row min-[1011px]:flex-col items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white transition-all gap-2 group/social"
                       >
                         <social.Icon size={18} className="opacity-40 group-hover/social:opacity-100" />
                         <span className="text-sm uppercase tracking-widest font-bold font-sans">{social.label}</span>
@@ -302,10 +302,10 @@ const ModernFooter = () => {
           </div>
 
           {/* 3. BOTTOM LEGEND ROW (md:col-span-12) */}
-          <div className="md:col-span-12 bg-white dark:bg-slate-950 p-8 md:p-10 border-t border-white dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
+          <div className="min-[1011px]:col-span-12 bg-white dark:bg-slate-950 p-8 min-[1011px]:p-10 border-t border-white dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
+            <div className="flex flex-col min-[1011px]:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
               <p className='text-center'>© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
-              <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
+              <div className="hidden min-[1011px]:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
               <div className="flex gap-6">
                 <a href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">PRIVACY</a>
                 <a href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">TERMS</a>

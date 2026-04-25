@@ -286,7 +286,7 @@ const AppInsights = () => {
                     >
                         {isGenerating ? (
                             <>
-                                <div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" />
+                                <div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin rounded-full" />
                                 Synthesizing...
                             </>
                         ) : (
@@ -639,7 +639,7 @@ const AppInsights = () => {
                 {/* ── Loading Spinner ── */}
                 {AUTHORIZED_TIERS.has(userTier) && isGenerating && (
                     <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
-                        <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5" />
+                        <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
                         <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
                         <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
                     </div>

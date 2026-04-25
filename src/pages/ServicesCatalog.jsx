@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronRight, Phone, MessageCircle, Bot, Code2, Globe as Glo
 import { useNavigate } from 'react-router-dom';
 import SEO from '../components/Seo';
 import seoConfig from '../seo/seoConfig';
+import ScrollReveal from '../components/ScrollReveal';
 
 const services = [
   {
@@ -138,7 +139,7 @@ const ServicesCatalog = () => {
         </header>
 
         {/* Catalog Grid */}
-        <section className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto">
+        <ScrollReveal as="section" className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border border-gray-200 dark:border-slate-800 rounded-none transition-colors duration-500">
             {services.map((service) => (
               <div key={service.id} className="bg-white dark:bg-slate-950 rounded-none p-6 md:p-8 flex flex-col transition-colors duration-500">
@@ -175,10 +176,10 @@ const ServicesCatalog = () => {
               </div>
             ))}
           </div>
-        </section>
+        </ScrollReveal>
 
         {/* Bottom CTA */}
-        <section className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto mt-16 md:mt-24">
+        <ScrollReveal as="section" className="px-6 md:px-12 lg:px-0 max-w-7xl mx-auto mt-16 md:mt-24" delay={0.05}>
           <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-none p-8 md:p-16 flex flex-col items-center text-center transition-colors duration-500">
             <div className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-3 transition-colors">
               System_Protocol [001]
@@ -201,7 +202,7 @@ const ServicesCatalog = () => {
               </button>
             </div>
           </div>
-        </section>
+        </ScrollReveal>
 
       </div>
     </>

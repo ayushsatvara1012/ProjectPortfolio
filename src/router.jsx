@@ -8,6 +8,7 @@ const Contactpage = lazy(() => import("./pages/contactpage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const ServicesCatalog = lazy(() => import("./pages/ServicesCatalog"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const BotIntegrationDocs = lazy(() => import("./components/BotIntegrationDocs"));
 
@@ -26,6 +27,15 @@ const AppSettingsAccount = lazy(() => import("./pages/AppSettings").then(m => ({
 const AppSettingsBilling = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.BillingSection })));
 const AppSettingsCustomize = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.CustomizeSection })));
 const AppSettingsApiKeys = lazy(() => import("./pages/AppSettings").then(m => ({ default: m.ApiKeysSection })));
+
+// ── Demo pages (fully public, no auth) ─────────────────────────────────────────
+const DemoLayout = lazy(() => import("./demo/DemoLayout"));
+const DemoTrainAI = lazy(() => import("./demo/DemoTrainAI"));
+const DemoMyBots = lazy(() => import("./demo/DemoMyBots"));
+const DemoCreateBot = lazy(() => import("./demo/DemoCreateBot"));
+const DemoInsights = lazy(() => import("./demo/DemoInsights"));
+const DemoCustomize = lazy(() => import("./demo/DemoCustomize"));
+const DemoChat = lazy(() => import("./demo/DemoChat"));
 
 import { AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import ErrorPage from "./pages/ErrorPage";
@@ -48,8 +58,7 @@ const router = createBrowserRouter([
       { path: "/docs", element: <Suspense fallback={<PageLoader />}><BotIntegrationDocs standalone={true} /></Suspense> },
       { path: "/sso-callback", element: <AuthenticateWithRedirectCallback /> },
 
-      // Legacy routes — redirect to AppLayout equivalents
-      { path: "/pricing", element: <Navigate to="/app/pricing" replace /> },
+      { path: "/pricing", element: <Suspense fallback={<PageLoader />}><PricingPage /></Suspense> },
       {
         path: "/admin",
         element: <Navigate to="/app/settings/admin" replace />,
@@ -87,6 +96,25 @@ const router = createBrowserRouter([
           { path: "admin", element: <AdminDashboard /> },
         ],
       },
+    ],
+  },
+  // ── Demo Shell (fully public, no auth, no ProtectedRoute) ────────────────────
+  {
+    path: "/demo",
+    element: (
+      <Suspense fallback={null}>
+        <DemoLayout />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <Navigate to="/demo/train" replace /> },
+      { path: "train", element: <DemoTrainAI /> },
+      { path: "bots", element: <DemoMyBots /> },
+      { path: "register", element: <DemoCreateBot /> },
+      { path: "insights", element: <DemoInsights /> },
+      { path: "customize", element: <DemoCustomize /> },
+      { path: "chat", element: <DemoChat /> },
     ],
   },
 ]);

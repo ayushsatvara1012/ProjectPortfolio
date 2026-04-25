@@ -192,17 +192,18 @@ const TopNav = ({ user, onMenuClick }) => {
             </div>
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors">
-                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-400 dark:text-slate-600 transition-colors">chevron_right</span>
-                <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-google hidden sm:block transition-colors">
-                    {user?.fullName || user?.firstName || 'My Workspace'}
-                </span>
-                {tierLabel && (
-                    <span className="hidden sm:inline-flex shrink-0 px-1.5 py-0.5 border border-gray-200 dark:border-slate-700 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors">
-                        {tierLabel}
+            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors border-l border-gray-100 dark:border-slate-800 ml-2 pl-4">
+                <div className="hidden sm:flex items-center gap-1.5 min-w-0">
+                    <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-google transition-colors">
+                        {user?.fullName || user?.firstName || 'My Workspace'}
                     </span>
-                )}
-                <span className="material-symbols-outlined text-[16px] shrink-0 hidden sm:block text-slate-400 dark:text-slate-600 transition-colors">chevron_right</span>
+                    {tierLabel && (
+                        <span className="shrink-0 px-1.5 py-0.5 border border-gray-200 dark:border-slate-700 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors">
+                            {tierLabel}
+                        </span>
+                    )}
+                    <span className="material-symbols-outlined text-[16px] shrink-0 text-slate-400 dark:text-slate-600">chevron_right</span>
+                </div>
                 <span className="truncate text-slate-800 dark:text-slate-200 font-google text-md transition-colors">{pageLabel}</span>
             </div>
         </header>
