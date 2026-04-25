@@ -34,8 +34,8 @@ export default function Navbar() {
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
     } else {
-      document.documentElement.style.overflow = 'unset';
-      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
     }
   }, [isOpen]);
 

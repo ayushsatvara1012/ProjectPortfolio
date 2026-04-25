@@ -1049,7 +1049,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20" />
               </div>
-              <div ref={scrollContainerRef} onScroll={handleScrollContainer} data-lenis-prevent
+              <div ref={scrollContainerRef} onScroll={handleScrollContainer}
                 className="flex-1 p-4 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar">
                 <div className="flex flex-col gap-5">
                   <AnimatePresence initial={false}>

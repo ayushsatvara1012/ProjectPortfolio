@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Zap, Rocket, AlertCircle, ExternalLink } from 'lucide-react';
 import { useUserRole } from '@/src/lib/context/UserContext';
-import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
 import Alert from '@/src/app/components/Alert';
 import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
 
@@ -230,6 +230,7 @@ const BillingTab = () => {
 const ApiKeysTab = () => {
   const { getToken } = useAuth();
   const authFetch = useAuthenticatedFetch();
+  const isAuthReady = useIsAuthReady();
   const [isRotating, setIsRotating] = useState(false);
   const [newKey, setNewKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -239,6 +240,7 @@ const ApiKeysTab = () => {
   const { data: botsData, isLoading: botsLoading } = useQuery({
     queryKey: ['bots'],
     queryFn: () => authFetch('/api/companies') as Promise<any>,
+    enabled: isAuthReady,
   });
   const bots = botsData?.bots || [];
 

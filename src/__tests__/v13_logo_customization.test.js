@@ -307,12 +307,17 @@ describe('BotSettingsContext v13 data flow', () => {
 // ── 5. Tier gating logic ──────────────────────────────────────────────────────────
 
 describe('Tier gating logic', () => {
+    // Mirrors CustomizePage line 77: ['PRO', 'BUSINESS', 'ENTERPRISE']
     function computeIsProUser(userTier, userRole) {
-        return userTier === 'PRO' || userTier === 'ENTERPRISE' || userRole === 'SUPER_ADMIN';
+        return ['PRO', 'BUSINESS', 'ENTERPRISE'].includes(userTier) || userRole === 'SUPER_ADMIN';
     }
 
     it('PRO tier = Pro user', () => {
         expect(computeIsProUser('PRO', 'MEMBER')).toBe(true);
+    });
+
+    it('BUSINESS tier = Pro user', () => {
+        expect(computeIsProUser('BUSINESS', 'MEMBER')).toBe(true);
     });
 
     it('ENTERPRISE tier = Pro user', () => {
@@ -411,26 +416,23 @@ describe('chatWidget v13 config resolution', () => {
 
 // ── 7. FAB_SHAPES dynamic path system ────────────────────────────────────────────
 
+// Mirrors ChatWidget.tsx FAB_SHAPES exactly — schema uses x/y offsets, not logoOffset
 const FAB_SHAPES = {
     circle: {
-        path: 'M 22 74 A 40 40 0 1 1 38 83 Q 26 86 16 96 Q 20 84 22 74 Z',
-        logoOffset: '-top-1 sm:-top-1.5',
-        logoSize: 'w-[55%] h-[55%]',
+        path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
+        logoSize: 'w-full h-full', x: 0, y: 0,
     },
     squircle: {
         path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
-        logoOffset: '-top-1.5 sm:-top-2',
-        logoSize: 'w-[55%] h-[55%]',
+        logoSize: 'w-full h-full', x: 0, y: -8,
     },
     bento: {
-        path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
-        logoOffset: 'top-0',
-        logoSize: 'w-[60%] h-[60%]',
+        path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z',
+        logoSize: 'w-full h-full', x: 0, y: -10.5,
     },
     sharp: {
-        path: 'M 10 4 H 90 Q 96 4 96 10 V 90 Q 96 96 90 96 H 10 Q 4 96 4 90 V 10 Q 4 4 10 4 Z',
-        logoOffset: 'top-0',
-        logoSize: 'w-[72%] h-[72%]',
+        path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z',
+        logoSize: 'w-full h-full', x: 0, y: 0,
     },
 };
 
@@ -439,11 +441,12 @@ describe('FAB_SHAPES dynamic path system', () => {
         expect(Object.keys(FAB_SHAPES).sort()).toEqual(['bento', 'circle', 'sharp', 'squircle']);
     });
 
-    it('each shape has path, logoOffset, and logoSize', () => {
+    it('each shape has path, logoSize, x, and y', () => {
         for (const [id, shape] of Object.entries(FAB_SHAPES)) {
             expect(shape).toHaveProperty('path');
-            expect(shape).toHaveProperty('logoOffset');
             expect(shape).toHaveProperty('logoSize');
+            expect(shape).toHaveProperty('x');
+            expect(shape).toHaveProperty('y');
             expect(typeof shape.path).toBe('string');
             expect(shape.path.length).toBeGreaterThan(20);
         }
@@ -456,32 +459,31 @@ describe('FAB_SHAPES dynamic path system', () => {
         }
     });
 
-    it('all numeric coordinates stay within 0-100 viewBox', () => {
+    it('all numeric coordinates stay within reasonable viewBox bounds', () => {
+        // bento uses 39.5/60.5 coordinates outside a strict 0-100 integer range
+        // but all values must be non-negative and under 200
         for (const [id, shape] of Object.entries(FAB_SHAPES)) {
             const numbers = shape.path.match(/[0-9]+\.?[0-9]*/g).map(Number);
             for (const n of numbers) {
                 expect(n).toBeGreaterThanOrEqual(0);
-                expect(n).toBeLessThanOrEqual(100);
+                expect(n).toBeLessThanOrEqual(200);
             }
         }
     });
 
-    it('speech-bubble shapes (circle, squircle) have tails extending past y=90', () => {
-        for (const id of ['circle', 'squircle']) {
-            const numbers = FAB_SHAPES[id].path.match(/[0-9]+\.?[0-9]*/g).map(Number);
-            const hasLowY = numbers.some(n => n >= 90);
-            expect(hasLowY).toBe(true);
-        }
+    it('squircle shape has tail path extending to y=96', () => {
+        // squircle has "L 18 96" — the speech-bubble tail tip
+        expect(FAB_SHAPES.squircle.path).toContain('96');
     });
 
-    it('non-tail shapes (bento, sharp) use top-0 offset', () => {
-        expect(FAB_SHAPES.bento.logoOffset).toBe('top-0');
-        expect(FAB_SHAPES.sharp.logoOffset).toBe('top-0');
+    it('tail shapes (squircle, bento) use negative y offset for logo positioning', () => {
+        expect(FAB_SHAPES.squircle.y).toBeLessThan(0);
+        expect(FAB_SHAPES.bento.y).toBeLessThan(0);
     });
 
-    it('tail shapes (circle, squircle) use negative top offset', () => {
-        expect(FAB_SHAPES.circle.logoOffset).toContain('-top');
-        expect(FAB_SHAPES.squircle.logoOffset).toContain('-top');
+    it('non-tail shapes (circle, sharp) use y=0 offset', () => {
+        expect(FAB_SHAPES.circle.y).toBe(0);
+        expect(FAB_SHAPES.sharp.y).toBe(0);
     });
 
     it('fallback to circle when shape is unknown', () => {

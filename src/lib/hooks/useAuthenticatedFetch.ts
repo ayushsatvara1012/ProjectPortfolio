@@ -20,11 +20,18 @@ export class UpgradeError extends Error {
 }
 
 export const useAuthenticatedFetch = () => {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   return useCallback(async (url: string, options: RequestInit = {}) => {
+    // Don't fire until Clerk has hydrated — React Query will retry once state changes
+    if (!isLoaded || !isSignedIn) {
+      throw new Error('AUTH_NOT_READY');
+    }
+
     const token = await getToken();
+    if (!token) throw new Error('AUTH_NOT_READY');
+
     const res = await fetch(`${baseUrl}${url}`, {
       ...options,
       headers: {
@@ -64,5 +71,11 @@ export const useAuthenticatedFetch = () => {
     }
 
     return data;
-  }, [getToken, baseUrl]);
+  }, [getToken, isLoaded, isSignedIn, baseUrl]);
+};
+
+// Convenience hook — use as `enabled` in useQuery to prevent firing before Clerk is ready
+export const useIsAuthReady = () => {
+  const { isLoaded, isSignedIn } = useAuth();
+  return isLoaded && !!isSignedIn;
 };

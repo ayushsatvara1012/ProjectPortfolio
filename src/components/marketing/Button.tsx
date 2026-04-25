@@ -9,7 +9,7 @@ const Button: React.FC<ButtonProps> = ({ className = "", children, ...props }) =
     return (
         <button
             {...props}
-            className={`relative flex items-center px-6 py-3 overflow-hidden font-medium transition-all bg-blue-950 group dark:bg-blue-600 dark:hover:bg-blue-700 ${className}`}
+            className={`relative flex items-center px-6 py-3 overflow-hidden font-medium transition-all bg-blue-950 group dark:bg-blue-600 dark:hover:bg-blue-700 text-white ${className}`}
         >
             <span
                 className="absolute top-0 right-0 inline-block w-4 h-4 transition-all duration-500 ease-in-out bg-blue-900 group-hover:-mr-4 group-hover:-mt-4"
@@ -26,7 +26,7 @@ const Button: React.FC<ButtonProps> = ({ className = "", children, ...props }) =
                 ></span>
             </span>
             <span
-                className="relative w-full flex items-center justify-center gap-2 transition-colors duration-200 ease-in-out text-white"
+                className="relative w-full flex items-center justify-center gap-2 transition-colors duration-200 ease-in-out"
             >
                 {children || "Button"}
             </span>

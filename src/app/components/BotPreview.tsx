@@ -43,7 +43,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
           <div
             className="absolute inset-0 animate-gradient-x opacity-20"
             style={{
-              background: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`,
+              backgroundImage: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`,
               backgroundSize: '200% 200%'
             }}
           />

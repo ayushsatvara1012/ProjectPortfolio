@@ -1,7 +1,6 @@
 import Navbar from '../components/Navbar';
 import NavToggle from '../components/NavToggle';
 import Footer from '../components/Footer';
-import SmoothScroll from '../smooth-scroll';
 import ClientEffects from '../client-effects';
 import FloatingBotWidget from '../components/FloatingBotWidget';
 
@@ -18,7 +17,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <NavToggle />
       <main id="main-content">{children}</main>
       <Footer />
-      <SmoothScroll />
       <ClientEffects />
       <FloatingBotWidget />
     </div>

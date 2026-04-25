@@ -5,7 +5,8 @@
       "Read(//usr/bin/**)",
       "Bash(/bin/mkdir -p '/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/\\(auth\\)/sign-in/[[...sign-in]]' '/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/\\(auth\\)/sign-up/[[...sign-up]]')",
       "Bash(/usr/bin/tail -80 /tmp/next-dev.log)",
-      "Bash(node -e \"const pkg = require\\('./node_modules/@clerk/nextjs/package.json'\\); console.log\\(pkg.version\\)\")"
+      "Bash(node -e \"const pkg = require\\('./node_modules/@clerk/nextjs/package.json'\\); console.log\\(pkg.version\\)\")",
+      "Bash(npm test *)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"

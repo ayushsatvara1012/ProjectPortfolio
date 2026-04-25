@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
-import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import LeadsPanel from '@/src/app/components/LeadsPanel';
 import ConversationsPanel from '@/src/app/components/ConversationsPanel';
@@ -201,11 +201,12 @@ export default function AppInsights() {
     const userTier = rawUserTier ?? '';
     const userRole = rawUserRole ?? '';
     const authFetch = useAuthenticatedFetch();
+    const isAuthReady = useIsAuthReady();
 
     const { data: botsData, isLoading: botsLoading } = useQuery({
         queryKey: ['bots'],
         queryFn: () => authFetch('/api/companies'),
-        enabled: !ctxLoading,
+        enabled: isAuthReady && !ctxLoading,
     });
 
     const bots = (botsData as any)?.bots || [];

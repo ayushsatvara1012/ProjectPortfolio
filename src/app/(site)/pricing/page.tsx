@@ -221,7 +221,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-500 overflow-x-hidden">
+    <div className="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-500 overflow-x-hidden overflow-y-visible">
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <section

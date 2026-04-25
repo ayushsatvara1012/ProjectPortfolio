@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
-import { useAuthenticatedFetch, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
 const TABS = [
@@ -262,6 +262,7 @@ export default function TrainPage() {
         totalMessages, refreshUser
     } = useUserRole();
     const authFetch = useAuthenticatedFetch();
+    const isAuthReady = useIsAuthReady();
     const searchParams = useSearchParams();
 
     const [activeTab, setActiveTab] = useState('url');
@@ -296,6 +297,7 @@ export default function TrainPage() {
     const { data: botsData } = useQuery({
         queryKey: ['bots'],
         queryFn: () => authFetch('/api/companies'),
+        enabled: isAuthReady,
     });
 
     const bots = (botsData as any)?.bots || [];

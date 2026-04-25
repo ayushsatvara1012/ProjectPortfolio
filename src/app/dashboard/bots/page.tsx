@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
-import { useAuthenticatedFetch, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
   standard:  { label: 'Standard',  cls: 'text-slate-500 bg-slate-50 border-slate-200' },
@@ -38,10 +38,12 @@ export default function BotsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const authFetch = useAuthenticatedFetch();
+  const isAuthReady = useIsAuthReady();
 
   const { data: botsData, isLoading, error: queryError } = useQuery({
     queryKey: ['bots'],
     queryFn: () => authFetch('/api/companies') as Promise<{ bots: Bot[]; plan: Plan }>,
+    enabled: isAuthReady,
   });
 
   const bots: Bot[] = (botsData as any)?.bots || [];

@@ -1,7 +1,43 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, Component } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
 import Link from 'next/link';
+
+// ── Dashboard error boundary ──────────────────────────────────────────────────
+
+class DashboardErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[DashboardErrorBoundary]', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8 text-center">
+          <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600">error</span>
+          <p className="text-slate-600 dark:text-slate-400 text-sm font-display">Something went wrong loading this page.</p>
+          <button
+            onClick={() => this.setState({ error: null })}
+            className="px-4 py-2 text-sm font-display border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { usePathname } from 'next/navigation';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -301,11 +337,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
         </aside>
         {/* Main content */}
-        <main className={`flex-1 mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 overflow-hidden flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
+        <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
           <div className="flex-1 flex flex-col pt-0">
-            <Suspense fallback={null}>
-              {children}
-            </Suspense>
+            <DashboardErrorBoundary>
+              <Suspense fallback={null}>
+                {children}
+              </Suspense>
+            </DashboardErrorBoundary>
           </div>
           {/* Dashboard Footer */}
           <footer className="md:col-span-12 bg-white dark:bg-slate-950 p-8 md:p-10 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">

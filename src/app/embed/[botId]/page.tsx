@@ -9,11 +9,12 @@ export default function EmbedPage() {
   const botId = params.botId as string;
 
   useEffect(() => {
+    const parentOrigin = document.referrer ? new URL(document.referrer).origin : '*';
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         window.parent.postMessage(
           { type: 'sapybase:resize', height: entry.contentRect.height },
-          '*'
+          parentOrigin
         );
       }
     });

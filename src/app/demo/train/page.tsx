@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
 import { parseFileToChunks } from '@/src/lib/demo/demoRag';
 import { saveKnowledge, getKnowledge, clearKnowledge, getBotConfig } from '@/src/lib/demo/demoStorage';
 
@@ -14,33 +13,55 @@ const TABS = [
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
-const labelCls = "block text-md uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors font-bold";
+const labelCls = "block text-md font-google uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+
+const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
 
 export default function DemoTrainAIPage() {
-    const router = useRouter();
-    const botConfig = getBotConfig();
-    const chunks = getKnowledge();
+    const [botConfig, setBotConfig] = React.useState<any>(null);
+    const [chunks, setChunks] = React.useState<any[]>([]);
+    const [mounted, setMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setBotConfig(getBotConfig());
+        setChunks(getKnowledge());
+        setMounted(true);
+    }, []);
+
+    const [activeTab, setActiveTab] = React.useState('pdf');
+    const [file, setFile] = React.useState<File | null>(null);
+    const [csvFile, setCsvFile] = React.useState<File | null>(null);
+    const [trainingText, setTrainingText] = React.useState('');
+    const [textLabel, setTextLabel] = React.useState('');
+    const [isTraining, setIsTraining] = React.useState(false);
+    const [isPurging, setIsPurging] = React.useState(false);
+    const [alert, setAlert] = React.useState<{ open: boolean; type: 'success' | 'error' | 'warning'; msg: string }>({ open: false, type: 'success', msg: '' });
+
+    // Re-read from storage on every render so state updates reflect immediately
     const chunksUsed = chunks.length;
     const chunkLimit = 200;
-    const chunkPct = Math.min((chunksUsed / chunkLimit) * 100, 100);
+    const chunkPct = chunkLimit > 0 ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
 
-    const [activeTab, setActiveTab] = useState('pdf');
-    const [file, setFile] = useState<File | null>(null);
-    const [csvFile, setCsvFile] = useState<File | null>(null);
-    const [trainingText, setTrainingText] = useState('');
-    const [status, setStatus] = useState<null | 'processing' | 'done' | 'error'>(null);
-    const [statusMsg, setStatusMsg] = useState('');
+    const [, forceUpdate] = React.useState(0);
+    const refresh = () => forceUpdate(n => n + 1);
 
-    const fileRef = useRef<HTMLInputElement>(null);
-    const csvFileRef = useRef<HTMLInputElement>(null);
+    const fileRef = React.useRef<HTMLInputElement>(null);
+    const csvFileRef = React.useRef<HTMLInputElement>(null);
+
+    const showAlert = (type: 'success' | 'error' | 'warning', msg: string) => {
+        setAlert({ open: true, type, msg });
+        setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
+    };
 
     const handleTrain = async (e: React.FormEvent) => {
         e.preventDefault();
         const activeFile = file || csvFile;
-        if (!activeFile && !trainingText.trim()) return;
+        if (!activeFile && !trainingText.trim()) {
+            showAlert('error', 'Provide a PDF file, CSV/Excel file, or manual text.');
+            return;
+        }
 
-        setStatus('processing');
-        setStatusMsg('Parsing and indexing...');
+        setIsTraining(true);
         try {
             let newChunks: string[];
             if (activeFile) {
@@ -50,91 +71,419 @@ export default function DemoTrainAIPage() {
             }
             if (newChunks.length > 200) newChunks = newChunks.slice(0, 200);
             saveKnowledge(newChunks);
-            setStatus('done');
-            setStatusMsg(`Training complete! ${newChunks.length} segments indexed.`);
-            setFile(null); setCsvFile(null); setTrainingText('');
+            refresh();
+            showAlert('success', `Training complete! ${newChunks.length} chunks committed to your bot's knowledge base.`);
+            setFile(null); setCsvFile(null); setTrainingText(''); setTextLabel('');
+            if (fileRef.current) fileRef.current.value = '';
+            if (csvFileRef.current) csvFileRef.current.value = '';
         } catch (err: any) {
-            setStatus('error');
-            setStatusMsg(err.message || 'Failed to process.');
+            showAlert('error', err.message || 'Failed to process.');
+        } finally {
+            setIsTraining(false);
         }
     };
 
     const handlePurge = () => {
-        if (!confirm('Clear all knowledge?')) return;
+        if (!window.confirm(
+            `⚠️ DESTRUCTIVE ACTION\n\nThis will permanently delete ALL ${chunksUsed} knowledge chunks for "${botConfig.name}".\n\nThis cannot be undone. Continue?`
+        )) return;
+        setIsPurging(true);
         clearKnowledge();
-        setStatus(null);
+        refresh();
+        setIsPurging(false);
+        showAlert('success', 'Knowledge purged successfully.');
+    };
+
+    // ── Source Browser (local demo version) ─────────────────────────────────
+    const DemoSourceBrowser = () => {
+        const allChunks = getKnowledge();
+        const [selectedChunks, setSelectedChunks] = React.useState(new Set<number>());
+
+        const toggleChunk = (i: number) => {
+            setSelectedChunks(prev => {
+                const next = new Set(prev);
+                if (next.has(i)) next.delete(i); else next.add(i);
+                return next;
+            });
+        };
+
+        const toggleAll = () => {
+            if (selectedChunks.size === allChunks.length) {
+                setSelectedChunks(new Set());
+            } else {
+                setSelectedChunks(new Set(allChunks.map((_: string, i: number) => i)));
+            }
+        };
+
+        const handleDeleteSelected = () => {
+            if (selectedChunks.size === 0) return;
+            if (!window.confirm(`Delete ${selectedChunks.size} selected chunk(s)? This cannot be undone.`)) return;
+            const remaining = allChunks.filter((_: string, i: number) => !selectedChunks.has(i));
+            saveKnowledge(remaining);
+            refresh();
+            showAlert('success', `${selectedChunks.size} chunk(s) deleted successfully.`);
+        };
+
+        if (allChunks.length === 0) {
+            return (
+                <div className="py-6 text-center">
+                    <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600 mb-2 block">inventory_2</span>
+                    <p className="text-lg font-semibold text-slate-500 dark:text-slate-400">No knowledge chunks yet.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-4">
+                <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 border border-gray-100 dark:border-slate-800 rounded-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-blue-500">notes</span>
+                        <span className="text-xs font-bold font-google uppercase tracking-widest text-slate-700 dark:text-slate-300 truncate flex-1">
+                            demo-knowledge
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
+                        <button
+                            onClick={toggleAll}
+                            disabled={allChunks.length === 0}
+                            className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+                        >
+                            <span className="material-symbols-outlined text-[14px]">
+                                {selectedChunks.size === allChunks.length && allChunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
+                            </span>
+                            {selectedChunks.size === allChunks.length && allChunks.length > 0 ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <span className="text-[10px] font-google font-bold text-slate-400 dark:text-slate-500">
+                            {allChunks.length} segments
+                        </span>
+                    </div>
+                </div>
+
+                <div className="max-h-[240px] overflow-y-auto custom-scrollbar border border-gray-100 dark:border-slate-800 divide-y divide-gray-50 dark:divide-slate-800 transition-colors">
+                    {allChunks.map((chunk: string, i: number) => (
+                        <label
+                            key={i}
+                            className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors ${selectedChunks.has(i) ? 'bg-blue-50/50 dark:bg-blue-900/30' : ''}`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={selectedChunks.has(i)}
+                                onChange={() => toggleChunk(i)}
+                                className="mt-1 shrink-0 accent-slate-900 dark:accent-blue-500"
+                            />
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 font-mono transition-colors">
+                                {chunk || '(empty chunk)'}
+                            </p>
+                        </label>
+                    ))}
+                </div>
+
+                {allChunks.length > 0 && (
+                    <button
+                        onClick={handleDeleteSelected}
+                        disabled={selectedChunks.size === 0}
+                        className="w-full py-2.5 min-h-[40px] bg-red-600 dark:bg-red-700 text-white text-xs uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                    >
+                        <span className="material-symbols-outlined text-[16px]">delete_sweep</span> Delete Selected ({selectedChunks.size})
+                    </button>
+                )}
+            </div>
+        );
     };
 
     return (
-        <div className="flex flex-col bg-[#E8EBF0] dark:bg-slate-900 min-h-full">
-            <div className="bg-white dark:bg-slate-950 px-8 py-6 border-b border-gray-100 dark:border-slate-800">
-                <h1 className="text-2xl font-bold">Train AI</h1>
-                <p className="text-sm text-slate-500">Upload documents and your demo bot will answer questions instantly (In-Browser).</p>
+        <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
+            {/* Header */}
+            <div className="bg-white dark:bg-slate-950 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
+                        psychology
+                    </span>
+                    <h1 className="text-xl md:text-2xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">Train AI</h1>
+                </div>
+                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Ingest knowledge sources into your AI's vector brain.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-gray-200/30 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800">
-                <div className={`${cellCls} px-4 py-3 sm:px-6 sm:py-4`}>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-2">Storage</p>
-                    <div className="flex items-end gap-1 mb-2">
-                        <span className="text-3xl font-bold text-slate-900 dark:text-slate-200">{chunksUsed}</span>
-                        <span className="text-sm text-slate-400 dark:text-slate-500 mb-1">/ {chunkLimit}</span>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+                {/* Data Storage */}
+                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
+                            <h4 className="text-md uppercase font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Data Storage</h4>
+                        </div>
                     </div>
-                    <div className="h-1 bg-slate-100 dark:bg-slate-800 w-full overflow-hidden">
-                        <div className="h-full bg-blue-500 transition-all" style={{ width: `${chunkPct}%` }} />
+                    <div className="flex items-end gap-1 mb-3">
+                        <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
+                        <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>
+                        <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
+                    </div>
+                    {chunkPct !== null && (
+                        <>
+                            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${chunkPct}%` }}
+                                    className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`}
+                                />
+                            </div>
+                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
+                                {Math.round(chunkPct)}% Storage Used
+                            </p>
+                        </>
+                    )}
+                </div>
+
+                {/* AI Memory */}
+                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
+                    <div className="flex items-center gap-2 mb-3">
+                        <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">vital_signs</span>
+                        <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
+                    </div>
+                    <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
+                        {chunksUsed} <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">segments</span>
+                    </p>
+                </div>
+
+                {/* System Tier */}
+                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
+                    <div className="flex items-center gap-2 mb-3">
+                        <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">bolt</span>
+                        <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">System Tier</p>
+                    </div>
+                    <p className="text-3xl font-google font-bold tracking-tight text-amber-500 transition-colors">
+                        DEMO <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">plan</span>
+                    </p>
+                </div>
+
+                {/* Total Usage */}
+                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">database</span>
+                            <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Total Usage</h4>
+                        </div>
+                    </div>
+                    <div className="flex items-end gap-1 mb-3">
+                        <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">0</span>
+                        <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ 15</span>
+                        <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
+                        <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: '0%' }}
+                            className="h-full bg-slate-900 dark:bg-blue-500"
+                        />
+                    </div>
+                    <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
+                        <span>0% CAP</span>
+                        <span className="flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px]">schedule</span> Demo
+                        </span>
                     </div>
                 </div>
-                <div className={`${cellCls} px-4 py-3 sm:px-6 sm:py-4`}><p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-2">Memory</p><p className="text-2xl font-bold text-slate-900 dark:text-slate-200">{chunksUsed} segments</p></div>
-                <div className={`${cellCls} px-4 py-3 sm:px-6 sm:py-4`}><p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-2">Plan</p><p className="text-2xl font-bold text-amber-500">DEMO</p></div>
-                <div className={`${cellCls} px-4 py-3 sm:px-6 sm:py-4`}><p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-2">Bot</p><p className="text-2xl font-bold truncate text-slate-900 dark:text-slate-200">{botConfig.name}</p></div>
             </div>
 
-            <div className="p-4 sm:p-8 space-y-8">
-                <div className={`${cellCls} p-6 sm:p-8 border border-gray-100 dark:border-slate-800`}>
-                    {status && (
-                        <div className={`mb-6 p-4 border flex justify-between items-center ${
-                            status === 'done' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/30'
-                            : status === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/30'
-                            : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/30'
-                        }`}>
-                           <span className="text-sm">{statusMsg}</span>
-                           {status === 'done' && <button onClick={() => router.push('/demo/chat')} className="px-4 py-2 bg-slate-900 dark:bg-blue-600 text-white text-xs font-bold uppercase hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors">Chat Now →</button>}
-                        </div>
-                    )}
+            {/* Knowledge Sources form */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 overflow-hidden transition-colors duration-500">
+                <div className={`lg:col-span-12 ${cellCls} p-4 md:p-8 relative overflow-y-auto custom-scrollbar`}>
+                    <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 mb-4 transition-colors">Knowledge Sources</h2>
 
-                    <div className="flex border border-gray-100 dark:border-slate-800 mb-6">
+                    {/* Tabs */}
+                    <div className="flex border border-gray-100 dark:border-slate-800 mb-5 overflow-x-auto transition-colors">
                         {TABS.map(t => (
-                            <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${activeTab === t.id ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                <span className="material-symbols-outlined text-[16px]">{t.icon}</span>
+                            <button
+                                key={t.id}
+                                onClick={() => setActiveTab(t.id)}
+                                className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 px-2 md:px-3 text-sm font-google uppercase tracking-widest font-bold transition-colors min-h-[44px] shrink-0 border-b-2 ${
+                                    activeTab === t.id
+                                        ? 'border-slate-900 dark:border-blue-500 text-slate-900 dark:text-slate-200 bg-[#FAFAFA] dark:bg-slate-900'
+                                        : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
                                 <span className="hidden sm:inline">{t.label}</span>
                             </button>
                         ))}
                     </div>
 
-                    <form onSubmit={handleTrain} className="space-y-6">
-                        {(activeTab === 'pdf' || activeTab === 'csv') && (
-                            <div onClick={() => (activeTab === 'pdf' ? fileRef : csvFileRef).current?.click()} className="h-40 border-2 border-dashed border-gray-100 dark:border-slate-700 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                <span className="material-symbols-outlined text-[32px] text-slate-400 dark:text-slate-500 mb-2">cloud_upload</span>
-                                <p className="text-sm font-bold text-slate-600 dark:text-slate-400">{(activeTab === 'pdf' ? file : csvFile)?.name || `Upload ${activeTab.toUpperCase()}`}</p>
-                                <input type="file" ref={activeTab === 'pdf' ? fileRef : csvFileRef} className="hidden" accept={activeTab === 'pdf' ? '.pdf' : '.csv,.xlsx,.xls'} onChange={e => {
-                                    const f = e.target.files?.[0];
-                                    if (f) activeTab === 'pdf' ? setFile(f) : setCsvFile(f);
-                                }} />
+                    {/* Alert banner */}
+                    {alert.open && (
+                        <div className={`mb-5 p-4 border flex items-start justify-between gap-3 ${
+                            alert.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/30'
+                            : alert.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/30'
+                            : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/30'
+                        }`}>
+                            <span className="text-sm font-google">{alert.msg}</span>
+                            <button onClick={() => setAlert(p => ({ ...p, open: false }))} className="shrink-0 opacity-60 hover:opacity-100">
+                                <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleTrain} className="space-y-4">
+                        {activeTab === 'pdf' && (
+                            <div>
+                                <label className={labelCls}>PDF Archive</label>
+                                <div
+                                    onClick={() => fileRef.current?.click()}
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">cloud_upload</span>
+                                    <div className="text-center w-full">
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">{file ? file.name : 'Drop PDF here'}</p>
+                                        <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
+                                        <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={fileRef}
+                                        className="hidden"
+                                        accept=".pdf"
+                                        onChange={e => {
+                                            const f = e.target.files?.[0];
+                                            if (f?.type === 'application/pdf') setFile(f);
+                                            else showAlert('error', 'Please select a valid PDF.');
+                                        }}
+                                    />
+                                </div>
+                                {file && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
+                                        className="mt-2 flex items-center gap-1 text-md font-google text-red-500 hover:text-red-700"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">close</span> Remove {file.name}
+                                    </button>
+                                )}
                             </div>
                         )}
-                        {activeTab === 'text' && <textarea rows={6} className={inputCls} placeholder="Paste knowledge here..." value={trainingText} onChange={e => setTrainingText(e.target.value)} />}
-                        <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold uppercase tracking-widest hover:bg-blue-700 transition-colors">Train AI Sequence</button>
+
+                        {activeTab === 'csv' && (
+                            <div>
+                                <label className={labelCls}>CSV / Excel File</label>
+                                <div
+                                    onClick={() => csvFileRef.current?.click()}
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">table_chart</span>
+                                    <div className="text-center w-full">
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">
+                                            {csvFile ? csvFile.name : 'Drop CSV or Excel file here'}
+                                        </p>
+                                        <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
+                                        <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">.csv, .xlsx, .xls — max 5 MB</p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={csvFileRef}
+                                        className="hidden"
+                                        accept=".csv,.xlsx,.xls"
+                                        onChange={e => {
+                                            const f = e.target.files?.[0];
+                                            if (!f) return;
+                                            const ok = ['.csv', '.xlsx', '.xls'].some(ext => f.name.toLowerCase().endsWith(ext));
+                                            if (!ok) { showAlert('error', 'Please select a .csv, .xlsx, or .xls file.'); return; }
+                                            if (f.size > 5 * 1024 * 1024) { showAlert('error', 'File exceeds 5 MB limit.'); return; }
+                                            setCsvFile(f);
+                                        }}
+                                    />
+                                </div>
+                                {csvFile && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }}
+                                        className="mt-2 flex items-center gap-1 text-md font-google text-red-500 hover:text-red-700"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">close</span> Remove {csvFile.name}
+                                    </button>
+                                )}
+                                {csvFile && (
+                                    <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 flex items-start gap-2">
+                                        <span className="material-symbols-outlined text-[15px] text-blue-500 mt-0.5 shrink-0">info</span>
+                                        <p className="text-xs text-blue-700 dark:text-blue-300 font-google leading-relaxed">
+                                            Each row becomes one knowledge chunk. Make sure your file has a <span className="font-bold">header row</span> (column names in row 1). Re-uploading the same filename will safely replace the previous version.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'text' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className={labelCls}>Source Label <span className="normal-case text-slate-400 dark:text-slate-500 font-normal tracking-normal">(optional)</span></label>
+                                    <input
+                                        type="text"
+                                        value={textLabel}
+                                        onChange={e => setTextLabel(e.target.value)}
+                                        className={inputCls + ' font-mono text-xs'}
+                                        placeholder="e.g. faq-returns, pricing-2025"
+                                    />
+                                    <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 font-google leading-relaxed">
+                                        {textLabel.trim()
+                                            ? <>Re-uploading with label <span className="font-mono font-bold text-slate-600 dark:text-slate-300">"{textLabel.trim()}"</span> will safely replace only that source.</>
+                                            : 'Without a label, re-submitting will overwrite all previous unlabelled text entries.'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Knowledge Text</label>
+                                    <textarea
+                                        value={trainingText}
+                                        onChange={e => setTrainingText(e.target.value)}
+                                        rows={6}
+                                        className={inputCls + ' resize-none font-google'}
+                                        placeholder="Paste your FAQs, services, or raw knowledge here..."
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={isTraining}
+                            className="w-full py-3 min-h-[44px] bg-linear-to-r from-blue-600 to-green-600 text-white text-md uppercase tracking-widest font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        >
+                            {isTraining ? (
+                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Uploading...</>
+                            ) : 'Start Training Sequence'}
+                        </button>
                     </form>
                 </div>
+            </div>
 
-                {chunksUsed > 0 && (
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-200">Knowledge Segments</h2>
-                        <div className="bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 divide-y divide-gray-100 dark:divide-slate-800 max-h-60 overflow-auto">
-                            {chunks.slice(0, 50).map((c: string, i: number) => <div key={i} className="p-4 text-xs font-mono text-slate-700 dark:text-slate-300">{c}</div>)}
-                        </div>
-                        <button onClick={handlePurge} className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-xs tracking-widest transition-colors">Purge Knowledge Base</button>
+            {/* Manage Knowledge */}
+            <div className={`${cellCls} p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar border-t border-gray-100 dark:border-slate-800`}>
+                <div className="flex items-center gap-2 mb-5">
+                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">folder_open</span>
+                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 transition-colors">Manage Knowledge</h2>
+                </div>
+
+                <DemoSourceBrowser />
+
+                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
+                    <div className="flex items-start gap-3 mb-4 p-3 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 transition-colors">
+                        <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
+                            delete_forever
+                        </span>
+                        <p className="text-lg font-medium tracking-wide text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
+                            Deleting permanently removes all trained data for this bot. This action cannot be undone.
+                        </p>
                     </div>
-                )}
+                    <button
+                        onClick={handlePurge}
+                        disabled={isPurging || chunksUsed === 0}
+                        className="w-full py-3 min-h-[44px] bg-red-600 dark:bg-red-700 text-white text-md uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                    >
+                        {isPurging ? (
+                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Deleting...</>
+                        ) : (
+                            <><span className="material-symbols-outlined text-[20px]">delete</span> Delete All Knowledge ({chunksUsed})</>
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );
