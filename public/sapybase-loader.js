@@ -1,0 +1,219 @@
+(function () {
+  'use strict';
+
+  // Fix #2: double-mount guard — if script is loaded twice, bail out early
+  if (customElements.get('sapybase-widget')) return;
+
+  const IFRAME_ORIGIN =
+    typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:3000'
+      : 'https://www.sapybase.com';
+
+  class SapybaseWidget extends HTMLElement {
+    constructor() {
+      super();
+      this.shadow = this.attachShadow({ mode: 'closed' });
+      this._open = false;
+      this._iframeLoaded = false;
+      this._iframe = null;
+      this._botId = null;
+      this._wrap = null;
+      this._fab = null;
+      this._label = null;
+    }
+
+    connectedCallback() {
+      // Fix #1: read data-bot-id (plan convention) with fallback to bot-id
+      const botId =
+        this.getAttribute('data-bot-id') ||
+        this.getAttribute('bot-id') ||
+        (window.SaPyBaseConfig && window.SaPyBaseConfig.apiKey);
+
+      if (!botId) {
+        console.error('[SaPyBase] No data-bot-id provided.');
+        return;
+      }
+
+      // Fix #4: read data-position attribute
+      const position = this.getAttribute('data-position') || 'bottom-right';
+
+      this._botId = botId;
+
+      // Fix #3: inject ld+json SEO schema into host <head>
+      this._injectSEO(botId);
+
+      this._render(position);
+      this._listenForMessages();
+    }
+
+    // Fix #3: ld+json WebApplication schema injection
+    _injectSEO(botId) {
+      if (document.querySelector('script[data-sapybase-seo]')) return;
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.dataset.sapybaseSeo = 'true';
+      script.textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: 'SaPyBase AI Assistant',
+        url: IFRAME_ORIGIN + '/embed/' + botId,
+        applicationCategory: 'ChatApplication',
+        operatingSystem: 'Web',
+        description: 'AI-powered customer support chatbot by SaPyBase',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      });
+      document.head.appendChild(script);
+    }
+
+    _render(position) {
+      const isLeft = position === 'bottom-left';
+      const themeColor =
+        (window.SaPyBaseConfig && window.SaPyBaseConfig.themeColor) || '#5730F5';
+
+      const style = document.createElement('style');
+      style.textContent = [
+        ':host {',
+        '  all: initial;',
+        '  position: fixed;',
+        '  z-index: 2147483647;',
+        '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
+        '  bottom: 20px;',
+        '  font-family: system-ui, -apple-system, sans-serif;',
+        '}',
+        '.fab {',
+        '  width: 60px; height: 60px; border-radius: 50%; cursor: pointer;',
+        '  background: linear-gradient(135deg, ' + themeColor + ', #4f46e5);',
+        '  box-shadow: 0 4px 24px rgba(87,48,245,.35); border: none;',
+        '  display: flex; align-items: center; justify-content: center;',
+        '  transition: transform .2s ease, box-shadow .2s ease;',
+        '  pointer-events: auto;',
+        '}',
+        '.fab:hover { transform: scale(1.08); box-shadow: 0 6px 32px rgba(87,48,245,.45); }',
+        '.fab svg { width: 28px; height: 28px; fill: white; }',
+        '.label {',
+        '  position: absolute; bottom: 70px; ' + (isLeft ? 'left: 0;' : 'right: 0;'),
+        '  white-space: nowrap; background: white; color: #1e293b;',
+        '  padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 500;',
+        '  box-shadow: 0 2px 12px rgba(0,0,0,.1); pointer-events: none;',
+        '  opacity: 0; animation: fadeIn .3s ease 2s forwards;',
+        '}',
+        '@keyframes fadeIn { to { opacity: 1; } }',
+        '.iframe-wrap {',
+        '  position: fixed; z-index: 2147483646;',
+        '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
+        '  bottom: 90px; width: 400px; height: 600px;',
+        '  max-height: calc(100vh - 120px); max-width: calc(100vw - 40px);',
+        '  border-radius: 16px; overflow: hidden;',
+        '  box-shadow: 0 12px 48px rgba(0,0,0,.15);',
+        '  opacity: 0; transform: translateY(20px) scale(.95);',
+        '  transition: opacity .25s ease, transform .25s ease;',
+        '  pointer-events: none; display: none;',
+        '}',
+        '.iframe-wrap.open {',
+        '  display: block; opacity: 1; transform: translateY(0) scale(1);',
+        '  pointer-events: auto;',
+        '}',
+        '.iframe-wrap iframe {',
+        '  width: 100%; height: 100%; border: none;',
+        '  border-radius: 16px; background: white;',
+        '}',
+        '@media (max-width: 480px) {',
+        '  .iframe-wrap {',
+        '    width: 100vw; height: 100vh; max-height: 100vh; max-width: 100vw;',
+        '    bottom: 0; right: 0; left: 0; border-radius: 0;',
+        '  }',
+        '  .fab { width: 52px; height: 52px; }',
+        '  .label { display: none; }',
+        '}',
+      ].join('\n');
+      this.shadow.appendChild(style);
+
+      const fab = document.createElement('button');
+      fab.className = 'fab';
+      fab.setAttribute('aria-label', 'Open chat');
+      fab.innerHTML =
+        '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+        '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>' +
+        '</svg>';
+      fab.addEventListener('click', () => this._toggle());
+      this.shadow.appendChild(fab);
+      this._fab = fab;
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = 'Chat with us!';
+      this.shadow.appendChild(label);
+      this._label = label;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'iframe-wrap';
+      this.shadow.appendChild(wrap);
+      this._wrap = wrap;
+    }
+
+    _toggle() {
+      this._open = !this._open;
+      if (this._open) {
+        this._label.style.display = 'none';
+        if (!this._iframeLoaded) this._loadIframe();
+        this._wrap.classList.add('open');
+        this._postToIframe({ type: 'sapybase:visibility', open: true });
+      } else {
+        this._wrap.classList.remove('open');
+        this._postToIframe({ type: 'sapybase:visibility', open: false });
+      }
+    }
+
+    _loadIframe() {
+      const iframe = document.createElement('iframe');
+      iframe.src = IFRAME_ORIGIN + '/embed/' + this._botId;
+      iframe.title = 'SaPyBase AI Chat';
+      iframe.loading = 'lazy';
+      iframe.allow = 'clipboard-write';
+      this._wrap.appendChild(iframe);
+      this._iframe = iframe;
+      this._iframeLoaded = true;
+    }
+
+    _postToIframe(data) {
+      if (this._iframe && this._iframe.contentWindow) {
+        this._iframe.contentWindow.postMessage(data, IFRAME_ORIGIN);
+      }
+    }
+
+    // Fix #5 (loader side): handle sapybase:resize from embed page + sapybase:close
+    _listenForMessages() {
+      window.addEventListener('message', function (e) {
+        if (e.origin !== IFRAME_ORIGIN && e.origin !== window.location.origin) return;
+        var data = e.data || {};
+
+        if (data.type === 'sapybase:resize' && data.height) {
+          if (this._wrap) {
+            this._wrap.style.height =
+              Math.min(data.height, window.innerHeight - 120) + 'px';
+          }
+        }
+
+        if (data.type === 'sapybase:close' || data === 'sapybase-close') {
+          this._open = false;
+          if (this._wrap) this._wrap.classList.remove('open');
+        }
+      }.bind(this));
+    }
+  }
+
+  customElements.define('sapybase-widget', SapybaseWidget);
+
+  // Auto-mount from <script data-bot-id="..."> tag
+  var currentScript = document.currentScript;
+  if (currentScript) {
+    var botId = currentScript.getAttribute('data-bot-id');
+    if (botId && !document.querySelector('sapybase-widget')) {
+      var el = document.createElement('sapybase-widget');
+      el.setAttribute('data-bot-id', botId);
+      var pos = currentScript.getAttribute('data-position');
+      if (pos) el.setAttribute('data-position', pos);
+      document.body.appendChild(el);
+    }
+  }
+})();
