@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import { useQueryClient } from '@tanstack/react-query';
 
 type BotSettings = {
   name: string;
@@ -49,8 +50,35 @@ const DEFAULT_SETTINGS: BotSettings = {
   hideBranding: false,
 };
 
+const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
+const COMPANY_DETAILS_STALE_MS = 1000 * 60 * 5;
+
+const mapCompanyToSettings = (company: any): BotSettings => {
+  const rawQs = company.quick_questions || [];
+  const parsedQuickQuestions = Array.isArray(rawQs) ? rawQs : [];
+  const quickQuestions = parsedQuickQuestions
+    .map((q: any) => (typeof q === 'string' ? q : q.label || q.prompt || ''))
+    .filter(Boolean);
+  return {
+    name: company.bot_name || 'SaPyBase AI',
+    primaryColor: company.theme_color || '#5730F5',
+    greeting: company.initial_message || 'Hi! How can I help you today?',
+    quickQuestions,
+    companyTone: company.company_tone ? company.company_tone.split(',') : [],
+    systemPrompt: company.system_prompt || '',
+    aiModel: company.ai_model || '',
+    logoShape: company.logo_shape || 'circle',
+    customLogoUrl: company.custom_logo_url || '',
+    avatarBgStyle: company.avatar_bg_style || 'none',
+    webhookUrl: company.webhook_url || '',
+    handoffRedirectUrl: company.handoff_redirect_url || '',
+    hideBranding: company.hide_branding === true,
+  };
+};
+
 export const BotSettingsProvider = ({ children }: { children: React.ReactNode }) => {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
   const [botSettings, setBotSettings] = useState<BotSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,41 +89,27 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
 
   const fetchSettings = useCallback(async (botId: string | null = null) => {
     if (!isSignedIn) return;
-    setIsLoading(true);
     setError(null);
     try {
-      const token = await getToken();
-      const url = botId
-        ? `${baseUrl}/api/company/details?company_id=${botId}`
-        : `${baseUrl}/api/company/details`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      // React Query cache: dedupes concurrent loads and serves stale-fresh data
+      // instantly when the user toggles back to a previously-selected bot.
+      const data = await queryClient.fetchQuery({
+        queryKey: COMPANY_DETAILS_KEY(botId),
+        staleTime: COMPANY_DETAILS_STALE_MS,
+        queryFn: async () => {
+          setIsLoading(true);
+          const token = await getToken();
+          const url = botId
+            ? `${baseUrl}/api/company/details?company_id=${botId}`
+            : `${baseUrl}/api/company/details`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          if (!res.ok) throw new Error(`company/details failed: ${res.status}`);
+          return res.json();
+        },
       });
-      const data = await res.json();
 
-      if (res.ok && data.company) {
-        const rawQs = data.company.quick_questions || [];
-        const parsedQuickQuestions = Array.isArray(rawQs) ? rawQs : [];
-        const quickQuestions = parsedQuickQuestions
-          .map((q: any) => (typeof q === 'string' ? q : q.label || q.prompt || ''))
-          .filter(Boolean);
-
-        setBotSettings({
-          name: data.company.bot_name || 'SaPyBase AI',
-          primaryColor: data.company.theme_color || '#5730F5',
-          greeting: data.company.initial_message || 'Hi! How can I help you today?',
-          quickQuestions,
-          companyTone: data.company.company_tone ? data.company.company_tone.split(',') : [],
-          systemPrompt: data.company.system_prompt || '',
-          aiModel: data.company.ai_model || '',
-          logoShape: data.company.logo_shape || 'circle',
-          customLogoUrl: data.company.custom_logo_url || '',
-          avatarBgStyle: data.company.avatar_bg_style || 'none',
-          webhookUrl: data.company.webhook_url || '',
-          handoffRedirectUrl: data.company.handoff_redirect_url || '',
-          hideBranding: data.company.hide_branding === true,
-        });
+      if (data?.company) {
+        setBotSettings(mapCompanyToSettings(data.company));
       }
     } catch (err) {
       console.error('Failed to fetch bot settings:', err);
@@ -103,7 +117,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
     } finally {
       setIsLoading(false);
     }
-  }, [isSignedIn, getToken, baseUrl]);
+  }, [isSignedIn, getToken, baseUrl, queryClient]);
 
   const saveSettings = async (botId: string | null = null) => {
     setIsSaving(true);
@@ -138,6 +152,9 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         const msg = typeof data.detail === 'string' ? data.detail : data.detail?.message || 'Save failed';
         throw new Error(msg);
       }
+      // Invalidate cached company details so the next read fetches fresh data.
+      queryClient.invalidateQueries({ queryKey: COMPANY_DETAILS_KEY(botId) });
+      queryClient.invalidateQueries({ queryKey: ['bots'] });
       return { success: true };
     } catch (err: any) {
       console.error('Failed to save bot settings:', err);

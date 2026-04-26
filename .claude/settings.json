@@ -12,7 +12,12 @@
       "Bash(pip list *)",
       "Bash(./venv/bin/alembic current *)",
       "Bash(./venv/bin/alembic downgrade *)",
-      "Bash(./venv/bin/alembic upgrade *)"
+      "Bash(./venv/bin/alembic upgrade *)",
+      "Bash(./venv/bin/pip install *)",
+      "Bash(./venv/bin/python scripts/sse_load_test.py --base-url https://sapybase-ai-engine.onrender.com --concurrency 4)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST https://sapybase-ai-engine.onrender.com/api/chat -H 'x-api-key: sb_k-Cd89HNMr0IOj67Jek0U4gyaTkZ0yc61N7dSO89bp8' -H 'Content-Type: application/json' -d '{\"message\":\"hello\",\"session_id\":\"test-1\"}')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST https://sapyai.onrender.com/api/chat -H 'x-api-key: sb_k-Cd89HNMr0IOj67Jek0U4gyaTkZ0yc61N7dSO89bp8' -H 'Content-Type: application/json' -H 'origin: https://sapybase.com' -d '{\"message\":\"hello\",\"session_id\":\"test-1\"}')",
+      "Bash(zip -r sapybase-chatbot.zip sapybase-chatbot/)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"

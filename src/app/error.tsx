@@ -12,8 +12,19 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error(error);
+    // Structured payload for whatever monitoring backend lands later (Sentry,
+    // Logtail, etc.). Until then, console.error keeps the trace visible in
+    // dev tools and any platform log drain.
+    const payload = {
+      message: error.message,
+      digest: error.digest,
+      stack: error.stack,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      ts: new Date().toISOString(),
+    };
+    console.error('[app:error-boundary]', payload);
+    // Hook point for Sentry: window.Sentry?.captureException(error, { extra: payload });
   }, [error]);
 
   return (

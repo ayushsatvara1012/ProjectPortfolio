@@ -60,18 +60,43 @@ const AppPricing = () => {
         }).format(val);
 
     // ── LOCATION DETECTION ───────────────────────────────────────────────────
+    // Cached in sessionStorage so repeat visits within a session skip the
+    // external ipapi.co call entirely.
     useEffect(() => {
+        const CACHE_KEY = 'sb_currency';
+        const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24h
+
         const detectCurrency = async () => {
             try {
+                if (typeof window !== 'undefined') {
+                    const cached = window.sessionStorage.getItem(CACHE_KEY);
+                    if (cached) {
+                        const { value, ts } = JSON.parse(cached) as { value: string; ts: number };
+                        if (value && Date.now() - ts < CACHE_TTL_MS) {
+                            setCurrency(value === 'INR' ? 'INR' : 'USD');
+                            setIsDetecting(false);
+                            return;
+                        }
+                    }
+                }
+
                 const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 if (tz.includes('India') || tz.includes('Calcutta')) {
                     setCurrency('INR');
+                    if (typeof window !== 'undefined') {
+                        window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ value: 'INR', ts: Date.now() }));
+                    }
                     setIsDetecting(false);
                     return;
                 }
+
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
-                setCurrency(data.currency === 'INR' ? 'INR' : 'USD');
+                const resolved = data.currency === 'INR' ? 'INR' : 'USD';
+                setCurrency(resolved);
+                if (typeof window !== 'undefined') {
+                    window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ value: resolved, ts: Date.now() }));
+                }
             } catch {
                 setCurrency('USD');
             } finally {

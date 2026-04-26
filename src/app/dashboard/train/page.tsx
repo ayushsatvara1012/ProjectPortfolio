@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { trainUrlSchema, trainTextSchema } from '@/src/lib/validation/schemas';
 
 const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
 const TABS = [
@@ -277,6 +278,7 @@ export default function TrainPage() {
     const [trainingJobId, setTrainingJobId] = useState<string | null>(null);
     const [trainingProgress, setTrainingProgress] = useState<any>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
+    const pollAbortRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         const queryText = searchParams.get('query');
@@ -308,7 +310,10 @@ export default function TrainPage() {
         }
     }, [bots, selectedBotId]);
 
-    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+    useEffect(() => () => {
+        if (pollRef.current) clearTimeout(pollRef.current);
+        if (pollAbortRef.current) clearTimeout(pollAbortRef.current);
+    }, []);
 
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier) && userRole !== 'SUPER_ADMIN';
     const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'BASIC' || userTier === 'STARTER') && messagesUsed >= messageLimit && userRole !== 'SUPER_ADMIN';
@@ -354,46 +359,76 @@ export default function TrainPage() {
                 if (fileRef.current) fileRef.current.value = '';
                 if (csvFileRef.current) csvFileRef.current.value = '';
 
-                const token = await getToken();
-                pollRef.current = setInterval(async () => {
+                const jobId = data.job_id;
+                // Backoff schedule: ramp up so the backend isn't hammered for
+                // long-running jobs and 429s extend the next interval.
+                const SCHEDULE = [2000, 2000, 3000, 5000, 8000, 12000, 15000];
+                let attempt = 0;
+                let nextDelay = SCHEDULE[0];
+
+                const stopPolling = () => {
+                    if (pollRef.current) clearTimeout(pollRef.current);
+                    pollRef.current = null;
+                    if (pollAbortRef.current) clearTimeout(pollAbortRef.current);
+                    pollAbortRef.current = null;
+                };
+
+                const tick = async () => {
                     try {
-                        const res = await fetch(`${baseUrl}/api/train/status/${data.job_id}`, {
+                        const token = await getToken();
+                        const res = await fetch(`${baseUrl}/api/train/status/${jobId}`, {
                             headers: { Authorization: `Bearer ${token}` },
                         });
+
+                        if (res.status === 429) {
+                            // Rate-limited: double next interval (capped) and retry.
+                            nextDelay = Math.min(nextDelay * 2, 30000);
+                            pollRef.current = setTimeout(tick, nextDelay);
+                            return;
+                        }
+
                         const status = await res.json();
                         setTrainingProgress(status);
 
                         if (status.status === 'done') {
-                            if (pollRef.current) clearInterval(pollRef.current);
-                            pollRef.current = null;
+                            stopPolling();
                             setTrainingJobId(null);
                             queryClient.invalidateQueries({ queryKey: ['bots'] });
                             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
-                            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
+                            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId] });
                             refreshUser();
                             const action = status.is_upsert ? 'Source updated!' : 'Training complete!';
                             const msg = status.truncated
                                 ? `${action} ${status.chunks_added} chunks added (plan limit reached).`
                                 : `${action} ${status.chunks_added} chunks committed to your bot's knowledge base.`;
                             showAlert('success', msg);
-                        } else if (status.status === 'error') {
-                            if (pollRef.current) clearInterval(pollRef.current);
-                            pollRef.current = null;
+                            return;
+                        }
+                        if (status.status === 'error') {
+                            stopPolling();
                             setTrainingJobId(null);
                             showAlert('error', status.message || 'Training failed.');
+                            return;
                         }
-                    } catch { 
-                        if (pollRef.current) clearInterval(pollRef.current); 
-                        pollRef.current = null; 
-                    }
-                }, 2000);
 
-                setTimeout(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; setTrainingJobId(null); } }, 300_000);
+                        attempt += 1;
+                        nextDelay = SCHEDULE[Math.min(attempt, SCHEDULE.length - 1)];
+                        pollRef.current = setTimeout(tick, nextDelay);
+                    } catch {
+                        stopPolling();
+                    }
+                };
+
+                pollRef.current = setTimeout(tick, nextDelay);
+                pollAbortRef.current = setTimeout(() => {
+                    stopPolling();
+                    setTrainingJobId(null);
+                }, 300_000);
                 return;
             }
             queryClient.invalidateQueries({ queryKey: ['bots'] });
             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
-            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId] });
             refreshUser();
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
             setUrl(''); setTrainingText(''); setFile(null); setCsvFile(null);
@@ -412,6 +447,20 @@ export default function TrainPage() {
             showAlert('error', 'Provide a URL, PDF file, CSV/Excel file, or manual text.');
             return;
         }
+        if (url.trim()) {
+            const r = trainUrlSchema.safeParse(url.trim());
+            if (!r.success) {
+                showAlert('error', r.error.issues[0]?.message || 'Invalid URL.');
+                return;
+            }
+        }
+        if (trainingText.trim()) {
+            const r = trainTextSchema.safeParse(trainingText);
+            if (!r.success) {
+                showAlert('error', r.error.issues[0]?.message || 'Invalid text.');
+                return;
+            }
+        }
         trainMutation.mutate();
     };
 
@@ -422,7 +471,7 @@ export default function TrainPage() {
         onSuccess: (data: any) => {
             queryClient.invalidateQueries({ queryKey: ['bots'] });
             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
-            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId] });
             refreshUser();
             showAlert('success', data?.message || 'Knowledge purged successfully.');
         },

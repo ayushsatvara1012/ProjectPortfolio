@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
+import DemoMigrationBanner from '@/src/app/components/DemoMigrationBanner';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
@@ -50,6 +52,20 @@ export default function BotsPage() {
   const plan: Plan | null = (botsData as any)?.plan || null;
   const upgradeError = queryError instanceof UpgradeError ? queryError : null;
 
+  // Surface non-upgrade query errors (network, 5xx) as toasts so the page
+  // doesn't silently render an empty state when the fetch genuinely failed.
+  useEffect(() => {
+    if (!queryError || queryError instanceof UpgradeError) return;
+    const msg = (queryError as Error)?.message || '';
+    if (msg === 'AUTH_REQUIRED' || msg === 'FORBIDDEN' || msg === 'AUTH_NOT_READY') return;
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('sapybase:toast', {
+        detail: { kind: 'error', message: msg || 'Failed to load bots.' },
+      })
+    );
+  }, [queryError]);
+
   const deleteMutation = useMutation({
     mutationFn: (botId: string) => authFetch(`/api/companies/${botId}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bots'] }),
@@ -70,6 +86,7 @@ export default function BotsPage() {
       <div className="absolute inset-0 bg-white/40 dark:bg-slate-950/70 backdrop-blur-[2px] pointer-events-none" />
 
       <div className="relative flex flex-col h-full z-10">
+        <DemoMigrationBanner />
         <div className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-md px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between transition-colors">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -110,7 +127,7 @@ export default function BotsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {[1, 2, 3].map(i => <SkeletonBase key={i} className="h-48 rounded-none" />)}
             </div>
-          ) : (
+          ) : bots.length === 0 ? null : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence>
                 {bots.map(bot => (

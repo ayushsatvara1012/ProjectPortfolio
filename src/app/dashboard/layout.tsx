@@ -1,17 +1,40 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import AppLayout from '@/src/app/components/AppLayout';
+import UserSeed from '@/src/app/components/UserSeed';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Server-side gate: middleware also protects /dashboard, but resolving auth
   // here means unauthenticated users redirect before any client JS ships,
   // and the rendered HTML is never the logged-out shell.
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) redirect('/sign-in');
 
-  // NOTE: tier/role still hydrate from /api/me client-side (see UserContext).
-  // UserProvider accepts `initialUser` for SSR seeding when we're ready to
-  // forward the Clerk JWT to FastAPI from a server component; until then the
-  // first paint shows neutral placeholders rather than a stale logged-out shell.
-  return <AppLayout>{children}</AppLayout>;
+  // SSR-seed role/tier from /api/me using the Clerk JWT, so the first paint
+  // already knows the user's tier/role (avoids tier-badge flicker and a redundant
+  // client-side fetch on every dashboard mount).
+  let role: string | null = null;
+  let tier: string | null = null;
+  try {
+    const token = await getToken();
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const res = await fetch(`${baseUrl}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const data = await res.json();
+      role = data.role || 'USER';
+      tier = data.tier || 'FREE';
+    }
+  } catch {
+    // fall through; client-side refreshUser will retry.
+  }
+
+  return (
+    <>
+      <UserSeed role={role} tier={tier} />
+      <AppLayout>{children}</AppLayout>
+    </>
+  );
 }

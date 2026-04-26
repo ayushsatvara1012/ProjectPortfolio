@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 import SkeletonLoader from '@/src/app/components/SkeletonLoader';
+import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 const TIERS = ['FREE', 'BASIC', 'STARTER', 'PRO', 'ENTERPRISE', 'CUSTOM'];
@@ -211,21 +212,35 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
     };
     if (draft.custom_plan_enabled) {
       const c = draft.cfg;
-      payload.custom_plan_config = {
+      const candidate = {
         plan_name: c.plan_name || 'Custom Plan',
-        monthly_price_usd: numVal(c.monthly_price_usd) ?? 0,
-        max_bots: numVal(c.max_bots) ?? 1,
-        max_messages: numVal(c.max_messages) ?? 500,
-        max_chunks: numVal(c.max_chunks) ?? 100,
-        gemini_model: c.gemini_model || null,
-        max_output_tokens: numVal(c.max_output_tokens) || null,
-        human_handoff: c.human_handoff,
-        lead_capture: c.lead_capture,
-        white_label: c.white_label,
-        webhook: c.webhook,
-        custom_logo: c.custom_logo,
-        analytics: c.analytics,
+        monthly_price_usd: c.monthly_price_usd === '' ? 0 : c.monthly_price_usd,
+        max_bots: c.max_bots === '' ? 1 : c.max_bots,
+        max_messages: c.max_messages === '' ? 500 : c.max_messages,
+        max_chunks: c.max_chunks === '' ? 100 : c.max_chunks,
+        gemini_model: c.gemini_model || undefined,
+        max_output_tokens: c.max_output_tokens === '' ? undefined : c.max_output_tokens,
+        human_handoff: !!c.human_handoff,
+        lead_capture: !!c.lead_capture,
+        white_label: !!c.white_label,
+        webhook: !!c.webhook,
+        custom_logo: !!c.custom_logo,
+        analytics: !!c.analytics,
         notes: c.notes || '',
+      };
+      const parsed = customPlanConfigSchema.safeParse(candidate);
+      if (!parsed.success) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sapybase:toast', {
+            detail: { kind: 'error', message: parsed.error.issues[0]?.message || 'Invalid plan config.' },
+          }));
+        }
+        return;
+      }
+      payload.custom_plan_config = {
+        ...parsed.data,
+        gemini_model: parsed.data.gemini_model ?? null,
+        max_output_tokens: parsed.data.max_output_tokens ?? null,
       };
     }
     onSave(payload);

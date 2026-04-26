@@ -7,6 +7,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './ThinkingLogo';
+import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE = IS_DEV ? '' : 'https://www.sapybase.com';
@@ -199,8 +200,10 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError('');
-    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
-      setLocalError('Please enter a valid email address.');
+    const parsed = leadCaptureSchema.safeParse({ email, name });
+    const issue = firstIssue(parsed);
+    if (issue || !parsed.success) {
+      setLocalError(issue || 'Invalid input.');
       return;
     }
     setIsSubmitting(true);
@@ -214,7 +217,7 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
           'x-api-key': apiKey,
           ...(parentOrigin ? { 'x-sapybase-parent-origin': parentOrigin } : {}),
         },
-        body: JSON.stringify({ email, name, context: contextString }),
+        body: JSON.stringify({ email: parsed.data.email, name: parsed.data.name ?? '', context: contextString }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to submit.');
@@ -268,12 +271,14 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
-      setError('Please enter a valid email address.');
+    const parsed = handoffSchema.safeParse({ email });
+    const issue = firstIssue(parsed);
+    if (issue || !parsed.success) {
+      setError(issue || 'Invalid input.');
       return;
     }
     setIsSubmitting(true);
-    await onSubmit(email.trim().toLowerCase(), name.trim());
+    await onSubmit(parsed.data.email.toLowerCase(), name.trim());
     setIsSubmitting(false);
   };
 

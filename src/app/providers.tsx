@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { UserProvider } from '@/src/lib/context/UserContext';
 import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
+import { ToastProvider } from '@/src/lib/context/ToastContext';
+import { UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // One QueryClient per client tree. useState ensures it survives re-renders
@@ -19,8 +21,49 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             refetchOnWindowFocus: false,
           },
         },
+        // Surface unhandled mutation errors as toasts so individual call sites
+        // don't each need to remember to wire up onError. UpgradeError and the
+        // typed AUTH_REQUIRED/FORBIDDEN errors are handled by their dedicated
+        // global flows and shouldn't double-toast here.
+        mutationCache: new MutationCache({
+          onError: (error) => {
+            if (typeof window === 'undefined') return;
+            if (error instanceof UpgradeError) return;
+            const msg = (error as Error)?.message || '';
+            if (msg === 'AUTH_REQUIRED' || msg === 'FORBIDDEN' || msg === 'AUTH_NOT_READY') return;
+            window.dispatchEvent(
+              new CustomEvent('sapybase:toast', {
+                detail: { kind: 'error', message: msg || 'Something went wrong.' },
+              })
+            );
+          },
+        }),
       })
   );
+
+  // Global auth event handlers: 401 → bounce to sign-in (Clerk middleware will
+  // re-establish session); 403 → bounce to dashboard. Both are emitted from
+  // useAuthenticatedFetch so every API call benefits without per-caller wiring.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onAuthRequired = () => {
+      if (!window.location.pathname.startsWith('/sign-in')) {
+        window.location.href = '/sign-in';
+      }
+    };
+    const onForbidden = () => {
+      if (!window.location.pathname.startsWith('/dashboard') ||
+          window.location.pathname.startsWith('/dashboard/settings/admin')) {
+        window.location.href = '/dashboard';
+      }
+    };
+    window.addEventListener('sapybase:auth-required', onAuthRequired);
+    window.addEventListener('sapybase:forbidden', onForbidden);
+    return () => {
+      window.removeEventListener('sapybase:auth-required', onAuthRequired);
+      window.removeEventListener('sapybase:forbidden', onForbidden);
+    };
+  }, []);
 
   // Global fetch interceptor: emit a custom event on 402 so the app can show
   // an upgrade modal. Lives in useEffect so it never runs during SSR.
@@ -71,11 +114,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <UserProvider>
-        <BotSettingsProvider>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-        </BotSettingsProvider>
-      </UserProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <UserProvider>
+            <BotSettingsProvider>{children}</BotSettingsProvider>
+          </UserProvider>
+        </ToastProvider>
+      </QueryClientProvider>
     </ClerkProvider>
   );
 }

@@ -23,7 +23,7 @@ export const useAuthenticatedFetch = () => {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
 
-  return useCallback(async (url: string, options: RequestInit = {}) => {
+  return useCallback(async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
     // Don't fire until Clerk has hydrated — React Query will retry once state changes
     if (!isLoaded || !isSignedIn) {
       throw new Error('AUTH_NOT_READY');
@@ -47,6 +47,21 @@ export const useAuthenticatedFetch = () => {
     }
 
     if (!res.ok) {
+      if (res.status === 401) {
+        // Token rejected — Clerk session is dead or revoked. Surface a global
+        // event so a top-level handler can prompt re-auth or redirect to /sign-in,
+        // and throw a typed error so callers can stop their flow.
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sapybase:auth-required'));
+        }
+        throw new Error('AUTH_REQUIRED');
+      }
+      if (res.status === 403) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sapybase:forbidden'));
+        }
+        throw new Error('FORBIDDEN');
+      }
       if (res.status === 402) {
         const detail = (data as { detail?: unknown })?.detail;
         throw new UpgradeError(
@@ -70,7 +85,7 @@ export const useAuthenticatedFetch = () => {
       throw new Error(msg);
     }
 
-    return data;
+    return data as T;
   }, [getToken, isLoaded, isSignedIn, baseUrl]);
 };
 
