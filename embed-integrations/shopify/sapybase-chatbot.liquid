@@ -1,0 +1,68 @@
+{% comment %}
+  SaPyBase AI Chatbot — Shopify Theme Section
+  ============================================
+  Installation:
+    1. In your Shopify admin go to Online Store → Themes → Edit code.
+    2. Under "Sections", click "Add a new section", name it "sapybase-chatbot".
+    3. Paste this entire file and click Save.
+    4. Go to Online Store → Themes → Customize.
+    5. Click "Add section" at the bottom of any template and choose "SaPyBase Chatbot".
+    6. Enter your Bot ID (from the SaPyBase dashboard) and click Save.
+
+  The section renders in the theme footer on every page automatically once added.
+{% endcomment %}
+
+{%- if section.settings.enabled and section.settings.bot_id != blank -%}
+<script>
+window.SaPyBaseConfig = {
+  themeColor: {{ section.settings.theme_color | default: '#5730F5' | json }}
+};
+</script>
+<script
+  src="https://www.sapybase.com/sapybase-loader.js"
+  data-bot-id="{{ section.settings.bot_id | escape }}"
+  data-position="{{ section.settings.position | default: 'bottom-right' | escape }}"
+  defer
+></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SaPyBase Chatbot",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable chatbot",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "bot_id",
+      "label": "Bot ID",
+      "info": "Find this in your SaPyBase dashboard under Settings → API Keys. It looks like: e70a4307-ef55-47e1-a67f-638327..."
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Widget position",
+      "default": "bottom-right",
+      "options": [
+        { "value": "bottom-right", "label": "Bottom Right" },
+        { "value": "bottom-left",  "label": "Bottom Left"  }
+      ]
+    },
+    {
+      "type": "color",
+      "id": "theme_color",
+      "label": "Theme color",
+      "default": "#5730F5"
+    }
+  ],
+  "presets": [
+    {
+      "name": "SaPyBase Chatbot"
+    }
+  ]
+}
+{% endschema %}
