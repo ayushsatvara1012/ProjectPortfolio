@@ -7,7 +7,9 @@
       "Bash(/usr/bin/tail -80 /tmp/next-dev.log)",
       "Bash(node -e \"const pkg = require\\('./node_modules/@clerk/nextjs/package.json'\\); console.log\\(pkg.version\\)\")",
       "Bash(npm test *)",
-      "Bash(awk '/^@app\\\\.\\(get|post|put|patch|delete\\)/{route=$0; getline next1; getline next2; print NR\": \"route\" | \"next1\" \"next2}' sapybase_ai_engine/main.py)"
+      "Bash(awk '/^@app\\\\.\\(get|post|put|patch|delete\\)/{route=$0; getline next1; getline next2; print NR\": \"route\" | \"next1\" \"next2}' sapybase_ai_engine/main.py)",
+      "Bash(python -c \"import sys; print\\(sys.prefix\\)\")",
+      "Bash(pip list *)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"

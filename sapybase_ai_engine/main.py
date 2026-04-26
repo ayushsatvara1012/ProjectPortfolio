@@ -2,7 +2,7 @@ import os
 import asyncio
 import redis.asyncio as redis
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import time
 import tempfile
 import psycopg2
@@ -601,6 +601,25 @@ limiter = Limiter(
 app.state.limiter = limiter
 
 
+# ── Polar product → tier mapping (Step 2.3) ──────────────────────────────────
+# Source of truth for which Polar product corresponds to which internal tier.
+# Loaded from env at startup so a misconfiguration fails loudly here, not
+# silently mid-webhook. ENTERPRISE is intentionally absent — the product
+# doesn't exist yet in Polar; when it does, add POLAR_PRODUCT_ID_ENTERPRISE.
+POLAR_PRODUCT_TIER_MAP = {
+    pid: tier
+    for tier, pid in {
+        "BASIC": os.getenv("POLAR_PRODUCT_ID_BASIC"),
+        "STARTER": os.getenv("POLAR_PRODUCT_ID_STARTER"),
+        "PRO": os.getenv("POLAR_PRODUCT_ID_PRO"),
+        "BUSINESS": os.getenv("POLAR_PRODUCT_ID_BUSINESS"),
+        "ENTERPRISE": os.getenv("POLAR_PRODUCT_ID_ENTERPRISE"),  # may be None
+    }.items()
+    if pid
+}
+print(f"POLAR PRODUCT MAP: {len(POLAR_PRODUCT_TIER_MAP)} products mapped: {sorted(POLAR_PRODUCT_TIER_MAP.values())}")
+
+
 # ── Tier-aware per-minute caps (Step 1.3) ────────────────────────────────────
 # These are TECHNICAL per-minute caps separate from the COMMERCIAL monthly
 # message quotas in PLAN_LIMITS. The monthly quota gates revenue (502); these
@@ -717,9 +736,13 @@ async def startup_event():
         cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100)")
         cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS webhook_url TEXT")
         cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS handoff_redirect_url TEXT")
+        # Step 2.2: track the timestamp of the most recently applied Polar
+        # event per user so out-of-order webhook deliveries (Polar retries
+        # can reorder events) don't overwrite newer state with older state.
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_polar_event_at TIMESTAMPTZ")
         conn.commit()
         cursor.close()
-        print("MIGRATION: ai_model, webhook_url, and handoff_redirect_url column checks complete.")
+        print("MIGRATION: ai_model, webhook_url, handoff_redirect_url, last_polar_event_at column checks complete.")
     except Exception as e:
         if conn: conn.rollback()
         print(f"MIGRATION WARNING: DB column verification failed: {e}")
@@ -1130,11 +1153,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             SELECT c.id, c.company_name, c.company_tone, c.theme_color, c.allowed_origin,
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
-                   u.email, c.handoff_redirect_url, c.hide_branding
+                   u.email, c.handoff_redirect_url, c.hide_branding,
+                   u.id, u.subscription_status, u.billing_period_end
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
-            """, 
+            """,
             (hashed_key,)
         )
         company_data = cursor.fetchone()
@@ -1149,6 +1173,38 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     # Determine if lead capture / handoff is enabled for this company
     tier = (company_data[13] or "FREE").upper()
     role = company_data[14]
+
+    # Step 2.4 (chat path): grace-period auto-downgrade. If the user is marked
+    # CANCELED via the Polar webhook and billing_period_end has passed, flip
+    # them to FREE on read. Mirrors the same logic in get_current_user so the
+    # widget/embed path doesn't keep serving paid features past grace.
+    _user_id_for_downgrade = company_data[19]
+    _sub_status = company_data[20]
+    _billing_end = company_data[21]
+    if (
+        _sub_status == "CANCELED"
+        and _billing_end is not None
+        and tier not in ("FREE", "CUSTOM")
+        and _billing_end < datetime.now(timezone.utc)
+    ):
+        try:
+            _dconn = get_db_connection()
+            try:
+                _dcur = _dconn.cursor()
+                _dcur.execute(
+                    "UPDATE users SET tier = 'FREE', subscription_status = 'EXPIRED' WHERE id = %s",
+                    (_user_id_for_downgrade,)
+                )
+                _dconn.commit()
+                _dcur.close()
+                tier = "FREE"
+                print(f"GRACE-PERIOD EXPIRY (chat path): user {_user_id_for_downgrade} downgraded to FREE")
+            finally:
+                release_db_connection(_dconn)
+        except Exception as e:
+            # Don't block the chat request on a downgrade failure — log and
+            # continue with the stale tier; next request will retry.
+            print(f"GRACE-PERIOD DOWNGRADE ERROR (chat path) for user {_user_id_for_downgrade}: {e}")
     if tier == "CUSTOM":
         # custom_plan_config is fetched below; we do a targeted lookup here
         _conn2 = get_db_connection()
@@ -1454,6 +1510,37 @@ async def get_current_user(request: Request):
 
         user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
         custom_plan_cfg = custom_plan_config_raw if isinstance(custom_plan_config_raw, dict) else None
+
+        # Grace-period auto-downgrade (Step 2.4): a user marked CANCELED via
+        # the Polar webhook keeps their tier until billing_period_end. When
+        # that timestamp passes, the next authenticated request lazily flips
+        # them to FREE. No cron needed; self-healing on read.
+        if (
+            subscription_status == "CANCELED"
+            and billing_end is not None
+            and tier not in (None, "FREE")
+        ):
+            try:
+                if billing_end < datetime.now(timezone.utc):
+                    conn2 = get_db_connection()
+                    try:
+                        c2 = conn2.cursor()
+                        c2.execute(
+                            "UPDATE users SET tier = 'FREE', subscription_status = 'EXPIRED' WHERE id = %s",
+                            (user_id,)
+                        )
+                        conn2.commit()
+                        c2.close()
+                        tier = "FREE"
+                        subscription_status = "EXPIRED"
+                        print(f"GRACE-PERIOD EXPIRY: user {user_id} downgraded to FREE (period_end={billing_end})")
+                    finally:
+                        release_db_connection(conn2)
+            except Exception as e:
+                # Don't block auth on a downgrade failure — log and continue
+                # with the stale tier; next request will retry the downgrade.
+                print(f"GRACE-PERIOD DOWNGRADE ERROR for user {user_id}: {e}")
+
         # Return updated values if they were changed by self-healing
         return {
             "id": user_id,
@@ -2067,17 +2154,23 @@ async def chat_endpoint(
     try:
         cursor = conn.cursor()
         
-        # 0. Verify usage limits using company_id for per-bot tracking
+        # 0. Verify usage limits — PER-BOT tracking (Step 3.0).
+        # plan["messages"] is the per-bot monthly quota. Each bot has its own
+        # usage_tracking row, so we sum messages_used scoped to THIS company_id
+        # only — not across all of the user's bots.
         cursor.execute("""
             SELECT u.tier, u.trial_end_date, u.subscription_status,
-                   (SELECT COALESCE(SUM(messages_used), 0) FROM usage_tracking WHERE user_id = u.id) as messages_used,
+                   COALESCE(
+                       (SELECT SUM(messages_used) FROM usage_tracking WHERE company_id = %s),
+                       0
+                   ) AS messages_used,
                    u.id, ut.id as usage_id, u.role
             FROM users u
             JOIN companies c ON c.user_id = u.id
             LEFT JOIN usage_tracking ut ON ut.company_id = c.id
             WHERE c.id = %s
             ORDER BY ut.period_end DESC LIMIT 1
-        """, (company["id"],))
+        """, (company["id"], company["id"]))
         sub_data = cursor.fetchone()
 
         if not sub_data:
@@ -2085,24 +2178,29 @@ async def chat_endpoint(
 
         tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
         plan = get_plan(tier, role=user_role, custom_plan_config=company.get("custom_plan_config"))
-        current_limit = plan["messages"]
+        current_limit = plan["messages"]  # Per-bot quota
 
         # Tier-aware per-minute / per-hour technical cap (Step 1.3). Runs
         # AFTER tier is known, BEFORE billing/quota checks — so abusers can't
         # burn through the monthly quota in 30 seconds via a runaway loop.
         await enforce_tier_chat_limit(company["id"], tier or "BASIC")
 
-        # Billing check: ensure the subscription is currently active (case-insensitive).
-        if status and status.upper() != "ACTIVE" and tier and tier.upper() != "FREE":
+        # Billing check: allow ACTIVE, plus CANCELED (in grace period — the
+        # 2.4 lazy-downgrade has already flipped expired ones to EXPIRED) and
+        # PAUSED (Step 3.5 — billing paused, access preserved). Any other
+        # non-FREE status (REVOKED, REFUNDED, EXPIRED, suspended) blocks chat.
+        ALLOWED_STATUSES = {"ACTIVE", "CANCELED", "PAUSED"}
+        if status and status.upper() not in ALLOWED_STATUSES and tier and tier.upper() != "FREE":
             raise HTTPException(status_code=403, detail="Company account is suspended or subscription has expired.")
 
         if messages_used is not None and current_limit < 999999 and messages_used >= current_limit:
             raise HTTPException(status_code=402, detail={
                 "code": "MESSAGE_LIMIT_EXCEEDED",
-                "message": f"Monthly message limit reached on your {tier} plan.",
+                "message": f"This bot has reached its monthly message limit on your {tier} plan ({current_limit} messages/bot). Upgrade for higher caps.",
                 "current": messages_used,
                 "limit": current_limit,
                 "tier": tier,
+                "scope": "per_bot",
                 "upgrade_url": "/app/pricing",
             })
 
@@ -3948,11 +4046,22 @@ def register_company(
         current_bot_count = cursor.fetchone()[0]
 
         if current_bot_count >= plan["max_bots"]:
+            # Distinguish "at limit" (signed up at cap) from "over limit"
+            # (Policy D — downgrade left them above the new cap). Existing
+            # bots keep working in both cases; only NEW creation is blocked.
+            is_over = current_bot_count > plan["max_bots"]
+            msg = (
+                f"Your {tier} plan allows {plan['max_bots']} bot(s) and you currently have "
+                f"{current_bot_count} active. Existing bots keep working; upgrade to add more."
+                if is_over else
+                f"Your {tier} plan allows {plan['max_bots']} bot(s). You're at the limit — upgrade to add another."
+            )
             raise HTTPException(status_code=402, detail={
                 "code": "BOT_LIMIT_EXCEEDED",
-                "message": f"Your {tier} plan allows {plan['max_bots']} bot(s). You have {current_bot_count}.",
+                "message": msg,
                 "current": current_bot_count,
                 "limit": plan["max_bots"],
+                "over_limit": is_over,
                 "tier": tier,
                 "upgrade_url": "/app/pricing",
             })
@@ -4099,6 +4208,14 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                 "max_bots": plan["max_bots"],
                 "current_bots": len(rows),
                 "can_add_more": len(rows) < plan["max_bots"],
+                # Step 3.3: Policy D — when a downgrade leaves a user above
+                # their new tier's bot cap, existing bots stay active but new
+                # creation is blocked. Surface this state explicitly so the
+                # dashboard can show a banner ("You're over your Starter limit
+                # by 3 bots — upgrade to keep adding") rather than a silently
+                # disabled "Create Bot" button.
+                "over_limit": len(rows) > plan["max_bots"],
+                "over_limit_by": max(0, len(rows) - plan["max_bots"]),
                 "message_limit": plan["messages"],
                 "chunk_limit": plan["chunks"],
                 "speed_tier": plan["speed"],
@@ -4436,17 +4553,25 @@ def get_my_profile(
     request: Request,
     current_user: dict = Depends(get_current_user),
 ):
-    """User profile and real-time usage stats."""
+    """User profile and real-time usage stats. Reports per-bot quotas (Step 3.0)."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # Aggregate usage across the user's bots — sum is the total messages
+        # used; bot count establishes the user's TOTAL budget (per-bot × bots).
         cursor.execute(
-            """SELECT SUM(messages_used), MAX(period_end) 
-               FROM usage_tracking 
-               WHERE user_id = %s""",
-            (current_user["id"],)
+            """SELECT
+                   COALESCE(SUM(ut.messages_used), 0) AS total_used,
+                   MAX(ut.period_end) AS latest_usage_period_end,
+                   (SELECT COUNT(*) FROM companies WHERE user_id = %s AND is_active = true) AS bot_count
+               FROM usage_tracking ut
+               WHERE ut.user_id = %s""",
+            (current_user["id"], current_user["id"])
         )
         usage = cursor.fetchone()
+        total_used = usage[0] if usage else 0
+        latest_usage_period_end = usage[1] if usage else None
+        bot_count = usage[2] if usage else 0
 
         plan = get_plan(
             current_user.get("tier"),
@@ -4462,14 +4587,27 @@ def get_my_profile(
         tier = current_user["tier"]
         custom_cfg = current_user.get("custom_plan_config") or {}
 
+        per_bot_limit = plan["messages"]
+        # Total budget = per-bot quota × number of active bots. For UNLIMITED
+        # plans (limit ≥ 999999), preserve the unlimited semantics.
+        total_limit = per_bot_limit if per_bot_limit >= 999999 else per_bot_limit * max(bot_count, 1)
+
         return {
             "status": "success",
             "role": current_user["role"],
             "tier": tier,
             "email": current_user["email"],
-            "messages_used": usage[0] if usage else 0,
-            "message_limit": plan["messages"],
-            "next_billing_date": usage[1] if usage else None,
+            # Aggregate usage (across all bots) — kept for backward compat
+            "messages_used": total_used,
+            # Total budget across all bots (per-bot × num_bots)
+            "message_limit": total_limit,
+            # Per-bot semantics (new in Step 3.0) — UI should prefer these
+            "per_bot_message_limit": per_bot_limit,
+            "active_bot_count": bot_count,
+            # Step 3.2-fix: prefer Polar's billing_period_end (true billing date)
+            # over usage_tracking.period_end (a 30-day-from-row-creation window).
+            # Fall back to the latter only for never-subscribed users.
+            "next_billing_date": current_user.get("billing_period_end") or latest_usage_period_end,
             "trial_days_left": trial_days_left,
             "trial_end_date": current_user.get("trial_end_date"),
             "max_bots": plan["max_bots"],
@@ -4694,6 +4832,88 @@ def update_user_limits(
     """Alias endpoint used by the Admin Dashboard plan builder UI."""
     return update_user_admin(clerk_id, req, admin, _fresh)
 
+
+class TrialExtensionRequest(BaseModel):
+    days: int = Field(..., ge=1, le=180, description="Number of days to extend the trial (1-180)")
+    reason: Optional[str] = Field(None, max_length=500, description="Internal reason for the extension (audit log)")
+
+
+@app.post("/api/admin/users/{clerk_id}/extend-trial")
+@limiter.limit("30/minute")
+def extend_user_trial(
+    request: Request,
+    clerk_id: str,
+    req: TrialExtensionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """
+    Step 3.7: Admin endpoint to extend a user's trial.
+
+    Replaces the previous "run raw SQL against production" workflow when
+    support needs to grant a customer extra trial days. All extensions are
+    audit-logged with the granting admin's clerk_id, target user, days
+    granted, and (optional) reason.
+
+    Behavior:
+      - If the user has no trial_end_date (never had a trial), starts one
+        from now() + days.
+      - If trial_end_date is in the future, extends FROM the existing date.
+      - If trial_end_date is in the past, extends FROM now() (not from the
+        stale date — otherwise +7 days on a 30-day-expired trial would still
+        leave them expired).
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, email, trial_end_date FROM users WHERE clerk_id = %s",
+            (clerk_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+        user_id, user_email, current_trial_end = row
+
+        now = datetime.now(timezone.utc)
+        delta = timedelta(days=req.days)
+        if current_trial_end is None or current_trial_end < now:
+            # No trial or expired trial: extend from now
+            new_trial_end = now + delta
+        else:
+            # Active trial: extend from the existing end date
+            new_trial_end = current_trial_end + delta
+
+        cursor.execute(
+            "UPDATE users SET trial_end_date = %s WHERE id = %s",
+            (new_trial_end, user_id)
+        )
+        conn.commit()
+        cursor.close()
+
+        log_admin_action(
+            admin["clerk_id"],
+            "EXTEND_TRIAL",
+            clerk_id,
+            {
+                "target_email": user_email,
+                "days_added": req.days,
+                "previous_trial_end": current_trial_end.isoformat() if current_trial_end else None,
+                "new_trial_end": new_trial_end.isoformat(),
+                "reason": req.reason or "(no reason provided)",
+            }
+        )
+
+        return {
+            "status": "success",
+            "clerk_id": clerk_id,
+            "trial_end_date": new_trial_end.isoformat(),
+            "days_added": req.days,
+        }
+    finally:
+        release_db_connection(conn)
+
+
 @app.delete("/api/admin/companies/{company_id}")
 @limiter.limit("30/minute")
 def delete_company_admin(
@@ -4801,7 +5021,80 @@ async def clerk_webhook(
         
         elif event_type == "user.deleted":
             clerk_id = data.get("id")
-            # Usage tracking should be purged if CASCADE is not set, doing it explicitly for safety
+
+            # Step 3.6: Synchronously cancel any active Polar subscription
+            # BEFORE deleting the user row. Without this, a deleted Clerk
+            # account keeps getting billed by Polar with no way for the user
+            # to log in and stop it — that's the worst possible failure mode
+            # for a paid SaaS (silent recurring charges to a former customer).
+            #
+            # Per our decision: synchronous (block the webhook on the Polar
+            # API call) and immediate cancellation (not cancel_at_period_end,
+            # since the user has explicitly destroyed their account).
+            cursor.execute(
+                "SELECT id, polar_customer_id FROM users WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+            user_row = cursor.fetchone()
+            polar_cust_id = user_row[1] if user_row else None
+
+            if polar_cust_id:
+                import httpx
+                polar_token = os.getenv("POLAR_ACCESS_TOKEN")
+                if not polar_token:
+                    # No token = we can't cancel. Refuse to delete the user
+                    # row — better to leave the account alive than to silently
+                    # leak a billing relationship. Returns 500 → Clerk retries.
+                    print(
+                        f"USER.DELETED CRITICAL: clerk_id={clerk_id} has polar_customer_id={polar_cust_id} "
+                        f"but POLAR_ACCESS_TOKEN is not set. Refusing to delete; will retry."
+                    )
+                    raise HTTPException(status_code=500, detail="Polar token missing; cannot cancel subscription before delete")
+
+                is_dev = os.getenv("ENV") == "development"
+                polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        sub_resp = await client.get(
+                            f"{polar_base_url}/api/v1/subscriptions/",
+                            params={"customer_id": polar_cust_id, "active": "true"},
+                            headers={"Authorization": f"Bearer {polar_token}"}
+                        )
+                        if not sub_resp.is_success:
+                            print(f"USER.DELETED: Polar fetch failed for {polar_cust_id}: {sub_resp.status_code} {sub_resp.text}")
+                            raise HTTPException(status_code=500, detail="Polar fetch failed during account delete")
+
+                        active_subs = sub_resp.json().get("items", [])
+                        for sub in active_subs:
+                            sub_id = sub.get("id")
+                            if not sub_id:
+                                continue
+                            # Immediate cancellation — DELETE on the subscription endpoint.
+                            # Different from the voluntary cancel flow which uses
+                            # PATCH cancel_at_period_end=True. Account deletion = no grace.
+                            cancel_resp = await client.delete(
+                                f"{polar_base_url}/api/v1/subscriptions/{sub_id}",
+                                headers={"Authorization": f"Bearer {polar_token}"}
+                            )
+                            # 200, 204, AND 404 (already canceled) all count as success.
+                            if cancel_resp.status_code not in (200, 204, 404):
+                                print(f"USER.DELETED: Polar cancel failed for sub {sub_id}: {cancel_resp.status_code} {cancel_resp.text}")
+                                raise HTTPException(status_code=500, detail="Polar cancel failed during account delete")
+                            print(f"USER.DELETED: Canceled Polar subscription {sub_id} for clerk_id={clerk_id}")
+
+                except httpx.TimeoutException:
+                    print(f"USER.DELETED: Polar API timeout for clerk_id={clerk_id}, customer={polar_cust_id}. Will retry.")
+                    raise HTTPException(status_code=500, detail="Polar API timeout during account delete")
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    print(f"USER.DELETED: Unexpected Polar error for clerk_id={clerk_id}: {e}")
+                    raise HTTPException(status_code=500, detail="Polar error during account delete")
+
+            # Polar cleanup succeeded (or no Polar account existed) — safe to
+            # purge the local rows. usage_tracking explicitly first because
+            # CASCADE may not be configured.
             cursor.execute("DELETE FROM usage_tracking WHERE user_id IN (SELECT id FROM users WHERE clerk_id = %s)", (clerk_id,))
             cursor.execute("DELETE FROM users WHERE clerk_id = %s", (clerk_id,))
         
@@ -4824,8 +5117,8 @@ async def polar_webhook(request: Request):
     payload = await request.body()
     headers = dict(request.headers)
 
-    secret_to_log = f"{POLAR_WEBHOOK_SECRET[:10]}...{POLAR_WEBHOOK_SECRET[-5:]}"
-    print(f"DEBUG WEBHOOK - Secret (Masked): {secret_to_log}")
+    # Don't log the secret in any form — even masked prefixes reduce entropy
+    # if logs leak. Payload size is fine (no PII).
     print(f"DEBUG WEBHOOK - Payload Size: {len(payload)}")
 
     try:
@@ -4846,6 +5139,29 @@ async def polar_webhook(request: Request):
         print("WEBHOOK ERROR: Missing webhook-id header")
         return {"status": "ignored"}
 
+    # Idempotency: Polar retries on 5xx. Without dedup, the same event can be
+    # processed twice — duplicate user rows, double-credited tier upgrades,
+    # corrupted billing state. Insert (webhook_id, 'polar') before any DB
+    # mutation; UniqueViolation = already processed → return 200 to stop the
+    # retry chain. Mirrors the Clerk webhook pattern at line 4742.
+    _idem_conn = get_db_connection()
+    try:
+        _idem_cursor = _idem_conn.cursor()
+        try:
+            _idem_cursor.execute(
+                "INSERT INTO processed_webhooks (webhook_id, provider) VALUES (%s, 'polar')",
+                (webhook_id,)
+            )
+            _idem_conn.commit()
+        except UniqueViolation:
+            _idem_conn.rollback()
+            print(f"POLAR WEBHOOK: Duplicate delivery {webhook_id} — already processed.")
+            return {"status": "success", "message": "Duplicate"}
+        finally:
+            _idem_cursor.close()
+    finally:
+        release_db_connection(_idem_conn)
+
     # The polar SDK returns strongly-typed Pydantic objects, not plain dicts.
     # We must inspect the class name to determine the event type reliably.
     # e.g. WebhookOrderPaidPayload, WebhookSubscriptionCreatedPayload, etc.
@@ -4864,8 +5180,34 @@ async def polar_webhook(request: Request):
     elif "SubscriptionActive" in event_class:
         event_type = "subscription.active"
         data = event.data
-    elif "SubscriptionRevoked" in event_class or "SubscriptionCanceled" in event_class:
+    elif "SubscriptionRevoked" in event_class:
+        # "Revoked" = immediate access loss (non-payment, fraud, manual ban).
         event_type = "subscription.revoked"
+        data = event.data
+    elif "SubscriptionPaused" in event_class:
+        # "Paused" = billing temporarily suspended; per Polar semantics the
+        # customer still has access. Per our decision: preserve access, mark
+        # status='PAUSED' so support and the dashboard can distinguish from
+        # ACTIVE. No tier change.
+        event_type = "subscription.paused"
+        data = event.data
+    elif "SubscriptionResumed" in event_class or "SubscriptionUncanceled" in event_class:
+        # Counterpart to paused: subscription resumes regular billing.
+        event_type = "subscription.resumed"
+        data = event.data
+    elif "OrderRefunded" in event_class or "Refunded" in event_class:
+        # Refund issued — per policy A, access is revoked immediately.
+        event_type = "order.refunded"
+        data = event.data
+    elif "RefundFailed" in event_class:
+        # Refund attempt failed — log only; the user's access state is
+        # unchanged because the refund didn't actually go through.
+        event_type = "refund.failed"
+        data = event.data
+    elif "SubscriptionCanceled" in event_class:
+        # "Canceled" = graceful end-of-period cancellation. User keeps access
+        # until current_period_end. Different from revoked above.
+        event_type = "subscription.canceled"
         data = event.data
     else:
         # Fallback: try event.type if it exists, otherwise log and ignore
@@ -4911,20 +5253,62 @@ async def polar_webhook(request: Request):
             print("POLAR WEBHOOK ERROR: No way to identify user. Dropping event.")
             return {"status": "ignored"}
 
+        # Step 2.2: out-of-order protection. If this event is older than the
+        # last one we successfully applied for this user, skip the mutation.
+        # Refund / revoke events bypass the check because they're terminal —
+        # better to apply a stale revoke than miss it.
+        event_ts = (
+            getattr(data, "modified_at", None)
+            or getattr(data, "created_at", None)
+        )
+        if event_ts is not None and event_type not in ("order.refunded", "subscription.revoked"):
+            cursor.execute(
+                "SELECT last_polar_event_at FROM users WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+            last_row = cursor.fetchone()
+            last_seen = last_row[0] if last_row else None
+            if last_seen is not None:
+                # 60s leeway absorbs minor clock skew between Polar and us.
+                from datetime import timedelta
+                if event_ts < (last_seen - timedelta(seconds=60)):
+                    print(
+                        f"POLAR WEBHOOK: Skipping stale event "
+                        f"(event_ts={event_ts}, last_seen={last_seen}, type={event_type})"
+                    )
+                    conn.commit()  # commit idempotency row
+                    return {"status": "success", "message": "Stale event skipped"}
+
         if event_type in ["subscription.created", "subscription.updated",
                           "subscription.active", "order.created", "order.paid"]:
 
+            # Resolve tier by Polar product ID (Step 2.3). String-matching
+            # product NAMES is fragile — a rename in Polar's dashboard would
+            # silently downgrade customers. Product IDs are immutable.
             product = getattr(data, "product", None)
-            product_name = (getattr(product, "name", "") or "").upper() if product else ""
+            product_id = getattr(product, "id", None) if product else None
+            product_name = (getattr(product, "name", "") or "") if product else ""
 
-            if "PRO" in product_name:
-                tier = "PRO"
-            elif "STARTER" in product_name:
-                tier = "STARTER"
-            else:
-                tier = "BASIC"
+            tier = POLAR_PRODUCT_TIER_MAP.get(product_id) if product_id else None
 
-            print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name}")
+            if tier is None:
+                # Unknown product ID: refuse to assign a tier rather than
+                # silently downgrading to BASIC. The user stays on whatever
+                # they were before; ops gets a CRITICAL log line and can
+                # update POLAR_PRODUCT_ID_* env vars + rerun via
+                # /api/user/sync-subscription.
+                print(
+                    f"POLAR WEBHOOK CRITICAL: Unknown product_id={product_id} "
+                    f"(name={product_name!r}). Add to POLAR_PRODUCT_ID_* env "
+                    f"and resync. Refusing to assign tier — user state unchanged."
+                )
+                conn.commit()  # commit the idempotency row so we don't loop
+                return {
+                    "status": "error",
+                    "message": "Unknown product ID; tier assignment skipped (logged for ops)"
+                }
+
+            print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name} ({product_id})")
 
             period_end = getattr(data, "current_period_end", None)
             customer_id = getattr(data, "customer_id", None)
@@ -4953,21 +5337,83 @@ async def polar_webhook(request: Request):
             )
 
         elif event_type == "subscription.revoked":
+            # Immediate access loss — non-payment, fraud, manual ban.
             cursor.execute(
-                "UPDATE users SET tier = 'FREE', subscription_status = 'CANCELED' WHERE clerk_id = %s",
+                "UPDATE users SET tier = 'FREE', subscription_status = 'REVOKED' WHERE clerk_id = %s",
                 (clerk_id,)
+            )
+
+        elif event_type == "subscription.paused":
+            # Polar semantics: billing paused, access preserved. Tier untouched.
+            # Status='PAUSED' so the dashboard and support can distinguish
+            # from ACTIVE (no charges accruing).
+            cursor.execute(
+                "UPDATE users SET subscription_status = 'PAUSED' WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+
+        elif event_type == "subscription.resumed":
+            # Resume from pause — flip back to ACTIVE. Tier preserved (it
+            # was never changed during pause).
+            cursor.execute(
+                "UPDATE users SET subscription_status = 'ACTIVE' WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+
+        elif event_type == "order.refunded":
+            # Policy A: refund = immediate access loss.
+            cursor.execute(
+                "UPDATE users SET tier = 'FREE', subscription_status = 'REFUNDED' WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+
+        elif event_type == "refund.failed":
+            # Refund didn't actually process — no state change. Log only.
+            print(f"POLAR WEBHOOK: refund.failed for clerk_id={clerk_id} — no state change.")
+            # Skip high-water update for refund.failed (no state change applied)
+            event_ts = None
+
+        elif event_type == "subscription.canceled":
+            # Graceful cancellation — user keeps tier until billing_period_end.
+            # Mark status='CANCELED' so the on-read downgrade in get_current_user
+            # / verify_api_key_and_origin can flip them to FREE when the period
+            # actually ends. Tier itself stays intact for the grace window.
+            period_end = getattr(data, "current_period_end", None)
+            cursor.execute(
+                """UPDATE users
+                   SET subscription_status = 'CANCELED',
+                       billing_period_end = COALESCE(%s, billing_period_end)
+                   WHERE clerk_id = %s""",
+                (period_end, clerk_id)
+            )
+
+        # Step 2.2: bump the high-water mark so subsequent stale events skip.
+        if event_ts is not None:
+            cursor.execute(
+                "UPDATE users SET last_polar_event_at = %s WHERE clerk_id = %s",
+                (event_ts, clerk_id)
             )
 
         conn.commit()
         return {"status": "success"}
 
-    except Exception as e:
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        # Transient DB errors (connection lost, pool exhausted) → 5xx so Polar
+        # retries. Idempotency from Step 2.1 ensures the retry is safe.
         if conn:
             conn.rollback()
-        print(f"POLAR WEBHOOK CRITICAL ERROR: {str(e)}")
+        print(f"POLAR WEBHOOK TRANSIENT ERROR: {str(e)}")
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+    except Exception as e:
+        # Permanent errors (data validation, schema mismatch, code bugs) → 200
+        # so Polar doesn't retry forever burning their quota and our logs.
+        # The event is logged for manual recovery via /api/user/sync-subscription.
+        if conn:
+            conn.rollback()
+        print(f"POLAR WEBHOOK PERMANENT ERROR (event={webhook_id}, type={event_type}): {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Webhook Processing Failed: {str(e)}")
+        return {"status": "error", "message": "Event accepted but processing failed; logged for manual review"}
     finally:
         release_db_connection(conn)
 
