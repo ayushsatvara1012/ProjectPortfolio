@@ -21,8 +21,10 @@ const nextConfig = {
       {
         source: '/embed/:path*',
         headers: [
-          { key: 'X-Frame-Options', value: 'ALLOWALL' },
-          { key: 'Content-Security-Policy', value: "frame-ancestors *" },
+          // CSP frame-ancestors supersedes X-Frame-Options on modern browsers.
+          { key: 'Content-Security-Policy', value: 'frame-ancestors *;' },
+          { key: 'Permissions-Policy', value: 'clipboard-write=(self)' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
     ];

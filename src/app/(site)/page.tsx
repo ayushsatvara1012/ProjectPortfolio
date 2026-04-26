@@ -50,7 +50,7 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
       />
-      <main className="relative overflow-x-hidden overflow-y-visible">
+      <main className="relative overflow-x-hidden">
         <HeroSection />
         <ScrollReveal>
           <HowItWorks />

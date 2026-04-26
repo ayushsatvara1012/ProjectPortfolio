@@ -205,9 +205,15 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
     }
     setIsSubmitting(true);
     try {
+      const parentOrigin = (typeof window !== 'undefined'
+        && (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin) || '';
       const res = await fetch(`${activeApiUrl}/api/leads/capture`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          ...(parentOrigin ? { 'x-sapybase-parent-origin': parentOrigin } : {}),
+        },
         body: JSON.stringify({ email, name, context: contextString }),
       });
       const data = await res.json();
@@ -227,21 +233,21 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
         <div className="flex flex-col gap-1">
           <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
           {localError && <span className="text-[11px] text-red-500 font-bold px-1">{localError}</span>}
         </div>
         <button type="submit" disabled={isSubmitting}
-          className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+          className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
           style={{ backgroundColor: themeColor }}>
           {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Submit'}
         </button>
       </form>
       <div className="text-center mt-3">
         <button onClick={onDismiss} type="button"
-          className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full">
+          className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none py-3 px-2 w-full min-h-[44px]">
           No thanks
         </button>
       </div>
@@ -278,21 +284,21 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
         <div className="flex flex-col gap-1">
           <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
           {error && <span className="text-[11px] text-red-500 font-bold px-1">{error}</span>}
         </div>
         <button type="submit" disabled={isSubmitting}
-          className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center h-10"
+          className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
           style={{ backgroundColor: themeColor }}>
           {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Notify the team'}
         </button>
       </form>
       <div className="text-center mt-3">
         <button onClick={onDismiss} type="button"
-          className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none p-2 w-full">
+          className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none py-3 px-2 w-full min-h-[44px]">
           No thanks
         </button>
       </div>
@@ -590,7 +596,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (!activeApiKey) return;
     const fetchConfig = async () => {
       try {
-        const res = await fetch(`${activeApiUrl}/api/config`, { headers: { 'x-api-key': activeApiKey } });
+        const parentOrigin = (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin || '';
+        const res = await fetch(`${activeApiUrl}/api/config`, {
+          headers: {
+            'x-api-key': activeApiKey,
+            ...(parentOrigin ? { 'x-sapybase-parent-origin': parentOrigin } : {}),
+          },
+        });
         if (res.ok) {
           const data = await res.json();
           setConfigData({
@@ -645,6 +657,32 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Mobile keyboard fix: 100dvh excludes the URL bar but NOT the on-screen
+  // keyboard, so the input row gets hidden behind it on iOS/Android. Track
+  // visualViewport.height (which DOES shrink for the keyboard) and feed it
+  // to the panel via a CSS variable.
+  useEffect(() => {
+    if (!isMobile || !isOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const sync = () => {
+      document.documentElement.style.setProperty('--sapy-vh', `${vv.height}px`);
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active.tagName === 'TEXTAREA') {
+        active.scrollIntoView({ block: 'end' });
+      }
+    };
+    sync();
+    vv.addEventListener('resize', sync);
+    vv.addEventListener('scroll', sync);
+    return () => {
+      vv.removeEventListener('resize', sync);
+      vv.removeEventListener('scroll', sync);
+      document.documentElement.style.removeProperty('--sapy-vh');
+    };
+  }, [isMobile, isOpen]);
 
   useEffect(() => {
     if (isEmbed && !isOpen) {
@@ -794,11 +832,19 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
     const recentHistory = messages.slice(-4).map(m => ({ role: m.role, content: m.content }));
     let firstChunkReceived = false;
+    let sseRetryCount = 0;
+    const SSE_MAX_RETRIES = 1;
 
     try {
+      const parentOriginChat = (typeof window !== 'undefined'
+        && (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin) || '';
       await fetchEventSource(`${activeApiUrl}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': resolvedApiKey },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': resolvedApiKey,
+          ...(parentOriginChat ? { 'x-sapybase-parent-origin': parentOriginChat } : {}),
+        },
         body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId }),
         signal: ctrl.signal,
         openWhenHidden: true,
@@ -827,6 +873,36 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const errorContent = isMessageLimit
                 ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
                 : "I'm temporarily unavailable. Please try again later.";
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === 'bot' && last.isStreaming) {
+                  updated[updated.length - 1] = { role: 'bot', content: errorContent, isStreaming: false, isTyped: false };
+                } else {
+                  updated.push({ role: 'bot', content: errorContent });
+                }
+                return updated;
+              });
+              setIsLoading(false);
+              throw new Error('HANDLED_ERROR');
+            }
+            if (response.status === 429) {
+              // Rate-limited by the technical per-minute cap. Distinct from the
+              // 402 commercial cap above. The Phase 2 silent-retry must NOT
+              // fire here — retrying a 429 makes it worse. We throw
+              // HANDLED_ERROR so the onerror short-circuit skips the retry.
+              let retryAfter = 60;
+              try {
+                const headerVal = response.headers.get('Retry-After');
+                if (headerVal && /^\d+$/.test(headerVal)) retryAfter = parseInt(headerVal, 10);
+                else {
+                  const detail = await response.json();
+                  const ra = (detail as { detail?: { retry_after?: number } })?.detail?.retry_after;
+                  if (typeof ra === 'number') retryAfter = ra;
+                }
+              } catch { /* keep default */ }
+              const waitLabel = retryAfter >= 60 ? `${Math.ceil(retryAfter / 60)} minute${retryAfter >= 120 ? 's' : ''}` : `${retryAfter} seconds`;
+              const errorContent = `You're sending messages a bit fast! Please wait ${waitLabel} and try again.`;
               setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -899,14 +975,32 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
         onerror(err: Error) {
           if (err.message === 'CACHE_HIT' || err.message === 'HANDLED_ERROR') throw err;
-          console.error('SSE Chat Error:', err);
+          if (err.name === 'AbortError') throw err;
+
+          // Silent single retry on transient network failures (wifi blip,
+          // proxy idle-kill). Returning a number tells fetch-event-source to
+          // wait that many ms then reconnect — the existing partial stream
+          // remains in streamingCallbackRef and continues accumulating.
+          if (sseRetryCount < SSE_MAX_RETRIES) {
+            sseRetryCount += 1;
+            console.warn(`SSE Chat: transient error, retrying (${sseRetryCount}/${SSE_MAX_RETRIES})`, err);
+            return 1500;
+          }
+
+          console.error('SSE Chat Error (giving up):', err);
+          // Preserve whatever streamed so far instead of replacing the message.
+          const partial = streamingCallbackRef.current?.flush?.() || '';
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
+            const fallback = "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.";
+            const content = partial.trim()
+              ? partial + '\n\n_(Connection lost — message may be incomplete.)_'
+              : fallback;
             if (last?.role === 'bot' && last.isStreaming) {
-              updated[updated.length - 1] = { role: 'bot', content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.", isStreaming: false, isTyped: false };
+              updated[updated.length - 1] = { role: 'bot', content, isStreaming: false, isTyped: false };
             } else {
-              updated.push({ role: 'bot', content: "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form." });
+              updated.push({ role: 'bot', content });
             }
             return updated;
           });
@@ -937,9 +1031,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setHandoffSent(true);
     const transcript = messages.filter(m => m.role === 'user' || m.role === 'bot').map(m => ({ role: m.role, content: m.content || '' }));
     try {
+      const parentOriginHandoff = (typeof window !== 'undefined'
+        && (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin) || '';
       const res = await fetch(`${activeApiUrl}/api/handoff`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': resolvedApiKey! },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': resolvedApiKey!,
+          ...(parentOriginHandoff ? { 'x-sapybase-parent-origin': parentOriginHandoff } : {}),
+        },
         body: JSON.stringify({ transcript, visitor_email: visitorEmail, visitor_name: visitorName || null }),
       });
       const data = res.ok ? await res.json() : {};
@@ -981,7 +1081,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
             className={`${isEmbed ? 'relative w-full h-full' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px]'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 dark:border-slate-800/50 z-[2147483647] pointer-events-auto origin-bottom-right`}
-            style={isEmbed ? { height: '100%' } : (isMobile ? { height: '100dvh', minHeight: '-webkit-fill-available' } : {})}
+            style={isEmbed ? { height: '100%' } : (isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {})}
           >
             {/* Header */}
             <div className="relative shrink-0">
@@ -1124,7 +1224,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       if (!label) return null;
                       return (
                         <button key={qidx} onClick={() => sendMessage(label)}
-                          className="px-4 py-2.5 border rounded-md text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500">
+                          className="px-4 py-2.5 min-h-[44px] border rounded-md text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500">
                           {label}
                         </button>
                       );
@@ -1151,10 +1251,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Ask anything..."
-                    className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-sm font-medium font-google"
+                    className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-base sm:text-sm font-medium font-google"
                     rows={1} disabled={isLoading} aria-label="Chat input" />
                   <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send message"
-                    className="p-2 shrink-0 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center translate-y-px"
+                    className="p-2 shrink-0 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center translate-y-px"
                     style={{ color: THEME_COLOR }}>
                     <Send size={15} />
                   </button>

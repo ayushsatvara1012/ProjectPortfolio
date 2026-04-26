@@ -46,23 +46,56 @@
       this._listenForMessages();
     }
 
-    // Fix #3: ld+json WebApplication schema injection
+    // SEO injection: emits two ld+json blocks into the host <head>.
+    // 1. WebApplication: identifies the widget itself. No `offers` block —
+    //    the merchant's page sells different products and a $0 Offer here
+    //    would be misleading schema.
+    // 2. FAQPage: fetched per-bot from the backend. This is the block that
+    //    actually helps the merchant rank in AI Overviews / SGE answer cards.
     _injectSEO(botId) {
       if (document.querySelector('script[data-sapybase-seo]')) return;
-      const script = document.createElement('script');
-      script.type = 'application/ld+json';
-      script.dataset.sapybaseSeo = 'true';
-      script.textContent = JSON.stringify({
+
+      var appScript = document.createElement('script');
+      appScript.type = 'application/ld+json';
+      appScript.dataset.sapybaseSeo = 'true';
+      appScript.textContent = JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebApplication',
         name: 'SaPyBase AI Assistant',
         url: IFRAME_ORIGIN + '/embed/' + botId,
-        applicationCategory: 'ChatApplication',
+        applicationCategory: 'CustomerSupportApplication',
         operatingSystem: 'Web',
-        description: 'AI-powered customer support chatbot by SaPyBase',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        description: 'AI-powered customer support chatbot embedded on this site',
       });
-      document.head.appendChild(script);
+      document.head.appendChild(appScript);
+
+      // Best-effort FAQ injection. Failures are silent — SEO is non-critical
+      // and must never block widget bootstrap.
+      try {
+        fetch(IFRAME_ORIGIN + '/api/bots/' + encodeURIComponent(botId) + '/faqs', {
+          headers: { 'accept': 'application/json' },
+        })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (!data || !Array.isArray(data.faqs) || data.faqs.length === 0) return;
+            var faqScript = document.createElement('script');
+            faqScript.type = 'application/ld+json';
+            faqScript.dataset.sapybaseFaq = 'true';
+            faqScript.textContent = JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: data.faqs.slice(0, 10).map(function (f) {
+                return {
+                  '@type': 'Question',
+                  name: f.question,
+                  acceptedAnswer: { '@type': 'Answer', text: f.answer },
+                };
+              }),
+            });
+            document.head.appendChild(faqScript);
+          })
+          .catch(function () { /* noop */ });
+      } catch (e) { /* noop */ }
     }
 
     _render(position) {
@@ -166,9 +199,12 @@
 
     _loadIframe() {
       const iframe = document.createElement('iframe');
-      iframe.src = IFRAME_ORIGIN + '/embed/' + this._botId;
+      iframe.src =
+        IFRAME_ORIGIN + '/embed/' + this._botId +
+        '#parentOrigin=' + encodeURIComponent(window.location.origin);
       iframe.title = 'SaPyBase AI Chat';
       iframe.loading = 'lazy';
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
       iframe.allow = 'clipboard-write';
       this._wrap.appendChild(iframe);
       this._iframe = iframe;
@@ -183,22 +219,25 @@
 
     // Fix #5 (loader side): handle sapybase:resize from embed page + sapybase:close
     _listenForMessages() {
-      window.addEventListener('message', function (e) {
-        if (e.origin !== IFRAME_ORIGIN && e.origin !== window.location.origin) return;
-        var data = e.data || {};
+      window.addEventListener('message', (e) => {
+        // Pin to OUR iframe's window and exact origin — no host-page or wildcard fallbacks.
+        if (!this._iframe || e.source !== this._iframe.contentWindow) return;
+        if (e.origin !== IFRAME_ORIGIN) return;
+        const data = e.data;
+        if (!data || typeof data !== 'object') return;
 
-        if (data.type === 'sapybase:resize' && data.height) {
+        if (data.type === 'sapybase:resize' && Number.isFinite(data.height)) {
           if (this._wrap) {
-            this._wrap.style.height =
-              Math.min(data.height, window.innerHeight - 120) + 'px';
+            const safeH = Math.max(200, Math.min(data.height, window.innerHeight - 120, 800));
+            this._wrap.style.height = safeH + 'px';
           }
         }
 
-        if (data.type === 'sapybase:close' || data === 'sapybase-close') {
+        if (data.type === 'sapybase:close') {
           this._open = false;
           if (this._wrap) this._wrap.classList.remove('open');
         }
-      }.bind(this));
+      });
     }
   }
 
@@ -214,6 +253,13 @@
       var pos = currentScript.getAttribute('data-position');
       if (pos) el.setAttribute('data-position', pos);
       document.body.appendChild(el);
+
+      // WP cookie banners / sticky CTAs often share max z-index 2147483647;
+      // when z-index ties, last-in-DOM wins. Re-append after load so we sit
+      // on top of late-injected overlays.
+      var reseat = function () { try { document.body.appendChild(el); } catch (e) {} };
+      if (document.readyState === 'complete') setTimeout(reseat, 1500);
+      else window.addEventListener('load', function () { setTimeout(reseat, 1500); });
     }
   }
 })();

@@ -6,7 +6,8 @@
       "Bash(/bin/mkdir -p '/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/\\(auth\\)/sign-in/[[...sign-in]]' '/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/\\(auth\\)/sign-up/[[...sign-up]]')",
       "Bash(/usr/bin/tail -80 /tmp/next-dev.log)",
       "Bash(node -e \"const pkg = require\\('./node_modules/@clerk/nextjs/package.json'\\); console.log\\(pkg.version\\)\")",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(awk '/^@app\\\\.\\(get|post|put|patch|delete\\)/{route=$0; getline next1; getline next2; print NR\": \"route\" | \"next1\" \"next2}' sapybase_ai_engine/main.py)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"

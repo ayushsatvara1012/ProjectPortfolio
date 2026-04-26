@@ -40,9 +40,22 @@ const INITIAL: UserData = {
   customPlanFeatures: null,
 };
 
-export const UserProvider = ({ children }: { children: React.ReactNode }) => {
+type InitialUserSeed = Partial<Pick<UserData, 'role' | 'tier'>> | null;
+
+export const UserProvider = ({
+  children,
+  initialUser = null,
+}: {
+  children: React.ReactNode;
+  initialUser?: InitialUserSeed;
+}) => {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
-  const [userData, setUserData] = useState<UserData>(INITIAL);
+  // Seed role/tier from SSR when available so the dashboard nav (tier badge,
+  // SUPER_ADMIN gate) renders correctly on the first paint instead of after
+  // /api/me resolves client-side.
+  const [userData, setUserData] = useState<UserData>(() =>
+    initialUser ? { ...INITIAL, role: initialUser.role ?? null, tier: initialUser.tier ?? null } : INITIAL
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {

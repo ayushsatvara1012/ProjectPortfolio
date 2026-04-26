@@ -9,7 +9,16 @@ export default function EmbedPage() {
   const botId = params.botId as string;
 
   useEffect(() => {
-    const parentOrigin = document.referrer ? new URL(document.referrer).origin : '*';
+    const parentOrigin = (() => {
+      const m = window.location.hash.match(/parentOrigin=([^&]+)/);
+      if (!m) return null;
+      try { return new URL(decodeURIComponent(m[1])).origin; } catch { return null; }
+    })();
+    if (!parentOrigin) return;
+
+    // Expose to ChatWidget so backend requests can carry x-sapybase-parent-origin.
+    (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin = parentOrigin;
+
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         window.parent.postMessage(

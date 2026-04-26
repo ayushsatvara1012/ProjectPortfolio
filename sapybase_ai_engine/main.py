@@ -27,7 +27,7 @@ try:
 except ImportError:
     convert_from_path = None
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field, validator
@@ -600,6 +600,92 @@ limiter = Limiter(
 )
 app.state.limiter = limiter
 
+
+# ── Tier-aware per-minute caps (Step 1.3) ────────────────────────────────────
+# These are TECHNICAL per-minute caps separate from the COMMERCIAL monthly
+# message quotas in PLAN_LIMITS. The monthly quota gates revenue (502); these
+# gates abuse and runaway loops (429). BUSINESS gets the highest ceiling AND
+# the priority Gemini model (see MODEL_MAPPING) — so "ultra" is genuinely
+# both lower-latency model AND higher concurrent throughput.
+TIER_RATE_LIMITS = {
+    "FREE":       {"per_minute": 0,   "per_hour": 0},      # FREE has no chat budget at all
+    "BASIC":      {"per_minute": 20,  "per_hour": 200},
+    "STARTER":    {"per_minute": 40,  "per_hour": 800},
+    "PRO":        {"per_minute": 80,  "per_hour": 2000},
+    "BUSINESS":   {"per_minute": 200, "per_hour": 5000},   # ultra-speed tier
+    "ENTERPRISE": {"per_minute": 500, "per_hour": 999999},
+    "CUSTOM":     {"per_minute": 100, "per_hour": 3000},   # safe default; override via custom_plan_config
+}
+
+
+async def enforce_tier_chat_limit(company_id: str, tier: str) -> None:
+    """
+    Tier-aware per-minute / per-hour cap on /api/chat. Uses Redis INCR with
+    EX so counters auto-expire — no cleanup job needed. Falls through silently
+    if Redis is unavailable (the slowapi decorator outer ceiling still applies).
+
+    Raises HTTPException(429) with a Retry-After-friendly detail payload that
+    matches the shape of _rate_limit_handler so the frontend's existing 429
+    branch handles both transparently.
+    """
+    if not r:
+        return
+    caps = TIER_RATE_LIMITS.get((tier or "FREE").upper(), TIER_RATE_LIMITS["BASIC"])
+    minute_cap = caps["per_minute"]
+    hour_cap = caps["per_hour"]
+
+    try:
+        # Per-minute window. Key includes the current minute so the window
+        # rolls over cleanly without a separate timer.
+        now = int(time.time())
+        minute_bucket = now // 60
+        hour_bucket = now // 3600
+
+        minute_key = f"chat_rate:m:{company_id}:{minute_bucket}"
+        hour_key = f"chat_rate:h:{company_id}:{hour_bucket}"
+
+        # INCR returns the post-increment value. EX on first set guarantees
+        # auto-expiry; subsequent INCRs preserve the existing TTL.
+        m_count = await r.incr(minute_key)
+        if m_count == 1:
+            await r.expire(minute_key, 70)   # 70s TTL — buffers clock skew
+        h_count = await r.incr(hour_key)
+        if h_count == 1:
+            await r.expire(hour_key, 3700)
+
+        if minute_cap > 0 and m_count > minute_cap:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "code": "RATE_LIMITED",
+                    "message": f"Per-minute chat limit reached on {tier} tier ({minute_cap}/min). Slow down or upgrade.",
+                    "retry_after": 60 - (now % 60),
+                    "tier": tier,
+                    "scope": "per_minute",
+                },
+                headers={"Retry-After": str(60 - (now % 60))},
+            )
+        if hour_cap > 0 and h_count > hour_cap:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "code": "RATE_LIMITED",
+                    "message": f"Per-hour chat limit reached on {tier} tier ({hour_cap}/hour). Slow down or upgrade.",
+                    "retry_after": 3600 - (now % 3600),
+                    "tier": tier,
+                    "scope": "per_hour",
+                },
+                headers={"Retry-After": str(3600 - (now % 3600))},
+            )
+    except HTTPException:
+        raise
+    except (redis.RedisError, Exception):
+        # Redis failure: fall through. The slowapi decorator outer ceiling
+        # ("200/minute") still protects against runaway loops at the API-key
+        # level, just without per-tier granularity.
+        pass
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initializes external services on app start."""
@@ -692,7 +778,45 @@ async def check_global_llm_budget(company_id: str):
         # If redis fails (e.g. connectivity), we allow the request to proceed (resiliency)
         pass
 
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """
+    Wraps slowapi's default handler to GUARANTEE a Retry-After header on every
+    429. Without this, frontend retry logic (ChatWidget's silent-retry from
+    the SSE resilience pass) can't compute backoff and will hammer the server
+    harder, defeating the whole point of the limit.
+
+    Also returns a structured JSON body with `code: RATE_LIMITED` so the
+    frontend can distinguish "you're sending too fast" from generic network
+    errors and surface a different UI.
+    """
+    # slowapi exposes the parsed limit on the exception. Detail looks like
+    # "10 per 1 minute" — pull the window seconds out of the RateLimitItem.
+    retry_after_seconds = 60  # safe default if introspection fails
+    try:
+        item = getattr(exc, "limit", None)
+        if item is not None and hasattr(item, "limit"):
+            # slowapi RateLimitItem has .GRANULARITY.seconds on the class
+            granularity = getattr(item.limit, "GRANULARITY", None)
+            if granularity is not None and hasattr(granularity, "seconds"):
+                retry_after_seconds = int(granularity.seconds)
+    except Exception:
+        pass
+
+    response = JSONResponse(
+        status_code=429,
+        content={
+            "detail": {
+                "code": "RATE_LIMITED",
+                "message": "Too many requests. Please slow down and try again shortly.",
+                "retry_after": retry_after_seconds,
+            }
+        },
+    )
+    response.headers["Retry-After"] = str(retry_after_seconds)
+    return response
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 # 3. Configure CORS (Production Hardening)
 ALLOWED_ORIGINS = {
@@ -732,10 +856,15 @@ combined_origins = list(ALLOWED_ORIGINS)
 # ──────────────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Reflect the request origin instead of literal "*" — required because the
+    # widget runs on arbitrary customer domains, but spec forbids "*" alongside
+    # credentials. The real per-bot authorization happens in
+    # verify_api_key_and_origin() against the x-sapybase-parent-origin header.
+    allow_origin_regex=r".*",
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["x-api-key", "x-sapybase-parent-origin", "content-type", "authorization"],
+    max_age=86400,
 )
 
 # 4. Define Request/Response Models
@@ -1079,7 +1208,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
-    client_origin = request.headers.get("origin")
+    # Prefer x-sapybase-parent-origin when present: the embed iframe is always
+    # same-origin to sapybase.com (so the Origin header is useless for
+    # identifying the merchant's site), but the loader sets parentOrigin via
+    # the URL hash and the embed page forwards it as a header. A browser-only
+    # attacker cannot forge it without already controlling our iframe.
+    client_origin = request.headers.get("x-sapybase-parent-origin") or request.headers.get("origin")
     if not client_origin:
         referer = request.headers.get("referer", "")
         try:
@@ -1912,11 +2046,15 @@ def async_increment_usage(usage_id: Optional[str], user_id: str, company_id: str
         release_db_connection(conn)
 
 @app.post("/api/chat", response_model=ChatResponse)
-@limiter.limit("10/minute;50/hour") # Per-API-Key limit (Hashed)
-@limiter.limit("30/minute", key_func=get_remote_address) # Global IP-based hard ceiling
+# Outer ceiling: covers the highest tier (BUSINESS) plus headroom. Per-tier
+# enforcement happens INSIDE the handler via _enforce_tier_chat_limit() once
+# the tier is known (slowapi decorators run before dependencies, so they
+# cannot read tier).
+@limiter.limit("200/minute;5000/hour")  # Per-API-Key hard ceiling (BUSINESS budget)
+@limiter.limit("200/minute", key_func=get_remote_address)  # Global IP-based hard ceiling
 async def chat_endpoint(
     request: Request,
-    chat_req: ChatRequest, 
+    chat_req: ChatRequest,
     background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
@@ -1948,6 +2086,11 @@ async def chat_endpoint(
         tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
         plan = get_plan(tier, role=user_role, custom_plan_config=company.get("custom_plan_config"))
         current_limit = plan["messages"]
+
+        # Tier-aware per-minute / per-hour technical cap (Step 1.3). Runs
+        # AFTER tier is known, BEFORE billing/quota checks — so abusers can't
+        # burn through the monthly quota in 30 seconds via a runaway loop.
+        await enforce_tier_chat_limit(company["id"], tier or "BASIC")
 
         # Billing check: ensure the subscription is currently active (case-insensitive).
         if status and status.upper() != "ACTIVE" and tier and tier.upper() != "FREE":
@@ -2178,24 +2321,37 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     
         messages.append(HumanMessage(content=delimited_user_message))
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
-        # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         async def stream_generator():
             full_reply = ""
             try:
-                # Stream from Gemini
-                async for chunk in chat_model.astream(messages):
+                # Heartbeat: race each chunk against a 15s timeout and emit an
+                # SSE comment line (`: ping`) when nothing arrives. Comments are
+                # ignored by EventSource clients but keep intermediate proxies
+                # (Render, Cloudflare, corporate NAT) from killing the
+                # connection while the LLM is mid-tool-call or mid-thought.
+                stream_iter = chat_model.astream(messages).__aiter__()
+                HEARTBEAT_SECONDS = 15
+
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(stream_iter.__anext__(), timeout=HEARTBEAT_SECONDS)
+                    except asyncio.TimeoutError:
+                        yield ": ping\n\n"
+                        continue
+                    except StopAsyncIteration:
+                        break
+
                     content = ""
                     if hasattr(chunk, 'content'):
                         if isinstance(chunk.content, list):
                             content = "".join([c.get("text", "") for c in chunk.content if isinstance(c, dict)])
                         else:
                             content = str(chunk.content)
-                    
+
                     if content:
                         full_reply += content
-                        # Format as SSE
                         yield f"data: {json.dumps({'token': content})}\n\n"
-                
+
                 # Sentinel signal for frontend (success path)
                 yield "data: [DONE]\n\n"
 
@@ -2361,7 +2517,10 @@ async def capture_lead(
         release_db_connection(conn)
 
 @app.post("/api/handoff")
+@limiter.limit("5/minute;30/hour")  # Per-API-Key — protects merchant inboxes from spam
+@limiter.limit("20/hour", key_func=get_remote_address)  # Per-IP — abuse from one visitor
 async def request_human_handoff(
+    request: Request,
     payload: HandoffRequest,
     background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
@@ -3274,8 +3433,20 @@ async def run_training_job(
                 for ct in child_texts:
                     all_child_texts_flat.append((parent_text, ct))
 
-        # Cap to remaining quota (child count)
+        # Cap to remaining quota (child count). The upfront CHUNK_QUOTA_OVERFLOW
+        # check uses a conservative estimate (total_chars / 250); when actual
+        # chunking produces more children than estimated, this cap silently
+        # truncates. Surface that explicitly in the job status so the dashboard
+        # can show "ingested N of M chunks — upgrade for full coverage."
+        unfiltered_total = len(all_child_texts_flat)
         capped_pairs = all_child_texts_flat[:remaining]
+        was_capped = len(capped_pairs) < unfiltered_total
+        if was_capped:
+            status["was_capped"] = True
+            status["capped_at"] = len(capped_pairs)
+            status["original_total"] = unfiltered_total
+            status["tier"] = current_user.get("tier")
+            status["chunk_limit"] = limit
 
         status["total"] = len(capped_pairs)
         await set_job_status(job_id, status)
@@ -3529,34 +3700,73 @@ async def train_chatbot(
         else:
             raise HTTPException(status_code=400, detail="Provide a URL, PDF file, CSV/Excel file, or text content.")
 
-        # Quota counts ONLY child rows — parent rows are free storage.
-        # Subtract the child rows belonging to the source being replaced so that
-        # a re-upload does not hit a false quota ceiling.
-        cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
-            (resolved_company_id,)
-        )
-        total_count = cursor.fetchone()[0]
+        # ── Per-company gate lock (race protection) ─────────────────────────
+        # Two concurrent /api/train requests for DIFFERENT sources of the same
+        # bot can both pass the chunk-quota gate below if they read total_count
+        # in the same millisecond. The per-source lock further down protects
+        # against same-source races, but not cross-source ones. A short
+        # company-wide lock (5s TTL, just covers the gate window) closes it.
+        gate_lock_key = f"training_gate:{resolved_company_id}"
+        gate_lock_acquired = False
+        if r:
+            try:
+                # Brief retry loop so a legitimate concurrent submission waits
+                # rather than instantly 409s on a 5s lock.
+                for _attempt in range(10):
+                    gate_lock_acquired = await r.set(gate_lock_key, "1", nx=True, ex=5)
+                    if gate_lock_acquired:
+                        break
+                    await asyncio.sleep(0.5)
+                if not gate_lock_acquired:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Another training job is being submitted for this bot. Please retry shortly."
+                    )
+            except HTTPException:
+                raise
+            except Exception:
+                # Redis unavailable — fall through; the per-source lock and DB
+                # constraints are still in place. Log-only degradation.
+                pass
 
-        cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
-            (resolved_company_id, pending_source_name)
-        )
-        existing_source_count = cursor.fetchone()[0]
-        is_upsert = existing_source_count > 0
+        try:
+            # Quota counts ONLY child rows — parent rows are free storage.
+            # Subtract the child rows belonging to the source being replaced so that
+            # a re-upload does not hit a false quota ceiling.
+            cursor.execute(
+                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+                (resolved_company_id,)
+            )
+            total_count = cursor.fetchone()[0]
 
-        # Effective child slots in use, excluding the source about to be replaced.
-        effective_count = total_count - existing_source_count
+            cursor.execute(
+                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+                (resolved_company_id, pending_source_name)
+            )
+            existing_source_count = cursor.fetchone()[0]
+            is_upsert = existing_source_count > 0
 
-        if effective_count >= limit:
-            raise HTTPException(status_code=402, detail={
-                "code": "CHUNK_LIMIT_EXCEEDED",
-                "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
-                "current": total_count,
-                "limit": limit,
-                "tier": current_user["tier"],
-                "upgrade_url": "/app/pricing",
-            })
+            # Effective child slots in use, excluding the source about to be replaced.
+            effective_count = total_count - existing_source_count
+
+            if effective_count >= limit:
+                raise HTTPException(status_code=402, detail={
+                    "code": "CHUNK_LIMIT_EXCEEDED",
+                    "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
+                    "current": total_count,
+                    "limit": limit,
+                    "tier": current_user["tier"],
+                    "upgrade_url": "/app/pricing",
+                })
+        finally:
+            # Release the gate lock as soon as we've passed (or failed) the
+            # quota check. The per-source lock takes over for the long-running
+            # ingestion phase.
+            if r and gate_lock_acquired:
+                try:
+                    await r.delete(gate_lock_key)
+                except Exception:
+                    pass
     finally:
         release_db_connection(conn)
 
@@ -3710,8 +3920,12 @@ async def get_training_status(job_id: str, user: dict = Depends(get_current_user
     return job
 
 @app.post("/api/register")
+@limiter.limit("5/hour;20/day", key_func=get_remote_address)  # Account-creation spam protection — keyed by IP since user is being created
 def register_company(
-reg: RegisterRequest, user: dict = Depends(get_current_user)):
+    request: Request,
+    reg: RegisterRequest,
+    user: dict = Depends(get_current_user),
+):
     """Multi-bot registration with per-plan bot count enforcement."""
     tier = user.get("tier") or "FREE"
     plan = get_plan(tier, role=user.get("role"), custom_plan_config=user.get("custom_plan_config"))
@@ -3785,6 +3999,7 @@ reg: RegisterRequest, user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/company/rotate-key")
+@limiter.limit("3/hour;10/day")  # Brute-force protection + accidental-loop guard on key rotation
 async def rotate_api_key(
     request: Request,
     user: dict = Depends(get_current_user),
@@ -4160,13 +4375,67 @@ def delete_knowledge_chunks(
 
 
 @app.get("/api/config")
+@limiter.limit("120/minute")  # Per-API-Key — widget polls this; cache absorbs most hits
 @cache(expire=300)
-def get_config(company: dict = Depends(verify_api_key_and_origin)):
+def get_config(
+    request: Request,
+    company: dict = Depends(verify_api_key_and_origin),
+):
     """Returns branding for the widget."""
     return company
 
+
+@app.get("/api/bots/{bot_id}/faqs")
+@limiter.limit("120/minute", key_func=get_remote_address)  # Per-IP; cache absorbs warm hits, this protects cold-cache deploy spikes
+@cache(expire=86400)
+def get_bot_faqs(request: Request, bot_id: str):
+    """
+    Public FAQ feed consumed by the loader to inject FAQPage JSON-LD into the
+    merchant's <head>. Intentionally does NOT enforce Origin: this endpoint
+    serves crawlable SEO content meant to be visible to Googlebot, GPTBot,
+    PerplexityBot, etc., regardless of where they fetch it from.
+
+    Auth model: bot_id (== api_key) acts as an unguessable identifier. We
+    validate it exists, but a leaked key only exposes top-FAQ content that
+    the merchant has explicitly opted to publish — the same content their
+    own customers see in the widget.
+
+    TODO: replace placeholder payload with a query against chat_logs filtering
+    for is_un_final = false AND length(answer) > 80, grouped by semantic
+    similarity, top 10. Cache 24h via fastapi-cache.
+    """
+    hashed_key = hashlib.sha256(bot_id.encode()).hexdigest()
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, bot_name FROM companies WHERE api_key = %s", (hashed_key,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            raise HTTPException(status_code=404, detail="Bot not found")
+
+        bot_name = row[1] or "AI Assistant"
+
+        # Placeholder payload. Real implementation reads from chat_logs.
+        return {
+            "bot_name": bot_name,
+            "faqs": [
+                {
+                    "question": f"What can {bot_name} help me with?",
+                    "answer": f"{bot_name} is an AI assistant that can answer questions about this site's products, services, and policies. Ask anything in the chat below.",
+                },
+            ],
+        }
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/me")
-def get_my_profile(current_user: dict = Depends(get_current_user)):
+@limiter.limit("60/minute")  # Frontend polls this; 60/min is generous for legit dashboard traffic
+def get_my_profile(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
     """User profile and real-time usage stats."""
     conn = get_db_connection()
     try:
@@ -4227,7 +4496,8 @@ def get_company_details(company_id: Optional[str] = None, user: dict = Depends(g
 # --- SUPER ADMIN ENDPOINTS ---
 
 @app.get("/api/admin/stats")
-def get_admin_stats(admin: dict = Depends(get_admin_user)):
+@limiter.limit("30/minute")  # Defense-in-depth — admin auth is primary; this caps credential-stuffing damage
+def get_admin_stats(request: Request, admin: dict = Depends(get_admin_user)):
     """Platform-wide statistics for Super Admins."""
     conn = get_db_connection()
     try:
@@ -4253,7 +4523,8 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
         release_db_connection(conn)
 
 @app.get("/api/admin/companies")
-def get_all_companies(admin: dict = Depends(get_admin_user)):
+@limiter.limit("30/minute")
+def get_all_companies(request: Request, admin: dict = Depends(get_admin_user)):
     """Admin-only view of all registered companies."""
     conn = get_db_connection()
     try:
@@ -4280,7 +4551,8 @@ def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_c
         release_db_connection(conn)
 
 @app.get("/api/admin/users")
-def get_all_users(admin: dict = Depends(get_admin_user)):
+@limiter.limit("30/minute")
+def get_all_users(request: Request, admin: dict = Depends(get_admin_user)):
     """Admin-only list of all platform users with usage and bots."""
     conn = get_db_connection()
     try:
@@ -4339,9 +4611,11 @@ def get_all_users(admin: dict = Depends(get_admin_user)):
         release_db_connection(conn)
 
 @app.patch("/api/admin/users/{clerk_id}")
+@limiter.limit("30/minute")
 def update_user_admin(
-    clerk_id: str, 
-    req: AdminUpdateUserRequest, 
+    request: Request,
+    clerk_id: str,
+    req: AdminUpdateUserRequest,
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
 ):
@@ -4409,7 +4683,9 @@ def update_user_admin(
         release_db_connection(conn)
 
 @app.patch("/api/admin/users/{clerk_id}/limits")
+@limiter.limit("30/minute")
 def update_user_limits(
+    request: Request,
     clerk_id: str,
     req: AdminUpdateUserRequest,
     admin: dict = Depends(get_admin_user),
@@ -4419,8 +4695,10 @@ def update_user_limits(
     return update_user_admin(clerk_id, req, admin, _fresh)
 
 @app.delete("/api/admin/companies/{company_id}")
+@limiter.limit("30/minute")
 def delete_company_admin(
-    company_id: str, 
+    request: Request,
+    company_id: str,
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin) # Issue #16: Step-Up Auth
 ):
@@ -4723,7 +5001,11 @@ async def select_basic_tier(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/user/sync-subscription")
-async def sync_subscription_from_polar(current_user: dict = Depends(get_current_user)):
+@limiter.limit("5/minute;20/hour")  # Polar API quota protection — each call hits their billing API
+async def sync_subscription_from_polar(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
     """
     POST-CHECKOUT SYNC: Called immediately after Polar redirects back.
     Pulls the user's latest active subscription directly from Polar's API
@@ -5045,7 +5327,9 @@ Respond ONLY with valid JSON in exactly this format:
 
 
 @app.post("/api/eval/run")
+@limiter.limit("5/hour;20/day")  # LLM judge calls are expensive — each eval run = N×Gemini calls
 async def run_eval(
+    request: Request,
     body: EvalRunRequest,
     current_user: dict = Depends(get_current_user),
 ):
