@@ -3,15 +3,35 @@ import { Gavel, AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Terms & Conditions | Sapybase',
-  description: 'Service agreement and terms of use for Sapybase LLC.',
+  title: 'Terms & Conditions | SaPyBase',
+  description: 'Terms of service and subscription agreement for SaPyBase.',
 };
+
+const LAST_UPDATED = 'April 26, 2026';
+const CONTACT_EMAIL = 'ayushsatvara2002@gmail.com';
+
+const Section = ({ num, title, children }: { num: string; title: string; children: React.ReactNode }) => (
+  <section>
+    <h2 className="text-2xl md:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
+      <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">
+        {num}
+      </span>
+      {title}
+    </h2>
+    <div className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors space-y-3">
+      {children}
+    </div>
+  </section>
+);
 
 export default function TermsAndConditionsPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-600 dark:text-slate-300 pt-32 pb-20 px-6 transition-colors duration-500">
       <div className="max-w-4xl mx-auto">
-        <Link href="/" className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors mb-12 group">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors mb-12 group"
+        >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
           Back to Home
         </Link>
@@ -21,97 +41,227 @@ export default function TermsAndConditionsPage() {
             <Gavel size={14} />
             Service Agreement
           </div>
-          <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-white mb-6 transition-colors">Terms & Conditions</h1>
-          <p className="text-sm text-slate-500 font-medium transition-colors">Last Updated: March 25, 2026</p>
+          <h1 className="text-3xl md:text-4xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-white mb-6 transition-colors">
+            Terms &amp; Conditions
+          </h1>
+          <p className="text-sm text-slate-500 font-medium transition-colors">
+            Last Updated: {LAST_UPDATED}
+          </p>
         </header>
 
         <div className="space-y-12">
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">01</span>
-              Agreement to Terms
-            </h2>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              By accessing or using the services provided by Sapybase LLC, you agree to be bound by these Terms and Conditions. If you disagree with any part of these terms, you may not access our services.
-            </p>
-          </section>
 
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">02</span>
-              Professional Services
-            </h2>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              Sapybase LLC provides high-performance full-stack engineering and web deployment services. Specific project scopes, timelines, and deliverables are governed by individual Master Service Agreements (MSA) or Statements of Work (SOW) executed between Sapybase LLC and the Client.
+          <Section num="01" title="Agreement to Terms">
+            <p>
+              By creating an account or using any part of the SaPyBase platform (&ldquo;Service&rdquo;), you agree to be
+              bound by these Terms &amp; Conditions. If you do not agree, do not use the Service.
             </p>
-          </section>
-
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">03</span>
-              Intellectual Property
-            </h2>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              Unless otherwise agreed in a written contract, all intellectual property rights for custom code and designs developed for a Client remain the property of Sapybase LLC until full payment is received, at which point rights are transferred as specified in the service agreement.
+            <p>
+              SaPyBase is operated by Ayush Satvara, based in Jersey City, New Jersey, United States
+              (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;). &ldquo;You&rdquo; refers to the individual or business that
+              created a SaPyBase account.
             </p>
-          </section>
+          </Section>
 
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">04</span>
-              Limitation of Liability
-            </h2>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              In no event shall Sapybase LLC, nor its directors, employees, or partners, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses.
+          <Section num="02" title="The Service">
+            <p>
+              SaPyBase is a SaaS platform that lets you create, train, and deploy AI-powered chatbots on your
+              website or app. Features available to you depend on your subscription plan. Current plan details
+              and pricing are published at{' '}
+              <Link href="/pricing" className="text-indigo-600 dark:text-indigo-400 underline">
+                sapybase.com/pricing
+              </Link>.
             </p>
-          </section>
-
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">05</span>
-              AI Training and Ingestion
-            </h2>
-            <div className="space-y-4 text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              <p>
-                Sapybase provides technical tools to ingest and process data for the purpose of training custom AI models ("AI Ingestion"). By providing a URL, PDF, or text for Ingestion, you certify that:
-              </p>
-              <ul className="list-disc pl-6 space-y-2 text-slate-600 dark:text-slate-400 transition-colors">
-                <li>You have the legal right, ownership, or permission to access and scrape the content provided.</li>
-                <li>The content does not violate any third-party intellectual property, privacy, or trade secret rights.</li>
-                <li>The ingestion does not bypass non-public security measures or paywalls (CFAA compliance).</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">06</span>
-              Indemnification
-            </h2>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              You agree to defend, indemnify, and hold harmless Sapybase LLC and its employees from and against any and all claims, damages, obligations, losses, liabilities, costs, or debt (including legal fees) resulting from: (i) your use and access of the Service, (ii) your violation of any third-party right, including copyright, or (iii) any claim that your training data caused damage to a third party.
+            <p>
+              We reserve the right to modify, suspend, or discontinue any feature of the Service at any time
+              with reasonable notice. We will not reduce core functionality of a paid plan without providing
+              at least 30 days&apos; notice by email.
             </p>
-          </section>
+          </Section>
 
-          <section>
-            <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-white mb-4 flex items-center gap-3 transition-colors">
-              <span className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-emerald-600 dark:text-emerald-500 text-base font-bold font-sans transition-colors">07</span>
-              Governing Law
-            </h2>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed transition-colors">
-              Any dispute arising from these terms or our services shall be governed by and construed in accordance with the laws of the jurisdiction in which Sapybase LLC is registered.
+          <Section num="03" title="Subscriptions and Billing">
+            <p>
+              Paid plans (Basic, Starter, Pro, Business) are billed monthly or annually in advance via Polar,
+              our payment processor. Prices are listed in USD and INR on our pricing page. Local taxes may
+              apply and are calculated at checkout.
             </p>
-          </section>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong>Upgrades</strong> take effect immediately. You are charged a pro-rated amount for the
+                remainder of the current billing period.
+              </li>
+              <li>
+                <strong>Downgrades</strong> take effect at the end of your current billing period. You retain
+                access to your current plan&apos;s features until then.
+              </li>
+              <li>
+                <strong>Cancellation</strong> can be done at any time from your dashboard. Access continues
+                until the end of the paid billing period. No further charges are made after cancellation.
+              </li>
+              <li>
+                <strong>Plan limits</strong> (bots, messages per month, knowledge chunks) are enforced
+                per-bot as described on the pricing page. Exceeding your message quota suspends chat
+                responses for that bot until the next billing cycle.
+              </li>
+              <li>
+                <strong>Annual billing</strong> is available on Starter, Pro, and Business plans at a 10%
+                discount. Contact us at{' '}
+                <a href={`mailto:${CONTACT_EMAIL}`} className="text-indigo-600 dark:text-indigo-400 underline">
+                  {CONTACT_EMAIL}
+                </a>{' '}
+                to set it up.
+              </li>
+            </ul>
+          </Section>
+
+          <Section num="04" title="Refund Policy">
+            <p>
+              We want you to be satisfied with SaPyBase. If you experience an issue with the Service, you
+              may request a refund by emailing{' '}
+              <a
+                href={`mailto:${CONTACT_EMAIL}?subject=Refund%20Request`}
+                className="text-indigo-600 dark:text-indigo-400 underline"
+              >
+                {CONTACT_EMAIL}
+              </a>{' '}
+              with the subject line &ldquo;Refund Request&rdquo; within <strong>12 days of the payment date</strong>.
+            </p>
+            <p>
+              Your email must include:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>A description of the issue you experienced.</li>
+              <li>Supporting evidence (screenshots, error messages, or relevant details).</li>
+              <li>The email address associated with your SaPyBase account.</li>
+            </ul>
+            <p>
+              We review each request individually and will respond within 5 business days. Refunds granted
+              are processed back to your original payment method via Polar and may take 5–10 business days
+              to appear.
+            </p>
+            <p>
+              Refund requests submitted more than 12 days after the payment date, or requests without
+              supporting evidence, are not eligible. Abuse of the refund policy (repeated refund requests
+              across billing cycles) may result in account suspension.
+            </p>
+          </Section>
+
+          <Section num="05" title="Acceptable Use">
+            <p>You agree not to use SaPyBase to:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Violate any applicable law or regulation.</li>
+              <li>Distribute spam, malware, or unsolicited commercial communications.</li>
+              <li>Harass, threaten, or deceive end-users of your bots.</li>
+              <li>Impersonate another person or entity.</li>
+              <li>Attempt to reverse-engineer, scrape, or extract our AI models or infrastructure.</li>
+              <li>Deliberately circumvent plan limits, rate limits, or billing enforcement.</li>
+              <li>Train bots on content that infringes third-party intellectual property rights.</li>
+              <li>Deploy bots for illegal activities including fraud, phishing, or data theft.</li>
+            </ul>
+            <p>
+              Violation of this Acceptable Use Policy may result in immediate account suspension without
+              a refund.
+            </p>
+          </Section>
+
+          <Section num="06" title="AI-Generated Content and Knowledge Ingestion">
+            <p>
+              SaPyBase uses Google&apos;s Gemini API to generate bot responses. AI-generated content may be
+              inaccurate, incomplete, or inappropriate. You are responsible for configuring your bot&apos;s
+              knowledge base and system prompt, and for the outputs your bot produces to your end-users.
+            </p>
+            <p>
+              By ingesting a URL, PDF, or text into your bot&apos;s knowledge base, you certify that:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>You have the legal right, ownership, or permission to use that content.</li>
+              <li>The content does not violate third-party intellectual property, privacy, or trade secret rights.</li>
+              <li>The ingestion does not bypass non-public security measures or paywalls (CFAA compliance).</li>
+            </ul>
+          </Section>
+
+          <Section num="07" title="Intellectual Property">
+            <p>
+              The SaPyBase platform, branding, and underlying code are owned by SaPyBase and protected by
+              applicable intellectual property law. You retain full ownership of the content you upload to
+              your knowledge base and the bot configurations you create.
+            </p>
+            <p>
+              You grant SaPyBase a limited, non-exclusive licence to store, process, and transmit your
+              content solely to operate the Service on your behalf. We do not claim ownership of your content
+              and will not use it for purposes outside the Service.
+            </p>
+          </Section>
+
+          <Section num="08" title="Limitation of Liability">
+            <p>
+              To the maximum extent permitted by law, SaPyBase and its operator shall not be liable for any
+              indirect, incidental, special, consequential, or punitive damages arising from your use of the
+              Service, including but not limited to loss of profits, data, or business opportunities.
+            </p>
+            <p>
+              Our total liability to you for any claim arising under these Terms shall not exceed the amount
+              you paid to SaPyBase in the 3 months preceding the claim.
+            </p>
+          </Section>
+
+          <Section num="09" title="Indemnification">
+            <p>
+              You agree to defend, indemnify, and hold harmless SaPyBase and its operator from and against
+              any claims, damages, or costs (including legal fees) arising from: (i) your use of the Service,
+              (ii) content you ingest or deploy through your bots, (iii) your violation of these Terms, or
+              (iv) your violation of any third-party right.
+            </p>
+          </Section>
+
+          <Section num="10" title="Termination">
+            <p>
+              You may close your account at any time from your dashboard settings. We may suspend or
+              terminate your account immediately if you violate these Terms, with or without notice depending
+              on the severity of the violation.
+            </p>
+            <p>
+              Upon termination, your bots will stop serving responses and your data will be retained for
+              the period described in our Privacy Policy, after which it will be deleted.
+            </p>
+          </Section>
+
+          <Section num="11" title="Governing Law">
+            <p>
+              These Terms are governed by and construed in accordance with the laws of the State of New
+              Jersey, United States, without regard to its conflict-of-law provisions. Any disputes arising
+              under these Terms shall be resolved exclusively in the courts of New Jersey.
+            </p>
+          </Section>
+
+          <Section num="12" title="Changes to These Terms">
+            <p>
+              We may update these Terms from time to time. When we do, we will update the &ldquo;Last Updated&rdquo;
+              date above. For material changes, we will notify you by email at least 14 days before the
+              change takes effect. Continued use of the Service after the effective date constitutes
+              acceptance of the updated Terms.
+            </p>
+          </Section>
 
           <div className="flex items-start gap-4 p-6 rounded-2xl bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 transition-colors">
             <AlertCircle className="text-amber-600 dark:text-amber-500 shrink-0 mt-1 transition-colors" size={20} />
             <div>
-              <h3 className="text-xl md:text-2xl font-display font-bold text-amber-700 dark:text-amber-500 mb-1 transition-colors">Company Registration</h3>
+              <h3 className="text-lg font-display font-bold text-amber-700 dark:text-amber-500 mb-1 transition-colors">
+                Questions or Concerns?
+              </h3>
               <p className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">
-                Sapybase LLC is a fully registered Limited Liability Company. All contracts are legally binding under the entity's registered jurisdiction.
+                For any questions about these Terms, email us at{' '}
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="text-indigo-600 dark:text-indigo-400 underline"
+                >
+                  {CONTACT_EMAIL}
+                </a>
+                . We aim to respond within 2 business days.
               </p>
             </div>
           </div>
+
         </div>
       </div>
     </div>
