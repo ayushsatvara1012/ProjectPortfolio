@@ -729,23 +729,34 @@ async def startup_event():
         r = None # Explicitly set to None for clarify
         print("CACHE: Running without Redis cache (REDIS_URL not set).")
 
-    # 2. Database Migration: Ensure ai_model column exists (self-healing)
+    # 2. Migration sanity check (Step 4.5): warn if Alembic has pending
+    #    revisions. Does NOT run them — Render's pre-deploy command runs
+    #    `alembic upgrade head` before the app starts. This check exists so
+    #    that if someone forgets the deploy hook (or runs locally against a
+    #    stale DB), startup logs make the drift loud and obvious instead of
+    #    surfacing as a mysterious column-not-found error mid-request.
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100)")
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS webhook_url TEXT")
-        cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS handoff_redirect_url TEXT")
-        # Step 2.2: track the timestamp of the most recently applied Polar
-        # event per user so out-of-order webhook deliveries (Polar retries
-        # can reorder events) don't overwrite newer state with older state.
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_polar_event_at TIMESTAMPTZ")
-        conn.commit()
+        # alembic_version table is created by the first stamp/upgrade. If it
+        # doesn't exist, the DB has never been touched by Alembic — likely a
+        # fresh dev DB; warn but don't crash.
+        cursor.execute(
+            "SELECT version_num FROM alembic_version LIMIT 1"
+        )
+        row = cursor.fetchone()
         cursor.close()
-        print("MIGRATION: ai_model, webhook_url, handoff_redirect_url, last_polar_event_at column checks complete.")
+        if row:
+            print(f"MIGRATION CHECK: alembic_version = {row[0]} (run `alembic upgrade head` if this lags behind versions/HEAD).")
+        else:
+            print("MIGRATION CHECK WARNING: alembic_version table empty — DB has never been stamped. Run `alembic stamp head` or `alembic upgrade head`.")
     except Exception as e:
-        if conn: conn.rollback()
-        print(f"MIGRATION WARNING: DB column verification failed: {e}")
+        # Most likely: alembic_version table doesn't exist at all (fresh DB).
+        # Don't crash — the app can still boot; the operator just needs to
+        # initialise Alembic against this DB.
+        if conn:
+            conn.rollback()
+        print(f"MIGRATION CHECK WARNING: alembic_version table missing or unreadable ({e}). Run `alembic upgrade head`.")
     finally:
         release_db_connection(conn)
 

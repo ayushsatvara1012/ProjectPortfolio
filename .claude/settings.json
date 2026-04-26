@@ -9,7 +9,10 @@
       "Bash(npm test *)",
       "Bash(awk '/^@app\\\\.\\(get|post|put|patch|delete\\)/{route=$0; getline next1; getline next2; print NR\": \"route\" | \"next1\" \"next2}' sapybase_ai_engine/main.py)",
       "Bash(python -c \"import sys; print\\(sys.prefix\\)\")",
-      "Bash(pip list *)"
+      "Bash(pip list *)",
+      "Bash(./venv/bin/alembic current *)",
+      "Bash(./venv/bin/alembic downgrade *)",
+      "Bash(./venv/bin/alembic upgrade *)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"
