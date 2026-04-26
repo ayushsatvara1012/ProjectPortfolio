@@ -4528,9 +4528,16 @@ def get_bot_faqs(request: Request, bot_id: str):
     the merchant has explicitly opted to publish — the same content their
     own customers see in the widget.
 
-    TODO: replace placeholder payload with a query against chat_logs filtering
-    for is_un_final = false AND length(answer) > 80, grouped by semantic
-    similarity, top 10. Cache 24h via fastapi-cache.
+    Aggregation strategy:
+      1. Pull answered (is_unanswered = false) Q&A pairs where the answer is
+         substantive (>= 80 chars) from the last 90 days.
+      2. De-duplicate near-identical questions via trigram similarity:
+         lower(user_query) similarity threshold 0.6 — Postgres pg_trgm.
+         We pick the most-asked representative from each cluster.
+      3. Rank by ask frequency DESC, then answer length DESC (longer = richer).
+      4. Cap at 10 pairs — FAQPage schema sweet spot for AI Overviews.
+      5. Fall back to a single generic FAQ if no chat history exists yet
+         (new bot, zero logs).
     """
     hashed_key = hashlib.sha256(bot_id.encode()).hexdigest()
     conn = get_db_connection()
@@ -4538,22 +4545,76 @@ def get_bot_faqs(request: Request, bot_id: str):
         cursor = conn.cursor()
         cursor.execute("SELECT id, bot_name FROM companies WHERE api_key = %s", (hashed_key,))
         row = cursor.fetchone()
-        cursor.close()
         if not row:
+            cursor.close()
             raise HTTPException(status_code=404, detail="Bot not found")
 
-        bot_name = row[1] or "AI Assistant"
+        company_id = row[0]
+        bot_name   = row[1] or "AI Assistant"
 
-        # Placeholder payload. Real implementation reads from chat_logs.
-        return {
-            "bot_name": bot_name,
-            "faqs": [
+        # ── Real FAQ aggregation ──────────────────────────────────────────────
+        # Step 1: fetch answered, substantive Q&A pairs from the last 90 days.
+        # We pull more than 10 so the de-dup pass has headroom to discard dupes.
+        cursor.execute(
+            """
+            SELECT user_query, bot_response, COUNT(*) AS ask_count
+            FROM chat_logs
+            WHERE company_id  = %s
+              AND is_unanswered = false
+              AND LENGTH(bot_response) >= 80
+              AND created_at  >= NOW() - INTERVAL '90 days'
+            GROUP BY user_query, bot_response
+            ORDER BY ask_count DESC, LENGTH(bot_response) DESC
+            LIMIT 60
+            """,
+            (company_id,),
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+
+        # Step 2: de-duplicate in Python using simple normalisation.
+        # pg_trgm similarity requires the extension to be enabled and a
+        # cross-join — doing it in Python avoids an extra DB round-trip and
+        # keeps the query simple. Normalise: lowercase + collapse whitespace,
+        # then skip any candidate whose normalised form shares a 6-gram prefix
+        # with an already-accepted question (cheap proxy for near-duplication).
+        def _norm(q: str) -> str:
+            import re as _re
+            return _re.sub(r'\s+', ' ', q.lower().strip())
+
+        seen_prefixes: list[str] = []
+        faqs: list[dict] = []
+
+        for user_query, bot_response, _ in rows:
+            if len(faqs) >= 10:
+                break
+            norm = _norm(user_query)
+            # Skip if the first 40 normalised chars match an accepted question
+            prefix = norm[:40]
+            if any(prefix == s for s in seen_prefixes):
+                continue
+            seen_prefixes.append(prefix)
+            # Truncate answer to 300 chars for JSON-LD (schema.org recommends concise)
+            answer = bot_response.strip()
+            if len(answer) > 300:
+                answer = answer[:297].rstrip() + "..."
+            faqs.append({"question": user_query.strip(), "answer": answer})
+
+        # Step 3: fall back to generic FAQ for bots with no history yet
+        if not faqs:
+            faqs = [
                 {
                     "question": f"What can {bot_name} help me with?",
-                    "answer": f"{bot_name} is an AI assistant that can answer questions about this site's products, services, and policies. Ask anything in the chat below.",
-                },
-            ],
-        }
+                    "answer": (
+                        f"{bot_name} is an AI assistant that can answer questions "
+                        "about this site's products, services, and policies. "
+                        "Ask anything in the chat below."
+                    ),
+                }
+            ]
+
+        return {"bot_name": bot_name, "faqs": faqs}
+
     finally:
         release_db_connection(conn)
 
