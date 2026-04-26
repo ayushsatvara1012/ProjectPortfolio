@@ -61,3 +61,4 @@ next-env.d.ts
 
 # Project Specific
 public/widget.js
+tsconfig.tsbuildinfo
