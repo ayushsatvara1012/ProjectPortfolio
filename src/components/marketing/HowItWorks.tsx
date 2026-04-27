@@ -194,7 +194,7 @@ const HowItWorks = () => {
   const active = PIPELINE_STEPS.find((s) => s.id === activeStep)!;
 
   return (
-    <section id="how-it-works" className="bg-white dark:bg-slate-950 overflow-hidden transition-colors duration-500">
+    <section id="how-it-works" className="bg-white dark:bg-slate-950 overflow-x-clip transition-colors duration-500">
       <div className="max-w-8xl mx-auto">
         <div className="grid grid-cols-1 gap-px bg-slate-200 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-800 transition-colors duration-500">
 

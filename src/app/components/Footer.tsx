@@ -268,7 +268,7 @@ export default function Footer() {
           </div>
 
           {/* Bottom legend row */}
-          <div className="min-[1011px]:col-span-12 bg-white dark:bg-slate-950 p-8 min-[1011px]:p-10 border-t border-white dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
+          <div className="min-[1011px]:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 min-[1011px]:px-8 min-[1011px]:py-4 border-t border-white dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
             <div className="flex flex-col min-[1011px]:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
               <p className="text-center">© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
               <div className="hidden min-[1011px]:block h-px w-6 bg-gray-200 dark:bg-slate-800" />

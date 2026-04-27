@@ -85,11 +85,11 @@ const PerformanceMetrics = () => {
   ];
 
   return (
-    <section id="metrics" className="w-full bg-white dark:bg-slate-950 py-2 overflow-hidden transition-colors duration-500">
+    <section id="metrics" className="w-full bg-white dark:bg-slate-950 py-2 transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 md:px-10">
-        
+
         {/* 9-Cell Checkerboard Extended Grid Archivecture */}
-        <div className="relative group/grid">
+        <div className="relative group/grid overflow-hidden">
           
           {/* Responsive Vertical Extended Lines */}
           <div className="hidden lg:block absolute left-[33.33%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />

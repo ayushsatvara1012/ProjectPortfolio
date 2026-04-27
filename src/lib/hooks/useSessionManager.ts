@@ -27,7 +27,7 @@ const useSessionManager = () => {
                 const isSsoCallback = window.location.href.includes('sso-callback');
 
                 if (ageInSeconds > 600 && !isSsoCallback) {
-                    console.log("Automatic persistent login detected. Forcing logout for security...");
+                    if (process.env.NODE_ENV === 'development') console.log("Automatic persistent login detected. Forcing logout for security...");
                     signOut();
                 } else {
                     sessionStorage.setItem(SESSION_KEY, 'true');

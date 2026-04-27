@@ -45,6 +45,7 @@ import Logo from './Logo';
 import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
 import FloatingBotWidget from './FloatingBotWidget';
 import { useUserRole } from '@/src/lib/context/UserContext';
+import NavigationProgress from './NavigationProgress';
 
 // ── Route maps ────────────────────────────────────────────────────────────────
 
@@ -223,8 +224,8 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
       </nav>
 
       {/* User footer */}
-      <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2.5 min-h-[56px] bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500 overflow-hidden">
-        <UserButton appearance={{ elements: { avatarBox: 'w-7 h-7' } }} />
+      <div className="px-4 py-1.5 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2.5 min-h-[56px] bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500 overflow-hidden">
+        <UserButton appearance={{ elements: { avatarBox: 'w-6 h-6' } }} />
         <div className={`flex-1 min-w-0 transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate transition-colors">
             {user?.fullName || user?.firstName || 'My Account'}
@@ -304,6 +305,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
       <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
         <TopNav user={user} onMenuClick={() => setSidebarOpen(true)} />
+        <NavigationProgress />
         {/* Mobile sidebar overlay */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -346,7 +348,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </DashboardErrorBoundary>
           </div>
           {/* Dashboard Footer */}
-          <footer className="md:col-span-12 bg-white dark:bg-slate-950 p-8 md:p-10 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
+          <footer className="md:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 md:px-8 md:py-4 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
             <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
               <p className="text-center">© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
               <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />

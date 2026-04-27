@@ -14,7 +14,7 @@ const useInactivityTimeout = (timeoutInMinutes = 30) => {
 
   const handleLogout = useCallback(() => {
     if (user) {
-      console.log(`User inactive for ${timeoutInMinutes} minutes. Logging out...`);
+      if (process.env.NODE_ENV === 'development') console.log(`User inactive for ${timeoutInMinutes} minutes. Logging out...`);
       signOut();
     }
   }, [signOut, user, timeoutInMinutes]);

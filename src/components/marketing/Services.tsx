@@ -43,7 +43,7 @@ const INSIGHT_MODULES = [
 
 const Services = () => {
   return (
-    <section id="services" className="bg-white dark:bg-slate-950 py-12 overflow-hidden transition-colors duration-500">
+    <section id="services" className="bg-white dark:bg-slate-950 py-12 overflow-x-clip transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 md:px-3">
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800  overflow-hidden transition-colors duration-500">

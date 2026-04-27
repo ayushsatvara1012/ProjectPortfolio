@@ -62,7 +62,7 @@ const HeroSection = () => {
   }, [view]);
 
   return (
-    <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-hidden transition-colors duration-500">
+    <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
       {/* Architectural Grid Container */}
       <div className="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 dark:bg-slate-800 border-x border-gray-100 dark:border-slate-800 transition-colors duration-500">
 
