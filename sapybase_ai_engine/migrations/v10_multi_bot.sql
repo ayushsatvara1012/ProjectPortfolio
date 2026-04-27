@@ -36,7 +36,7 @@ SET company_id = (
 )
 WHERE ut.company_id IS NULL;
 
--- 7. Ensure the existing company (the live sapybase.com bot) is visible in the bot manager.
+-- 7. Ensure the existing company (the live Sapybase.com bot) is visible in the bot manager.
 --    The ADD COLUMN steps above apply defaults to existing rows, so is_active and display_order
 --    are already set. This step creates a usage_tracking row if one doesn't exist yet,
 --    so the bot card shows correct usage stats instead of 0/NULL.

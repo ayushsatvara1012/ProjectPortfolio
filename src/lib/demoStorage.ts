@@ -17,7 +17,7 @@ const DEFAULT_BOT = {
     quickQuestions: [] as string[],
     systemPrompt: '',
     companyName: 'Demo Company',
-    allowedOrigin: 'https://demo.sapybase.com',
+    allowedOrigin: 'https://demo.Sapybase.com',
     themeColor: '#5730F5',
     companyTone_str: 'Professional and helpful',
 };

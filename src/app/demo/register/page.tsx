@@ -54,7 +54,7 @@ export default function DemoCreateBotPage() {
         setFormData({ companyName: '', allowedOrigin: '', themeColor: '#5730F5', companyTone: 'Professional and helpful' });
     };
 
-    const embedSnippet = `<script src="https://sapybase.com/widget.js" data-api-key="${registrationData?.apiKey}" defer></script>`;
+    const embedSnippet = `<script src="https://Sapybase.com/widget.js" data-api-key="${registrationData?.apiKey}" defer></script>`;
 
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">

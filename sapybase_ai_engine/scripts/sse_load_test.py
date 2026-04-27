@@ -1,6 +1,6 @@
 """SSE concurrency load test for /api/chat.
 
-Usage (from sapybase_ai_engine/ with venv activated):
+Usage (from Sapybase_ai_engine/ with venv activated):
 
     # Against local dev server:
     ./venv/bin/python scripts/sse_load_test.py --base-url http://localhost:8000
@@ -75,7 +75,7 @@ async def run_one_stream(
         "message": TEST_MESSAGE,
         "session_id": f"{SESSION_ID_PREFIX}{worker_id}-{int(time.time())}",
     }
-    origin = os.getenv("SSE_TEST_ORIGIN", "https://sapybase.com")
+    origin = os.getenv("SSE_TEST_ORIGIN", "https://Sapybase.com")
     headers = {
         "x-api-key": api_key,
         "Content-Type": "application/json",
@@ -145,7 +145,7 @@ async def run_one_stream(
 # Main
 # ---------------------------------------------------------------------------
 async def main(base_url: str, concurrency: int, api_key: str) -> None:
-    print(f"\nSaPyBase SSE Load Test")
+    print(f"\nSapybase SSE Load Test")
     print(f"  Base URL    : {base_url}")
     print(f"  Concurrency : {concurrency} simultaneous streams")
     print(f"  Message     : \"{TEST_MESSAGE}\"\n")

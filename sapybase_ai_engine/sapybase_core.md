@@ -1,7 +1,7 @@
-# SaPyBase: Core Content Audit & Extraction
+# Sapybase: Core Content Audit & Extraction
 
 ## 1. Brand Identity & Value Proposition
-**Agency Name:** SaPyBase
+**Agency Name:** Sapybase
 **Tagline:** Engineering Digital Excellence from Code to Cloud.
 **Core Mission:** We don't just build websites. We architect, develop, and deploy high-performance web applications tailored for the next generation of startups.
 **Current Status:** Now accepting Q1 2026 Projects.
@@ -51,7 +51,7 @@
 ## 5. Selected Project Deployments (Ecosystems)
 - **LuminaLib:** AI-driven digital library platform (FastAPI + PostgreSQL + pgvector). Manages 271k+ book records with 384-dimensional semantic search.
 - **V-Comm:** Specialized digital hub for community finance and member directories. Built with React and Supabase.
-- **SaPyBase (Duo-Portfolio):** Ultra-modern Bento-grid architecture. Built with React 19 and Tailwind CSS v4.
+- **Sapybase (Duo-Portfolio):** Ultra-modern Bento-grid architecture. Built with React 19 and Tailwind CSS v4.
 - **Ghost SDR:** AI-driven sales development solution optimizing complex digital workflows (In Active Development).
 
 ---

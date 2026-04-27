@@ -25,7 +25,7 @@ const nextConfig = {
       },
       // Widget assets — public CDN-style, no framing restriction
       {
-        source: '/:path(widget.js|style.css|sapybase-loader.js)',
+        source: '/:path(widget.js|style.css|Sapybase-loader.js)',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },

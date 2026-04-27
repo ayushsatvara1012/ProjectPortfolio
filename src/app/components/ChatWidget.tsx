@@ -10,23 +10,23 @@ import ThinkingLogo from './ThinkingLogo';
 import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
-const ASSET_BASE = IS_DEV ? '' : 'https://www.sapybase.com';
+const ASSET_BASE = IS_DEV ? '' : 'https://www.Sapybase.com';
 const BrandLogo = `${ASSET_BASE}/SB_loading.svg`;
 
 // ── Shape / gradient catalogs ─────────────────────────────────────────────────
 
 const SHAPE_CLASS_MAP: Record<string, string> = {
-  circle:   'rounded-full',
+  circle: 'rounded-full',
   squircle: 'rounded-[2rem]',
-  bento:    'rounded-2xl',
-  sharp:    'rounded-lg',
+  bento: 'rounded-2xl',
+  sharp: 'rounded-lg',
 };
 
 export const AVATAR_GRADIENTS: Record<string, [string, string] | null> = {
-  none:   null,
+  none: null,
   cosmic: ['#c026d3', '#3b82f6'],
   sunset: ['#f97316', '#eab308'],
-  ocean:  ['#06b6d4', '#3b82f6'],
+  ocean: ['#06b6d4', '#3b82f6'],
   hacker: ['#22c55e', '#14b8a6'],
 };
 
@@ -49,11 +49,11 @@ export const FAB_SHAPES: Record<string, { path: string; logoSize: string; x: num
   },
 };
 
-// ── SaPyBaseConfig window augmentation ───────────────────────────────────────
+// ── SapybaseConfig window augmentation ───────────────────────────────────────
 
 declare global {
   interface Window {
-    SaPyBaseConfig?: {
+    SapybaseConfig?: {
       apiKey?: string;
       apiUrl?: string;
       themeColor?: string;
@@ -161,12 +161,12 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
           <stop offset="0%" stopColor="#1E293B" /><stop offset="100%" stopColor="#0F172A" />
         </linearGradient>
         {gradient && (
-          <linearGradient id={`${idPrefix}-sapybase-avatar-grad`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={`${idPrefix}-Sapybase-avatar-grad`} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={gradient[0]} /><stop offset="100%" stopColor={gradient[1]} />
           </linearGradient>
         )}
       </defs>
-      <path d={FAB_PATH} fill={gradient ? `url(#${idPrefix}-sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`}
+      <path d={FAB_PATH} fill={gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`}
         className={!gradient ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
       {logoUrl && (
         <g clipPath={`url(#${idPrefix}-fab-clip)`}>
@@ -209,13 +209,13 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
     setIsSubmitting(true);
     try {
       const parentOrigin = (typeof window !== 'undefined'
-        && (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin) || '';
+        && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
       const res = await fetch(`${activeApiUrl}/api/leads/capture`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          ...(parentOrigin ? { 'x-sapybase-parent-origin': parentOrigin } : {}),
+          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
         },
         body: JSON.stringify({ email: parsed.data.email, name: parsed.data.name ?? '', context: contextString }),
       });
@@ -571,21 +571,21 @@ function TypewriterContent({ content, isStreaming, isTyped, onComplete, themeCol
 type ChatWidgetProps = { apiKey?: string; isEmbed?: boolean };
 
 export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps) {
-  // Resolve API key and base URL (supports both prop and window.SaPyBaseConfig)
-  const activeApiKey = apiKey ?? (typeof window !== 'undefined' ? window.SaPyBaseConfig?.apiKey : undefined);
+  // Resolve API key and base URL (supports both prop and window.SapybaseConfig)
+  const activeApiKey = apiKey ?? (typeof window !== 'undefined' ? window.SapybaseConfig?.apiKey : undefined);
   const activeApiUrl = typeof window !== 'undefined'
-    ? (window.SaPyBaseConfig?.apiUrl ?? (IS_DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com'))
+    ? (window.SapybaseConfig?.apiUrl ?? (IS_DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com'))
     : (IS_DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com');
 
   const DEFAULT_CONFIG: ConfigData = {
-    theme_color: (typeof window !== 'undefined' && window.SaPyBaseConfig?.themeColor) || '#5730F5',
-    bot_name: (typeof window !== 'undefined' && window.SaPyBaseConfig?.botName) || 'Sapy AI',
-    logo_url: (typeof window !== 'undefined' && window.SaPyBaseConfig?.logoUrl) || `${ASSET_BASE}/SB_loading.svg`,
-    initial_message: (typeof window !== 'undefined' && window.SaPyBaseConfig?.welcomeMessage) || "Hi! I'm your AI assistant. How can I help you today?",
-    quick_questions: (typeof window !== 'undefined' && window.SaPyBaseConfig?.quickQuestions) || [],
-    logo_shape: (typeof window !== 'undefined' && window.SaPyBaseConfig?.logoShape) || 'circle',
-    custom_logo_url: (typeof window !== 'undefined' && window.SaPyBaseConfig?.customLogoUrl) || '',
-    avatar_bg_style: (typeof window !== 'undefined' && window.SaPyBaseConfig?.avatarBgStyle) || 'none',
+    theme_color: (typeof window !== 'undefined' && window.SapybaseConfig?.themeColor) || '#5730F5',
+    bot_name: (typeof window !== 'undefined' && window.SapybaseConfig?.botName) || 'Sapy AI',
+    logo_url: (typeof window !== 'undefined' && window.SapybaseConfig?.logoUrl) || `${ASSET_BASE}/SB_loading.svg`,
+    initial_message: (typeof window !== 'undefined' && window.SapybaseConfig?.welcomeMessage) || "Hi! I'm your AI assistant. How can I help you today?",
+    quick_questions: (typeof window !== 'undefined' && window.SapybaseConfig?.quickQuestions) || [],
+    logo_shape: (typeof window !== 'undefined' && window.SapybaseConfig?.logoShape) || 'circle',
+    custom_logo_url: (typeof window !== 'undefined' && window.SapybaseConfig?.customLogoUrl) || '',
+    avatar_bg_style: (typeof window !== 'undefined' && window.SapybaseConfig?.avatarBgStyle) || 'none',
   };
 
   const [configData, setConfigData] = useState<ConfigData>(DEFAULT_CONFIG);
@@ -601,11 +601,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (!activeApiKey) return;
     const fetchConfig = async () => {
       try {
-        const parentOrigin = (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin || '';
+        const parentOrigin = (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin || '';
         const res = await fetch(`${activeApiUrl}/api/config`, {
           headers: {
             'x-api-key': activeApiKey,
-            ...(parentOrigin ? { 'x-sapybase-parent-origin': parentOrigin } : {}),
+            ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
           },
         });
         if (res.ok) {
@@ -631,14 +631,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           });
         }
       } catch (err) {
-        console.warn('[SaPyBase] Could not load bot config:', err);
+        console.warn('[Sapybase] Could not load bot config:', err);
       }
     };
     fetchConfig();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeApiKey]);
 
-  const BOT_NAME = configData.bot_name || 'SaPyBase';
+  const BOT_NAME = configData.bot_name || 'Sapybase';
   const THEME_COLOR = configData.theme_color || '#5730F5';
   const LOGO_URL = configData.custom_logo_url || configData.logo_url;
   const LOGO_SHAPE = configData.logo_shape || 'circle';
@@ -691,7 +691,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   useEffect(() => {
     if (isEmbed && !isOpen) {
-      window.parent.postMessage({ type: 'sapybase:close' }, '*');
+      window.parent.postMessage({ type: 'Sapybase:close' }, '*');
     }
   }, [isOpen, isEmbed]);
 
@@ -720,7 +720,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     };
     timer = setTimeout(handleTyping, typingSpeed);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPhrase, isDeleting, loopNum, typingSpeed]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -842,13 +842,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
     try {
       const parentOriginChat = (typeof window !== 'undefined'
-        && (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin) || '';
+        && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
       await fetchEventSource(`${activeApiUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': resolvedApiKey,
-          ...(parentOriginChat ? { 'x-sapybase-parent-origin': parentOriginChat } : {}),
+          ...(parentOriginChat ? { 'x-Sapybase-parent-origin': parentOriginChat } : {}),
         },
         body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId }),
         signal: ctrl.signal,
@@ -876,7 +876,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               try { detail = await response.json(); } catch { /* noop */ }
               const isMessageLimit = (detail as { detail?: { code?: string } })?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
               const errorContent = isMessageLimit
-                ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
+                ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [Sapybase.com](https://www.Sapybase.com). I'll be back next billing cycle! 🚀`
                 : "I'm temporarily unavailable. Please try again later.";
               setMessages(prev => {
                 const updated = [...prev];
@@ -998,7 +998,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
-            const fallback = "I'm having trouble connecting to the SaPyBase servers right now. Please try again later or use the contact form.";
+            const fallback = "I'm having trouble connecting to the Sapybase servers right now. Please try again later or use the contact form.";
             const content = partial.trim()
               ? partial + '\n\n_(Connection lost — message may be incomplete.)_'
               : fallback;
@@ -1037,13 +1037,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     const transcript = messages.filter(m => m.role === 'user' || m.role === 'bot').map(m => ({ role: m.role, content: m.content || '' }));
     try {
       const parentOriginHandoff = (typeof window !== 'undefined'
-        && (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin) || '';
+        && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
       const res = await fetch(`${activeApiUrl}/api/handoff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': resolvedApiKey!,
-          ...(parentOriginHandoff ? { 'x-sapybase-parent-origin': parentOriginHandoff } : {}),
+          ...(parentOriginHandoff ? { 'x-Sapybase-parent-origin': parentOriginHandoff } : {}),
         },
         body: JSON.stringify({ transcript, visitor_email: visitorEmail, visitor_name: visitorName || null }),
       });
@@ -1054,7 +1054,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           : m
       ));
     } catch (err) {
-      console.warn('[SaPyBase] Handoff request failed:', err);
+      console.warn('[Sapybase] Handoff request failed:', err);
       setMessages(prev => prev.map(m =>
         m.id === 'handoff-form' ? { role: 'bot', content: 'Something went wrong. Please try again.', isTyped: false } : m
       ));
@@ -1106,7 +1106,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     </button>
                     <button onClick={() => {
                       if (isEmbed) {
-                        window.parent.postMessage('sapybase-close', '*');
+                        window.parent.postMessage('Sapybase-close', '*');
                       } else {
                         setIsOpen(false);
                       }
@@ -1136,7 +1136,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         }} className="w-full text-left px-4 py-2 text-sm font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
                           Clear chat <span className="material-symbols-outlined">refresh</span>
                         </button>
-                        <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
+                        <a href="https://www.Sapybase.com" target="_blank" rel="noopener noreferrer"
                           className="w-full text-left px-4 py-2 text-sm font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
                           onClick={() => setShowMenu(false)} style={{ color: THEME_COLOR }}>
                           Add to your site
@@ -1244,11 +1244,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
               {!configData.white_label_enabled && (
                 <div className="shrink-0 pt-2 flex justify-center items-center">
-                  <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
+                  <a href="https://www.Sapybase.com" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    Powered by SaPyBase
+                    <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
+                    Powered by Sapybase
                   </a>
                 </div>
               )}
@@ -1273,78 +1273,78 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       {/* FAB button */}
       {!isEmbed && (
         <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483646] pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
-        <div className="relative flex items-center justify-end">
-          <AnimatePresence>
-            {!isOpen && (
-              <motion.div initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                className="absolute right-[calc(100%+12px)] hidden sm:flex items-center pointer-events-none">
-                <div className="bg-white dark:bg-slate-900 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 dark:border-slate-800 flex items-center gap-1.5 min-w-[150px] justify-center relative">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-200 font-sans whitespace-nowrap">{currentPhrase}</span>
-                  <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="w-0.5 h-4 rounded-full" style={{ backgroundColor: THEME_COLOR }} />
-                  <div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white dark:bg-slate-900 border-r border-t border-indigo-100/50 dark:border-slate-800 rotate-45 rounded-sm" />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="relative flex items-center justify-end">
+            <AnimatePresence>
+              {!isOpen && (
+                <motion.div initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                  className="absolute right-[calc(100%+12px)] hidden sm:flex items-center pointer-events-none">
+                  <div className="bg-white dark:bg-slate-900 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 dark:border-slate-800 flex items-center gap-1.5 min-w-[150px] justify-center relative">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-200 font-sans whitespace-nowrap">{currentPhrase}</span>
+                    <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      className="w-0.5 h-4 rounded-full" style={{ backgroundColor: THEME_COLOR }} />
+                    <div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white dark:bg-slate-900 border-r border-t border-indigo-100/50 dark:border-slate-800 rotate-45 rounded-sm" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-            onClick={() => setIsOpen(prev => !prev)}
-            aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
-            style={{ touchAction: 'manipulation', background: 'transparent' }}
-            className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
-            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
-              <defs>
-                <clipPath id="fab-clip"><path d={FAB_PATH} /></clipPath>
-                <filter id="neumorphic-3d-inset" x="-20%" y="-20%" width="140%" height="140%">
-                  <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
-                  <feGaussianBlur stdDeviation="3" /><feOffset dx="4" dy="4" result="offsetBlurDark" />
-                  <feComposite operator="in" in2="SourceAlpha" result="innerShadowDark" />
-                  <feFlood floodColor="rgba(0,0,0,0.14)" />
-                  <feComposite operator="in" in2="innerShadowDark" result="finalDark" />
-                  <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
-                  <feGaussianBlur stdDeviation="3" /><feOffset dx="-3" dy="-3" result="offsetBlurLight" />
-                  <feComposite operator="in" in2="SourceAlpha" result="innerShadowLight" />
-                  <feFlood floodColor="rgba(255,255,255,0.8)" />
-                  <feComposite operator="in" in2="innerShadowLight" result="finalLight" />
-                  <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="finalDark" /><feMergeNode in="finalLight" /></feMerge>
-                </filter>
-                <linearGradient id="fab-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#E2E8F0" />
-                </linearGradient>
-                <linearGradient id="fab-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#1E293B" /><stop offset="100%" stopColor="#0F172A" />
-                </linearGradient>
-                {fabGradient && (
-                  <linearGradient id="sapybase-avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor={fabGradient[0]} /><stop offset="100%" stopColor={fabGradient[1]} />
+            <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              onClick={() => setIsOpen(prev => !prev)}
+              aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
+              style={{ touchAction: 'manipulation', background: 'transparent' }}
+              className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
+                <defs>
+                  <clipPath id="fab-clip"><path d={FAB_PATH} /></clipPath>
+                  <filter id="neumorphic-3d-inset" x="-20%" y="-20%" width="140%" height="140%">
+                    <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+                    <feGaussianBlur stdDeviation="3" /><feOffset dx="4" dy="4" result="offsetBlurDark" />
+                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowDark" />
+                    <feFlood floodColor="rgba(0,0,0,0.14)" />
+                    <feComposite operator="in" in2="innerShadowDark" result="finalDark" />
+                    <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+                    <feGaussianBlur stdDeviation="3" /><feOffset dx="-3" dy="-3" result="offsetBlurLight" />
+                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowLight" />
+                    <feFlood floodColor="rgba(255,255,255,0.8)" />
+                    <feComposite operator="in" in2="innerShadowLight" result="finalLight" />
+                    <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="finalDark" /><feMergeNode in="finalLight" /></feMerge>
+                  </filter>
+                  <linearGradient id="fab-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#E2E8F0" />
                   </linearGradient>
+                  <linearGradient id="fab-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#1E293B" /><stop offset="100%" stopColor="#0F172A" />
+                  </linearGradient>
+                  {fabGradient && (
+                    <linearGradient id="Sapybase-avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor={fabGradient[0]} /><stop offset="100%" stopColor={fabGradient[1]} />
+                    </linearGradient>
+                  )}
+                </defs>
+                <path d={FAB_PATH} fill={fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)'}
+                  className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
+                {LOGO_URL && (
+                  <g clipPath="url(#fab-clip)">
+                    <image href={LOGO_URL}
+                      x={configData.custom_logo_url ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
+                      y={configData.custom_logo_url ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
+                      width={configData.custom_logo_url ? 100 : 70} height={configData.custom_logo_url ? 100 : 70}
+                      preserveAspectRatio="xMidYMid meet" />
+                  </g>
                 )}
-              </defs>
-              <path d={FAB_PATH} fill={fabGradient ? 'url(#sapybase-avatar-grad)' : 'url(#fab-gradient)'}
-                className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
-              {LOGO_URL && (
-                <g clipPath="url(#fab-clip)">
-                  <image href={LOGO_URL}
-                    x={configData.custom_logo_url ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
-                    y={configData.custom_logo_url ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
-                    width={configData.custom_logo_url ? 100 : 70} height={configData.custom_logo_url ? 100 : 70}
-                    preserveAspectRatio="xMidYMid meet" />
-                </g>
-              )}
-              {!LOGO_URL && (
-                <text x={50 + (fabShape.x || 0)} y={52 + (fabShape.y || 0)} textAnchor="middle" dominantBaseline="middle"
-                  fill={fabGradient ? '#ffffff' : THEME_COLOR} className="font-bold select-none pointer-events-none"
-                  style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
-                  {(BOT_NAME || 'S').charAt(0).toUpperCase()}
-                </text>
-              )}
-              <path d={FAB_PATH} fill="transparent" filter="url(#neumorphic-3d-inset)" className="pointer-events-none" />
-              <path d={FAB_PATH} fill="none" stroke="white" strokeWidth="0.8" className="aura-path opacity-30 dark:stroke-slate-500/30" />
-              <path d={FAB_PATH} fill="none" stroke={THEME_COLOR} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20" />
-            </svg>
-          </motion.button>
-        </div>
+                {!LOGO_URL && (
+                  <text x={50 + (fabShape.x || 0)} y={52 + (fabShape.y || 0)} textAnchor="middle" dominantBaseline="middle"
+                    fill={fabGradient ? '#ffffff' : THEME_COLOR} className="font-bold select-none pointer-events-none"
+                    style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
+                    {(BOT_NAME || 'S').charAt(0).toUpperCase()}
+                  </text>
+                )}
+                <path d={FAB_PATH} fill="transparent" filter="url(#neumorphic-3d-inset)" className="pointer-events-none" />
+                <path d={FAB_PATH} fill="none" stroke="white" strokeWidth="0.8" className="aura-path opacity-30 dark:stroke-slate-500/30" />
+                <path d={FAB_PATH} fill="none" stroke={THEME_COLOR} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20" />
+              </svg>
+            </motion.button>
+          </div>
         </div>
       )}
     </div>

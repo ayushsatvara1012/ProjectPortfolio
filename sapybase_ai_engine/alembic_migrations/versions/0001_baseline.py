@@ -9,7 +9,7 @@ FUTURE schema changes are tracked through Alembic from this point forward.
 == How we got here ==
 
 Before Alembic, schema changes were applied via:
-  1. Hand-written SQL files in sapybase_ai_engine/migrations/v8-v22.sql,
+  1. Hand-written SQL files in Sapybase_ai_engine/migrations/v8-v22.sql,
      applied manually via psql against the production database.
   2. Self-healing ALTER TABLE IF NOT EXISTS calls in main.py's
      startup_event for recent additive columns (ai_model, webhook_url,

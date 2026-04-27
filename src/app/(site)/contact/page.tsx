@@ -6,10 +6,10 @@ import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 
 export default function ContactPage() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
-  const [alertConfig, setAlertConfig] = useState<{ open: boolean; type: 'success' | 'error' | 'warning' | 'development'; msg: string }>({ 
-    open: false, 
-    type: 'success', 
-    msg: '' 
+  const [alertConfig, setAlertConfig] = useState<{ open: boolean; type: 'success' | 'error' | 'warning' | 'development'; msg: string }>({
+    open: false,
+    type: 'success',
+    msg: ''
   });
 
   const showError = (event: React.MouseEvent) => {
@@ -101,7 +101,7 @@ export default function ContactPage() {
                     <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Architecture Overview</label>
                     <textarea rows={4} placeholder="Describe your vision..." className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-1 focus:ring-blue-500/50 focus:border-blue-400 transition-colors outline-none resize-none"></textarea>
                   </div>
-                   <button onClick={showDev} type='button' className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:opacity-90 text-md font-display uppercase tracking-widest font-bold text-white px-8 py-5 rounded-none flex items-center justify-center gap-2 transition-all active:scale-[0.99] group">
+                  <button onClick={showDev} type='button' className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:opacity-90 text-md font-display uppercase tracking-widest font-bold text-white px-8 py-5 rounded-none flex items-center justify-center gap-2 transition-all active:scale-[0.99] group">
                     Deploy Message <span className="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">send</span>
                   </button>
                 </form>

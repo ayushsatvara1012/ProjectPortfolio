@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
-const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
+const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.Sapybase.com';
 const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
 
 const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
@@ -166,8 +166,8 @@ const InlineBotPreview = ({ settings, theme = 'light' }: { settings: any; theme?
             {!hideBranding && (
                 <div className={`shrink-0 py-1.5 flex justify-center items-center backdrop-blur-sm ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
                     <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50" />
-                        Powered by SaPyBase
+                        <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 grayscale opacity-50" />
+                        Powered by Sapybase
                     </span>
                 </div>
             )}
@@ -422,7 +422,7 @@ export default function DemoCustomizePage() {
                                     value={settings.name || ''}
                                     onChange={e => updateSetting('name', e.target.value)}
                                     className={inputCls}
-                                    placeholder="SaPyBase AI"
+                                    placeholder="Sapybase AI"
                                 />
                             </div>
                             <div>
@@ -441,10 +441,10 @@ export default function DemoCustomizePage() {
                                 <div className="flex items-start justify-between gap-4 p-4 border border-gray-200 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 transition-colors">
                                     <div className="min-w-0">
                                         <p className="text-md font-semibold font-google text-slate-800 dark:text-slate-200 transition-colors">
-                                            Remove "Powered by SaPyBase" branding
+                                            Remove "Powered by Sapybase" branding
                                         </p>
                                         <p className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
-                                            Hide the SaPyBase footer from your widget.
+                                            Hide the Sapybase footer from your widget.
                                         </p>
                                     </div>
                                     <button
@@ -510,7 +510,7 @@ export default function DemoCustomizePage() {
                                     value={settings.systemPrompt || ''}
                                     onChange={e => updateSetting('systemPrompt', e.target.value)}
                                     className={inputCls + ' min-h-[120px] resize-none py-3'}
-                                    placeholder="Example: You are a helpful assistant for SaPyBase..."
+                                    placeholder="Example: You are a helpful assistant for Sapybase..."
                                 />
                             </div>
 

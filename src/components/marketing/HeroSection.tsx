@@ -16,7 +16,7 @@ const HeroSection = () => {
   const router = useRouter();
   const { isSignedIn } = useUser();
   const { openSignUp } = useClerk();
-  const [view, setView] = useState<'train' | 'configure'>('configure'); 
+  const [view, setView] = useState<'train' | 'configure'>('configure');
   const [botColor, setBotColor] = useState('#0000FF');
   const [isTraining, setIsTraining] = useState(false);
 
@@ -173,7 +173,7 @@ const HeroSection = () => {
                   <div className="w-2.5 h-2.5 bg-[#27C93F] rounded-full" />
                 </div>
                 <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded px-12 py-0.5 text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">
-                  app.sapybase.com
+                  app.Sapybase.com
                 </div>
                 <div className="w-10" />
               </div>
@@ -271,7 +271,7 @@ const HeroSection = () => {
                                 <span className="text-[#FF79C6]">script</span>
                                 <br />
                                 <span className="text-[#50FA7B] ml-2">src</span>
-                                <span className="text-[#F1FA8C]">="https://sapybase.com/widget.js"</span>
+                                <span className="text-[#F1FA8C]">="https://Sapybase.com/widget.js"</span>
                                 <br />
                                 <span className="text-[#50FA7B] ml-2">data-api-key</span>
                                 <span className="text-[#F1FA8C]">="sb_live_0123456789"</span>
@@ -329,7 +329,7 @@ const HeroSection = () => {
                           </div>
                           <div className="w-full aspect-video bg-gray-50 dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 transition-colors">
                             <span className="material-symbols-outlined text-[24px] text-gray-300 dark:text-slate-600">public</span>
-                            <p className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">https://docs.sapybase.com</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 font-medium transition-colors">https://docs.Sapybase.com</p>
                           </div>
                           <button className="w-full py-3 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-500 text-[10px] uppercase tracking-widest font-bold text-white font-sans transition-colors">
                             Start Training Sequence
@@ -386,7 +386,7 @@ const HeroSection = () => {
                   <div className="flex flex-col items-start min-w-0 max-w-[85%] self-start">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">Sapy AI</span>
                     <div className="px-3 py-2 min-h-[36px] w-fit max-w-full bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden text-xs font-google leading-relaxed">
-                      Hi! I'm SaPyBase AI Assistant. How can I help you build your custom software today?
+                      Hi! I'm Sapybase AI Assistant. How can I help you build your custom software today?
                     </div>
                   </div>
 
@@ -421,8 +421,8 @@ const HeroSection = () => {
                 {/* Fixed Branding Footer */}
                 <div className="shrink-0 py-1 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm border-t border-gray-200/50 dark:border-slate-800/50">
                   <div className="flex items-center gap-1.5 text-[5px] font-sans font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                    <img src="/SB_loading.svg" alt="SaPyBase" className="w-3.5 h-3.5 grayscale opacity-50" />
-                    Powered by SaPyBase
+                    <img src="/SB_loading.svg" alt="Sapybase" className="w-3.5 h-3.5 grayscale opacity-50" />
+                    Powered by Sapybase
                   </div>
                 </div>
 

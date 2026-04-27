@@ -9,7 +9,7 @@ load_dotenv()
 
 DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
-COMPANY_ID = os.getenv("SAPYBASE_COMPANY_ID")
+COMPANY_ID = os.getenv("Sapybase_COMPANY_ID")
 
 
 def list_companies():
@@ -24,7 +24,7 @@ def list_companies():
     cursor.close()
     conn.close()
 
-SOURCE_URL = "sapybase.com/core-services"
+SOURCE_URL = "Sapybase.com/core-services"
 
 PARENT_CHUNK_SIZE = 1500
 PARENT_CHUNK_OVERLAP = 150
@@ -35,7 +35,7 @@ CHILD_CHUNK_OVERLAP = 50
 def ingest_knowledge():
     print("Starting Ingestion Pipeline (parent-child chunking)...")
 
-    with open("sapybase_core.md", "r", encoding="utf-8") as file:
+    with open("Sapybase_core.md", "r", encoding="utf-8") as file:
         raw_text = file.read()
 
     parent_splitter = RecursiveCharacterTextSplitter(

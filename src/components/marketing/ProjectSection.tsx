@@ -29,7 +29,7 @@ const projects = [
   },
   {
     id: "03",
-    title: "SaPyBase",
+    title: "Sapybase",
     subtitle: "Agency Identity Core",
     description: "Ultra-modern, Bento-grid architecture engineered to showcase dual technical profiles. Leveraging React 19 and Tailwind v4 for zero-lag mobile responsiveness.",
     github: "https://github.com/ayushsatvara1012/ProjectPortfolio.git",
@@ -57,10 +57,10 @@ const ProjectSection = () => {
   return (
     <section id="projects" className="bg-white dark:bg-slate-950 py-12 overflow-hidden transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 md:px-12">
-        
+
         {/* Tic-Tac-Toe Grid Architecture */}
         <div className="grid grid-cols-1 gap-px bg-gray-200 dark:bg-slate-800 border border-gray-200 dark:border-slate-800 rounded-none overflow-hidden transition-colors duration-500">
-          
+
           {/* 1. SECTION HEADER BLOCK */}
           <div className="bg-white dark:bg-slate-950 p-12 md:p-6 flex flex-col justify-center gap-8 transition-colors duration-500">
             <div className="flex items-center gap-3 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
@@ -69,7 +69,7 @@ const ProjectSection = () => {
             </div>
             <div className="space-y-4">
               <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">
-                Our 
+                Our
                 <span className="text-indigo-600 dark:text-indigo-400"> Work.</span>
               </h2>
               <p className="text-base font-display text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl transition-colors">
@@ -81,12 +81,12 @@ const ProjectSection = () => {
           {/* 2. PROJECT ROWS */}
           {projects.map((project, index) => (
             <div key={project.id} className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-gray-200 dark:bg-slate-800 transition-colors duration-500">
-              
+
               {/* IMAGE CELL */}
               <div className="lg:col-span-4 bg-white dark:bg-slate-950 p-0 relative overflow-hidden h-[300px] lg:h-auto group/img transition-colors duration-500">
-                <img 
-                  src={project.image} 
-                  alt={project.title} 
+                <img
+                  src={project.image}
+                  alt={project.title}
                   className="w-full h-full object-cover grayscale-0 lg:grayscale opacity-90 transition-all duration-700 lg:group-hover/img:grayscale-0 group-hover/img:scale-105"
                 />
                 <div className="absolute top-6 left-6 py-1 px-3 bg-slate-900 dark:bg-indigo-600 text-[10px] uppercase tracking-widest font-bold text-white transition-colors">
@@ -100,7 +100,7 @@ const ProjectSection = () => {
                   <span className="text-green-600 dark:text-emerald-400">{project.icon}</span>
                   <span>{project.status}</span>
                 </div>
-                
+
                 <div className="space-y-4">
                   <h3 className="text-xl md:text-3xl font-display text-slate-900 dark:text-slate-200 transition-transform duration-500 group-hover/content:translate-x-1">
                     {project.title}
@@ -117,17 +117,17 @@ const ProjectSection = () => {
 
               {/* ACTIONS CELL */}
               <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 lg:grid-rows-2 gap-px bg-gray-200 dark:bg-slate-800 transition-colors duration-500">
-                <a 
-                  href={project.github} 
-                  target="_blank"                   rel="noopener noreferrer"
+                <a
+                  href={project.github}
+                  target="_blank" rel="noopener noreferrer"
                   className="bg-white dark:bg-slate-950 dark:text-slate-400 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white dark:hover:text-slate-200 transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
                   <span className="material-symbols-outlined text-[20px] md:text-[32px] opacity-40 group-hover/btn:opacity-100">code</span>
                   <span className="text-md tracking-widest font-display">Source</span>
                 </a>
-                <a 
-                  href={project.launch} 
-                  target="_blank"                   rel="noopener noreferrer"
+                <a
+                  href={project.launch}
+                  target="_blank" rel="noopener noreferrer"
                   className="bg-white dark:bg-slate-950 dark:text-slate-400 hover:bg-blue-800 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-slate-200 transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
                   <span className="material-symbols-outlined text-[20px] md:text-[32px] opacity-40 group-hover/btn:opacity-100">arrow_forward</span>

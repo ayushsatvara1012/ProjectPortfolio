@@ -15,17 +15,17 @@ import { describe, it, expect } from 'vitest';
 // This test ensures they stay in sync.
 
 const LOGOCUSTOMIZER_SHAPE_MAP = {
-    circle:   'rounded-full',
+    circle: 'rounded-full',
     squircle: 'rounded-[2rem]',
-    bento:    'rounded-2xl',
-    sharp:    'rounded-lg',
+    bento: 'rounded-2xl',
+    sharp: 'rounded-lg',
 };
 
 const CHATWIDGET_SHAPE_MAP = {
-    circle:   'rounded-full',
+    circle: 'rounded-full',
     squircle: 'rounded-[2rem]',
-    bento:    'rounded-2xl',
-    sharp:    'rounded-lg',
+    bento: 'rounded-2xl',
+    sharp: 'rounded-lg',
 };
 
 describe('SHAPE_CLASS_MAP Consistency', () => {
@@ -232,7 +232,7 @@ describe('BotAvatar prop contract', () => {
 
 describe('BotSettingsContext v13 data flow', () => {
     const defaultState = {
-        name: 'SaPyBase AI',
+        name: 'Sapybase AI',
         primaryColor: '#5730F5',
         greeting: 'Hi! How can I help you today?',
         quickQuestions: [{ label: 'Pricing', prompt: 'Tell me about pricing' }],
@@ -263,7 +263,7 @@ describe('BotSettingsContext v13 data flow', () => {
         };
 
         const mappedState = {
-            name: apiResponse.bot_name || 'SaPyBase AI',
+            name: apiResponse.bot_name || 'Sapybase AI',
             primaryColor: apiResponse.theme_color || '#5730F5',
             greeting: apiResponse.initial_message || 'Hi! How can I help you today?',
             logoShape: apiResponse.logo_shape || 'circle',
@@ -398,15 +398,15 @@ describe('chatWidget v13 config resolution', () => {
         expect(LOGO_SHAPE).toBe('sharp');
     });
 
-    it('SaPyBaseConfig overrides work for v13 fields', () => {
-        const SaPyBaseConfig = {
+    it('SapybaseConfig overrides work for v13 fields', () => {
+        const SapybaseConfig = {
             logoShape: 'bento',
             customLogoUrl: 'https://my.cdn.com/logo.png',
         };
 
         const DEFAULT_CONFIG = {
-            logo_shape: SaPyBaseConfig.logoShape || 'circle',
-            custom_logo_url: SaPyBaseConfig.customLogoUrl || '',
+            logo_shape: SapybaseConfig.logoShape || 'circle',
+            custom_logo_url: SapybaseConfig.customLogoUrl || '',
         };
 
         expect(DEFAULT_CONFIG.logo_shape).toBe('bento');

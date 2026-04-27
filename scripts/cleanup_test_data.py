@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # 1. Configuration & Constants
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ENV_PATH = os.path.join(BACKEND_DIR, 'sapybase_ai_engine', '.env')
+ENV_PATH = os.path.join(BACKEND_DIR, 'Sapybase_ai_engine', '.env')
 
 def load_environment():
     """Load the production/development environment variables."""
@@ -152,7 +152,7 @@ def cleanup(pattern, dry_run=True, delete_clerk=False):
             conn.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Clean up test user data from SaPyBase production/dev database.")
+    parser = argparse.ArgumentParser(description="Clean up test user data from Sapybase production/dev database.")
     parser.add_argument("--pattern", type=str, help="Email pattern to match (e.g. '%%@test.com')", required=True)
     parser.add_argument("--confirm", action="store_true", help="Run in live mode (destructive!)")
     parser.add_argument("--clerk", action="store_true", help="Also delete users from Clerk Dashboard")

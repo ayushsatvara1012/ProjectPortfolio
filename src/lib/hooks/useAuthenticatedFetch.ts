@@ -52,13 +52,13 @@ export const useAuthenticatedFetch = () => {
         // event so a top-level handler can prompt re-auth or redirect to /sign-in,
         // and throw a typed error so callers can stop their flow.
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('sapybase:auth-required'));
+          window.dispatchEvent(new CustomEvent('Sapybase:auth-required'));
         }
         throw new Error('AUTH_REQUIRED');
       }
       if (res.status === 403) {
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('sapybase:forbidden'));
+          window.dispatchEvent(new CustomEvent('Sapybase:forbidden'));
         }
         throw new Error('FORBIDDEN');
       }

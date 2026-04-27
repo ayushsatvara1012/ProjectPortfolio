@@ -1,39 +1,39 @@
 export const seoConfig = {
   home: {
-    title: "SaPyBase | Autonomous AI Chatbots for Modern Business",
+    title: "Sapybase | Autonomous AI Chatbots for Modern Business",
     description:
-      "Automate your customer support and sales with SaPyBase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.",
-    canonical: "https://www.sapybase.com/",
+      "Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.",
+    canonical: "https://www.Sapybase.com/",
   },
   about: {
-    title: "About SaPyBase | The Future of Autonomous AI Agents",
+    title: "About Sapybase | The Future of Autonomous AI Agents",
     description:
-      "SaPyBase is an engineering studio dedicated to building autonomous AI infrastructure. We simplify complex AI integration for businesses of all sizes, ensuring speed and reliability.",
-    canonical: "https://www.sapybase.com/about",
+      "Sapybase is an engineering studio dedicated to building autonomous AI infrastructure. We simplify complex AI integration for businesses of all sizes, ensuring speed and reliability.",
+    canonical: "https://www.Sapybase.com/about",
   },
   contact: {
-    title: "Build Your AI Bot | Contact SaPyBase",
+    title: "Build Your AI Bot | Contact Sapybase",
     description:
-      "Ready to automate? Contact SaPyBase for a consultation on deploying custom AI chatbots for your business. Scalable, intelligent, and production-ready solutions.",
-    canonical: "https://www.sapybase.com/contact",
+      "Ready to automate? Contact Sapybase for a consultation on deploying custom AI chatbots for your business. Scalable, intelligent, and production-ready solutions.",
+    canonical: "https://www.Sapybase.com/contact",
   },
   services: {
-    title: "AI Chatbot Solutions & Custom Integration | SaPyBase",
+    title: "AI Chatbot Solutions & Custom Integration | Sapybase",
     description:
-      "Explore SaPyBase AI-driven solutions: from custom LLM training (RAG) to seamless multi-platform integration. Build intelligent systems that grow with your business.",
-    canonical: "https://www.sapybase.com/services",
+      "Explore Sapybase AI-driven solutions: from custom LLM training (RAG) to seamless multi-platform integration. Build intelligent systems that grow with your business.",
+    canonical: "https://www.Sapybase.com/services",
   },
   privacy: {
-    title: "Privacy Policy | SaPyBase",
+    title: "Privacy Policy | Sapybase",
     description:
-      "Read the SaPyBase privacy policy to understand how we collect, use, and protect your personal information.",
-    canonical: "https://www.sapybase.com/privacy-policy",
+      "Read the Sapybase privacy policy to understand how we collect, use, and protect your personal information.",
+    canonical: "https://www.Sapybase.com/privacy-policy",
   },
   terms: {
-    title: "Terms & Conditions | SaPyBase",
+    title: "Terms & Conditions | Sapybase",
     description:
-      "Review the SaPyBase terms and conditions governing use of our services, intellectual property, and service agreements.",
-    canonical: "https://www.sapybase.com/terms-and-conditions",
+      "Review the Sapybase terms and conditions governing use of our services, intellectual property, and service agreements.",
+    canonical: "https://www.Sapybase.com/terms-and-conditions",
   },
 };
 

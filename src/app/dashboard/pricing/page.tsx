@@ -8,9 +8,9 @@ import { useUserRole } from '@/src/lib/context/UserContext';
 import Alert from '@/src/app/components/Alert';
 
 const POLAR_URLS: Record<string, string | undefined> = {
-    BASIC:    process.env.NEXT_PUBLIC_POLAR_BASIC_URL,
-    STARTER:  process.env.NEXT_PUBLIC_POLAR_STARTER_URL,
-    PRO:      process.env.NEXT_PUBLIC_POLAR_PRO_URL,
+    BASIC: process.env.NEXT_PUBLIC_POLAR_BASIC_URL,
+    STARTER: process.env.NEXT_PUBLIC_POLAR_STARTER_URL,
+    PRO: process.env.NEXT_PUBLIC_POLAR_PRO_URL,
     BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_URL,
 };
 
@@ -44,9 +44,9 @@ const AppPricing = () => {
     };
 
     const PRICE_MATRIX = {
-        BASIC:    { USD: 9,  INR: 749  },
-        STARTER:  { USD: 19, INR: 1599 },
-        PRO:      { USD: 49, INR: 3999 },
+        BASIC: { USD: 9, INR: 749 },
+        STARTER: { USD: 19, INR: 1599 },
+        PRO: { USD: 49, INR: 3999 },
         BUSINESS: { USD: 99, INR: 7999 },
     };
 
@@ -127,7 +127,7 @@ const AppPricing = () => {
                 { label: '500 messages / month' },
                 { label: '100 knowledge chunks' },
                 { label: 'Standard response speed' },
-                { label: 'SaPyBase branding' },
+                { label: 'Sapybase branding' },
                 { label: 'Basic analytics' },
                 { label: 'Community support' },
             ],
@@ -396,14 +396,14 @@ const AppPricing = () => {
                                 <p className="text-[9px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-4">Fully configurable add-ons</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                                     {[
-                                        { icon: 'smart_toy',          label: 'Custom bot count',      sub: 'From 1 to unlimited' },
-                                        { icon: 'forum',              label: 'Custom message quota',  sub: 'Per-month cap you choose' },
-                                        { icon: 'storage',            label: 'Knowledge chunks',      sub: 'Scale your data store' },
-                                        { icon: 'auto_awesome',       label: 'Gemini model choice',   sub: 'Flash-Lite → Pro Preview' },
-                                        { icon: 'support_agent',      label: 'Human handoff',         sub: 'Transcript + URL' },
-                                        { icon: 'contact_mail',       label: 'Lead capture',          sub: 'CRM-ready visitor data' },
-                                        { icon: 'branding_watermark', label: 'White label',           sub: 'Remove SaPyBase branding' },
-                                        { icon: 'webhook',            label: 'Webhook / Zapier',      sub: 'Connect any platform' },
+                                        { icon: 'smart_toy', label: 'Custom bot count', sub: 'From 1 to unlimited' },
+                                        { icon: 'forum', label: 'Custom message quota', sub: 'Per-month cap you choose' },
+                                        { icon: 'storage', label: 'Knowledge chunks', sub: 'Scale your data store' },
+                                        { icon: 'auto_awesome', label: 'Gemini model choice', sub: 'Flash-Lite → Pro Preview' },
+                                        { icon: 'support_agent', label: 'Human handoff', sub: 'Transcript + URL' },
+                                        { icon: 'contact_mail', label: 'Lead capture', sub: 'CRM-ready visitor data' },
+                                        { icon: 'branding_watermark', label: 'White label', sub: 'Remove Sapybase branding' },
+                                        { icon: 'webhook', label: 'Webhook / Zapier', sub: 'Connect any platform' },
                                     ].map((f, i) => (
                                         <div key={i} className="flex items-start gap-2.5">
                                             <div className="w-6 h-6 shrink-0 mt-0.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 flex items-center justify-center">

@@ -7,10 +7,10 @@ import Services from '@/src/components/marketing/Services';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 
 export const metadata: Metadata = {
-  title: "SaPyBase | Autonomous AI Chatbots for Modern Business",
-  description: "Automate your customer support and sales with SaPyBase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.",
+  title: "Sapybase | Autonomous AI Chatbots for Modern Business",
+  description: "Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.",
   alternates: {
-    canonical: "https://www.sapybase.com/",
+    canonical: "https://www.Sapybase.com/",
   },
 };
 
@@ -20,20 +20,20 @@ export default function HomePage() {
     "@graph": [
       {
         "@type": "Organization",
-        "@id": "https://www.sapybase.com/#organization",
-        "name": "SaPyBase",
-        "url": "https://www.sapybase.com",
+        "@id": "https://www.Sapybase.com/#organization",
+        "name": "Sapybase",
+        "url": "https://www.Sapybase.com",
         "logo": {
           "@type": "ImageObject",
-          "url": "https://www.sapybase.com/SB_Brand-removebg.png"
+          "url": "https://www.Sapybase.com/SB_Brand-removebg.png"
         }
       },
       {
         "@type": "SoftwareApplication",
-        "name": "SaPyBase AI Chatbot",
+        "name": "Sapybase AI Chatbot",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
-        "url": "https://www.sapybase.com",
+        "url": "https://www.Sapybase.com",
         "description": "Autonomous AI chatbots and agents for modern businesses. Connect documents and databases to automate customer support and sales.",
         "offers": {
           "@type": "Offer",

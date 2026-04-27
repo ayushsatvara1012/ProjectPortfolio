@@ -6,7 +6,7 @@ report comparing the actual database against what migrations/v8-v22 SQL
 files plus the startup_event ALTER TABLE block expect to exist.
 
 Usage:
-    cd sapybase_ai_engine
+    cd Sapybase_ai_engine
     source venv/bin/activate
     export DATABASE_URL="<your prod URL>"   # already in .env
     python scripts/schema_audit.py > migrations/SCHEMA_AUDIT_$(date +%Y-%m-%d).md

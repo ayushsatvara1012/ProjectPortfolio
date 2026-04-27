@@ -3,8 +3,8 @@ import { Gavel, AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Terms & Conditions | SaPyBase',
-  description: 'Terms of service and subscription agreement for SaPyBase.',
+  title: 'Terms & Conditions | Sapybase',
+  description: 'Terms of service and subscription agreement for Sapybase.',
 };
 
 const LAST_UPDATED = 'April 26, 2026';
@@ -53,23 +53,23 @@ export default function TermsAndConditionsPage() {
 
           <Section num="01" title="Agreement to Terms">
             <p>
-              By creating an account or using any part of the SaPyBase platform (&ldquo;Service&rdquo;), you agree to be
+              By creating an account or using any part of the Sapybase platform (&ldquo;Service&rdquo;), you agree to be
               bound by these Terms &amp; Conditions. If you do not agree, do not use the Service.
             </p>
             <p>
-              SaPyBase is operated by Ayush Satvara, based in Jersey City, New Jersey, United States
+              Sapybase is operated by Ayush Satvara, based in Jersey City, New Jersey, United States
               (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;). &ldquo;You&rdquo; refers to the individual or business that
-              created a SaPyBase account.
+              created a Sapybase account.
             </p>
           </Section>
 
           <Section num="02" title="The Service">
             <p>
-              SaPyBase is a SaaS platform that lets you create, train, and deploy AI-powered chatbots on your
+              Sapybase is a SaaS platform that lets you create, train, and deploy AI-powered chatbots on your
               website or app. Features available to you depend on your subscription plan. Current plan details
               and pricing are published at{' '}
               <Link href="/pricing" className="text-indigo-600 dark:text-indigo-400 underline">
-                sapybase.com/pricing
+                Sapybase.com/pricing
               </Link>.
             </p>
             <p>
@@ -116,7 +116,7 @@ export default function TermsAndConditionsPage() {
 
           <Section num="04" title="Refund Policy">
             <p>
-              We want you to be satisfied with SaPyBase. If you experience an issue with the Service, you
+              We want you to be satisfied with Sapybase. If you experience an issue with the Service, you
               may request a refund by emailing{' '}
               <a
                 href={`mailto:${CONTACT_EMAIL}?subject=Refund%20Request`}
@@ -132,7 +132,7 @@ export default function TermsAndConditionsPage() {
             <ul className="list-disc pl-6 space-y-2">
               <li>A description of the issue you experienced.</li>
               <li>Supporting evidence (screenshots, error messages, or relevant details).</li>
-              <li>The email address associated with your SaPyBase account.</li>
+              <li>The email address associated with your Sapybase account.</li>
             </ul>
             <p>
               We review each request individually and will respond within 5 business days. Refunds granted
@@ -147,7 +147,7 @@ export default function TermsAndConditionsPage() {
           </Section>
 
           <Section num="05" title="Acceptable Use">
-            <p>You agree not to use SaPyBase to:</p>
+            <p>You agree not to use Sapybase to:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>Violate any applicable law or regulation.</li>
               <li>Distribute spam, malware, or unsolicited commercial communications.</li>
@@ -166,7 +166,7 @@ export default function TermsAndConditionsPage() {
 
           <Section num="06" title="AI-Generated Content and Knowledge Ingestion">
             <p>
-              SaPyBase uses Google&apos;s Gemini API to generate bot responses. AI-generated content may be
+              Sapybase uses Google&apos;s Gemini API to generate bot responses. AI-generated content may be
               inaccurate, incomplete, or inappropriate. You are responsible for configuring your bot&apos;s
               knowledge base and system prompt, and for the outputs your bot produces to your end-users.
             </p>
@@ -182,12 +182,12 @@ export default function TermsAndConditionsPage() {
 
           <Section num="07" title="Intellectual Property">
             <p>
-              The SaPyBase platform, branding, and underlying code are owned by SaPyBase and protected by
+              The Sapybase platform, branding, and underlying code are owned by Sapybase and protected by
               applicable intellectual property law. You retain full ownership of the content you upload to
               your knowledge base and the bot configurations you create.
             </p>
             <p>
-              You grant SaPyBase a limited, non-exclusive licence to store, process, and transmit your
+              You grant Sapybase a limited, non-exclusive licence to store, process, and transmit your
               content solely to operate the Service on your behalf. We do not claim ownership of your content
               and will not use it for purposes outside the Service.
             </p>
@@ -195,19 +195,19 @@ export default function TermsAndConditionsPage() {
 
           <Section num="08" title="Limitation of Liability">
             <p>
-              To the maximum extent permitted by law, SaPyBase and its operator shall not be liable for any
+              To the maximum extent permitted by law, Sapybase and its operator shall not be liable for any
               indirect, incidental, special, consequential, or punitive damages arising from your use of the
               Service, including but not limited to loss of profits, data, or business opportunities.
             </p>
             <p>
               Our total liability to you for any claim arising under these Terms shall not exceed the amount
-              you paid to SaPyBase in the 3 months preceding the claim.
+              you paid to Sapybase in the 3 months preceding the claim.
             </p>
           </Section>
 
           <Section num="09" title="Indemnification">
             <p>
-              You agree to defend, indemnify, and hold harmless SaPyBase and its operator from and against
+              You agree to defend, indemnify, and hold harmless Sapybase and its operator from and against
               any claims, damages, or costs (including legal fees) arising from: (i) your use of the Service,
               (ii) content you ingest or deploy through your bots, (iii) your violation of these Terms, or
               (iv) your violation of any third-party right.

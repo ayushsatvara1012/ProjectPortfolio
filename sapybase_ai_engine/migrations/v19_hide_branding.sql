@@ -1,5 +1,5 @@
 -- v19: Add hide_branding column to companies table
--- Allows STARTER+ users to remove "Powered by SaPyBase" footer from the widget.
+-- Allows STARTER+ users to remove "Powered by Sapybase" footer from the widget.
 -- Defaults to FALSE so existing bots are unaffected until the user explicitly toggles it.
 
 ALTER TABLE companies

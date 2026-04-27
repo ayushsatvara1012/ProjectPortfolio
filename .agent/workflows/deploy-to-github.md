@@ -1,5 +1,5 @@
 ---
-description: How to build and push the SaPyBase Chat Widget to GitHub
+description: How to build and push the Sapybase Chat Widget to GitHub
 ---
 
 Follow these steps to ensure all your latest dynamic configuration and backend changes are uploaded to your GitHub repository.
@@ -15,7 +15,7 @@ Follow these steps to ensure all your latest dynamic configuration and backend c
    Add both the frontend and backend files:  
    `// turbo`
    ```bash
-   git add src/components/chatWidget.jsx sapybase_ai_engine/main.py sapybase_ai_engine/migrate_v2.py index.html package.json vercel.json dist-widget/ public/
+   git add src/components/chatWidget.jsx Sapybase_ai_engine/main.py Sapybase_ai_engine/migrate_v2.py index.html package.json vercel.json dist-widget/ public/
    ```
 
 3. **Commit with a Descriptive Message**  

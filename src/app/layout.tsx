@@ -25,15 +25,15 @@ export const metadata: Metadata = {
     'Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Built for modern businesses seeking intelligent automation.',
   authors: [{ name: 'Sapybase Engineering' }],
   robots: 'index, follow',
-  metadataBase: new URL('https://www.sapybase.com'),
+  metadataBase: new URL('https://www.Sapybase.com'),
   alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
-    url: 'https://www.sapybase.com',
+    url: 'https://www.Sapybase.com',
     title: 'Sapybase | Autonomous AI Chatbots for Modern Business',
     description:
       'Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes.',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    images: ['https://www.Sapybase.com/SB_Brand-removebg.png'],
   },
   icons: {
     icon: [

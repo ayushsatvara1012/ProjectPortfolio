@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Pricing — SaPyBase',
+  title: 'Pricing — Sapybase',
   description: 'Simple, scalable pricing for AI chatbots. Free, Basic, Starter, Pro, and Enterprise plans with per-bot message and knowledge limits.',
   openGraph: {
-    title: 'Pricing — SaPyBase',
+    title: 'Pricing — Sapybase',
     description: 'Plans built for indie hackers and growing teams. Compare features and choose the tier that fits.',
   },
 };

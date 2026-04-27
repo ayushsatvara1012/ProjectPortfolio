@@ -42,7 +42,7 @@ const TOKEN_OPTIONS = [
 const FEATURE_FLAGS = [
   { key: 'human_handoff', label: 'Human Handoff', icon: 'support_agent', desc: 'Talk-to-human button + transcript email' },
   { key: 'lead_capture', label: 'Lead Capture', icon: 'contact_mail', desc: 'Collect visitor email/name in widget' },
-  { key: 'white_label', label: 'White Label', icon: 'branding_watermark', desc: 'Remove "Powered by SaPyBase"' },
+  { key: 'white_label', label: 'White Label', icon: 'branding_watermark', desc: 'Remove "Powered by Sapybase"' },
   { key: 'webhook', label: 'Webhooks', icon: 'webhook', desc: 'Zapier / Make integration' },
   { key: 'custom_logo', label: 'Custom Logo', icon: 'image', desc: 'Upload own logo URL' },
   { key: 'analytics', label: 'Analytics', icon: 'bar_chart', desc: 'Insights & ROI reports' },
@@ -231,7 +231,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       const parsed = customPlanConfigSchema.safeParse(candidate);
       if (!parsed.success) {
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('sapybase:toast', {
+          window.dispatchEvent(new CustomEvent('Sapybase:toast', {
             detail: { kind: 'error', message: parsed.error.issues[0]?.message || 'Invalid plan config.' },
           }));
         }

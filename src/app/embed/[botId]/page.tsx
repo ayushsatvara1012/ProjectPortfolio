@@ -16,13 +16,13 @@ export default function EmbedPage() {
     })();
     if (!parentOrigin) return;
 
-    // Expose to ChatWidget so backend requests can carry x-sapybase-parent-origin.
-    (window as unknown as { __sapybaseParentOrigin?: string }).__sapybaseParentOrigin = parentOrigin;
+    // Expose to ChatWidget so backend requests can carry x-Sapybase-parent-origin.
+    (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin = parentOrigin;
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         window.parent.postMessage(
-          { type: 'sapybase:resize', height: entry.contentRect.height },
+          { type: 'Sapybase:resize', height: entry.contentRect.height },
           parentOrigin
         );
       }

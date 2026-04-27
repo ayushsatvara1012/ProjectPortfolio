@@ -238,11 +238,11 @@ describe('NEXT_PUBLIC_ environment variables', () => {
     expect(typeof process.env.NEXT_PUBLIC_API_URL).toBe('string');
   });
 
-  it('NEXT_PUBLIC_SAPYBASE_API_KEY is defined when set in env', () => {
+  it('NEXT_PUBLIC_Sapybase_API_KEY is defined when set in env', () => {
     // Vitest does not auto-load .env.local — the key is injected via vitest.config.ts
     // or must be present in process.env at test time. We assert the pattern: if set,
     // it must be a non-empty string starting with "sb_".
-    const key = process.env.NEXT_PUBLIC_SAPYBASE_API_KEY;
+    const key = process.env.NEXT_PUBLIC_Sapybase_API_KEY;
     if (key !== undefined) {
       expect(key.length).toBeGreaterThan(0);
       expect(key.startsWith('sb_')).toBe(true);
@@ -256,14 +256,14 @@ describe('NEXT_PUBLIC_ environment variables', () => {
 // ── 5. EmbedPage ResizeObserver postMessage ───────────────────────────────────
 
 describe('EmbedPage ResizeObserver postMessage bridge', () => {
-  it('posts sapybase:resize message with height when body resizes', () => {
+  it('posts Sapybase:resize message with height when body resizes', () => {
     const postMessageSpy = vi.spyOn(window.parent, 'postMessage');
 
     // The global ResizeObserver stub in setup.ts exposes a `.trigger()` method
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         window.parent.postMessage(
-          { type: 'sapybase:resize', height: entry.contentRect.height },
+          { type: 'Sapybase:resize', height: entry.contentRect.height },
           '*'
         );
       }
@@ -274,7 +274,7 @@ describe('EmbedPage ResizeObserver postMessage bridge', () => {
     (observer as any).trigger([{ contentRect: { height: 650 } }] as any);
 
     expect(postMessageSpy).toHaveBeenCalledWith(
-      { type: 'sapybase:resize', height: 650 },
+      { type: 'Sapybase:resize', height: 650 },
       '*'
     );
 
@@ -297,9 +297,9 @@ describe('EmbedPage ResizeObserver postMessage bridge', () => {
 
 describe('SSR safety: module-level browser access', () => {
   it('FloatingBotWidget reads env at runtime, not module scope', () => {
-    // NEXT_PUBLIC_SAPYBASE_API_KEY must be accessed via process.env at render time
+    // NEXT_PUBLIC_Sapybase_API_KEY must be accessed via process.env at render time
     // not stored in a module-level const that would run on the server
-    const key = process.env.NEXT_PUBLIC_SAPYBASE_API_KEY ?? '';
+    const key = process.env.NEXT_PUBLIC_Sapybase_API_KEY ?? '';
     // If it were server-inaccessible, this would throw. It must not.
     expect(typeof key).toBe('string');
   });

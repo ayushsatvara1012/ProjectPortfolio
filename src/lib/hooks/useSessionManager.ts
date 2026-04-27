@@ -15,7 +15,7 @@ const useSessionManager = () => {
     useEffect(() => {
         if (!isUserLoaded || !isSessionLoaded) return;
 
-        const SESSION_KEY = 'sapybase_session_active';
+        const SESSION_KEY = 'Sapybase_session_active';
         const isSessionActive = sessionStorage.getItem(SESSION_KEY);
 
         if (isSignedIn && session) {

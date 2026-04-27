@@ -181,10 +181,10 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }: LeadsPanel
                         <table className="w-full text-left border-collapse min-w-[800px]">
                             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900/90 shadow-sm transition-colors border-b border-gray-100 dark:border-slate-800 backdrop-blur-sm">
                                 <tr>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50">Contact Info</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-1/3">Context / Query</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-32">Captured At</th>
-                                    <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-24">Action</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[40%]">Contact Info</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[40%]">Context / Query</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[15%]">Captured At</th>
+                                    <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-[5%]">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
@@ -202,7 +202,7 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }: LeadsPanel
                                             </p>
                                         </td>
                                         <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
-                                            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                            <span className="text-sm font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                                 {new Date(lead.created_at).toLocaleDateString()}
                                                 <br/>
                                                 {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

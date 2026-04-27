@@ -2,12 +2,12 @@
   'use strict';
 
   // Fix #2: double-mount guard — if script is loaded twice, bail out early
-  if (customElements.get('sapybase-widget')) return;
+  if (customElements.get('Sapybase-widget')) return;
 
   const IFRAME_ORIGIN =
     typeof window !== 'undefined' && window.location.hostname === 'localhost'
       ? 'http://localhost:3000'
-      : 'https://www.sapybase.com';
+      : 'https://www.Sapybase.com';
 
   class SapybaseWidget extends HTMLElement {
     constructor() {
@@ -27,10 +27,10 @@
       const botId =
         this.getAttribute('data-bot-id') ||
         this.getAttribute('bot-id') ||
-        (window.SaPyBaseConfig && window.SaPyBaseConfig.apiKey);
+        (window.SapybaseConfig && window.SapybaseConfig.apiKey);
 
       if (!botId) {
-        console.error('[SaPyBase] No data-bot-id provided.');
+        console.error('[Sapybase] No data-bot-id provided.');
         return;
       }
 
@@ -53,15 +53,15 @@
     // 2. FAQPage: fetched per-bot from the backend. This is the block that
     //    actually helps the merchant rank in AI Overviews / SGE answer cards.
     _injectSEO(botId) {
-      if (document.querySelector('script[data-sapybase-seo]')) return;
+      if (document.querySelector('script[data-Sapybase-seo]')) return;
 
       var appScript = document.createElement('script');
       appScript.type = 'application/ld+json';
-      appScript.dataset.sapybaseSeo = 'true';
+      appScript.dataset.SapybaseSeo = 'true';
       appScript.textContent = JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebApplication',
-        name: 'SaPyBase AI Assistant',
+        name: 'Sapybase AI Assistant',
         url: IFRAME_ORIGIN + '/embed/' + botId,
         applicationCategory: 'CustomerSupportApplication',
         operatingSystem: 'Web',
@@ -80,7 +80,7 @@
             if (!data || !Array.isArray(data.faqs) || data.faqs.length === 0) return;
             var faqScript = document.createElement('script');
             faqScript.type = 'application/ld+json';
-            faqScript.dataset.sapybaseFaq = 'true';
+            faqScript.dataset.SapybaseFaq = 'true';
             faqScript.textContent = JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'FAQPage',
@@ -101,7 +101,7 @@
     _render(position) {
       const isLeft = position === 'bottom-left';
       const themeColor =
-        (window.SaPyBaseConfig && window.SaPyBaseConfig.themeColor) || '#5730F5';
+        (window.SapybaseConfig && window.SapybaseConfig.themeColor) || '#5730F5';
 
       const style = document.createElement('style');
       style.textContent = [
@@ -190,10 +190,10 @@
         this._label.style.display = 'none';
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
-        this._postToIframe({ type: 'sapybase:visibility', open: true });
+        this._postToIframe({ type: 'Sapybase:visibility', open: true });
       } else {
         this._wrap.classList.remove('open');
-        this._postToIframe({ type: 'sapybase:visibility', open: false });
+        this._postToIframe({ type: 'Sapybase:visibility', open: false });
       }
     }
 
@@ -202,7 +202,7 @@
       iframe.src =
         IFRAME_ORIGIN + '/embed/' + this._botId +
         '#parentOrigin=' + encodeURIComponent(window.location.origin);
-      iframe.title = 'SaPyBase AI Chat';
+      iframe.title = 'Sapybase AI Chat';
       iframe.loading = 'lazy';
       iframe.referrerPolicy = 'strict-origin-when-cross-origin';
       iframe.allow = 'clipboard-write';
@@ -217,7 +217,7 @@
       }
     }
 
-    // Fix #5 (loader side): handle sapybase:resize from embed page + sapybase:close
+    // Fix #5 (loader side): handle Sapybase:resize from embed page + Sapybase:close
     _listenForMessages() {
       window.addEventListener('message', (e) => {
         // Pin to OUR iframe's window and exact origin — no host-page or wildcard fallbacks.
@@ -226,14 +226,14 @@
         const data = e.data;
         if (!data || typeof data !== 'object') return;
 
-        if (data.type === 'sapybase:resize' && Number.isFinite(data.height)) {
+        if (data.type === 'Sapybase:resize' && Number.isFinite(data.height)) {
           if (this._wrap) {
             const safeH = Math.max(200, Math.min(data.height, window.innerHeight - 120, 800));
             this._wrap.style.height = safeH + 'px';
           }
         }
 
-        if (data.type === 'sapybase:close') {
+        if (data.type === 'Sapybase:close') {
           this._open = false;
           if (this._wrap) this._wrap.classList.remove('open');
         }
@@ -241,14 +241,14 @@
     }
   }
 
-  customElements.define('sapybase-widget', SapybaseWidget);
+  customElements.define('Sapybase-widget', SapybaseWidget);
 
   // Auto-mount from <script data-bot-id="..."> tag
   var currentScript = document.currentScript;
   if (currentScript) {
     var botId = currentScript.getAttribute('data-bot-id');
-    if (botId && !document.querySelector('sapybase-widget')) {
-      var el = document.createElement('sapybase-widget');
+    if (botId && !document.querySelector('Sapybase-widget')) {
+      var el = document.createElement('Sapybase-widget');
       el.setAttribute('data-bot-id', botId);
       var pos = currentScript.getAttribute('data-position');
       if (pos) el.setAttribute('data-position', pos);
@@ -257,7 +257,7 @@
       // WP cookie banners / sticky CTAs often share max z-index 2147483647;
       // when z-index ties, last-in-DOM wins. Re-append after load so we sit
       // on top of late-injected overlays.
-      var reseat = function () { try { document.body.appendChild(el); } catch (e) {} };
+      var reseat = function () { try { document.body.appendChild(el); } catch (e) { } };
       if (document.readyState === 'complete') setTimeout(reseat, 1500);
       else window.addEventListener('load', function () { setTimeout(reseat, 1500); });
     }

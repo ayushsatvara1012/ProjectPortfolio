@@ -7,7 +7,7 @@
  *
  * Covers:
  * 1. sanitizeStreamMarkdown — stream-safe markdown repair
- * 2. Config resolution — SaPyBaseConfig override precedence
+ * 2. Config resolution — SapybaseConfig override precedence
  * 3. AVATAR_GRADIENTS / FAB_SHAPES catalog completeness
  * 4. Typewriter buffer logic — drain contract
  * 5. Lead capture trigger detection

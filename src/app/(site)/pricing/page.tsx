@@ -9,9 +9,9 @@ import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const PRICE_MATRIX = {
-  BASIC:    { USD: 9,  INR: 749 },
-  STARTER:  { USD: 19, INR: 1599 },
-  PRO:      { USD: 49, INR: 3999 },
+  BASIC: { USD: 9, INR: 749 },
+  STARTER: { USD: 19, INR: 1599 },
+  PRO: { USD: 49, INR: 3999 },
   BUSINESS: { USD: 99, INR: 7999 },
 };
 
@@ -36,7 +36,7 @@ const PLANS = [
       '500 messages / month',
       '100 knowledge chunks',
       'Standard response speed',
-      'SaPyBase branding',
+      'Sapybase branding',
       'Basic analytics',
       'Community support',
     ],
@@ -104,27 +104,35 @@ const PLANS = [
 ];
 
 const COMPARISON_FEATURES = [
-  { category: 'Bots & Capacity', rows: [
-    { label: 'AI Bots', basic: '1', starter: '2', pro: '5', business: '15' },
-    { label: 'Messages / bot / month', basic: '500', starter: '2,000', pro: '5,000', business: '15,000' },
-    { label: 'Knowledge chunks / bot', basic: '100', starter: '500', pro: '2,000', business: '10,000' },
-    { label: 'Response speed', basic: 'Standard', starter: 'Priority', pro: 'Dedicated', business: 'Ultra' },
-  ]},
-  { category: 'Branding & Customization', rows: [
-    { label: 'Custom branding & colors', basic: false, starter: true, pro: true, business: true },
-    { label: 'White-label (remove SaPyBase)', basic: false, starter: false, pro: true, business: true },
-    { label: 'Human handoff', basic: false, starter: false, pro: false, business: true },
-  ]},
-  { category: 'Integrations', rows: [
-    { label: 'Lead capture / CRM', basic: false, starter: 'Basic', pro: 'Full CRM', business: 'Full CRM' },
-    { label: 'Webhooks & Zapier', basic: false, starter: false, pro: true, business: true },
-    { label: 'Analytics & exports', basic: 'Basic', starter: 'Standard', pro: 'Advanced + CSV', business: 'Full + ROI' },
-  ]},
-  { category: 'Support & SLA', rows: [
-    { label: 'Support channel', basic: 'Community', starter: 'Priority email', pro: 'SLA email', business: 'Dedicated SLA' },
-    { label: 'Onboarding call', basic: false, starter: false, pro: false, business: true },
-    { label: 'Guaranteed uptime SLA', basic: false, starter: false, pro: true, business: true },
-  ]},
+  {
+    category: 'Bots & Capacity', rows: [
+      { label: 'AI Bots', basic: '1', starter: '2', pro: '5', business: '15' },
+      { label: 'Messages / bot / month', basic: '500', starter: '2,000', pro: '5,000', business: '15,000' },
+      { label: 'Knowledge chunks / bot', basic: '100', starter: '500', pro: '2,000', business: '10,000' },
+      { label: 'Response speed', basic: 'Standard', starter: 'Priority', pro: 'Dedicated', business: 'Ultra' },
+    ]
+  },
+  {
+    category: 'Branding & Customization', rows: [
+      { label: 'Custom branding & colors', basic: false, starter: true, pro: true, business: true },
+      { label: 'White-label (remove Sapybase)', basic: false, starter: false, pro: true, business: true },
+      { label: 'Human handoff', basic: false, starter: false, pro: false, business: true },
+    ]
+  },
+  {
+    category: 'Integrations', rows: [
+      { label: 'Lead capture / CRM', basic: false, starter: 'Basic', pro: 'Full CRM', business: 'Full CRM' },
+      { label: 'Webhooks & Zapier', basic: false, starter: false, pro: true, business: true },
+      { label: 'Analytics & exports', basic: 'Basic', starter: 'Standard', pro: 'Advanced + CSV', business: 'Full + ROI' },
+    ]
+  },
+  {
+    category: 'Support & SLA', rows: [
+      { label: 'Support channel', basic: 'Community', starter: 'Priority email', pro: 'SLA email', business: 'Dedicated SLA' },
+      { label: 'Onboarding call', basic: false, starter: false, pro: false, business: true },
+      { label: 'Guaranteed uptime SLA', basic: false, starter: false, pro: true, business: true },
+    ]
+  },
 ];
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -209,14 +217,14 @@ export default function PricingPage() {
     val === 0
       ? 'Free'
       : new Intl.NumberFormat(CURRENCIES[currency].locale, {
-          style: 'currency', currency,
-          minimumFractionDigits: val % 1 === 0 ? 0 : 1,
-        }).format(billingPeriod === 'annual' ? Math.round(val * 0.9) : val);
+        style: 'currency', currency,
+        minimumFractionDigits: val % 1 === 0 ? 0 : 1,
+      }).format(billingPeriod === 'annual' ? Math.round(val * 0.9) : val);
 
   const accentMap = {
-    slate:   { border: 'border-slate-200 dark:border-slate-700', top: 'border-t-slate-400', icon: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', badge: '', btn: 'border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900', colBg: 'bg-slate-50/60 dark:bg-slate-800/20' },
-    blue:    { border: 'border-blue-200 dark:border-blue-800', top: 'border-t-blue-500', icon: 'bg-gradient-to-br from-blue-600 to-green-600 text-white shadow-lg shadow-blue-500/20', badge: 'bg-gradient-to-r from-blue-600 to-green-600', btn: 'bg-gradient-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-lg shadow-blue-500/10', colBg: 'bg-blue-50/60 dark:bg-blue-900/15' },
-    indigo:  { border: 'border-indigo-200 dark:border-indigo-800', top: 'border-t-indigo-500', icon: 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-lg shadow-indigo-500/20', badge: 'bg-gradient-to-r from-indigo-600 to-blue-600', btn: 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:opacity-90 shadow-lg shadow-indigo-500/10', colBg: 'bg-indigo-50/60 dark:bg-indigo-900/15' },
+    slate: { border: 'border-slate-200 dark:border-slate-700', top: 'border-t-slate-400', icon: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', badge: '', btn: 'border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900', colBg: 'bg-slate-50/60 dark:bg-slate-800/20' },
+    blue: { border: 'border-blue-200 dark:border-blue-800', top: 'border-t-blue-500', icon: 'bg-gradient-to-br from-blue-600 to-green-600 text-white shadow-lg shadow-blue-500/20', badge: 'bg-gradient-to-r from-blue-600 to-green-600', btn: 'bg-gradient-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-lg shadow-blue-500/10', colBg: 'bg-blue-50/60 dark:bg-blue-900/15' },
+    indigo: { border: 'border-indigo-200 dark:border-indigo-800', top: 'border-t-indigo-500', icon: 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-lg shadow-indigo-500/20', badge: 'bg-gradient-to-r from-indigo-600 to-blue-600', btn: 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:opacity-90 shadow-lg shadow-indigo-500/10', colBg: 'bg-indigo-50/60 dark:bg-indigo-900/15' },
     emerald: { border: 'border-emerald-200 dark:border-emerald-800', top: 'border-t-emerald-500', icon: 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/20', badge: 'bg-gradient-to-r from-emerald-600 to-teal-600', btn: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:opacity-90 shadow-lg shadow-emerald-500/10', colBg: 'bg-emerald-50/60 dark:bg-emerald-900/15' },
   };
 
@@ -341,7 +349,7 @@ export default function PricingPage() {
 
       {/* ── PLAN CARDS ───────────────────────────────────────────────── */}
       <section ref={cardsRef} className="py-16 md:py-24 bg-white dark:bg-slate-950 transition-colors duration-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-10">
             <div>
@@ -479,27 +487,29 @@ export default function PricingPage() {
                 </div>
                 <h3 className="text-lg font-display font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight mb-2">Custom</h3>
                 <span className="text-2xl font-display font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-0.5 border-l-4 border-blue-500 inline-block mb-3">Let's Talk</span>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed">
                   Built for agencies, resellers, and high-growth teams. Fully configured via admin panel — any bot count, any message quota, any model.
                 </p>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-900 p-6 md:p-8 transition-colors duration-500">
-                <p className="text-[9px] uppercase tracking-widest font-display font-bold text-slate-400 dark:text-slate-500 mb-4">Configurable add-ons</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <p className="text-sm uppercase tracking-widest font-display font-bold text-slate-400 dark:text-slate-500 mb-4">Configurable add-ons</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
                     { icon: 'smart_toy', label: 'Custom bot count' },
                     { icon: 'forum', label: 'Custom message quota' },
-                    { icon: 'storage', label: 'Knowledge chunks' },
+                    { icon: 'storage', label: 'Data Storage' },
                     { icon: 'auto_awesome', label: 'Gemini model choice' },
                     { icon: 'support_agent', label: 'Human handoff' },
-                    { icon: 'branding_watermark', label: 'White label' },
+                    { icon: 'branding_watermark', label: 'Remove Branding ' },
+                    { icon: 'analytics', label: 'Analytics & ROI Reports ' },
+                    { icon: 'apps', label: 'Customise ChatBot' },
                   ].map(f => (
                     <div key={f.label} className="flex items-center gap-2">
-                      <div className="w-5 h-5 shrink-0 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[11px] text-blue-600 dark:text-blue-400">{f.icon}</span>
+                      <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-md text-blue-600 dark:text-blue-400">{f.icon}</span>
                       </div>
-                      <span className="text-xs font-google font-bold text-slate-700 dark:text-slate-300">{f.label}</span>
+                      <span className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">{f.label}</span>
                     </div>
                   ))}
                 </div>
@@ -530,7 +540,7 @@ export default function PricingPage() {
 
       {/* ── FEATURE COMPARISON TABLE ─────────────────────────────────── */}
       <section ref={tableRef} className="py-16 md:py-24 bg-slate-50 dark:bg-slate-900 border-y border-gray-100 dark:border-slate-800 transition-colors duration-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={tableInView ? { opacity: 1, y: 0 } : {}}
@@ -592,7 +602,7 @@ export default function PricingPage() {
                       className="grid grid-cols-5 gap-px bg-gray-200 dark:bg-slate-700"
                     >
                       <div className="bg-white dark:bg-slate-950 px-4 py-3.5 flex items-center transition-colors duration-500">
-                        <span className="text-md font-google font-semibold text-slate-600 dark:text-slate-400">{row.label}</span>
+                        <span className="text-md font-google font-medium text-slate-600 dark:text-slate-400">{row.label}</span>
                       </div>
                       {PLANS.map((plan, ci) => (
                         <div key={ci} className={`${accentMap[plan.accent as keyof typeof accentMap].colBg} px-4 py-3.5 flex items-center justify-center transition-colors duration-500`}>

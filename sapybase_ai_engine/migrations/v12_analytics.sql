@@ -1,4 +1,4 @@
--- v12: SaPyBase Insights Analytics
+-- v12: Sapybase Insights Analytics
 -- Logs every user chat interaction and stores AI-generated BI reports.
 
 -- chat_logs: every user interaction (logged silently via BackgroundTasks)

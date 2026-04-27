@@ -12,7 +12,7 @@ def seed_production():
     # 1. Load environment variables from the backend
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(current_dir)
-    backend_env = os.path.join(root_dir, 'sapybase_ai_engine', '.env')
+    backend_env = os.path.join(root_dir, 'Sapybase_ai_engine', '.env')
     
     if os.path.exists(backend_env):
         load_dotenv(backend_env)
@@ -63,8 +63,8 @@ def seed_production():
         # B. Hash the API Key for storage
         hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
         
-        # C. Create the SaPyBase Company
-        print(f"[*] Seeding Company: SaPyBase (API Key Hashed: {hashed_key[:10]}...)")
+        # C. Create the Sapybase Company
+        print(f"[*] Seeding Company: Sapybase (API Key Hashed: {hashed_key[:10]}...)")
         cur.execute("SELECT id FROM companies WHERE api_key = %s", (hashed_key,))
         company_row = cur.fetchone()
         
@@ -73,7 +73,7 @@ def seed_production():
             print(f"[*] Company already exists (ID: {company_uuid})")
             cur.execute(
                 "UPDATE companies SET user_id = %s, company_name = %s WHERE id = %s",
-                (user_uuid, "SaPyBase", company_uuid)
+                (user_uuid, "Sapybase", company_uuid)
             )
         else:
             cur.execute(
@@ -86,15 +86,15 @@ def seed_production():
                 """,
                 (
                     user_uuid, 
-                    "SaPyBase", 
+                    "Sapybase", 
                     hashed_key, 
-                    "https://www.sapybase.com", 
-                    "SapyBase Assistant", 
+                    "https://www.Sapybase.com", 
+                    "Sapybase Assistant", 
                     "#5730F5", 
-                    "Hi! I am the SaPyBase AI Assistant. How can I help you today?", 
+                    "Hi! I am the Sapybase AI Assistant. How can I help you today?", 
                     "Professional and helpful", 
                     "active",
-                    "You are the official AI assistant for SaPyBase, the platform for custom website & web app development."
+                    "You are the official AI assistant for Sapybase, the platform for custom website & web app development."
                 )
             )
             company_uuid = cur.fetchone()[0]
@@ -114,7 +114,7 @@ def seed_production():
         
         # E. Seed Allowed Domains for security
         print("[*] Seeding Allowed Domains...")
-        domains = ["sapybase.com", "www.sapybase.com", "localhost"]
+        domains = ["Sapybase.com", "www.Sapybase.com", "localhost"]
         for domain in domains:
             cur.execute(
                 "INSERT INTO allowed_domains (user_id, domain) VALUES (%s, %s) ON CONFLICT DO NOTHING",
@@ -128,7 +128,7 @@ def seed_production():
         print("[*] Admin email '{admin_email}' is now SUPER_ADMIN.")
         print("-" * 50)
         print("💡 NEXT STEPS:")
-        print("1. Go to https://www.sapybase.com and refresh.")
+        print("1. Go to https://www.Sapybase.com and refresh.")
         print("2. The 'Or.shouldRetry' and 401 errors should now be GONE.")
         print("3. Sign in to your admin account to finalize reconciliation.")
         print("-" * 50)

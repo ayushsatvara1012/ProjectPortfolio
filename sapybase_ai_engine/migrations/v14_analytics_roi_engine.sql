@@ -1,4 +1,4 @@
--- Migration v14: SaPyBase ROI & Analytics Engine
+-- Migration v14: Sapybase ROI & Analytics Engine
 
 -- 1. Modify chat_logs
 ALTER TABLE chat_logs 

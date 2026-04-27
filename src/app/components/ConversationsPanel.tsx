@@ -128,7 +128,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, userTier, userRole }: Co
 
                                     {/* Preview + meta */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-google text-slate-700 dark:text-slate-300 truncate font-medium">
+                                        <p className="text-md font-google text-slate-700 dark:text-slate-300 truncate font-medium">
                                             {preview || 'No messages'}
                                         </p>
                                         <div className="flex items-center gap-3 mt-1">

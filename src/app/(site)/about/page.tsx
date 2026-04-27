@@ -9,38 +9,38 @@ import Link from 'next/link';
    DATA — all resume/about content lives here, deconstructed into grid cells
  ───────────────────────────────────────────────────────────────────────────── */
 const STACK = [
-  { name: 'Python',       note: 'Backend core'         },
-  { name: 'FastAPI',      note: 'REST & async'          },
-  { name: 'React 19',     note: 'UI layer'              },
-  { name: 'PostgreSQL',   note: 'Relational store'      },
-  { name: 'pgvector',     note: 'Semantic search'       },
-  { name: 'AWS',          note: 'Cloud infra'           },
-  { name: 'Tailwind v4',  note: 'Design system'         },
-  { name: 'Vite',         note: 'Build tooling'         },
-  { name: 'Gemini AI',    note: 'LLM layer'             },
-  { name: 'RAG Pipeline', note: 'Context retrieval'     },
-  { name: 'Supabase',     note: 'Auth & realtime'       },
-  { name: 'Docker',       note: 'Containerisation'      },
+  { name: 'Python', note: 'Backend core' },
+  { name: 'FastAPI', note: 'REST & async' },
+  { name: 'React 19', note: 'UI layer' },
+  { name: 'PostgreSQL', note: 'Relational store' },
+  { name: 'pgvector', note: 'Semantic search' },
+  { name: 'AWS', note: 'Cloud infra' },
+  { name: 'Tailwind v4', note: 'Design system' },
+  { name: 'Vite', note: 'Build tooling' },
+  { name: 'Gemini AI', note: 'LLM layer' },
+  { name: 'RAG Pipeline', note: 'Context retrieval' },
+  { name: 'Supabase', note: 'Auth & realtime' },
+  { name: 'Docker', note: 'Containerisation' },
 ];
 
 const PROJECTS_DATA = [
   {
-    title:   'SaPyBase Portfolio',
-    tech:    'React · Vite · Tailwind v4 · SEO',
-    result:  '100 Lighthouse',
-    tag:     'LIVE',
+    title: 'Sapybase Portfolio',
+    tech: 'React · Vite · Tailwind v4 · SEO',
+    result: '100 Lighthouse',
+    tag: 'LIVE',
   },
   {
-    title:   'LuminaLib AI',
-    tech:    'FastAPI · pgvector · RAG',
-    result:  '<80ms retrieval',
-    tag:     'DEPLOYED',
+    title: 'LuminaLib AI',
+    tech: 'FastAPI · pgvector · RAG',
+    result: '<80ms retrieval',
+    tag: 'DEPLOYED',
   },
   {
-    title:   'V-Comm Platform',
-    tech:    'IAM · S3 · EC2 · Route53',
-    result:  '99.9% uptime',
-    tag:     'PRODUCTION',
+    title: 'V-Comm Platform',
+    tech: 'IAM · S3 · EC2 · Route53',
+    result: '99.9% uptime',
+    tag: 'PRODUCTION',
   },
 ];
 
@@ -140,7 +140,7 @@ export default function AboutPage() {
                 </h1>
                 <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-md">
                   I'm <strong className="text-slate-900 dark:text-slate-200 font-bold">Ayush Satvara</strong> — the solo architect, engineer, and founder
-                  behind SaPyBase. Every line of infrastructure, from the RAG pipeline to the
+                  behind Sapybase. Every line of infrastructure, from the RAG pipeline to the
                   React UI, was designed and shipped by one person.
                 </p>
               </div>
@@ -182,10 +182,10 @@ export default function AboutPage() {
       <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800 border-x border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
           {[
-            { eyebrow: 'Bot Response Time',   value: '<2s',        icon: 'bolt',          accent: 'text-blue-500'   },
-            { eyebrow: 'Chatbot Uptime',       value: '99.9%',      icon: 'verified_user', accent: 'text-green-500'  },
-            { eyebrow: 'Deploy Time',          value: '< 10 min',   icon: 'rocket_launch', accent: 'text-blue-500'   },
-            { eyebrow: 'Platforms Supported',  value: 'Any HTML',   icon: 'devices',       accent: 'text-green-500'  },
+            { eyebrow: 'Bot Response Time', value: '<2s', icon: 'bolt', accent: 'text-blue-500' },
+            { eyebrow: 'Chatbot Uptime', value: '99.9%', icon: 'verified_user', accent: 'text-green-500' },
+            { eyebrow: 'Deploy Time', value: '< 10 min', icon: 'rocket_launch', accent: 'text-blue-500' },
+            { eyebrow: 'Platforms Supported', value: 'Any HTML', icon: 'devices', accent: 'text-green-500' },
           ].map((m, i) => (
             <div key={i} className="bg-white dark:bg-slate-950 p-8 lg:p-10 flex flex-col gap-3 group/cell transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-slate-900">
               <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">
@@ -239,11 +239,10 @@ export default function AboutPage() {
                 >
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`text-xs font-google font-bold uppercase tracking-widest px-1.5 py-0.5 border ${
-                        p.tag === 'LIVE' || p.tag === 'DEPLOYED'
+                      <span className={`text-xs font-google font-bold uppercase tracking-widest px-1.5 py-0.5 border ${p.tag === 'LIVE' || p.tag === 'DEPLOYED'
                           ? 'border-green-200 dark:border-green-800 text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/20'
                           : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      }`}>
+                        }`}>
                         {p.tag}
                       </span>
                       <span className="text-base font-display font-bold text-slate-900 dark:text-slate-100 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors">

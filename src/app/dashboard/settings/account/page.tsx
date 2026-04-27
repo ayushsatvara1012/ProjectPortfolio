@@ -147,9 +147,9 @@ const BillingTab = () => {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await res.json();
-      window.open(data.url || 'https://polar.sh/sapybase-llc/portal', '_blank');
+      window.open(data.url || 'https://polar.sh/Sapybase-llc/portal', '_blank');
     } catch {
-      window.open('https://polar.sh/sapybase-llc/portal', '_blank');
+      window.open('https://polar.sh/Sapybase-llc/portal', '_blank');
     } finally { setProcessing(null); }
   };
 

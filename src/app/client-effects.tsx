@@ -9,7 +9,7 @@ type UpgradeDetail = Pick<UpgradePromptProps, 'code' | 'tier' | 'current' | 'lim
 
 /**
  * App-wide client effects (runs inside every (site) page):
- *   - Listens for 'sapybase:upgrade-required' custom events dispatched by the
+ *   - Listens for 'Sapybase:upgrade-required' custom events dispatched by the
  *     fetch interceptor in providers.tsx on HTTP 402 responses and renders the
  *     real UpgradePrompt modal.
  *   - Vercel Analytics beacon.
@@ -22,8 +22,8 @@ export default function ClientEffects() {
       const detail = (e as CustomEvent<UpgradeDetail>).detail;
       setUpgradeError(detail ?? { code: 'DEFAULT' });
     };
-    window.addEventListener('sapybase:upgrade-required', handler);
-    return () => window.removeEventListener('sapybase:upgrade-required', handler);
+    window.addEventListener('Sapybase:upgrade-required', handler);
+    return () => window.removeEventListener('Sapybase:upgrade-required', handler);
   }, []);
 
   return (

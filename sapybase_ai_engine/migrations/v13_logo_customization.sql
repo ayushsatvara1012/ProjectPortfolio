@@ -33,5 +33,5 @@ COMMENT ON COLUMN companies.logo_shape IS
     'Widget avatar shape. Allowed: circle | squircle | bento | sharp. Default: circle.';
 
 COMMENT ON COLUMN companies.custom_logo_url IS
-    'Tenant-supplied HTTPS image URL for the bot avatar. NULL = SaPyBase default logo. '
-    'Tenant is responsible for hosting and CORS. SaPyBase never stores or proxies the image.';
+    'Tenant-supplied HTTPS image URL for the bot avatar. NULL = Sapybase default logo. '
+    'Tenant is responsible for hosting and CORS. Sapybase never stores or proxies the image.';

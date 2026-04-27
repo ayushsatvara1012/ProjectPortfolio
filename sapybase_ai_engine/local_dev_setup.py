@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-local_dev_setup.py — SaPyBase Local Development Setup Checker
+local_dev_setup.py — Sapybase Local Development Setup Checker
 =============================================================
 Run this ONCE before starting your local dev environment.
 It validates your config, checks DB connectivity, and prints a
 step-by-step startup guide.
 
 Usage:
-    cd sapybase_ai_engine
+    cd Sapybase_ai_engine
     python local_dev_setup.py
 """
 
@@ -70,7 +70,7 @@ def check_env_vars():
         print(f"  {status}  {var:<35} {masked or '(not set — optional)'}")
 
     if not all_ok:
-        print("\n  ⛔  Fix missing required vars in sapybase_ai_engine/.env.local")
+        print("\n  ⛔  Fix missing required vars in Sapybase_ai_engine/.env.local")
     return all_ok
 
 def check_db():
@@ -198,7 +198,7 @@ def print_startup_guide():
     print("""
   STEP 1 — Start the backend (Terminal 1):
   ─────────────────────────────────────────
-  cd sapybase_ai_engine
+  cd Sapybase_ai_engine
   source venv/bin/activate
   uvicorn main:app --reload --port 8000
 
@@ -230,7 +230,7 @@ def print_startup_guide():
 
 def main():
     print("\n" + "═" * 55)
-    print("  SaPyBase Local Dev Environment Checker")
+    print("  Sapybase Local Dev Environment Checker")
     print("═" * 55)
 
     env_mode = os.getenv("ENV", "production")

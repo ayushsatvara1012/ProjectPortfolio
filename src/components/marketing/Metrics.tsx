@@ -37,7 +37,7 @@ const PerformanceMetrics = () => {
     {
       type: "text",
       heading: "Trained on Your Content",
-      body: "Upload your PDFs, paste your website URL, or type your FAQs directly. SaPyBase reads everything and turns it into a smart knowledge base — no coding, no manual Q&A pairs needed."
+      body: "Upload your PDFs, paste your website URL, or type your FAQs directly. Sapybase reads everything and turns it into a smart knowledge base — no coding, no manual Q&A pairs needed."
     },
     {
       type: "metric",
@@ -90,12 +90,12 @@ const PerformanceMetrics = () => {
 
         {/* 9-Cell Checkerboard Extended Grid Archivecture */}
         <div className="relative group/grid overflow-hidden">
-          
+
           {/* Responsive Vertical Extended Lines */}
           <div className="hidden lg:block absolute left-[33.33%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
           <div className="hidden lg:block absolute left-[66.66%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
           <div className="hidden md:block lg:hidden absolute left-[50%] top-[-100vh] bottom-[-100vh] w-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
-          
+
           {/* Responsive Horizontal Extended Lines */}
           <div className="absolute top-0 left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
           <div className="hidden lg:block absolute top-[33.33%] left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
@@ -172,8 +172,8 @@ const PerformanceMetrics = () => {
               </svg>
             </div>
             {gridData.map((cell: any, index: number) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`
                   p-8 lg:p-12 flex flex-col gap-6 group/cell transition-colors duration-500
                   ${index % 2 === 0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50/50 dark:bg-slate-900'}
@@ -193,7 +193,7 @@ const PerformanceMetrics = () => {
                       <div className="text-3xl md:text-5xl font-display tracking-tight text-slate-900 dark:text-slate-200 tabular-nums leading-[0.8] transition-all duration-500 group-hover/cell:translate-x-1">
                         {cell.value}
                       </div>
-                      
+
                       {/* Subtext */}
                       <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-700 dark:text-slate-400 font-sans font-semibold leading-relaxed transition-colors duration-500">
                         <span className="material-symbols-outlined text-[20px] text-emerald-500 shrink-0">north_east</span>

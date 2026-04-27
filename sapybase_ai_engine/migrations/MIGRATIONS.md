@@ -7,9 +7,9 @@ production-readiness plan (2026-04-26). Replaces the previous manual
 
 The Alembic config lives at:
 
-- `sapybase_ai_engine/alembic.ini` — config (URL is loaded from env, not stored here)
-- `sapybase_ai_engine/alembic_migrations/env.py` — runtime config; loads `DATABASE_URL` from `.env`
-- `sapybase_ai_engine/alembic_migrations/versions/` — versioned migration files
+- `Sapybase_ai_engine/alembic.ini` — config (URL is loaded from env, not stored here)
+- `Sapybase_ai_engine/alembic_migrations/env.py` — runtime config; loads `DATABASE_URL` from `.env`
+- `Sapybase_ai_engine/alembic_migrations/versions/` — versioned migration files
 
 The legacy `v8-v22.sql` files in this directory are kept for **historical
 reference only**. Do not apply them; the production schema they describe was
@@ -19,7 +19,7 @@ baselined as revision `0001`.
 
 ## Day-to-day commands
 
-All commands run from `sapybase_ai_engine/` with the venv activated.
+All commands run from `Sapybase_ai_engine/` with the venv activated.
 
 ```bash
 # Where is prod right now?

@@ -11,7 +11,7 @@ const PIPELINE_STEPS = [
     subtitle: "Zero manual entry. Pure extraction.",
     value: {
       heading: "Your knowledge, on autopilot.",
-      body: "SaPyBase securely crawls your website or accepts PDF uploads and extracts every meaningful sentence — product descriptions, FAQs, pricing tables, policy pages — without you copying a single line. The moment you hit connect, your content becomes the brain of your chatbot.",
+      body: "Sapybase securely crawls your website or accepts PDF uploads and extracts every meaningful sentence — product descriptions, FAQs, pricing tables, policy pages — without you copying a single line. The moment you hit connect, your content becomes the brain of your chatbot.",
       bullets: ["PDF · URL · Raw Text supported", "Auto-sync on content change", "No manual data entry"],
     },
     tech: {
@@ -36,7 +36,7 @@ const PIPELINE_STEPS = [
     subtitle: "Why your bot gives smart answers.",
     value: {
       heading: "Beyond keyword search.",
-      body: "Traditional search breaks when a customer types \"what does it cost?\" instead of \"pricing\". SaPyBase converts every sentence into a mathematical vector — a fingerprint of its meaning. When a user asks a question, we find the closest meaning, not the closest word.",
+      body: "Traditional search breaks when a customer types \"what does it cost?\" instead of \"pricing\". Sapybase converts every sentence into a mathematical vector — a fingerprint of its meaning. When a user asks a question, we find the closest meaning, not the closest word.",
       bullets: ["pgvector semantic search", "Prevents keyword-mismatch failures", "Context-aware retrieval"],
     },
     tech: {
@@ -63,7 +63,7 @@ const PIPELINE_STEPS = [
       type: "script",
       label: "EMBED SNIPPET",
       snippet: `<script
-  src="https://cdn.sapybase.com/widget.js"
+  src="https://cdn.Sapybase.com/widget.js"
   data-bot-id="sb_prod_x7k9m"
   data-theme="blue"
   defer
@@ -160,7 +160,7 @@ const ScriptPanel = ({ data }: { data: any }) => (
         {"\n  "}
         <span className="text-amber-300">src</span>
         <span className="text-slate-500">=</span>
-        <span className="text-emerald-400">&quot;https://cdn.sapybase.com/widget.js&quot;</span>
+        <span className="text-emerald-400">&quot;https://cdn.Sapybase.com/widget.js&quot;</span>
         {"\n  "}
         <span className="text-amber-300">data-bot-id</span>
         <span className="text-slate-500">=</span>
@@ -215,9 +215,9 @@ const HowItWorks = () => {
             </div>
             <div className="flex flex-row md:flex-col items-center justify-center md:items-end gap-4 md:gap-2 shrink-0 py-3">
               <div className="text-4xl md:text-5xl font-display font-black tabular-nums text-slate-900 dark:text-slate-200 flex items-center gap-2">
-                <span className="material-symbols-outlined text-blue-900" style={{fontSize:"40px"}}>
-                nest_clock_farsight_analog
-              </span> &lt; 10</div>
+                <span className="material-symbols-outlined text-blue-900" style={{ fontSize: "40px" }}>
+                  nest_clock_farsight_analog
+                </span> &lt; 10</div>
               <div className="text-xs uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 md:text-right">
                 Minutes to deploy<br className=" md:block" /> a live AI chatbot
               </div>

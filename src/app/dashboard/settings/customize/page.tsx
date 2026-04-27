@@ -154,7 +154,7 @@ export default function CustomizePage() {
                   value={botSettings.name}
                   onChange={e => updateSetting('name', e.target.value)}
                   className={inputCls}
-                  placeholder="SaPyBase AI"
+                  placeholder="Sapybase AI"
                 />
               </div>
               <div>
@@ -172,10 +172,10 @@ export default function CustomizePage() {
                 <div className={`flex items-start justify-between gap-4 p-4 border transition-colors ${canHideBranding ? 'border-gray-200 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900' : 'border-gray-100 dark:border-slate-800/50 bg-gray-50 dark:bg-slate-900/40 opacity-50'}`}>
                   <div className="min-w-0">
                     <p className="text-md font-semibold font-google text-slate-800 dark:text-slate-200 transition-colors">
-                      Remove "Powered by SaPyBase" branding
+                      Remove "Powered by Sapybase" branding
                     </p>
                     <p className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
-                      {canHideBranding ? 'Hide the SaPyBase footer from your widget.' : 'Available on Starter plan and above.'}
+                      {canHideBranding ? 'Hide the Sapybase footer from your widget.' : 'Available on Starter plan and above.'}
                     </p>
                   </div>
                   <button
@@ -251,7 +251,7 @@ export default function CustomizePage() {
                     value={botSettings.systemPrompt}
                     onChange={e => updateSetting('systemPrompt', e.target.value)}
                     className={inputCls + ' min-h-[120px] resize-none py-3'}
-                    placeholder="Example: You are a helpful assistant for SaPyBase..."
+                    placeholder="Example: You are a helpful assistant for Sapybase..."
                   />
                 </div>
 

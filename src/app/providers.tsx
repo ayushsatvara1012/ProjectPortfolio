@@ -32,7 +32,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             const msg = (error as Error)?.message || '';
             if (msg === 'AUTH_REQUIRED' || msg === 'FORBIDDEN' || msg === 'AUTH_NOT_READY') return;
             window.dispatchEvent(
-              new CustomEvent('sapybase:toast', {
+              new CustomEvent('Sapybase:toast', {
                 detail: { kind: 'error', message: msg || 'Something went wrong.' },
               })
             );
@@ -53,15 +53,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     };
     const onForbidden = () => {
       if (!window.location.pathname.startsWith('/dashboard') ||
-          window.location.pathname.startsWith('/dashboard/settings/admin')) {
+        window.location.pathname.startsWith('/dashboard/settings/admin')) {
         window.location.href = '/dashboard';
       }
     };
-    window.addEventListener('sapybase:auth-required', onAuthRequired);
-    window.addEventListener('sapybase:forbidden', onForbidden);
+    window.addEventListener('Sapybase:auth-required', onAuthRequired);
+    window.addEventListener('Sapybase:forbidden', onForbidden);
     return () => {
-      window.removeEventListener('sapybase:auth-required', onAuthRequired);
-      window.removeEventListener('sapybase:forbidden', onForbidden);
+      window.removeEventListener('Sapybase:auth-required', onAuthRequired);
+      window.removeEventListener('Sapybase:forbidden', onForbidden);
     };
   }, []);
 
@@ -80,13 +80,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             .then((data) => {
               if (data?.detail?.code) {
                 window.dispatchEvent(
-                  new CustomEvent('sapybase:upgrade-required', {
+                  new CustomEvent('Sapybase:upgrade-required', {
                     detail: data.detail,
                   })
                 );
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       } catch {
         // Network errors (e.g. backend unreachable) — let caller handle

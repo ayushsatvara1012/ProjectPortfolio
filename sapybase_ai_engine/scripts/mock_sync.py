@@ -9,7 +9,7 @@ DB_URL = os.getenv("NEON_DATABASE_URL")
 
 def manual_sync(clerk_id, email, role='USER'):
     """
-    Manually syncs your specific Clerk User ID to the SaPyBase database.
+    Manually syncs your specific Clerk User ID to the Sapybase database.
     Use this to bypass ngrok/webhooks for local testing.
     """
     if not DB_URL:

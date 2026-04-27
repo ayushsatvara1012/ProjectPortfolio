@@ -30,7 +30,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
     };
 
     const calendarDates = generateLast30Days();
-    
+
     // Map existing data to dictionary for fast lookup
     const dataMap: Record<string, any> = {};
     let maxCount = 0;
@@ -50,7 +50,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
             if (dataMap[todayStr]) {
                 setSelectedCell(dataMap[todayStr]);
             } else {
-                setSelectedCell(data[0]); 
+                setSelectedCell(data[0]);
             }
         }
     }, [data, selectedCell]);
@@ -68,12 +68,12 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">Activity Overview</span>
                     <div className="flex items-center gap-4">
-                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
                             <div className="w-2 h-2 rounded-full border border-slate-200" /> IDLE
-                         </div>
-                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
                             <div className="w-2 h-2 rounded-full bg-blue-500/50" /> ACTIVE
-                         </div>
+                        </div>
                     </div>
                 </div>
                 {/* Enforce 10 columns across all devices to minimize vertical height, allowing the inspector to sit directly below on mobile */}
@@ -83,14 +83,14 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         const count = cellData?.total_questions || 0;
                         const opacity = maxCount > 0 ? (count / maxCount) : 0;
                         const isSelected = selectedCell?.date === dateStr;
-                        
+
                         return (
-                            <div 
+                            <div
                                 key={dateStr}
                                 onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
                                 onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
                                 className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-md cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
-                                style={{ 
+                                style={{
                                     backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
                                     borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
                                 }}
@@ -110,7 +110,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
             {/* Inspector Panel (50%) */}
             <div className="w-full lg:w-1/2 flex flex-col">
                 {selectedCell ? (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         key={selectedCell.date}
@@ -122,7 +122,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                                 {formatDateStr(selectedCell.date)}
                             </span>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div className="flex flex-col p-3 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-sm">
                                 <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google">Total Activity</span>
@@ -186,7 +186,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                 ) : (
                     <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 p-8 rounded-lg items-center justify-center h-full">
                         <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">radar</span>
-                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold text-center">Select a day<br/>to inspect activity</p>
+                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold text-center">Select a day<br />to inspect activity</p>
                     </div>
                 )}
             </div>
@@ -271,7 +271,7 @@ export default function AppInsights() {
                             insights
                         </span>
                         <h1 className="text-xl md:text-2xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
-                            SaPyBase Insights
+                            Sapybase Insights
                         </h1>
                     </div>
                     <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
@@ -321,52 +321,48 @@ export default function AppInsights() {
                     </select>
                 </div>
             )}
-            
+
             {/* Tabs */}
             <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
-            <div className="flex items-center gap-4 sm:gap-6 border-b border-gray-100 dark:border-slate-800 px-4 sm:px-0 min-w-max sm:min-w-0">
-                <button
-                    onClick={() => setActiveTab('analytics')}
-                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 ${
-                        activeTab === 'analytics' 
-                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
-                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                >
-                    Analytics Report
-                </button>
-                <button
-                    onClick={() => setActiveTab('leads')}
-                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
-                        activeTab === 'leads'
-                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                >
-                    Leads CRM
-                </button>
-                <button
-                    onClick={() => setActiveTab('conversations')}
-                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
-                        activeTab === 'conversations'
-                            ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                >
-                    Conversations
-                </button>
-                <button
-                    onClick={() => setActiveTab('roi')}
-                    className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${
-                        activeTab === 'roi'
-                            ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                >
-                    <span className="material-symbols-outlined text-[14px]">savings</span>
-                    ROI
-                </button>
-            </div>
+                <div className="flex items-center gap-4 sm:gap-6 border-b border-gray-100 dark:border-slate-800 px-4 sm:px-0 min-w-max sm:min-w-0">
+                    <button
+                        onClick={() => setActiveTab('analytics')}
+                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 ${activeTab === 'analytics'
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                    >
+                        Analytics Report
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('leads')}
+                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'leads'
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                    >
+                        Leads CRM
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('conversations')}
+                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'conversations'
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                    >
+                        Conversations
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('roi')}
+                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'roi'
+                                ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
+                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                    >
+                        <span className="material-symbols-outlined text-[14px]">savings</span>
+                        ROI
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -408,7 +404,7 @@ export default function AppInsights() {
 
             {/* Content Area */}
             <div className="flex-1 overflow-auto custom-scrollbar flex flex-col">
-                
+
                 {activeTab === 'leads' && (
                     <LeadsPanel
                         selectedBotId={selectedBotId}
@@ -447,209 +443,209 @@ export default function AppInsights() {
 
                         {AUTHORIZED_TIERS.has(userTier) && reportData && !isGenerating && !error && (
                             <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1">
-                                
+
                                 {/* ── ROI Scorecards (Top Row) ── */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800">
-                            {/* Support Hours Saved */}
-                            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span>
-                                    <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Support Hours Saved</h3>
-                                </div>
-                                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{Math.floor((Number((reportData?.roi_metrics?.support_savings || '$0').replace(/[^0-9.-]+/g,"")) || 0) / 25)}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
-                                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
-                            </div>
+                                    {/* Support Hours Saved */}
+                                    <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span>
+                                            <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Support Hours Saved</h3>
+                                        </div>
+                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{Math.floor((Number((reportData?.roi_metrics?.support_savings || '$0').replace(/[^0-9.-]+/g, "")) || 0) / 25)}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
+                                        <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
+                                    </div>
 
-                            {/* Estimated Savings */}
-                            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span>
-                                    <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Estimated Savings</h3>
-                                </div>
-                                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.support_savings || '$0.00'}</span></div>
-                                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
-                            </div>
+                                    {/* Estimated Savings */}
+                                    <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span>
+                                            <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Estimated Savings</h3>
+                                        </div>
+                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.support_savings || '$0.00'}</span></div>
+                                        <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
+                                    </div>
 
-                            {/* Leads Captured / Potential Revenue */}
-                            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span>
-                                    <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Potential Revenue</h3>
+                                    {/* Leads Captured / Potential Revenue */}
+                                    <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span>
+                                            <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Potential Revenue</h3>
+                                        </div>
+                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.potential_revenue || '$0.00'}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
+                                        <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
+                                    </div>
                                 </div>
-                                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.potential_revenue || '$0.00'}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
-                                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
-                            </div>
-                        </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-visible transition-colors duration-500 flex-1">
-                        {/* Left Column: Top Trends & Temporal */}
-                        <div className={`lg:col-span-7 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500`}>
-                            <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
-                                <div className="flex items-center gap-2 mb-6">
-                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
-                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
-                                        Top Customer Trends
-                                    </h2>
-                                </div>
-                                <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                                    The most common subjects and questions your users are asking.
-                                </p>
-                                <div className="space-y-px bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-800">
-                                    {reportData?.top_trends?.map((trend: string, idx: number) => (
-                                        <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                            <div className="w-8 h-8 shrink-0 bg-white dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
-                                                {String(idx + 1).padStart(2, '0')}
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-visible transition-colors duration-500 flex-1">
+                                    {/* Left Column: Top Trends & Temporal */}
+                                    <div className={`lg:col-span-7 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500`}>
+                                        <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
+                                            <div className="flex items-center gap-2 mb-6">
+                                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
+                                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
+                                                    Top Customer Trends
+                                                </h2>
                                             </div>
-                                            <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
-                                                {trend}
+                                            <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                                                The most common subjects and questions your users are asking.
                                             </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right Column: Knowledge Gaps + Advice */}
-                        <div className="lg:col-span-5 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500">
-                            <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">warning</span>
-                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
-                                        High Value Gaps
-                                    </h2>
-                                </div>
-                                <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
-                                    Questions your bot failed to answer. Train these topics to secure leads.
-                                </p>
-                                <div className="space-y-2 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar pr-1">
-                                    {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap: string, idx: number) => (
-                                        <div key={idx} className="flex items-start gap-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-                                            <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_center</span>
-                                            <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
-                                            <Link href={`/dashboard/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
-                                        </div>
-                                    )) : (
-                                        <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No critical knowledge gaps detected.</p>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center gap-2 mb-4">
-                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
-                                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Actionable Advice</h2>
-                                </div>
-                                <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
-                                    {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-
-                    {/* ── Peak Activity Full Row ── */}
-                    <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
-                        <div className={`${cellCls} p-4 sm:p-8`}>
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
-                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
-                            </div>
-                            <div className="w-full">
-                                <ActivityCalendar data={reportData?.peak_activity_blocks} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Recent Conversations Log ── */}
-                    <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
-                        <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto`}>
-                            <div className="flex items-center gap-2 mb-6">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span>
-                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
-                            </div>
-                            <div className="w-full">
-                                <div className="hidden md:grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
-                                    <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
-                                    <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
-                                    <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
-                                </div>
-                                <div className="space-y-3 md:space-y-1">
-                                    {reportData?.recent_conversations?.map((log: any, idx: number) => (
-                                        <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-4 bg-slate-50 md:bg-transparent dark:bg-slate-900/50 md:dark:bg-transparent rounded-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors md:items-center">
-                                            <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300 md:truncate">
-                                                {log.query}
+                                            <div className="space-y-px bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-800">
+                                                {reportData?.top_trends?.map((trend: string, idx: number) => (
+                                                    <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
+                                                        <div className="w-8 h-8 shrink-0 bg-white dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
+                                                            {String(idx + 1).padStart(2, '0')}
+                                                        </div>
+                                                        <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
+                                                            {trend}
+                                                        </p>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
-                                                <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
-                                                {log.unanswered ? (
-                                                    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-900/50 px-2 py-0.5 rounded-sm">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[-1px]"></span> Unanswered
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-900/50 px-2 py-0.5 rounded-sm">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[-1px]"></span> Handled
-                                                    </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column: Knowledge Gaps + Advice */}
+                                    <div className="lg:col-span-5 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500">
+                                        <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">warning</span>
+                                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
+                                                    High Value Gaps
+                                                </h2>
+                                            </div>
+                                            <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
+                                                Questions your bot failed to answer. Train these topics to secure leads.
+                                            </p>
+                                            <div className="space-y-2 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar pr-1">
+                                                {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap: string, idx: number) => (
+                                                    <div key={idx} className="flex items-start gap-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
+                                                        <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_center</span>
+                                                        <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
+                                                        <Link href={`/dashboard/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
+                                                    </div>
+                                                )) : (
+                                                    <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No critical knowledge gaps detected.</p>
                                                 )}
                                             </div>
-                                            <div className="col-span-2 flex items-center md:justify-end gap-3 md:gap-0 mt-1 md:mt-0">
-                                                <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Time:</span>
-                                                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                                                    {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
-                                                </span>
+
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
+                                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Actionable Advice</h2>
+                                            </div>
+                                            <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
+                                                {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                {/* ── Peak Activity Full Row ── */}
+                                <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
+                                    <div className={`${cellCls} p-4 sm:p-8`}>
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
+                                            <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
+                                        </div>
+                                        <div className="w-full">
+                                            <ActivityCalendar data={reportData?.peak_activity_blocks} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ── Recent Conversations Log ── */}
+                                <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
+                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto`}>
+                                        <div className="flex items-center gap-2 mb-6">
+                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span>
+                                            <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
+                                        </div>
+                                        <div className="w-full">
+                                            <div className="hidden md:grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
+                                                <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
+                                                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
+                                                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
+                                            </div>
+                                            <div className="space-y-3 md:space-y-1">
+                                                {reportData?.recent_conversations?.map((log: any, idx: number) => (
+                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-4 bg-slate-50 md:bg-transparent dark:bg-slate-900/50 md:dark:bg-transparent rounded-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors md:items-center">
+                                                        <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300 md:truncate">
+                                                            {log.query}
+                                                        </div>
+                                                        <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
+                                                            <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
+                                                            {log.unanswered ? (
+                                                                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-900/50 px-2 py-0.5 rounded-sm">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[-1px]"></span> Unanswered
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-900/50 px-2 py-0.5 rounded-sm">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[-1px]"></span> Handled
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="col-span-2 flex items-center md:justify-end gap-3 md:gap-0 mt-1 md:mt-0">
+                                                            <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Time:</span>
+                                                            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                                                {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
+                                                    <div className="text-center py-6 text-sm italic font-google text-slate-400">No recent activity found.</div>
+                                                )}
                                             </div>
                                         </div>
-                                    ))}
-                                    {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
-                                        <div className="text-center py-6 text-sm italic font-google text-slate-400">No recent activity found.</div>
-                                    )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
                         )}
 
-                {/* ── Error Banner ── */}
-                {AUTHORIZED_TIERS.has(userTier) && error && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 shrink-0">
-                        <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
-                        <p className="text-md font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
-                        <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
-                    </div>
-                )}
+                        {/* ── Error Banner ── */}
+                        {AUTHORIZED_TIERS.has(userTier) && error && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 shrink-0">
+                                <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
+                                <p className="text-md font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
+                                <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
+                            </div>
+                        )}
 
-                {/* ── Ghost Town ── */}
-                {AUTHORIZED_TIERS.has(userTier) && isGhostTown && !isGenerating && (
-                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
-                        <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
-                            <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
-                        </div>
-                        <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-3">No Conversations Yet</h2>
-                        <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
-                            Your bot hasn't had any conversations yet. Check back once users start interacting!
-                        </p>
-                        <Link href="/dashboard/bots" className="px-8 py-3 bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-all active:scale-95">View My Bots</Link>
-                    </div>
-                )}
+                        {/* ── Ghost Town ── */}
+                        {AUTHORIZED_TIERS.has(userTier) && isGhostTown && !isGenerating && (
+                            <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
+                                <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
+                                    <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
+                                </div>
+                                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-3">No Conversations Yet</h2>
+                                <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
+                                    Your bot hasn't had any conversations yet. Check back once users start interacting!
+                                </p>
+                                <Link href="/dashboard/bots" className="px-8 py-3 bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-all active:scale-95">View My Bots</Link>
+                            </div>
+                        )}
 
-                {/* ── Empty State ── */}
-                {AUTHORIZED_TIERS.has(userTier) && !reportData && !isGenerating && !error && !isGhostTown && (
-                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
-                        <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
-                            <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
-                        </div>
-                        <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">No Report Generated Yet</h2>
-                        <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">Click "Generate Report" above to synthesize your chat logs.</p>
-                    </div>
-                )}
+                        {/* ── Empty State ── */}
+                        {AUTHORIZED_TIERS.has(userTier) && !reportData && !isGenerating && !error && !isGhostTown && (
+                            <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
+                                <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
+                                    <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
+                                </div>
+                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">No Report Generated Yet</h2>
+                                <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">Click "Generate Report" above to synthesize your chat logs.</p>
+                            </div>
+                        )}
 
-                {/* ── Loading Spinner ── */}
-                {AUTHORIZED_TIERS.has(userTier) && isGenerating && (
-                    <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
-                        <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
-                        <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
-                        <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
-                    </div>
-                )}
-                </>
+                        {/* ── Loading Spinner ── */}
+                        {AUTHORIZED_TIERS.has(userTier) && isGenerating && (
+                            <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
+                                <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
+                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
+                                <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </motion.div>

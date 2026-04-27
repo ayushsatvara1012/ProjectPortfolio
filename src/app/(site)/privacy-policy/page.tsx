@@ -3,8 +3,8 @@ import { Shield } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Privacy Policy | SaPyBase',
-  description: 'Learn how SaPyBase collects, uses, and protects your data.',
+  title: 'Privacy Policy | Sapybase',
+  description: 'Learn how Sapybase collects, uses, and protects your data.',
 };
 
 const LAST_UPDATED = 'April 26, 2026';
@@ -52,12 +52,12 @@ export default function PrivacyPolicyPage() {
 
           <Section num="01" title="Who We Are">
             <p>
-              SaPyBase (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is a SaaS platform that lets businesses build and deploy
+              Sapybase (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is a SaaS platform that lets businesses build and deploy
               AI-powered chatbots. We are operated by Ayush Satvara, based in Jersey City, New Jersey, United States.
             </p>
             <p>
               This Privacy Policy applies to our website at{' '}
-              <span className="text-indigo-600 dark:text-indigo-400">www.sapybase.com</span>, our dashboard, our embeddable
+              <span className="text-indigo-600 dark:text-indigo-400">www.Sapybase.com</span>, our dashboard, our embeddable
               chatbot widget, and our API. By using any of these services you agree to the practices described here.
             </p>
           </Section>
@@ -95,7 +95,7 @@ export default function PrivacyPolicyPage() {
 
           <Section num="03" title="How We Use Your Information">
             <ul className="list-disc pl-6 space-y-2">
-              <li>Providing, operating, and improving the SaPyBase platform and your bots.</li>
+              <li>Providing, operating, and improving the Sapybase platform and your bots.</li>
               <li>Processing subscription billing and enforcing plan limits.</li>
               <li>Generating analytics, insight reports, and SEO FAQ content for your bots.</li>
               <li>Sending transactional emails (account creation, billing events, password reset) via Clerk.</li>
@@ -195,7 +195,7 @@ export default function PrivacyPolicyPage() {
 
           <Section num="09" title="Children's Privacy">
             <p>
-              SaPyBase is not directed at children under 13. We do not knowingly collect personal data from
+              Sapybase is not directed at children under 13. We do not knowingly collect personal data from
               anyone under 13. If you believe a child has provided us data, contact us immediately at{' '}
               <a href={`mailto:${CONTACT_EMAIL}`} className="text-indigo-600 dark:text-indigo-400 underline">{CONTACT_EMAIL}</a>.
             </p>

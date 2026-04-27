@@ -9,10 +9,10 @@ def purge_database():
     Uses TRUNCATE ... CASCADE on all core tables.
     """
     # 1. Load environment variables
-    # Priority: sapybase_ai_engine/.env (where the real DB_URL lives)
+    # Priority: Sapybase_ai_engine/.env (where the real DB_URL lives)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(current_dir)
-    backend_env = os.path.join(root_dir, 'sapybase_ai_engine', '.env')
+    backend_env = os.path.join(root_dir, 'Sapybase_ai_engine', '.env')
     local_env = os.path.join(current_dir, '.env')
     root_env = os.path.join(root_dir, '.env')
 
@@ -28,7 +28,7 @@ def purge_database():
             
     if not loaded:
         print("[!] Error: No .env file found with DATABASE_URL.")
-        print("Expected location: sapybase_ai_engine/.env")
+        print("Expected location: Sapybase_ai_engine/.env")
         return
 
     db_url = os.getenv("DATABASE_URL")

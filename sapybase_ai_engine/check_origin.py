@@ -2,7 +2,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
-env_path = "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/.env"
+env_path = "/Users/ayushsatvara/CodeWorld/Project Portfolio/Sapybase_ai_engine/.env"
 load_dotenv(env_path)
 
 DB_URL = os.getenv("DATABASE_URL")

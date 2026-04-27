@@ -40,6 +40,6 @@
     "node_modules",
     "dist",
     "dist-widget",
-    "sapybase_ai_engine"
+    "Sapybase_ai_engine"
   ]
 }

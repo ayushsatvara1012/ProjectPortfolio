@@ -37,8 +37,8 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
       const detail = (e as CustomEvent<{ kind?: ToastKind; message?: string }>).detail;
       if (detail?.message) showToast(detail.kind || 'info', detail.message);
     };
-    window.addEventListener('sapybase:toast', handler);
-    return () => window.removeEventListener('sapybase:toast', handler);
+    window.addEventListener('Sapybase:toast', handler);
+    return () => window.removeEventListener('Sapybase:toast', handler);
   }, [showToast]);
 
   return (

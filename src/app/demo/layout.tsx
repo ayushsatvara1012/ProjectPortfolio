@@ -9,24 +9,24 @@ import Logo from '@/src/app/components/Logo';
 import { isTrained, resetDemo } from '@/src/lib/demo/demoStorage';
 
 const TOP_NAV = [
-    { label: 'My Bots',    icon: 'smart_toy',   path: '/demo/bots' },
-    { label: 'Create Bot', icon: 'domain',       path: '/demo/register' },
-    { label: 'Train AI',   icon: 'psychology',   path: '/demo/train' },
-    { label: 'Insights',   icon: 'insights',     path: '/demo/insights' },
-    { label: 'Chat',       icon: 'chat',         path: '/demo/chat' },
+    { label: 'My Bots', icon: 'smart_toy', path: '/demo/bots' },
+    { label: 'Create Bot', icon: 'domain', path: '/demo/register' },
+    { label: 'Train AI', icon: 'psychology', path: '/demo/train' },
+    { label: 'Insights', icon: 'insights', path: '/demo/insights' },
+    { label: 'Chat', icon: 'chat', path: '/demo/chat' },
 ];
 
 const SETTINGS_SUB = [
-    { label: 'Customize Bot', icon: 'palette',      path: '/demo/customize' },
+    { label: 'Customize Bot', icon: 'palette', path: '/demo/customize' },
 ];
 
 const PATH_LABELS: Record<string, string> = {
-    '/demo/bots':      'My Bots',
-    '/demo/register':  'Create Bot Identity',
-    '/demo/train':     'Train AI',
-    '/demo/insights':  'Insights Dashboard',
+    '/demo/bots': 'My Bots',
+    '/demo/register': 'Create Bot Identity',
+    '/demo/train': 'Train AI',
+    '/demo/insights': 'Insights Dashboard',
     '/demo/customize': 'Customize Bot',
-    '/demo/chat':      'Live Chat Demo',
+    '/demo/chat': 'Live Chat Demo',
 };
 
 const DemoBanner = () => {
@@ -58,19 +58,17 @@ const SidebarItem = ({ label, icon, path, expanded, trained, onClick }: any) => 
             href={isChatLocked ? '#' : path}
             onClick={onClick}
             title={!expanded ? label : undefined}
-            className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${
-                isChatLocked
+            className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${isChatLocked
                     ? 'border-transparent text-slate-300 dark:text-slate-600 cursor-not-allowed'
                     : isActive
-                    ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
-                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+                        ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
+                        : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
         >
-            <span className={`material-symbols-outlined text-[20px] shrink-0 ${
-                isChatLocked ? 'text-slate-300 dark:text-slate-600'
-                : isActive ? 'text-slate-900 dark:text-slate-100'
-                : 'text-slate-400 dark:text-slate-500'
-            }`}>{isChatLocked ? 'lock' : icon}</span>
+            <span className={`material-symbols-outlined text-[20px] shrink-0 ${isChatLocked ? 'text-slate-300 dark:text-slate-600'
+                    : isActive ? 'text-slate-900 dark:text-slate-100'
+                        : 'text-slate-400 dark:text-slate-500'
+                }`}>{isChatLocked ? 'lock' : icon}</span>
             <span className={`flex-1 truncate transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
                 {label}
                 {isChatLocked && <span className="ml-1 text-[9px] uppercase tracking-widest font-bold text-amber-500"> (train first)</span>}
@@ -113,11 +111,10 @@ const SidebarContent = ({ onClose, expanded = true, trained, handleReset }: any)
                     <button
                         onClick={() => expanded && setSettingsOpen(p => !p)}
                         title={!expanded ? 'Settings' : undefined}
-                        className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${
-                            onSettings
+                        className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${onSettings
                                 ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
                                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
+                            }`}
                     >
                         <span className={`material-symbols-outlined text-[20px] shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
                             settings
@@ -142,7 +139,7 @@ const SidebarContent = ({ onClose, expanded = true, trained, handleReset }: any)
                                 {SETTINGS_SUB.map(item => (
                                     <SidebarItem key={item.path} {...item} onClick={onClose} expanded={expanded} trained={trained} />
                                 ))}
-                                
+
                                 <button
                                     onClick={handleReset}
                                     className="flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full border-transparent text-red-400 hover:bg-white dark:hover:bg-slate-800 hover:text-red-600"
@@ -196,7 +193,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
     return (
         <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
             <div className="fixed top-0 left-0 right-0 z-70"><DemoBanner /></div>
-            
+
             <header className="fixed top-8 left-0 right-0 h-12 bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
                 <div className="flex items-center gap-2 lg:w-[calc(256px-1rem)]">
                     <button
@@ -208,7 +205,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                     </button>
                     <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                         <Logo className="h-5 w-auto" />
-                        <span className="text-md uppercase tracking-widest font-bold text-slate-900 dark:text-slate-100 transition-colors">SaPyBase</span>
+                        <span className="text-md uppercase tracking-widest font-bold text-slate-900 dark:text-slate-100 transition-colors">Sapybase</span>
                     </Link>
                 </div>
 
@@ -273,7 +270,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                 {/* Demo Dashboard Footer */}
                 <footer className="md:col-span-12 bg-white dark:bg-slate-950 py-4 px-8 md:px-10 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
                     <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
-                        <p className="text-center">© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
+                        <p className="text-center">© 2026 Sapybase LLC — ENGINEERED WITH PRECISION.</p>
                         <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
                         <div className="flex gap-6">
                             <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">PRIVACY</Link>

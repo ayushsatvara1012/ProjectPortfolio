@@ -362,7 +362,7 @@ async def validate_logo_url(url: str) -> None:
     # 3 & 4. HEAD request validation
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=8.0) as client:
-            head_resp = await client.head(url, headers={"User-Agent": "SaPyBase-LogoValidator/1.0"})
+            head_resp = await client.head(url, headers={"User-Agent": "Sapybase-LogoValidator/1.0"})
 
             if head_resp.status_code >= 400:
                 raise HTTPException(
@@ -398,7 +398,7 @@ async def validate_logo_url(url: str) -> None:
                     url,
                     headers={
                         "Range": f"bytes=0-{MAX_LOGO_BYTES}",
-                        "User-Agent": "SaPyBase-LogoValidator/1.0"
+                        "User-Agent": "Sapybase-LogoValidator/1.0"
                     }
                 )
                 # If the server ignored Range and returned 200 with a full body,
@@ -559,7 +559,7 @@ def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> di
     return plan
 
 # 3. Initialize FastAPI App
-app = FastAPI(title="SaPyBase AI Engine (SaaS Edition)", version="2.0")
+app = FastAPI(title="Sapybase AI Engine (SaaS Edition)", version="2.0")
 
 # Setup SlowAPI Rate Limiter
 # ── SECURITY: Conditional Redis Backend for Distributed Rate Enforcement ──────
@@ -717,7 +717,7 @@ async def startup_event():
             r = redis.from_url(redis_url, encoding="utf8", decode_responses=False)
             # CRITICAL: Verify connectivity immediately to catch AuthenticationError at start
             await r.ping()
-            FastAPICache.init(RedisBackend(r), prefix="sapybase-cache")
+            FastAPICache.init(RedisBackend(r), prefix="Sapybase-cache")
             print("CACHE: FastAPI Cache initialized with Redis.")
         except Exception as e:
             msg = str(e).lower()
@@ -854,11 +854,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 # 3. Configure CORS (Production Hardening)
 ALLOWED_ORIGINS = {
-    "https://sapybase.com",
-    "https://www.sapybase.com",
-    "https://app.sapybase.com",
-    "https://admin.sapybase.com",
-    "https://sapybase-deploy-test.vercel.app",
+    "https://Sapybase.com",
+    "https://www.Sapybase.com",
+    "https://app.Sapybase.com",
+    "https://admin.Sapybase.com",
+    "https://Sapybase-deploy-test.vercel.app",
     "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app",
     "http://localhost:5173", 
     "http://localhost:5174",
@@ -893,11 +893,11 @@ app.add_middleware(
     # Reflect the request origin instead of literal "*" — required because the
     # widget runs on arbitrary customer domains, but spec forbids "*" alongside
     # credentials. The real per-bot authorization happens in
-    # verify_api_key_and_origin() against the x-sapybase-parent-origin header.
+    # verify_api_key_and_origin() against the x-Sapybase-parent-origin header.
     allow_origin_regex=r".*",
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["x-api-key", "x-sapybase-parent-origin", "content-type", "authorization"],
+    allow_headers=["x-api-key", "x-Sapybase-parent-origin", "content-type", "authorization"],
     max_age=86400,
 )
 
@@ -1275,12 +1275,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
-    # Prefer x-sapybase-parent-origin when present: the embed iframe is always
-    # same-origin to sapybase.com (so the Origin header is useless for
+    # Prefer x-Sapybase-parent-origin when present: the embed iframe is always
+    # same-origin to Sapybase.com (so the Origin header is useless for
     # identifying the merchant's site), but the loader sets parentOrigin via
     # the URL hash and the embed page forwards it as a header. A browser-only
     # attacker cannot forge it without already controlling our iframe.
-    client_origin = request.headers.get("x-sapybase-parent-origin") or request.headers.get("origin")
+    client_origin = request.headers.get("x-Sapybase-parent-origin") or request.headers.get("origin")
     if not client_origin:
         referer = request.headers.get("referer", "")
         try:
@@ -1857,7 +1857,7 @@ class CompanyUpdate(BaseModel):
     company_tone:     Optional[str]  = None
     theme_color:      Optional[str]  = None
     bot_name:         Optional[str]  = None
-    logo_url:         Optional[str]  = None   # existing SaPyBase default logo path
+    logo_url:         Optional[str]  = None   # existing Sapybase default logo path
     initial_message:  Optional[str]  = None
     system_prompt:    Optional[str]  = None
     allowed_origin:   Optional[str]  = None
@@ -1872,7 +1872,7 @@ class CompanyUpdate(BaseModel):
     # ── v17 human handoff ──
     handoff_redirect_url:  Optional[str]  = None   # WhatsApp/Calendly/etc link shown after handoff
     # ── v18 white-label ──
-    hide_branding:         Optional[bool] = None   # True = remove "Powered by SaPyBase" footer
+    hide_branding:         Optional[bool] = None   # True = remove "Powered by Sapybase" footer
 
     @validator('webhook_url')
     def validate_webhook_url(cls, v):
@@ -1978,7 +1978,7 @@ async def update_company_details(
                 status_code=402,
                 detail={
                     "code": "TIER_REQUIRED",
-                    "message": "Removing SaPyBase branding requires the Starter plan or higher.",
+                    "message": "Removing Sapybase branding requires the Starter plan or higher.",
                     "upgrade_url": "/app/pricing"
                 }
             )
@@ -2279,8 +2279,8 @@ async def chat_endpoint(
         bot_name        = company.get("bot_name") or "Sapy AI"
         company_name    = company.get("company_name") or "Sapybase"
         company_tone    = company.get("company_tone") or "Professional, expert and highly descriptive"
-        contact_email   = company.get("contact_email") or f"support@{(company.get('allowed_origin') or 'sapybase.com').replace('https://', '').replace('http://', '').rstrip('/')}"
-        contact_website = (company.get("allowed_origin") or "https://sapybase.com").rstrip("/")
+        contact_email   = company.get("contact_email") or f"support@{(company.get('allowed_origin') or 'Sapybase.com').replace('https://', '').replace('http://', '').rstrip('/')}"
+        contact_website = (company.get("allowed_origin") or "https://Sapybase.com").rstrip("/")
 
         # ── Custom prompt from DB (tenant-written, stored in system_prompt col) ─
         raw_custom = (company.get("system_prompt") or "").strip()
@@ -2544,7 +2544,7 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
       <p style="color:#64748b;margin:0 0 8px"><b>{visitor_label}</b> on <b>{bot_name}</b> has requested to speak with a human.</p>
       <p style="color:#64748b;margin:0 0 20px">{reply_note}</p>
       {transcript_html}
-      <p style="color:#94a3b8;font-size:12px;margin-top:24px">Sent by SaPyBase</p>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px">Sent by Sapybase</p>
     </div>
     """
 
@@ -3062,7 +3062,7 @@ def update_roi_benchmarks(
         release_db_connection(conn)
 
 
-# ── SAPYBASE INSIGHTS: AI SYNTHESIS ENDPOINT ──────────────────────────────────
+# ── Sapybase INSIGHTS: AI SYNTHESIS ENDPOINT ──────────────────────────────────
 
 SPAM_WORDS = {"test", "hi", "hello", "hey", "ok", "yes", "no", "thanks", "bye"}
 
@@ -3907,7 +3907,7 @@ async def train_chatbot(
         validate_safe_url(url.strip())
         try:
             jina_url = f"https://r.jina.ai/{url.strip()}"
-            response = requests.get(jina_url, headers={"User-Agent": "SaPyBaseBot/1.0"}, timeout=15)
+            response = requests.get(jina_url, headers={"User-Agent": "SapybaseBot/1.0"}, timeout=15)
             if response.status_code != 200 or len(response.text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
             # Store with the normalised URL so metadata.source matches source_name.
@@ -6069,4 +6069,4 @@ async def get_eval_results(
 
 
 @app.get("/")
-def read_root(): return {"status": "SaPyBase AI Engine Running"}
+def read_root(): return {"status": "Sapybase AI Engine Running"}

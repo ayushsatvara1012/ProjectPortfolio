@@ -35,7 +35,7 @@ type BotSettingsContextValue = {
 const BotSettingsContext = createContext<BotSettingsContextValue | undefined>(undefined);
 
 const DEFAULT_SETTINGS: BotSettings = {
-  name: 'SaPyBase AI',
+  name: 'Sapybase AI',
   primaryColor: '#5730F5',
   greeting: 'Hi! How can I help you today?',
   quickQuestions: ['Pricing'],
@@ -60,7 +60,7 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     .map((q: any) => (typeof q === 'string' ? q : q.label || q.prompt || ''))
     .filter(Boolean);
   return {
-    name: company.bot_name || 'SaPyBase AI',
+    name: company.bot_name || 'Sapybase AI',
     primaryColor: company.theme_color || '#5730F5',
     greeting: company.initial_message || 'Hi! How can I help you today?',
     quickQuestions,

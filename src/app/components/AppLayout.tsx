@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, Component } from 'react';
+import { useState, useEffect, Suspense, Component, useRef } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import Link from 'next/link';
 
@@ -39,13 +39,123 @@ class DashboardErrorBoundary extends Component<
   }
 }
 import { usePathname } from 'next/navigation';
-import { UserButton, useUser } from '@clerk/nextjs';
+import { UserButton, useUser, useAuth } from '@clerk/nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
 import FloatingBotWidget from './FloatingBotWidget';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import NavigationProgress from './NavigationProgress';
+
+// ── Dashboard loader ──────────────────────────────────────────────────────────
+
+const LOADER_MESSAGES = [
+  'Getting ready…',
+  'Patience is key…',
+  'Loading your workspace…',
+  'Almost there…',
+  'Hang tight…',
+];
+
+const shimmerStyle: React.CSSProperties = {
+  background: 'linear-gradient(90deg, #94a3b8 0%, #e2e8f0 40%, #94a3b8 80%)',
+  backgroundSize: '200% 100%',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+  animation: 'sapybase-shimmer 1.8s linear infinite',
+};
+
+const DashboardLoader = ({
+  isLoaded,
+  isSignedIn,
+  userLoading,
+}: {
+  isLoaded: boolean;
+  isSignedIn: boolean | null | undefined;
+  userLoading: boolean;
+}) => {
+  // Real ceiling gates: bar pauses below each ceiling until the signal fires
+  const ceiling = !isLoaded ? 39 : !isSignedIn ? 69 : userLoading ? 99 : 100;
+  const isDone = ceiling === 100;
+
+  const [pct, setPct] = useState(0);
+  const [msgIdx, setMsgIdx] = useState(0);
+  const [fading, setFading] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const ceilingRef = useRef(ceiling);
+  ceilingRef.current = ceiling;
+
+  // Tick 1% at a time, pausing at current ceiling
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPct(prev => {
+        if (prev >= ceilingRef.current) return prev;
+        return prev + 1;
+      });
+    }, 25);
+    return () => clearInterval(id);
+  }, []);
+
+  // Once ceiling lifts to 100 and pct reaches 100, fade out
+  useEffect(() => {
+    if (isDone) {
+      setPct(100);
+    }
+  }, [isDone]);
+
+  useEffect(() => {
+    if (pct >= 100) {
+      const t1 = setTimeout(() => setFading(true), 400);
+      const t2 = setTimeout(() => setHidden(true), 750);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [pct]);
+
+  // Cycle shimmer messages
+  useEffect(() => {
+    const id = setInterval(() => setMsgIdx(i => (i + 1) % LOADER_MESSAGES.length), 1200);
+    return () => clearInterval(id);
+  }, []);
+
+  if (hidden) return null;
+
+  return (
+    <>
+      <style>{`
+        @keyframes sapybase-shimmer {
+          0% { background-position: 200% center; }
+          100% { background-position: -200% center; }
+        }
+      `}</style>
+      <div
+        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white dark:bg-slate-950 transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
+        aria-live="polite"
+        aria-label={LOADER_MESSAGES[msgIdx]}
+      >
+        <Logo className="h-7 w-auto mb-10 opacity-90" />
+
+        <p className="text-sm font-google font-semibold tracking-widest uppercase mb-6" style={shimmerStyle}>
+          {LOADER_MESSAGES[msgIdx]}
+        </p>
+
+        <div className="w-72 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-300 ease-out"
+            style={{
+              width: `${pct}%`,
+              background: 'linear-gradient(90deg, #0F2060 0%, #5730F5 100%)',
+            }}
+          />
+        </div>
+
+        <p className="mt-3 text-[11px] font-google font-bold text-slate-400 dark:text-slate-600 tabular-nums tracking-widest">
+          {Math.round(pct)}%
+        </p>
+      </div>
+    </>
+  );
+};
 
 // ── Route maps ────────────────────────────────────────────────────────────────
 
@@ -99,11 +209,10 @@ const SidebarItem = ({ label, icon: iconName, path, onClick, expanded }: Sidebar
       href={path}
       onClick={onClick ?? undefined}
       title={!expanded ? label : undefined}
-      className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${
-        isActive
+      className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${isActive
           ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
           : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
-      }`}
+        }`}
     >
       <span className={`material-symbols-outlined text-[20px] shrink-0 ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
         {iconName}
@@ -158,11 +267,10 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
           <button
             onClick={() => expanded && setSettingsOpen(p => !p)}
             title={!expanded ? 'Settings' : undefined}
-            className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${
-              onSettings
+            className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${onSettings
                 ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+              }`}
           >
             <span className={`material-symbols-outlined text-[20px] shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
               settings
@@ -191,11 +299,10 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                       key={item.path}
                       href={item.path}
                       onClick={onClose ?? undefined}
-                      className={`flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${
-                        isActive
+                      className={`flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${isActive
                           ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-semibold'
                           : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
-                      }`}
+                        }`}
                     >
                       <span className="material-symbols-outlined text-[18px] shrink-0">{item.icon}</span>
                       {item.label}
@@ -207,11 +314,10 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                   <Link
                     href="/dashboard/settings/admin"
                     onClick={onClose ?? undefined}
-                    className={`flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${
-                      pathname === '/dashboard/settings/admin'
+                    className={`flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${pathname === '/dashboard/settings/admin'
                         ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-semibold'
                         : 'border-transparent text-slate-400 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
+                      }`}
                   >
                     <span className="material-symbols-outlined text-[18px] shrink-0">verified_user</span>
                     Super Admin
@@ -265,7 +371,7 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
         </button>
         <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <Logo className="h-5 w-auto" />
-          <span className="text-md uppercase tracking-widest font-bold text-slate-900 dark:text-slate-100 transition-colors">SaPyBase</span>
+          <span className="text-md uppercase tracking-widest font-bold text-slate-900 dark:text-slate-100 transition-colors">Sapybase</span>
         </Link>
       </div>
 
@@ -292,6 +398,8 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoading: userLoading } = useUserRole();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const pathname = usePathname();
@@ -303,69 +411,70 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [sidebarOpen]);
 
   return (
-      <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
-        <TopNav user={user} onMenuClick={() => setSidebarOpen(true)} />
-        <NavigationProgress />
-        {/* Mobile sidebar overlay */}
-        <AnimatePresence>
-          {sidebarOpen && (
-            <div className="fixed inset-0 z-50 lg:hidden" aria-modal="true">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                onClick={() => setSidebarOpen(false)}
-              />
-              <motion.aside
-                initial={{ x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '-100%' }}
-                transition={{ type: 'spring', damping: 28, stiffness: 280, mass: 0.8 }}
-                className="absolute top-0 left-0 bottom-0 w-64 border-r border-gray-100 dark:border-slate-800 shadow-none transition-colors"
-              >
-                <SidebarContent user={user} onClose={() => setSidebarOpen(false)} expanded={true} />
-              </motion.aside>
-            </div>
-          )}
-        </AnimatePresence>
-        {/* Desktop sidebar (hover-expand) */}
-        <aside
-          onMouseEnter={() => setSidebarExpanded(true)}
-          onMouseLeave={() => setSidebarExpanded(false)}
-          className={`hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#fafafa] dark:bg-slate-900 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
-        >
-          <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
-        </aside>
-        {/* Main content */}
-        <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
-          <div className="flex-1 flex flex-col pt-0">
-            <DashboardErrorBoundary>
-              <Suspense fallback={null}>
-                {children}
-              </Suspense>
-            </DashboardErrorBoundary>
+    <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
+      <DashboardLoader isLoaded={isLoaded} isSignedIn={isSignedIn} userLoading={userLoading} />
+      <TopNav user={user} onMenuClick={() => setSidebarOpen(true)} />
+      <NavigationProgress />
+      {/* Mobile sidebar overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden" aria-modal="true">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280, mass: 0.8 }}
+              className="absolute top-0 left-0 bottom-0 w-64 border-r border-gray-100 dark:border-slate-800 shadow-none transition-colors"
+            >
+              <SidebarContent user={user} onClose={() => setSidebarOpen(false)} expanded={true} />
+            </motion.aside>
           </div>
-          {/* Dashboard Footer */}
-          <footer className="md:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 md:px-8 md:py-4 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
-            <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
-              <p className="text-center">© 2026 SAPYBASE LLC — ENGINEERED WITH PRECISION.</p>
-              <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
-              <div className="flex gap-6">
-                <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">PRIVACY</Link>
-                <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">TERMS</Link>
-              </div>
+        )}
+      </AnimatePresence>
+      {/* Desktop sidebar (hover-expand) */}
+      <aside
+        onMouseEnter={() => setSidebarExpanded(true)}
+        onMouseLeave={() => setSidebarExpanded(false)}
+        className={`hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#fafafa] dark:bg-slate-900 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
+      >
+        <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
+      </aside>
+      {/* Main content */}
+      <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
+        <div className="flex-1 flex flex-col pt-0">
+          <DashboardErrorBoundary>
+            <Suspense fallback={null}>
+              {children}
+            </Suspense>
+          </DashboardErrorBoundary>
+        </div>
+        {/* Dashboard Footer */}
+        <footer className="md:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 md:px-8 md:py-4 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
+          <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
+            <p className="text-center">© 2026 Sapybase LLC — ENGINEERED WITH PRECISION.</p>
+            <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
+            <div className="flex gap-6">
+              <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">PRIVACY</Link>
+              <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">TERMS</Link>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[16px] text-emerald-500">browse_activity</span>
-              <span className="text-sm uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans">
-                Status: <span className="text-emerald-600">Operational</span>
-              </span>
-            </div>
-          </footer>
-        </main>
-        <FloatingBotWidget />
-      </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-[16px] text-emerald-500">browse_activity</span>
+            <span className="text-sm uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans">
+              Status: <span className="text-emerald-600">Operational</span>
+            </span>
+          </div>
+        </footer>
+      </main>
+      <FloatingBotWidget />
+    </div>
   );
 }

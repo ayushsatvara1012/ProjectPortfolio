@@ -95,7 +95,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                 setSelectedCell(data[data.length - 1]);
             }
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data]);
 
     const formatDateStr = (dateStr: string) => {
@@ -509,7 +509,7 @@ export default function DemoInsightsPage() {
                             insights
                         </span>
                         <h1 className="text-xl md:text-2xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
-                            SaPyBase Insights
+                            Sapybase Insights
                         </h1>
                     </div>
                     <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">

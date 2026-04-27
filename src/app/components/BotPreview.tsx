@@ -6,7 +6,7 @@ import { useBotSettings } from '@/src/lib/context/BotSettingsContext';
 import { BotAvatar } from './LogoCustomizer';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
-const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
+const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.Sapybase.com';
 const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
 
 type BotPreviewProps = {
@@ -131,8 +131,8 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         {!hideBranding && (
           <div className={`shrink-0 py-1.5 flex justify-center items-center backdrop-blur-sm ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
             <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <img src={BrandLogo} alt="SaPyBase" className="w-5 h-5 grayscale opacity-50" />
-              Powered by SaPyBase
+              <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 grayscale opacity-50" />
+              Powered by Sapybase
             </span>
           </div>
         )}

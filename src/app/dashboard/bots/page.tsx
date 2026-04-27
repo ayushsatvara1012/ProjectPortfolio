@@ -11,10 +11,10 @@ import DemoMigrationBanner from '@/src/app/components/DemoMigrationBanner';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
-  standard:  { label: 'Standard',  cls: 'text-slate-500 bg-slate-50 border-slate-200' },
-  priority:  { label: 'Priority',  cls: 'text-blue-600 bg-blue-50 border-blue-200' },
+  standard: { label: 'Standard', cls: 'text-slate-500 bg-slate-50 border-slate-200' },
+  priority: { label: 'Priority', cls: 'text-blue-600 bg-blue-50 border-blue-200' },
   dedicated: { label: 'Dedicated', cls: 'text-violet-600 bg-violet-50 border-violet-200' },
-  none:      { label: 'No Access', cls: 'text-red-500 bg-red-50 border-red-200' },
+  none: { label: 'No Access', cls: 'text-red-500 bg-red-50 border-red-200' },
 };
 
 interface Bot {
@@ -60,7 +60,7 @@ export default function BotsPage() {
     if (msg === 'AUTH_REQUIRED' || msg === 'FORBIDDEN' || msg === 'AUTH_NOT_READY') return;
     if (typeof window === 'undefined') return;
     window.dispatchEvent(
-      new CustomEvent('sapybase:toast', {
+      new CustomEvent('Sapybase:toast', {
         detail: { kind: 'error', message: msg || 'Failed to load bots.' },
       })
     );
@@ -227,7 +227,7 @@ export default function BotsPage() {
         </div>
 
         {upgradeError && (
-          <UpgradePrompt mode="modal" code={upgradeError.code} tier={upgradeError.tier} current={upgradeError.current} limit={upgradeError.limit} onDismiss={() => {}} />
+          <UpgradePrompt mode="modal" code={upgradeError.code} tier={upgradeError.tier} current={upgradeError.current} limit={upgradeError.limit} onDismiss={() => { }} />
         )}
       </div>
     </div>
