@@ -4503,9 +4503,19 @@ def delete_knowledge_chunks(
         release_db_connection(conn)
 
 
+def _config_cache_key_builder(func, namespace: str = "", *, request: Request = None, response=None, **kwargs):
+    """Cache key for /api/config that includes the API key header. The default
+    fastapi-cache key builder keys only on URL/method, which would cause every
+    bot to receive the first cached response. We must partition by api key."""
+    api_key = ""
+    if request is not None:
+        api_key = request.headers.get("x-api-key", "")
+    return f"{namespace}:get_config:{api_key}"
+
+
 @app.get("/api/config")
 @limiter.limit("120/minute")  # Per-API-Key — widget polls this; cache absorbs most hits
-@cache(expire=300)
+@cache(expire=300, key_builder=_config_cache_key_builder)
 def get_config(
     request: Request,
     company: dict = Depends(verify_api_key_and_origin),
