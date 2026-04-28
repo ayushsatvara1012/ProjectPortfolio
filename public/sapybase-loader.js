@@ -11,8 +11,25 @@
     return;
   }
 
+  // Graceful degradation for very old browsers (IE, pre-Edge, pre-iOS 10).
+  // Custom Elements v1, fetch, and Shadow DOM are required. If any are
+  // missing, fail silently — the host site is unaffected.
+  if (
+    typeof window.customElements === 'undefined' ||
+    typeof window.fetch !== 'function' ||
+    typeof window.HTMLElement === 'undefined' ||
+    !HTMLElement.prototype.attachShadow
+  ) {
+    return;
+  }
+
   // Fix #2: double-mount guard — if script is loaded twice, bail out early
-  if (customElements.get('sapybase-widget')) return;
+  try {
+    if (customElements.get('sapybase-widget')) return;
+  } catch (e) {
+    // Some legacy polyfills throw on .get(); treat as already-defined.
+    return;
+  }
 
   const IFRAME_ORIGIN =
     typeof window !== 'undefined' && window.location.hostname === 'localhost'
@@ -157,7 +174,8 @@
         ':host {',
         '  all: initial;',
         '  position: fixed;',
-        '  z-index: 2147483647;',
+        // Host pages can lower this with `sapybase-widget { --sapybase-z: 9999; }`
+        '  z-index: var(--sapybase-z, 2147483647);',
         '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
         '  bottom: 20px;',
         '  font-family: system-ui, -apple-system, sans-serif;',
@@ -294,29 +312,58 @@
     }
   }
 
-  customElements.define('sapybase-widget', SapybaseWidget);
+  try {
+    customElements.define('sapybase-widget', SapybaseWidget);
+  } catch (e) {
+    // Already defined by another script copy — abort.
+    return;
+  }
 
   // Auto-mount from <script data-bot-id="..."> tag.
   // document.currentScript is null when the script is injected dynamically
   // (e.g. Next.js <Script strategy="lazyOnload">), so fall back to a query.
-  var currentScript =
-    document.currentScript ||
-    document.querySelector('script[data-bot-id][src*="sapybase-loader.js"]');
-  if (currentScript) {
-    var botId = currentScript.getAttribute('data-bot-id');
-    if (botId && !document.querySelector('sapybase-widget')) {
-      var el = document.createElement('sapybase-widget');
-      el.setAttribute('data-bot-id', botId);
-      var pos = currentScript.getAttribute('data-position');
-      if (pos) el.setAttribute('data-position', pos);
-      document.body.appendChild(el);
+  function autoMount() {
+    var currentScript =
+      document.currentScript ||
+      document.querySelector('script[data-bot-id][src*="sapybase-loader.js"]');
+    if (!currentScript) return;
 
-      // WP cookie banners / sticky CTAs often share max z-index 2147483647;
-      // when z-index ties, last-in-DOM wins. Re-append after load so we sit
-      // on top of late-injected overlays.
-      var reseat = function () { try { document.body.appendChild(el); } catch (e) { } };
-      if (document.readyState === 'complete') setTimeout(reseat, 1500);
-      else window.addEventListener('load', function () { setTimeout(reseat, 1500); });
+    var botId = currentScript.getAttribute('data-bot-id');
+    if (!botId || document.querySelector('sapybase-widget')) return;
+
+    // Some hosts (e.g. AMP, very early defer scripts) may run this before
+    // <body> exists. Defer until the body is available.
+    if (!document.body) {
+      document.addEventListener('DOMContentLoaded', autoMount, { once: true });
+      return;
     }
+
+    var el = document.createElement('sapybase-widget');
+    el.setAttribute('data-bot-id', botId);
+    var pos = currentScript.getAttribute('data-position');
+    if (pos) el.setAttribute('data-position', pos);
+
+    try {
+      document.body.appendChild(el);
+    } catch (e) {
+      // SPA frameworks may replace body during hydration; retry once.
+      setTimeout(function () {
+        try { document.body.appendChild(el); } catch (err) { }
+      }, 500);
+      return;
+    }
+
+    // WP cookie banners / sticky CTAs often share max z-index 2147483647;
+    // when z-index ties, last-in-DOM wins. Re-append after load so we sit
+    // on top of late-injected overlays.
+    var reseat = function () {
+      try {
+        if (el.parentNode === document.body) document.body.appendChild(el);
+      } catch (e) { }
+    };
+    if (document.readyState === 'complete') setTimeout(reseat, 1500);
+    else window.addEventListener('load', function () { setTimeout(reseat, 1500); });
   }
+
+  autoMount();
 })();

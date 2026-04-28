@@ -1091,7 +1091,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           >
             {/* Header */}
             <div className="relative shrink-0">
-              <div className="absolute inset-0 animate-gradient-x opacity-20" style={{ background: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`, backgroundSize: '200% 200%' }} />
+              <div className="absolute inset-0 animate-gradient-x opacity-20" style={{ backgroundImage: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`, backgroundSize: '200% 200%' }} />
               <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50 dark:border-slate-800/50">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-3 pl-4">

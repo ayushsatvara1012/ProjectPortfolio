@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { ClerkProvider } from '@clerk/nextjs';
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { UserProvider } from '@/src/lib/context/UserContext';
@@ -9,6 +10,16 @@ import { ToastProvider } from '@/src/lib/context/ToastContext';
 import { UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  // The embeddable widget at /embed/[botId] runs on third-party sites inside
+  // an iframe. It must NOT carry our app providers (Clerk, query client, etc.)
+  // because: (a) Clerk would attempt auth on anonymous visitors, (b) the
+  // upgrade-modal fetch interceptor would mutate window.fetch on the host's
+  // iframe document.
+  const pathname = usePathname();
+  const isEmbed = pathname?.startsWith('/embed/') ?? false;
+  if (isEmbed) {
+    return <>{children}</>;
+  }
   // One QueryClient per client tree. useState ensures it survives re-renders
   // but is not shared across requests during SSR.
   const [queryClient] = useState(

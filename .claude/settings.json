@@ -19,7 +19,8 @@
       "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST https://sapyai.onrender.com/api/chat -H 'x-api-key: sb_k-Cd89HNMr0IOj67Jek0U4gyaTkZ0yc61N7dSO89bp8' -H 'Content-Type: application/json' -H 'origin: https://Sapybase.com' -d '{\"message\":\"hello\",\"session_id\":\"test-1\"}')",
       "Bash(zip -r Sapybase-chatbot.zip Sapybase-chatbot/)",
       "Bash(npm audit *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(node -c public/sapybase-loader.js)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"

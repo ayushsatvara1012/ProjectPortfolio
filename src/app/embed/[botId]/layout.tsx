@@ -9,12 +9,13 @@ export const metadata: Metadata = {
   robots: 'noindex, indexifembedded',
 };
 
+// IMPORTANT: do NOT render <html>/<body> here. App Router only allows one
+// pair per page. The root layout (src/app/layout.tsx) renders them; this
+// nested layout only contributes route-specific metadata and a wrapper div.
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" style={{ height: '100%' }}>
-      <body style={{ margin: 0, padding: 0, height: '100%', overflow: 'hidden', background: '#ffffff' }}>
-        {children}
-      </body>
-    </html>
+    <div data-sapybase-embed="true" style={{ width: '100%', height: '100dvh', background: '#ffffff' }}>
+      {children}
+    </div>
   );
 }
