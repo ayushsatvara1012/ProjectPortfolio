@@ -2,12 +2,12 @@
   'use strict';
 
   // Fix #2: double-mount guard — if script is loaded twice, bail out early
-  if (customElements.get('Sapybase-widget')) return;
+  if (customElements.get('sapybase-widget')) return;
 
   const IFRAME_ORIGIN =
     typeof window !== 'undefined' && window.location.hostname === 'localhost'
       ? 'http://localhost:3000'
-      : 'https://www.Sapybase.com';
+      : 'https://www.sapybase.com';
 
   class SapybaseWidget extends HTMLElement {
     constructor() {
@@ -23,6 +23,10 @@
     }
 
     connectedCallback() {
+      // Custom elements fire connectedCallback every time they're appended,
+      // including on reseat. Render once.
+      if (this._mounted) return;
+      this._mounted = true;
       // Fix #1: read data-bot-id (plan convention) with fallback to bot-id
       const botId =
         this.getAttribute('data-bot-id') ||
@@ -53,11 +57,11 @@
     // 2. FAQPage: fetched per-bot from the backend. This is the block that
     //    actually helps the merchant rank in AI Overviews / SGE answer cards.
     _injectSEO(botId) {
-      if (document.querySelector('script[data-Sapybase-seo]')) return;
+      if (document.querySelector('script[data-sapybase-seo]')) return;
 
       var appScript = document.createElement('script');
       appScript.type = 'application/ld+json';
-      appScript.dataset.SapybaseSeo = 'true';
+      appScript.dataset.sapybaseSeo = 'true';
       appScript.textContent = JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebApplication',
@@ -80,7 +84,7 @@
             if (!data || !Array.isArray(data.faqs) || data.faqs.length === 0) return;
             var faqScript = document.createElement('script');
             faqScript.type = 'application/ld+json';
-            faqScript.dataset.SapybaseFaq = 'true';
+            faqScript.dataset.sapybaseFaq = 'true';
             faqScript.textContent = JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'FAQPage',
@@ -241,14 +245,18 @@
     }
   }
 
-  customElements.define('Sapybase-widget', SapybaseWidget);
+  customElements.define('sapybase-widget', SapybaseWidget);
 
-  // Auto-mount from <script data-bot-id="..."> tag
-  var currentScript = document.currentScript;
+  // Auto-mount from <script data-bot-id="..."> tag.
+  // document.currentScript is null when the script is injected dynamically
+  // (e.g. Next.js <Script strategy="lazyOnload">), so fall back to a query.
+  var currentScript =
+    document.currentScript ||
+    document.querySelector('script[data-bot-id][src*="sapybase-loader.js"]');
   if (currentScript) {
     var botId = currentScript.getAttribute('data-bot-id');
-    if (botId && !document.querySelector('Sapybase-widget')) {
-      var el = document.createElement('Sapybase-widget');
+    if (botId && !document.querySelector('sapybase-widget')) {
+      var el = document.createElement('sapybase-widget');
       el.setAttribute('data-bot-id', botId);
       var pos = currentScript.getAttribute('data-position');
       if (pos) el.setAttribute('data-position', pos);
