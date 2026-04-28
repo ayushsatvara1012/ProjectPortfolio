@@ -36,6 +36,87 @@
       ? 'http://localhost:3000'
       : 'https://www.sapybase.com';
 
+  // FAB shape paths — must stay in sync with FAB_SHAPES in
+  // src/app/components/ChatWidget.tsx so the loader's outer FAB matches the
+  // bot's preview avatar exactly. Each entry includes per-shape offsets used
+  // to nudge the logo/text into the visual center of asymmetric shapes.
+  var FAB_SHAPES = {
+    circle:   { path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z', x: 0, y: 0 },
+    squircle: { path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z', x: 0, y: -8 },
+    bento:    { path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z', x: 0, y: -10.5 },
+    sharp:    { path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z', x: 0, y: 0 },
+  };
+
+  // Color helpers used by FAB theming. Kept tiny — no full color library.
+  function _hexToRgba(hex, alpha) {
+    var h = (hex || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var n = parseInt(h, 16);
+    if (isNaN(n)) return 'rgba(87,48,245,' + alpha + ')';
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+  }
+  // Render the FAB as a shape-clipped SVG that matches BotAvatar in
+  // ChatWidget. For custom (uploaded) logos the image fills the full 100x100
+  // viewBox and is clipped by the shape; for the default Sapybase logo a
+  // smaller 70x70 inset is used so it doesn't bleed past the shape.
+  function _buildFabSvg(shape, themeColor, darkColor, logoUrl, isCustom, botName) {
+    var sfx = Math.random().toString(36).slice(2, 8);
+    var gradId = 'sb-fab-grad-' + sfx;
+    var clipId = 'sb-fab-clip-' + sfx;
+    var safeUrl = logoUrl ? String(logoUrl).replace(/"/g, '&quot;') : '';
+    var initial = (botName || 'S').charAt(0).toUpperCase();
+    var ox = shape.x || 0;
+    var oy = shape.y || 0;
+
+    var content = '';
+    if (safeUrl) {
+      var ix = isCustom ? ox : 15 + ox;
+      var iy = isCustom ? oy : 15 + oy;
+      var iw = isCustom ? 100 : 70;
+      var ih = isCustom ? 100 : 70;
+      content =
+        '<g clip-path="url(#' + clipId + ')">' +
+        '<image href="' + safeUrl + '" x="' + ix + '" y="' + iy + '" ' +
+        'width="' + iw + '" height="' + ih + '" preserveAspectRatio="xMidYMid slice" />' +
+        '</g>';
+    } else {
+      content =
+        '<text x="' + (50 + ox) + '" y="' + (52 + oy) + '" ' +
+        'text-anchor="middle" dominant-baseline="middle" fill="#ffffff" ' +
+        'style="font-size:38px;font-weight:700;font-family:system-ui,sans-serif;">' +
+        initial + '</text>';
+    }
+
+    return (
+      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" ' +
+      'style="width:100%;height:100%;overflow:visible;display:block;" ' +
+      'preserveAspectRatio="xMidYMid meet">' +
+      '<defs>' +
+      '<linearGradient id="' + gradId + '" x1="0%" y1="0%" x2="100%" y2="100%">' +
+      '<stop offset="0%" stop-color="' + themeColor + '"/>' +
+      '<stop offset="100%" stop-color="' + darkColor + '"/>' +
+      '</linearGradient>' +
+      '<clipPath id="' + clipId + '"><path d="' + shape.path + '"/></clipPath>' +
+      '</defs>' +
+      '<path d="' + shape.path + '" fill="url(#' + gradId + ')"/>' +
+      content +
+      '</svg>'
+    );
+  }
+
+  function _shadeColor(hex, percent) {
+    var h = (hex || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var n = parseInt(h, 16);
+    if (isNaN(n)) return hex;
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    var f = (100 + percent) / 100;
+    r = Math.max(0, Math.min(255, Math.round(r * f)));
+    g = Math.max(0, Math.min(255, Math.round(g * f)));
+    b = Math.max(0, Math.min(255, Math.round(b * f)));
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+  }
+
   class SapybaseWidget extends HTMLElement {
     constructor() {
       super();
@@ -114,10 +195,25 @@
 
     _applyConfig(cfg) {
       const themeColor = cfg.theme_color || '#5730F5';
+      const shapeId = cfg.logo_shape || 'circle';
+      const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
+      const logoUrl = cfg.custom_logo_url || cfg.logo_url || '';
+      const isCustom = !!cfg.custom_logo_url;
+      const botName = cfg.bot_name || 'Sapy AI';
+
       if (this._fab) {
-        this._fab.style.background =
-          'linear-gradient(135deg, ' + themeColor + ', #4f46e5)';
+        const dark = _shadeColor(themeColor, -20);
+
+        // For all shapes we render an SVG so the logo can be clipped to the
+        // shape path. The button itself becomes a transparent shell.
+        this._fab.style.borderRadius = '0';
+        this._fab.style.background = 'transparent';
+        this._fab.style.boxShadow = 'none';
+        this._fab.style.padding = '0';
+        this._fab.style.overflow = 'visible';
+        this._fab.innerHTML = _buildFabSvg(shape, themeColor, dark, logoUrl, isCustom, botName);
       }
+
       if (this._label && cfg.bot_name) {
         this._label.textContent = 'Chat with ' + cfg.bot_name + '!';
       }
@@ -194,15 +290,17 @@
         '  font-family: system-ui, -apple-system, sans-serif;',
         '}',
         '.fab {',
-        '  width: 60px; height: 60px; border-radius: 50%; cursor: pointer;',
+        '  width: 64px; height: 64px; border-radius: 50%; cursor: pointer;',
         '  background: linear-gradient(135deg, ' + themeColor + ', #4f46e5);',
         '  box-shadow: 0 4px 24px rgba(87,48,245,.35); border: none;',
+        '  padding: 0; overflow: visible;',
         '  display: flex; align-items: center; justify-content: center;',
         '  transition: transform .2s ease, box-shadow .2s ease;',
         '  pointer-events: auto;',
         '}',
-        '.fab:hover { transform: scale(1.08); box-shadow: 0 6px 32px rgba(87,48,245,.45); }',
-        '.fab svg { width: 28px; height: 28px; fill: white; }',
+        '.fab:hover { transform: scale(1.08); }',
+        '.fab > svg { width: 100%; height: 100%; display: block; }',
+        '.fab > svg.default-icon { width: 28px; height: 28px; fill: white; }',
         '.label {',
         '  position: absolute; bottom: 70px; ' + (isLeft ? 'left: 0;' : 'right: 0;'),
         '  white-space: nowrap; background: white; color: #1e293b;',
@@ -237,7 +335,7 @@
         '    bottom: 0; right: 0; left: 0; top: 0; border-radius: 0;',
         '  }',
         '  .iframe-wrap iframe { border-radius: 0; }',
-        '  .fab { width: 52px; height: 52px; }',
+        '  .fab { width: 56px; height: 56px; }',
         '  :host(.chat-open) .fab, :host(.chat-open) .label { display: none; }',
         '  .label { display: none; }',
         '}',
@@ -248,7 +346,7 @@
       fab.className = 'fab';
       fab.setAttribute('aria-label', 'Open chat');
       fab.innerHTML =
-        '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+        '<svg class="default-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
         '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>' +
         '</svg>';
       fab.addEventListener('click', () => this._toggle());
