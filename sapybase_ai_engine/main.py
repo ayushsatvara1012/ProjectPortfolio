@@ -854,17 +854,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 # 3. Configure CORS (Production Hardening)
 ALLOWED_ORIGINS = {
-    "https://Sapybase.com",
-    "https://www.Sapybase.com",
-    "https://app.Sapybase.com",
-    "https://admin.Sapybase.com",
-    "https://Sapybase-deploy-test.vercel.app",
+    "https://sapybase.com",
+    "https://www.sapybase.com",
+    "https://app.sapybase.com",
+    "https://admin.sapybase.com",
+    "https://sapybase-deploy-test.vercel.app",
     "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app",
-    "http://localhost:5173", 
+    "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
     "http://localhost:5176",
-    "http://localhost:3000", 
+    "http://localhost:3000",
     "http://127.0.0.1:5173"
 }
 
@@ -1296,15 +1296,16 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         )
     
     if client_origin:
-        # Normalize: Remove trailing slash
-        actual_client_origin = client_origin.rstrip('/')
-        
-        allowed = (company["allowed_origin"] or "").rstrip('/')
-        
+        # Normalize: trailing slash + lowercase host. Browsers send Origin with
+        # lowercase host (RFC 6454), but stored values may have mixed case.
+        actual_client_origin = client_origin.rstrip('/').lower()
+
+        allowed = (company["allowed_origin"] or "").rstrip('/').lower()
+
         # 3.1. Priority Check: Company-specific allowed origin (Exact Match)
         if allowed != "*" and actual_client_origin != allowed:
             # 3.2. Secondary Check: Platform Production Origins
-            if actual_client_origin in ALLOWED_ORIGINS:
+            if actual_client_origin in {o.lower() for o in ALLOWED_ORIGINS}:
                 return company
                 
             # 3.3. Wildcard Check: Vercel & Ngrok (Issue 48 Fix)

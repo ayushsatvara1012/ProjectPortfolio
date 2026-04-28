@@ -201,10 +201,12 @@
         '}',
         '@media (max-width: 480px) {',
         '  .iframe-wrap {',
-        '    width: 100vw; height: 100vh; max-height: 100vh; max-width: 100vw;',
-        '    bottom: 0; right: 0; left: 0; border-radius: 0;',
+        '    width: 100vw; height: 100dvh; max-height: 100dvh; max-width: 100vw;',
+        '    bottom: 0; right: 0; left: 0; top: 0; border-radius: 0;',
         '  }',
+        '  .iframe-wrap iframe { border-radius: 0; }',
         '  .fab { width: 52px; height: 52px; }',
+        '  :host(.chat-open) .fab, :host(.chat-open) .label { display: none; }',
         '  .label { display: none; }',
         '}',
       ].join('\n');
@@ -239,9 +241,11 @@
         this._label.style.display = 'none';
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
+        this.classList.add('chat-open');
         this._postToIframe({ type: 'Sapybase:visibility', open: true });
       } else {
         this._wrap.classList.remove('open');
+        this.classList.remove('chat-open');
         this._postToIframe({ type: 'Sapybase:visibility', open: false });
       }
     }
@@ -283,6 +287,7 @@
         if (data.type === 'Sapybase:close') {
           this._open = false;
           if (this._wrap) this._wrap.classList.remove('open');
+          this.classList.remove('chat-open');
         }
       });
     }

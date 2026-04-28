@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" style={{ height: '100%' }}>
-      <body style={{ margin: 0, padding: 0, height: '100%', overflow: 'hidden', background: 'transparent' }}>
+      <body style={{ margin: 0, padding: 0, height: '100%', overflow: 'hidden', background: '#ffffff' }}>
         {children}
       </body>
     </html>

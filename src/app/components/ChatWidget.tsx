@@ -647,6 +647,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const leadCapturedRef = useRef(false);
   const leadFormShownRef = useRef(false);
   const userMessageCountRef = useRef(0);
+  const [clearCount, setClearCount] = useState(0);
 
   const [isOpen, setIsOpen] = useState(isEmbed);
   const [showMenu, setShowMenu] = useState(false);
@@ -1133,6 +1134,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           animatedMsgIndices.current.clear();
                           setHandoffSent(false);
                           setShowMenu(false);
+                          setClearCount(c => c + 1);
                         }} className="w-full text-left px-4 py-2 text-sm font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
                           Clear chat <span className="material-symbols-outlined">refresh</span>
                         </button>
@@ -1162,7 +1164,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       const isNew = !animatedMsgIndices.current.has(idx);
                       if (isNew) animatedMsgIndices.current.add(idx);
                       return (
-                        <motion.div key={idx} layout={msg.isStreaming ? false : 'position'}
+                        <motion.div key={`${clearCount}-${idx}`} layout={msg.isStreaming ? false : 'position'}
                           initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
