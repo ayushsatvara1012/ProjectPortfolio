@@ -80,20 +80,33 @@
       this._listenForMessages();
       this._fetchConfig(botId).then((cfg) => {
         if (cfg) this._applyConfig(cfg);
+        else console.warn('[Sapybase] /api/config returned no usable data; FAB will keep defaults.');
       });
     }
 
     _fetchConfig(botId) {
       try {
+        // cache: 'no-store' ensures we never get a stale 304 with an empty
+        // body — the backend already caches via Redis with a 5-minute TTL.
         return fetch(IFRAME_ORIGIN + '/api/config', {
+          cache: 'no-store',
           headers: {
             'accept': 'application/json',
             'x-api-key': botId,
             'x-Sapybase-parent-origin': window.location.origin,
           },
         })
-          .then(function (res) { return res.ok ? res.json() : null; })
-          .catch(function () { return null; });
+          .then(function (res) {
+            if (!res.ok) {
+              console.warn('[Sapybase] /api/config returned ' + res.status);
+              return null;
+            }
+            return res.json();
+          })
+          .catch(function (err) {
+            console.warn('[Sapybase] /api/config fetch failed:', err);
+            return null;
+          });
       } catch (e) {
         return Promise.resolve(null);
       }
