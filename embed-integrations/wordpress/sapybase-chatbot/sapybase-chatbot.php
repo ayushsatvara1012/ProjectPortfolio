@@ -122,7 +122,7 @@ function Sapybase_embed_widget() {
     window.SapybaseConfig = { themeColor: <?php echo wp_json_encode( $theme_color ); ?> };
     </script>
     <script
-        src="https://www.Sapybase.com/Sapybase-loader.js"
+        src="https://www.sapybase.com/sapybase-loader.js"
         data-bot-id="<?php echo esc_attr( $bot_id ); ?>"
         data-position="<?php echo esc_attr( $position ); ?>"
         defer

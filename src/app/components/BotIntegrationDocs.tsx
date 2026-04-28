@@ -138,7 +138,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
           Copy the code below and paste it onto your website. Need help? Check our <Link href="/docs" className="text-blue-600 dark:text-blue-400 font-bold underline">full guide</Link>.
         </p>
         <SyntaxHighlightedCode code={`<!-- Paste before </body> on every page -->
-<script src="https://www.Sapybase.com/Sapybase-loader.js"
+<script src="https://www.Sapybase.com/sapybase-loader.js"
         data-bot-id="${apiKey}"
         defer></script>`} />
       </div>
@@ -238,31 +238,31 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
               {integrationTab === 'html' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">Plain HTML / Static Websites</h3>
-                  <SyntaxHighlightedCode code={`<!DOCTYPE html>\n<html lang="en">\n<head>\n    <title>My Website</title>\n</head>\n<body>\n    <h1>Welcome to my business</h1>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/Sapybase-loader.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>\n</html>`} />
+                  <SyntaxHighlightedCode code={`<!DOCTYPE html>\n<html lang="en">\n<head>\n    <title>My Website</title>\n</head>\n<body>\n    <h1>Welcome to my business</h1>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/sapybase-loader.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>\n</html>`} />
                 </div>
               )}
               {integrationTab === 'react' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">React (Vite or CRA)</h3>
-                  <SyntaxHighlightedCode code={`<body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/Sapybase-loader.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>`} />
+                  <SyntaxHighlightedCode code={`<body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/sapybase-loader.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>`} />
                 </div>
               )}
               {integrationTab === 'nextjs' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">Next.js (App Router)</h3>
-                  <SyntaxHighlightedCode code={`import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        {/* Sapybase AI Chat Widget */}\n        <Script\n          src="https://www.Sapybase.com/Sapybase-loader.js"\n          data-bot-id="YOUR_API_KEY"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`} />
+                  <SyntaxHighlightedCode code={`import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        {/* Sapybase AI Chat Widget */}\n        <Script\n          src="https://www.Sapybase.com/sapybase-loader.js"\n          data-bot-id="YOUR_API_KEY"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`} />
                 </div>
               )}
               {integrationTab === 'wordpress' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">WordPress Integration</h3>
-                  <SyntaxHighlightedCode code={`<!-- Paste in Appearance > Theme Editor > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/Sapybase-loader.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
+                  <SyntaxHighlightedCode code={`<!-- Paste in Appearance > Theme Editor > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/sapybase-loader.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
                 </div>
               )}
               {integrationTab === 'shopify' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">Shopify Store</h3>
-                  <SyntaxHighlightedCode code={`<!-- Paste in Online Store > Themes > Edit Code > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/Sapybase-loader.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
+                  <SyntaxHighlightedCode code={`<!-- Paste in Online Store > Themes > Edit Code > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/sapybase-loader.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
                 </div>
               )}
             </div>

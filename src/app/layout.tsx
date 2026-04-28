@@ -1,5 +1,6 @@
 
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import {
   Bricolage_Grotesque,
   Darker_Grotesque,
@@ -74,6 +75,13 @@ export default function RootLayout({
       </head>
       <body>
         <Providers>{children}</Providers>
+        {process.env.NEXT_PUBLIC_SAPYBASE_API_KEY && (
+          <Script
+            src="/sapybase-loader.js"
+            data-bot-id={process.env.NEXT_PUBLIC_SAPYBASE_API_KEY}
+            strategy="lazyOnload"
+          />
+        )}
       </body>
     </html>
   );
