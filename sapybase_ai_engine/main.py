@@ -896,7 +896,7 @@ app.add_middleware(
     # verify_api_key_and_origin() against the x-Sapybase-parent-origin header.
     allow_origin_regex=r".*",
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["x-api-key", "x-Sapybase-parent-origin", "content-type", "authorization"],
     max_age=86400,
 )
