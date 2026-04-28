@@ -76,11 +76,16 @@ export default function RootLayout({
       <body>
         <Providers>{children}</Providers>
         {process.env.NEXT_PUBLIC_SAPYBASE_API_KEY && (
-          <Script
-            src="/sapybase-loader.js"
-            data-bot-id={process.env.NEXT_PUBLIC_SAPYBASE_API_KEY}
-            strategy="lazyOnload"
-          />
+          <>
+            <Script id="sapybase-config" strategy="beforeInteractive">
+              {`window.SapybaseConfig = { themeColor: '#5730F5' };`}
+            </Script>
+            <Script
+              src="/sapybase-loader.js"
+              data-bot-id={process.env.NEXT_PUBLIC_SAPYBASE_API_KEY}
+              strategy="lazyOnload"
+            />
+          </>
         )}
       </body>
     </html>

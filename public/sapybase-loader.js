@@ -1,6 +1,16 @@
 (function () {
   'use strict';
 
+  // Don't run inside our own embed iframe — the embed page already renders
+  // the full ChatWidget. Re-running the loader there produces a nested FAB
+  // and a duplicate chat panel.
+  try {
+    if (window.self !== window.top) return;
+  } catch (e) {
+    // Cross-origin access threw — we are framed. Bail out.
+    return;
+  }
+
   // Fix #2: double-mount guard — if script is loaded twice, bail out early
   if (customElements.get('sapybase-widget')) return;
 
