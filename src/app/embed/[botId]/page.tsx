@@ -18,17 +18,6 @@ export default function EmbedPage() {
 
     // Expose to ChatWidget so backend requests can carry x-Sapybase-parent-origin.
     (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin = parentOrigin;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        window.parent.postMessage(
-          { type: 'Sapybase:resize', height: entry.contentRect.height },
-          parentOrigin
-        );
-      }
-    });
-    observer.observe(document.body);
-    return () => observer.disconnect();
   }, []);
 
   return (

@@ -56,8 +56,41 @@
       // Fix #3: inject ld+json SEO schema into host <head>
       this._injectSEO(botId);
 
-      this._render(position);
+      // Fetch bot config for FAB customization. Render with defaults first
+      // so the FAB shows up even if the request fails or is slow, then
+      // re-style on success.
+      this._render(position, null);
       this._listenForMessages();
+      this._fetchConfig(botId).then((cfg) => {
+        if (cfg) this._applyConfig(cfg);
+      });
+    }
+
+    _fetchConfig(botId) {
+      try {
+        return fetch(IFRAME_ORIGIN + '/api/config', {
+          headers: {
+            'accept': 'application/json',
+            'x-api-key': botId,
+            'x-Sapybase-parent-origin': window.location.origin,
+          },
+        })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .catch(function () { return null; });
+      } catch (e) {
+        return Promise.resolve(null);
+      }
+    }
+
+    _applyConfig(cfg) {
+      const themeColor = cfg.theme_color || '#5730F5';
+      if (this._fab) {
+        this._fab.style.background =
+          'linear-gradient(135deg, ' + themeColor + ', #4f46e5)';
+      }
+      if (this._label && cfg.bot_name) {
+        this._label.textContent = 'Chat with ' + cfg.bot_name + '!';
+      }
     }
 
     // SEO injection: emits two ld+json blocks into the host <head>.
@@ -112,10 +145,12 @@
       } catch (e) { /* noop */ }
     }
 
-    _render(position) {
+    _render(position, cfg) {
       const isLeft = position === 'bottom-left';
       const themeColor =
-        (window.SapybaseConfig && window.SapybaseConfig.themeColor) || '#5730F5';
+        (cfg && cfg.theme_color) ||
+        (window.SapybaseConfig && window.SapybaseConfig.themeColor) ||
+        '#5730F5';
 
       const style = document.createElement('style');
       style.textContent = [
@@ -240,12 +275,10 @@
         const data = e.data;
         if (!data || typeof data !== 'object') return;
 
-        if (data.type === 'Sapybase:resize' && Number.isFinite(data.height)) {
-          if (this._wrap) {
-            const safeH = Math.max(200, Math.min(data.height, window.innerHeight - 120, 800));
-            this._wrap.style.height = safeH + 'px';
-          }
-        }
+        // Sapybase:resize was previously used to dynamically size the wrap to
+        // the iframe's content. That created a feedback loop on close (iframe
+        // collapses → height: 0 → wrap shrinks → next open is tiny). The wrap
+        // size is now controlled entirely by CSS.
 
         if (data.type === 'Sapybase:close') {
           this._open = false;

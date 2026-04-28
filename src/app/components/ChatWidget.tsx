@@ -1106,7 +1106,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     </button>
                     <button onClick={() => {
                       if (isEmbed) {
-                        window.parent.postMessage('Sapybase-close', '*');
+                        window.parent.postMessage({ type: 'Sapybase:close' }, '*');
                       } else {
                         setIsOpen(false);
                       }
