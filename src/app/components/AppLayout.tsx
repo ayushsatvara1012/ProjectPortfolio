@@ -46,7 +46,6 @@ import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
 import FloatingBotWidget from './FloatingBotWidget';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import NavigationProgress from './NavigationProgress';
-import { AppPageSkeleton } from './SkeletonLoader';
 
 // ── Dashboard loader ──────────────────────────────────────────────────────────
 
@@ -461,10 +460,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
       </aside>
       {/* Main content */}
-      <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
+      <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
         <div className="flex-1 flex flex-col pt-0">
           <DashboardErrorBoundary>
-            <Suspense fallback={<AppPageSkeleton />}>
+            <Suspense fallback={null}>
               {children}
             </Suspense>
           </DashboardErrorBoundary>

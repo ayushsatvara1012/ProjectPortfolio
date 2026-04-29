@@ -191,7 +191,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
     const pageLabel = (pathname && PATH_LABELS[pathname]) || 'Demo Dashboard';
 
     return (
-        <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
+        <div className="flex min-h-screen w-full overflow-x-hidden bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
             <div className="fixed top-0 left-0 right-0 z-70"><DemoBanner /></div>
 
             <header className="fixed top-8 left-0 right-0 h-12 bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
@@ -260,7 +260,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
             </aside>
 
             {/* Main content */}
-            <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`} style={{ marginTop: '5rem' }}>
+            <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] min-w-0 overflow-x-hidden bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`} style={{ marginTop: '5rem' }}>
                 <div className="flex-1 flex flex-col pt-0">
                     <Suspense fallback={null}>
                         <div className="flex-1 relative">{children}</div>

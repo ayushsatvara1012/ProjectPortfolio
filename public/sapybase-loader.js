@@ -644,6 +644,16 @@
       iframe.loading = 'lazy';
       iframe.referrerPolicy = 'strict-origin-when-cross-origin';
       iframe.allow = 'clipboard-write';
+      // Sandbox: limit iframe blast radius if /embed is ever XSS'd.
+      // - allow-scripts: chat UI is React, obviously needs JS.
+      // - allow-same-origin: required so the embed page (on www.sapybase.com)
+      //   can call /api/chat etc. with normal CORS; without it the iframe
+      //   gets an opaque origin and breaks fetch credentialing.
+      // - allow-popups + allow-popups-to-escape-sandbox: for target="_blank"
+      //   links (brand link, handoff redirect, source citations).
+      // - allow-forms: defensive; LeadCaptureForm uses fetch(), not native
+      //   form submit, but kept in case future flows add real <form> POSTs.
+      iframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms';
       this._wrap.appendChild(iframe);
       this._iframe = iframe;
       this._iframeLoaded = true;

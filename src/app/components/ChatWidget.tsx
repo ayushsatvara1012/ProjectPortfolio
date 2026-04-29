@@ -22,6 +22,21 @@ const SHAPE_CLASS_MAP: Record<string, string> = {
   sharp: 'rounded-lg',
 };
 
+// Send a message to the host page only when we have a validated origin.
+// `__SapybaseParentOrigin` is set by `src/app/embed/[botId]/page.tsx` after
+// it parses & validates `parentOrigin` from the URL hash via `new URL().origin`.
+// If we don't have a trusted origin, we skip the post entirely — never use '*'.
+function postToParent(message: unknown) {
+  if (typeof window === 'undefined' || window.parent === window) return;
+  const origin = (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin;
+  if (!origin) return;
+  try {
+    window.parent.postMessage(message, origin);
+  } catch {
+    // Cross-origin failure or detached frame — drop silently.
+  }
+}
+
 export const AVATAR_GRADIENTS: Record<string, [string, string] | null> = {
   none: null,
   cosmic: ['#c026d3', '#3b82f6'],
@@ -640,7 +655,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         if (isEmbed && typeof window !== 'undefined' && window.parent !== window) {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              window.parent.postMessage({ type: 'Sapybase:ready' }, '*');
+              postToParent({ type: 'Sapybase:ready' });
             });
           });
         }
@@ -704,7 +719,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   useEffect(() => {
     if (isEmbed && !isOpen) {
-      window.parent.postMessage({ type: 'Sapybase:close' }, '*');
+      postToParent({ type: 'Sapybase:close' });
     }
   }, [isOpen, isEmbed]);
 
@@ -1130,7 +1145,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     </button>
                     <button onClick={() => {
                       if (isEmbed) {
-                        window.parent.postMessage({ type: 'Sapybase:close' }, '*');
+                        postToParent({ type: 'Sapybase:close' });
                       } else {
                         setIsOpen(false);
                       }

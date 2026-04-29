@@ -119,7 +119,7 @@ export default function DemoChatPage() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500 font-google">
+        <div className="flex flex-col bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500 font-google" style={{ height: 'calc(100vh - 5rem)' }}>
             {/* Header */}
             <div className={`${cellCls} px-6 py-4 border-b border-gray-100 dark:border-slate-800 shadow-sm relative z-10`}>
                 <div className="flex justify-between items-center">

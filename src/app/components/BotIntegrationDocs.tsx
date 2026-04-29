@@ -337,14 +337,25 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
         </main>
 
         <aside className="hidden lg:block lg:col-span-3 sticky top-20 h-fit max-h-[calc(100vh-100px)] overflow-y-auto custom-scrollbar border-l border-gray-100 dark:border-slate-800 pl-8 transition-colors">
-          <div className="space-y-1">
-            <h4 className="text-lg uppercase tracking-[0.2em] font-google text-slate-400 dark:text-slate-600 mb-6">On this page</h4>
-            {tocLinks.map(link => (
-              <button key={link.id} onClick={() => scrollTo(link.id)}
-                className={`block py-1.5 text-lg font-google transition-all w-full text-left border-l-2 pl-4 -ml-[33px] ${activeSection === link.id ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 bg-blue-50/30' : 'text-slate-400 dark:text-slate-600 border-transparent hover:text-slate-900 dark:hover:text-slate-200'}`}>
-                {link.label}
-              </button>
-            ))}
+          <div className="mt-0">
+            <h4 className="text-lg uppercase tracking-[0.2em] font-google text-slate-400 dark:text-slate-600 mb-6">Quick Links</h4>
+            <div className="space-y-1">
+              {[
+                { href: '/', label: 'Home', icon: 'home' },
+                { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+                { href: '/pricing', label: 'Pricing', icon: 'payments' },
+                { href: '/dashboard/train', label: 'Train AI', icon: 'model_training' },
+                { href: '/dashboard/bots', label: 'My Bots', icon: 'smart_toy' },
+                { href: '/about', label: 'About', icon: 'info' },
+                { href: '/contact', label: 'Contact Us', icon: 'mail' },
+              ].map(link => (
+                <Link key={link.href} href={link.href}
+                  className="flex items-center gap-2.5 py-1.5 pl-4 -ml-[33px] border-l-2 border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 transition-all text-lg font-google group">
+                  <span className="material-symbols-outlined text-[18px] text-slate-300 dark:text-slate-700 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors">{link.icon}</span>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </aside>
       </div>
