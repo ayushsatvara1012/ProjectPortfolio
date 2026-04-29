@@ -38,10 +38,10 @@ export const TableSkeleton = ({ rows = 5 }: { rows?: number }) => (
   </div>
 );
 
-export const AppPageSkeleton = ({ pct: externalPct }: { pct?: number }) => {
+export const AppPageSkeleton = ({ pct: externalPct, messages: customMessages }: { pct?: number; messages?: string[] }) => {
   const [pct, setPct] = useState(0);
   const [done, setDone] = useState(false);
-  const messages = ['Initializing page…', 'Authenticating identity…', 'Retrieving data…', 'Optimizing assets…'];
+  const messages = customMessages ?? ['Initializing page…', 'Authenticating identity…', 'Retrieving data…', 'Optimizing assets…'];
 
   useEffect(() => {
     if (externalPct !== undefined) {
