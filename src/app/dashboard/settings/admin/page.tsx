@@ -377,7 +377,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <NumInput label="Max Bots" value={draft.cfg.max_bots} onChange={v => setCfg('max_bots', v)} placeholder="10" disabled={isSaving} />
                         <NumInput label="Messages / mo" value={draft.cfg.max_messages} onChange={v => setCfg('max_messages', v)} placeholder="5000" disabled={isSaving} />
-                        <NumInput label="Knowledge Chunks" value={draft.cfg.max_chunks} onChange={v => setCfg('max_chunks', v)} placeholder="1000" disabled={isSaving} />
+                        <NumInput label="Storage(chunks)" value={draft.cfg.max_chunks} onChange={v => setCfg('max_chunks', v)} placeholder="1000" disabled={isSaving} />
                       </div>
                     </div>
 
@@ -442,8 +442,8 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                 {companies.map((bot: any, i: number) => (
                   <div key={bot.id || i} className="p-3 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 flex justify-between items-center">
                     <div>
-                      <p className="text-xs font-bold text-slate-900 dark:text-slate-200">{bot.bot_name || 'Unnamed'}</p>
-                      <p className="text-[10px] font-mono text-slate-400">{bot.allowed_origin || 'No origin'}</p>
+                      <p className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200">{bot.bot_name || 'Unnamed'}</p>
+                      <a href={bot.allowed_origin} target="_blank" className="text-[10px] font-mono text-blue-400 underline">{bot.allowed_origin || 'No origin'}</a>
                     </div>
                     <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-slate-500 border border-gray-200'}`}>
                       {bot.is_active !== false ? 'Active' : 'Inactive'}
@@ -531,10 +531,10 @@ export default function AdminPage() {
             placeholder="Search users..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="flex-1 max-w-full md:max-w-md bg-gray-50 dark:bg-slate-800 border-none px-4 py-2.5 text-sm outline-none"
+            className="flex-1 max-w-full md:max-w-md bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 px-4 py-2.5 text-md font-medium outline-none"
           />
-          <div className="-mx-4 sm:-mx-6 md:mx-0 px-4 sm:px-6 md:px-0 overflow-x-auto">
-            <div className="flex gap-1 min-w-max">
+          <div className="-mx-4 sm:-mx-6 md:mx-0 px-4 sm:px-6 md:px-0 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1 min-w-max ">
               {['ALL', ...TIERS].map(t => (
                 <button
                   key={t}
@@ -566,7 +566,7 @@ export default function AdminPage() {
       </div>
 
       {/* Users — table on md+, stacked cards on mobile */}
-      <div className="flex-1 p-4 sm:p-6">
+      <div className="flex-1 p-4 sm:p-6 bg-white">
         {isLoading ? <SkeletonLoader.Table /> : (
           <>
             {/* Desktop / tablet: traditional table */}
@@ -584,7 +584,7 @@ export default function AdminPage() {
                   {filteredUsers.map((u: any) => (
                     <tr key={u.clerk_id} className="hover:bg-gray-50/50 dark:hover:bg-slate-900/50 transition-colors">
                       <td className="py-4 px-2 min-w-0">
-                        <p className="text-sm font-bold truncate max-w-[260px]">{u.email}</p>
+                        <p className="text-md font-google truncate max-w-[260px]">{u.email}</p>
                         <p className="text-[10px] font-mono text-slate-400 truncate max-w-[260px]">{u.clerk_id}</p>
                       </td>
                       <td className="py-4 px-2 space-y-1">
@@ -614,7 +614,7 @@ export default function AdminPage() {
                 >
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">User</p>
-                    <p className="text-sm font-bold break-all">{u.email}</p>
+                    <p className="text-md font-google font-semibold break-all">{u.email}</p>
                     <p className="text-[10px] font-mono text-slate-400 break-all">{u.clerk_id}</p>
                   </div>
 

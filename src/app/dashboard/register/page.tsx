@@ -158,7 +158,7 @@ const AppRegistration = () => {
     return (
         <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
             {/* Header */}
-            <div className="bg-white dark:bg-slate-950 px-8 py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+            <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
                 <div className="flex items-center gap-2 mb-1">
                     <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">smart_toy</span>
                     <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">Create Your Bot</h1>
@@ -172,7 +172,7 @@ const AppRegistration = () => {
                         exit={{ opacity: 0, y: -8 }}
                         className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 flex-1 overflow-hidden transition-colors duration-500"
                     >
-                        <div className={`lg:col-span-5 ${cellCls} p-10 overflow-y-auto custom-scrollbar`}>
+                        <div className={`lg:col-span-5 ${cellCls} p-5 sm:p-7 md:p-10 overflow-y-auto custom-scrollbar`}>
                             <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 mb-4 transition-colors">
                                 Identity &{' '}
                                 <span className="bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">Deployment</span>
@@ -197,7 +197,7 @@ const AppRegistration = () => {
                             </div>
                         </div>
 
-                        <div className={`lg:col-span-7 ${cellCls} p-10 overflow-y-auto custom-scrollbar border-l border-gray-100 dark:border-slate-800 relative`}>
+                        <div className={`lg:col-span-7 ${cellCls} p-5 sm:p-7 md:p-10 overflow-y-auto custom-scrollbar border-t lg:border-t-0 lg:border-l border-gray-100 dark:border-slate-800 relative`}>
                             {isLocked && (
                                 <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors">
                                     <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-500 mb-4 transition-colors">lock</span>
@@ -272,7 +272,7 @@ const AppRegistration = () => {
                     <motion.div key="success"
                         className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500"
                     >
-                        <div className="bg-white dark:bg-slate-950 px-8 py-6 flex items-center gap-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors duration-500">
+                        <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 flex flex-wrap items-center gap-4 md:gap-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors duration-500">
                             <div className="w-12 h-12 border-2 border-emerald-900 dark:border-emerald-500 bg-white dark:bg-slate-900 flex items-center justify-center shrink-0 transition-colors">
                                 <span className="material-symbols-outlined text-[24px] text-emerald-900 dark:text-emerald-500 transition-colors">check_circle</span>
                             </div>
@@ -280,7 +280,7 @@ const AppRegistration = () => {
                                 <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 uppercase transition-colors">{registrationData.companyName}</h2>
                                 <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed mt-1 transition-colors">Provision successful. Credentials active.</p>
                             </div>
-                            <div className="ml-auto flex gap-4">
+                            <div className="ml-auto flex flex-wrap gap-2 sm:gap-4">
                                 <button onClick={() => router.push('/dashboard/train')}
                                     className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-green-600 text-white text-md uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all flex items-center gap-2 active:scale-95 shadow-md">
                                     Train AI <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -293,7 +293,7 @@ const AppRegistration = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors">
-                            <div className="bg-white dark:bg-slate-950 p-8 transition-colors">
+                            <div className="bg-white dark:bg-slate-950 p-4 sm:p-6 md:p-8 transition-colors">
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[14px] text-slate-600 dark:text-slate-500 transition-colors">vpn_key</span>
                                     <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors">Secure API Key</p>
@@ -306,13 +306,13 @@ const AppRegistration = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="bg-white dark:bg-slate-950 p-8 transition-colors">
+                            <div className="bg-white dark:bg-slate-950 p-4 sm:p-6 md:p-8 transition-colors">
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-[14px] text-slate-600 dark:text-slate-500 transition-colors">code</span>
                                     <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-display transition-colors">Quick Embed</p>
                                 </div>
-                                <div className="relative">
-                                    <pre className="p-4 bg-slate-900 border border-slate-900 text-blue-300 text-md font-mono overflow-x-auto leading-relaxed h-[88px] flex items-center">
+                                <div className="relative ">
+                                    <pre className="p-4 bg-slate-900 border border-slate-900 text-blue-300 text-md font-mono overflow-x-auto leading-relaxed h-[88px] flex items-center scrollbar-hide">
                                         <code>{`<script src="${frontendUrl}/widget.js" data-api-key="${registrationData.apiKey}" defer></script>`}</code>
                                     </pre>
                                     <button onClick={() => handleCopy(`<script src="${frontendUrl}/widget.js" data-api-key="${registrationData.apiKey}" defer></script>`)}
@@ -324,7 +324,7 @@ const AppRegistration = () => {
                         </div>
 
                         {/* Dynamic Integration Guides */}
-                        <div className="p-8 pt-4">
+                        <div className="p-4 pt-3 sm:p-6 sm:pt-4 md:p-8 md:pt-4">
                             <BotIntegrationDocs
                                 apiKey={registrationData.apiKey}
                                 apiUrl={process.env.NEXT_PUBLIC_API_URL || 'https://sapyai.onrender.com'}

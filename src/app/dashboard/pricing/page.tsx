@@ -124,7 +124,7 @@ const AppPricing = () => {
             highlight: false,
             features: [
                 { label: '1 AI Bot' },
-                { label: '500 messages / month' },
+                { label: '500 msg / mo' },
                 { label: '100 knowledge chunks' },
                 { label: 'Standard response speed' },
                 { label: 'Sapybase branding' },
@@ -141,8 +141,8 @@ const AppPricing = () => {
             highlight: true,
             features: [
                 { label: '2 AI Bots' },
-                { label: '2,000 messages / bot / month' },
-                { label: '500 knowledge chunks per bot' },
+                { label: '2,000 msg / bot / mo' },
+                { label: '500 knowledge chunks / bot' },
                 { label: 'Priority response speed' },
                 { label: 'Custom branding & colors' },
                 { label: 'Lead capture (CRM-ready)' },
@@ -159,8 +159,8 @@ const AppPricing = () => {
             highlight: false,
             features: [
                 { label: '5 AI Bots' },
-                { label: '5,000 messages / bot / month' },
-                { label: '2,000 knowledge chunks per bot' },
+                { label: '5,000 msg / bot / mo' },
+                { label: '2,000 knowledge chunks / bot' },
                 { label: 'Dedicated response speed' },
                 { label: 'Full white-label' },
                 { label: 'Webhooks & Zapier' },
@@ -179,8 +179,8 @@ const AppPricing = () => {
             badge: 'Full Platform',
             features: [
                 { label: '15 AI Bots' },
-                { label: '15,000 messages / bot / month' },
-                { label: '10,000 knowledge chunks per bot' },
+                { label: '15,000 msg / bot / mo' },
+                { label: '10,000 knowledge chunks / bot' },
                 { label: 'Ultra response speed' },
                 { label: 'Full white-label' },
                 { label: 'Human handoff (transcript + URL)' },
@@ -221,7 +221,7 @@ const AppPricing = () => {
     const renderFeature = (f: { label: string }) => (
         <div key={f.label} className="flex items-center gap-3 group">
             <CheckIcon />
-            <span className="text-sm text-slate-600 font-semibold dark:text-slate-400 font-sans transition-colors group-hover:text-slate-900 dark:group-hover:text-slate-200">{f.label}</span>
+            <span className="text-sm text-slate-600 dark:text-slate-400 font-google transition-colors group-hover:text-slate-900 dark:group-hover:text-slate-200">{f.label}</span>
         </div>
     );
 
@@ -249,7 +249,7 @@ const AppPricing = () => {
 
                     <div className="flex items-center gap-3 self-start sm:self-auto">
                         {isDetecting ? (
-                            <div className="flex items-center gap-2 text-[10px] font-sans font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+                            <div className="flex items-center gap-2 text-[10px] font-google font-bold text-slate-400 uppercase tracking-widest animate-pulse">
                                 <span className="material-symbols-outlined text-[12px]">public</span>
                                 Detecting...
                             </div>
@@ -257,7 +257,7 @@ const AppPricing = () => {
                             <div className="flex border border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-950 h-9 overflow-hidden shadow-sm">
                                 {(Object.keys(CURRENCIES) as Array<keyof typeof CURRENCIES>).map(curr => (
                                     <button key={curr} onClick={() => setCurrency(curr)}
-                                        className={`px-3 py-1 text-sm font-sans font-bold tracking-widest uppercase transition-all ${currency === curr
+                                        className={`px-3 py-1 text-sm font-google font-bold tracking-widest uppercase transition-all ${currency === curr
                                             ? 'bg-slate-900 dark:bg-blue-600 text-white'
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900'}`}>
                                         {curr}
@@ -344,7 +344,7 @@ const AppPricing = () => {
                                 <button
                                     onClick={() => handleSelectPlan(plan.id)}
                                     disabled={isLoading || plan.id === userTier}
-                                    className={`w-full py-3 min-h-[44px] text-xs font-sans uppercase tracking-widest font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${plan.highlight
+                                    className={`w-full py-3 min-h-[44px] text-xs font-google uppercase tracking-widest font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${plan.highlight
                                         ? 'bg-gradient-to-r from-blue-600 to-green-600 text-white hover:opacity-90 shadow-xl shadow-blue-500/10'
                                         : plan.id === 'BUSINESS'
                                             ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:opacity-90 shadow-xl shadow-emerald-500/10'
@@ -353,7 +353,7 @@ const AppPricing = () => {
                                 >
                                     {plan.id === userTier ? 'ACTIVE_PLAN' : (
                                         isLoading && selectedTier === plan.id
-                                            ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current animate-spin rounded-full" /> PROVISIONING...</>
+                                            ? <><div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin-slow" /> PROVISIONING...</>
                                             : `ACTIVATE_${plan.name.toUpperCase()}`
                                     )}
                                 </button>
@@ -368,7 +368,7 @@ const AppPricing = () => {
                         transition={{ delay: plans.length * 0.08 }}
                         className="bg-white dark:bg-slate-950 border-t-2 border-blue-500 dark:border-blue-400 relative transition-colors duration-500"
                     >
-                        <div className="flex w-fit px-3 py-1 bg-gradient-to-r from-blue-600 to-teal-600 text-white text-[9px] uppercase tracking-widest font-bold font-sans">
+                        <div className="flex w-fit px-3 py-1 bg-gradient-to-r from-blue-600 to-teal-600 text-white text-[9px] uppercase tracking-widest font-bold font-google">
                             For Agencies
                         </div>
 
@@ -385,7 +385,7 @@ const AppPricing = () => {
                                         Let's Talk
                                     </span>
                                 </div>
-                                <span className="text-[9px] uppercase tracking-widest font-bold text-blue-600 dark:text-blue-400 font-sans">Tailored pricing · monthly or annual</span>
+                                <span className="text-[9px] uppercase tracking-widest font-bold text-blue-600 dark:text-blue-400 font-google">Tailored pricing · monthly or annual</span>
                                 <p className="text-xs font-google text-slate-500 dark:text-slate-300 leading-relaxed mt-3">
                                     Built for agencies, resellers, and high-growth businesses that need full control over bots, data, models, and features. Configured from our admin panel.
                                 </p>

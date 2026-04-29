@@ -263,14 +263,14 @@ export default function AppInsights() {
 
     // ── Rendering Helpers ────────────────────────────────────────────────────
     const renderHeader = () => (
-        <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+        <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500 min-w-0 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
+                        <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors shrink-0">
                             insights
                         </span>
-                        <h1 className="text-xl md:text-2xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
+                        <h1 className="text-xl md:text-2xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors truncate">
                             Sapybase Insights
                         </h1>
                     </div>
@@ -313,7 +313,7 @@ export default function AppInsights() {
                     <select
                         value={selectedBotId}
                         onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 max-w-xs px-3 py-2 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 text-sm font-mono text-slate-900 dark:text-slate-200 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
+                        className="flex-1 min-w-0 max-w-xs px-3 py-2 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 text-sm font-mono text-slate-900 dark:text-slate-200 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
                     >
                         {bots.map((b: any) => (
                             <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
@@ -323,11 +323,11 @@ export default function AppInsights() {
             )}
 
             {/* Tabs */}
-            <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
-                <div className="flex items-center gap-4 sm:gap-6 border-b border-gray-100 dark:border-slate-800 px-4 sm:px-0 min-w-max sm:min-w-0">
+            <div className="mt-6 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-4 sm:gap-6 border-b border-gray-100 dark:border-slate-800 min-w-max sm:min-w-0">
                     <button
                         onClick={() => setActiveTab('analytics')}
-                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 ${activeTab === 'analytics'
+                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'analytics'
                                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
@@ -336,7 +336,7 @@ export default function AppInsights() {
                     </button>
                     <button
                         onClick={() => setActiveTab('leads')}
-                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'leads'
+                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'leads'
                                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
@@ -345,7 +345,7 @@ export default function AppInsights() {
                     </button>
                     <button
                         onClick={() => setActiveTab('conversations')}
-                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'conversations'
+                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'conversations'
                                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
@@ -354,7 +354,7 @@ export default function AppInsights() {
                     </button>
                     <button
                         onClick={() => setActiveTab('roi')}
-                        className={`pb-3 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'roi'
+                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'roi'
                                 ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
@@ -398,12 +398,12 @@ export default function AppInsights() {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col h-full w-full min-w-0 max-w-full bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-500"
+            className="flex flex-col h-full w-full min-w-0 bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-500"
         >
             {renderHeader()}
 
             {/* Content Area */}
-            <div className="flex-1 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto custom-scrollbar flex flex-col">
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col">
 
                 {activeTab === 'leads' && (
                     <LeadsPanel
@@ -442,10 +442,10 @@ export default function AppInsights() {
                         )}
 
                         {AUTHORIZED_TIERS.has(userTier) && reportData && !isGenerating && !error && (
-                            <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1">
+                            <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 w-full overflow-hidden">
 
                                 {/* ── ROI Scorecards (Top Row) ── */}
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800 w-full min-w-0">
                                     {/* Support Hours Saved */}
                                     <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                         <div className="flex items-center gap-2 mb-3">
@@ -477,7 +477,7 @@ export default function AppInsights() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-visible transition-colors duration-500 flex-1">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-hidden transition-colors duration-500 flex-1 w-full min-w-0">
                                     {/* Left Column: Top Trends & Temporal */}
                                     <div className={`lg:col-span-7 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500`}>
                                         <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
@@ -555,13 +555,13 @@ export default function AppInsights() {
                                 </div>
 
                                 {/* ── Recent Conversations Log ── */}
-                                <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
-                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto`}>
+                                <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 w-full overflow-hidden">
+                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto overflow-y-hidden scrollbar-hide`}>
                                         <div className="flex items-center gap-2 mb-6">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span>
+                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5 shrink-0">history</span>
                                             <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
                                         </div>
-                                        <div className="w-full">
+                                        <div className="w-full min-w-0">
                                             <div className="hidden md:grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
                                                 <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
                                                 <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>

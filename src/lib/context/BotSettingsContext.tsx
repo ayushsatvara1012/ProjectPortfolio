@@ -85,7 +85,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
   const fetchSettings = useCallback(async (botId: string | null = null) => {
     if (!isSignedIn) return;

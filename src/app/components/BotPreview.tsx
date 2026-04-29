@@ -35,9 +35,9 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
   const quickQs = (Array.isArray(quickQuestions) ? quickQuestions : []).filter(Boolean);
 
   return (
-    <div className="relative h-full w-full flex items-center justify-center p-2 lg:p-8 transition-all duration-300 bg-transparent">
+    <div className="relative h-full w-full flex items-center justify-center p-2 md:p-4 lg:p-8 transition-all duration-300 bg-transparent">
       {/* ── Main Chatbot Box ── */}
-      <div className={`w-full max-w-[440px] h-[600px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
+      <div className={`w-full max-w-[95vw] sm:max-w-[440px] h-[60vh] sm:h-[600px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
         {/* ── Header ── */}
         <div className="relative shrink-0">
           <div
@@ -51,16 +51,16 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
             <div className="relative flex flex-row justify-between items-center w-full">
               {/* Left: Avatar + Name */}
               <div className="relative flex items-center gap-3 pl-4">
-                <div className="relative">
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
+                <div className="relative inline-flex shrink-0">
                   <BotAvatar
-                    shapeId={logoShape || 'circle'}
+                    shapeId="rounded-square"
                     logoUrl={LOGO_URL}
                     botName={BOT_NAME}
                     themeColor={THEME_COLOR}
                     size="md"
                     bgStyle={avatarBgStyle || 'none'}
                   />
+                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
                 </div>
                 <div className="flex flex-row items-center justify-center">
                   <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>

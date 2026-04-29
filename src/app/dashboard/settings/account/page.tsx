@@ -49,7 +49,7 @@ const ProfileTab = () => {
           <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-950 rounded-full" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-2xl font-display font-bold text-slate-900 dark:text-slate-100 truncate">
+          <h3 className="text-lg sm:text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-100 truncate">
             {user?.fullName || 'Developer'}
           </h3>
           <p className="text-md font-display text-slate-500 dark:text-slate-400 mt-0.5 truncate">
@@ -317,13 +317,13 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState('profile');
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900">
-      <div className="px-6 py-6 border-b border-gray-100 dark:border-slate-800">
-        <h2 className="text-2xl font-display font-bold">Account</h2>
+    <div className="min-h-dvh bg-white dark:bg-slate-900">
+      <div className="px-4 py-4 sm:px-6 sm:py-6 border-b border-gray-100 dark:border-slate-800">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-display font-bold">Account</h2>
         <p className="text-md text-slate-500">Manage profile and billing.</p>
       </div>
 
-      <div className="flex border-b px-6 gap-1 overflow-x-auto">
+      <div className="flex border-b px-4 sm:px-6 gap-1 overflow-x-auto">
         {ACCOUNT_TABS.map(tab => (
           <button
             key={tab.id}
@@ -336,7 +336,7 @@ export default function AccountPage() {
         ))}
       </div>
 
-      <div className="p-6 max-w-3xl">
+      <div className="px-4 py-4 sm:px-6 sm:py-6 max-w-3xl">
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
             {activeTab === 'profile' && <ProfileTab />}

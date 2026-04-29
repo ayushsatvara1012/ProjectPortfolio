@@ -87,7 +87,7 @@ export default function BotsPage() {
 
       <div className="relative flex flex-col h-full z-10">
         <DemoMigrationBanner />
-        <div className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-md px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between transition-colors">
+        <div className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-md px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between transition-colors">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="material-symbols-outlined text-[16px] text-slate-600 dark:text-slate-400">smart_toy</span>
@@ -108,15 +108,15 @@ export default function BotsPage() {
         </div>
 
         {plan && (
-          <div className="grid grid-cols-3 gap-px bg-gray-200/30 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 transition-colors">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200/30 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 transition-colors">
             {[
               { label: 'Plan', value: plan.tier || '—' },
               { label: 'Msgs / Bot / Mo', value: plan.message_limit >= 999999 ? 'Unlimited' : plan.message_limit.toLocaleString() },
               { label: 'Knowledge Chunks', value: plan.chunk_limit >= 999999 ? 'Unlimited' : plan.chunk_limit.toLocaleString() },
             ].map((s, i) => (
-              <div key={i} className="bg-white/50 dark:bg-slate-950/70 backdrop-blur-md px-6 py-4 transition-colors">
+              <div key={i} className="bg-white/50 dark:bg-slate-950/70 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 transition-colors">
                 <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-0.5">{s.label}</p>
-                <p className="text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
+                <p className="text-sm sm:text-base md:text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
               </div>
             ))}
           </div>

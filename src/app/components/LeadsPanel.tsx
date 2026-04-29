@@ -163,7 +163,7 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }: LeadsPanel
                                 {/* Context */}
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">Context / Query</span>
-                                    <p className="text-sm font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap wrap-break-word">
+                                    <p className="text-sm font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap break-words">
                                         {lead.context || "No context provided."}
                                     </p>
                                 </div>

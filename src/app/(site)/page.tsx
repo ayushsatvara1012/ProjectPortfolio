@@ -1,5 +1,6 @@
 import React from 'react';
 import { Metadata } from 'next';
+
 import HeroSection from '@/src/components/marketing/HeroSection';
 import HowItWorks from '@/src/components/marketing/HowItWorks';
 import Metrics from '@/src/components/marketing/Metrics';
@@ -14,41 +15,41 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
-  const schema = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        "@id": "https://www.Sapybase.com/#organization",
-        "name": "Sapybase",
-        "url": "https://www.Sapybase.com",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://www.Sapybase.com/SB_Brand-removebg.png"
-        }
-      },
-      {
-        "@type": "SoftwareApplication",
-        "name": "Sapybase AI Chatbot",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "url": "https://www.Sapybase.com",
-        "description": "Autonomous AI chatbots and agents for modern businesses. Connect documents and databases to automate customer support and sales.",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        }
+const structuredSchema = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.Sapybase.com/#organization",
+      "name": "Sapybase",
+      "url": "https://www.Sapybase.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.Sapybase.com/SB_Brand-removebg.png"
       }
-    ]
-  };
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Sapybase AI Chatbot",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "url": "https://www.Sapybase.com",
+      "description": "Autonomous AI chatbots and agents for modern businesses. Connect documents and databases to automate customer support and sales.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+  ]
+};
 
+export default function HomePage() {
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredSchema) }}
       />
       <main className="relative overflow-x-clip">
         <HeroSection />

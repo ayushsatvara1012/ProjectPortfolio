@@ -111,6 +111,12 @@
     @apply bg-slate-800 hover:bg-slate-700;
   }
 
+  /* Target horizontal scrollbars specifically to make them transparent/hidden */
+  .custom-scrollbar::-webkit-scrollbar:horizontal {
+    height: 0px;
+    background: transparent;
+  }
+
   /* Hidden scrollbar — scrollable but no visible bar */
   .scrollbar-hide {
     -ms-overflow-style: none;

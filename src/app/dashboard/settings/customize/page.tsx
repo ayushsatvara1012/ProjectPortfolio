@@ -12,8 +12,8 @@ import BotPreview from '@/src/app/components/BotPreview';
 import Alert from '@/src/app/components/Alert';
 
 const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
-const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
-const headingCls = "text-xl font-medium font-google mb-4 transition-colors text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-600 dark:from-blue-400 dark:to-green-500";
+const labelCls = "block text-sm sm:text-base md:text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+const headingCls = "text-base sm:text-lg md:text-xl font-medium font-google mb-4 transition-colors text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-600 dark:from-blue-400 dark:to-green-500";
 
 export default function CustomizePage() {
   const { botSettings, updateSetting, saveSettings, fetchSettings, isSaving, isLoading } = useBotSettings();
@@ -77,15 +77,15 @@ export default function CustomizePage() {
   const isProUser = ['PRO', 'BUSINESS', 'ENTERPRISE'].includes(userTier || '') || userRole === 'SUPER_ADMIN';
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100vh-3rem)]">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100dvh-3rem)]">
       {/* ── LEFT: Settings Form ── */}
       <div className="bg-white dark:bg-slate-950 flex flex-col relative transition-colors">
-        <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
+        <div className="px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
           <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Customize</h2>
           <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
         </div>
 
-        <div className={`p-8 relative ${showFullOverlay ? 'overflow-hidden select-none' : 'overflow-y-auto custom-scrollbar'} lg:max-h-[calc(100vh-9.5rem)]`}>
+        <div className={`p-4 sm:p-6 md:p-8 relative ${showFullOverlay ? 'overflow-hidden select-none' : 'overflow-y-auto custom-scrollbar'} lg:max-h-[calc(100dvh-9.5rem)]`}>
           {showFullOverlay && (
             <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center border-t border-gray-100 dark:border-slate-800 transition-colors cursor-help">
               <span className="material-symbols-outlined text-[32px] text-slate-500 dark:text-slate-500 mb-4 transition-colors">lock</span>
@@ -225,7 +225,7 @@ export default function CustomizePage() {
               <div className={isAdvancedLocked ? 'opacity-40 grayscale-[0.5] pointer-events-none filter blur-[0.5px]' : ''}>
                 <div className="mb-6">
                   <label className={labelCls}>Company Tone</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {['Professional', 'Friendly', 'Humorous', 'Technical', 'Concise'].map(tone => (
                       <label key={tone} className="flex items-center gap-2 p-3 border border-gray-100 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                         <input
@@ -385,7 +385,7 @@ export default function CustomizePage() {
           </button>
         </div>
 
-        <div className="w-full lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0">
+        <div className="w-full lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.75] sm:scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0">
           <BotPreview theme={isDark ? 'dark' : 'light'} />
         </div>
       </div>

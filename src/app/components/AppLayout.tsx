@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, Component, useRef } from 'react';
+import React, { useState, useEffect, Suspense, Component, useRef } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import Link from 'next/link';
 
@@ -233,8 +233,13 @@ type SidebarContentProps = {
 };
 
 const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps) => {
-  const { userRole } = useUserRole();
   const pathname = usePathname();
+  const { userRole } = useUserRole();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const onSettings = !!pathname && pathname.startsWith('/dashboard/settings');
   const [settingsOpen, setSettingsOpen] = useState(onSettings);
 
@@ -331,10 +336,10 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
 
       {/* User footer */}
       <div className="px-4 py-1.5 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2.5 min-h-[56px] bg-[#FAFAFA] dark:bg-slate-900 transition-colors duration-500 overflow-hidden">
-        <UserButton appearance={{ elements: { avatarBox: 'w-6 h-6' } }} />
+        {mounted && <UserButton appearance={{ elements: { avatarBox: 'w-6 h-6' } }} />}
         <div className={`flex-1 min-w-0 transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate transition-colors">
-            {user?.fullName || user?.firstName || 'My Account'}
+            {mounted ? (user?.fullName || user?.firstName || 'My Account') : ''}
           </p>
           <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 truncate transition-colors">
             Profile &amp; Billing
@@ -355,6 +360,12 @@ type TopNavProps = {
 const TopNav = ({ user, onMenuClick }: TopNavProps) => {
   const pathname = usePathname();
   const { userTier } = useUserRole();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const pageLabel = (pathname && PATH_LABELS[pathname]) || 'Dashboard';
   const tierLabel = userTier ? (TIER_LABEL[userTier] ?? userTier) : null;
 
@@ -379,7 +390,7 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
       <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors border-l border-gray-100 dark:border-slate-800 ml-2 pl-4">
         <div className="hidden sm:flex items-center gap-1.5 min-w-0">
           <span className="truncate max-w-[140px] text-slate-700 dark:text-slate-300 font-google transition-colors">
-            {user?.fullName || user?.firstName || 'My Workspace'}
+            {mounted ? (user?.fullName || user?.firstName || 'My Workspace') : ''}
           </span>
           {tierLabel && (
             <span className="shrink-0 px-1.5 py-0.5 border border-gray-200 dark:border-slate-700 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors">
@@ -439,16 +450,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </AnimatePresence>
-      {/* Desktop sidebar (hover-expand) */}
+      {/* Desktop sidebar (hover-expand; touch-tap to toggle on iPad) */}
       <aside
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
+        onClick={() => { if (window.matchMedia('(hover: none)').matches) setSidebarExpanded(p => !p); }}
         className={`hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#fafafa] dark:bg-slate-900 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
       >
         <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
       </aside>
       {/* Main content */}
-      <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
+      <main className={`flex-1 relative mt-12 min-h-[calc(100vh-3rem)] bg-white dark:bg-slate-950 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'}`}>
         <div className="flex-1 flex flex-col pt-0">
           <DashboardErrorBoundary>
             <Suspense fallback={null}>
@@ -457,7 +469,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </DashboardErrorBoundary>
         </div>
         {/* Dashboard Footer */}
-        <footer className="md:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 md:px-8 md:py-4 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
+        <footer className="bg-white dark:bg-slate-950 px-6 py-4 md:px-8 md:py-4 border-t border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6 mt-auto transition-colors duration-500">
           <div className="flex flex-col md:flex-row items-center gap-6 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans">
             <p className="text-center">© 2026 Sapybase LLC — ENGINEERED WITH PRECISION.</p>
             <div className="hidden md:block h-px w-6 bg-gray-200 dark:bg-slate-800" />

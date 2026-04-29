@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { AVATAR_GRADIENTS, FabWidgetPreview } from './ChatWidget';
+import { AVATAR_GRADIENTS, FAB_SHAPES, SHAPE_CLASS_MAP } from './avatar/AvatarShared';
+export { AVATAR_GRADIENTS, FAB_SHAPES, SHAPE_CLASS_MAP } from './avatar/AvatarShared';
 
-// ── Shape catalogue ────────────────────────────────────────────────────────────
+// ── Shape catalogue (for shape picker UI) ─────────────────────────────────────
 export const SHAPES = [
   {
     id: 'circle',
@@ -12,7 +13,7 @@ export const SHAPES = [
     twClass: 'rounded-full',
     icon: (
       <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d="M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z" />
+        <path d={FAB_SHAPES.circle.path} />
       </svg>
     ),
   },
@@ -22,7 +23,7 @@ export const SHAPES = [
     twClass: 'rounded-[2rem]',
     icon: (
       <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d="M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z" />
+        <path d={FAB_SHAPES.squircle.path} />
       </svg>
     ),
   },
@@ -32,7 +33,7 @@ export const SHAPES = [
     twClass: 'rounded-2xl',
     icon: (
       <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d="M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z" />
+        <path d={FAB_SHAPES.bento.path} />
       </svg>
     ),
   },
@@ -42,17 +43,14 @@ export const SHAPES = [
     twClass: 'rounded-lg',
     icon: (
       <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d="M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z" />
+        <path d={FAB_SHAPES.sharp.path} />
       </svg>
     ),
   },
 ];
 
-export const SHAPE_CLASS_MAP = Object.fromEntries(
-  SHAPES.map(s => [s.id, s.twClass])
-);
 
-// ── Front-end URL pre-validation ───────────────────────────────────────────────
+
 const BLOCKED_LOGO_HOSTS = [
   'cdn.discordapp.com',
   'media.discordapp.net',
@@ -87,7 +85,15 @@ function preValidateUrl(url: string) {
   return null;
 }
 
-// ── BotAvatar ──
+// ── BotAvatar ──────────────────────────────────────────────────────────────────
+// SVG clipPath renderer — the ONLY approach that correctly clips to irregular
+// paths (bento tail, sharp point). CSS overflow-hidden cannot do this.
+//
+// 4-layer SVG stack:
+//   L1 themeColor <path>  — fills entire shape including tail
+//   L2 white <rect>       — backdrop for transparent PNGs (only when image shown)
+//   L3 <image>            — custom logo, slice-scaled to fill clip area
+//   L4 <text>             — initial letter fallback (only when no image)
 type BotAvatarProps = {
   shapeId?: string;
   logoUrl?: string;
@@ -103,11 +109,12 @@ export function BotAvatar({
   botName = 'S',
   size = 'md',
   themeColor = '#5730F5',
-  bgStyle = 'none'
+  bgStyle = 'none',
 }: BotAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
 
+  // EC5: reset imgFailed whenever URL changes so new image gets a fresh attempt
   useEffect(() => {
     if (logoUrl !== prevUrlRef.current) {
       setImgFailed(false);
@@ -115,54 +122,223 @@ export function BotAvatar({
     }
   }, [logoUrl]);
 
-  const shapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-full';
+  // EC6: unique per-instance IDs prevent SVG clipPath/gradient ID collisions
+  const uid = React.useId().replace(/:/g, '');
+
+  const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
+  const FAB_PATH = shape.path;
+  const offsetX = shape.x || 0;
+  const offsetY = shape.y || 0;
+
+  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
   const initial = (botName || 'S').charAt(0).toUpperCase();
+  const showImage = !!(logoUrl && logoUrl.trim() && !imgFailed);
 
-  const sizeClasses = {
-    sm: 'w-7 h-7 text-sm',
-    md: 'w-10 h-10 text-lg',
-    lg: 'w-14 h-14 text-2xl',
-  };
-  const sizeClass = sizeClasses[size] || sizeClasses.md;
+  // L1 fill: gradient when bgStyle set, otherwise themeColor
+  const baseFill = gradient ? `url(#${uid}-grad)` : themeColor;
 
-  const showImage = logoUrl && logoUrl.trim() && !imgFailed;
-
-  let bgProps: React.CSSProperties = { backgroundColor: showImage ? '#ffffff' : themeColor };
-  if (showImage && bgStyle && AVATAR_GRADIENTS[bgStyle]) {
-    const gradient = AVATAR_GRADIENTS[bgStyle];
-    if (gradient) {
-      bgProps = {
-        background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
-        backgroundColor: 'transparent'
-      };
-    }
-  }
+  // EC2: sizes in SVG coordinate units (viewBox is 0 0 100 100)
+  const sizePx = { sm: 28, md: 40, lg: 56 }[size] ?? 40;
+  const fontSize = { sm: 10, md: 15, lg: 21 }[size] ?? 15;
 
   return (
-    <div
-      className={`${sizeClass} ${shapeClass} overflow-hidden flex items-center justify-center shrink-0 border border-gray-100 dark:border-slate-700 shadow-sm`}
-      style={bgProps}
+    <svg
+      viewBox="0 0 100 100"
+      xmlns="http://www.w3.org/2000/svg"
+      width={sizePx}
+      height={sizePx}
+      className="shrink-0 drop-shadow-sm"
+      overflow="visible"
     >
-      {showImage ? (
-        <img
-          src={logoUrl}
-          alt={`${botName} logo`}
-          className="w-[80%] h-[80%] object-contain"
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <span
-          className="font-bold leading-none select-none"
-          style={{ color: '#ffffff', fontSize: size === 'lg' ? '1.5rem' : size === 'sm' ? '0.75rem' : '1rem' }}
+      <defs>
+        {/* EC12: clipPath defined inline in same SVG — safe in shadow DOM */}
+        <clipPath id={`${uid}-clip`}>
+          <path d={FAB_PATH} />
+        </clipPath>
+        {gradient && (
+          <linearGradient id={`${uid}-grad`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={gradient[0]} />
+            <stop offset="100%" stopColor={gradient[1]} />
+          </linearGradient>
+        )}
+      </defs>
+
+      {/* L1: theme-color fills entire path including tail/corners */}
+      <path d={FAB_PATH} fill={baseFill} />
+
+      {/* L2: white/slate backdrop clipped to shape — EC1 transparent PNG fix.
+           EC8: if gradient bgStyle, show gradient not white so it shows through. */}
+      {showImage && (
+        <g clipPath={`url(#${uid}-clip)`}>
+          {gradient ? (
+            <rect x="0" y="0" width="100" height="100" fill={`url(#${uid}-grad)`} />
+          ) : (
+            <rect x="0" y="0" width="100" height="100" fill="#f8fafc" />
+          )}
+        </g>
+      )}
+
+      {/* L3: custom logo clipped precisely to shape — EC2 tail coverage */}
+      {showImage && (
+        <g clipPath={`url(#${uid}-clip)`}>
+          <image
+            href={logoUrl}
+            x={0}
+            y={0}
+            width={100}
+            height={100}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        </g>
+      )}
+
+      {/* L4: initial letter when no image — EC3, EC11 */}
+      {!showImage && (
+        <text
+          x={50 + offsetX}
+          y={52 + offsetY}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#ffffff"
+          style={{
+            fontSize: `${fontSize}px`,
+            fontFamily: 'var(--font-display, sans-serif)',
+            fontWeight: 700,
+          }}
         >
           {initial}
-        </span>
+        </text>
       )}
-    </div>
+    </svg>
   );
 }
 
-// ── LogoCustomizer ──
+
+// ── FabWidgetPreview (used in the customizer live preview strip) ───────────────
+export const FabWidgetPreview = ({
+  shapeId,
+  logoUrl,
+  botName,
+  themeColor,
+  bgStyle,
+  isCustomUrl = false,
+}: {
+  shapeId: string;
+  logoUrl: string;
+  botName: string;
+  themeColor: string;
+  bgStyle: string;
+  isCustomUrl?: boolean;
+}) => {
+  const fabShape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
+  const FAB_PATH = fabShape.path;
+  const THEME_COLOR = themeColor || '#5730F5';
+  const BOT_NAME = botName || 'S';
+  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
+  const idPrefix = 'fab-preview';
+
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-14 h-14 shrink-0 drop-shadow-sm"
+      overflow="visible"
+    >
+      <defs>
+        <clipPath id={`${idPrefix}-clip`}>
+          <path d={FAB_PATH} />
+        </clipPath>
+        <filter id={`${idPrefix}-inset`} x="-20%" y="-20%" width="140%" height="140%">
+          <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+          <feGaussianBlur stdDeviation="3" /><feOffset dx="4" dy="4" result="dark" />
+          <feComposite operator="in" in2="SourceAlpha" result="iDark" />
+          <feFlood floodColor="rgba(0,0,0,0.14)" />
+          <feComposite operator="in" in2="iDark" result="fDark" />
+          <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+          <feGaussianBlur stdDeviation="3" /><feOffset dx="-3" dy="-3" result="light" />
+          <feComposite operator="in" in2="SourceAlpha" result="iLight" />
+          <feFlood floodColor="rgba(255,255,255,0.8)" />
+          <feComposite operator="in" in2="iLight" result="fLight" />
+          <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="fDark" /><feMergeNode in="fLight" /></feMerge>
+        </filter>
+        <linearGradient id={`${idPrefix}-light`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#E2E8F0" />
+        </linearGradient>
+        <linearGradient id={`${idPrefix}-dark`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1E293B" /><stop offset="100%" stopColor="#0F172A" />
+        </linearGradient>
+        {gradient && (
+          <linearGradient id={`${idPrefix}-grad`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={gradient[0]} />
+            <stop offset="100%" stopColor={gradient[1]} />
+          </linearGradient>
+        )}
+      </defs>
+
+      {/* Background */}
+      <path
+        d={FAB_PATH}
+        fill={
+          gradient
+            ? `url(#${idPrefix}-grad)`
+            : logoUrl && isCustomUrl
+              ? THEME_COLOR
+              : `url(#${idPrefix}-light)`
+        }
+        className={
+          !gradient && (!logoUrl || !isCustomUrl)
+            ? `dark:fill-[url(#${idPrefix}-dark)] transition-all duration-500`
+            : 'transition-all duration-500'
+        }
+      />
+
+      {/* EC1: white backdrop for custom URLs — transparent PNGs show slate-50 not theme color */}
+      {logoUrl && isCustomUrl && (
+        <g clipPath={`url(#${idPrefix}-clip)`}>
+          {gradient ? (
+            <rect x="0" y="0" width="100" height="100" fill={`url(#${idPrefix}-grad)`} />
+          ) : (
+            <rect x="0" y="0" width="100" height="100" fill="#f8fafc" />
+          )}
+        </g>
+      )}
+
+      {/* Image clipped to shape — slice for custom URLs fills the full clip area */}
+      {logoUrl && (
+        <g clipPath={`url(#${idPrefix}-clip)`}>
+          <image
+            href={logoUrl}
+            x={isCustomUrl ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
+            y={isCustomUrl ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
+            width={isCustomUrl ? 100 : 70}
+            height={isCustomUrl ? 100 : 70}
+            preserveAspectRatio={isCustomUrl ? 'xMidYMid slice' : 'xMidYMid meet'}
+          />
+        </g>
+      )}
+
+      {/* Fallback initial letter */}
+      {!logoUrl && (
+        <text
+          x={50 + (fabShape.x || 0)}
+          y={52 + (fabShape.y || 0)}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={gradient ? '#ffffff' : THEME_COLOR}
+          className="font-bold select-none pointer-events-none"
+          style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}
+        >
+          {(BOT_NAME || 'S').charAt(0).toUpperCase()}
+        </text>
+      )}
+
+      {/* 3D inset shadow overlay */}
+      <path d={FAB_PATH} fill="transparent" filter={`url(#${idPrefix}-inset)`} className="pointer-events-none" />
+    </svg>
+  );
+};
+
+// ── LogoCustomizer ──────────────────────────────────────────────────────────────
 type LogoCustomizerProps = {
   logoShape: string;
   customLogoUrl: string;
@@ -199,23 +375,17 @@ export default function LogoCustomizer({
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setUrlInput(val);
-
     const err = preValidateUrl(val);
     setUrlError(err);
-
-    if (!err) {
-      onUrlChange(val);
-    }
+    if (!err) onUrlChange(val);
   };
 
   const handleUrlBlur = () => {
-    if (!urlError) {
-      onUrlChange(urlInput);
-    }
+    if (!urlError) onUrlChange(urlInput);
   };
 
-  const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
-  const inputCls = "w-full text-md font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
+  const labelCls = 'block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors';
+  const inputCls = 'w-full text-md font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm';
 
   return (
     <div className="space-y-6">
@@ -398,8 +568,7 @@ export default function LogoCustomizer({
               />
               {urlInput && (
                 <span
-                  className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] ${urlError ? 'text-red-500' : 'text-emerald-500'
-                    }`}
+                  className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] ${urlError ? 'text-red-500' : 'text-emerald-500'}`}
                 >
                   {urlError ? 'error' : 'check_circle'}
                 </span>

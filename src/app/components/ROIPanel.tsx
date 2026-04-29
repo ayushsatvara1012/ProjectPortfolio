@@ -106,21 +106,21 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }: ROIPanelProp
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100 dark:bg-slate-800">
                 <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-2">Support Cost Saved</span>
-                    <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{fmt(previewSavings)}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{fmt(previewSavings)}</span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
                         {stats.answered_queries_30d?.toLocaleString()} queries × ${previewCost.toFixed(2)}/ticket
                     </p>
                 </div>
                 <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-2">Potential Revenue</span>
-                    <span className="text-4xl font-google font-bold tracking-tight text-blue-600 dark:text-blue-400">{fmt(previewRevenue)}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-blue-600 dark:text-blue-400">{fmt(previewRevenue)}</span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
                         {stats.leads_30d?.toLocaleString()} leads × ${previewLead.toFixed(2)}/lead
                     </p>
                 </div>
                 <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-2">Total ROI</span>
-                    <span className="text-4xl font-google font-bold tracking-tight text-green-600 dark:text-green-400">{fmt(previewTotal)}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-green-600 dark:text-green-400">{fmt(previewTotal)}</span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
                         Answer rate: {answerRate}%
                     </p>
@@ -134,7 +134,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }: ROIPanelProp
                         <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">forum</span>
                     </div>
                     <div>
-                        <span className="text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{stats.total_queries_30d?.toLocaleString()}</span>
+                        <span className="text-lg sm:text-xl md:text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{stats.total_queries_30d?.toLocaleString()}</span>
                         <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google mt-0.5">Total Queries</p>
                     </div>
                 </div>
@@ -143,7 +143,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }: ROIPanelProp
                         <span className="material-symbols-outlined text-[18px] text-emerald-500 dark:text-emerald-400">check_circle</span>
                     </div>
                     <div>
-                        <span className="text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{stats.answered_queries_30d?.toLocaleString()}</span>
+                        <span className="text-lg sm:text-xl md:text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{stats.answered_queries_30d?.toLocaleString()}</span>
                         <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google mt-0.5">Answered</p>
                     </div>
                 </div>
@@ -152,7 +152,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }: ROIPanelProp
                         <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">group</span>
                     </div>
                     <div>
-                        <span className="text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{stats.leads_30d?.toLocaleString()}</span>
+                        <span className="text-lg sm:text-xl md:text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{stats.leads_30d?.toLocaleString()}</span>
                         <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google mt-0.5">Leads Captured</p>
                     </div>
                 </div>
