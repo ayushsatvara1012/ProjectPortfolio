@@ -625,13 +625,25 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
           setMessages(prev => {
             if (prev.length === 1 && prev[0].role === 'bot') {
-              return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }];
+              return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message, isTyped: true }];
             }
             return prev;
           });
         }
       } catch (err) {
         console.warn('[Sapybase] Could not load bot config:', err);
+      } finally {
+        // Tell the loader the chat UI has finished hydrating so it can hide
+        // the iframe-loader spinner. Double rAF: first frame commits the
+        // state update; second frame paints it. Posting after the second
+        // ensures the user sees the rendered greeting, not a blank panel.
+        if (isEmbed && typeof window !== 'undefined' && window.parent !== window) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              window.parent.postMessage({ type: 'Sapybase:ready' }, '*');
+            });
+          });
+        }
       }
     };
     fetchConfig();
@@ -652,7 +664,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [isOpen, setIsOpen] = useState(isEmbed);
   const [showMenu, setShowMenu] = useState(false);
   const [handoffSent, setHandoffSent] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([{ role: 'bot', content: DEFAULT_CONFIG.initial_message }]);
+  const [messages, setMessages] = useState<Message[]>([{ role: 'bot', content: DEFAULT_CONFIG.initial_message, isTyped: true }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -940,20 +952,31 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             setIsLoading(false);
             forceScrollToBottom(true);
 
-            // Lead capture trigger
+            // Lead capture trigger.
+            //
+            // We only react to signals that genuinely indicate the visitor
+            // wants follow-up:
+            //   1. The visitor's own message expresses buying / contact intent.
+            //   2. The visitor explicitly asks for human help.
+            //   3. The bot fell back ("I don't know") so we offer escalation.
+            //
+            // We deliberately do NOT scan the bot's reply for words like
+            // "pricing" or "demo" — informational answers naturally contain
+            // those terms and would otherwise force-show the form on every
+            // factual question (e.g. "what services do you offer").
             if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current) {
               const lowerReply = fullContent.toLowerCase();
               const lowerUserMsg = userMessage.toLowerCase();
-              const intentWords = ['contact us', 'reach out', 'get in touch', 'schedule', 'book a', 'free trial', 'pricing', 'get started', 'sign up', 'demo', 'consultation', 'quote', 'let us know', 'our team will', 'speak with', 'talk to'];
-              const userIntentWords = ['quote', 'price', 'pricing', 'cost', 'how much', 'rate', 'package', 'buy', 'purchase', 'hire', 'get started', 'book', 'order', 'interested', 'want to', 'i need', 'can you build', 'can you make', 'can you create', 'build me', 'make me', 'create me', 'help me build', 'looking for'];
-              const fallbackPhrases = ['does not appear in my knowledge base', "don't have information on that", 'please reach out to', 'contact our support'];
 
-              const isIntent = intentWords.some(w => lowerReply.includes(w));
-              const isUserIntent = userIntentWords.some(w => lowerUserMsg.includes(w));
+              const userBuyingIntent = ['quote', 'pricing', 'how much', 'cost', 'buy', 'purchase', 'hire', 'sign up', 'get started', 'book a', 'schedule', 'free trial', 'demo', 'subscribe'];
+              const userHumanIntent = ['talk to a human', 'speak to someone', 'speak to a person', 'real person', 'contact you', 'contact us', 'reach out', 'get in touch', 'help me', 'i need help', 'support team', 'sales team'];
+              const fallbackPhrases = ['does not appear in my knowledge base', "don't have information on that", 'please reach out to', 'contact our support', "i'm not sure", 'i do not have'];
+
+              const isUserBuying = userBuyingIntent.some(w => lowerUserMsg.includes(w));
+              const isUserAskingForHuman = userHumanIntent.some(w => lowerUserMsg.includes(w));
               const isFallback = fallbackPhrases.some(w => lowerReply.includes(w));
-              const isThirdMessage = userMessageCountRef.current === 3;
 
-              if (isIntent || isUserIntent || isFallback || isThirdMessage) {
+              if (isUserBuying || isUserAskingForHuman || isFallback) {
                 leadFormShownRef.current = true;
                 setTimeout(() => {
                   setMessages(prev => {
@@ -961,7 +984,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     return [...prev, { role: 'lead_capture', id: 'lead-form' }];
                   });
                   setTimeout(() => forceScrollToBottom(true), 100);
-                }, (isIntent || isUserIntent) ? 1500 : 2000);
+                }, 1500);
               }
             }
             return;
@@ -1127,7 +1150,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           </button>
                         )}
                         <button onClick={() => {
-                          setMessages([{ role: 'bot', content: configData.initial_message }]);
+                          setMessages([{ role: 'bot', content: configData.initial_message, isTyped: true }]);
                           userMessageCountRef.current = 0;
                           leadCapturedRef.current = false;
                           leadFormShownRef.current = false;

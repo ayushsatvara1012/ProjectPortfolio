@@ -521,26 +521,30 @@ export default function AdminPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-slate-950">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 py-8">
-        <h1 className="text-2xl font-display font-black uppercase tracking-tight">Super Admin <span className="text-slate-400">Console</span></h1>
-        <div className="mt-4 flex flex-col md:flex-row gap-4">
+      <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-4 py-5 sm:px-6 sm:py-8">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-display font-black uppercase tracking-tight leading-tight">
+          Super Admin <span className="text-slate-400">Console</span>
+        </h1>
+        <div className="mt-4 flex flex-col md:flex-row gap-3 sm:gap-4">
           <input
             type="text"
             placeholder="Search users..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="flex-1 max-w-md bg-gray-50 dark:bg-slate-800 border-none px-4 py-2.5 text-sm outline-none"
+            className="flex-1 max-w-full md:max-w-md bg-gray-50 dark:bg-slate-800 border-none px-4 py-2.5 text-sm outline-none"
           />
-          <div className="flex gap-1 overflow-x-auto">
-            {['ALL', ...TIERS].map(t => (
-              <button
-                key={t}
-                onClick={() => setTierFilter(t)}
-                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${tierFilter === t ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-500 hover:bg-gray-100'}`}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="-mx-4 sm:-mx-6 md:mx-0 px-4 sm:px-6 md:px-0 overflow-x-auto">
+            <div className="flex gap-1 min-w-max">
+              {['ALL', ...TIERS].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTierFilter(t)}
+                  className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${tierFilter === t ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-500 hover:bg-gray-100'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -554,49 +558,87 @@ export default function AdminPage() {
           { label: 'Messages', value: stats.total_messages?.toLocaleString(), icon: 'forum' },
           { label: 'Custom Plans', value: stats.custom_plan_count, icon: 'build' },
         ].map((s, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 p-6">
-            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">{s.label}</p>
-            <h3 className="text-xl font-display font-bold">{s.value}</h3>
+          <div key={i} className="bg-white dark:bg-slate-900 p-4 sm:p-6">
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1 truncate">{s.label}</p>
+            <h3 className="text-base sm:text-lg md:text-xl font-display font-bold truncate">{s.value}</h3>
           </div>
         ))}
       </div>
 
-      {/* Table */}
-      <div className="flex-1 p-6">
+      {/* Users — table on md+, stacked cards on mobile */}
+      <div className="flex-1 p-4 sm:p-6">
         {isLoading ? <SkeletonLoader.Table /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-gray-100 dark:border-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-400">
-                  <th className="py-4 px-2">User / Clerk ID</th>
-                  <th className="py-4 px-2">Tier / Status</th>
-                  <th className="py-4 px-2">Usage</th>
-                  <th className="py-4 px-2 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-slate-900">
-                {filteredUsers.map((u: any) => (
-                  <tr key={u.clerk_id} className="hover:bg-gray-50/50 dark:hover:bg-slate-900/50 transition-colors">
-                    <td className="py-4 px-2">
-                      <p className="text-sm font-bold truncate max-w-[200px]">{u.email}</p>
-                      <p className="text-[10px] font-mono text-slate-400 truncate max-w-[200px]">{u.clerk_id}</p>
-                    </td>
-                    <td className="py-4 px-2 space-y-1">
-                      <TierBadge tier={u.tier} />
-                      <br />
-                      <StatusBadge status={u.status} />
-                    </td>
-                    <td className="py-4 px-2">
-                      <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
-                    </td>
-                    <td className="py-4 px-2 text-right">
-                      <button onClick={() => setSelectedUser(u)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-800 text-white hover:bg-blue-600 transition-colors">Manage</button>
-                    </td>
+          <>
+            {/* Desktop / tablet: traditional table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 dark:border-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-400">
+                    <th className="py-4 px-2">User / Clerk ID</th>
+                    <th className="py-4 px-2">Tier / Status</th>
+                    <th className="py-4 px-2">Usage</th>
+                    <th className="py-4 px-2 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-slate-900">
+                  {filteredUsers.map((u: any) => (
+                    <tr key={u.clerk_id} className="hover:bg-gray-50/50 dark:hover:bg-slate-900/50 transition-colors">
+                      <td className="py-4 px-2 min-w-0">
+                        <p className="text-sm font-bold truncate max-w-[260px]">{u.email}</p>
+                        <p className="text-[10px] font-mono text-slate-400 truncate max-w-[260px]">{u.clerk_id}</p>
+                      </td>
+                      <td className="py-4 px-2 space-y-1">
+                        <TierBadge tier={u.tier} />
+                        <br />
+                        <StatusBadge status={u.status} />
+                      </td>
+                      <td className="py-4 px-2">
+                        <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
+                      </td>
+                      <td className="py-4 px-2 text-right">
+                        <button onClick={() => setSelectedUser(u)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-800 text-white hover:bg-blue-600 transition-colors">Manage</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: each user as a stacked card so user / tier / usage / action
+                stack vertically instead of being scrolled horizontally. */}
+            <div className="md:hidden flex flex-col gap-3">
+              {filteredUsers.map((u: any) => (
+                <div
+                  key={u.clerk_id}
+                  className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-sm p-4 flex flex-col gap-3 min-w-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">User</p>
+                    <p className="text-sm font-bold break-all">{u.email}</p>
+                    <p className="text-[10px] font-mono text-slate-400 break-all">{u.clerk_id}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mr-1">Tier</span>
+                    <TierBadge tier={u.tier} />
+                    <StatusBadge status={u.status} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1.5">Usage</p>
+                    <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedUser(u)}
+                    className="self-start px-3 py-2 min-h-[40px] text-[10px] font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-800 text-white hover:bg-blue-600 transition-colors"
+                  >
+                    Manage
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

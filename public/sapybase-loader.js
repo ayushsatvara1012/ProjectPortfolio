@@ -128,6 +128,16 @@
       this._wrap = null;
       this._fab = null;
       this._label = null;
+      // Typewriter tooltip state.
+      this._tipMessages = ['Need help?', 'I am here', 'Powered by Sapybase'];
+      this._tipMsgIdx = 0;
+      this._tipTimer = null;
+      this._tipTextNode = null;
+      this._tipCaret = null;
+      this._tipPaused = false;
+      this._tipDismissed = false;
+      this._onTipVisibility = null;
+      this._onTipDismiss = null;
     }
 
     connectedCallback() {
@@ -159,10 +169,153 @@
       // re-style on success.
       this._render(position, null);
       this._listenForMessages();
+
+      // Safety: if /api/config is slow or unreachable, reveal the FAB anyway
+      // after 2s so users always have a way to open the chat.
+      const revealTimer = setTimeout(() => this._reveal(), 2000);
+
       this._fetchConfig(botId).then((cfg) => {
+        clearTimeout(revealTimer);
         if (cfg) this._applyConfig(cfg);
         else console.warn('[Sapybase] /api/config returned no usable data; FAB will keep defaults.');
+        this._reveal();
       });
+    }
+
+    _reveal() {
+      if (this._fab) this._fab.classList.add('ready');
+      this._startTooltipCycle();
+    }
+
+    // ── Cycling typewriter tooltip ─────────────────────────────────────────
+    _startTooltipCycle() {
+      if (this._tipDismissed) return;
+      try {
+        if (window.sessionStorage &&
+            window.sessionStorage.getItem('sapybase:tooltip-dismissed') === '1') {
+          this._tipDismissed = true;
+          return;
+        }
+      } catch (e) { /* sessionStorage may throw under strict cookie policies */ }
+
+      // First user touch/hover/click on the FAB dismisses the cycle for the
+      // rest of the session. pointerdown covers mouse + touch in one event.
+      this._onTipDismiss = () => this._dismissTooltip(/*persist*/ true);
+      if (this._fab) {
+        this._fab.addEventListener('pointerdown', this._onTipDismiss, { once: true });
+        this._fab.addEventListener('mouseenter', this._onTipDismiss, { once: true });
+      }
+
+      // Pause the cycle when the tab is hidden — no animation budget burned
+      // on a backgrounded page.
+      this._onTipVisibility = () => {
+        this._tipPaused = document.hidden;
+        if (!this._tipPaused && !this._tipDismissed) this._scheduleTipStep(0);
+      };
+      document.addEventListener('visibilitychange', this._onTipVisibility);
+
+      // Show the bubble shell first, then begin typing.
+      this._label.classList.add('show');
+      this._tipMsgIdx = 0;
+      this._typeMessage(this._tipMessages[0], 0);
+    }
+
+    _scheduleTipStep(delay) {
+      if (this._tipDismissed || this._tipPaused) return;
+      clearTimeout(this._tipTimer);
+      this._tipTimer = setTimeout(() => this._nextTipMessage(), delay);
+    }
+
+    _typeMessage(text, charIdx) {
+      if (this._tipDismissed) return;
+      if (this._tipPaused) {
+        // Resume from the same position when tab becomes visible again.
+        this._tipTimer = setTimeout(() => this._typeMessage(text, charIdx), 250);
+        return;
+      }
+
+      const reduced = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) {
+        this._tipTextNode.nodeValue = text;
+        this._scheduleTipStep(2200);
+        return;
+      }
+
+      if (charIdx <= text.length) {
+        this._tipTextNode.nodeValue = text.slice(0, charIdx);
+        const ch = text.charAt(charIdx - 1);
+        const base = /[.!?,]/.test(ch) ? 120 : 50;
+        const jitter = (Math.random() * 20) - 10;
+        this._tipTimer = setTimeout(
+          () => this._typeMessage(text, charIdx + 1),
+          base + jitter
+        );
+      } else {
+        // Hold full message, then erase.
+        this._tipTimer = setTimeout(() => this._eraseMessage(text, text.length), 2000);
+      }
+    }
+
+    _eraseMessage(text, charIdx) {
+      if (this._tipDismissed) return;
+      if (this._tipPaused) {
+        this._tipTimer = setTimeout(() => this._eraseMessage(text, charIdx), 250);
+        return;
+      }
+
+      const reduced = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) {
+        this._tipTextNode.nodeValue = '';
+        this._scheduleTipStep(400);
+        return;
+      }
+
+      if (charIdx >= 0) {
+        this._tipTextNode.nodeValue = text.slice(0, charIdx);
+        this._tipTimer = setTimeout(
+          () => this._eraseMessage(text, charIdx - 1),
+          25
+        );
+      } else {
+        this._scheduleTipStep(400);
+      }
+    }
+
+    _nextTipMessage() {
+      if (this._tipDismissed) return;
+      this._tipMsgIdx = (this._tipMsgIdx + 1) % this._tipMessages.length;
+      this._typeMessage(this._tipMessages[this._tipMsgIdx], 0);
+    }
+
+    _dismissTooltip(persist) {
+      if (this._tipDismissed) return;
+      this._tipDismissed = true;
+      clearTimeout(this._tipTimer);
+      if (this._label) this._label.classList.remove('show');
+      if (persist) {
+        try {
+          window.sessionStorage &&
+            window.sessionStorage.setItem('sapybase:tooltip-dismissed', '1');
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    _stopTooltipCycle() {
+      clearTimeout(this._tipTimer);
+      if (this._onTipVisibility) {
+        document.removeEventListener('visibilitychange', this._onTipVisibility);
+        this._onTipVisibility = null;
+      }
+      if (this._fab && this._onTipDismiss) {
+        this._fab.removeEventListener('pointerdown', this._onTipDismiss);
+        this._fab.removeEventListener('mouseenter', this._onTipDismiss);
+      }
+    }
+
+    disconnectedCallback() {
+      this._stopTooltipCycle();
     }
 
     _fetchConfig(botId) {
@@ -214,8 +367,12 @@
         this._fab.innerHTML = _buildFabSvg(shape, themeColor, dark, logoUrl, isCustom, botName);
       }
 
-      if (this._label && cfg.bot_name) {
-        this._label.textContent = 'Chat with ' + cfg.bot_name + '!';
+      // Drop the "Powered by Sapybase" tease when the merchant has paid for
+      // white-label branding — they shouldn't be advertising us.
+      if (cfg.white_label_enabled === true) {
+        this._tipMessages = this._tipMessages.filter(function (m) {
+          return m.indexOf('Powered by') === -1;
+        });
       }
     }
 
@@ -295,20 +452,56 @@
         '  box-shadow: 0 4px 24px rgba(87,48,245,.35); border: none;',
         '  padding: 0; overflow: visible;',
         '  display: flex; align-items: center; justify-content: center;',
-        '  transition: transform .2s ease, box-shadow .2s ease;',
-        '  pointer-events: auto;',
+        // Hidden until /api/config resolves (or 2s safety timeout) so the
+        // unbranded placeholder never flashes.
+        '  opacity: 0; transform: scale(.85);',
+        '  transition: opacity .25s ease, transform .25s ease, box-shadow .2s ease;',
+        '  pointer-events: none;',
         '}',
-        '.fab:hover { transform: scale(1.08); }',
+        '.fab.ready { opacity: 1; transform: scale(1); pointer-events: auto; }',
+        '.fab.ready:hover { transform: scale(1.08); }',
+        '@keyframes sb-spin { to { transform: rotate(360deg); } }',
         '.fab > svg { width: 100%; height: 100%; display: block; }',
         '.fab > svg.default-icon { width: 28px; height: 28px; fill: white; }',
+        // Cycling typewriter tooltip. Tablet/desktop default: floats next to
+        // the FAB on the same horizontal line. Phone override below moves it
+        // above the FAB with a downward arrow.
         '.label {',
-        '  position: absolute; bottom: 70px; ' + (isLeft ? 'left: 0;' : 'right: 0;'),
-        '  white-space: nowrap; background: white; color: #1e293b;',
-        '  padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 500;',
-        '  box-shadow: 0 2px 12px rgba(0,0,0,.1); pointer-events: none;',
-        '  opacity: 0; animation: fadeIn .3s ease 2s forwards;',
+        '  position: absolute;',
+        '  ' + (isLeft ? 'left: 76px;' : 'right: 76px;'),
+        '  bottom: 12px;',
+        '  background: white; color: #1e293b;',
+        '  padding: 8px 14px; border-radius: 12px;',
+        '  font-size: 13px; font-weight: 500; line-height: 1.3;',
+        '  box-shadow: 0 4px 16px rgba(15,23,42,.12);',
+        '  pointer-events: none; user-select: none;',
+        '  white-space: nowrap; max-width: min(80vw, 240px);',
+        '  opacity: 0; transform: translateY(2px);',
+        '  transition: opacity .2s ease, transform .2s ease;',
+        '  direction: inherit; z-index: 1;',
         '}',
-        '@keyframes fadeIn { to { opacity: 1; } }',
+        '.label.show { opacity: 1; transform: translateY(0); }',
+        // Side-anchored arrow tail (tablet/desktop).
+        '.label::after {',
+        '  content: ""; position: absolute;',
+        '  top: 50%; ' + (isLeft ? 'right: 100%;' : 'left: 100%;'),
+        '  margin-top: -6px;',
+        '  border: 6px solid transparent;',
+        '  ' + (isLeft ? 'border-right-color: white;' : 'border-left-color: white;'),
+        '}',
+        '.label .caret {',
+        '  display: inline-block; width: 1px; height: 1em;',
+        '  background: currentColor; vertical-align: text-bottom;',
+        '  margin-left: 2px; animation: sb-caret 1s steps(1) infinite;',
+        '}',
+        '@keyframes sb-caret { 50% { opacity: 0; } }',
+        // While chat is open the tooltip must hide everywhere.
+        ':host(.chat-open) .label { display: none; }',
+        // Reduced motion: skip the caret blink and the slide-in.
+        '@media (prefers-reduced-motion: reduce) {',
+        '  .label { transition: opacity .15s ease; transform: none; }',
+        '  .label .caret { animation: none; opacity: .6; }',
+        '}',
         '.iframe-wrap {',
         '  position: fixed; z-index: 2147483646;',
         '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
@@ -329,6 +522,19 @@
         '  width: 100%; height: 100%; border: none;',
         '  border-radius: 16px; background: white;',
         '}',
+        '.iframe-loader {',
+        '  position: absolute; inset: 0; z-index: 1;',
+        '  display: flex; align-items: center; justify-content: center;',
+        '  background: white; border-radius: 16px;',
+        '  transition: opacity .25s ease;',
+        '}',
+        '.iframe-loader.hide { opacity: 0; pointer-events: none; }',
+        '.iframe-loader .spinner-lg {',
+        '  width: 36px; height: 36px; border-radius: 50%;',
+        '  border: 3px solid rgba(15,23,42,.12);',
+        '  border-top-color: ' + themeColor + ';',
+        '  animation: sb-spin .7s linear infinite;',
+        '}',
         '@media (max-width: 480px) {',
         '  .iframe-wrap {',
         '    width: 100vw; height: 100dvh; max-height: 100dvh; max-width: 100vw;',
@@ -337,7 +543,24 @@
         '  .iframe-wrap iframe { border-radius: 0; }',
         '  .fab { width: 56px; height: 56px; }',
         '  :host(.chat-open) .fab, :host(.chat-open) .label { display: none; }',
-        '  .label { display: none; }',
+        // Phone tooltip: floats above the FAB, centered horizontally on it.
+        // Uses px offset (not viewport units) to dodge iOS Safari URL-bar jitter.
+        '  .label {',
+        '    left: auto; right: auto; bottom: 68px;',
+        '    ' + (isLeft ? 'left: 0;' : 'right: 0;'),
+        '    padding: 7px 12px; font-size: 12.5px;',
+        '    max-width: min(80vw, 220px);',
+        '  }',
+        // Replace the side arrow with a downward arrow under the bubble.
+        '  .label::after {',
+        '    top: 100%; bottom: auto;',
+        '    ' + (isLeft ? 'left: 18px; right: auto;' : 'right: 18px; left: auto;'),
+        '    margin-top: 0;',
+        '    border: 6px solid transparent;',
+        '    border-top-color: white;',
+        '    border-right-color: transparent !important;',
+        '    border-left-color: transparent !important;',
+        '  }',
         '}',
       ].join('\n');
       this.shadow.appendChild(style);
@@ -345,6 +568,8 @@
       const fab = document.createElement('button');
       fab.className = 'fab';
       fab.setAttribute('aria-label', 'Open chat');
+      // Default chat-bubble icon shown if /api/config never resolves.
+      // _applyConfig replaces this with the bot's branded SVG.
       fab.innerHTML =
         '<svg class="default-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
         '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>' +
@@ -353,11 +578,23 @@
       this.shadow.appendChild(fab);
       this._fab = fab;
 
+      // Typewriter tooltip. textNode is what we mutate per-char so we never
+      // re-create DOM during the cycle; the caret is a sibling so the blink
+      // animation is independent of the text writing.
       const label = document.createElement('div');
       label.className = 'label';
-      label.textContent = 'Chat with us!';
+      label.setAttribute('role', 'status');
+      label.setAttribute('aria-live', 'polite');
+      const textNode = document.createTextNode('');
+      const caret = document.createElement('span');
+      caret.className = 'caret';
+      caret.setAttribute('aria-hidden', 'true');
+      label.appendChild(textNode);
+      label.appendChild(caret);
       this.shadow.appendChild(label);
       this._label = label;
+      this._tipTextNode = textNode;
+      this._tipCaret = caret;
 
       const wrap = document.createElement('div');
       wrap.className = 'iframe-wrap';
@@ -368,7 +605,9 @@
     _toggle() {
       this._open = !this._open;
       if (this._open) {
-        this._label.style.display = 'none';
+        // Tooltip visibility is now driven by :host(.chat-open) .label rule;
+        // also stop the cycle so we don't burn timer ticks while chat is open.
+        this._dismissTooltip(/*persist*/ true);
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
         this.classList.add('chat-open');
@@ -381,6 +620,22 @@
     }
 
     _loadIframe() {
+      // Loading spinner overlay — covers the iframe until the embed page
+      // posts 'Sapybase:ready' (after its /api/config fetch + first paint).
+      // We don't use the iframe's 'load' event because that fires before
+      // React has hydrated the chat UI, leaving a visible flash.
+      const loader = document.createElement('div');
+      loader.className = 'iframe-loader';
+      loader.innerHTML = '<div class="spinner-lg" aria-hidden="true"></div>';
+      this._wrap.appendChild(loader);
+      this._iframeLoader = loader;
+
+      // Safety: if the embed page never posts ready (network error, very
+      // old build), hide the spinner after 8s anyway so users aren't stuck.
+      this._iframeLoaderTimer = setTimeout(() => {
+        if (this._iframeLoader) this._iframeLoader.classList.add('hide');
+      }, 8000);
+
       const iframe = document.createElement('iframe');
       iframe.src =
         IFRAME_ORIGIN + '/embed/' + this._botId +
@@ -418,6 +673,11 @@
           this._open = false;
           if (this._wrap) this._wrap.classList.remove('open');
           this.classList.remove('chat-open');
+        }
+
+        if (data.type === 'Sapybase:ready' && this._iframeLoader) {
+          clearTimeout(this._iframeLoaderTimer);
+          this._iframeLoader.classList.add('hide');
         }
       });
     }

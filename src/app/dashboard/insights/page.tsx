@@ -398,12 +398,12 @@ export default function AppInsights() {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col h-full bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-500"
+            className="flex flex-col h-full w-full min-w-0 max-w-full bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-500"
         >
             {renderHeader()}
 
             {/* Content Area */}
-            <div className="flex-1 overflow-auto custom-scrollbar flex flex-col">
+            <div className="flex-1 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto custom-scrollbar flex flex-col">
 
                 {activeTab === 'leads' && (
                     <LeadsPanel
@@ -569,8 +569,8 @@ export default function AppInsights() {
                                             </div>
                                             <div className="space-y-3 md:space-y-1">
                                                 {reportData?.recent_conversations?.map((log: any, idx: number) => (
-                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-4 bg-slate-50 md:bg-transparent dark:bg-slate-900/50 md:dark:bg-transparent rounded-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors md:items-center">
-                                                        <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300 md:truncate">
+                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-3 sm:px-4 bg-slate-50 md:bg-transparent dark:bg-slate-900/50 md:dark:bg-transparent rounded-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors md:items-center min-w-0">
+                                                        <div className="col-span-8 min-w-0 text-sm font-google font-medium text-slate-700 dark:text-slate-300 break-words md:truncate">
                                                             {log.query}
                                                         </div>
                                                         <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
