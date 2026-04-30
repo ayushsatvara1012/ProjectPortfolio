@@ -1160,7 +1160,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
                    u.email, c.handoff_redirect_url, c.hide_branding,
-                   u.id, u.subscription_status, u.billing_period_end, c.webhook_secret
+                   u.id, u.subscription_status, u.billing_period_end
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1267,7 +1267,6 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "owner_email": company_data[16],
         "handoff_redirect_url": company_data[17],
         "hide_branding": bool(company_data[18]),
-        "webhook_secret": company_data[22],
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -1634,8 +1633,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
-                       webhook_secret
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1645,8 +1643,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
-                       webhook_secret
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1676,7 +1673,6 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "webhook_url": company_row[15],
             "handoff_redirect_url": company_row[16],
             "hide_branding": bool(company_row[17]),
-            "webhook_secret": company_row[18],
         }
     finally:
         release_db_connection(conn)
@@ -4159,7 +4155,6 @@ def register_company(
 
         api_key = f"sb_{secrets.token_urlsafe(32)}"
         hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
-        webhook_secret = f"whsec_{secrets.token_urlsafe(32)}"
 
         cursor.execute("SELECT COALESCE(MAX(display_order), -1) + 1 FROM companies WHERE user_id = %s", (user["id"],))
         next_order = cursor.fetchone()[0]
@@ -4167,14 +4162,13 @@ def register_company(
         cursor.execute(
             """INSERT INTO companies
                (user_id, company_name, allowed_origin, domain, api_key, display_order,
-                bot_name, theme_color, company_tone, initial_message, webhook_secret)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                bot_name, theme_color, company_tone, initial_message)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                RETURNING id""",
             (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin,
              hashed_key, next_order,
              reg.company_name + " AI", reg.theme_color, reg.company_tone,
-             f"Hi! I'm {reg.company_name} AI. How can I help you today?",
-             webhook_secret)
+             f"Hi! I'm {reg.company_name} AI. How can I help you today?")
         )
         company_id = cursor.fetchone()[0]
 

@@ -478,6 +478,7 @@ function TypewriterContent({ content, isStreaming, isTyped, onComplete, themeCol
           typewriterTimerRef.current = setTimeout(typeNextWord, delay + (Math.random() * 20 - 10));
         } else {
           setIsTyping(false);
+          setSegments([]);
           frozenTextRef.current = content;
           setIsFinalizing(true);
           finalizeTimerRef.current = setTimeout(() => {
@@ -609,6 +610,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             }
             return prev;
           });
+        } else {
+          const errorDetail = await res.text().catch(() => 'Unknown error');
+          console.warn(`[Sapybase] Config fetch failed with status ${res.status}:`, errorDetail);
         }
       } catch (err) {
         console.warn('[Sapybase] Could not load bot config:', err);
@@ -640,6 +644,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const leadFormShownRef = useRef(false);
   const userMessageCountRef = useRef(0);
   const [clearCount, setClearCount] = useState(0);
+
+  const MAX_MESSAGES = 100;
+  const appendBounded = (prev: Message[], ...next: Message[]): Message[] => {
+    const combined = [...prev, ...next];
+    if (combined.length <= MAX_MESSAGES) return combined;
+    // Always keep the first message (initial greeting) and trim from the front
+    return [combined[0], ...combined.slice(-(MAX_MESSAGES - 1))];
+  };
 
   const [isOpen, setIsOpen] = useState(isEmbed);
   const [showMenu, setShowMenu] = useState(false);
@@ -801,11 +813,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
     const userMessage = overrideText || input.trim();
     userMessageCountRef.current += 1;
-    setMessages(prev => [
-      ...prev,
+    setMessages(prev => appendBounded(prev,
       { role: 'user', content: userMessage },
       { role: 'bot', content: '', isStreaming: true, isTyped: false },
-    ]);
+    ));
     setInput('');
     setIsLoading(true);
     userHasScrolledUpRef.current = false;
@@ -921,6 +932,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         onmessage(msg) {
           if (msg.data === '[DONE]') {
             const fullContent = streamingCallbackRef.current?.flush?.() || '';
+            streamingCallbackRef.current = null;
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -988,10 +1000,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
           // Silent single retry on transient network failures (wifi blip,
           // proxy idle-kill). Returning a number tells fetch-event-source to
-          // wait that many ms then reconnect — the existing partial stream
-          // remains in streamingCallbackRef and continues accumulating.
+          // wait that many ms then reconnect. Reset the buffer so partial chunks
+          // from the failed attempt don't duplicate on retry.
           if (sseRetryCount < SSE_MAX_RETRIES) {
             sseRetryCount += 1;
+            streamingCallbackRef.current = null;
             console.warn(`SSE Chat: transient error, retrying (${sseRetryCount}/${SSE_MAX_RETRIES})`, err);
             return 1500;
           }
@@ -999,6 +1012,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           console.error('SSE Chat Error (giving up):', err);
           // Preserve whatever streamed so far instead of replacing the message.
           const partial = streamingCallbackRef.current?.flush?.() || '';
+          streamingCallbackRef.current = null;
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
