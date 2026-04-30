@@ -7,6 +7,13 @@ const nextConfig = {
         source: '/api/:path*',
         destination: 'https://sapyai.onrender.com/api/:path*',
       },
+      // Versioned loader alias: /sapybase-loader@1.js → /sapybase-loader.js
+      // Bump the version number (e.g. @2) on breaking loader changes so
+      // existing customer sites continue serving the previous version.
+      {
+        source: '/sapybase-loader@:version.js',
+        destination: '/sapybase-loader.js',
+      },
     ];
   },
   async headers() {
@@ -25,10 +32,10 @@ const nextConfig = {
       },
       // Widget assets — public CDN-style, no framing restriction
       {
-        source: '/:path(widget.js|style.css|Sapybase-loader.js)',
+        source: '/:path(widget.js|style.css|sapybase-loader.js|sapybase-loader@:version.js)',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       // Embed routes — override X-Frame-Options to allow cross-origin framing for widget

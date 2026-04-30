@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
+import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/app/components/avatar/AvatarShared';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.Sapybase.com';
@@ -11,21 +12,8 @@ const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transpar
 const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
 const headingCls = "text-xl font-medium font-google mb-4 transition-colors text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-600 dark:from-blue-400 dark:to-green-500";
 
-// ── Shape / gradient catalogs ─────────────────────────────────────────────────
-const SHAPE_CLASS_MAP: Record<string, string> = {
-    circle: 'rounded-full',
-    squircle: 'rounded-[2rem]',
-    bento: 'rounded-2xl',
-    sharp: 'rounded-lg',
-};
-
-const AVATAR_GRADIENTS: Record<string, [string, string] | null> = {
-    none: null,
-    cosmic: ['#c026d3', '#3b82f6'],
-    sunset: ['#f97316', '#eab308'],
-    ocean: ['#06b6d4', '#3b82f6'],
-    hacker: ['#22c55e', '#14b8a6'],
-};
+// Shape / gradient / FAB definitions now imported from AvatarShared.ts
+// (single source of truth — no local copies to drift)
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const MoreHorizontalIcon = () => (
@@ -192,28 +180,12 @@ const InlineBotPreview = ({ settings, theme = 'light' }: { settings: any; theme?
 };
 
 // ── Inline Logo Customizer ──
-const LOGO_SHAPE_DATA = [
-    {
-        id: 'circle',
-        label: 'Circle',
-        path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z'
-    },
-    {
-        id: 'squircle',
-        label: 'Squircle',
-        path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z'
-    },
-    {
-        id: 'bento',
-        label: 'Bento',
-        path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z'
-    },
-    {
-        id: 'sharp',
-        label: 'Sharp',
-        path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z'
-    }
-];
+// Derive LOGO_SHAPE_DATA from FAB_SHAPES so paths stay in sync automatically.
+const LOGO_SHAPE_DATA = (['circle', 'squircle', 'bento', 'sharp'] as const).map(id => ({
+    id,
+    label: id.charAt(0).toUpperCase() + id.slice(1),
+    path: FAB_SHAPES[id].path,
+}));
 
 const AVATAR_BG_STYLES = [
     { id: 'none', label: 'None' },
@@ -397,7 +369,7 @@ export default function DemoCustomizePage() {
     const TONES = ['Professional', 'Friendly', 'Humorous', 'Technical', 'Concise'];
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100vh-3rem)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100vh-3rem)] overflow-x-hidden">
 
             {/* ── LEFT: Settings Form ── */}
             <div className="bg-white dark:bg-slate-950 flex flex-col relative transition-colors">

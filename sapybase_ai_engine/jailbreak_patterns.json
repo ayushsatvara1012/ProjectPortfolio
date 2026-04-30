@@ -1,0 +1,17 @@
+[
+  "(?i)ignore\\s+(all\\s+)?(previous|prior|above|earlier)\\s+(instructions|rules|prompts|directives)",
+  "(?i)disregard\\s+(all\\s+)?(previous|prior|above|earlier)\\s+(instructions|rules|prompts)",
+  "(?i)you\\s+are\\s+now\\s+(a|an|the|in)\\s",
+  "(?i)new\\s+(instructions|rules|persona|identity|system\\s*prompt)",
+  "(?i)override\\s+(system|previous|your)\\s",
+  "(?i)forget\\s+(everything|all|your\\s+rules|your\\s+instructions)",
+  "(?i)act\\s+as\\s+(if|though|a|an)\\s",
+  "(?i)pretend\\s+(you\\s+are|to\\s+be|you're)",
+  "(?i)from\\s+now\\s+on,?\\s+(you|ignore|forget)",
+  "(?i)</?\\s*(system|instruction|prompt|admin|root|sudo)",
+  "(?i)```\\s*(system|instructions|prompt)",
+  "(?i)\\[SYSTEM\\]",
+  "(?i)\\[INST\\]",
+  "(?i)<<\\s*SYS\\s*>>",
+  "(?i)do\\s+not\\s+follow\\s+(the|your|any)\\s+(rules|instructions)"
+]

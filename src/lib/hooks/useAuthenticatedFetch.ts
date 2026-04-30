@@ -21,7 +21,7 @@ export class UpgradeError extends Error {
 
 export const useAuthenticatedFetch = () => {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL?.trim()) || (typeof window !== 'undefined' ? window.location.origin : '');
 
   return useCallback(async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
     // Don't fire until Clerk has hydrated — React Query will retry once state changes
@@ -32,13 +32,20 @@ export const useAuthenticatedFetch = () => {
     const token = await getToken();
     if (!token) throw new Error('AUTH_NOT_READY');
 
-    const res = await fetch(`${baseUrl}${url}`, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {}),
-      },
-    });
+    const fullUrl = `${baseUrl.replace(/\/$/, '')}${url}`;
+    let res: Response;
+    try {
+      res = await fetch(fullUrl, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(options.headers || {}),
+        },
+      });
+    } catch (err) {
+      console.error(`Fetch failed for ${fullUrl}:`, err);
+      throw err;
+    }
 
     let data: unknown = null;
     const contentType = res.headers.get('content-type') || '';

@@ -40,9 +40,31 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
   const [integrationTab, setIntegrationTab] = useState('html');
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    };
+    try {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }).catch(() => {
+          if (fallback()) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+        });
+      } else {
+        if (fallback()) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+      }
+    } catch {
+      fallback();
+    }
   };
 
   const SyntaxHighlightedCode = ({ code }: { code: string }) => {
@@ -92,6 +114,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
   const navLinks = [
     { id: 'setup', label: '1. Account Setup', icon: 'person_add' },
     { id: 'integration', label: '2. Integration', icon: 'code' },
+    { id: 'csp', label: '2b. CSP / Security', icon: 'shield' },
     { id: 'customization', label: '3. Customization', icon: 'palette' },
     { id: 'training', label: '4. Training AI', icon: 'model_training' },
     { id: 'knowledge', label: '5. Knowledge Base', icon: 'database' },
@@ -102,6 +125,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
   const tocLinks = [
     { id: 'setup', label: 'Registration' },
     { id: 'integration', label: 'Website Integration' },
+    { id: 'csp', label: 'CSP / Security Headers' },
     { id: 'customization', label: 'Branding & Styling' },
     { id: 'training', label: 'Teaching the AI' },
     { id: 'knowledge', label: 'Managing Data' },
@@ -138,7 +162,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
           Copy the code below and paste it onto your website. Need help? Check our <Link href="/docs" className="text-blue-600 dark:text-blue-400 font-bold underline">full guide</Link>.
         </p>
         <SyntaxHighlightedCode code={`<!-- Paste before </body> on every page -->
-<script src="https://www.Sapybase.com/sapybase-loader.js"
+<script src="https://www.Sapybase.com/sapybase-loader@1.js"
         data-bot-id="${apiKey}"
         defer></script>`} />
       </div>
@@ -238,35 +262,100 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
               {integrationTab === 'html' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">Plain HTML / Static Websites</h3>
-                  <SyntaxHighlightedCode code={`<!DOCTYPE html>\n<html lang="en">\n<head>\n    <title>My Website</title>\n</head>\n<body>\n    <h1>Welcome to my business</h1>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/sapybase-loader.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>\n</html>`} />
+                  <SyntaxHighlightedCode code={`<!DOCTYPE html>\n<html lang="en">\n<head>\n    <title>My Website</title>\n</head>\n<body>\n    <h1>Welcome to my business</h1>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/sapybase-loader@1.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>\n</html>`} />
                 </div>
               )}
               {integrationTab === 'react' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">React (Vite or CRA)</h3>
-                  <SyntaxHighlightedCode code={`<body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/sapybase-loader.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>`} />
+                  <SyntaxHighlightedCode code={`<body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n\n    <!-- Sapybase AI Chat Widget -->\n    <script src="https://www.Sapybase.com/sapybase-loader@1.js"\n            data-bot-id="YOUR_API_KEY"\n            defer></script>\n</body>`} />
                 </div>
               )}
               {integrationTab === 'nextjs' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">Next.js (App Router)</h3>
-                  <SyntaxHighlightedCode code={`import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        {/* Sapybase AI Chat Widget */}\n        <Script\n          src="https://www.Sapybase.com/sapybase-loader.js"\n          data-bot-id="YOUR_API_KEY"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`} />
+                  <SyntaxHighlightedCode code={`import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        {/* Sapybase AI Chat Widget */}\n        <Script\n          src="https://www.Sapybase.com/sapybase-loader@1.js"\n          data-bot-id="YOUR_API_KEY"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`} />
                 </div>
               )}
               {integrationTab === 'wordpress' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">WordPress Integration</h3>
-                  <SyntaxHighlightedCode code={`<!-- Paste in Appearance > Theme Editor > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/sapybase-loader.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
+                  <SyntaxHighlightedCode code={`<!-- Paste in Appearance > Theme Editor > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/sapybase-loader@1.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
                 </div>
               )}
               {integrationTab === 'shopify' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <h3 className="text-2xl font-black text-slate-900 dark:text-slate-200 mb-2 mt-0">Shopify Store</h3>
-                  <SyntaxHighlightedCode code={`<!-- Paste in Online Store > Themes > Edit Code > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/sapybase-loader.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
+                  <SyntaxHighlightedCode code={`<!-- Paste in Online Store > Themes > Edit Code > theme.liquid, before </body> -->\n<script src="https://www.Sapybase.com/sapybase-loader@1.js"\n        data-bot-id="YOUR_API_KEY"\n        defer></script>`} />
                 </div>
               )}
             </div>
             <DocMedia alt="Dashboard Snippet Copy" placeholderText="Screen Recording: Showing how to copy the Snippet and find the API Key in the Dashboard." src="/videos/Integrate_Bot.mp4" />
+          </section>
+
+          <section id="csp" className="scroll-mt-24 prose prose-slate dark:prose-invert max-w-none">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-200 mb-6 transition-colors flex items-center gap-3 tracking-tight">
+              <span className="w-8 h-8 bg-blue-600 text-white flex items-center justify-center text-sm font-black rounded-full select-none">
+                <span className="material-symbols-outlined text-[16px]">shield</span>
+              </span>
+              Content Security Policy (CSP)
+            </h2>
+            <p className="text-lg font-google tracking-wide text-slate-600 dark:text-slate-400 leading-relaxed transition-colors mb-4">
+              If your site sends a <strong>Content-Security-Policy</strong> header, you need to whitelist Sapybase so the widget script can load and the embedded chat iframe can connect to our servers. Without these additions the widget will be silently blocked by the browser.
+            </p>
+            <div className="flex items-start gap-4 p-5 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-xl my-6">
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">info</span>
+              <p className="text-base font-google text-amber-800 dark:text-amber-300 m-0">
+                Most static HTML sites do <strong>not</strong> set a CSP header and can skip this section entirely. You only need this if you already have a <code className="text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-1 rounded text-sm">Content-Security-Policy</code> header in your server config or a <code className="text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-1 rounded text-sm">&lt;meta http-equiv&gt;</code> tag.
+              </p>
+            </div>
+
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Minimum required directives</h3>
+            <p className="text-base font-google text-slate-600 dark:text-slate-400 mb-2">Add these to your existing CSP — do not replace your current policy, only extend it:</p>
+            <SyntaxHighlightedCode code={`Content-Security-Policy:
+  script-src   'self' https://www.sapybase.com;
+  frame-src    https://www.sapybase.com;
+  connect-src  'self' https://www.sapybase.com https://sapyai.onrender.com;
+  img-src      'self' data: blob: https://www.sapybase.com;`} />
+
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Next.js — add to next.config</h3>
+            <SyntaxHighlightedCode code={`// next.config.mjs
+async headers() {
+  return [
+    {
+      source: '/:path*',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://www.sapybase.com",
+            "frame-src https://www.sapybase.com",
+            "connect-src 'self' https://www.sapybase.com https://sapyai.onrender.com",
+            "img-src 'self' data: blob: https://www.sapybase.com",
+          ].join('; '),
+        },
+      ],
+    },
+  ];
+}`} />
+
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Nginx</h3>
+            <SyntaxHighlightedCode code={`add_header Content-Security-Policy
+  "default-src 'self'; script-src 'self' https://www.sapybase.com; frame-src https://www.sapybase.com; connect-src 'self' https://www.sapybase.com https://sapyai.onrender.com; img-src 'self' data: blob: https://www.sapybase.com"
+  always;`} />
+
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Apache (.htaccess)</h3>
+            <SyntaxHighlightedCode code={`Header always set Content-Security-Policy \
+  "default-src 'self'; script-src 'self' https://www.sapybase.com; frame-src https://www.sapybase.com; connect-src 'self' https://www.sapybase.com https://sapyai.onrender.com; img-src 'self' data: blob: https://www.sapybase.com"`} />
+
+            <div className="flex items-start gap-4 p-5 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-xl mt-8">
+              <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">lightbulb</span>
+              <div className="text-base font-google text-blue-800 dark:text-blue-300 m-0 space-y-1">
+                <p className="m-0 font-bold">Why <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">connect-src</code> needs both domains</p>
+                <p className="m-0">The loader is served from <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">www.sapybase.com</code>. The AI backend that answers chat messages runs on <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">sapyai.onrender.com</code>. Both must be whitelisted or the chat will load but fail to respond.</p>
+              </div>
+            </div>
           </section>
 
           <section id="customization" className="scroll-mt-24 prose prose-slate dark:prose-invert max-w-none">

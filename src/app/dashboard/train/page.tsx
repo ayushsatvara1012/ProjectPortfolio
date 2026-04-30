@@ -145,33 +145,43 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
 
     return (
         <div className="space-y-4">
-            <div className="flex gap-2">
-                <select
-                    value={selectedSource}
-                    onChange={e => setSelectedSource(e.target.value)}
-                    disabled={sourcesLoading || sources.length === 0 || isDeleting}
-                    className={inputCls + ' appearance-none font-mono text-xs flex-1'}
-                >
-                    {sourcesLoading && <option>Loading sources...</option>}
-                    {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
-                    {sources.map((s: any) => (
-                        <option key={s.source} value={s.source}>
-                            {(s.source || 'Unknown').length > 40 ? s.source.substring(0, 37) + '...' : s.source} ({s.chunk_count} chunks)
-                        </option>
-                    ))}
-                </select>
+            {!sourcesLoading && sources.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <span className="material-symbols-outlined text-[48px] text-gray-200 dark:text-slate-700 mb-4">auto_stories</span>
+                    <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No sources yet</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-600 font-display mb-6">Add a URL, paste text, or upload a document to start training your bot.</p>
+                </div>
+            )}
 
-                {selectedSource && (
-                    <button
-                        onClick={handleDeleteSource}
-                        disabled={isDeleting}
-                        title="Delete this entire source (all chunks)"
-                        className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 hover:bg-red-600 hover:text-white dark:hover:bg-red-700 transition-all rounded-xs flex items-center justify-center shrink-0"
+            {sources.length > 0 && (
+                <div className="flex gap-2">
+                    <select
+                        value={selectedSource}
+                        onChange={e => setSelectedSource(e.target.value)}
+                        disabled={sourcesLoading || sources.length === 0 || isDeleting}
+                        className={inputCls + ' appearance-none font-mono text-xs flex-1'}
                     >
-                        <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                    </button>
-                )}
-            </div>
+                        {sourcesLoading && <option>Loading sources...</option>}
+                        {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
+                        {sources.map((s: any) => (
+                            <option key={s.source} value={s.source}>
+                                {(s.source || 'Unknown').length > 40 ? s.source.substring(0, 37) + '...' : s.source} ({s.chunk_count} chunks)
+                            </option>
+                        ))}
+                    </select>
+
+                    {selectedSource && (
+                        <button
+                            onClick={handleDeleteSource}
+                            disabled={isDeleting}
+                            title="Delete this entire source (all chunks)"
+                            className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 hover:bg-red-600 hover:text-white dark:hover:bg-red-700 transition-all rounded-xs flex items-center justify-center shrink-0"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                        </button>
+                    )}
+                </div>
+            )}
 
             {selectedSource && (
                 <>

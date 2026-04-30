@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 type BotSettings = {
   name: string;
@@ -77,15 +78,14 @@ const mapCompanyToSettings = (company: any): BotSettings => {
 };
 
 export const BotSettingsProvider = ({ children }: { children: React.ReactNode }) => {
-  const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuth();
   const queryClient = useQueryClient();
+  const authFetch = useAuthenticatedFetch();
   const [botSettings, setBotSettings] = useState<BotSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-
-  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
   const fetchSettings = useCallback(async (botId: string | null = null) => {
     if (!isSignedIn) return;
@@ -98,13 +98,10 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         staleTime: COMPANY_DETAILS_STALE_MS,
         queryFn: async () => {
           setIsLoading(true);
-          const token = await getToken();
           const url = botId
-            ? `${baseUrl}/api/company/details?company_id=${botId}`
-            : `${baseUrl}/api/company/details`;
-          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-          if (!res.ok) throw new Error(`company/details failed: ${res.status}`);
-          return res.json();
+            ? `/api/company/details?company_id=${botId}`
+            : `/api/company/details`;
+          return authFetch<any>(url);
         },
       });
 
@@ -117,19 +114,14 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
     } finally {
       setIsLoading(false);
     }
-  }, [isSignedIn, getToken, baseUrl, queryClient]);
+  }, [isSignedIn, authFetch, queryClient]);
 
   const saveSettings = async (botId: string | null = null) => {
     setIsSaving(true);
     setError(null);
     try {
-      const token = await getToken();
-      const res = await fetch(`${baseUrl}/api/company`, {
+      const data = await authFetch<any>('/api/company', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           company_id: botId,
           bot_name: botSettings.name,
@@ -147,11 +139,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
           hide_branding: botSettings.hideBranding,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        const msg = typeof data.detail === 'string' ? data.detail : data.detail?.message || 'Save failed';
-        throw new Error(msg);
-      }
+      // Invalidate cached company details so the next read fetches fresh data.
       // Invalidate cached company details so the next read fetches fresh data.
       queryClient.invalidateQueries({ queryKey: COMPANY_DETAILS_KEY(botId) });
       queryClient.invalidateQueries({ queryKey: ['bots'] });
@@ -167,10 +155,10 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
   };
 
   useEffect(() => {
-    if (isAuthLoaded && isSignedIn) {
+    if (isSignedIn) {
       fetchSettings();
     }
-  }, [isAuthLoaded, isSignedIn, fetchSettings]);
+  }, [isSignedIn, fetchSettings]);
 
   const updateSetting = (key: keyof BotSettings, value: any) =>
     setBotSettings((prev) => ({ ...prev, [key]: value }));

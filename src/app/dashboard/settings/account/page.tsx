@@ -227,83 +227,169 @@ const BillingTab = () => {
   );
 };
 
+type BotRow = {
+  id: string;
+  bot_name: string;
+  company_name: string;
+  allowed_origin: string;
+  created_at: string | null;
+};
+
 const ApiKeysTab = () => {
-  const { getToken } = useAuth();
   const authFetch = useAuthenticatedFetch();
   const isAuthReady = useIsAuthReady();
   const [isRotating, setIsRotating] = useState(false);
   const [newKey, setNewKey] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [selectedBotId, setSelectedBotId] = useState('');
   const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'warning', msg: '' });
 
   const { data: botsData, isLoading: botsLoading } = useQuery({
     queryKey: ['bots'],
-    queryFn: () => authFetch('/api/companies') as Promise<any>,
+    queryFn: () => authFetch<{ bots: BotRow[] }>('/api/companies'),
     enabled: isAuthReady,
   });
-  const bots = botsData?.bots || [];
+  const bots: BotRow[] = botsData?.bots || [];
+  const selectedBot = bots.find(b => b.id === selectedBotId) || null;
 
   useEffect(() => {
     if (bots.length > 0 && !selectedBotId) setSelectedBotId(bots[0].id);
   }, [bots, selectedBotId]);
 
   const handleRotate = async () => {
-    if (!window.confirm('Invalidate current key?')) return;
+    if (!selectedBotId) return;
+    if (!window.confirm(
+      'Rotating will immediately invalidate the current API key. Any embedded widget using the old key will stop working until you replace it. Continue?'
+    )) return;
+
     setIsRotating(true);
+    setNewKey('');
+    setCopied(false);
     try {
-      const token = await getToken();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company/rotate-key`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bot_id: selectedBotId }),
-      });
-      const data = await res.json();
+      // Centralized auth + 401/403/402/429 handling via useAuthenticatedFetch.
+      const data = await authFetch<{ status: string; new_key: string }>(
+        '/api/company/rotate-key',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bot_id: selectedBotId }),
+        }
+      );
+      if (!data?.new_key) {
+        // Defensive: backend contract requires new_key on success. If it ever
+        // changes, fail loud rather than showing a green "rotated!" with no key.
+        throw new Error('Rotation succeeded but no key was returned. Try again.');
+      }
       setNewKey(data.new_key);
-      setAlert({ open: true, type: 'success', msg: 'Key rotated!' });
+      setShowKey(true);
+      setAlert({ open: true, type: 'success', msg: 'Key rotated. Copy it now — it will not be shown again.' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Rotation failed.';
+      // Treat the standard rate-limit error from useAuthenticatedFetch
+      // ("Request failed (429)") as a user-friendly message.
+      const friendly = /429/.test(msg)
+        ? 'Too many rotations. Try again in an hour.'
+        : msg;
+      setAlert({ open: true, type: 'error', msg: friendly });
+    } finally {
+      setIsRotating(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!newKey) return;
+    try {
+      await navigator.clipboard.writeText(newKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      setAlert({ open: true, type: 'error', msg: 'Failed' });
-    } finally { setIsRotating(false); }
+      setAlert({ open: true, type: 'warning', msg: 'Clipboard unavailable. Select the key and copy manually.' });
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div className="p-4 bg-amber-50 border border-amber-200 flex gap-3">
-        <span className="material-symbols-outlined text-amber-500">warning</span>
-        <p className="text-md text-amber-800">Rotating invalidates immediately.</p>
+      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 flex gap-3">
+        <span className="material-symbols-outlined text-amber-500 shrink-0">warning</span>
+        <div className="text-md text-amber-800 dark:text-amber-300 space-y-1">
+          <p className="font-semibold">Rotation invalidates the current key immediately.</p>
+          <p className="text-[11px] opacity-80">Embedded widgets using the old key will stop working until you replace the snippet on every site.</p>
+        </div>
       </div>
 
-      <div className="space-y-px bg-gray-100">
-        {bots.map((bot: any) => (
-          <button
-            key={bot.id}
-            onClick={() => { setSelectedBotId(bot.id); setNewKey(''); }}
-            className={`w-full bg-white px-5 py-4 flex items-center justify-between border-l-2 ${selectedBotId === bot.id ? 'border-blue-600' : 'border-transparent'}`}
-          >
-            <div className="text-left">
-              <p className="text-md font-bold">{bot.bot_name}</p>
-              <p className="text-[10px] text-slate-400">{bot.allowed_origin}</p>
-            </div>
-          </button>
-        ))}
-      </div>
+      {botsLoading && <SkeletonBase className="h-24" />}
+
+      {!botsLoading && bots.length === 0 && (
+        <div className="p-8 text-center bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800">
+          <p className="text-md text-slate-500 dark:text-slate-400">You don&apos;t have any bots yet.</p>
+        </div>
+      )}
+
+      {!botsLoading && bots.length > 0 && (
+        <div className="space-y-px bg-gray-100 dark:bg-slate-800">
+          {bots.map((bot) => (
+            <button
+              key={bot.id}
+              onClick={() => { setSelectedBotId(bot.id); setNewKey(''); setCopied(false); }}
+              className={`w-full bg-white dark:bg-slate-900 px-5 py-4 flex items-center justify-between border-l-2 transition-colors ${selectedBotId === bot.id ? 'border-blue-600' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              <div className="text-left min-w-0">
+                <p className="text-md font-bold truncate">{bot.bot_name || bot.company_name}</p>
+                <p className="text-[10px] text-slate-400 truncate">{bot.allowed_origin}</p>
+              </div>
+              {selectedBotId === bot.id && (
+                <span className="material-symbols-outlined text-[16px] text-blue-600 shrink-0">check_circle</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedBot && (
+        <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+          <p>
+            <span className="font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Created:</span>{' '}
+            {selectedBot.created_at ? new Date(selectedBot.created_at).toLocaleDateString() : '—'}
+          </p>
+          <p className="opacity-80">The current key value is never stored — only its SHA-256 hash. Lost keys can&apos;t be recovered, only rotated.</p>
+        </div>
+      )}
 
       {newKey && (
-        <div className="p-5 bg-emerald-50 border border-emerald-200">
-          <p className="text-[10px] font-bold text-emerald-600 mb-2">New Key (shown once)</p>
-          <div className="flex gap-2 bg-white border p-3 font-mono text-sm">
-            <span className="flex-1 truncate">{showKey ? newKey : '••••••••••••••••'}</span>
-            <button onClick={() => setShowKey(!showKey)} className="text-slate-400">
+        <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/40">
+          <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-widest">New Key — shown once</p>
+          <div className="flex gap-2 bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 p-3 font-mono text-sm">
+            <span className="flex-1 truncate select-all">{showKey ? newKey : '•'.repeat(Math.min(newKey.length, 48))}</span>
+            <button
+              onClick={() => setShowKey(s => !s)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+              aria-label={showKey ? 'Hide key' : 'Show key'}
+              type="button"
+            >
               <span className="material-symbols-outlined text-[16px]">{showKey ? 'visibility_off' : 'visibility'}</span>
             </button>
+            <button
+              onClick={handleCopy}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+              aria-label="Copy key"
+              type="button"
+            >
+              <span className={`material-symbols-outlined text-[16px] ${copied ? 'text-emerald-600' : ''}`}>
+                {copied ? 'check' : 'content_copy'}
+              </span>
+            </button>
           </div>
+          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-2 opacity-80">
+            Save this somewhere safe before leaving this page.
+          </p>
         </div>
       )}
 
       <button
         onClick={handleRotate}
         disabled={isRotating || !selectedBotId}
-        className="w-full py-3 bg-gradient-to-r from-blue-600 to-green-600 text-white font-bold uppercase tracking-widest text-[10px]"
+        className="w-full py-3 bg-gradient-to-r from-blue-600 to-green-600 text-white font-bold uppercase tracking-widest text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isRotating ? 'Rotating...' : 'Rotate Key'}
       </button>

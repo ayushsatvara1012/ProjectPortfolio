@@ -2,6 +2,7 @@ import os
 import asyncio
 import redis.asyncio as redis
 import re
+import logging
 from datetime import datetime, timezone, timedelta
 import time
 import tempfile
@@ -11,6 +12,7 @@ import secrets
 import socket
 import ipaddress
 import hashlib
+import hmac
 import smtplib
 import ssl
 from email.mime.text import MIMEText
@@ -65,6 +67,10 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
 POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+
+# 1a. Structured Logging
+logger = logging.getLogger(__name__)
 
 # 2. Database Connection Pool (singleton ThreadedConnectionPool)
 # Supabase pgBouncer already pools externally; this avoids reconnecting per-request.
@@ -908,27 +914,16 @@ class RegisterRequest(BaseModel):
     theme_color: str = "#5730F5"
     company_tone: str = "Professional and helpful"
 
-# ── PROMPT INJECTION SHIELD: Input Sanitization ──────────────────────────────
-# These patterns are silently stripped from user input BEFORE it reaches the LLM.
-# This is a defense-in-depth layer; the XML delimiters and instruction
-# reinforcement in the system prompt are the primary defense.
-JAILBREAK_PATTERNS = [
-    r"(?i)ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|rules|prompts|directives)",
-    r"(?i)disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|rules|prompts)",
-    r"(?i)you\s+are\s+now\s+(a|an|the|in)\s",
-    r"(?i)new\s+(instructions|rules|persona|identity|system\s*prompt)",
-    r"(?i)override\s+(system|previous|your)\s",
-    r"(?i)forget\s+(everything|all|your\s+rules|your\s+instructions)",
-    r"(?i)act\s+as\s+(if|though|a|an)\s",
-    r"(?i)pretend\s+(you\s+are|to\s+be|you're)",
-    r"(?i)from\s+now\s+on,?\s+(you|ignore|forget)",
-    r"(?i)<\/?\s*(system|instruction|prompt|admin|root|sudo)",
-    r"(?i)```\s*(system|instructions|prompt)",
-    r"(?i)\[SYSTEM\]",
-    r"(?i)\[INST\]",
-    r"(?i)<<\s*SYS\s*>>",
-    r"(?i)do\s+not\s+follow\s+(the|your|any)\s+(rules|instructions)",
-]
+def _load_jailbreak_patterns():
+    patterns_path = os.path.join(os.path.dirname(__file__), "jailbreak_patterns.json")
+    try:
+        with open(patterns_path) as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load jailbreak_patterns.json: {e}; using empty list")
+        return []
+
+JAILBREAK_PATTERNS = _load_jailbreak_patterns()
 
 VALID_LOGO_SHAPES = {"circle", "squircle", "bento", "sharp"}
 
@@ -1165,7 +1160,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
                    u.email, c.handoff_redirect_url, c.hide_branding,
-                   u.id, u.subscription_status, u.billing_period_end
+                   u.id, u.subscription_status, u.billing_period_end, c.webhook_secret
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1272,6 +1267,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "owner_email": company_data[16],
         "handoff_redirect_url": company_data[17],
         "hide_branding": bool(company_data[18]),
+        "webhook_secret": company_data[22],
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -1330,50 +1326,70 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
 
 # --- JWT VERIFICATION (CLERK) ---
 
-# Cache for JWKS to avoid frequent network calls
-_JWKS_CACHE = {"keys": [], "expires_at": 0}
+_JWKS_CACHE = {"keys": [], "stale_at": 0, "expires_at": 0}
+_JWKS_REFRESHING = False
 
-async def get_clerk_jwks():
-    """Fetches and caches Clerk public keys for JWT verification."""
-    global _JWKS_CACHE
-    now = time.time()
-    if _JWKS_CACHE["keys"] and now < _JWKS_CACHE["expires_at"]:
-        return _JWKS_CACHE["keys"]
-    
+async def _refresh_jwks_background():
+    global _JWKS_CACHE, _JWKS_REFRESHING
+    if _JWKS_REFRESHING:
+        return
+    _JWKS_REFRESHING = True
     try:
         jwks_url = f"{CLERK_JWT_ISSUER}/.well-known/jwks.json"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(jwks_url)
+            resp.raise_for_status()
+            now = time.time()
+            _JWKS_CACHE["keys"] = resp.json().get("keys", [])
+            _JWKS_CACHE["stale_at"] = now + 3300   # 55 min
+            _JWKS_CACHE["expires_at"] = now + 3600  # 60 min hard expiry
+    except Exception as e:
+        print(f"JWKS BACKGROUND REFRESH FAILED: {e}")
+    finally:
+        _JWKS_REFRESHING = False
+
+async def get_clerk_jwks(force: bool = False):
+    global _JWKS_CACHE
+    now = time.time()
+
+    if force:
+        _JWKS_CACHE["expires_at"] = 0
+
+    if _JWKS_CACHE["keys"] and now < _JWKS_CACHE["expires_at"]:
+        if now >= _JWKS_CACHE["stale_at"]:
+            asyncio.create_task(_refresh_jwks_background())
+        return _JWKS_CACHE["keys"]
+
+    try:
+        jwks_url = f"{CLERK_JWT_ISSUER}/.well-known/jwks.json"
+        async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(jwks_url)
             resp.raise_for_status()
             _JWKS_CACHE["keys"] = resp.json().get("keys", [])
-            _JWKS_CACHE["expires_at"] = now + 3600 # Cache for 1 hour
+            _JWKS_CACHE["stale_at"] = now + 3300
+            _JWKS_CACHE["expires_at"] = now + 3600
             return _JWKS_CACHE["keys"]
     except Exception as e:
         print(f"JWKS FETCH FAILED: {e}")
-        return []
+        return _JWKS_CACHE["keys"]  # serve stale on transient failure
 
 async def verify_clerk_jwt(token: str):
-    """
-    CRITICAL SECURITY FIX: Validates JWT signature against Clerk JWKS.
-    Replaces the previous unverified fallback.
-    """
-    try:
-        keys = await get_clerk_jwks()
-        if not keys:
-            raise Exception("Could not retrieve public keys")
-            
-        # Verify the token using the provided public keys
-        payload = jwt.decode(
-            token, 
-            keys, 
-            algorithms=["RS256"], 
-            audience=None, # aud check can be added if configured in Clerk
-            issuer=CLERK_JWT_ISSUER
-        )
-        return payload
-    except Exception as e:
-        print(f"JWT VERIFICATION FAILED: {e}")
-        return None
+    for attempt in range(2):
+        try:
+            keys = await get_clerk_jwks(force=(attempt == 1))
+            if not keys:
+                return None
+            payload = jwt.decode(
+                token, keys, algorithms=["RS256"],
+                audience=None, issuer=CLERK_JWT_ISSUER
+            )
+            return payload
+        except Exception as e:
+            err = str(e).lower()
+            if attempt == 0 and "kid" in err:
+                continue
+            print(f"JWT VERIFICATION FAILED: {e}")
+            return None
 
 async def get_current_user(request: Request):
     """
@@ -1618,7 +1634,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
+                       webhook_secret
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1628,7 +1645,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
+                       webhook_secret
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1658,6 +1676,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "webhook_url": company_row[15],
             "handoff_redirect_url": company_row[16],
             "hide_branding": bool(company_row[17]),
+            "webhook_secret": company_row[18],
         }
     finally:
         release_db_connection(conn)
@@ -2226,6 +2245,8 @@ async def chat_endpoint(
         # Only use cache if: (a) first question (no history), or (b) history is provided (context-aware)
         # Cache is ALWAYS eligible since the widget now sends history. Future-proofed with None guard.
         cache_eligible = True
+        if len(history_for_hash) == 0 and len(chat_req.message.split()) <= 3:
+            cache_eligible = False
         query_hash = build_query_hash(company["id"], chat_req.message, history_for_hash) if cache_eligible else None
 
         if query_hash:
@@ -2483,6 +2504,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     is_un_final = len(retrieved_docs) == 0
                     if not is_un_final:
                         is_un_final = any(phrase in full_reply.lower() for phrase in FALLBACK_PHRASES)
+                    if len(chat_req.message.strip()) < 4:
+                        is_un_final = False
 
                     background_tasks.add_task(
                         log_chat_to_db, company["id"], chat_req.message,
@@ -2508,13 +2531,57 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
 # ── LEAD CAPTURE ENDPOINTS ────────────────────────────────────────────────────
 
-async def _fire_webhook(webhook_url: str, lead_data: dict):
-    """Fire lead payload to the business owner's configured webhook URL."""
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            await client.post(webhook_url, json=lead_data, headers={"Content-Type": "application/json"})
-    except Exception as e:
-        print(f"WEBHOOK FIRE ERROR: {e}")
+async def _fire_webhook(webhook_url: str, lead_data: dict, secret: str | None, company_id: str, lead_id: str):
+    """
+    POST lead payload to the business owner's webhook URL.
+    - Signs the body with HMAC-SHA256 using the bot's webhook_secret.
+    - Retries up to 3 times with exponential backoff (2s, 4s).
+    - Logs each attempt to lead_webhook_deliveries.
+    """
+    body = json.dumps(lead_data, separators=(",", ":")).encode()
+
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if secret:
+        sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        headers["X-Sapybase-Signature"] = f"sha256={sig}"
+
+    delays = [0, 2, 4]
+    for attempt, delay in enumerate(delays, start=1):
+        if delay:
+            await asyncio.sleep(delay)
+        http_status = None
+        error_msg = None
+        status = "failed"
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(webhook_url, content=body, headers=headers)
+            http_status = resp.status_code
+            if resp.is_success:
+                status = "success"
+        except Exception as exc:
+            error_msg = str(exc)[:500]
+
+        # Log delivery attempt
+        try:
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    """INSERT INTO lead_webhook_deliveries
+                       (company_id, lead_id, attempt, status, http_status, error_msg)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (company_id, lead_id, attempt, status, http_status, error_msg),
+                )
+                conn.commit()
+            finally:
+                release_db_connection(conn)
+        except Exception as log_exc:
+            logger.error(f"WEBHOOK DELIVERY LOG ERROR: {log_exc}")
+
+        if status == "success":
+            return
+
+    logger.error(f"WEBHOOK FIRE FAILED after {len(delays)} attempts: {webhook_url}")
 
 
 async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None):
@@ -2568,8 +2635,13 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
         print(f"HANDOFF EMAIL ERROR: {e}")
 
 
+def _get_company_key(request: Request) -> str:
+    api_key = request.headers.get("x-api-key", "")
+    return f"company:{hashlib.sha256(api_key.encode()).hexdigest()[:16]}"
+
 @app.post("/api/leads/capture")
 @limiter.limit("3/minute", key_func=get_remote_address)
+@limiter.limit("10/hour", key_func=_get_company_key)
 async def capture_lead(
     request: Request,
     payload: LeadCaptureRequest,
@@ -2608,15 +2680,22 @@ async def capture_lead(
         # Fire webhook in background if configured
         webhook_url = company.get("webhook_url")
         if webhook_url:
-            background_tasks.add_task(_fire_webhook, webhook_url, {
-                "event": "lead.captured",
-                "lead_id": str(lead_id),
-                "email": payload.email,
-                "name": payload.name,
-                "context": payload.context,
-                "bot_id": str(company["id"]),
-                "bot_name": company.get("bot_name", ""),
-            })
+            background_tasks.add_task(
+                _fire_webhook,
+                webhook_url,
+                {
+                    "event": "lead.captured",
+                    "lead_id": str(lead_id),
+                    "email": payload.email,
+                    "name": payload.name,
+                    "context": payload.context,
+                    "bot_id": str(company["id"]),
+                    "bot_name": company.get("bot_name", ""),
+                },
+                company.get("webhook_secret"),
+                str(company["id"]),
+                str(lead_id),
+            )
 
         return {"status": "success", "lead_id": str(lead_id)}
     except Exception as e:
@@ -4080,6 +4159,7 @@ def register_company(
 
         api_key = f"sb_{secrets.token_urlsafe(32)}"
         hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
+        webhook_secret = f"whsec_{secrets.token_urlsafe(32)}"
 
         cursor.execute("SELECT COALESCE(MAX(display_order), -1) + 1 FROM companies WHERE user_id = %s", (user["id"],))
         next_order = cursor.fetchone()[0]
@@ -4087,13 +4167,14 @@ def register_company(
         cursor.execute(
             """INSERT INTO companies
                (user_id, company_name, allowed_origin, domain, api_key, display_order,
-                bot_name, theme_color, company_tone, initial_message)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                bot_name, theme_color, company_tone, initial_message, webhook_secret)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                RETURNING id""",
             (user["id"], reg.company_name, reg.allowed_origin, reg.allowed_origin,
              hashed_key, next_order,
              reg.company_name + " AI", reg.theme_color, reg.company_tone,
-             f"Hi! I'm {reg.company_name} AI. How can I help you today?")
+             f"Hi! I'm {reg.company_name} AI. How can I help you today?",
+             webhook_secret)
         )
         company_id = cursor.fetchone()[0]
 
@@ -4742,6 +4823,20 @@ def get_admin_stats(request: Request, admin: dict = Depends(get_admin_user)):
         }
     finally:
         release_db_connection(conn)
+
+@app.post("/api/admin/reload-jailbreak")
+def reload_jailbreak_patterns(request: Request, x_admin_key: str = Header(None)):
+    """Reload jailbreak patterns from disk without a redeploy. Requires x-admin-key header."""
+    if not ADMIN_SECRET or x_admin_key != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    global JAILBREAK_PATTERNS
+    try:
+        JAILBREAK_PATTERNS = _load_jailbreak_patterns()
+        logger.info(f"Reloaded {len(JAILBREAK_PATTERNS)} jailbreak patterns from disk")
+        return {"status": "ok", "pattern_count": len(JAILBREAK_PATTERNS)}
+    except Exception as e:
+        logger.error(f"Failed to reload jailbreak patterns: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/companies")
 @limiter.limit("30/minute")

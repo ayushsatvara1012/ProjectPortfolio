@@ -105,7 +105,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-8 w-full p-1">
+        <div className="flex flex-col lg:flex-row gap-8 w-full p-1 overflow-x-hidden">
             {/* Calendar Grid */}
             <div className="w-full lg:w-1/2 flex flex-col gap-4">
                 <div className="flex items-center justify-between mb-2">

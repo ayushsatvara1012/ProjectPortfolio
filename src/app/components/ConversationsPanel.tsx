@@ -115,7 +115,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, userTier, userRole }: Co
                                 {/* Session Row */}
                                 <button
                                     onClick={() => setExpandedSession(isExpanded ? null : session.session_id)}
-                                    className="w-full text-left px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors flex items-start gap-4"
+                                    className="w-full text-left px-3 py-3 sm:px-6 sm:py-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors flex items-start gap-4"
                                 >
                                     {/* Status dot */}
                                     <div className="mt-1 shrink-0">
@@ -131,7 +131,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, userTier, userRole }: Co
                                         <p className="text-md font-google text-slate-700 dark:text-slate-300 truncate font-medium">
                                             {preview || 'No messages'}
                                         </p>
-                                        <div className="flex items-center gap-3 mt-1">
+                                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
                                             <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
                                                 {formatTime(session.last_active)}
                                             </span>
@@ -154,7 +154,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, userTier, userRole }: Co
 
                                 {/* Expanded Transcript */}
                                 {isExpanded && (
-                                    <div className="px-6 pb-6 bg-slate-50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-800 flex flex-col gap-4 pt-4">
+                                    <div className="px-3 pb-4 sm:px-6 sm:pb-6 bg-slate-50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-800 flex flex-col gap-4 pt-4">
                                         {session.messages.map((msg: any, idx: number) => (
                                             <div key={idx} className="flex flex-col gap-2">
                                                 {/* User message */}

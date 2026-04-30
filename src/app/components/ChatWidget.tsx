@@ -8,19 +8,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './ThinkingLogo';
 import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
+import { FAB_SHAPES, SHAPE_CLASS_MAP, AVATAR_GRADIENTS } from './avatar/AvatarShared';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE = IS_DEV ? '' : 'https://www.Sapybase.com';
 const BrandLogo = `${ASSET_BASE}/SB_loading.svg`;
-
-// ── Shape / gradient catalogs ─────────────────────────────────────────────────
-
-const SHAPE_CLASS_MAP: Record<string, string> = {
-  circle: 'rounded-full',
-  squircle: 'rounded-[2rem]',
-  bento: 'rounded-2xl',
-  sharp: 'rounded-lg',
-};
 
 // Send a message to the host page only when we have a validated origin.
 // `__SapybaseParentOrigin` is set by `src/app/embed/[botId]/page.tsx` after
@@ -36,33 +28,6 @@ function postToParent(message: unknown) {
     // Cross-origin failure or detached frame — drop silently.
   }
 }
-
-export const AVATAR_GRADIENTS: Record<string, [string, string] | null> = {
-  none: null,
-  cosmic: ['#c026d3', '#3b82f6'],
-  sunset: ['#f97316', '#eab308'],
-  ocean: ['#06b6d4', '#3b82f6'],
-  hacker: ['#22c55e', '#14b8a6'],
-};
-
-export const FAB_SHAPES: Record<string, { path: string; logoSize: string; x: number; y: number }> = {
-  circle: {
-    path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z',
-    logoSize: 'w-full h-full', x: 0, y: 0,
-  },
-  squircle: {
-    path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z',
-    logoSize: 'w-full h-full', x: 0, y: -8,
-  },
-  bento: {
-    path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z',
-    logoSize: 'w-full h-full', x: 0, y: -10.5,
-  },
-  sharp: {
-    path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z',
-    logoSize: 'w-full h-full', x: 0, y: 0,
-  },
-};
 
 // ── SapybaseConfig window augmentation ───────────────────────────────────────
 
