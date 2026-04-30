@@ -5,7 +5,7 @@ import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
 import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/app/components/avatar/AvatarShared';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
-const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.Sapybase.com';
+const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
 const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
 
 const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";

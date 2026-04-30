@@ -2,9 +2,18 @@ import React from 'react';
 import { Gavel, AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export const metadata = {
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
   title: 'Terms & Conditions | Sapybase',
-  description: 'Terms of service and subscription agreement for Sapybase.',
+  description: 'Review the Sapybase terms and conditions governing use of our services, intellectual property, and service agreements.',
+  alternates: { canonical: 'https://www.sapybase.com/terms-and-conditions' },
+  openGraph: {
+    title: 'Terms & Conditions | Sapybase',
+    description: 'Review the Sapybase terms and conditions governing use of our services.',
+    url: 'https://www.sapybase.com/terms-and-conditions',
+  },
+  twitter: { card: 'summary', title: 'Terms & Conditions | Sapybase' },
 };
 
 const LAST_UPDATED = 'April 26, 2026';

@@ -289,7 +289,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
               value={draft.custom_plan_enabled ? 'CUSTOM' : draft.tier}
               onChange={e => handleTierChange(e.target.value)}
               disabled={isSaving}
-              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none"
+              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none"
             >
               {TIERS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -531,7 +531,7 @@ export default function AdminPage() {
             placeholder="Search users..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="flex-1 max-w-full md:max-w-md bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 px-4 py-2.5 text-md font-medium outline-none"
+            className="flex-1 max-w-full md:max-w-md bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 px-4 py-2.5 text-md font-medium font-google outline-none"
           />
           <div className="-mx-4 sm:-mx-6 md:mx-0 px-4 sm:px-6 md:px-0 overflow-x-auto scrollbar-hide">
             <div className="flex gap-1 min-w-max ">
@@ -539,7 +539,7 @@ export default function AdminPage() {
                 <button
                   key={t}
                   onClick={() => setTierFilter(t)}
-                  className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${tierFilter === t ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-500 hover:bg-gray-100'}`}
+                  className={`px-3 py-1.5 text-md font-bold uppercase tracking-widest whitespace-nowrap ${tierFilter === t ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors'}`}
                 >
                   {t}
                 </button>
@@ -559,14 +559,14 @@ export default function AdminPage() {
           { label: 'Custom Plans', value: stats.custom_plan_count, icon: 'build' },
         ].map((s, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 p-4 sm:p-6">
-            <p className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1 truncate">{s.label}</p>
-            <h3 className="text-base sm:text-lg md:text-xl font-display font-bold truncate">{s.value}</h3>
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1 truncate">{s.label}</p>
+            <h3 className="text-base sm:text-lg md:text-xl font-display font-bold truncate text-slate-900 dark:text-slate-100">{s.value}</h3>
           </div>
         ))}
       </div>
 
       {/* Users — table on md+, stacked cards on mobile */}
-      <div className="flex-1 p-4 sm:p-6 bg-white">
+      <div className="flex-1 p-4 sm:p-6 bg-white dark:bg-slate-950">
         {isLoading ? <SkeletonLoader.Table /> : (
           <>
             {/* Desktop / tablet: traditional table */}
@@ -584,8 +584,8 @@ export default function AdminPage() {
                   {filteredUsers.map((u: any) => (
                     <tr key={u.clerk_id} className="hover:bg-gray-50/50 dark:hover:bg-slate-900/50 transition-colors">
                       <td className="py-4 px-2 min-w-0">
-                        <p className="text-md font-google truncate max-w-[260px]">{u.email}</p>
-                        <p className="text-[10px] font-mono text-slate-400 truncate max-w-[260px]">{u.clerk_id}</p>
+                        <p className="text-md font-google text-slate-900 dark:text-slate-100 truncate max-w-[260px]">{u.email}</p>
+                        <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[260px]">{u.clerk_id}</p>
                       </td>
                       <td className="py-4 px-2 space-y-1">
                         <TierBadge tier={u.tier} />

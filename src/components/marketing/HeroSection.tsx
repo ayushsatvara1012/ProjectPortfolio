@@ -271,7 +271,7 @@ const HeroSection = () => {
                                 <span className="text-[#FF79C6]">script</span>
                                 <br />
                                 <span className="text-[#50FA7B] ml-2">src</span>
-                                <span className="text-[#F1FA8C]">="https://Sapybase.com/widget.js"</span>
+                                <span className="text-[#F1FA8C]">="https://sapybase.com/widget.js"</span>
                                 <br />
                                 <span className="text-[#50FA7B] ml-2">data-api-key</span>
                                 <span className="text-[#F1FA8C]">="sb_live_0123456789"</span>

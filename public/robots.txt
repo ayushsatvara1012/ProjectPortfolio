@@ -18,4 +18,4 @@ User-agent: Google-Extended
 Allow: /
 
 # Sitemap
-Sitemap: https://www.Sapybase.com/sitemap.xml
+Sitemap: https://www.sapybase.com/sitemap.xml

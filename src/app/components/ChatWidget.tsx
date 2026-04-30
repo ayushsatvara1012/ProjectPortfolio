@@ -11,7 +11,7 @@ import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validati
 import { FAB_SHAPES, SHAPE_CLASS_MAP, AVATAR_GRADIENTS } from './avatar/AvatarShared';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
-const ASSET_BASE = IS_DEV ? '' : 'https://www.Sapybase.com';
+const ASSET_BASE = IS_DEV ? '' : 'https://www.sapybase.com';
 const BrandLogo = `${ASSET_BASE}/SB_loading.svg`;
 
 // Send a message to the host page only when we have a validated origin.
@@ -880,7 +880,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               try { detail = await response.json(); } catch { /* noop */ }
               const isMessageLimit = (detail as { detail?: { code?: string } })?.detail?.code === 'MESSAGE_LIMIT_EXCEEDED';
               const errorContent = isMessageLimit
-                ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [Sapybase.com](https://www.Sapybase.com). I'll be back next billing cycle! 🚀`
+                ? `I've reached my monthly message limit. Please contact the site owner to upgrade their plan at [Sapybase.com](https://www.sapybase.com). I'll be back next billing cycle! 🚀`
                 : "I'm temporarily unavailable. Please try again later.";
               setMessages(prev => {
                 const updated = [...prev];
@@ -1155,7 +1155,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         }} className="w-full text-left px-4 py-2 text-sm font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
                           Clear chat <span className="material-symbols-outlined">refresh</span>
                         </button>
-                        <a href="https://www.Sapybase.com" target="_blank" rel="noopener noreferrer"
+                        <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                           className="w-full text-left px-4 py-2 text-sm font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
                           onClick={() => setShowMenu(false)} style={{ color: THEME_COLOR }}>
                           Add to your site
@@ -1185,7 +1185,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                          className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `max-w-[85%] ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
+                          className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-[95%]' : 'max-w-[85%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
                           {msg.role === 'handoff_form' ? (
                             <HandoffContactForm themeColor={THEME_COLOR} onSubmit={submitHandoff}
                               onDismiss={() => setMessages(prev => prev.filter(m => m.id !== 'handoff-form'))} />
@@ -1263,7 +1263,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
               {!configData.white_label_enabled && (
                 <div className="shrink-0 pt-2 flex justify-center items-center">
-                  <a href="https://www.Sapybase.com" target="_blank" rel="noopener noreferrer"
+                  <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
@@ -1275,7 +1275,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Ask anything..."
-                    className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-base sm:text-sm font-medium font-google"
+                    className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-base sm:text-sm font-google"
                     rows={1} disabled={isLoading} aria-label="Chat input" />
                   <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send message"
                     className="p-2 shrink-0 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center translate-y-px"
@@ -1291,7 +1291,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
       {/* FAB button */}
       {!isEmbed && (
-        <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[2147483646] pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
+        <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
           <div className="relative flex items-center justify-end">
             <AnimatePresence>
               {!isOpen && (

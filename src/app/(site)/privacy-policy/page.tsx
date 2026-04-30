@@ -2,9 +2,18 @@ import React from 'react';
 import { Shield } from 'lucide-react';
 import Link from 'next/link';
 
-export const metadata = {
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
   title: 'Privacy Policy | Sapybase',
-  description: 'Learn how Sapybase collects, uses, and protects your data.',
+  description: 'Read the Sapybase privacy policy to understand how we collect, use, and protect your personal information.',
+  alternates: { canonical: 'https://www.sapybase.com/privacy-policy' },
+  openGraph: {
+    title: 'Privacy Policy | Sapybase',
+    description: 'Read the Sapybase privacy policy to understand how we collect, use, and protect your personal information.',
+    url: 'https://www.sapybase.com/privacy-policy',
+  },
+  twitter: { card: 'summary', title: 'Privacy Policy | Sapybase' },
 };
 
 const LAST_UPDATED = 'April 26, 2026';
@@ -57,7 +66,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               This Privacy Policy applies to our website at{' '}
-              <span className="text-indigo-600 dark:text-indigo-400">www.Sapybase.com</span>, our dashboard, our embeddable
+              <span className="text-indigo-600 dark:text-indigo-400">www.sapybase.com</span>, our dashboard, our embeddable
               chatbot widget, and our API. By using any of these services you agree to the practices described here.
             </p>
           </Section>

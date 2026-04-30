@@ -6,7 +6,7 @@ import { useBotSettings } from '@/src/lib/context/BotSettingsContext';
 import { BotAvatar } from './LogoCustomizer';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
-const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.Sapybase.com';
+const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
 const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
 
 type BotPreviewProps = {

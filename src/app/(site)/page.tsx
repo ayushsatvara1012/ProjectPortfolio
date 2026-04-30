@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "Sapybase | Autonomous AI Chatbots for Modern Business",
   description: "Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.",
   alternates: {
-    canonical: "https://www.Sapybase.com/",
+    canonical: "https://www.sapybase.com/",
   },
 };
 
@@ -20,12 +20,12 @@ const structuredSchema = {
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://www.Sapybase.com/#organization",
+      "@id": "https://www.sapybase.com/#organization",
       "name": "Sapybase",
-      "url": "https://www.Sapybase.com",
+      "url": "https://www.sapybase.com",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://www.Sapybase.com/SB_Brand-removebg.png"
+        "url": "https://www.sapybase.com/SB_Brand-removebg.png"
       }
     },
     {
@@ -33,7 +33,7 @@ const structuredSchema = {
       "name": "Sapybase AI Chatbot",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "url": "https://www.Sapybase.com",
+      "url": "https://www.sapybase.com",
       "description": "Autonomous AI chatbots and agents for modern businesses. Connect documents and databases to automate customer support and sales.",
       "offers": {
         "@type": "Offer",
