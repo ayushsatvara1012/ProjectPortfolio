@@ -1,56 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { ClerkProvider } from '@clerk/nextjs';
-import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
-import { UserProvider } from '@/src/lib/context/UserContext';
-import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
 import { ToastProvider } from '@/src/lib/context/ToastContext';
-import { UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // The embeddable widget at /embed/[botId] runs on third-party sites inside
-  // an iframe. It must NOT carry our app providers (Clerk, query client, etc.)
-  // because: (a) Clerk would attempt auth on anonymous visitors, (b) the
-  // upgrade-modal fetch interceptor would mutate window.fetch on the host's
-  // iframe document.
   const pathname = usePathname();
-  const isEmbed = pathname?.startsWith('/embed/') ?? false;
-  if (isEmbed) {
-    return <>{children}</>;
-  }
-  // One QueryClient per client tree. useState ensures it survives re-renders
-  // but is not shared across requests during SSR.
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 1000 * 60 * 2,
-            retry: 1,
-            refetchOnWindowFocus: false,
-          },
-        },
-        // Surface unhandled mutation errors as toasts so individual call sites
-        // don't each need to remember to wire up onError. UpgradeError and the
-        // typed AUTH_REQUIRED/FORBIDDEN errors are handled by their dedicated
-        // global flows and shouldn't double-toast here.
-        mutationCache: new MutationCache({
-          onError: (error) => {
-            if (typeof window === 'undefined') return;
-            if (error instanceof UpgradeError) return;
-            const msg = (error as Error)?.message || '';
-            if (msg === 'AUTH_REQUIRED' || msg === 'FORBIDDEN' || msg === 'AUTH_NOT_READY') return;
-            window.dispatchEvent(
-              new CustomEvent('Sapybase:toast', {
-                detail: { kind: 'error', message: msg || 'Something went wrong.' },
-              })
-            );
-          },
-        }),
-      })
-  );
 
   // Global auth event handlers: 401 → bounce to sign-in (Clerk middleware will
   // re-establish session); 403 → bounce to dashboard. Both are emitted from
@@ -110,6 +66,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // The embeddable widget at /embed/[botId] runs on third-party sites inside
+  // an iframe. It must NOT carry our app providers (Clerk, query client, etc.)
+  // because: (a) Clerk would attempt auth on anonymous visitors, (b) the
+  // upgrade-modal fetch interceptor would mutate window.fetch on the host's
+  // iframe document.
+  if (pathname?.startsWith('/embed/')) {
+    return <>{children}</>;
+  }
+
   return (
     <ClerkProvider
       appearance={{
@@ -125,13 +90,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <UserProvider>
-            <BotSettingsProvider>{children}</BotSettingsProvider>
-          </UserProvider>
-        </ToastProvider>
-      </QueryClientProvider>
+      <ToastProvider>
+        {children}
+      </ToastProvider>
     </ClerkProvider>
   );
 }

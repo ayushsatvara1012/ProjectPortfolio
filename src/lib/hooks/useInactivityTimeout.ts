@@ -3,61 +3,49 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useClerk } from '@clerk/nextjs';
 
-/**
- * Custom hook to log out the user after a period of inactivity.
- * @param {number} timeoutInMinutes - Time in minutes before auto-logout.
- */
+const EVENTS = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'] as const;
+
 const useInactivityTimeout = (timeoutInMinutes = 30) => {
   const { signOut, user } = useClerk();
   const timeoutMs = timeoutInMinutes * 60 * 1000;
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleLogout = useCallback(() => {
-    if (user) {
-      if (process.env.NODE_ENV === 'development') console.log(`User inactive for ${timeoutInMinutes} minutes. Logging out...`);
-      signOut();
-    }
-  }, [signOut, user, timeoutInMinutes]);
+  // Keep latest values accessible inside the stable listener without re-registering.
+  const userRef = useRef(user);
+  const timeoutMsRef = useRef(timeoutMs);
+  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { timeoutMsRef.current = timeoutMs; }, [timeoutMs]);
 
+  const signOutRef = useRef(signOut);
+  useEffect(() => { signOutRef.current = signOut; }, [signOut]);
+
+  // Stable reset function — identity never changes, so addEventListener only runs once.
   const resetTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (userRef.current) {
+      timerRef.current = setTimeout(() => {
+        if (userRef.current) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`User inactive for ${timeoutInMinutes} minutes. Logging out...`);
+          }
+          signOutRef.current();
+        }
+      }, timeoutMsRef.current);
     }
-    if (user) {
-      timerRef.current = setTimeout(handleLogout, timeoutMs);
-    }
-  }, [handleLogout, timeoutMs, user]);
+  }, [timeoutInMinutes]);
 
   useEffect(() => {
     if (!user) {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
+      if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
 
-    const events = [
-      'mousedown',
-      'mousemove',
-      'keypress',
-      'scroll',
-      'touchstart',
-      'click'
-    ];
-
     resetTimer();
-
-    events.forEach(event => {
-      window.addEventListener(event, resetTimer);
-    });
+    EVENTS.forEach(e => window.addEventListener(e, resetTimer));
 
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-      events.forEach(event => {
-        window.removeEventListener(event, resetTimer);
-      });
+      if (timerRef.current) clearTimeout(timerRef.current);
+      EVENTS.forEach(e => window.removeEventListener(e, resetTimer));
     };
   }, [user, resetTimer]);
 

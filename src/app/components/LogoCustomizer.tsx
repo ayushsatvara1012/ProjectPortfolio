@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { AVATAR_GRADIENTS, FAB_SHAPES, SHAPE_CLASS_MAP } from './avatar/AvatarShared';
-export { AVATAR_GRADIENTS, FAB_SHAPES, SHAPE_CLASS_MAP } from './avatar/AvatarShared';
 
 // ── Shape catalogue (for shape picker UI) ─────────────────────────────────────
 export const SHAPES = [

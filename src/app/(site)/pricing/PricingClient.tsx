@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, Zap, Rocket, Building2, Globe, Mail, ChevronDown } from 'lucide-react';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 
@@ -235,13 +236,8 @@ export default function PricingClient() {
       <section
         ref={heroRef}
         className="relative min-h-[85vh] sm:min-h-[80vh] md:min-h-screen flex flex-col border-b border-gray-100 dark:border-slate-800 overflow-hidden"
-        style={{
-          backgroundImage: 'url(/robo_nature.webp)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat',
-        }}
       >
+        <Image src="/robo_nature.webp" alt="Hero background" fill className="object-cover object-top" priority />
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/60 to-slate-950/90 sm:bg-gradient-to-r sm:from-slate-950/85 sm:via-slate-950/70 sm:to-slate-950/30" />
 
         <div className="relative z-10 flex-1 flex flex-col justify-end sm:justify-center max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-28 pb-12 sm:py-20 lg:py-28">
@@ -670,15 +666,9 @@ export default function PricingClient() {
       {/* ── FAQ ──────────────────────────────────────────────────────── */}
       <section
         ref={faqRef}
-        className="relative"
-        style={{
-          backgroundImage: 'url(/que_vector.webp)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed',
-        }}
+        className="relative overflow-hidden"
       >
+        <Image src="/que_vector.webp" alt="FAQ background" fill className="object-cover object-center" />
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/85 via-slate-900/80 to-slate-900/92 pointer-events-none" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">

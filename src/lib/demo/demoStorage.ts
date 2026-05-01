@@ -5,6 +5,7 @@ const KEYS = {
     MESSAGES: 'demo_chat_messages',
 };
 
+// ── Bot Config ────────────────────────────────────────────────────────────────
 const DEFAULT_BOT = {
     name: 'Demo Bot',
     greeting: 'Hi! Ask me anything about the document you uploaded.',
@@ -13,7 +14,7 @@ const DEFAULT_BOT = {
     logoShape: 'circle',
     avatarBgStyle: 'none',
     customLogoUrl: '',
-    quickQuestions: [],
+    quickQuestions: [] as string[],
     systemPrompt: '',
     companyName: 'Demo Company',
     allowedOrigin: 'https://demo.Sapybase.com',
@@ -21,7 +22,9 @@ const DEFAULT_BOT = {
     companyTone_str: 'Professional and helpful',
 };
 
-export function getBotConfig() {
+export type DemoBotConfig = typeof DEFAULT_BOT;
+
+export function getBotConfig(): DemoBotConfig {
     if (typeof window === 'undefined') return DEFAULT_BOT;
     try {
         const raw = sessionStorage.getItem(KEYS.BOT);
@@ -29,14 +32,15 @@ export function getBotConfig() {
     } catch { return { ...DEFAULT_BOT }; }
 }
 
-export function saveBotConfig(partial: any) {
+export function saveBotConfig(partial: Partial<DemoBotConfig>) {
     if (typeof window === 'undefined') return;
     try {
         const current = getBotConfig();
         sessionStorage.setItem(KEYS.BOT, JSON.stringify({ ...current, ...partial }));
-    } catch { /* quota exceeded */ }
+    } catch { /* quota exceeded — silently ignore */ }
 }
 
+// ── Knowledge Chunks ──────────────────────────────────────────────────────────
 export function getKnowledge() {
     if (typeof window === 'undefined') return [];
     try {
@@ -64,6 +68,7 @@ export function isTrained() {
     return sessionStorage.getItem(KEYS.TRAINED) === 'true' && getKnowledge().length > 0;
 }
 
+// ── Chat Messages ─────────────────────────────────────────────────────────────
 export function getChatMessages() {
     if (typeof window === 'undefined') return [];
     try {
@@ -84,6 +89,7 @@ export function clearChatMessages() {
     sessionStorage.removeItem(KEYS.MESSAGES);
 }
 
+// ── Full Reset ────────────────────────────────────────────────────────────────
 export function resetDemo() {
     if (typeof window === 'undefined') return;
     Object.values(KEYS).forEach(k => sessionStorage.removeItem(k));

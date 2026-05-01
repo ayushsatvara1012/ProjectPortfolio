@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
 import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/app/components/avatar/AvatarShared';
-
+import BotPreview from '@/src/app/components/BotPreview';
+import { BotAvatar } from '@/src/app/components/LogoCustomizer';
+import { BotSettingsContext } from '@/src/lib/context/BotSettingsContext';
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
 const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
@@ -14,170 +16,6 @@ const headingCls = "text-xl font-medium font-google mb-4 transition-colors text-
 
 // Shape / gradient / FAB definitions now imported from AvatarShared.ts
 // (single source of truth — no local copies to drift)
-
-// ── Icons ──────────────────────────────────────────────────────────────────
-const MoreHorizontalIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
-);
-const XIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-);
-const SendIcon = ({ color }: { color: string }) => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-);
-
-// ── BotAvatar (Inline) ──
-const BotAvatar = ({ shapeId, logoUrl, botName, themeColor, size = 'md', bgStyle = 'none' }: any) => {
-    const initial = String(botName || 'S').charAt(0).toUpperCase();
-    const shapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-full';
-    const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
-
-    const sizeClasses: any = {
-        sm: 'w-7 h-7 text-xs',
-        md: 'w-10 h-10 text-md',
-        lg: 'w-14 h-14 text-lg',
-    };
-
-    let bgProps: any = { backgroundColor: logoUrl ? '#ffffff' : themeColor };
-    if (logoUrl && gradient) {
-        bgProps = {
-            background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
-            backgroundColor: 'transparent'
-        };
-    }
-
-    return (
-        <div
-            className={`${sizeClasses[size]} ${shapeClass} flex items-center justify-center border border-gray-100 dark:border-slate-800 shadow-sm overflow-hidden shrink-0`}
-            style={bgProps}
-        >
-            {logoUrl ? (
-                <img src={logoUrl} alt="Bot logo" className="w-[80%] h-[80%] object-contain" />
-            ) : (
-                <span className="font-bold text-white leading-none">{initial}</span>
-            )}
-        </div>
-    );
-};
-
-// ── Inline Bot Preview ──
-const InlineBotPreview = ({ settings, theme = 'light' }: { settings: any; theme?: string }) => {
-    const isDark = theme === 'dark';
-    const color = settings.primaryColor || '#5730F5';
-    const botName = settings.name || 'Demo Bot';
-    const greeting = settings.greeting || 'Hi! How can I help you today?';
-    const logoUrl = settings.customLogoUrl || '/SB_loading.svg';
-    const logoShape = settings.logoShape || 'circle';
-    const bgStyle = settings.avatarBgStyle || 'none';
-    const hideBranding = settings.hideBranding || false;
-
-    const quickQs = (Array.isArray(settings.quickQuestions) ? settings.quickQuestions : [])
-        .map((q: any) => (typeof q === 'string' ? q : q.label || '')).filter(Boolean);
-
-    return (
-        <div className={`w-full max-w-[440px] h-[600px] flex flex-col border shadow-2xl overflow-hidden relative transition-all rounded-2xl ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
-            {/* Header */}
-            <div className="relative shrink-0">
-                <div
-                    className="absolute inset-0 animate-gradient-x opacity-20"
-                    style={{
-                        backgroundImage: `linear-gradient(90deg, ${color}, #f97316, ${color})`,
-                        backgroundSize: '200% 200%'
-                    }}
-                />
-                <div className={`backdrop-blur-md p-2 flex justify-end items-center relative z-10 border-b ${isDark ? 'bg-slate-900/40 text-slate-100 border-slate-800/50' : 'bg-white/40 text-slate-900 border-gray-200/50'}`}>
-                    <div className="relative flex flex-row justify-between items-center w-full">
-                        <div className="relative flex items-center gap-3 pl-4">
-                            <div className="relative">
-                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
-                                <BotAvatar shapeId={logoShape} logoUrl={settings.customLogoUrl} botName={botName} themeColor={color} bgStyle={bgStyle} />
-                            </div>
-                            <div className="flex flex-row items-center justify-center">
-                                <p className="text-lg font-display font-bold" style={{ color }}>{botName}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <button className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>
-                                <MoreHorizontalIcon />
-                            </button>
-                            <button className="p-2 hover:bg-red-50 rounded-full transition-colors group">
-                                <XIcon />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Messages Area */}
-            <div className={`flex-1 p-4 flex flex-col gap-5 overflow-y-auto pt-6 pb-2 ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
-                {/* Bot greeting */}
-                <div className="flex max-w-[96%] self-start text-left">
-                    <div className="flex flex-col max-w-full min-w-0 items-start">
-                        <span className={`text-md uppercase tracking-widest font-bold font-sans mb-1.5 ml-1 leading-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {botName}
-                        </span>
-                        <div className={`px-4 py-2 min-h-[38px] flex items-center rounded-2xl rounded-tl-none border text-sm font-google leading-relaxed ${isDark ? 'bg-slate-800 text-slate-200 border-slate-700/60' : 'bg-white text-gray-800 border-gray-200/60'}`}>
-                            {greeting}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Mock user message */}
-                <div className="flex max-w-[96%] self-end text-right">
-                    <div className="flex flex-col max-w-full min-w-0 items-end">
-                        <span className={`text-md uppercase tracking-widest font-bold font-sans mb-1.5 mr-1 leading-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            YOU
-                        </span>
-                        <div className="px-4 py-2 min-h-[38px] flex items-center rounded-2xl rounded-tr-none text-white text-sm font-google leading-relaxed" style={{ backgroundColor: color }}>
-                            Looking good!
-                        </div>
-                    </div>
-                </div>
-
-                {/* Quick Questions */}
-                {quickQs.length > 0 && (
-                    <div className="flex flex-col items-end gap-2 px-3 pb-2 pt-1">
-                        {quickQs.map((label: string, idx: number) => (
-                            <button
-                                key={idx}
-                                className={`px-4 py-2.5 border rounded-md text-md font-regular font-google whitespace-nowrap ${isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-                <div className="flex-1" />
-            </div>
-
-            {/* Branding Strip */}
-            {!hideBranding && (
-                <div className={`shrink-0 py-1.5 flex justify-center items-center backdrop-blur-sm ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
-                    <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 grayscale opacity-50" />
-                        Powered by Sapybase
-                    </span>
-                </div>
-            )}
-
-            {/* Input Area */}
-            <div className={`backdrop-blur-2xl border-t shrink-0 z-10 flex flex-col ${isDark ? 'bg-slate-900/95 border-slate-800/50' : 'bg-white/95 border-gray-200/50'}`}>
-                <div className="p-2 w-full">
-                    <div className="relative flex items-center gap-2 pb-1">
-                        <input
-                            readOnly
-                            placeholder="Ask anything..."
-                            className={`flex-1 min-h-[40px] bg-transparent px-2.5 py-[9px] focus:outline-none leading-relaxed text-xl font-medium font-sans ${isDark ? 'text-slate-100 placeholder-slate-500' : 'text-slate-900 placeholder-gray-400'}`}
-                        />
-                        <button className="p-2 shrink-0 rounded-lg transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center">
-                            <SendIcon color={color} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // ── Inline Logo Customizer ──
 // Derive LOGO_SHAPE_DATA from FAB_SHAPES so paths stay in sync automatically.
@@ -611,7 +449,19 @@ export default function DemoCustomizePage() {
                 </div>
 
                 <div className="w-full lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0 relative z-10">
-                    <InlineBotPreview settings={settings} theme={isDark ? 'dark' : 'light'} />
+                    <BotSettingsContext.Provider value={{
+                        botSettings: settings,
+                        updateSetting: () => {},
+                        saveSettings: async () => ({ success: true }),
+                        fetchSettings: async () => {},
+                        isLoading: false,
+                        isSaving: false,
+                        error: null,
+                        previewOpen: false,
+                        setPreviewOpen: () => {},
+                    }}>
+                        <BotPreview theme={isDark ? 'dark' : 'light'} />
+                    </BotSettingsContext.Provider>
                 </div>
             </div>
 

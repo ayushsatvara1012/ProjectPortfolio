@@ -1,5 +1,4 @@
 import Navbar from '../components/Navbar';
-import NavToggle from '../components/NavToggle';
 import Footer from '../components/Footer';
 import ClientEffects from '../client-effects';
 import FloatingBotWidget from '../components/FloatingBotWidget';
@@ -14,7 +13,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         Skip to content
       </a>
       <Navbar />
-      <NavToggle />
       <main id="main-content">{children}</main>
       <Footer />
       <ClientEffects />

@@ -2,6 +2,8 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import AppLayout from '@/src/app/components/AppLayout';
 import UserSeed from '@/src/app/components/UserSeed';
+import DashboardProviders from './DashboardProviders';
+
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Server-side gate: middleware also protects /dashboard, but resolving auth
@@ -20,7 +22,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const res = await fetch(`${baseUrl}/api/me`, {
       headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
+      cache: 'force-cache',
+      next: { revalidate: 60 },
     });
     if (res.ok) {
       const data = await res.json();
@@ -32,9 +35,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <>
+    <DashboardProviders>
       <UserSeed role={role} tier={tier} />
+
       <AppLayout>{children}</AppLayout>
-    </>
+    </DashboardProviders>
   );
 }

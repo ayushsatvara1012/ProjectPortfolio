@@ -103,18 +103,20 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0..1,-50..200"
         />
-      </head>
-      <body>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
+      </head>
+      <body>
         <Providers>{children}</Providers>
         {process.env.NEXT_PUBLIC_SAPYBASE_API_KEY && (
           <>
-            <Script id="sapybase-config" strategy="beforeInteractive">
-              {`window.SapybaseConfig = { themeColor: '#5730F5' };`}
-            </Script>
+            <Script 
+              id="sapybase-config" 
+              strategy="beforeInteractive"
+              dangerouslySetInnerHTML={{ __html: `window.SapybaseConfig = { themeColor: '#5730F5' };` }}
+            />
             <Script
               src="/sapybase-loader@1.js"
               data-bot-id={process.env.NEXT_PUBLIC_SAPYBASE_API_KEY}

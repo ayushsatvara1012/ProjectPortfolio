@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Projects from '@/src/components/marketing/ProjectSection';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 import Link from 'next/link';
+import Image from 'next/image';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DATA — all resume/about content lives here, deconstructed into grid cells
@@ -109,13 +110,8 @@ export default function AboutClient() {
           {/* ── CELL A · HERO ─────────────────────────────────────────── */}
           <div
             className="lg:col-span-2 min-h-[420px] sm:min-h-[500px] lg:min-h-[480px] relative overflow-hidden flex flex-col justify-between group"
-            style={{
-              backgroundImage: 'url(/about-vec.webp)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center center',
-              backgroundRepeat: 'no-repeat',
-            }}
           >
+            {/* <Image src="/nature.webp" alt="Background pattern" fill className="object-cover" priority /> */}
             {/* Scrim — heavier at bottom so text stays readable on every screen */}
             <div className="absolute inset-0 bg-linear-to-b from-white/85 via-white/75 to-white/95 dark:from-slate-950/85 dark:via-slate-950/75 dark:to-slate-950/95 transition-colors duration-500" />
 
@@ -144,15 +140,7 @@ export default function AboutClient() {
                   React UI, was designed and shipped by one person.
                 </p>
               </div>
-              <div className="mt-10 flex flex-col sm:flex-row gap-3">
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 text-sm font-display font-bold uppercase tracking-wider transition-colors duration-200 hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white"
-                >
-                  Start a Project
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                </Link>
-              </div>
+
             </div>
           </div>
 

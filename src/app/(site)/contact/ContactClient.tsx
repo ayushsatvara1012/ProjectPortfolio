@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Alert from '@/src/components/marketing/Alert';
+import Alert from '@/src/app/components/Alert';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 
 export default function ContactClient() {

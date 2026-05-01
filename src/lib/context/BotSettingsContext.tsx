@@ -33,7 +33,7 @@ type BotSettingsContextValue = {
   setPreviewOpen: (open: boolean) => void;
 };
 
-const BotSettingsContext = createContext<BotSettingsContextValue | undefined>(undefined);
+export const BotSettingsContext = createContext<BotSettingsContextValue | undefined>(undefined);
 
 const DEFAULT_SETTINGS: BotSettings = {
   name: 'Sapybase AI',

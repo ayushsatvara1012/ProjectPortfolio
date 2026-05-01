@@ -32,8 +32,16 @@ const AppRegistration = () => {
     const [isSyncing, setIsSyncing] = useState(false);
 
     // ── POST-CHECKOUT AUTO-SYNC ──────────────────────────────────────────────
+    // sb_sync_attempted prevents re-triggering the sync if the user refreshes
+    // with ?payment=success still in the URL after a failed sync attempt.
     useEffect(() => {
-        if (searchParams.get('payment') === 'success' && !isSyncing) {
+        if (
+            searchParams.get('payment') === 'success' &&
+            !isSyncing &&
+            typeof window !== 'undefined' &&
+            !sessionStorage.getItem('sb_sync_attempted')
+        ) {
+            sessionStorage.setItem('sb_sync_attempted', 'true');
             handleAutoSync();
         }
     }, [searchParams]);
@@ -54,7 +62,8 @@ const AppRegistration = () => {
             if (res.ok) {
                 showAlert('success', 'Subscription verified! Your dashboard is now unlocked.');
                 await refreshUser?.();
-                
+                sessionStorage.removeItem('sb_sync_attempted');
+
                 // Clean URL
                 const url = new URL(window.location.href);
                 url.searchParams.delete('payment');

@@ -449,12 +449,6 @@ const HeroSection = () => {
         </div>
 
       </div>
-      <style jsx global>{`
-        @keyframes caretBlink {
-          from, to { opacity: 1; }
-          50% { opacity: 0; }
-        }
-      `}</style>
     </section>
   );
 };
