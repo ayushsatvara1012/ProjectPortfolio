@@ -115,7 +115,7 @@ export default function RootLayout({
               {`window.SapybaseConfig = { themeColor: '#5730F5' };`}
             </Script>
             <Script
-              src="/sapybase-loader.js"
+              src="/sapybase-loader@1.js"
               data-bot-id={process.env.NEXT_PUBLIC_SAPYBASE_API_KEY}
               strategy="lazyOnload"
             />
