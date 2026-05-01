@@ -636,7 +636,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   const BOT_NAME = configData.bot_name || 'Sapybase';
   const THEME_COLOR = configData.theme_color || '#5730F5';
-  const LOGO_URL = configData.custom_logo_url || configData.logo_url;
+  const LOGO_URL = configData.custom_logo_url || configData.logo_url || BrandLogo;
   const LOGO_SHAPE = configData.logo_shape || 'circle';
   const AVATAR_BG_STYLE = configData.avatar_bg_style || 'none';
 
@@ -700,22 +700,33 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     }
   }, [isOpen, isEmbed]);
 
-  // Typewriter promo label
+  // Typewriter promo label — iPad-and-larger (≥768px) only.
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [loopNum, setLoopNum] = useState(0);
-  const [typingSpeed, setTypingSpeed] = useState(100);
-  const phrases = ['Chat with me !', 'Have questions ?', "I'm here to help!", 'Powered by Sapybase !'];
+  const [typingSpeed, setTypingSpeed] = useState(70);
+  const [isTabletUp, setIsTabletUp] = useState(false);
+  const phrases = ['Need help !', 'Chat with me', 'Powered by sapybase'];
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsTabletUp(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!isTabletUp) return;
     let timer: ReturnType<typeof setTimeout>;
     const handleTyping = () => {
       const i = loopNum % phrases.length;
       const fullText = phrases[i];
       setCurrentPhrase(isDeleting ? fullText.substring(0, currentPhrase.length - 1) : fullText.substring(0, currentPhrase.length + 1));
-      setTypingSpeed(isDeleting ? 40 : 100);
+      setTypingSpeed(isDeleting ? 35 : 70);
       if (!isDeleting && currentPhrase === fullText) {
-        timer = setTimeout(() => setIsDeleting(true), 2500);
+        timer = setTimeout(() => setIsDeleting(true), 2000);
       } else if (isDeleting && currentPhrase === '') {
         setIsDeleting(false);
         setLoopNum(loopNum + 1);
@@ -726,7 +737,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     timer = setTimeout(handleTyping, typingSpeed);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPhrase, isDeleting, loopNum, typingSpeed]);
+  }, [currentPhrase, isDeleting, loopNum, typingSpeed, isTabletUp]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1104,7 +1115,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
             className={`${isEmbed ? 'relative w-full h-full' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px]'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 dark:border-slate-800/50 z-[2147483647] pointer-events-auto origin-bottom-right`}
-            style={isEmbed ? { height: '100%' } : (isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {})}
+            style={isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : (isEmbed ? { height: '100%' } : {})}
           >
             {/* Header */}
             <div className="relative shrink-0">
@@ -1119,7 +1130,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setShowMenu(!showMenu)} className="p-2.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Chat menu">
+                    <button onClick={() => setShowMenu(!showMenu)}
+                      style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
+                      className="p-2.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Chat menu">
                       <MoreHorizontal size={22} className="text-slate-500 dark:text-slate-400" />
                     </button>
                     <button onClick={() => {
@@ -1128,7 +1141,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       } else {
                         setIsOpen(false);
                       }
-                    }} className="p-2.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors group focus:outline-none min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close chat">
+                    }}
+                      style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
+                      className="p-2.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors group focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close chat">
                       <X size={22} className="text-red-500 dark:text-red-400 transition-transform group-hover:rotate-90" />
                     </button>
                   </div>
@@ -1294,14 +1309,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
           <div className="relative flex items-center justify-end">
             <AnimatePresence>
-              {!isOpen && (
+              {!isOpen && isTabletUp && (
                 <motion.div initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                  className="absolute right-[calc(100%+12px)] hidden sm:flex items-center pointer-events-none">
+                  className="absolute right-[calc(100%+12px)] top-1/2 -translate-y-1/2 hidden md:flex items-center pointer-events-none">
                   <div className="bg-white dark:bg-slate-900 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 dark:border-slate-800 flex items-center gap-1.5 min-w-[150px] justify-center relative">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-200 font-sans whitespace-nowrap">{currentPhrase}</span>
                     <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                       className="w-0.5 h-4 rounded-full" style={{ backgroundColor: THEME_COLOR }} />
-                    <div className="absolute -right-[6px] top-[calc(50%-6px)] w-3 h-3 bg-white dark:bg-slate-900 border-r border-t border-indigo-100/50 dark:border-slate-800 rotate-45 rounded-sm" />
+                    <div className="absolute -right-[6px] top-1/2 -translate-y-1/2 w-3 h-3 bg-white dark:bg-slate-900 border-r border-t border-indigo-100/50 dark:border-slate-800 rotate-45 rounded-sm" />
                   </div>
                 </motion.div>
               )}
@@ -1310,8 +1325,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
               onClick={() => setIsOpen(prev => !prev)}
               aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
-              style={{ touchAction: 'manipulation', background: 'transparent' }}
-              className="relative flex flex-col items-center justify-center focus:outline-none sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
+              style={{
+                touchAction: 'manipulation',
+                background: 'transparent',
+                WebkitTapHighlightColor: 'transparent',
+                WebkitTouchCallout: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                outlineColor: THEME_COLOR,
+              }}
+              className="relative flex flex-col items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
               <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
                 <defs>
                   <clipPath id="fab-clip"><path d={FAB_PATH} /></clipPath>

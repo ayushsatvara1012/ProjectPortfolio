@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 // nested layout only contributes route-specific metadata and a wrapper div.
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-sapybase-embed="true" style={{ width: '100%', height: '100dvh', background: '#ffffff' }}>
+    <div data-sapybase-embed="true" style={{ position: 'fixed', inset: 0, width: '100%', height: 'var(--sapy-vh, 100dvh)', background: 'transparent', overflow: 'hidden' }}>
       {children}
     </div>
   );

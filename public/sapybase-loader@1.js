@@ -36,6 +36,12 @@
       ? 'http://localhost:3000'
       : 'https://www.sapybase.com';
 
+  // Origin where loader assets (e.g. /SB_loading.svg) are served from.
+  // Always points at the Sapybase origin so the brand fallback resolves on
+  // third-party host pages even when the loader was served from a CDN copy.
+  var ASSET_BASE = IFRAME_ORIGIN;
+  var BRAND_LOGO_URL = ASSET_BASE + '/SB_loading.svg';
+
   // FAB shape paths — must stay in sync with FAB_SHAPES in
   // src/app/components/avatar/AvatarShared.ts (the canonical source of truth).
   // This file cannot import ES modules, so the paths are inlined here.
@@ -46,6 +52,7 @@
     squircle: { path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z', x: 0, y: -8 },
     bento:    { path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z', x: 0, y: -10.5 },
     sharp:    { path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z', x: 0, y: 0 },
+    'rounded-square': { path: 'M20 0H80A20 20 0 0 1 100 20V80A20 20 0 0 1 80 100H20A20 20 0 0 1 0 80V20A20 20 0 0 1 20 0Z', x: 0, y: 0 },
   };
 
   // Color helpers used by FAB theming. Kept tiny — no full color library.
@@ -131,7 +138,7 @@
       this._label = null;
       this._revealed = false;
       // Typewriter tooltip state.
-      this._tipMessages = ['Need help?', 'I am here', 'Powered by Sapybase'];
+      this._tipMessages = ['Need help !', 'Chat with me', 'Powered by sapybase'];
       this._tipMsgIdx = 0;
       this._tipTimer = null;
       this._tipTextNode = null;
@@ -194,6 +201,9 @@
     // ── Cycling typewriter tooltip ─────────────────────────────────────────
     _startTooltipCycle() {
       if (this._tipDismissed) return;
+      // Tagline is iPad-and-larger only. Skip the cycle entirely on phones
+      // so we don't burn timers when the bubble is CSS-hidden.
+      if (window.matchMedia && window.matchMedia('(max-width: 767px)').matches) return;
       try {
         if (window.sessionStorage &&
             window.sessionStorage.getItem('sapybase:tooltip-dismissed') === '1') {
@@ -249,7 +259,7 @@
       if (charIdx <= text.length) {
         this._tipTextNode.nodeValue = text.slice(0, charIdx);
         const ch = text.charAt(charIdx - 1);
-        const base = /[.!?,]/.test(ch) ? 120 : 50;
+        const base = /[.!?,]/.test(ch) ? 140 : 70;
         const jitter = (Math.random() * 20) - 10;
         this._tipTimer = setTimeout(
           () => this._typeMessage(text, charIdx + 1),
@@ -280,7 +290,7 @@
         this._tipTextNode.nodeValue = text.slice(0, charIdx);
         this._tipTimer = setTimeout(
           () => this._eraseMessage(text, charIdx - 1),
-          25
+          35
         );
       } else {
         this._scheduleTipStep(400);
@@ -354,7 +364,7 @@
       const themeColor = cfg.theme_color || '#5730F5';
       const shapeId = cfg.logo_shape || 'circle';
       const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
-      const logoUrl = cfg.custom_logo_url || cfg.logo_url || '';
+      const logoUrl = cfg.custom_logo_url || cfg.logo_url || BRAND_LOGO_URL;
       const isCustom = !!cfg.custom_logo_url;
       const botName = cfg.bot_name || 'Sapy AI';
 
@@ -456,6 +466,12 @@
         '  box-shadow: 0 4px 24px rgba(87,48,245,.35); border: none;',
         '  padding: 0; overflow: visible;',
         '  display: flex; align-items: center; justify-content: center;',
+        // Suppress iOS/iPadOS gray tap-highlight rectangle and long-press
+        // callout. Keyboard users still get a ring via :focus-visible below.
+        '  -webkit-tap-highlight-color: transparent;',
+        '  -webkit-touch-callout: none;',
+        '  user-select: none; -webkit-user-select: none;',
+        '  touch-action: manipulation;',
         // Hidden until /api/config resolves (or 2s safety timeout) so the
         // unbranded placeholder never flashes.
         '  opacity: 0; transform: scale(.85);',
@@ -464,28 +480,31 @@
         '}',
         '.fab.ready { opacity: 1; transform: scale(1); pointer-events: auto; }',
         '.fab.ready:hover { transform: scale(1.08); }',
+        '.fab:focus { outline: none; }',
+        '.fab:focus-visible { outline: 2px solid ' + themeColor + '; outline-offset: 3px; }',
         '@keyframes sb-spin { to { transform: rotate(360deg); } }',
         '.fab > svg { width: 100%; height: 100%; display: block; }',
         '.fab > svg.default-icon { width: 28px; height: 28px; fill: white; }',
-        // Cycling typewriter tooltip. Tablet/desktop default: floats next to
-        // the FAB on the same horizontal line. Phone override below moves it
-        // above the FAB with a downward arrow.
+        // Cycling typewriter tooltip. iPad-and-larger only (≥768px). Anchored
+        // to the FAB's vertical center so the bubble visually aligns with the
+        // logo regardless of FAB size.
         '.label {',
         '  position: absolute;',
         '  ' + (isLeft ? 'left: 76px;' : 'right: 76px;'),
-        '  bottom: 12px;',
+        '  top: 50%;',
+        '  transform: translateY(-50%) translateY(2px);',
         '  background: white; color: #1e293b;',
         '  padding: 8px 14px; border-radius: 12px;',
         '  font-size: 13px; font-weight: 500; line-height: 1.3;',
         '  box-shadow: 0 4px 16px rgba(15,23,42,.12);',
         '  pointer-events: none; user-select: none;',
         '  white-space: nowrap; max-width: min(80vw, 240px);',
-        '  opacity: 0; transform: translateY(2px);',
+        '  opacity: 0;',
         '  transition: opacity .2s ease, transform .2s ease;',
         '  direction: inherit; z-index: 1;',
         '}',
-        '.label.show { opacity: 1; transform: translateY(0); }',
-        // Side-anchored arrow tail (tablet/desktop).
+        '.label.show { opacity: 1; transform: translateY(-50%); }',
+        // Side-anchored arrow tail, pinned to the bubble vertical midline.
         '.label::after {',
         '  content: ""; position: absolute;',
         '  top: 50%; ' + (isLeft ? 'right: 100%;' : 'left: 100%;'),
@@ -501,9 +520,11 @@
         '@keyframes sb-caret { 50% { opacity: 0; } }',
         // While chat is open the tooltip must hide everywhere.
         ':host(.chat-open) .label { display: none; }',
-        // Reduced motion: skip the caret blink and the slide-in.
+        // Reduced motion: skip the caret blink and the slide-in (but keep
+        // the vertical-center transform so the bubble stays aligned).
         '@media (prefers-reduced-motion: reduce) {',
-        '  .label { transition: opacity .15s ease; transform: none; }',
+        '  .label { transition: opacity .15s ease; transform: translateY(-50%); }',
+        '  .label.show { transform: translateY(-50%); }',
         '  .label .caret { animation: none; opacity: .6; }',
         '}',
         '.iframe-wrap {',
@@ -524,13 +545,17 @@
         '.iframe-wrap iframe {',
         '  display: block;',
         '  width: 100%; height: 100%; border: none;',
-        '  border-radius: 16px; background: white;',
+        '  border-radius: 16px; background: transparent;',
+        '  color-scheme: light dark;',
         '}',
         '.iframe-loader {',
         '  position: absolute; inset: 0; z-index: 1;',
         '  display: flex; align-items: center; justify-content: center;',
-        '  background: white; border-radius: 16px;',
+        '  background: Canvas; border-radius: 16px;',
         '  transition: opacity .25s ease;',
+        '}',
+        '@media (prefers-color-scheme: dark) {',
+        '  .iframe-loader { background: #0f172a; }',
         '}',
         '.iframe-loader.hide { opacity: 0; pointer-events: none; }',
         '.iframe-loader .spinner-lg {',
@@ -539,6 +564,10 @@
         '  border-top-color: ' + themeColor + ';',
         '  animation: sb-spin .7s linear infinite;',
         '}',
+        // Below iPad (≥768px): hide the typewriter tagline entirely.
+        '@media (max-width: 767px) {',
+        '  .label, .label::after { display: none !important; }',
+        '}',
         '@media (max-width: 480px) {',
         '  .iframe-wrap {',
         '    width: 100vw; height: 100dvh; max-height: 100dvh; max-width: 100vw;',
@@ -546,25 +575,7 @@
         '  }',
         '  .iframe-wrap iframe { border-radius: 0; }',
         '  .fab { width: 56px; height: 56px; }',
-        '  :host(.chat-open) .fab, :host(.chat-open) .label { display: none; }',
-        // Phone tooltip: floats above the FAB, centered horizontally on it.
-        // Uses px offset (not viewport units) to dodge iOS Safari URL-bar jitter.
-        '  .label {',
-        '    left: auto; right: auto; bottom: 68px;',
-        '    ' + (isLeft ? 'left: 0;' : 'right: 0;'),
-        '    padding: 7px 12px; font-size: 12.5px;',
-        '    max-width: min(80vw, 220px);',
-        '  }',
-        // Replace the side arrow with a downward arrow under the bubble.
-        '  .label::after {',
-        '    top: 100%; bottom: auto;',
-        '    ' + (isLeft ? 'left: 18px; right: auto;' : 'right: 18px; left: auto;'),
-        '    margin-top: 0;',
-        '    border: 6px solid transparent;',
-        '    border-top-color: white;',
-        '    border-right-color: transparent !important;',
-        '    border-left-color: transparent !important;',
-        '  }',
+        '  :host(.chat-open) .fab { display: none; }',
         '}',
       ].join('\n');
       this.shadow.appendChild(style);
@@ -615,11 +626,53 @@
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
         this.classList.add('chat-open');
+        this._attachViewportTracking();
         this._postToIframe({ type: 'Sapybase:visibility', open: true });
       } else {
         this._wrap.classList.remove('open');
         this.classList.remove('chat-open');
+        this._detachViewportTracking();
         this._postToIframe({ type: 'Sapybase:visibility', open: false });
+      }
+    }
+
+    // Mobile keyboard fix for the iframe-wrap: when the on-screen keyboard
+    // opens inside the iframe, iOS Safari shrinks visualViewport but leaves
+    // the layout viewport unchanged — so a 100dvh wrap shows the host page
+    // between the chat input and the keyboard. Track visualViewport.height +
+    // offsetTop while open and pin the wrap to the visible region.
+    _attachViewportTracking() {
+      if (typeof window === 'undefined' || !window.visualViewport) return;
+      var vv = window.visualViewport;
+      var wrap = this._wrap;
+      if (!wrap) return;
+      var sync = function () {
+        if (window.matchMedia && !window.matchMedia('(max-width: 480px)').matches) {
+          // Desktop / tablet sized wrap doesn't fill the viewport; leave it.
+          wrap.style.height = '';
+          wrap.style.top = '';
+          return;
+        }
+        wrap.style.height = vv.height + 'px';
+        wrap.style.top = vv.offsetTop + 'px';
+      };
+      this._onVvSync = sync;
+      vv.addEventListener('resize', sync);
+      vv.addEventListener('scroll', sync);
+      sync();
+    }
+
+    _detachViewportTracking() {
+      if (typeof window === 'undefined' || !window.visualViewport) return;
+      var vv = window.visualViewport;
+      if (this._onVvSync) {
+        vv.removeEventListener('resize', this._onVvSync);
+        vv.removeEventListener('scroll', this._onVvSync);
+        this._onVvSync = null;
+      }
+      if (this._wrap) {
+        this._wrap.style.height = '';
+        this._wrap.style.top = '';
       }
     }
 
@@ -687,6 +740,7 @@
           this._open = false;
           if (this._wrap) this._wrap.classList.remove('open');
           this.classList.remove('chat-open');
+          this._detachViewportTracking();
         }
 
         if (data.type === 'Sapybase:ready' && this._iframeLoader) {
