@@ -122,6 +122,9 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
     try {
       const data = await authFetch<any>('/api/company', {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           company_id: botId,
           bot_name: botSettings.name,
