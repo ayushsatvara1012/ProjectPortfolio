@@ -53,7 +53,7 @@ export default function NotFound() {
           className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 font-mono text-left max-w-md mx-auto shadow-sm"
         >
           <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-            <img src="/SB_logo.svg" className="w-4 h-4 object-contain" alt="" />
+            <img src="/SB_logo.svg" className="w-4 h-4 object-contain" alt="Sapybase" />
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-sans">Error_Report</span>
           </div>
           <p className="text-sm font-medium text-rose-500/80 dark:text-rose-400">

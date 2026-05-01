@@ -8,6 +8,19 @@ import {
 import './globals.css';
 import Providers from './providers';
 
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': 'https://www.sapybase.com/#organization',
+  name: 'Sapybase',
+  url: 'https://www.sapybase.com',
+  logo: {
+    '@type': 'ImageObject',
+    url: 'https://www.sapybase.com/SB_Brand-removebg.png',
+  },
+  sameAs: [],
+};
+
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
   display: 'swap',
@@ -25,7 +38,9 @@ export const metadata: Metadata = {
   description:
     'Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Built for modern businesses seeking intelligent automation.',
   authors: [{ name: 'Sapybase Engineering' }],
+  keywords: ['AI chatbot', 'autonomous AI agents', 'customer support automation', 'Sapybase', 'LLM integration'],
   robots: 'index, follow',
+  formatDetection: { telephone: false },
   metadataBase: new URL('https://www.sapybase.com'),
   alternates: { canonical: '/' },
   openGraph: {
@@ -89,6 +104,10 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
         <Providers>{children}</Providers>
         {process.env.NEXT_PUBLIC_SAPYBASE_API_KEY && (
           <>

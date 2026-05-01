@@ -3,18 +3,9 @@ import { Shield } from 'lucide-react';
 import Link from 'next/link';
 
 import type { Metadata } from 'next';
+import { buildMetadata } from '@/src/seo/buildMetadata';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy | Sapybase',
-  description: 'Read the Sapybase privacy policy to understand how we collect, use, and protect your personal information.',
-  alternates: { canonical: 'https://www.sapybase.com/privacy-policy' },
-  openGraph: {
-    title: 'Privacy Policy | Sapybase',
-    description: 'Read the Sapybase privacy policy to understand how we collect, use, and protect your personal information.',
-    url: 'https://www.sapybase.com/privacy-policy',
-  },
-  twitter: { card: 'summary', title: 'Privacy Policy | Sapybase' },
-};
+export const metadata: Metadata = buildMetadata('privacy');
 
 const LAST_UPDATED = 'April 26, 2026';
 const CONTACT_EMAIL = 'ayushsatvara2002@gmail.com';

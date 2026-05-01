@@ -52,7 +52,7 @@ const BotAvatar = ({ shapeId, logoUrl, botName, themeColor, size = 'md', bgStyle
             style={bgProps}
         >
             {logoUrl ? (
-                <img src={logoUrl} alt="" className="w-[80%] h-[80%] object-contain" />
+                <img src={logoUrl} alt="Bot logo" className="w-[80%] h-[80%] object-contain" />
             ) : (
                 <span className="font-bold text-white leading-none">{initial}</span>
             )}
