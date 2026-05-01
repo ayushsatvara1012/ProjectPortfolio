@@ -617,10 +617,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       } catch (err) {
         console.warn('[Sapybase] Could not load bot config:', err);
       } finally {
-        // Tell the loader the chat UI has finished hydrating so it can hide
-        // the iframe-loader spinner. Double rAF: first frame commits the
-        // state update; second frame paints it. Posting after the second
-        // ensures the user sees the rendered greeting, not a blank panel.
         if (isEmbed && typeof window !== 'undefined' && window.parent !== window) {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -631,7 +627,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       }
     };
     fetchConfig();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeApiKey]);
 
   const BOT_NAME = configData.bot_name || 'Sapybase';
@@ -649,7 +644,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const appendBounded = (prev: Message[], ...next: Message[]): Message[] => {
     const combined = [...prev, ...next];
     if (combined.length <= MAX_MESSAGES) return combined;
-    // Always keep the first message (initial greeting) and trim from the front
     return [combined[0], ...combined.slice(-(MAX_MESSAGES - 1))];
   };
 
@@ -668,15 +662,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Mobile keyboard fix: 100dvh excludes the URL bar but NOT the on-screen
-  // keyboard, so the input row gets hidden behind it on iOS/Android. Track
-  // visualViewport.height (which DOES shrink for the keyboard) and feed it
-  // to the panel via a CSS variable.
   useEffect(() => {
     if (!isMobile || !isOpen) return;
     const vv = window.visualViewport;
     if (!vv) return;
-
     const sync = () => {
       document.documentElement.style.setProperty('--sapy-vh', `${vv.height}px`);
       const active = document.activeElement as HTMLElement | null;
@@ -700,7 +689,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     }
   }, [isOpen, isEmbed]);
 
-  // Typewriter promo label — iPad-and-larger (≥768px) only.
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [loopNum, setLoopNum] = useState(0);
@@ -723,21 +711,29 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     const handleTyping = () => {
       const i = loopNum % phrases.length;
       const fullText = phrases[i];
-      setCurrentPhrase(isDeleting ? fullText.substring(0, currentPhrase.length - 1) : fullText.substring(0, currentPhrase.length + 1));
-      setTypingSpeed(isDeleting ? 35 : 70);
-      if (!isDeleting && currentPhrase === fullText) {
-        timer = setTimeout(() => setIsDeleting(true), 2000);
-      } else if (isDeleting && currentPhrase === '') {
-        setIsDeleting(false);
-        setLoopNum(loopNum + 1);
+      if (!isDeleting) {
+        if (currentPhrase === fullText) {
+          timer = setTimeout(() => setIsDeleting(true), 2000);
+        } else {
+          const nextText = fullText.substring(0, currentPhrase.length + 1);
+          setCurrentPhrase(nextText);
+          setTypingSpeed(70);
+        }
       } else {
-        timer = setTimeout(handleTyping, typingSpeed);
+        if (currentPhrase === '') {
+          setIsDeleting(false);
+          setLoopNum(prev => prev + 1);
+          setTypingSpeed(500);
+        } else {
+          const nextText = fullText.substring(0, currentPhrase.length - 1);
+          setCurrentPhrase(nextText);
+          setTypingSpeed(35);
+        }
       }
     };
     timer = setTimeout(handleTyping, typingSpeed);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPhrase, isDeleting, loopNum, typingSpeed, isTabletUp]);
+  }, [currentPhrase, isDeleting, loopNum, typingSpeed, isTabletUp, phrases]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -821,7 +817,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const handleSend = async (e: React.FormEvent | null, overrideText?: string) => {
     if (e) e.preventDefault();
     if (!overrideText && !input.trim()) return;
-
     const userMessage = overrideText || input.trim();
     userMessageCountRef.current += 1;
     setMessages(prev => appendBounded(prev,
@@ -831,11 +826,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setInput('');
     setIsLoading(true);
     userHasScrolledUpRef.current = false;
-
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const ctrl = new AbortController();
     abortControllerRef.current = ctrl;
-
     const resolvedApiKey = activeApiKey;
     if (!resolvedApiKey) {
       setMessages(prev => {
@@ -849,15 +842,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       setIsLoading(false);
       return;
     }
-
     const recentHistory = messages.slice(-4).map(m => ({ role: m.role, content: m.content }));
     let firstChunkReceived = false;
     let sseRetryCount = 0;
     const SSE_MAX_RETRIES = 1;
-
     try {
-      const parentOriginChat = (typeof window !== 'undefined'
-        && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const parentOriginChat = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
       await fetchEventSource(`${activeApiUrl}/api/chat`, {
         method: 'POST',
         headers: {
@@ -868,7 +858,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId }),
         signal: ctrl.signal,
         openWhenHidden: true,
-
         async onopen(response) {
           if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
             const data = await response.json();
@@ -907,10 +896,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               throw new Error('HANDLED_ERROR');
             }
             if (response.status === 429) {
-              // Rate-limited by the technical per-minute cap. Distinct from the
-              // 402 commercial cap above. The Phase 2 silent-retry must NOT
-              // fire here — retrying a 429 makes it worse. We throw
-              // HANDLED_ERROR so the onerror short-circuit skips the retry.
               let retryAfter = 60;
               try {
                 const headerVal = response.headers.get('Retry-After');
@@ -939,7 +924,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             throw new Error(`Server error: ${response.status}`);
           }
         },
-
         onmessage(msg) {
           if (msg.data === '[DONE]') {
             const fullContent = streamingCallbackRef.current?.flush?.() || '';
@@ -954,31 +938,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             });
             setIsLoading(false);
             forceScrollToBottom(true);
-
-            // Lead capture trigger.
-            //
-            // We only react to signals that genuinely indicate the visitor
-            // wants follow-up:
-            //   1. The visitor's own message expresses buying / contact intent.
-            //   2. The visitor explicitly asks for human help.
-            //   3. The bot fell back ("I don't know") so we offer escalation.
-            //
-            // We deliberately do NOT scan the bot's reply for words like
-            // "pricing" or "demo" — informational answers naturally contain
-            // those terms and would otherwise force-show the form on every
-            // factual question (e.g. "what services do you offer").
             if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current) {
               const lowerReply = fullContent.toLowerCase();
               const lowerUserMsg = userMessage.toLowerCase();
-
               const userBuyingIntent = ['quote', 'pricing', 'how much', 'cost', 'buy', 'purchase', 'hire', 'sign up', 'get started', 'book a', 'schedule', 'free trial', 'demo', 'subscribe'];
               const userHumanIntent = ['talk to a human', 'speak to someone', 'speak to a person', 'real person', 'contact you', 'contact us', 'reach out', 'get in touch', 'help me', 'i need help', 'support team', 'sales team'];
               const fallbackPhrases = ['does not appear in my knowledge base', "don't have information on that", 'please reach out to', 'contact our support', "i'm not sure", 'i do not have'];
-
               const isUserBuying = userBuyingIntent.some(w => lowerUserMsg.includes(w));
               const isUserAskingForHuman = userHumanIntent.some(w => lowerUserMsg.includes(w));
               const isFallback = fallbackPhrases.some(w => lowerReply.includes(w));
-
               if (isUserBuying || isUserAskingForHuman || isFallback) {
                 leadFormShownRef.current = true;
                 setTimeout(() => {
@@ -992,7 +960,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             }
             return;
           }
-
           let chunk = '';
           try {
             const parsed = JSON.parse(msg.data);
@@ -1004,33 +971,21 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           if (!firstChunkReceived) { firstChunkReceived = true; setIsLoading(false); }
           streamingCallbackRef.current?.push?.(chunk);
         },
-
         onerror(err: Error) {
           if (err.message === 'CACHE_HIT' || err.message === 'HANDLED_ERROR') throw err;
           if (err.name === 'AbortError') throw err;
-
-          // Silent single retry on transient network failures (wifi blip,
-          // proxy idle-kill). Returning a number tells fetch-event-source to
-          // wait that many ms then reconnect. Reset the buffer so partial chunks
-          // from the failed attempt don't duplicate on retry.
           if (sseRetryCount < SSE_MAX_RETRIES) {
             sseRetryCount += 1;
             streamingCallbackRef.current = null;
-            console.warn(`SSE Chat: transient error, retrying (${sseRetryCount}/${SSE_MAX_RETRIES})`, err);
             return 1500;
           }
-
-          console.error('SSE Chat Error (giving up):', err);
-          // Preserve whatever streamed so far instead of replacing the message.
           const partial = streamingCallbackRef.current?.flush?.() || '';
           streamingCallbackRef.current = null;
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
             const fallback = "I'm having trouble connecting to the Sapybase servers right now. Please try again later or use the contact form.";
-            const content = partial.trim()
-              ? partial + '\n\n_(Connection lost — message may be incomplete.)_'
-              : fallback;
+            const content = partial.trim() ? partial + '\n\n_(Connection lost — message may be incomplete.)_' : fallback;
             if (last?.role === 'bot' && last.isStreaming) {
               updated[updated.length - 1] = { role: 'bot', content, isStreaming: false, isTyped: false };
             } else {
@@ -1041,12 +996,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           setIsLoading(false);
           throw err;
         },
-
         onclose() { setIsLoading(false); },
       });
     } catch (err) {
       if (err instanceof Error && (err.name === 'AbortError' || err.message === 'CACHE_HIT' || err.message === 'HANDLED_ERROR')) return;
-      console.error('Chat Error (outer):', err);
       setIsLoading(false);
     }
   };
@@ -1065,34 +1018,27 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setHandoffSent(true);
     const transcript = messages.filter(m => m.role === 'user' || m.role === 'bot').map(m => ({ role: m.role, content: m.content || '' }));
     try {
-      const parentOriginHandoff = (typeof window !== 'undefined'
-        && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const parentOriginHandoff = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
       const res = await fetch(`${activeApiUrl}/api/handoff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': resolvedApiKey!,
+          'x-api-key': activeApiKey!,
           ...(parentOriginHandoff ? { 'x-Sapybase-parent-origin': parentOriginHandoff } : {}),
         },
         body: JSON.stringify({ transcript, visitor_email: visitorEmail, visitor_name: visitorName || null }),
       });
       const data = res.ok ? await res.json() : {};
       setMessages(prev => prev.map(m =>
-        m.id === 'handoff-form'
-          ? { role: 'handoff_confirmed', visitorEmail, redirectUrl: data.handoff_redirect_url, id: 'handoff-confirmed' }
-          : m
+        m.id === 'handoff-form' ? { role: 'handoff_confirmed', visitorEmail, redirectUrl: data.handoff_redirect_url, id: 'handoff-confirmed' } : m
       ));
-    } catch (err) {
-      console.warn('[Sapybase] Handoff request failed:', err);
+    } catch {
       setMessages(prev => prev.map(m =>
         m.id === 'handoff-form' ? { role: 'bot', content: 'Something went wrong. Please try again.', isTyped: false } : m
       ));
       setHandoffSent(false);
     }
   };
-
-  // resolvedApiKey alias used in submitHandoff closure
-  const resolvedApiKey = activeApiKey;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1117,7 +1063,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             className={`${isEmbed ? 'relative w-full h-full' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px]'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden border-t sm:border border-gray-200/50 dark:border-slate-800/50 z-[2147483647] pointer-events-auto origin-bottom-right`}
             style={isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : (isEmbed ? { height: '100%' } : {})}
           >
-            {/* Header */}
             <div className="relative shrink-0">
               <div className="absolute inset-0 animate-gradient-x opacity-20" style={{ backgroundImage: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`, backgroundSize: '200% 200%' }} />
               <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative z-10 border-b border-gray-200/50 dark:border-slate-800/50">
@@ -1135,13 +1080,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       className="p-2.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Chat menu">
                       <MoreHorizontal size={22} className="text-slate-500 dark:text-slate-400" />
                     </button>
-                    <button onClick={() => {
-                      if (isEmbed) {
-                        postToParent({ type: 'Sapybase:close' });
-                      } else {
-                        setIsOpen(false);
-                      }
-                    }}
+                    <button onClick={() => { if (isEmbed) { postToParent({ type: 'Sapybase:close' }); } else { setIsOpen(false); } }}
                       style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
                       className="p-2.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors group focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close chat">
                       <X size={22} className="text-red-500 dark:text-red-400 transition-transform group-hover:rotate-90" />
@@ -1183,7 +1122,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             </div>
 
-            {/* Messages area */}
             <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
               <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20" />
@@ -1208,9 +1146,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                             <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm w-full self-start text-left mt-2 space-y-3">
                               <p className="text-sm font-google font-bold text-emerald-600 dark:text-emerald-400 text-center">✅ Team notified!</p>
                               <p className="text-xs font-google text-slate-500 dark:text-slate-400 text-center">
-                                {msg.visitorEmail
-                                  ? <><b className="text-slate-700 dark:text-slate-300">Our team will reply to {msg.visitorEmail} shortly.</b></>
-                                  : 'Our team has been notified and will follow up shortly.'}
+                                {msg.visitorEmail ? <><b className="text-slate-700 dark:text-slate-300">Our team will reply to {msg.visitorEmail} shortly.</b></> : 'Our team has been notified and will follow up shortly.'}
                               </p>
                               {msg.redirectUrl && (
                                 <a href={msg.redirectUrl} target="_blank" rel="noopener noreferrer"
@@ -1225,27 +1161,18 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                               contextString={messages.slice(Math.max(0, idx - 4), idx).filter(m => m.role === 'user').map(m => m.content).join(' || ')}
                               onSubmit={(name) => {
                                 leadCapturedRef.current = true;
-                                setMessages(prev => prev.map(m =>
-                                  m.id === 'lead-form' ? { role: 'bot', content: `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉` } : m
-                                ));
+                                setMessages(prev => prev.map(m => m.id === 'lead-form' ? { role: 'bot', content: `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉` } : m));
                               }}
                               onDismiss={() => { leadCapturedRef.current = true; setMessages(prev => prev.filter(m => m.id !== 'lead-form')); }} />
                           ) : (
                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                              {msg.role === 'bot'
-                                ? <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span>
-                                : <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>}
-                              <div
-                                className={`px-4 py-2 min-h-[38px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere ${msg.role === 'user' ? 'text-white rounded-2xl rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`}
-                                style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}>
+                              {msg.role === 'bot' ? <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span> : <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>}
+                              <div className={`px-4 py-2 min-h-[38px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere ${msg.role === 'user' ? 'text-white rounded-2xl rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`} style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}>
                                 {msg.role === 'user' ? (
                                   <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                 ) : (
                                   <div className="min-w-0 max-w-full text-base font-google leading-relaxed">
-                                    <TypewriterContent content={msg.content ?? ''} isStreaming={msg.isStreaming} isTyped={msg.isTyped}
-                                      onComplete={() => handleTypingComplete(idx)} themeColor={THEME_COLOR}
-                                      streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined}
-                                      onStreamTick={() => scrollToBottom(false)} />
+                                    <TypewriterContent content={msg.content ?? ''} isStreaming={msg.isStreaming} isTyped={msg.isTyped} onComplete={() => handleTypingComplete(idx)} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} onStreamTick={() => scrollToBottom(false)} />
                                   </div>
                                 )}
                               </div>
@@ -1274,13 +1201,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             </div>
 
-            {/* Input area */}
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
               {!configData.white_label_enabled && (
                 <div className="shrink-0 pt-2 flex justify-center items-center">
                   <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
                     Powered by Sapybase
                   </a>
@@ -1304,14 +1229,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         )}
       </AnimatePresence>
 
-      {/* FAB button */}
       {!isEmbed && (
         <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
           <div className="relative flex items-center justify-end">
             <AnimatePresence>
               {!isOpen && isTabletUp && (
                 <motion.div initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                  className="absolute right-[calc(100%+12px)] top-1/2 -translate-y-1/2 hidden md:flex items-center pointer-events-none">
+                  className="absolute right-[calc(100%+12px)] top-[calc(50%-4px)] sm:top-[calc(50%-6px)] -translate-y-1/2 hidden md:flex items-center pointer-events-none">
                   <div className="bg-white dark:bg-slate-900 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-indigo-100/50 dark:border-slate-800 flex items-center gap-1.5 min-w-[150px] justify-center relative">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-200 font-sans whitespace-nowrap">{currentPhrase}</span>
                     <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
@@ -1325,15 +1249,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
               onClick={() => setIsOpen(prev => !prev)}
               aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
-              style={{
-                touchAction: 'manipulation',
-                background: 'transparent',
-                WebkitTapHighlightColor: 'transparent',
-                WebkitTouchCallout: 'none',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                outlineColor: THEME_COLOR,
-              }}
+              style={{ touchAction: 'manipulation', background: 'transparent', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
               className="relative flex flex-col items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
               <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
                 <defs>
@@ -1367,17 +1283,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
                 {LOGO_URL && (
                   <g clipPath="url(#fab-clip)">
-                    <image href={LOGO_URL}
-                      x={configData.custom_logo_url ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
-                      y={configData.custom_logo_url ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
-                      width={configData.custom_logo_url ? 100 : 70} height={configData.custom_logo_url ? 100 : 70}
-                      preserveAspectRatio="xMidYMid meet" />
+                    <image href={LOGO_URL} x={configData.custom_logo_url ? (fabShape.x || 0) : (15 + (fabShape.x || 0))} y={configData.custom_logo_url ? (fabShape.y || 0) : (15 + (fabShape.y || 0))} width={configData.custom_logo_url ? 100 : 70} height={configData.custom_logo_url ? 100 : 70} preserveAspectRatio="xMidYMid meet" />
                   </g>
                 )}
                 {!LOGO_URL && (
-                  <text x={50 + (fabShape.x || 0)} y={52 + (fabShape.y || 0)} textAnchor="middle" dominantBaseline="middle"
-                    fill={fabGradient ? '#ffffff' : THEME_COLOR} className="font-bold select-none pointer-events-none"
-                    style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
+                  <text x={50 + (fabShape.x || 0)} y={52 + (fabShape.y || 0)} textAnchor="middle" dominantBaseline="middle" fill={fabGradient ? '#ffffff' : THEME_COLOR} className="font-bold select-none pointer-events-none" style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
                     {(BOT_NAME || 'S').charAt(0).toUpperCase()}
                   </text>
                 )}

@@ -492,7 +492,7 @@
         '  position: absolute;',
         '  ' + (isLeft ? 'left: 76px;' : 'right: 76px;'),
         '  top: 50%;',
-        '  transform: translateY(-50%) translateY(2px);',
+        '  transform: translateY(-50%) translateY(-6px);',
         '  background: white; color: #1e293b;',
         '  padding: 8px 14px; border-radius: 12px;',
         '  font-size: 13px; font-weight: 500; line-height: 1.3;',
@@ -503,7 +503,7 @@
         '  transition: opacity .2s ease, transform .2s ease;',
         '  direction: inherit; z-index: 1;',
         '}',
-        '.label.show { opacity: 1; transform: translateY(-50%); }',
+        '.label.show { opacity: 1; transform: translateY(-50%) translateY(-6px); }',
         // Side-anchored arrow tail, pinned to the bubble vertical midline.
         '.label::after {',
         '  content: ""; position: absolute;',
@@ -523,8 +523,8 @@
         // Reduced motion: skip the caret blink and the slide-in (but keep
         // the vertical-center transform so the bubble stays aligned).
         '@media (prefers-reduced-motion: reduce) {',
-        '  .label { transition: opacity .15s ease; transform: translateY(-50%); }',
-        '  .label.show { transform: translateY(-50%); }',
+        '  .label { transition: opacity .15s ease; transform: translateY(-50%) translateY(-6px); }',
+        '  .label.show { transform: translateY(-50%) translateY(-6px); }',
         '  .label .caret { animation: none; opacity: .6; }',
         '}',
         '.iframe-wrap {',
