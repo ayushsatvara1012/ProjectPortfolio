@@ -64,6 +64,7 @@
     var sfx = Math.random().toString(36).slice(2, 8);
     var gradId = 'sb-fab-grad-' + sfx;
     var clipId = 'sb-fab-clip-' + sfx;
+    var filterId = 'sb-fab-shadow-' + sfx;
     var safeUrl = logoUrl ? String(logoUrl).replace(/"/g, '&quot;') : '';
     var initial = (botName || 'S').charAt(0).toUpperCase();
     var ox = shape.x || 0;
@@ -98,8 +99,12 @@
       '<stop offset="100%" stop-color="' + darkColor + '"/>' +
       '</linearGradient>' +
       '<clipPath id="' + clipId + '"><path d="' + shape.path + '"/></clipPath>' +
+      '<filter id="' + filterId + '" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="' + _hexToRgba(darkColor, 0.55) + '" result="shadow1"/>' +
+      '<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="' + _hexToRgba(darkColor, 0.35) + '"/>' +
+      '</filter>' +
       '</defs>' +
-      '<path d="' + shape.path + '" fill="url(#' + gradId + ')"/>' +
+      '<path d="' + shape.path + '" fill="url(#' + gradId + ')" filter="url(#' + filterId + ')"/>' +
       content +
       '</svg>'
     );
@@ -130,16 +135,7 @@
       this._fab = null;
       this._label = null;
       this._revealed = false;
-      // Typewriter tooltip state.
-      this._tipMessages = ['Need help?', 'I am here', 'Powered by Sapybase'];
-      this._tipMsgIdx = 0;
-      this._tipTimer = null;
-      this._tipTextNode = null;
-      this._tipCaret = null;
-      this._tipPaused = false;
-      this._tipDismissed = false;
-      this._onTipVisibility = null;
-      this._onTipDismiss = null;
+      this._revealed = false;
     }
 
     connectedCallback() {
@@ -187,139 +183,10 @@
     _reveal() {
       if (this._revealed) return;
       this._revealed = true;
-      if (this._fab) this._fab.classList.add('ready');
-      this._startTooltipCycle();
-    }
-
-    // ── Cycling typewriter tooltip ─────────────────────────────────────────
-    _startTooltipCycle() {
-      if (this._tipDismissed) return;
-      try {
-        if (window.sessionStorage &&
-            window.sessionStorage.getItem('sapybase:tooltip-dismissed') === '1') {
-          this._tipDismissed = true;
-          return;
-        }
-      } catch (e) { /* sessionStorage may throw under strict cookie policies */ }
-
-      // First user touch/hover/click on the FAB dismisses the cycle for the
-      // rest of the session. pointerdown covers mouse + touch in one event.
-      this._onTipDismiss = () => this._dismissTooltip(/*persist*/ true);
-      if (this._fab) {
-        this._fab.addEventListener('pointerdown', this._onTipDismiss, { once: true });
-        this._fab.addEventListener('mouseenter', this._onTipDismiss, { once: true });
-      }
-
-      // Pause the cycle when the tab is hidden — no animation budget burned
-      // on a backgrounded page.
-      this._onTipVisibility = () => {
-        this._tipPaused = document.hidden;
-        if (!this._tipPaused && !this._tipDismissed) this._scheduleTipStep(0);
-      };
-      document.addEventListener('visibilitychange', this._onTipVisibility);
-
-      // Show the bubble shell first, then begin typing.
-      this._label.classList.add('show');
-      this._tipMsgIdx = 0;
-      this._typeMessage(this._tipMessages[0], 0);
-    }
-
-    _scheduleTipStep(delay) {
-      if (this._tipDismissed || this._tipPaused) return;
-      clearTimeout(this._tipTimer);
-      this._tipTimer = setTimeout(() => this._nextTipMessage(), delay);
-    }
-
-    _typeMessage(text, charIdx) {
-      if (this._tipDismissed) return;
-      if (this._tipPaused) {
-        // Resume from the same position when tab becomes visible again.
-        this._tipTimer = setTimeout(() => this._typeMessage(text, charIdx), 250);
-        return;
-      }
-
-      const reduced = window.matchMedia &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduced) {
-        this._tipTextNode.nodeValue = text;
-        this._scheduleTipStep(2200);
-        return;
-      }
-
-      if (charIdx <= text.length) {
-        this._tipTextNode.nodeValue = text.slice(0, charIdx);
-        const ch = text.charAt(charIdx - 1);
-        const base = /[.!?,]/.test(ch) ? 120 : 50;
-        const jitter = (Math.random() * 20) - 10;
-        this._tipTimer = setTimeout(
-          () => this._typeMessage(text, charIdx + 1),
-          base + jitter
-        );
-      } else {
-        // Hold full message, then erase.
-        this._tipTimer = setTimeout(() => this._eraseMessage(text, text.length), 2000);
-      }
-    }
-
-    _eraseMessage(text, charIdx) {
-      if (this._tipDismissed) return;
-      if (this._tipPaused) {
-        this._tipTimer = setTimeout(() => this._eraseMessage(text, charIdx), 250);
-        return;
-      }
-
-      const reduced = window.matchMedia &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduced) {
-        this._tipTextNode.nodeValue = '';
-        this._scheduleTipStep(400);
-        return;
-      }
-
-      if (charIdx >= 0) {
-        this._tipTextNode.nodeValue = text.slice(0, charIdx);
-        this._tipTimer = setTimeout(
-          () => this._eraseMessage(text, charIdx - 1),
-          25
-        );
-      } else {
-        this._scheduleTipStep(400);
-      }
-    }
-
-    _nextTipMessage() {
-      if (this._tipDismissed) return;
-      this._tipMsgIdx = (this._tipMsgIdx + 1) % this._tipMessages.length;
-      this._typeMessage(this._tipMessages[this._tipMsgIdx], 0);
-    }
-
-    _dismissTooltip(persist) {
-      if (this._tipDismissed) return;
-      this._tipDismissed = true;
-      clearTimeout(this._tipTimer);
-      if (this._label) this._label.classList.remove('show');
-      if (persist) {
-        try {
-          window.sessionStorage &&
-            window.sessionStorage.setItem('sapybase:tooltip-dismissed', '1');
-        } catch (e) { /* ignore */ }
-      }
-    }
-
-    _stopTooltipCycle() {
-      clearTimeout(this._tipTimer);
-      if (this._onTipVisibility) {
-        document.removeEventListener('visibilitychange', this._onTipVisibility);
-        this._onTipVisibility = null;
-      }
-      if (this._fab && this._onTipDismiss) {
-        this._fab.removeEventListener('pointerdown', this._onTipDismiss);
-        this._fab.removeEventListener('mouseenter', this._onTipDismiss);
-      }
+      if (this._fabWrap) this._fabWrap.classList.add('ready');
     }
 
     disconnectedCallback() {
-      this._stopTooltipCycle();
     }
 
     _fetchConfig(botId) {
@@ -361,8 +228,6 @@
       if (this._fab) {
         const dark = _shadeColor(themeColor, -20);
 
-        // For all shapes we render an SVG so the logo can be clipped to the
-        // shape path. The button itself becomes a transparent shell.
         this._fab.style.borderRadius = '0';
         this._fab.style.background = 'transparent';
         this._fab.style.boxShadow = 'none';
@@ -371,12 +236,8 @@
         this._fab.innerHTML = _buildFabSvg(shape, themeColor, dark, logoUrl, isCustom, botName);
       }
 
-      // Drop the "Powered by Sapybase" tease when the merchant has paid for
-      // white-label branding — they shouldn't be advertising us.
-      if (cfg.white_label_enabled === true) {
-        this._tipMessages = this._tipMessages.filter(function (m) {
-          return m.indexOf('Powered by') === -1;
-        });
+      if (this._pulse) {
+        this._pulse.style.background = _hexToRgba(themeColor, 0.45);
       }
     }
 
@@ -444,68 +305,51 @@
         ':host {',
         '  all: initial;',
         '  position: fixed;',
-        // Host pages can lower this with `sapybase-widget { --sapybase-z: 9999; }`
         '  z-index: var(--sapybase-z, 2147483647);',
         '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
         '  bottom: 20px;',
         '  font-family: system-ui, -apple-system, sans-serif;',
         '}',
-        '.fab {',
-        '  width: 64px; height: 64px; border-radius: 50%; cursor: pointer;',
-        '  background: linear-gradient(135deg, ' + themeColor + ', #4f46e5);',
-        '  box-shadow: 0 4px 24px rgba(87,48,245,.35); border: none;',
-        '  padding: 0; overflow: visible;',
+        '.fab-wrap {',
+        '  position: relative;',
+        '  width: 64px; height: 64px;',
         '  display: flex; align-items: center; justify-content: center;',
-        // Hidden until /api/config resolves (or 2s safety timeout) so the
-        // unbranded placeholder never flashes.
         '  opacity: 0; transform: scale(.85);',
-        '  transition: opacity .25s ease, transform .25s ease, box-shadow .2s ease;',
+        '  transition: opacity .25s ease, transform .25s ease;',
         '  pointer-events: none;',
         '}',
-        '.fab.ready { opacity: 1; transform: scale(1); pointer-events: auto; }',
-        '.fab.ready:hover { transform: scale(1.08); }',
+        '.fab-wrap.ready { opacity: 1; transform: scale(1); pointer-events: auto; }',
+        '.fab-pulse {',
+        '  position: absolute; inset: 0;',
+        '  border-radius: 50%;',
+        '  background: ' + _hexToRgba(themeColor, 0.45) + ';',
+        '  animation: sb-pulse 2.2s ease-out infinite;',
+        '  pointer-events: none;',
+        '}',
+        '.fab-wrap.open .fab-pulse { animation-play-state: paused; opacity: 0; }',
+        '@keyframes sb-pulse {',
+        '  0%   { transform: scale(1);    opacity: 0.5; }',
+        '  70%  { transform: scale(1.65); opacity: 0; }',
+        '  100% { transform: scale(1.65); opacity: 0; }',
+        '}',
+        '.fab {',
+        '  width: 64px; height: 64px; border-radius: 50%; cursor: pointer;',
+        '  background: transparent; border: none;',
+        '  padding: 0; overflow: visible;',
+        '  display: flex; align-items: center; justify-content: center;',
+        '  position: relative; z-index: 1;',
+        '  -webkit-tap-highlight-color: transparent;',
+        '  -webkit-touch-callout: none;',
+        '  user-select: none; -webkit-user-select: none;',
+        '  touch-action: manipulation;',
+        '  transition: transform .2s ease;',
+        '}',
+        '.fab-wrap.ready .fab:hover { transform: scale(1.08); }',
+        '.fab:focus { outline: none; }',
+        '.fab:focus-visible { outline: 2px solid ' + themeColor + '; outline-offset: 3px; border-radius: 50%; }',
         '@keyframes sb-spin { to { transform: rotate(360deg); } }',
         '.fab > svg { width: 100%; height: 100%; display: block; }',
         '.fab > svg.default-icon { width: 28px; height: 28px; fill: white; }',
-        // Cycling typewriter tooltip. Tablet/desktop default: floats next to
-        // the FAB on the same horizontal line. Phone override below moves it
-        // above the FAB with a downward arrow.
-        '.label {',
-        '  position: absolute;',
-        '  ' + (isLeft ? 'left: 76px;' : 'right: 76px;'),
-        '  bottom: 12px;',
-        '  background: white; color: #1e293b;',
-        '  padding: 8px 14px; border-radius: 12px;',
-        '  font-size: 13px; font-weight: 500; line-height: 1.3;',
-        '  box-shadow: 0 4px 16px rgba(15,23,42,.12);',
-        '  pointer-events: none; user-select: none;',
-        '  white-space: nowrap; max-width: min(80vw, 240px);',
-        '  opacity: 0; transform: translateY(2px);',
-        '  transition: opacity .2s ease, transform .2s ease;',
-        '  direction: inherit; z-index: 1;',
-        '}',
-        '.label.show { opacity: 1; transform: translateY(0); }',
-        // Side-anchored arrow tail (tablet/desktop).
-        '.label::after {',
-        '  content: ""; position: absolute;',
-        '  top: 50%; ' + (isLeft ? 'right: 100%;' : 'left: 100%;'),
-        '  margin-top: -6px;',
-        '  border: 6px solid transparent;',
-        '  ' + (isLeft ? 'border-right-color: white;' : 'border-left-color: white;'),
-        '}',
-        '.label .caret {',
-        '  display: inline-block; width: 1px; height: 1em;',
-        '  background: currentColor; vertical-align: text-bottom;',
-        '  margin-left: 2px; animation: sb-caret 1s steps(1) infinite;',
-        '}',
-        '@keyframes sb-caret { 50% { opacity: 0; } }',
-        // While chat is open the tooltip must hide everywhere.
-        ':host(.chat-open) .label { display: none; }',
-        // Reduced motion: skip the caret blink and the slide-in.
-        '@media (prefers-reduced-motion: reduce) {',
-        '  .label { transition: opacity .15s ease; transform: none; }',
-        '  .label .caret { animation: none; opacity: .6; }',
-        '}',
         '.iframe-wrap {',
         '  position: fixed; z-index: 2147483646;',
         '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
@@ -545,29 +389,21 @@
         '    bottom: 0; right: 0; left: 0; top: 0; border-radius: 0;',
         '  }',
         '  .iframe-wrap iframe { border-radius: 0; }',
+        '  .fab-wrap { width: 56px; height: 56px; }',
         '  .fab { width: 56px; height: 56px; }',
-        '  :host(.chat-open) .fab, :host(.chat-open) .label { display: none; }',
-        // Phone tooltip: floats above the FAB, centered horizontally on it.
-        // Uses px offset (not viewport units) to dodge iOS Safari URL-bar jitter.
-        '  .label {',
-        '    left: auto; right: auto; bottom: 68px;',
-        '    ' + (isLeft ? 'left: 0;' : 'right: 0;'),
-        '    padding: 7px 12px; font-size: 12.5px;',
-        '    max-width: min(80vw, 220px);',
-        '  }',
-        // Replace the side arrow with a downward arrow under the bubble.
-        '  .label::after {',
-        '    top: 100%; bottom: auto;',
-        '    ' + (isLeft ? 'left: 18px; right: auto;' : 'right: 18px; left: auto;'),
-        '    margin-top: 0;',
-        '    border: 6px solid transparent;',
-        '    border-top-color: white;',
-        '    border-right-color: transparent !important;',
-        '    border-left-color: transparent !important;',
-        '  }',
+        '  :host(.chat-open) .fab-wrap { display: none; }',
         '}',
       ].join('\n');
       this.shadow.appendChild(style);
+
+      const fabWrap = document.createElement('div');
+      fabWrap.className = 'fab-wrap';
+      this._fabWrap = fabWrap;
+
+      const pulse = document.createElement('div');
+      pulse.className = 'fab-pulse';
+      this._pulse = pulse;
+      fabWrap.appendChild(pulse);
 
       const fab = document.createElement('button');
       fab.className = 'fab';
@@ -579,26 +415,9 @@
         '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>' +
         '</svg>';
       fab.addEventListener('click', () => this._toggle());
-      this.shadow.appendChild(fab);
+      fabWrap.appendChild(fab);
+      this.shadow.appendChild(fabWrap);
       this._fab = fab;
-
-      // Typewriter tooltip. textNode is what we mutate per-char so we never
-      // re-create DOM during the cycle; the caret is a sibling so the blink
-      // animation is independent of the text writing.
-      const label = document.createElement('div');
-      label.className = 'label';
-      label.setAttribute('role', 'status');
-      label.setAttribute('aria-live', 'polite');
-      const textNode = document.createTextNode('');
-      const caret = document.createElement('span');
-      caret.className = 'caret';
-      caret.setAttribute('aria-hidden', 'true');
-      label.appendChild(textNode);
-      label.appendChild(caret);
-      this.shadow.appendChild(label);
-      this._label = label;
-      this._tipTextNode = textNode;
-      this._tipCaret = caret;
 
       const wrap = document.createElement('div');
       wrap.className = 'iframe-wrap';
@@ -609,16 +428,15 @@
     _toggle() {
       this._open = !this._open;
       if (this._open) {
-        // Tooltip visibility is now driven by :host(.chat-open) .label rule;
-        // also stop the cycle so we don't burn timer ticks while chat is open.
-        this._dismissTooltip(/*persist*/ true);
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
         this.classList.add('chat-open');
+        if (this._fabWrap) this._fabWrap.classList.add('open');
         this._postToIframe({ type: 'Sapybase:visibility', open: true });
       } else {
         this._wrap.classList.remove('open');
         this.classList.remove('chat-open');
+        if (this._fabWrap) this._fabWrap.classList.remove('open');
         this._postToIframe({ type: 'Sapybase:visibility', open: false });
       }
     }
@@ -687,6 +505,7 @@
           this._open = false;
           if (this._wrap) this._wrap.classList.remove('open');
           this.classList.remove('chat-open');
+          if (this._fabWrap) this._fabWrap.classList.remove('open');
         }
 
         if (data.type === 'Sapybase:ready' && this._iframeLoader) {
