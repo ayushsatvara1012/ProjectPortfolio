@@ -580,12 +580,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (!isMobile || !isOpen) return;
     const vv = window.visualViewport;
     if (!vv) return;
+    const fullHeight = window.innerHeight;
     const sync = () => {
       document.documentElement.style.setProperty('--sapy-vh', `${vv.height}px`);
-      const active = document.activeElement as HTMLElement | null;
-      if (active && active.tagName === 'TEXTAREA') {
-        active.scrollIntoView({ block: 'end' });
-      }
+      // Remove safe-area bottom padding when keyboard is open to avoid gap
+      const keyboardOpen = vv.height < fullHeight * 0.8;
+      document.documentElement.style.setProperty('--sapy-safe-bottom', keyboardOpen ? '0px' : 'env(safe-area-inset-bottom, 0px)');
     };
     sync();
     vv.addEventListener('resize', sync);
@@ -594,6 +594,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       vv.removeEventListener('resize', sync);
       vv.removeEventListener('scroll', sync);
       document.documentElement.style.removeProperty('--sapy-vh');
+      document.documentElement.style.removeProperty('--sapy-safe-bottom');
     };
   }, [isMobile, isOpen]);
 
@@ -1083,7 +1084,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   </a>
                 </div>
               )}
-              <div className="px-2 w-full shadow-xs" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
+              <div className="px-2 w-full shadow-xs" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
                 <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Ask anything..."

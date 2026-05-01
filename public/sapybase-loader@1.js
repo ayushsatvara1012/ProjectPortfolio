@@ -460,20 +460,50 @@
     // the layout viewport unchanged — so a 100dvh wrap shows the host page
     // between the chat input and the keyboard. Track visualViewport.height +
     // offsetTop while open and pin the wrap to the visible region.
+    _lockScroll() {
+      var de = document.documentElement;
+      var body = document.body;
+      this._savedScrollStyles = {
+        deOverflow: de.style.overflow,
+        deHeight: de.style.height,
+        bodyOverflow: body.style.overflow,
+        bodyHeight: body.style.height,
+      };
+      de.style.overflow = 'hidden';
+      de.style.height = '100%';
+      body.style.overflow = 'hidden';
+      body.style.height = '100%';
+    }
+
+    _unlockScroll() {
+      if (!this._savedScrollStyles) return;
+      var s = this._savedScrollStyles;
+      document.documentElement.style.overflow = s.deOverflow;
+      document.documentElement.style.height = s.deHeight;
+      document.body.style.overflow = s.bodyOverflow;
+      document.body.style.height = s.bodyHeight;
+      this._savedScrollStyles = null;
+    }
+
     _attachViewportTracking() {
       if (typeof window === 'undefined' || !window.visualViewport) return;
       var vv = window.visualViewport;
       var wrap = this._wrap;
       if (!wrap) return;
+      var isMobile = window.matchMedia && window.matchMedia('(max-width: 480px)').matches;
+      if (isMobile) this._lockScroll();
       var sync = function () {
         if (window.matchMedia && !window.matchMedia('(max-width: 480px)').matches) {
-          // Desktop / tablet sized wrap doesn't fill the viewport; leave it.
           wrap.style.height = '';
           wrap.style.top = '';
+          wrap.style.left = '';
+          wrap.style.width = '';
           return;
         }
         wrap.style.height = vv.height + 'px';
         wrap.style.top = vv.offsetTop + 'px';
+        wrap.style.left = vv.offsetLeft + 'px';
+        wrap.style.width = vv.width + 'px';
       };
       this._onVvSync = sync;
       vv.addEventListener('resize', sync);
@@ -489,9 +519,12 @@
         vv.removeEventListener('scroll', this._onVvSync);
         this._onVvSync = null;
       }
+      this._unlockScroll();
       if (this._wrap) {
         this._wrap.style.height = '';
         this._wrap.style.top = '';
+        this._wrap.style.left = '';
+        this._wrap.style.width = '';
       }
     }
 
