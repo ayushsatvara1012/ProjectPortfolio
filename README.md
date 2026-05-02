@@ -1,16 +1,49 @@
-# React + Vite
+# Sapybase AI Engine & Web App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sapybase is an autonomous AI chatbot platform built for modern businesses. This repository contains the Next.js frontend web application and the Python (FastAPI) backend AI engine.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend (`/src`)**: A native Next.js App Router application containing the marketing site, SaaS dashboard, and embeddable widget routes.
+- **Backend (`/sapybase_ai_engine`)**: A FastAPI application powering the RAG pipeline, AI agent orchestration, and database management.
 
-## React Compiler
+### Enterprise Embed Architecture
+The chatbot widget is optimized for global performance and zero-dependency integration:
+- **Edge Runtime**: The `/embed` route is powered by the Vercel Edge Runtime for sub-second global delivery.
+- **API Proxying**: All client-side requests are proxied via Next.js rewrites to the FastAPI backend, obfuscating internal infrastructure and simplifying CSP whitelisting for customers.
+- **Dependency Isolation**: The widget is decoupled from the main dashboard dependencies (Clerk, React Query), resulting in a minimal initial JavaScript payload.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Getting Started
 
-## Expanding the ESLint configuration
+### Prerequisites
+- Node.js (v18+)
+- Python (v3.12+)
+- Postgres with pgvector
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Running Locally
+
+We use `concurrently` to run both the frontend and backend development servers with a single command.
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   cd sapybase_ai_engine
+   # Ensure your python virtual environment is activated and dependencies are installed
+   pip install -r requirements.txt
+   cd ..
+   ```
+
+2. **Start the development servers:**
+   ```bash
+   npm run dev:all
+   ```
+   This will start:
+   - Next.js frontend on `http://localhost:3000`
+   - FastAPI backend on `http://localhost:8000`
+
+### Build for Production
+To build the Next.js application for production:
+```bash
+npm run build
+npm start
+```

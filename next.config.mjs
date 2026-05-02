@@ -1,11 +1,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.sapybase.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'sapyai.onrender.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+  },
   // The migration is complete, Next.js will now use default extensions.
   async rewrites() {
+    const isDev = process.env.NODE_ENV === 'development';
+    const apiUrl = isDev ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
+    
     return [
       {
         source: '/api/:path*',
-        destination: 'https://sapyai.onrender.com/api/:path*',
+        destination: `${apiUrl}/api/:path*`,
       },
       // Versioned loader alias: /sapybase-loader@1.js → /sapybase-loader.js
       // Bump the version number (e.g. @2) on breaking loader changes so
@@ -24,7 +43,6 @@ const nextConfig = {
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },

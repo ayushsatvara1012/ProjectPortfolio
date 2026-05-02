@@ -1,0 +1,746 @@
+{
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/tailwind.config.js": {
+    "mtime": 1776301948.4227257,
+    "hash": "decd9ab66519c5869ca89739daf6c4c9"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/next.config.mjs": {
+    "mtime": 1777516718.8396926,
+    "hash": "d517cb1f14defc4d033a7d11695da5ac"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/next-env.d.ts": {
+    "mtime": 1777606678.250757,
+    "hash": "d0f8375ae1199dc7acd3977fc33b78b8"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/eslint.config.js": {
+    "mtime": 1777237061.9283242,
+    "hash": "1095078b528bee65f02dbf899e2ee710"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/vitest.config.ts": {
+    "mtime": 1777144087.9965127,
+    "hash": "482656bb369f53ffd1f9800e2d6ace81"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/postcss.config.js": {
+    "mtime": 1777099258.2612743,
+    "hash": "3c28f25fec4d7eceba24345e12e9e429"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/embed-integrations/wordpress/sapybase-chatbot/sapybase-chatbot.php": {
+    "mtime": 1777520251.6722524,
+    "hash": "e7bc252d6f02ea572e22e7d652c19ef2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/sapybase-loader.js": {
+    "mtime": 1777613487.6323633,
+    "hash": "10fa29c85df0f03156922a9a18af2906"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/sapybase-loader@1.js": {
+    "mtime": 1777658265.7964563,
+    "hash": "9ac011983512d489c3eccce94b734191"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/widget.js": {
+    "mtime": 1777003255.3982363,
+    "hash": "bced005a17b0d3799b42359d1ee7bf4b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/ingest.py": {
+    "mtime": 1777312289.5978055,
+    "hash": "4f1882ac562d10556ed8e90529889876"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/embedding_config.py": {
+    "mtime": 1776553135.2442544,
+    "hash": "4e5c875ba0d61235287633e9fdc33518"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/main.py": {
+    "mtime": 1777572217.5986612,
+    "hash": "96d451538ee0ed4f76f369b3e5f5de76"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v14_analytics_roi_engine.sql": {
+    "mtime": 1777312289.667863,
+    "hash": "7c7b11f8ce8762c1d3e392ce1b4465ec"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v8_add_performance_indexes.sql": {
+    "mtime": 1775102970.353848,
+    "hash": "3ff7c29fe0b6e202fffbc1b2824595db"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v20_hybrid_search.sql": {
+    "mtime": 1776911090.9273639,
+    "hash": "5b042853b3fcb60c08d28d3739b65f89"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v13_logo_customization.sql": {
+    "mtime": 1777312289.6679893,
+    "hash": "6ac4607637539e069753bc44ea019132"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v11_exact_cache.sql": {
+    "mtime": 1776301948.3916695,
+    "hash": "97ad359c3f1035f3a54817cac7e3366f"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v17_handoff_redirect_url.sql": {
+    "mtime": 1776553030.9345558,
+    "hash": "4014186bf374ec49668110cdd855c50f"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v18_custom_plan.sql": {
+    "mtime": 1776736793.273965,
+    "hash": "39ce279c8a6102469e4e576eb7ee0bdd"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v19_hide_branding.sql": {
+    "mtime": 1777312289.667853,
+    "hash": "fda43f7d4773d886f8ae427e619d7c64"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v22_eval_pipeline.sql": {
+    "mtime": 1776912644.6871052,
+    "hash": "5cae346777ad2b4dd50f085e31fae198"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v9_advanced_security.sql": {
+    "mtime": 1775102970.354264,
+    "hash": "77a5663d2587cf68d559d4e44224ef78"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v16_human_handoff.sql": {
+    "mtime": 1776553030.9306269,
+    "hash": "8dab768e8ddfe288373bf0d615c1c302"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v12_analytics.sql": {
+    "mtime": 1777312289.648174,
+    "hash": "a3ca6dfdd76d806d5c4d2f34b9fcccd4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v10_multi_bot.sql": {
+    "mtime": 1777312289.6481876,
+    "hash": "8b7396d8d22fe72a67a9bad75d465c4b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v21_parent_child_chunking.sql": {
+    "mtime": 1776911490.943736,
+    "hash": "1caccbfb9029d67811efdd11a0958186"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/v15_webhook_integration.sql": {
+    "mtime": 1776553030.9299498,
+    "hash": "4c1f82432d962caa32849f0cbba89f41"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/alembic_migrations/env.py": {
+    "mtime": 1777184323.1525111,
+    "hash": "78b85751f1a94f8a50d4a45c66b45720"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/alembic_migrations/versions/0002_migrate_startup_event_alters_to_alembic.py": {
+    "mtime": 1777184556.1575694,
+    "hash": "bb12fedf299d9394d3c98dacede8ab04"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/alembic_migrations/versions/0001_baseline.py": {
+    "mtime": 1777312289.6683767,
+    "hash": "0ca8d95116d39b284cbcaba11a8c8ca3"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/local_dev_setup.py": {
+    "mtime": 1777312289.398575,
+    "hash": "2f94026089e5930307ecca39f8f01290"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/mock_sync.py": {
+    "mtime": 1777312289.6683486,
+    "hash": "48f5b9aeadd4037083e27e8f8d416ef6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/schema_audit.py": {
+    "mtime": 1777312289.6683269,
+    "hash": "771a145f73e6116db8c28d951a4fc5c0"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/check_origin.py": {
+    "mtime": 1777312289.3985317,
+    "hash": "b92dad14ea3a9351d6ca660c2c971b13"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/promote_admin.py": {
+    "mtime": 1776553135.2499979,
+    "hash": "1145a16722ebffc2be4e971b3273fcda"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/sse_load_test.py": {
+    "mtime": 1777312289.6686895,
+    "hash": "a26f27843f86d135d61cb2f5d484843c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/scripts/nuke_db.py": {
+    "mtime": 1774461417.9849443,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/scripts/cleanup_test_data.py": {
+    "mtime": 1777312289.39856,
+    "hash": "80d6a934a9c8523695cef590db62ffd6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/scripts/seed_production.py": {
+    "mtime": 1777312289.3985107,
+    "hash": "c69da2759bd12b2acd03baec4e52282a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/scripts/production_purge.py": {
+    "mtime": 1777312289.398444,
+    "hash": "217764128c68de9c7d195e2e75069983"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/middleware.ts": {
+    "mtime": 1777661683.3942256,
+    "hash": "50bb8a1842507eb2ec57385b82a6700b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/robots.ts": {
+    "mtime": 1777593706.8586671,
+    "hash": "659f67477cdc79ec3463e5c6c91c7e85"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/footer-placeholder.tsx": {
+    "mtime": 1777312291.1072493,
+    "hash": "cd1706ef8dbadf9d239da2cf4defe6a6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/client-effects.tsx": {
+    "mtime": 1777312291.6206465,
+    "hash": "751d224cd9f1ef24c40b8ab1c058aa1e"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/sitemap.ts": {
+    "mtime": 1777593702.2487733,
+    "hash": "2d697836e5f80bbe89e55aedb9495286"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/layout.tsx": {
+    "mtime": 1777667965.2336237,
+    "hash": "0bcb4c9ebadb8d61ec77657873849047"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/error.tsx": {
+    "mtime": 1777594717.8831282,
+    "hash": "0fa3ec78543b82ba229bb60464910356"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/not-found.tsx": {
+    "mtime": 1777594716.8174436,
+    "hash": "ac42f05b98512a06a398a17ed0ed1642"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/providers.tsx": {
+    "mtime": 1777667441.5462866,
+    "hash": "1cde383a4931d1ca1b460af7d61fe24d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/layout.tsx": {
+    "mtime": 1777667119.5933025,
+    "hash": "e158c59b68bd0691a35c75a5a86c67ba"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/loading.tsx": {
+    "mtime": 1777662300.9992423,
+    "hash": "eb3c6fcb715bed075ac8bc7a69ceaa6c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/page.tsx": {
+    "mtime": 1777099258.3435535,
+    "hash": "bf0580b03aada038929531231b9e01ec"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/bots/page.tsx": {
+    "mtime": 1777667116.2960951,
+    "hash": "21ebe5d8b1ca6fa82029081b8f34bcb6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/insights/page.tsx": {
+    "mtime": 1777667114.5664973,
+    "hash": "d3790bc73fd9bbcbb34a2dd127b6b038"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/chat/page.tsx": {
+    "mtime": 1777667112.7478905,
+    "hash": "4cb161b117767d7a55d778b6d1e97f2a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/register/page.tsx": {
+    "mtime": 1777667111.1127958,
+    "hash": "449cbde175eed8a6c0d0b1e825af8fc7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/train/page.tsx": {
+    "mtime": 1777667118.0149655,
+    "hash": "7012e02f54c3805d48f28b2ba5c75804"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/customize/page.tsx": {
+    "mtime": 1777667333.2337966,
+    "hash": "171d8c74ae5a29413a152b720768ddbf"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/embed/[botId]/layout.tsx": {
+    "mtime": 1777607773.7707891,
+    "hash": "be8582cca4fa371a2c55371c51eaab0d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/embed/[botId]/page.tsx": {
+    "mtime": 1777406384.6660354,
+    "hash": "bcf82f4e53e2c77481981803ce30ce59"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/layout.tsx": {
+    "mtime": 1777669798.4562376,
+    "hash": "b668ccf0a9f553a82b6518b834414b19"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/error.tsx": {
+    "mtime": 1777256742.094523,
+    "hash": "b10f62345c85d75b38ac7671bc0246bc"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/DashboardProviders.tsx": {
+    "mtime": 1777667424.0155606,
+    "hash": "70a3876d06adcfeed00ae15f457c78dd"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/page.tsx": {
+    "mtime": 1777099258.3182125,
+    "hash": "65adcea725ed12d9c4306e9917a0b2b0"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/bots/page.tsx": {
+    "mtime": 1777477248.4001305,
+    "hash": "4567d6c899274d92a64068aa202eb539"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/insights/page.tsx": {
+    "mtime": 1777484276.438051,
+    "hash": "aa8b82438f79f74545e4dae536c2b12c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/layout.tsx": {
+    "mtime": 1777099258.3304138,
+    "hash": "8cae90c8307ce0326badf6392d594bc7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/page.tsx": {
+    "mtime": 1777099258.331559,
+    "hash": "a63fbd526c6129ba4cd042f00c849963"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/admin/layout.tsx": {
+    "mtime": 1777661916.2119217,
+    "hash": "9c76db4c730d7fdc82c333eead09a934"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/admin/page.tsx": {
+    "mtime": 1777593333.8460135,
+    "hash": "c3fdaae99f14b21fc545dd1eaf98cc36"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/account/page.tsx": {
+    "mtime": 1777515554.8149884,
+    "hash": "6855dfee022dda5189359f5875e904a4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/billing/page.tsx": {
+    "mtime": 1777477353.1348877,
+    "hash": "90562415c191a9ecdf03617f24d8a75a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/customize/page.tsx": {
+    "mtime": 1777477347.1987932,
+    "hash": "751207fd3d0283a2b334c4713145cc5a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/register/page.tsx": {
+    "mtime": 1777662321.5783494,
+    "hash": "84dbfff8460a10cb2275a8fffcc8bb1e"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/train/page.tsx": {
+    "mtime": 1777519203.0045326,
+    "hash": "3bef45dcae9aacd5a41b0d0371a25e2c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/pricing/page.tsx": {
+    "mtime": 1777488008.5678906,
+    "hash": "654cd5694a75094e5048c3278585cdef"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/BotIntegrationDocs.tsx": {
+    "mtime": 1777576473.6415067,
+    "hash": "088fca6cd730006ef0c38abd74b21cb4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/BotPreview.tsx": {
+    "mtime": 1777576473.6435573,
+    "hash": "c8b709427682538397d3bb3b089004da"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/Navbar.tsx": {
+    "mtime": 1777152816.2495537,
+    "hash": "effcc0c515030ea6b15cd5a74a999ba8"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/InteractiveSchematic.tsx": {
+    "mtime": 1777662873.1898456,
+    "hash": "1652f95be30546cb7b331e39a1d8ba8a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/ChatWidget.tsx": {
+    "mtime": 1777658281.0732045,
+    "hash": "5e1d7c44f0168321dcfcbfc361de41b4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/UserSeed.tsx": {
+    "mtime": 1777235438.1970162,
+    "hash": "b523e7a6521540624ba93426cbd5f09b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/SkeletonLoader.tsx": {
+    "mtime": 1777498034.497764,
+    "hash": "eb9c0c3ecfb84fd9de24d0d3b0d43d4b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/ThinkingLogo.tsx": {
+    "mtime": 1777099258.3107538,
+    "hash": "068df93c32760e4b23fad185b0b85e45"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/LogoCustomizer.tsx": {
+    "mtime": 1777661713.2186778,
+    "hash": "916c1a21ba6a6ce0d14844b21493ed0a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/LeadsPanel.tsx": {
+    "mtime": 1777484027.515403,
+    "hash": "1281af821788de7f75c6b470371b33fa"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/Alert.tsx": {
+    "mtime": 1777099258.2892299,
+    "hash": "cfa496ccf60517decefd945eeec6b465"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/ConversationsPanel.tsx": {
+    "mtime": 1777520320.3863175,
+    "hash": "7d60a3bb91ad13dd3859856a92c4c73a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/Footer.tsx": {
+    "mtime": 1777662059.3859398,
+    "hash": "0a559109627280567bb130043c07c34d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/AppLayout.tsx": {
+    "mtime": 1777520869.9568863,
+    "hash": "8a11d2c2f33234fead3d68e2d35f2dc6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/NavigationProgress.tsx": {
+    "mtime": 1777593096.925584,
+    "hash": "bad15b304b4a0920ce8d6fbdf8263430"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/FloatingBotWidget.tsx": {
+    "mtime": 1777312291.7259767,
+    "hash": "eb689cf21d3deb3a6feeb73d4ed605e0"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/Logo.tsx": {
+    "mtime": 1777099258.3027039,
+    "hash": "6b8865f54a4681e9d35ac5a0ae36df41"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/UpgradePrompt.tsx": {
+    "mtime": 1777099258.3118958,
+    "hash": "3e2d21a738c5bebc34aac41e85d6f2ed"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/ROIPanel.tsx": {
+    "mtime": 1777477385.7119732,
+    "hash": "81219b595ba8ea4a84784e33af070159"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/DemoMigrationBanner.tsx": {
+    "mtime": 1777236380.213983,
+    "hash": "71183321493ba29d86842484e51a2ba0"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/avatar/AvatarShared.ts": {
+    "mtime": 1777492728.1223192,
+    "hash": "500699d313322812b2ac56490e95aa64"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/layout.tsx": {
+    "mtime": 1777668042.3934202,
+    "hash": "b85075f568773e431f011f82cea14efc"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/loading.tsx": {
+    "mtime": 1777498041.511074,
+    "hash": "7d68e7d27be0c0a7658b2ea86a8b9af7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/page.tsx": {
+    "mtime": 1777594706.4296093,
+    "hash": "abc6e3b7a7d22fa51af8592f957cef10"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/layout.tsx": {
+    "mtime": 1777576515.7602587,
+    "hash": "b4102f610caf6d57180cd79e913dc552"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/ContactClient.tsx": {
+    "mtime": 1777661699.335931,
+    "hash": "20e7f69cdad27553b4ba46223f4db9e6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/loading.tsx": {
+    "mtime": 1777498045.1774476,
+    "hash": "652695c18dd64e8da3e1d3cc3f49b18d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/page.tsx": {
+    "mtime": 1777594651.0315201,
+    "hash": "14c2d841fb8ed3cae00c017e702398b3"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/privacy/page.tsx": {
+    "mtime": 1777099258.2801185,
+    "hash": "eb67291e25943d10cff385821a159959"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/sso-callback/page.tsx": {
+    "mtime": 1777099258.2826774,
+    "hash": "a13c2bba62a01bb320456e516337c9db"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/privacy-policy/page.tsx": {
+    "mtime": 1777594672.5513506,
+    "hash": "2a7ed879c6752897aa11ee0d91e4c9d4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/terms/page.tsx": {
+    "mtime": 1777099258.2871776,
+    "hash": "14ce2382940b45ff01685a038deab2a5"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/admin/page.tsx": {
+    "mtime": 1777099258.2713299,
+    "hash": "6b6045f73742b6f2d465c0560ced1ab4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/layout.tsx": {
+    "mtime": 1777576510.451725,
+    "hash": "c420c855d70555ef4c995d2c2d143fb2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/loading.tsx": {
+    "mtime": 1777498044.160809,
+    "hash": "a2dbd14d576f071c3420126cc71ddc94"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/AboutClient.tsx": {
+    "mtime": 1777668849.5341227,
+    "hash": "d3e7a4afcfafdad2ed068c18d506fa13"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/page.tsx": {
+    "mtime": 1777594614.073917,
+    "hash": "276a55319c6ab779b14c2f2dbaf9af25"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/docs/loading.tsx": {
+    "mtime": 1777498048.1224802,
+    "hash": "8cd9ff3874fb4501e68a8589b096f991"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/docs/page.tsx": {
+    "mtime": 1777594669.79025,
+    "hash": "552e2718ee8e74f26a836da19eb3437b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/terms-and-conditions/page.tsx": {
+    "mtime": 1777594674.8132763,
+    "hash": "e4f19bb1b8aee50a431074f54633f316"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/PricingClient.tsx": {
+    "mtime": 1777668273.6072721,
+    "hash": "9b186091a5de3f4b47ad333517c73ecf"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/layout.tsx": {
+    "mtime": 1777576522.353122,
+    "hash": "f91c752d2421b5048aaea6c91f62afa7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/loading.tsx": {
+    "mtime": 1777498042.8492303,
+    "hash": "59c481e452d50ad2f8e276e0563c5d2a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/page.tsx": {
+    "mtime": 1777594648.8521676,
+    "hash": "54c24ea209aa7dcfe0666e03f793e88c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/layout.tsx": {
+    "mtime": 1777576528.6726983,
+    "hash": "3e89e5a275e93ea7e6e16d84891185b2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/loading.tsx": {
+    "mtime": 1777498046.7403255,
+    "hash": "c86ebe19653504d8cebf67d19f02ef71"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/page.tsx": {
+    "mtime": 1777594650.0053596,
+    "hash": "a7ece1362e918e2649bf735cfc31731d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/ServicesClient.tsx": {
+    "mtime": 1777594643.4758677,
+    "hash": "6dbcb62523df09f4b1db0175630a2502"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/api/demo/chat/route.ts": {
+    "mtime": 1777667527.1054373,
+    "hash": "26f8ca0d9b267f2aae23c41ba0bbe059"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/layout.tsx": {
+    "mtime": 1777312291.6205707,
+    "hash": "e6d358112e73ef0025694f0f1ef2b580"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/sign-up/[[...sign-up]]/page.tsx": {
+    "mtime": 1777235514.8412,
+    "hash": "31ba79c5bd097a8e74b19087e60629c2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/sign-in/[[...sign-in]]/page.tsx": {
+    "mtime": 1777235508.4922254,
+    "hash": "957cc5b8d2f80c6d3307e6a92578ed49"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/HowItWorks.tsx": {
+    "mtime": 1777312293.4492412,
+    "hash": "156abcdf1eb98059572323c8f6a5d673"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/Services.tsx": {
+    "mtime": 1777253448.9253967,
+    "hash": "f845e399458b2fc0c562197597c8ec88"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/ScrollReveal.tsx": {
+    "mtime": 1777099258.3676136,
+    "hash": "ca19276654d09e69d79e41e5b5c9b360"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/ProjectSection.tsx": {
+    "mtime": 1777312293.429084,
+    "hash": "be2f5fdb9e4941de50a6f85384f6dfe3"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/Metrics.tsx": {
+    "mtime": 1777312293.4290452,
+    "hash": "6bc0990aed6b49c97e90e4b52363638a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/HeroSection.tsx": {
+    "mtime": 1777662070.892231,
+    "hash": "f6f49f14c9862275852ed9c306a72780"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/Button.tsx": {
+    "mtime": 1777154697.9633038,
+    "hash": "b9578a5dce7017eb97c789d6ecf73217"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/__tests__/v13_logo_customization.test.js": {
+    "mtime": 1777312293.4291165,
+    "hash": "f1d6befb0e44f18832ff9b30c75d0844"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/__tests__/setup.ts": {
+    "mtime": 1777144261.5797155,
+    "hash": "9e51a04b2526a65e6b7352c5eafb658f"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/__tests__/nextjs_migration.test.ts": {
+    "mtime": 1777312289.3982902,
+    "hash": "540cdf2d6e0ddf27c9a50feda0a3b24f"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/__tests__/chatwidget_streaming.test.ts": {
+    "mtime": 1777312289.3354876,
+    "hash": "afb69569b11a5462fdc474fe12c824fc"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/errors.ts": {
+    "mtime": 1777662514.729034,
+    "hash": "5eeed72ef7b22f5fa47b7fd68d939a06"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/demo/demoStorage.ts": {
+    "mtime": 1777667160.2857382,
+    "hash": "c2032ca85334c4cc4042f26dc441bcf4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/demo/demoRag.ts": {
+    "mtime": 1777667539.84322,
+    "hash": "3049d717a4897aa1a347f41f1e020d6a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/types/api.ts": {
+    "mtime": 1777237038.392849,
+    "hash": "8cee29667de048277b4a8686e3340ded"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/context/UserContext.tsx": {
+    "mtime": 1777236072.8503566,
+    "hash": "364e31ba59aa3794b0caa3e24a48fac2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/context/BotSettingsContext.tsx": {
+    "mtime": 1777670823.3034456,
+    "hash": "a43128f1e39667ffcd78f4257969a98e"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/context/ToastContext.tsx": {
+    "mtime": 1777312293.1795764,
+    "hash": "012b334a99ae64b290bafc8c609e4093"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/hooks/useSessionManager.ts": {
+    "mtime": 1777312289.3984005,
+    "hash": "977342f583ed25d10d117694bebb12b3"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/hooks/useInactivityTimeout.ts": {
+    "mtime": 1777662547.8846939,
+    "hash": "663bcd9d7b0b41b5688785e9a338013c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/hooks/useAuthenticatedFetch.ts": {
+    "mtime": 1777662521.6442056,
+    "hash": "786ac7251637b197870e96946778330d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/lib/validation/schemas.ts": {
+    "mtime": 1777237139.3876488,
+    "hash": "684acbbf055af78b5889bbdf5e341ecf"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/seo/seoConfig.ts": {
+    "mtime": 1777594514.8624911,
+    "hash": "7e44a580947d2c764450e7a16388614c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/seo/buildMetadata.ts": {
+    "mtime": 1777594519.1447737,
+    "hash": "fab6a7df7ee317ba5428258e41a57aa4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/README.md": {
+    "mtime": 1770227524.4633641,
+    "hash": "3f01850e9fce601d04d6dba39204c1d8"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/docs/runbooks/plan.md": {
+    "mtime": 1777661179.203385,
+    "hash": "88ec5943ac0f703504ac7c830f31a71f"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/robots.txt": {
+    "mtime": 1777576473.662291,
+    "hash": "0b5e907e568017c184f0ce44bfae1d98"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/requirements.txt": {
+    "mtime": 1777184053.4549181,
+    "hash": "2aa387b89e56a828a601b40a4fcd3cb4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/sapybase_core.md": {
+    "mtime": 1777312289.3985453,
+    "hash": "8f0d558f54998d5c6730762738758a99"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/MIGRATIONS.md": {
+    "mtime": 1777312289.668301,
+    "hash": "e6bf584c1c827088e145435fd55e0f51"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/SCHEMA_AUDIT_2026-04-26.md": {
+    "mtime": 1777312289.667899,
+    "hash": "cd06bc1f0ccca752fb90342040817127"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/sapybase_ai_engine/migrations/RENDER_DEPLOY.md": {
+    "mtime": 1777222329.6070821,
+    "hash": "821d572923e80136a55ddbf412a728d9"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/SB_loading.svg": {
+    "mtime": 1776301948.190476,
+    "hash": "46c8210040dcd52442057557a47fa8ae"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/IMG_9163.webp": {
+    "mtime": 1774224118.6282334,
+    "hash": "749a19840743963e4b67d051260ef6bb"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/Manage_Bot.png": {
+    "mtime": 1776301948.188882,
+    "hash": "af7dc37968b94d94bbbe92db9b46747f"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/SB_Brand-removebg.png": {
+    "mtime": 1774224118.6312325,
+    "hash": "c8db3a2c036fe718e922a0cc3d4a0710"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/sb_logo.svg": {
+    "mtime": 1774224118.6439943,
+    "hash": "012b09b9a3076166bd1c0fc2243b8c26"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/favicon_180.svg": {
+    "mtime": 1774224118.641749,
+    "hash": "0147e94d8ddf071176c2348789861798"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/IMG_9145.webp": {
+    "mtime": 1774224118.6247616,
+    "hash": "613ca8cadc99045e6053004d1b1fd0db"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/nature_1.webp": {
+    "mtime": 1776301948.2097433,
+    "hash": "6ba5ad1a2c65e011879daceae2533754"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/nature.webp": {
+    "mtime": 1776301948.205089,
+    "hash": "fb7351765981d1a6724e3abe94a6f531"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/que_vector.webp": {
+    "mtime": 1776827465.5927975,
+    "hash": "d5edd81a5c9276c5722a7ccc73fcf72b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/SB_loading_dark.svg": {
+    "mtime": 1774224118.637404,
+    "hash": "8c3e5e1b78fd1a9814d4839665d5f49e"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/globe.svg": {
+    "mtime": 1776969241.1881304,
+    "hash": "3c133e6cb7d8f81861ab4778cfd08b06"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/SB_Brand.png": {
+    "mtime": 1774224118.6328907,
+    "hash": "737ec1944eb5ecfdd864318d87ae01fc"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/favicon.svg": {
+    "mtime": 1774224118.641101,
+    "hash": "0147e94d8ddf071176c2348789861798"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/robo_nature.webp": {
+    "mtime": 1776822981.2723198,
+    "hash": "b99d2bca831629ab865687927edccae5"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/assets/web_design.png": {
+    "mtime": 1774224118.7187219,
+    "hash": "ff5d03c3c7f46928b1f433a35cc7ce4c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/assets/custom_software.png": {
+    "mtime": 1774224118.6708088,
+    "hash": "8ab3bd6909fdb03d0cd25498c10d34cb"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/assets/full_stack.png": {
+    "mtime": 1774224118.6795945,
+    "hash": "7e7acd44a7490256258406794148c2f9"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/assets/react.svg": {
+    "mtime": 1770227524.4680316,
+    "hash": "f0402b67b6ce880f65666bb49e841696"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/assets/seo_optimization.png": {
+    "mtime": 1774224118.7125232,
+    "hash": "f00fafe0e74e42ec7b3ad1fa103ac730"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/videos/Integrate_Bot.mp4": {
+    "mtime": 1776301948.3260183,
+    "hash": "ad053d69ced6fed9f4360473cfde495c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/videos/Customise_Bot.mp4": {
+    "mtime": 1776301948.2967947,
+    "hash": "872191677fe402a8c379f8bbf1a0c51a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/videos/Bot_Creation.mp4": {
+    "mtime": 1776301948.2445223,
+    "hash": "8cd5679191c48d719ba8f9e6f2535ad3"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/videos/registration_sapybase.mp4": {
+    "mtime": 1776301948.3818471,
+    "hash": "a9e7ccd62a40f6dbcbb775c5469bb511"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/videos/Train_Bot.mp4": {
+    "mtime": 1776301948.356958,
+    "hash": "e8cc2f92d60cd5f5285b0c412173d4dd"
+  }
+}

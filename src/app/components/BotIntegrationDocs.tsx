@@ -33,7 +33,7 @@ const DocMedia = ({ alt, placeholderText, src }: { alt: string; placeholderText?
 
 type Props = { apiKey?: string; apiUrl?: string; standalone?: boolean };
 
-const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.onrender.com', standalone = false }: Props) => {
+const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://www.sapybase.com', standalone = false }: Props) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('setup');
   const [copied, setCopied] = useState(false);
@@ -315,7 +315,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://sapyai.
             <SyntaxHighlightedCode code={`Content-Security-Policy:
   script-src   'self' https://www.sapybase.com;
   frame-src    https://www.sapybase.com;
-  connect-src  'self' https://www.sapybase.com https://sapyai.onrender.com;
+  connect-src  'self' https://www.sapybase.com;
   img-src      'self' data: blob: https://www.sapybase.com;`} />
 
             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Next.js — add to next.config</h3>
@@ -331,7 +331,7 @@ async headers() {
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' https://www.sapybase.com",
             "frame-src https://www.sapybase.com",
-            "connect-src 'self' https://www.sapybase.com https://sapyai.onrender.com",
+            "connect-src 'self' https://www.sapybase.com",
             "img-src 'self' data: blob: https://www.sapybase.com",
           ].join('; '),
         },
@@ -342,18 +342,18 @@ async headers() {
 
             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Nginx</h3>
             <SyntaxHighlightedCode code={`add_header Content-Security-Policy
-  "default-src 'self'; script-src 'self' https://www.sapybase.com; frame-src https://www.sapybase.com; connect-src 'self' https://www.sapybase.com https://sapyai.onrender.com; img-src 'self' data: blob: https://www.sapybase.com"
+  "default-src 'self'; script-src 'self' https://www.sapybase.com; frame-src https://www.sapybase.com; connect-src 'self' https://www.sapybase.com; img-src 'self' data: blob: https://www.sapybase.com"
   always;`} />
 
             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-200 mt-8 mb-3">Apache (.htaccess)</h3>
             <SyntaxHighlightedCode code={`Header always set Content-Security-Policy \
-  "default-src 'self'; script-src 'self' https://www.sapybase.com; frame-src https://www.sapybase.com; connect-src 'self' https://www.sapybase.com https://sapyai.onrender.com; img-src 'self' data: blob: https://www.sapybase.com"`} />
+  "default-src 'self'; script-src 'self' https://www.sapybase.com; frame-src https://www.sapybase.com; connect-src 'self' https://www.sapybase.com; img-src 'self' data: blob: https://www.sapybase.com"`} />
 
             <div className="flex items-start gap-4 p-5 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-xl mt-8">
               <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">lightbulb</span>
               <div className="text-base font-google text-blue-800 dark:text-blue-300 m-0 space-y-1">
-                <p className="m-0 font-bold">Why <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">connect-src</code> needs both domains</p>
-                <p className="m-0">The loader is served from <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">www.sapybase.com</code>. The AI backend that answers chat messages runs on <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">sapyai.onrender.com</code>. Both must be whitelisted or the chat will load but fail to respond.</p>
+                <p className="m-0 font-bold">Why <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">connect-src</code> needs Sapybase</p>
+                <p className="m-0">The loader and the AI backend are both served through <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-sm">www.sapybase.com</code>. This domain must be whitelisted for the chat to function.</p>
               </div>
             </div>
           </section>

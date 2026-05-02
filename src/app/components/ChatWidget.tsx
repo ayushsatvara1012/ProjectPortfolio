@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
@@ -88,9 +89,11 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
       style={{ ...bgProps, boxSizing: 'border-box' }}
     >
       {showImage ? (
-        <img
+        <Image
           src={logoUrl}
           alt={`${botName} logo`}
+          width={40}
+          height={40}
           className={`m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none! ${isCustom ? 'w-full! h-full! object-contain!' : 'w-[75%]! h-[75%]! object-contain!'}`}
           onError={() => setImgFailed(true)}
           style={{ display: 'block', boxSizing: 'border-box' }}
@@ -469,8 +472,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // Resolve API key and base URL (supports both prop and window.SapybaseConfig)
   const activeApiKey = apiKey ?? (typeof window !== 'undefined' ? window.SapybaseConfig?.apiKey : undefined);
   const activeApiUrl = typeof window !== 'undefined'
-    ? (window.SapybaseConfig?.apiUrl ?? (IS_DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com'))
-    : (IS_DEV ? 'http://localhost:8000' : 'https://sapyai.onrender.com');
+    ? (window.SapybaseConfig?.apiUrl ?? '')
+    : '';
 
   const DEFAULT_CONFIG: ConfigData = {
     theme_color: (typeof window !== 'undefined' && window.SapybaseConfig?.themeColor) || '#5730F5',

@@ -5,7 +5,7 @@ import Button from './Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-
+import Image from 'next/image';
 const TYPEWRITER_WORDS = ['Businesses', 'Freelancers', 'Portfolios'];
 const TYPING_SPEED = 80;
 const DELETING_SPEED = 50;
@@ -421,7 +421,7 @@ const HeroSection = () => {
                 {/* Fixed Branding Footer */}
                 <div className="shrink-0 py-1 flex justify-center items-center bg-gray-50/80 dark:bg-slate-950/80 backdrop-blur-sm border-t border-gray-200/50 dark:border-slate-800/50">
                   <div className="flex items-center gap-1.5 text-[5px] font-sans font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                    <img src="/SB_loading.svg" alt="Sapybase" className="w-3.5 h-3.5 grayscale opacity-50" />
+                    <Image src="/SB_loading.svg" alt="Sapybase" width={14} height={14} className="w-3.5 h-3.5 grayscale opacity-50" />
                     Powered by Sapybase
                   </div>
                 </div>

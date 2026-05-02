@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 
 const projects = [
   {
@@ -84,10 +85,12 @@ const ProjectSection = () => {
 
               {/* IMAGE CELL */}
               <div className="lg:col-span-4 bg-white dark:bg-slate-950 p-0 relative overflow-hidden h-[300px] lg:h-auto group/img transition-colors duration-500">
-                <img
+                <Image
                   src={project.image}
                   alt={project.title}
-                  className="w-full h-full object-cover grayscale-0 lg:grayscale opacity-90 transition-all duration-700 lg:group-hover/img:grayscale-0 group-hover/img:scale-105"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className="object-cover grayscale-0 lg:grayscale opacity-90 transition-all duration-700 lg:group-hover/img:grayscale-0 group-hover/img:scale-105"
                 />
                 <div className="absolute top-6 left-6 py-1 px-3 bg-slate-900 dark:bg-indigo-600 text-[10px] uppercase tracking-widest font-bold text-white transition-colors">
                   NODE_REF_{project.id}

@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+
 import { ClerkProvider } from '@clerk/nextjs';
 import { ToastProvider } from '@/src/lib/context/ToastContext';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-
   // Global auth event handlers: 401 → bounce to sign-in (Clerk middleware will
   // re-establish session); 403 → bounce to dashboard. Both are emitted from
   // useAuthenticatedFetch so every API call benefits without per-caller wiring.
@@ -66,14 +64,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // The embeddable widget at /embed/[botId] runs on third-party sites inside
-  // an iframe. It must NOT carry our app providers (Clerk, query client, etc.)
-  // because: (a) Clerk would attempt auth on anonymous visitors, (b) the
-  // upgrade-modal fetch interceptor would mutate window.fetch on the host's
-  // iframe document.
-  if (pathname?.startsWith('/embed/')) {
-    return <>{children}</>;
-  }
 
   return (
     <ClerkProvider

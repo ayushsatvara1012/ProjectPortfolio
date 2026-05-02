@@ -1,0 +1,6 @@
+/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/account/page.tsx
+/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/billing/page.tsx
+/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/customize/page.tsx
+/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/api/demo/chat/route.ts
+/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/sign-up/[[...sign-up]]/page.tsx
+/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/sign-in/[[...sign-in]]/page.tsx

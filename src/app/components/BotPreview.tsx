@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { MoreHorizontal, X, Send } from 'lucide-react';
 import { useBotSettings } from '@/src/lib/context/BotSettingsContext';
 import { BotAvatar } from './LogoCustomizer';
@@ -131,7 +132,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         {!hideBranding && (
           <div className={`shrink-0 py-1.5 flex justify-center items-center backdrop-blur-sm ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
             <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 grayscale opacity-50" />
+              <Image src={BrandLogo} alt="Sapybase" width={20} height={20} className="grayscale opacity-50" />
               Powered by Sapybase
             </span>
           </div>
