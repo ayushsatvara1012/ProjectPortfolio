@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
+import Image from 'next/image';
+
 const DocMedia = ({ alt, placeholderText, src }: { alt: string; placeholderText?: string; src?: string }) => {
   const isVideo = src && /\.(mp4|webm|ogg|mov)$/i.test(src);
   return (
@@ -12,7 +14,7 @@ const DocMedia = ({ alt, placeholderText, src }: { alt: string; placeholderText?
         isVideo ? (
           <video src={src} autoPlay loop muted playsInline preload="metadata" className="absolute -top-8 w-full h-full object-cover" />
         ) : (
-          <img src={src} alt={alt} className="w-full h-full" />
+          <Image src={src} alt={alt} fill className="object-cover" />
         )
       ) : (
         <div className="w-full h-full bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex flex-col items-center justify-center p-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">

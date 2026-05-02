@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -74,35 +74,75 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
     }
   }, [logoUrl]);
 
+  const uid = useId().replace(/:/g, '');
+  const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
+  const FAB_PATH = shape.path;
+  const offsetX = shape.x || 0;
+  const offsetY = shape.y || 0;
+
+  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
   const initial = String(botName || 'S').charAt(0).toUpperCase();
   const showImage = logoUrl && logoUrl.trim() && !imgFailed;
-  const activeShapeClass = SHAPE_CLASS_MAP[shapeId] || 'rounded-xl';
-  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
 
-  const bgProps: React.CSSProperties = gradient
-    ? { backgroundImage: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`, backgroundColor: 'transparent' }
-    : { backgroundColor: showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor };
+  // L1 fill: gradient when bgStyle set, otherwise themeColor or white backdrop
+  const baseFill = gradient ? `url(#${uid}-grad)` : (showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor);
 
   return (
-    <div
-      className={`${sizeClass} ${activeShapeClass} overflow-hidden! flex! items-center! justify-center! shrink-0! dark:border-slate-700! ${hasShadow ? 'shadow-sm!' : ''} p-0! m-0! border-none!`}
-      style={{ ...bgProps, boxSizing: 'border-box' }}
-    >
-      {showImage ? (
-        <Image
-          src={logoUrl}
-          alt={`${botName} logo`}
-          width={40}
-          height={40}
-          className={`m-0! p-0! border-none! bg-transparent! max-w-none! max-h-none! ${isCustom ? 'w-full! h-full! object-contain!' : 'w-[75%]! h-[75%]! object-contain!'}`}
-          onError={() => setImgFailed(true)}
-          style={{ display: 'block', boxSizing: 'border-box' }}
-        />
-      ) : (
-        <span className="font-bold! leading-none! select-none! text-white! m-0! p-0!" style={{ fontSize: sizeClass.includes('w-10') ? '1rem' : '0.7rem' }}>
-          {initial}
-        </span>
-      )}
+    <div className={`${sizeClass} shrink-0 ${hasShadow ? 'shadow-sm' : ''} relative flex items-center justify-center`}>
+      <svg
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+        overflow="visible"
+      >
+        <defs>
+          <clipPath id={`${uid}-clip`}>
+            <path d={FAB_PATH} />
+          </clipPath>
+          {gradient && (
+            <linearGradient id={`${uid}-grad`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={gradient[0]} />
+              <stop offset="100%" stopColor={gradient[1]} />
+            </linearGradient>
+          )}
+        </defs>
+
+        {/* L1: Backdrop/Fill */}
+        <path d={FAB_PATH} fill={baseFill} />
+
+        {/* L2: Image clipped precisely to shape */}
+        {showImage && (
+          <g clipPath={`url(#${uid}-clip)`}>
+            <image
+              href={logoUrl}
+              x={isCustom ? offsetX : (15 + offsetX)}
+              y={isCustom ? offsetY : (15 + offsetY)}
+              width={isCustom ? 100 : 70}
+              height={isCustom ? 100 : 70}
+              preserveAspectRatio={isCustom ? 'xMidYMid slice' : 'xMidYMid meet'}
+              onError={() => setImgFailed(true)}
+            />
+          </g>
+        )}
+
+        {/* L3: Fallback Initial */}
+        {!showImage && (
+          <text
+            x={50 + offsetX}
+            y={52 + offsetY}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#ffffff"
+            style={{
+              fontSize: sizeClass.includes('w-10') ? '38px' : '28px',
+              fontFamily: 'var(--font-display, sans-serif)',
+              fontWeight: 700,
+            }}
+          >
+            {initial}
+          </text>
+        )}
+      </svg>
     </div>
   );
 }
@@ -647,15 +687,23 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const scrollToBottom = useCallback((smooth = true) => {
     if (userHasScrolledUpRef.current) return;
     const el = scrollContainerRef.current;
-    if (el && !smooth) { el.scrollTop = el.scrollHeight; }
-    else { messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' }); }
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
   }, []);
 
   const forceScrollToBottom = useCallback((smooth = true) => {
     userHasScrolledUpRef.current = false;
     const el = scrollContainerRef.current;
-    if (el && !smooth) { el.scrollTop = el.scrollHeight; }
-    else { messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' }); }
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
   }, []);
 
   const handleScrollContainer = useCallback(() => {
@@ -673,7 +721,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => { forceScrollToBottom(false); inputRef.current?.focus(); }, 10);
+      setTimeout(() => { forceScrollToBottom(false); inputRef.current?.focus({ preventScroll: true }); }, 10);
     }
   }, [isOpen, forceScrollToBottom]);
 
@@ -945,8 +993,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-3 pl-4">
                     <div className="relative">
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
-                      <BotAvatar shapeId={LOGO_SHAPE} logoUrl={LOGO_URL} botName={BOT_NAME} themeColor={THEME_COLOR} sizeClass="w-10 h-10" isCustom={!!configData.custom_logo_url} />
+                      <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white animate-pulse z-10" />
+                      <BotAvatar 
+                        shapeId="circle" 
+                        logoUrl={LOGO_URL} 
+                        botName={BOT_NAME} 
+                        themeColor={THEME_COLOR} 
+                        sizeClass="w-10 h-10 rounded-full" 
+                        isCustom={!!configData.custom_logo_url} 
+                      />
                     </div>
                     <p className="text-lg font-display font-bold" style={{ color: THEME_COLOR }}>{BOT_NAME}</p>
                   </div>
@@ -1043,7 +1098,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           ) : (
                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                               {msg.role === 'bot' ? <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span> : <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>}
-                              <div className={`px-4 py-2 min-h-[38px] w-fit max-w-full wrap-break-word overflow-wrap-anywhere ${msg.role === 'user' ? 'text-white rounded-2xl rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-pre:break-words prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`} style={msg.role === 'user' ? { backgroundColor: THEME_COLOR, overflowWrap: 'anywhere' } : {}}>
+                              <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'user' ? 'w-fit max-w-[85%] self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'text-white rounded-2xl rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`} style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}>
                                 {msg.role === 'user' ? (
                                   <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                 ) : (
@@ -1082,7 +1137,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div className="shrink-0 pt-2 flex justify-center items-center">
                   <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
-                    <img src={BrandLogo} alt="Sapybase" className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
+                    <Image src={BrandLogo} alt="Sapybase" width={20} height={20} className="opacity-50 group-hover:opacity-100 transition-opacity" />
                     Powered by Sapybase
                   </a>
                 </div>

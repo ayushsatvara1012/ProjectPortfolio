@@ -4,8 +4,8 @@
     "hash": "decd9ab66519c5869ca89739daf6c4c9"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/next.config.mjs": {
-    "mtime": 1777516718.8396926,
-    "hash": "d517cb1f14defc4d033a7d11695da5ac"
+    "mtime": 1777743875.2811375,
+    "hash": "6b702518b0c9c8d9ecc1fa11fc573db8"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/next-env.d.ts": {
     "mtime": 1777606678.250757,
@@ -163,9 +163,9 @@
     "mtime": 1777312289.398444,
     "hash": "217764128c68de9c7d195e2e75069983"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/middleware.ts": {
-    "mtime": 1777661683.3942256,
-    "hash": "50bb8a1842507eb2ec57385b82a6700b"
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/proxy.ts": {
+    "mtime": 1777745853.125001,
+    "hash": "a5bfbe19a0004be865a3773c9140e6ce"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/robots.ts": {
     "mtime": 1777593706.8586671,
@@ -184,8 +184,8 @@
     "hash": "2d697836e5f80bbe89e55aedb9495286"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/layout.tsx": {
-    "mtime": 1777667965.2336237,
-    "hash": "0bcb4c9ebadb8d61ec77657873849047"
+    "mtime": 1777691110.6976252,
+    "hash": "fbeb545040b783f069de703afef170e2"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/error.tsx": {
     "mtime": 1777594717.8831282,
@@ -196,124 +196,248 @@
     "hash": "ac42f05b98512a06a398a17ed0ed1642"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/providers.tsx": {
-    "mtime": 1777667441.5462866,
-    "hash": "1cde383a4931d1ca1b460af7d61fe24d"
+    "mtime": 1777689980.6729226,
+    "hash": "cbff54e9a6738a63641b16d05d69fe1c"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/layout.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/layout.tsx": {
+    "mtime": 1777689943.145813,
+    "hash": "63c0779192e8938603c9f30277cc247c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/layout.tsx": {
     "mtime": 1777667119.5933025,
     "hash": "e158c59b68bd0691a35c75a5a86c67ba"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/loading.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/loading.tsx": {
     "mtime": 1777662300.9992423,
     "hash": "eb3c6fcb715bed075ac8bc7a69ceaa6c"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/page.tsx": {
     "mtime": 1777099258.3435535,
     "hash": "bf0580b03aada038929531231b9e01ec"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/bots/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/bots/page.tsx": {
     "mtime": 1777667116.2960951,
     "hash": "21ebe5d8b1ca6fa82029081b8f34bcb6"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/insights/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/insights/page.tsx": {
     "mtime": 1777667114.5664973,
     "hash": "d3790bc73fd9bbcbb34a2dd127b6b038"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/chat/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/chat/page.tsx": {
     "mtime": 1777667112.7478905,
     "hash": "4cb161b117767d7a55d778b6d1e97f2a"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/register/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/register/page.tsx": {
     "mtime": 1777667111.1127958,
     "hash": "449cbde175eed8a6c0d0b1e825af8fc7"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/train/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/train/page.tsx": {
     "mtime": 1777667118.0149655,
     "hash": "7012e02f54c3805d48f28b2ba5c75804"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/demo/customize/page.tsx": {
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/demo/customize/page.tsx": {
     "mtime": 1777667333.2337966,
     "hash": "171d8c74ae5a29413a152b720768ddbf"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/layout.tsx": {
+    "mtime": 1777669798.4562376,
+    "hash": "b668ccf0a9f553a82b6518b834414b19"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/error.tsx": {
+    "mtime": 1777256742.094523,
+    "hash": "b10f62345c85d75b38ac7671bc0246bc"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/DashboardProviders.tsx": {
+    "mtime": 1777667424.0155606,
+    "hash": "70a3876d06adcfeed00ae15f457c78dd"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/page.tsx": {
+    "mtime": 1777099258.3182125,
+    "hash": "65adcea725ed12d9c4306e9917a0b2b0"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/bots/page.tsx": {
+    "mtime": 1777477248.4001305,
+    "hash": "4567d6c899274d92a64068aa202eb539"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/insights/page.tsx": {
+    "mtime": 1777484276.438051,
+    "hash": "aa8b82438f79f74545e4dae536c2b12c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/layout.tsx": {
+    "mtime": 1777099258.3304138,
+    "hash": "8cae90c8307ce0326badf6392d594bc7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/page.tsx": {
+    "mtime": 1777099258.331559,
+    "hash": "a63fbd526c6129ba4cd042f00c849963"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/admin/layout.tsx": {
+    "mtime": 1777661916.2119217,
+    "hash": "9c76db4c730d7fdc82c333eead09a934"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/admin/page.tsx": {
+    "mtime": 1777593333.8460135,
+    "hash": "c3fdaae99f14b21fc545dd1eaf98cc36"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/account/page.tsx": {
+    "mtime": 1777515554.8149884,
+    "hash": "6855dfee022dda5189359f5875e904a4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/billing/page.tsx": {
+    "mtime": 1777477353.1348877,
+    "hash": "90562415c191a9ecdf03617f24d8a75a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/settings/customize/page.tsx": {
+    "mtime": 1777477347.1987932,
+    "hash": "751207fd3d0283a2b334c4713145cc5a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/register/page.tsx": {
+    "mtime": 1777690423.6342664,
+    "hash": "37fe47d24be39aedd8d1ed3f33beb305"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/train/page.tsx": {
+    "mtime": 1777519203.0045326,
+    "hash": "3bef45dcae9aacd5a41b0d0371a25e2c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/dashboard/pricing/page.tsx": {
+    "mtime": 1777488008.5678906,
+    "hash": "654cd5694a75094e5048c3278585cdef"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/layout.tsx": {
+    "mtime": 1777690079.846113,
+    "hash": "26bb757942524d654ad041e901429747"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/loading.tsx": {
+    "mtime": 1777498041.511074,
+    "hash": "7d68e7d27be0c0a7658b2ea86a8b9af7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/page.tsx": {
+    "mtime": 1777594706.4296093,
+    "hash": "abc6e3b7a7d22fa51af8592f957cef10"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/contact/layout.tsx": {
+    "mtime": 1777576515.7602587,
+    "hash": "b4102f610caf6d57180cd79e913dc552"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/contact/ContactClient.tsx": {
+    "mtime": 1777661699.335931,
+    "hash": "20e7f69cdad27553b4ba46223f4db9e6"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/contact/loading.tsx": {
+    "mtime": 1777498045.1774476,
+    "hash": "652695c18dd64e8da3e1d3cc3f49b18d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/contact/page.tsx": {
+    "mtime": 1777594651.0315201,
+    "hash": "14c2d841fb8ed3cae00c017e702398b3"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/privacy/page.tsx": {
+    "mtime": 1777099258.2801185,
+    "hash": "eb67291e25943d10cff385821a159959"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/sso-callback/page.tsx": {
+    "mtime": 1777099258.2826774,
+    "hash": "a13c2bba62a01bb320456e516337c9db"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/privacy-policy/page.tsx": {
+    "mtime": 1777594672.5513506,
+    "hash": "2a7ed879c6752897aa11ee0d91e4c9d4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/terms/page.tsx": {
+    "mtime": 1777099258.2871776,
+    "hash": "14ce2382940b45ff01685a038deab2a5"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/admin/page.tsx": {
+    "mtime": 1777099258.2713299,
+    "hash": "6b6045f73742b6f2d465c0560ced1ab4"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/about/layout.tsx": {
+    "mtime": 1777576510.451725,
+    "hash": "c420c855d70555ef4c995d2c2d143fb2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/about/loading.tsx": {
+    "mtime": 1777498044.160809,
+    "hash": "a2dbd14d576f071c3420126cc71ddc94"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/about/AboutClient.tsx": {
+    "mtime": 1777689514.8004553,
+    "hash": "175a18116cd4fb3cc37bdf326a6fa59b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/about/page.tsx": {
+    "mtime": 1777594614.073917,
+    "hash": "276a55319c6ab779b14c2f2dbaf9af25"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/docs/loading.tsx": {
+    "mtime": 1777498048.1224802,
+    "hash": "8cd9ff3874fb4501e68a8589b096f991"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/docs/page.tsx": {
+    "mtime": 1777594669.79025,
+    "hash": "552e2718ee8e74f26a836da19eb3437b"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/terms-and-conditions/page.tsx": {
+    "mtime": 1777594674.8132763,
+    "hash": "e4f19bb1b8aee50a431074f54633f316"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/pricing/PricingClient.tsx": {
+    "mtime": 1777668273.6072721,
+    "hash": "9b186091a5de3f4b47ad333517c73ecf"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/pricing/layout.tsx": {
+    "mtime": 1777576522.353122,
+    "hash": "f91c752d2421b5048aaea6c91f62afa7"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/pricing/loading.tsx": {
+    "mtime": 1777498042.8492303,
+    "hash": "59c481e452d50ad2f8e276e0563c5d2a"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/pricing/page.tsx": {
+    "mtime": 1777594648.8521676,
+    "hash": "54c24ea209aa7dcfe0666e03f793e88c"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/services/layout.tsx": {
+    "mtime": 1777576528.6726983,
+    "hash": "3e89e5a275e93ea7e6e16d84891185b2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/services/loading.tsx": {
+    "mtime": 1777498046.7403255,
+    "hash": "c86ebe19653504d8cebf67d19f02ef71"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/services/page.tsx": {
+    "mtime": 1777594650.0053596,
+    "hash": "a7ece1362e918e2649bf735cfc31731d"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(site)/services/ServicesClient.tsx": {
+    "mtime": 1777594643.4758677,
+    "hash": "6dbcb62523df09f4b1db0175630a2502"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(auth)/layout.tsx": {
+    "mtime": 1777312291.6205707,
+    "hash": "e6d358112e73ef0025694f0f1ef2b580"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(auth)/sign-up/[[...sign-up]]/page.tsx": {
+    "mtime": 1777235514.8412,
+    "hash": "31ba79c5bd097a8e74b19087e60629c2"
+  },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(app)/(auth)/sign-in/[[...sign-in]]/page.tsx": {
+    "mtime": 1777235508.4922254,
+    "hash": "957cc5b8d2f80c6d3307e6a92578ed49"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/embed/[botId]/layout.tsx": {
     "mtime": 1777607773.7707891,
     "hash": "be8582cca4fa371a2c55371c51eaab0d"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/embed/[botId]/page.tsx": {
-    "mtime": 1777406384.6660354,
-    "hash": "bcf82f4e53e2c77481981803ce30ce59"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/layout.tsx": {
-    "mtime": 1777669798.4562376,
-    "hash": "b668ccf0a9f553a82b6518b834414b19"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/error.tsx": {
-    "mtime": 1777256742.094523,
-    "hash": "b10f62345c85d75b38ac7671bc0246bc"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/DashboardProviders.tsx": {
-    "mtime": 1777667424.0155606,
-    "hash": "70a3876d06adcfeed00ae15f457c78dd"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/page.tsx": {
-    "mtime": 1777099258.3182125,
-    "hash": "65adcea725ed12d9c4306e9917a0b2b0"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/bots/page.tsx": {
-    "mtime": 1777477248.4001305,
-    "hash": "4567d6c899274d92a64068aa202eb539"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/insights/page.tsx": {
-    "mtime": 1777484276.438051,
-    "hash": "aa8b82438f79f74545e4dae536c2b12c"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/layout.tsx": {
-    "mtime": 1777099258.3304138,
-    "hash": "8cae90c8307ce0326badf6392d594bc7"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/page.tsx": {
-    "mtime": 1777099258.331559,
-    "hash": "a63fbd526c6129ba4cd042f00c849963"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/admin/layout.tsx": {
-    "mtime": 1777661916.2119217,
-    "hash": "9c76db4c730d7fdc82c333eead09a934"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/admin/page.tsx": {
-    "mtime": 1777593333.8460135,
-    "hash": "c3fdaae99f14b21fc545dd1eaf98cc36"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/account/page.tsx": {
-    "mtime": 1777515554.8149884,
-    "hash": "6855dfee022dda5189359f5875e904a4"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/billing/page.tsx": {
-    "mtime": 1777477353.1348877,
-    "hash": "90562415c191a9ecdf03617f24d8a75a"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/settings/customize/page.tsx": {
-    "mtime": 1777477347.1987932,
-    "hash": "751207fd3d0283a2b334c4713145cc5a"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/register/page.tsx": {
-    "mtime": 1777662321.5783494,
-    "hash": "84dbfff8460a10cb2275a8fffcc8bb1e"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/train/page.tsx": {
-    "mtime": 1777519203.0045326,
-    "hash": "3bef45dcae9aacd5a41b0d0371a25e2c"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/dashboard/pricing/page.tsx": {
-    "mtime": 1777488008.5678906,
-    "hash": "654cd5694a75094e5048c3278585cdef"
+    "mtime": 1777690474.6922066,
+    "hash": "c816515a829f55cb34a29fed57395ac0"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/BotIntegrationDocs.tsx": {
-    "mtime": 1777576473.6415067,
-    "hash": "088fca6cd730006ef0c38abd74b21cb4"
+    "mtime": 1777690439.158201,
+    "hash": "e3f4e849564578de338d0629fe557ed6"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/BotPreview.tsx": {
-    "mtime": 1777576473.6435573,
-    "hash": "c8b709427682538397d3bb3b089004da"
+    "mtime": 1777691189.9825332,
+    "hash": "9c61ebf67ba04c2a4b901facc370c59e"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/Navbar.tsx": {
     "mtime": 1777152816.2495537,
@@ -323,9 +447,13 @@
     "mtime": 1777662873.1898456,
     "hash": "1652f95be30546cb7b331e39a1d8ba8a"
   },
+  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/EmbedBootstrapper.tsx": {
+    "mtime": 1777690006.3439577,
+    "hash": "89a9fbfb841970d5379fdaa890668f79"
+  },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/ChatWidget.tsx": {
-    "mtime": 1777658281.0732045,
-    "hash": "5e1d7c44f0168321dcfcbfc361de41b4"
+    "mtime": 1777744837.636001,
+    "hash": "7d233449e4a850fb1a2aa7af822deefa"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/components/UserSeed.tsx": {
     "mtime": 1777235438.1970162,
@@ -391,129 +519,9 @@
     "mtime": 1777492728.1223192,
     "hash": "500699d313322812b2ac56490e95aa64"
   },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/layout.tsx": {
-    "mtime": 1777668042.3934202,
-    "hash": "b85075f568773e431f011f82cea14efc"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/loading.tsx": {
-    "mtime": 1777498041.511074,
-    "hash": "7d68e7d27be0c0a7658b2ea86a8b9af7"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/page.tsx": {
-    "mtime": 1777594706.4296093,
-    "hash": "abc6e3b7a7d22fa51af8592f957cef10"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/layout.tsx": {
-    "mtime": 1777576515.7602587,
-    "hash": "b4102f610caf6d57180cd79e913dc552"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/ContactClient.tsx": {
-    "mtime": 1777661699.335931,
-    "hash": "20e7f69cdad27553b4ba46223f4db9e6"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/loading.tsx": {
-    "mtime": 1777498045.1774476,
-    "hash": "652695c18dd64e8da3e1d3cc3f49b18d"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/contact/page.tsx": {
-    "mtime": 1777594651.0315201,
-    "hash": "14c2d841fb8ed3cae00c017e702398b3"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/privacy/page.tsx": {
-    "mtime": 1777099258.2801185,
-    "hash": "eb67291e25943d10cff385821a159959"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/sso-callback/page.tsx": {
-    "mtime": 1777099258.2826774,
-    "hash": "a13c2bba62a01bb320456e516337c9db"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/privacy-policy/page.tsx": {
-    "mtime": 1777594672.5513506,
-    "hash": "2a7ed879c6752897aa11ee0d91e4c9d4"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/terms/page.tsx": {
-    "mtime": 1777099258.2871776,
-    "hash": "14ce2382940b45ff01685a038deab2a5"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/admin/page.tsx": {
-    "mtime": 1777099258.2713299,
-    "hash": "6b6045f73742b6f2d465c0560ced1ab4"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/layout.tsx": {
-    "mtime": 1777576510.451725,
-    "hash": "c420c855d70555ef4c995d2c2d143fb2"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/loading.tsx": {
-    "mtime": 1777498044.160809,
-    "hash": "a2dbd14d576f071c3420126cc71ddc94"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/AboutClient.tsx": {
-    "mtime": 1777668849.5341227,
-    "hash": "d3e7a4afcfafdad2ed068c18d506fa13"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/about/page.tsx": {
-    "mtime": 1777594614.073917,
-    "hash": "276a55319c6ab779b14c2f2dbaf9af25"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/docs/loading.tsx": {
-    "mtime": 1777498048.1224802,
-    "hash": "8cd9ff3874fb4501e68a8589b096f991"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/docs/page.tsx": {
-    "mtime": 1777594669.79025,
-    "hash": "552e2718ee8e74f26a836da19eb3437b"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/terms-and-conditions/page.tsx": {
-    "mtime": 1777594674.8132763,
-    "hash": "e4f19bb1b8aee50a431074f54633f316"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/PricingClient.tsx": {
-    "mtime": 1777668273.6072721,
-    "hash": "9b186091a5de3f4b47ad333517c73ecf"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/layout.tsx": {
-    "mtime": 1777576522.353122,
-    "hash": "f91c752d2421b5048aaea6c91f62afa7"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/loading.tsx": {
-    "mtime": 1777498042.8492303,
-    "hash": "59c481e452d50ad2f8e276e0563c5d2a"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/pricing/page.tsx": {
-    "mtime": 1777594648.8521676,
-    "hash": "54c24ea209aa7dcfe0666e03f793e88c"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/layout.tsx": {
-    "mtime": 1777576528.6726983,
-    "hash": "3e89e5a275e93ea7e6e16d84891185b2"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/loading.tsx": {
-    "mtime": 1777498046.7403255,
-    "hash": "c86ebe19653504d8cebf67d19f02ef71"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/page.tsx": {
-    "mtime": 1777594650.0053596,
-    "hash": "a7ece1362e918e2649bf735cfc31731d"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(site)/services/ServicesClient.tsx": {
-    "mtime": 1777594643.4758677,
-    "hash": "6dbcb62523df09f4b1db0175630a2502"
-  },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/api/demo/chat/route.ts": {
     "mtime": 1777667527.1054373,
     "hash": "26f8ca0d9b267f2aae23c41ba0bbe059"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/layout.tsx": {
-    "mtime": 1777312291.6205707,
-    "hash": "e6d358112e73ef0025694f0f1ef2b580"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/sign-up/[[...sign-up]]/page.tsx": {
-    "mtime": 1777235514.8412,
-    "hash": "31ba79c5bd097a8e74b19087e60629c2"
-  },
-  "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/app/(auth)/sign-in/[[...sign-in]]/page.tsx": {
-    "mtime": 1777235508.4922254,
-    "hash": "957cc5b8d2f80c6d3307e6a92578ed49"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/HowItWorks.tsx": {
     "mtime": 1777312293.4492412,
@@ -528,16 +536,16 @@
     "hash": "ca19276654d09e69d79e41e5b5c9b360"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/ProjectSection.tsx": {
-    "mtime": 1777312293.429084,
-    "hash": "be2f5fdb9e4941de50a6f85384f6dfe3"
+    "mtime": 1777691181.490996,
+    "hash": "3f97fd9f598d1bbf4154b988291578e6"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/Metrics.tsx": {
     "mtime": 1777312293.4290452,
     "hash": "6bc0990aed6b49c97e90e4b52363638a"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/HeroSection.tsx": {
-    "mtime": 1777662070.892231,
-    "hash": "f6f49f14c9862275852ed9c306a72780"
+    "mtime": 1777689530.9030323,
+    "hash": "e068d243444f65ceafd9b3e381cbcb59"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/src/components/marketing/Button.tsx": {
     "mtime": 1777154697.9633038,
@@ -612,12 +620,12 @@
     "hash": "fab6a7df7ee317ba5428258e41a57aa4"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/README.md": {
-    "mtime": 1770227524.4633641,
-    "hash": "3f01850e9fce601d04d6dba39204c1d8"
+    "mtime": 1777691198.1405826,
+    "hash": "50b87e99a5aa7a2ef6b9e247f5f8ba14"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/docs/runbooks/plan.md": {
-    "mtime": 1777661179.203385,
-    "hash": "88ec5943ac0f703504ac7c830f31a71f"
+    "mtime": 1777689205.7608268,
+    "hash": "c52a96424910604c03d22f6a11d0ecfc"
   },
   "/Users/ayushsatvara/CodeWorld/Project Portfolio/public/robots.txt": {
     "mtime": 1777576473.662291,
