@@ -1,15 +1,15 @@
 """SSE concurrency load test for /api/chat.
 
-Usage (from Sapybase_ai_engine/ with venv activated):
+Usage (from sapybase_ai_engine/ with venv activated):
 
-    # Against local dev server:
+    # Against local dev server (default 8 workers):
     ./venv/bin/python scripts/sse_load_test.py --base-url http://localhost:8000
 
-    # Against Render:
-    ./venv/bin/python scripts/sse_load_test.py --base-url https://<your-render-url>
+    # Against Render at 5x expected scale (100 workers):
+    ./venv/bin/python scripts/sse_load_test.py --base-url https://<your-render-url> --concurrency 100
 
-    # Adjust concurrency (default 8):
-    ./venv/bin/python scripts/sse_load_test.py --base-url ... --concurrency 20
+    # With explicit TTFT threshold (default 2.0s):
+    ./venv/bin/python scripts/sse_load_test.py --base-url ... --concurrency 100 --ttft-threshold 2.0
 
 Required env vars (loaded from .env / .env.local):
     SSE_TEST_API_KEY   — a valid company API key
@@ -84,6 +84,7 @@ async def run_one_stream(
     }
 
     t_start = time.monotonic()
+    t_first_token: float | None = None
     tokens_received = 0
     pings_received = 0
     done_received = False
@@ -112,6 +113,8 @@ async def run_one_stream(
                         try:
                             data = json.loads(payload_str)
                             if "token" in data:
+                                if t_first_token is None:
+                                    t_first_token = time.monotonic() - t_start
                                 tokens_received += 1
                             elif "error" in data:
                                 error_detail = f"stream error event: {data['error']}"
@@ -135,6 +138,7 @@ async def run_one_stream(
         "worker_id": worker_id,
         "result": result_code,
         "elapsed_s": round(elapsed, 2),
+        "ttft_s": round(t_first_token, 3) if t_first_token is not None else None,
         "tokens": tokens_received,
         "pings": pings_received,
         "error": error_detail,
@@ -142,13 +146,28 @@ async def run_one_stream(
 
 
 # ---------------------------------------------------------------------------
+# Percentile helper
+# ---------------------------------------------------------------------------
+def percentile(values: list[float], p: float) -> float:
+    if not values:
+        return 0.0
+    sorted_v = sorted(values)
+    idx = (p / 100) * (len(sorted_v) - 1)
+    lo, frac = int(idx), idx % 1
+    if frac == 0 or lo + 1 >= len(sorted_v):
+        return sorted_v[lo]
+    return sorted_v[lo] + frac * (sorted_v[lo + 1] - sorted_v[lo])
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-async def main(base_url: str, concurrency: int, api_key: str) -> None:
+async def main(base_url: str, concurrency: int, api_key: str, ttft_threshold: float) -> None:
     print(f"\nSapybase SSE Load Test")
-    print(f"  Base URL    : {base_url}")
-    print(f"  Concurrency : {concurrency} simultaneous streams")
-    print(f"  Message     : \"{TEST_MESSAGE}\"\n")
+    print(f"  Base URL      : {base_url}")
+    print(f"  Concurrency   : {concurrency} simultaneous streams")
+    print(f"  TTFT threshold: {ttft_threshold}s")
+    print(f"  Message       : \"{TEST_MESSAGE}\"\n")
 
     results: list = []
     t_wall_start = time.monotonic()
@@ -181,36 +200,70 @@ async def main(base_url: str, concurrency: int, api_key: str) -> None:
     print(f"  Timed out   : {len(timeouts)}/{concurrency}")
     print(f"  Errors      : {len(errors)}/{concurrency}")
 
+    ttft_breach_count = 0
+
     if ok:
-        times = [r["elapsed_s"] for r in ok]
-        print(f"\n  Latency (successful streams):")
-        print(f"    min  {min(times):.1f}s")
-        print(f"    avg  {sum(times)/len(times):.1f}s")
-        print(f"    max  {max(times):.1f}s")
+        elapsed_times = [r["elapsed_s"] for r in ok]
+        ttft_values = [r["ttft_s"] for r in ok if r["ttft_s"] is not None]
+
+        print(f"\n  Total latency (successful streams):")
+        print(f"    min    {min(elapsed_times):.2f}s")
+        print(f"    avg    {sum(elapsed_times)/len(elapsed_times):.2f}s")
+        print(f"    p95    {percentile(elapsed_times, 95):.2f}s")
+        print(f"    p99    {percentile(elapsed_times, 99):.2f}s")
+        print(f"    max    {max(elapsed_times):.2f}s")
+
+        if ttft_values:
+            ttft_breach_count = sum(1 for t in ttft_values if t > ttft_threshold)
+            print(f"\n  Time-to-First-Token (TTFT) — threshold {ttft_threshold}s:")
+            print(f"    min    {min(ttft_values):.3f}s")
+            print(f"    avg    {sum(ttft_values)/len(ttft_values):.3f}s")
+            print(f"    p95    {percentile(ttft_values, 95):.3f}s")
+            print(f"    p99    {percentile(ttft_values, 99):.3f}s")
+            print(f"    max    {max(ttft_values):.3f}s")
+            print(f"    breached threshold: {ttft_breach_count}/{len(ttft_values)} streams")
+        else:
+            print(f"\n  TTFT: no first-token events captured (check 'token' key in SSE payload)")
+
         avg_tokens = sum(r["tokens"] for r in ok) / len(ok)
         avg_pings  = sum(r["pings"]  for r in ok) / len(ok)
-        print(f"    avg tokens/stream : {avg_tokens:.0f}")
-        print(f"    avg pings/stream  : {avg_pings:.1f}")
+        print(f"\n  avg tokens/stream : {avg_tokens:.0f}")
+        print(f"  avg pings/stream  : {avg_pings:.1f}")
 
     if limited:
         print(f"\n  Rate-limited details:")
         for r in limited:
-            print(f"    worker {r['worker_id']:2d} — {r['error']}")
+            print(f"    worker {r['worker_id']:3d} — {r['error']}")
 
     if errors:
         print(f"\n  Error details:")
         for r in errors:
-            print(f"    worker {r['worker_id']:2d} — {r['error']}")
+            print(f"    worker {r['worker_id']:3d} — {r['error']}")
 
     if timeouts:
         print(f"\n  Timeout details:")
         for r in timeouts:
-            print(f"    worker {r['worker_id']:2d} — {r['error']}")
+            print(f"    worker {r['worker_id']:3d} — {r['error']}")
 
-    # Exit non-zero if more than half failed (ignoring rate limits — those are expected)
+    # ---------------------------------------------------------------------------
+    # Pass/fail determination
+    # Hard failures = errors + timeouts exceeding half the concurrency
+    # TTFT failures = p95 TTFT exceeding threshold
+    # ---------------------------------------------------------------------------
     hard_failures = len(errors) + len(timeouts)
+    ttft_ok = True
+
+    if ok:
+        ttft_values = [r["ttft_s"] for r in ok if r["ttft_s"] is not None]
+        if ttft_values and percentile(ttft_values, 95) > ttft_threshold:
+            ttft_ok = False
+            p95_ttft = percentile(ttft_values, 95)
+            print(f"\nFAIL: p95 TTFT {p95_ttft:.3f}s exceeds threshold {ttft_threshold}s.")
+
     if hard_failures > concurrency // 2:
-        print(f"\nFAIL: {hard_failures} hard failures exceed threshold.")
+        print(f"\nFAIL: {hard_failures} hard failures exceed threshold ({concurrency // 2}).")
+        sys.exit(1)
+    elif not ttft_ok:
         sys.exit(1)
     else:
         print(f"\nPASS: load test complete.")
@@ -220,6 +273,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SSE concurrency load test")
     parser.add_argument("--base-url", default="http://localhost:8000", help="Backend base URL")
     parser.add_argument("--concurrency", type=int, default=8, help="Number of parallel streams")
+    parser.add_argument(
+        "--ttft-threshold",
+        type=float,
+        default=2.0,
+        help="Max acceptable p95 Time-to-First-Token in seconds (default: 2.0)",
+    )
     args = parser.parse_args()
 
     api_key = os.getenv("SSE_TEST_API_KEY")
@@ -232,4 +291,4 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    asyncio.run(main(args.base_url, args.concurrency, api_key))
+    asyncio.run(main(args.base_url, args.concurrency, api_key, args.ttft_threshold))

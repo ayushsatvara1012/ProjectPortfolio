@@ -1314,7 +1314,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                 return company
             
             # 3.5. Unauthorized
-            print(f"DEBUG: verify_api_key_and_origin - CORS REJECTED for Origin: {actual_client_origin}. Expected: {allowed}")
+            logger.warning("CORS REJECTED for Origin: %s. Expected origin redacted.", actual_client_origin)
             raise HTTPException(
                 status_code=403, 
                 detail=f"CORS Error: Origin {client_origin} is not allowed for this API Key."
@@ -5859,6 +5859,53 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
             release_db_connection(conn)
 
         return {"status": "success", "message": "Subscription will cancel at the end of the billing period."}
+
+
+@app.delete("/api/user/gdpr-delete")
+async def gdpr_delete_user(current_user: dict = Depends(get_current_user)):
+    """GDPR Right to Erasure — permanently deletes all data for the authenticated user.
+
+    Purges (in order): bots + knowledge chunks, leads, usage_tracking, and the
+    user row itself. The caller must re-authenticate after this call; the Clerk
+    account is NOT deleted here (user must do that from the Clerk portal, which
+    will fire the user.deleted webhook as a belt-and-suspenders cleanup).
+    """
+    user_id = current_user["id"]
+    clerk_id = current_user["clerk_id"]
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # 1. Collect company IDs owned by this user so we can cascade-delete.
+        cursor.execute("SELECT id FROM companies WHERE owner_id = %s", (user_id,))
+        company_ids = [row[0] for row in cursor.fetchall()]
+
+        for cid in company_ids:
+            cursor.execute("DELETE FROM chunks WHERE company_id = %s", (cid,))
+            cursor.execute("DELETE FROM knowledge_sources WHERE company_id = %s", (cid,))
+            cursor.execute("DELETE FROM leads WHERE company_id = %s", (cid,))
+            cursor.execute("DELETE FROM companies WHERE id = %s", (cid,))
+
+        # 2. Delete usage tracking.
+        cursor.execute("DELETE FROM usage_tracking WHERE user_id = %s", (user_id,))
+
+        # 3. Delete the user row.
+        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+
+        conn.commit()
+        cursor.close()
+
+        log_admin_action(clerk_id, "GDPR_DELETE", None, {"company_ids_purged": company_ids})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error("GDPR delete failed for user %s: %s", user_id, e)
+        raise HTTPException(status_code=500, detail="Data deletion failed. Contact privacy@sapybase.com.")
+    finally:
+        release_db_connection(conn)
+
+    return {"status": "deleted", "message": "All personal data has been permanently removed."}
 
 # ── EVALUATION PIPELINE ───────────────────────────────────────────────────────
 

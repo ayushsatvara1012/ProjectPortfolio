@@ -57,6 +57,43 @@ export const customPlanConfigSchema = z.object({
 });
 export type CustomPlanConfig = z.infer<typeof customPlanConfigSchema>;
 
+// File upload validation — 20 MB cap, allowlist of safe MIME types.
+const ALLOWED_UPLOAD_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/markdown',
+] as const;
+
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+export const uploadFileSchema = z
+  .instanceof(File)
+  .refine(f => f.size > 0, 'File is empty.')
+  .refine(f => f.size <= MAX_FILE_SIZE_BYTES, 'File exceeds the 20 MB limit.')
+  .refine(
+    f => (ALLOWED_UPLOAD_TYPES as readonly string[]).includes(f.type),
+    `Unsupported file type. Allowed: PDF, TXT, CSV, Excel, Markdown.`
+  );
+
+// LLM output sanitization — strips prompt-injection echoes before rendering.
+// Applied client-side as defense-in-depth; backend already sanitizes.
+const INJECTION_ECHO_PATTERNS = [
+  /ignore\s+(all\s+)?previous\s+instructions?/gi,
+  /system\s+prompt\s*:/gi,
+  /you\s+are\s+now\s+(a\s+)?(?:DAN|jailbreak|unrestricted)/gi,
+];
+
+export function sanitizeLlmOutput(text: string): string {
+  let result = text;
+  for (const pattern of INJECTION_ECHO_PATTERNS) {
+    result = result.replace(pattern, '[FILTERED]');
+  }
+  return result;
+}
+
 // Helper: returns the first issue message from a Zod parse failure.
 type ParseResult = { success: true; data: unknown } | { success: false; error: { issues: { message: string }[] } };
 export function firstIssue(result: ParseResult): string | null {

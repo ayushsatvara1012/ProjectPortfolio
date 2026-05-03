@@ -1,4 +1,8 @@
 {
+  "model": "sonnet", 
+  "env": {
+    "CLAUDE_CODE_CACHE_ENABLED": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(command -v curl)",
@@ -23,7 +27,8 @@
       "Bash(node -c public/sapybase-loader.js)",
       "Bash(curl -v -X GET http://localhost:8000/api/config -H 'x-api-key: sb_EqAYDTVfGVzqegCE9sbVMOC0niRuEcDptvDJ_n_ISPQ' -H 'Origin: http://localhost:3000')",
       "Bash(pkill -f \"uvicorn main:app\")",
-      "Bash(curl -s -X GET http://localhost:8000/api/config -H 'x-api-key: sb_EqAYDTVfGVzqegCE9sbVMOC0niRuEcDptvDJ_n_ISPQ' -H 'Origin: http://localhost:3000')"
+      "Bash(curl -s -X GET http://localhost:8000/api/config -H 'x-api-key: sb_EqAYDTVfGVzqegCE9sbVMOC0niRuEcDptvDJ_n_ISPQ' -H 'Origin: http://localhost:3000')",
+      "read(graphify-out/**)"
     ],
     "additionalDirectories": [
       "/Users/ayushsatvara/CodeWorld/Project Portfolio/src"

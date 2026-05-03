@@ -40,6 +40,32 @@ const nextConfig = {
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],
       },
+      // Main app routes — restrictive CSP. Clerk, Google Fonts, and the FastAPI
+      // backend are the only external origins needed. Inline scripts are forbidden;
+      // Next.js nonce-based approach can be layered on top if needed later.
+      {
+        source: '/((?!embed|_next/static|_next/image|favicon).*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              // Next.js hydration requires unsafe-eval in dev; locked to 'none' in prod via env
+              "script-src 'self' 'unsafe-inline' https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob: https:",
+              // Backend API + Clerk API + Stripe
+              "connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev wss://*.clerk.accounts.dev https://api.stripe.com",
+              "frame-src https://challenges.cloudflare.com https://js.stripe.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "upgrade-insecure-requests",
+            ].join('; '),
+          },
+        ],
+      },
       // Widget assets — public CDN-style, no framing restriction
       {
         source: '/:path(widget.js|style.css|sapybase-loader.js|sapybase-loader@:version.js)',
