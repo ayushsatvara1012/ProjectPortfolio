@@ -51,14 +51,15 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Turbopack / React dev tools require unsafe-eval in development for call-stack reconstruction
-              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com`,
+              // Turbopack / React dev tools require unsafe-eval in development. 
+              // Some third-party SDKs (Clerk/Stripe) may also require it in production.
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://clerk.sapybase.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com https://challenges.cloudflare.com https://js.stripe.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
               // Backend API + Clerk API + Stripe
-              `connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev wss://*.clerk.accounts.dev https://api.stripe.com${isDev ? " http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 wss://localhost:3000" : ""}`,
-              "frame-src https://challenges.cloudflare.com https://js.stripe.com",
+              `connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com wss://*.clerk.accounts.dev https://api.stripe.com${isDev ? " http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 wss://localhost:3000" : ""}`,
+              "frame-src 'self' https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
