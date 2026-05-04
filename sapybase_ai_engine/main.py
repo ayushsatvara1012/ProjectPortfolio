@@ -5002,7 +5002,7 @@ def update_user_limits(
     _fresh: dict = Depends(require_fresh_admin),
 ):
     """Alias endpoint used by the Admin Dashboard plan builder UI."""
-    return update_user_admin(clerk_id, req, admin, _fresh)
+    return update_user_admin(request, clerk_id, req, admin, _fresh)
 
 
 class TrialExtensionRequest(BaseModel):
