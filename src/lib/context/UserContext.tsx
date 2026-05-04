@@ -84,7 +84,7 @@ export const UserProvider = ({
     staleTime: 1000 * 60 * 5,
     queryFn: async () => {
       const token = await getToken();
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
       const res = await fetch(`${baseUrl}/api/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -129,7 +129,7 @@ export const UserProvider = ({
     (async () => {
       try {
         const token = await getToken();
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
         const res = await fetch(`${baseUrl}/api/user/sync-subscription`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },

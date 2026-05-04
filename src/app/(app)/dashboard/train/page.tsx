@@ -304,7 +304,7 @@ export default function TrainPage() {
 
     const fileRef = useRef<HTMLInputElement>(null);
     const csvFileRef = useRef<HTMLInputElement>(null);
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
 
     const { data: botsData } = useQuery({
         queryKey: ['bots'],

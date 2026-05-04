@@ -121,7 +121,7 @@ const BillingTab = () => {
     setTimeout(() => setAlert(prev => ({ ...prev, open: false })), 8000);
   }, []);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+  const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
 
   const handleUpgrade = (targetTier: string) => async () => {
     setProcessing(targetTier.toLowerCase());

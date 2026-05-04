@@ -41,7 +41,7 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }: LeadsPanel
     const handleExport = async () => {
         try {
             const token = await getToken();
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+            const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
             const res = await fetch(`${baseUrl}/api/leads/${selectedBotId}/export`, {
                 headers: { Authorization: `Bearer ${token}` }
             });

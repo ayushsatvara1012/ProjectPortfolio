@@ -9,7 +9,7 @@ export { UpgradeError } from '@/src/lib/errors';
 
 export const useAuthenticatedFetch = () => {
   const { getToken, isLoaded, isSignedIn } = useAuth();
-  const baseUrl = (process.env.NEXT_PUBLIC_API_URL?.trim()) || (typeof window !== 'undefined' ? window.location.origin : '');
+  const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
 
   return useCallback(async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
     // Don't fire until Clerk has hydrated — React Query will retry once state changes
