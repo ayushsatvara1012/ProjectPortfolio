@@ -36,25 +36,26 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return;
     const originalFetch = window.fetch.bind(window);
     const patched: typeof window.fetch = async (...args) => {
-      const response = await originalFetch(...args);
+      let response: Response;
       try {
-        if (response.status === 402) {
-          const cloned = response.clone();
-          cloned
-            .json()
-            .then((data) => {
-              if (data?.detail?.code) {
-                window.dispatchEvent(
-                  new CustomEvent('Sapybase:upgrade-required', {
-                    detail: data.detail,
-                  })
-                );
-              }
-            })
-            .catch(() => { });
-        }
-      } catch {
-        // Network errors (e.g. backend unreachable) — let caller handle
+        response = await originalFetch(...args);
+      } catch (err) {
+        // Network error (e.g. backend unreachable) — let caller handle
+        throw err;
+      }
+      if (response.status === 402) {
+        response.clone()
+          .json()
+          .then((data) => {
+            if (data?.detail?.code) {
+              window.dispatchEvent(
+                new CustomEvent('Sapybase:upgrade-required', {
+                  detail: data.detail,
+                })
+              );
+            }
+          })
+          .catch(() => { });
       }
       return response;
     };

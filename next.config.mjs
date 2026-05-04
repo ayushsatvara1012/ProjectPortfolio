@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV === 'development';
+
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -10,7 +12,6 @@ const nextConfig = {
   },
   // The migration is complete, Next.js will now use default extensions.
   async rewrites() {
-    const isDev = process.env.NODE_ENV === 'development';
     const apiUrl = isDev ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
     
     return [
@@ -50,8 +51,8 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Next.js hydration requires unsafe-eval in dev; locked to 'none' in prod via env
-              "script-src 'self' 'unsafe-inline' https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com",
+              // Turbopack / React dev tools require unsafe-eval in development for call-stack reconstruction
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
