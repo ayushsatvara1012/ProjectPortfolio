@@ -551,7 +551,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           setConfigData({
             theme_color: data.theme_color || DEFAULT_CONFIG.theme_color,
             bot_name: data.bot_name || DEFAULT_CONFIG.bot_name,
-            logo_url: data.logo_url || DEFAULT_CONFIG.logo_url,
+            logo_url: (() => {
+              const raw = data.logo_url || DEFAULT_CONFIG.logo_url;
+              return raw.startsWith('/') ? `https://www.sapybase.com${raw}` : raw;
+            })(),
             initial_message: data.initial_message || DEFAULT_CONFIG.initial_message,
             quick_questions: data.quick_questions || [],
             logo_shape: data.logo_shape || 'circle',
