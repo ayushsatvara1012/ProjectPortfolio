@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { resolveEntitlements, type Entitlements } from '@/src/lib/auth/entitlements';
 
 type UserData = {
   role: string | null;
@@ -22,6 +23,7 @@ type UserContextValue = UserData & {
   userRole: string | null;
   userTier: string | null;
   isLoading: boolean;
+  entitlements: Entitlements;
   refreshUser: () => Promise<void>;
   hydrateFromServer: (seed: { role?: string | null; tier?: string | null }) => void;
 };
@@ -148,16 +150,22 @@ export const UserProvider = ({
 
   const isLoading = !isAuthLoaded || (isSignedIn && queryLoading && !seed);
 
+  const entitlements = useMemo(
+    () => resolveEntitlements(userData.role, userData.tier, userData.customPlanFeatures),
+    [userData.role, userData.tier, userData.customPlanFeatures]
+  );
+
   const value = useMemo<UserContextValue>(
     () => ({
       ...userData,
       userRole: userData.role,
       userTier: userData.tier,
       isLoading,
+      entitlements,
       refreshUser,
       hydrateFromServer,
     }),
-    [userData, isLoading, refreshUser, hydrateFromServer]
+    [userData, isLoading, entitlements, refreshUser, hydrateFromServer]
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, Component } from 'react';
+import React, { useState, useEffect, useRef, Suspense, Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import Link from 'next/link';
 
@@ -162,7 +162,7 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
         {/* Settings group */}
         <div>
           <button
-            onClick={() => expanded && setSettingsOpen(p => !p)}
+            onClick={(e) => { e.stopPropagation(); expanded && setSettingsOpen(p => !p); }}
             title={!expanded ? 'Settings' : undefined}
             className={`flex items-center gap-3 px-4 py-2.5 text-md font-display transition-all min-h-[44px] border-l-2 w-full overflow-hidden ${onSettings
                 ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-bold'
@@ -195,7 +195,7 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                     <Link
                       key={item.path}
                       href={item.path}
-                      onClick={onClose ?? undefined}
+                      onClick={(e) => { e.stopPropagation(); onClose?.(); }}
                       className={`flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${isActive
                           ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-semibold'
                           : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
@@ -210,7 +210,7 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                 {userRole === 'SUPER_ADMIN' && (
                   <Link
                     href="/dashboard/settings/admin"
-                    onClick={onClose ?? undefined}
+                    onClick={(e) => { e.stopPropagation(); onClose?.(); }}
                     className={`flex items-center gap-2 pl-10 pr-4 py-2 text-sm font-display transition-colors min-h-[36px] border-l-2 w-full ${pathname === '/dashboard/settings/admin'
                         ? 'border-slate-900 dark:border-slate-100 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-semibold'
                         : 'border-transparent text-slate-400 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-300'
@@ -304,12 +304,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const pathname = usePathname();
+  const desktopAsideRef = useRef<HTMLElement>(null);
 
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
+
+  // Click-outside to collapse desktop sidebar on touch devices (replaces bubbling-tap behavior).
+  useEffect(() => {
+    const handleOutsideTap = (e: MouseEvent) => {
+      if (!window.matchMedia('(hover: none)').matches) return;
+      if (!sidebarExpanded) return;
+      if (desktopAsideRef.current && !desktopAsideRef.current.contains(e.target as Node)) {
+        setSidebarExpanded(false);
+      }
+    };
+    document.addEventListener('click', handleOutsideTap);
+    return () => document.removeEventListener('click', handleOutsideTap);
+  }, [sidebarExpanded]);
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-slate-950 antialiased transition-colors duration-500">
@@ -340,11 +354,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </AnimatePresence>
-      {/* Desktop sidebar (hover-expand; touch-tap to toggle on iPad) */}
+      {/* Desktop sidebar (hover-expand; touch-tap collapsed rail to expand on iPad) */}
       <aside
+        ref={desktopAsideRef}
         onMouseEnter={() => setSidebarExpanded(true)}
-        onMouseLeave={() => setSidebarExpanded(false)}
-        onClick={() => { if (window.matchMedia('(hover: none)').matches) setSidebarExpanded(p => !p); }}
+        onMouseLeave={() => { if (!window.matchMedia('(hover: none)').matches) setSidebarExpanded(false); }}
+        onClick={(e) => {
+          // Only toggle when tapping the aside chrome itself on touch devices.
+          // Inner interactive elements stop propagation so they don't collapse the sidebar.
+          if (e.target === e.currentTarget && window.matchMedia('(hover: none)').matches)
+            setSidebarExpanded(p => !p);
+        }}
         className={`hidden lg:flex lg:flex-col fixed top-12 left-0 bottom-0 border-r border-gray-100 dark:border-slate-800 z-30 bg-[#fafafa] dark:bg-slate-900 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
       >
         <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />

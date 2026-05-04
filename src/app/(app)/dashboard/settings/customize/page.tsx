@@ -17,7 +17,7 @@ const headingCls = "text-base sm:text-lg md:text-xl font-medium font-google mb-4
 
 export default function CustomizePage() {
   const { botSettings, updateSetting, saveSettings, fetchSettings, isSaving, isLoading } = useBotSettings();
-  const { userTier, userRole } = useUserRole();
+  const { userTier, userRole, entitlements, isLoading: userLoading } = useUserRole();
   const authFetch = useAuthenticatedFetch();
   const isAuthReady = useIsAuthReady();
   const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'warning', msg: '' });
@@ -62,19 +62,16 @@ export default function CustomizePage() {
     setIsDark(isSystemDark || isGlobalDark);
   }, []);
 
-  // Tier guards
+  // Entitlement-based guards (resolved from SUPER_ADMIN → customPlanFeatures → tier defaults)
   const isTotallyLocked = !userTier || userTier === 'null';
-  const isFree = userTier === 'FREE';
-  const isBasic = userTier === 'BASIC';
-  const isAdvancedLocked = (isFree || isBasic) && userRole !== 'SUPER_ADMIN';
-  const showFullOverlay = (isTotallyLocked || isFree) && userRole !== 'SUPER_ADMIN';
-
-  // White-label = STARTER, PRO, BUSINESS, ENTERPRISE, CUSTOM, or SUPER_ADMIN
-  const isWhiteLabelUser = !isFree && !isBasic && !!userTier && userTier !== 'null';
-  const canHideBranding = isWhiteLabelUser || userRole === 'SUPER_ADMIN';
-
-  // Pro user = PRO, BUSINESS, ENTERPRISE, or SUPER_ADMIN
-  const isProUser = ['PRO', 'BUSINESS', 'ENTERPRISE'].includes(userTier || '') || userRole === 'SUPER_ADMIN';
+  const isFree = (userTier ?? '').toUpperCase() === 'FREE';
+  // Show full overlay only for FREE/unset tiers that also have no custom plan entitlements.
+  // A BASIC user with a custom plan granting any feature should see content, not the overlay.
+  const hasAnyEntitlement = Object.values(entitlements).some(Boolean);
+  const showFullOverlay = (isTotallyLocked || isFree) && !hasAnyEntitlement && userRole !== 'SUPER_ADMIN';
+  const isAdvancedLocked = !entitlements.canUseAdvancedBot;
+  const canHideBranding = entitlements.canWhiteLabel;
+  const isProUser = entitlements.canUseCustomLogo;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100dvh-3rem)]">
@@ -140,7 +137,7 @@ export default function CustomizePage() {
             </div>
           )}
 
-          <div className={`space-y-8 ${showFullOverlay || isLoading ? 'opacity-30 pointer-events-none' : ''}`}>
+          <div className={`space-y-8 ${showFullOverlay || isLoading || userLoading ? 'opacity-30 pointer-events-none' : ''}`}>
             {/* ── Section: Bot Appearance ── */}
             <div className="space-y-6">
               <p className={headingCls + ' flex items-center'}>
