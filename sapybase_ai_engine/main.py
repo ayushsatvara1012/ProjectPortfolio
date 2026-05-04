@@ -1222,7 +1222,16 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             )
             _cfg_row = _cur2.fetchone()
             _cur2.close()
-            _custom_cfg = (_cfg_row[0] if _cfg_row and isinstance(_cfg_row[0], dict) else {})
+            _raw = _cfg_row[0] if _cfg_row else None
+            if isinstance(_raw, dict):
+                _custom_cfg = _raw
+            elif isinstance(_raw, str):
+                try:
+                    _custom_cfg = json.loads(_raw)
+                except Exception:
+                    _custom_cfg = {}
+            else:
+                _custom_cfg = {}
         finally:
             release_db_connection(_conn2)
         lead_capture_enabled  = bool(_custom_cfg.get("lead_capture"))
@@ -1536,7 +1545,15 @@ async def get_current_user(request: Request):
         if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
 
         user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
-        custom_plan_cfg = custom_plan_config_raw if isinstance(custom_plan_config_raw, dict) else None
+        if isinstance(custom_plan_config_raw, dict):
+            custom_plan_cfg = custom_plan_config_raw
+        elif isinstance(custom_plan_config_raw, str):
+            try:
+                custom_plan_cfg = json.loads(custom_plan_config_raw)
+            except Exception:
+                custom_plan_cfg = None
+        else:
+            custom_plan_cfg = None
 
         # Grace-period auto-downgrade (Step 2.4): a user marked CANCELED via
         # the Polar webhook keeps their tier until billing_period_end. When
@@ -4301,24 +4318,29 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
 
 
 @app.delete("/api/companies/{company_id}")
-def deactivate_company(company_id: str, user: dict = Depends(get_current_user)):
-    """Soft-deletes a bot by setting is_active=false. Data is retained."""
+def delete_company(company_id: str, user: dict = Depends(get_current_user)):
+    """Permanently deletes a bot and all its associated data (knowledge, chat logs, usage, etc.)."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE companies SET is_active = false WHERE id = %s AND user_id = %s RETURNING id",
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s",
             (company_id, user["id"])
         )
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        # Explicitly purge knowledge and cache (tables may lack ON DELETE CASCADE)
+        cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (company_id,))
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
+        # Hard delete — cascades to usage_tracking, chat_logs, analytics, leads, etc.
+        cursor.execute("DELETE FROM companies WHERE id = %s AND user_id = %s", (company_id, user["id"]))
         conn.commit()
         return {"status": "success"}
     except HTTPException:
         raise
     except Exception as e:
         if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail="Failed to deactivate bot.")
+        raise HTTPException(status_code=500, detail="Failed to delete bot.")
     finally:
         release_db_connection(conn)
 

@@ -11,6 +11,38 @@ import DemoMigrationBanner from '@/src/app/components/DemoMigrationBanner';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 import { deleteBot } from './actions';
 
+function DeleteConfirmModal({ botName, onConfirm, onCancel }: { botName: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-slate-950 border border-red-200 dark:border-red-900/40 w-full max-w-md shadow-xl">
+        <div className="p-6 border-b border-red-100 dark:border-red-900/30 flex items-center gap-3">
+          <span className="material-symbols-outlined text-[24px] text-red-500">warning</span>
+          <h3 className="text-base font-bold font-google text-slate-900 dark:text-slate-200">Delete "{botName}"?</h3>
+        </div>
+        <div className="p-6 space-y-3">
+          <p className="text-sm font-google text-slate-600 dark:text-slate-400">This action is permanent and cannot be undone. The following will be deleted:</p>
+          <ul className="space-y-1.5">
+            {['All trained knowledge & documents', 'Full conversation history', 'Analytics & insights', 'Captured leads', 'API key & configuration'].map(item => (
+              <li key={item} className="flex items-center gap-2 text-sm font-google text-red-600 dark:text-red-400">
+                <span className="material-symbols-outlined text-[14px]">remove_circle</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="p-4 flex gap-3 justify-end border-t border-gray-100 dark:border-slate-800">
+          <button onClick={onCancel} className="px-4 py-2 text-[10px] uppercase tracking-widest font-bold font-sans border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="px-4 py-2 text-[10px] uppercase tracking-widest font-bold font-sans bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer">
+            Delete Forever
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
   standard: { label: 'Standard', cls: 'text-slate-500 bg-slate-50 border-slate-200' },
   priority: { label: 'Priority', cls: 'text-blue-600 bg-blue-50 border-blue-200' },
@@ -54,6 +86,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
   const plan: Plan | null = (botsData as any)?.plan || null;
   const upgradeError = queryError instanceof UpgradeError ? queryError : null;
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   // Surface non-upgrade query errors (network, 5xx) as toasts so the page
   // doesn't silently render an empty state when the fetch genuinely failed.
@@ -69,13 +102,17 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
     );
   }, [queryError]);
 
-  const handleDelete = async (botId: string, botName: string) => {
-    if (!window.confirm(`Delete "${botName}"? This will deactivate the bot and its API key.`)) return;
-    
+  const handleDelete = (botId: string, botName: string) => {
+    setDeleteTarget({ id: botId, name: botName });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { id: botId } = deleteTarget;
+    setDeleteTarget(null);
     setDeletingId(botId);
     try {
       await deleteBot(botId);
-      // Invalidate query to refresh the list
       queryClient.invalidateQueries({ queryKey: ['bots'] });
     } catch (err: any) {
       window.dispatchEvent(
@@ -92,6 +129,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
   const speedInfo = SPEED_BADGE[plan?.speed_tier || 'none'];
 
   return (
+    <>
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 transition-all duration-500 relative overflow-hidden">
       <div className="absolute inset-0 bg-cover bg-center bg-no-repeat sm:bg-fixed opacity-100" style={{ backgroundImage: "url('/nature.webp')" }} />
       <div className="absolute inset-0 bg-white/40 dark:bg-slate-950/70 backdrop-blur-[2px] pointer-events-none" />
@@ -242,5 +280,14 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
         )}
       </div>
     </div>
+
+    {deleteTarget && (
+      <DeleteConfirmModal
+        botName={deleteTarget.name}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    )}
+    </>
   );
 }

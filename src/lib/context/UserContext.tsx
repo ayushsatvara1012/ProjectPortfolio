@@ -25,7 +25,7 @@ type UserContextValue = UserData & {
   isLoading: boolean;
   entitlements: Entitlements;
   refreshUser: () => Promise<void>;
-  hydrateFromServer: (seed: { role?: string | null; tier?: string | null }) => void;
+  hydrateFromServer: (seed: { role?: string | null; tier?: string | null; customPlanFeatures?: unknown }) => void;
 };
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -83,7 +83,7 @@ export const UserProvider = ({
   const { data, isLoading: queryLoading, refetch } = useQuery<UserData>({
     queryKey: ME_QUERY_KEY,
     enabled: isAuthLoaded && isSignedIn,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 30,
     queryFn: async () => {
       const token = await getToken();
       const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
@@ -99,18 +99,18 @@ export const UserProvider = ({
   const userData: UserData = data ?? seed ?? INITIAL;
 
   const hydrateFromServer = useCallback(
-    (s: { role?: string | null; tier?: string | null }) => {
+    (s: { role?: string | null; tier?: string | null; customPlanFeatures?: unknown }) => {
       setSeed((prev) => ({
         ...(prev ?? INITIAL),
         role: s.role ?? prev?.role ?? null,
         tier: s.tier ?? prev?.tier ?? null,
+        customPlanFeatures: s.customPlanFeatures !== undefined ? s.customPlanFeatures : prev?.customPlanFeatures ?? null,
       }));
-      // Merge into the query cache so consumers reading via useQuery see the seed
-      // immediately, before /api/me resolves.
       queryClient.setQueryData<UserData>(ME_QUERY_KEY, (prev) => ({
         ...(prev ?? INITIAL),
         role: s.role ?? prev?.role ?? null,
         tier: s.tier ?? prev?.tier ?? null,
+        customPlanFeatures: s.customPlanFeatures !== undefined ? s.customPlanFeatures : prev?.customPlanFeatures ?? null,
       }));
     },
     [queryClient]

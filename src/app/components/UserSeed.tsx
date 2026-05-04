@@ -9,13 +9,15 @@ import { useUserRole } from '@/src/lib/context/UserContext';
 export default function UserSeed({
   role,
   tier,
+  customPlanFeatures,
 }: {
   role: string | null;
   tier: string | null;
+  customPlanFeatures?: unknown;
 }) {
   const { hydrateFromServer } = useUserRole();
   useEffect(() => {
-    hydrateFromServer({ role, tier });
-  }, [role, tier, hydrateFromServer]);
+    hydrateFromServer({ role, tier, customPlanFeatures });
+  }, [role, tier, customPlanFeatures, hydrateFromServer]);
   return null;
 }

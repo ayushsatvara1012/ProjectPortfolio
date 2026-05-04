@@ -17,18 +17,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // client-side fetch on every dashboard mount).
   let role: string | null = null;
   let tier: string | null = null;
+  let customPlanFeatures: unknown = null;
   try {
     const token = await getToken();
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const res = await fetch(`${baseUrl}/api/me`, {
       headers: { Authorization: `Bearer ${token}` },
-      cache: 'force-cache',
-      next: { revalidate: 60 },
+      cache: 'no-store',
     });
     if (res.ok) {
       const data = await res.json();
       role = data.role || 'USER';
       tier = data.tier || 'FREE';
+      customPlanFeatures = data.custom_plan_features ?? null;
     }
   } catch {
     // fall through; client-side refreshUser will retry.
@@ -36,7 +37,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <DashboardProviders>
-      <UserSeed role={role} tier={tier} />
+      <UserSeed role={role} tier={tier} customPlanFeatures={customPlanFeatures} />
 
       <AppLayout>{children}</AppLayout>
     </DashboardProviders>
