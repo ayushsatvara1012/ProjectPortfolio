@@ -2744,17 +2744,15 @@ def list_leads(
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
             
         # Tier gate
-        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
-        user_row = cursor.fetchone()
-        if user_row:
-            user_tier, user_role = user_row
-            tier_upper = (user_tier or "FREE").upper()
-            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
-                raise HTTPException(status_code=402, detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Lead management requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                })
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("lead_capture"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "Lead management requires the Pro plan or a custom plan with lead capture enabled.",
+                "upgrade_url": "/app/pricing"
+            })
 
         offset = (page - 1) * limit
         cursor.execute("SELECT COUNT(*) FROM lead_capture WHERE company_id = %s", (company_id,))
@@ -2839,13 +2837,11 @@ def export_leads(
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
             
         # Tier gate
-        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
-        user_row = cursor.fetchone()
-        if user_row:
-            user_tier, user_role = user_row
-            tier_upper = (user_tier or "FREE").upper()
-            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
-                raise HTTPException(status_code=402, detail="Export requires Pro plan.")
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("lead_capture"):
+            raise HTTPException(status_code=402, detail="Export requires the Pro plan or a custom plan with lead capture enabled.")
 
         cursor.execute(
             """
@@ -2911,18 +2907,16 @@ def list_conversations(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        # Tier gate — same as leads (PRO/ENTERPRISE)
-        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
-        user_row = cursor.fetchone()
-        if user_row:
-            user_tier, user_role = user_row
-            tier_upper = (user_tier or "FREE").upper()
-            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
-                raise HTTPException(status_code=402, detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Conversation transcripts require the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                })
+        # Tier gate
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "Conversation transcripts require the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
 
         unanswered_clause = "AND cl.is_unanswered = true" if filter == "unanswered" else ""
 
@@ -3022,17 +3016,15 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
-        user_row = cursor.fetchone()
-        if user_row:
-            user_tier, user_role = user_row
-            tier_upper = (user_tier or "FREE").upper()
-            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
-                raise HTTPException(status_code=402, detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "ROI Dashboard requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                })
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "ROI Dashboard requires the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
 
         # Benchmarks (defaults if not yet set)
         cursor.execute(
@@ -3104,17 +3096,15 @@ def update_roi_benchmarks(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
-        user_row = cursor.fetchone()
-        if user_row:
-            user_tier, user_role = user_row
-            tier_upper = (user_tier or "FREE").upper()
-            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
-                raise HTTPException(status_code=402, detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "ROI Dashboard requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                })
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "ROI Dashboard requires the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
 
         cursor.execute(
             """
@@ -3165,18 +3155,16 @@ def generate_insight_report(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        # ── TIER GUARD: PRO+ only ───────────────────────────────────────────
-        cursor.execute("SELECT tier, role FROM users WHERE id = %s", (user["id"],))
-        user_row = cursor.fetchone()
-        if user_row:
-            user_tier, user_role = user_row
-            tier_upper = (user_tier or "FREE").upper()
-            if user_role != "SUPER_ADMIN" and tier_upper not in ["PRO", "ENTERPRISE"]:
-                raise HTTPException(status_code=403, detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Insights reports are a premium feature requiring the Professional plan.",
-                    "upgrade_url": "/app/pricing"
-                })
+        # ── TIER GUARD: PRO+ or custom plan with analytics ─────────────────
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+            raise HTTPException(status_code=403, detail={
+                "code": "TIER_REQUIRED",
+                "message": "Insights reports are a premium feature requiring the Professional plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
 
         # ── FETCH RECENT CONVERSATIONS (ALWAYS FRESH) ────────────────────────
         cursor.execute(

@@ -10,16 +10,13 @@ const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 interface ConversationsPanelProps {
     selectedBotId: string;
     authFetch: any;
-    userTier: string;
-    userRole: string;
+    isAuthorized: boolean;
 }
 
-const ConversationsPanel = ({ selectedBotId, authFetch, userTier, userRole }: ConversationsPanelProps) => {
+const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: ConversationsPanelProps) => {
     const [page, setPage] = useState(1);
     const [filter, setFilter] = useState('all');
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
-
-    const isAuthorized = userTier === 'PRO' || userTier === 'ENTERPRISE' || userRole === 'SUPER_ADMIN';
 
     const { data, isLoading } = useQuery({
         queryKey: ['conversations', selectedBotId, page, filter],
@@ -31,7 +28,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, userTier, userRole }: Co
     if (!isAuthorized) {
         return (
             <div className="p-8">
-                <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
+                <UpgradePrompt code="DEFAULT" tier="" mode="inline" />
             </div>
         );
     }

@@ -11,13 +11,11 @@ const fmt = (n: number | string) => '$' + Number(n).toLocaleString('en-US', { mi
 interface ROIPanelProps {
     selectedBotId: string;
     authFetch: any;
-    userTier: string;
-    userRole: string;
+    isAuthorized: boolean;
 }
 
-const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }: ROIPanelProps) => {
+const ROIPanel = ({ selectedBotId, authFetch, isAuthorized }: ROIPanelProps) => {
     const queryClient = useQueryClient();
-    const isAuthorized = userTier === 'PRO' || userTier === 'ENTERPRISE' || userRole === 'SUPER_ADMIN';
 
     const { data, isLoading } = useQuery({
         queryKey: ['roi-benchmarks', selectedBotId],
@@ -57,7 +55,7 @@ const ROIPanel = ({ selectedBotId, authFetch, userTier, userRole }: ROIPanelProp
     if (!isAuthorized) {
         return (
             <div className="p-8">
-                <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
+                <UpgradePrompt code="DEFAULT" tier="" mode="inline" />
             </div>
         );
     }

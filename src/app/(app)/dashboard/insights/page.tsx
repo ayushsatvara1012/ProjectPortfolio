@@ -194,12 +194,12 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
     );
 };
 
-const AUTHORIZED_TIERS = new Set(['PRO', 'ENTERPRISE']);
-
 export default function AppInsights() {
-    const { userTier: rawUserTier, userRole: rawUserRole, isLoading: ctxLoading } = useUserRole();
+    const { userTier: rawUserTier, userRole: rawUserRole, entitlements, isLoading: ctxLoading } = useUserRole();
     const userTier = rawUserTier ?? '';
     const userRole = rawUserRole ?? '';
+    const canAnalytics = entitlements.canUseAnalytics;
+    const canLeadCapture = entitlements.canUseLeadCapture;
     const authFetch = useAuthenticatedFetch();
     const isAuthReady = useIsAuthReady();
 
@@ -226,7 +226,7 @@ export default function AppInsights() {
 
     // Silently try to load a cached report on mount
     useEffect(() => {
-        if (selectedBotId && AUTHORIZED_TIERS.has(userTier)) handleGenerate(true);
+        if (selectedBotId && canAnalytics) handleGenerate(true);
     }, [selectedBotId, userTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleGenerate = async (silentLoad = false) => {
@@ -283,7 +283,7 @@ export default function AppInsights() {
                         </p>
                     )}
                 </div>
-                {AUTHORIZED_TIERS.has(userTier) && activeTab === 'analytics' && (
+                {canAnalytics && activeTab === 'analytics' && (
                     <button
                         onClick={() => handleGenerate(false)}
                         disabled={isGenerating || !selectedBotId}
@@ -305,7 +305,7 @@ export default function AppInsights() {
             </div>
 
             {/* Persistent Bot Selector */}
-            {AUTHORIZED_TIERS.has(userTier) && bots.length > 1 && (
+            {canAnalytics && bots.length > 1 && (
                 <div className="mt-5 pt-5 border-t border-gray-50 dark:border-slate-800/50 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
                         Reporting for
@@ -409,8 +409,7 @@ export default function AppInsights() {
                     <LeadsPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
-                        userTier={userTier}
-                        userRole={userRole}
+                        isAuthorized={canLeadCapture}
                     />
                 )}
 
@@ -418,8 +417,7 @@ export default function AppInsights() {
                     <ConversationsPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
-                        userTier={userTier}
-                        userRole={userRole}
+                        isAuthorized={canAnalytics}
                     />
                 )}
 
@@ -427,21 +425,20 @@ export default function AppInsights() {
                     <ROIPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
-                        userTier={userTier}
-                        userRole={userRole}
+                        isAuthorized={canAnalytics}
                     />
                 )}
 
                 {activeTab === 'analytics' && (
                     <>
                         {/* ── Tier Gate ── */}
-                        {!AUTHORIZED_TIERS.has(userTier) && (
+                        {!canAnalytics && (
                             <div className="p-8">
                                 <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
                             </div>
                         )}
 
-                        {AUTHORIZED_TIERS.has(userTier) && reportData && !isGenerating && !error && (
+                        {canAnalytics && reportData && !isGenerating && !error && (
                             <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 w-full overflow-hidden">
 
                                 {/* ── ROI Scorecards (Top Row) ── */}
@@ -604,7 +601,7 @@ export default function AppInsights() {
                         )}
 
                         {/* ── Error Banner ── */}
-                        {AUTHORIZED_TIERS.has(userTier) && error && (
+                        {canAnalytics && error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 shrink-0">
                                 <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
                                 <p className="text-md font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
@@ -613,7 +610,7 @@ export default function AppInsights() {
                         )}
 
                         {/* ── Ghost Town ── */}
-                        {AUTHORIZED_TIERS.has(userTier) && isGhostTown && !isGenerating && (
+                        {canAnalytics && isGhostTown && !isGenerating && (
                             <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                                 <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                                     <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
@@ -627,7 +624,7 @@ export default function AppInsights() {
                         )}
 
                         {/* ── Empty State ── */}
-                        {AUTHORIZED_TIERS.has(userTier) && !reportData && !isGenerating && !error && !isGhostTown && (
+                        {canAnalytics && !reportData && !isGenerating && !error && !isGhostTown && (
                             <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                                 <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                                     <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
@@ -638,7 +635,7 @@ export default function AppInsights() {
                         )}
 
                         {/* ── Loading Spinner ── */}
-                        {AUTHORIZED_TIERS.has(userTier) && isGenerating && (
+                        {canAnalytics && isGenerating && (
                             <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                                 <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
                                 <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>

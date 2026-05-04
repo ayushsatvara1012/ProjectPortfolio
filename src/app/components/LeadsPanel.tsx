@@ -10,18 +10,14 @@ const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 interface LeadsPanelProps {
     selectedBotId: string;
     authFetch: any;
-    userTier: string;
-    userRole: string;
+    isAuthorized: boolean;
 }
 
-const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }: LeadsPanelProps) => {
+const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps) => {
     const [page, setPage] = useState(1);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const { getToken } = useAuth();
-    
-    // Authorization check
-    const isAuthorized = userTier === 'PRO' || userTier === 'ENTERPRISE' || userRole === 'SUPER_ADMIN';
 
     const { data: leadsData, isLoading } = useQuery({
         queryKey: ['leads', selectedBotId, page],
@@ -62,7 +58,7 @@ const LeadsPanel = ({ selectedBotId, authFetch, userTier, userRole }: LeadsPanel
     if (!isAuthorized) {
         return (
             <div className="p-8">
-                <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
+                <UpgradePrompt code="DEFAULT" tier="" mode="inline" />
             </div>
         );
     }
