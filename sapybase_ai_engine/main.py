@@ -1927,7 +1927,7 @@ async def update_company_details(
     if tier == "BASIC" and role != "SUPER_ADMIN":
         restricted_fields = ["system_prompt", "company_tone", "quick_questions", "ai_model",
                              "logo_shape", "custom_logo_url", "avatar_bg_style"]
-        provided_fields = update.dict(exclude_unset=True).keys()
+        provided_fields = update.model_dump(exclude_unset=True).keys()
         forbidden = [f for f in provided_fields if f in restricted_fields]
         if forbidden:
             raise HTTPException(
@@ -2019,7 +2019,7 @@ async def update_company_details(
         updates = []
         params = []
 
-        for field, value in update.dict(exclude_unset=True).items():
+        for field, value in update.model_dump(exclude_unset=True).items():
             if field == "company_id":
                 continue
             if field == "quick_questions" and value is not None:
@@ -2236,7 +2236,7 @@ async def chat_endpoint(
         # If widget sends no history, cache ONLY works for the first question
         # (empty history = standalone query, safe to cache without context).
         chat_history = chat_req.history or []
-        history_for_hash = [msg.dict() for msg in chat_history] if chat_history else []
+        history_for_hash = [msg.model_dump() for msg in chat_history] if chat_history else []
 
         # Only use cache if: (a) first question (no history), or (b) history is provided (context-aware)
         # Cache is ALWAYS eligible since the widget now sends history. Future-proofed with None guard.
@@ -4963,7 +4963,7 @@ def update_user_admin(
             if old_state: changes["status"] = {"old": old_state[2], "new": req.status}
 
         if req.custom_plan_config is not None:
-            config_dict = req.custom_plan_config.dict(exclude_none=False)
+            config_dict = req.custom_plan_config.model_dump(exclude_none=False)
             updates.append("custom_plan_config = %s")
             params.append(json.dumps(config_dict))
             # Auto-promote tier to CUSTOM when a config is saved
