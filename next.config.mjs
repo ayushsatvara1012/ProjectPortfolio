@@ -58,7 +58,7 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
               // Backend API + Clerk API + Stripe
-              `connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com wss://*.clerk.accounts.dev https://api.stripe.com${isDev ? " http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 wss://localhost:3000" : ""}`,
+              `connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://clerk.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com wss://*.clerk.accounts.dev https://api.stripe.com${isDev ? " http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 wss://localhost:3000" : ""}`,
               "frame-src 'self' https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com",
               "object-src 'none'",
               "base-uri 'self'",
