@@ -1263,7 +1263,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "initial_message": company_data[8] or "Hi! How can I help you today?",
         "quick_questions": normalize_quick_questions(company_data[9]),
         "logo_shape": company_data[10] or "circle",
-        "custom_logo_url": company_data[11],
+        "custom_logo_url": company_data[11] or None,
         "avatar_bg_style": company_data[12] or "none",
         "lead_capture_enabled":  lead_capture_enabled,
         "human_handoff_enabled": human_handoff_enabled,
@@ -4606,7 +4606,23 @@ def get_config(
     company: dict = Depends(verify_api_key_and_origin),
 ):
     """Returns branding for the widget."""
-    return company
+    try:
+        # Ensure all UUID and None values are properly serialized
+        safe_company = {}
+        for key, value in company.items():
+            if hasattr(value, '__str__') and hasattr(value, 'hex'):  # UUID check
+                safe_company[key] = str(value)
+            elif value is None:
+                safe_company[key] = None
+            elif isinstance(value, (str, int, float, bool, list, dict)):
+                safe_company[key] = value
+            else:
+                # Fallback: convert to string representation
+                safe_company[key] = str(value)
+        return safe_company
+    except Exception as e:
+        logger.error(f"ERROR in get_config serialization: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Config serialization error: {str(e)}")
 
 
 @app.get("/api/bots/{bot_id}/faqs")
