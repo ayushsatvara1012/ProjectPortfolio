@@ -111,18 +111,27 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
         <path d={FAB_PATH} fill={baseFill} />
 
         {/* L2: Image clipped precisely to shape */}
-        {showImage && (
+        {showImage && isCustom && (
           <g clipPath={`url(#${uid}-clip)`}>
             <image
               href={logoUrl}
               xlinkHref={logoUrl}
-              x={isCustom ? offsetX : (15 + offsetX)}
-              y={isCustom ? offsetY : (15 + offsetY)}
-              width={isCustom ? 100 : 70}
-              height={isCustom ? 100 : 70}
-              preserveAspectRatio={isCustom ? 'xMidYMid slice' : 'xMidYMid meet'}
+              x={offsetX}
+              y={offsetY}
+              width={100}
+              height={100}
+              preserveAspectRatio="xMidYMid slice"
               onError={() => setImgFailed(true)}
             />
+          </g>
+        )}
+        {showImage && !isCustom && (
+          <g clipPath={`url(#${uid}-clip)`}>
+            <g transform={`translate(${15 + offsetX}, ${15 + offsetY})`}>
+              <svg viewBox="100 15 200 200" width="70" height="70" preserveAspectRatio="xMidYMid meet">
+                <path d="M128,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5"/><path d="M276,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5"/><path d="M128,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060"/><path d="M276,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060"/><path d="M201,44h-3c-1.105,0-2,.8954-2,2v3c0,1.1046.895,2,2,2h3c1.105,0,2-.8954,2-2v-3c0-1.1046-.895-2-2-2Z" opacity="0.45" fill="#5730f5"/><path d="M148,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M170,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M258,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M258,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M148,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M236,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M192,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M214,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M170,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#5730f5"/><path d="M236,100h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" transform="translate(0 -1.000054)" fill="#5730f5"/><path d="M192,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M214,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M170,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M236,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M148,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M258,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M192,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M213,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/>
+              </svg>
+            </g>
           </g>
         )}
 
@@ -218,18 +227,27 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
         <path d={fabPath} fill={fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)'}
           filter="url(#fab-drop-shadow)"
           className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
-        {showImage && (
+        {showImage && isCustomLogo && (
           <g clipPath="url(#fab-clip)">
             <image
               href={logoUrl}
               xlinkHref={logoUrl}
-              x={isCustomLogo ? (fabShapeX || 0) : (15 + (fabShapeX || 0))}
-              y={isCustomLogo ? (fabShapeY || 0) : (15 + (fabShapeY || 0))}
-              width={isCustomLogo ? 100 : 70}
-              height={isCustomLogo ? 100 : 70}
+              x={fabShapeX || 0}
+              y={fabShapeY || 0}
+              width={100}
+              height={100}
               preserveAspectRatio="xMidYMid meet"
               onError={() => setImgFailed(true)}
             />
+          </g>
+        )}
+        {showImage && !isCustomLogo && (
+          <g clipPath="url(#fab-clip)">
+            <g transform={`translate(${15 + (fabShapeX || 0)}, ${15 + (fabShapeY || 0)})`}>
+              <svg viewBox="100 15 200 200" width="70" height="70" preserveAspectRatio="xMidYMid meet">
+                <path d="M128,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5"/><path d="M276,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5"/><path d="M128,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060"/><path d="M276,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060"/><path d="M201,44h-3c-1.105,0-2,.8954-2,2v3c0,1.1046.895,2,2,2h3c1.105,0,2-.8954,2-2v-3c0-1.1046-.895-2-2-2Z" opacity="0.45" fill="#5730f5"/><path d="M148,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M170,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M258,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M258,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M148,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M236,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M192,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M214,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060"/><path d="M170,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#5730f5"/><path d="M236,100h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" transform="translate(0 -1.000054)" fill="#5730f5"/><path d="M192,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M214,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M170,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M236,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M148,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M258,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M192,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/><path d="M213,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060"/>
+              </svg>
+            </g>
           </g>
         )}
         {!showImage && (
@@ -689,7 +707,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   const BOT_NAME = configData.bot_name || 'Sapybase';
   const THEME_COLOR = configData.theme_color || '#5730F5';
-  const LOGO_URL = configData.custom_logo_url || configData.logo_url || BrandLogo;
+  const LOGO_URL = configData.custom_logo_url || '';
   const LOGO_SHAPE = configData.logo_shape || 'circle';
   const AVATAR_BG_STYLE = configData.avatar_bg_style || 'none';
 
