@@ -115,6 +115,7 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
           <g clipPath={`url(#${uid}-clip)`}>
             <image
               href={logoUrl}
+              xlinkHref={logoUrl}
               x={isCustom ? offsetX : (15 + offsetX)}
               y={isCustom ? offsetY : (15 + offsetY)}
               width={isCustom ? 100 : 70}
@@ -144,6 +145,103 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
         )}
       </svg>
     </div>
+  );
+}
+
+// ── FabButton (FAB with image-error fallback for Safari) ─────────────────────
+
+type FabButtonProps = {
+  fabPath: string;
+  fabGradient: [string, string] | null;
+  logoUrl: string;
+  botName: string;
+  themeColor: string;
+  isCustomLogo: boolean;
+  fabShapeX: number;
+  fabShapeY: number;
+  isOpen: boolean;
+  onClick: () => void;
+};
+
+function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCustomLogo, fabShapeX, fabShapeY, isOpen, onClick }: FabButtonProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const prevUrlRef = useRef(logoUrl);
+
+  useEffect(() => {
+    if (logoUrl !== prevUrlRef.current) {
+      setImgFailed(false);
+      prevUrlRef.current = logoUrl;
+    }
+  }, [logoUrl]);
+
+  const showImage = logoUrl && !imgFailed;
+  const initial = (botName || 'S').charAt(0).toUpperCase();
+
+  return (
+    <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      onClick={onClick}
+      aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
+      style={{ touchAction: 'manipulation', background: 'transparent', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: themeColor, position: 'relative', zIndex: 1 }}
+      className="relative flex flex-col items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
+        <defs>
+          <clipPath id="fab-clip"><path d={fabPath} /></clipPath>
+          <filter id="neumorphic-3d-inset" x="-20%" y="-20%" width="140%" height="140%">
+            <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+            <feGaussianBlur stdDeviation="3" /><feOffset dx="4" dy="4" result="offsetBlurDark" />
+            <feComposite operator="in" in2="SourceAlpha" result="innerShadowDark" />
+            <feFlood floodColor="rgba(0,0,0,0.14)" />
+            <feComposite operator="in" in2="innerShadowDark" result="finalDark" />
+            <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+            <feGaussianBlur stdDeviation="3" /><feOffset dx="-3" dy="-3" result="offsetBlurLight" />
+            <feComposite operator="in" in2="SourceAlpha" result="innerShadowLight" />
+            <feFlood floodColor="rgba(255,255,255,0.8)" />
+            <feComposite operator="in" in2="innerShadowLight" result="finalLight" />
+            <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="finalDark" /><feMergeNode in="finalLight" /></feMerge>
+          </filter>
+          <linearGradient id="fab-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#E2E8F0" />
+          </linearGradient>
+          <linearGradient id="fab-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1E293B" /><stop offset="100%" stopColor="#0F172A" />
+          </linearGradient>
+          {fabGradient && (
+            <linearGradient id="Sapybase-avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={fabGradient[0]} /><stop offset="100%" stopColor={fabGradient[1]} />
+            </linearGradient>
+          )}
+          <filter id="fab-drop-shadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor={`${themeColor}8C`} />
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={`${themeColor}59`} />
+          </filter>
+        </defs>
+        <path d={fabPath} fill={fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)'}
+          filter="url(#fab-drop-shadow)"
+          className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
+        {showImage && (
+          <g clipPath="url(#fab-clip)">
+            <image
+              href={logoUrl}
+              xlinkHref={logoUrl}
+              x={isCustomLogo ? (fabShapeX || 0) : (15 + (fabShapeX || 0))}
+              y={isCustomLogo ? (fabShapeY || 0) : (15 + (fabShapeY || 0))}
+              width={isCustomLogo ? 100 : 70}
+              height={isCustomLogo ? 100 : 70}
+              preserveAspectRatio="xMidYMid meet"
+              onError={() => setImgFailed(true)}
+            />
+          </g>
+        )}
+        {!showImage && (
+          <text x={50 + (fabShapeX || 0)} y={52 + (fabShapeY || 0)} textAnchor="middle" dominantBaseline="middle" fill={fabGradient ? '#ffffff' : themeColor} className="font-bold select-none pointer-events-none" style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
+            {initial}
+          </text>
+        )}
+        <path d={fabPath} fill="transparent" filter="url(#neumorphic-3d-inset)" className="pointer-events-none" />
+        <path d={fabPath} fill="none" stroke="white" strokeWidth="0.8" className="aura-path opacity-30 dark:stroke-slate-500/30" />
+        <path d={fabPath} fill="none" stroke={themeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20" />
+      </svg>
+    </motion.button>
   );
 }
 
@@ -193,7 +291,7 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
         className={!gradient ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
       {logoUrl && (
         <g clipPath={`url(#${idPrefix}-fab-clip)`}>
-          <image href={logoUrl} x={isCustomUrl ? (fabShape.x || 0) : (15 + (fabShape.x || 0))} y={isCustomUrl ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
+          <image href={logoUrl} xlinkHref={logoUrl} x={isCustomUrl ? (fabShape.x || 0) : (15 + (fabShape.x || 0))} y={isCustomUrl ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
             width={isCustomUrl ? 100 : 70} height={isCustomUrl ? 100 : 70} preserveAspectRatio="xMidYMid meet" />
         </g>
       )}
@@ -1183,61 +1281,18 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               />
             )}
 
-            <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            <FabButton
+              fabPath={FAB_PATH}
+              fabGradient={fabGradient}
+              logoUrl={LOGO_URL}
+              botName={BOT_NAME}
+              themeColor={THEME_COLOR}
+              isCustomLogo={!!configData.custom_logo_url}
+              fabShapeX={fabShape.x || 0}
+              fabShapeY={fabShape.y || 0}
+              isOpen={isOpen}
               onClick={() => setIsOpen(prev => !prev)}
-              aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
-              style={{ touchAction: 'manipulation', background: 'transparent', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR, position: 'relative', zIndex: 1 }}
-              className="relative flex flex-col items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
-              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
-                <defs>
-                  <clipPath id="fab-clip"><path d={FAB_PATH} /></clipPath>
-                  <filter id="neumorphic-3d-inset" x="-20%" y="-20%" width="140%" height="140%">
-                    <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
-                    <feGaussianBlur stdDeviation="3" /><feOffset dx="4" dy="4" result="offsetBlurDark" />
-                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowDark" />
-                    <feFlood floodColor="rgba(0,0,0,0.14)" />
-                    <feComposite operator="in" in2="innerShadowDark" result="finalDark" />
-                    <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
-                    <feGaussianBlur stdDeviation="3" /><feOffset dx="-3" dy="-3" result="offsetBlurLight" />
-                    <feComposite operator="in" in2="SourceAlpha" result="innerShadowLight" />
-                    <feFlood floodColor="rgba(255,255,255,0.8)" />
-                    <feComposite operator="in" in2="innerShadowLight" result="finalLight" />
-                    <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="finalDark" /><feMergeNode in="finalLight" /></feMerge>
-                  </filter>
-                  <linearGradient id="fab-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#E2E8F0" />
-                  </linearGradient>
-                  <linearGradient id="fab-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#1E293B" /><stop offset="100%" stopColor="#0F172A" />
-                  </linearGradient>
-                  {fabGradient && (
-                    <linearGradient id="Sapybase-avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={fabGradient[0]} /><stop offset="100%" stopColor={fabGradient[1]} />
-                    </linearGradient>
-                  )}
-                  <filter id="fab-drop-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                    <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor={`${THEME_COLOR}8C`} />
-                    <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={`${THEME_COLOR}59`} />
-                  </filter>
-                </defs>
-                <path d={FAB_PATH} fill={fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)'}
-                  filter="url(#fab-drop-shadow)"
-                  className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
-                {LOGO_URL && (
-                  <g clipPath="url(#fab-clip)">
-                    <image href={LOGO_URL} x={configData.custom_logo_url ? (fabShape.x || 0) : (15 + (fabShape.x || 0))} y={configData.custom_logo_url ? (fabShape.y || 0) : (15 + (fabShape.y || 0))} width={configData.custom_logo_url ? 100 : 70} height={configData.custom_logo_url ? 100 : 70} preserveAspectRatio="xMidYMid meet" />
-                  </g>
-                )}
-                {!LOGO_URL && (
-                  <text x={50 + (fabShape.x || 0)} y={52 + (fabShape.y || 0)} textAnchor="middle" dominantBaseline="middle" fill={fabGradient ? '#ffffff' : THEME_COLOR} className="font-bold select-none pointer-events-none" style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
-                    {(BOT_NAME || 'S').charAt(0).toUpperCase()}
-                  </text>
-                )}
-                <path d={FAB_PATH} fill="transparent" filter="url(#neumorphic-3d-inset)" className="pointer-events-none" />
-                <path d={FAB_PATH} fill="none" stroke="white" strokeWidth="0.8" className="aura-path opacity-30 dark:stroke-slate-500/30" />
-                <path d={FAB_PATH} fill="none" stroke={THEME_COLOR} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20" />
-              </svg>
-            </motion.button>
+            />
           </div>
         </div>
       )}
