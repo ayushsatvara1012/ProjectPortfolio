@@ -26,9 +26,18 @@ UPDATE companies
     SET custom_logo_url = logo_url
     WHERE logo_url IS NOT NULL 
     AND custom_logo_url IS NULL
-    AND logo_url != '/SB_loading_clean.svg';
+    AND logo_url NOT IN ('/SB_loading_clean.svg', '/SB_loading.svg');
 
--- 5. Add DB Definitions and Comments
+-- 5. Fix legacy default logo path in existing data and schema
+UPDATE companies
+    SET logo_url = '/SB_loading.svg'
+    WHERE logo_url = '/SB_loading_clean.svg';
+
+-- Update the column default so new bots start with the correct logo
+ALTER TABLE companies 
+    ALTER COLUMN logo_url SET DEFAULT '/SB_loading.svg';
+
+-- 6. Add DB Definitions and Comments
 COMMENT ON COLUMN companies.logo_shape IS
     'Widget avatar shape. Allowed: circle | squircle | bento | sharp. Default: circle.';
 

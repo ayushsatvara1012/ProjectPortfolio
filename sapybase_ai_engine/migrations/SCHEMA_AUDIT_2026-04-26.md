@@ -58,7 +58,7 @@
 | `domain` | `character varying` | YES | `` | ✅ |
 | `white_label` | `boolean` | YES | `false` | ❓ extra |
 | `bot_name` | `character varying` | YES | `'Sapybase Assistant'::character varying` | ✅ |
-| `logo_url` | `text` | YES | `'/SB_loading_clean.svg'::text` | ✅ |
+| `logo_url` | `text` | YES | `'/SB_loading.svg'::text` | ✅ |
 | `initial_message` | `text` | YES | `'Hi! I am the Sapybase AI Assistant. How` | ✅ |
 | `quick_questions` | `jsonb` | YES | `` | ✅ |
 | `admin_notes` | `text` | YES | `` | ❓ extra |

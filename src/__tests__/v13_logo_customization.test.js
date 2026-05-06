@@ -355,7 +355,7 @@ describe('Tier gating logic', () => {
 describe('chatWidget v13 config resolution', () => {
     it('custom_logo_url takes precedence over logo_url', () => {
         const configData = {
-            logo_url: '/SB_loading_clean.svg',
+            logo_url: '/SB_loading.svg',
             custom_logo_url: 'https://example.com/custom.png',
         };
         const LOGO_URL = configData.custom_logo_url || configData.logo_url;
@@ -364,20 +364,20 @@ describe('chatWidget v13 config resolution', () => {
 
     it('falls back to logo_url when custom_logo_url is empty', () => {
         const configData = {
-            logo_url: '/SB_loading_clean.svg',
+            logo_url: '/SB_loading.svg',
             custom_logo_url: '',
         };
         const LOGO_URL = configData.custom_logo_url || configData.logo_url;
-        expect(LOGO_URL).toBe('/SB_loading_clean.svg');
+        expect(LOGO_URL).toBe('/SB_loading.svg');
     });
 
     it('falls back to logo_url when custom_logo_url is null', () => {
         const configData = {
-            logo_url: '/SB_loading_clean.svg',
+            logo_url: '/SB_loading.svg',
             custom_logo_url: null,
         };
         const LOGO_URL = configData.custom_logo_url || configData.logo_url;
-        expect(LOGO_URL).toBe('/SB_loading_clean.svg');
+        expect(LOGO_URL).toBe('/SB_loading.svg');
     });
 
     it('LOGO_SHAPE defaults to circle when missing', () => {
