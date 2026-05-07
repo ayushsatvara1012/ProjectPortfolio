@@ -42,6 +42,7 @@ export const trainTextSchema = z
 export const customPlanConfigSchema = z.object({
   plan_name: z.string().trim().min(1, 'Plan name is required.').max(60),
   monthly_price_usd: z.coerce.number().nonnegative('Price must be ≥ 0.'),
+  trial_days: z.coerce.number().int().min(0, 'Trial days must be 0 or more.').max(30, 'Trial days cannot exceed 30.').optional(),
   max_bots: z.coerce.number().int().nonnegative(),
   max_messages: z.coerce.number().int().nonnegative(),
   max_chunks: z.coerce.number().int().nonnegative(),

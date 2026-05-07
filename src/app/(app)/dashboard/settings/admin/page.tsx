@@ -51,6 +51,7 @@ const FEATURE_FLAGS = [
 const BLANK_CUSTOM_CONFIG = {
   plan_name: '',
   monthly_price_usd: '',
+  trial_days: 14,
   max_bots: '',
   max_messages: '',
   max_chunks: '',
@@ -141,6 +142,8 @@ const NumInput = ({ label, value, onChange, placeholder, disabled, hint }: { lab
 
 // ── Manage Slide-Over ─────────────────────────────────────────────────────────
 const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClose: () => void; onSave: (p: any) => void; isSaving: boolean }) => {
+  const authFetch = useAuthenticatedFetch();
+  const queryClient = useQueryClient();
   const existingCfg = user.custom_plan_config || {};
   const isCustom = user.tier === 'CUSTOM';
 
@@ -153,6 +156,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       ...(isCustom ? {
         plan_name: existingCfg.plan_name || '',
         monthly_price_usd: existingCfg.monthly_price_usd ?? '',
+        trial_days: existingCfg.trial_days ?? 14,
         max_bots: existingCfg.max_bots ?? '',
         max_messages: existingCfg.max_messages ?? '',
         max_chunks: existingCfg.max_chunks ?? '',
@@ -168,6 +172,12 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       } : {}),
     } as any,
   });
+
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(
+    existingCfg.polar_checkout_url ?? null
+  );
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const set = (key: string, val: any) => setDraft(d => ({ ...d, [key]: val }));
   const setCfg = (key: string, val: any) => setDraft(d => ({ ...d, cfg: { ...d.cfg, [key]: val } }));
@@ -192,6 +202,78 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
 
   const numVal = (v: any) => (v === '' || v === null || v === undefined) ? null : Number(v);
 
+  const buildCandidate = () => {
+    const c = draft.cfg;
+    return {
+      plan_name: c.plan_name || 'Custom Plan',
+      monthly_price_usd: c.monthly_price_usd === '' ? 0 : Number(c.monthly_price_usd),
+      trial_days: c.trial_days === '' ? 14 : Number(c.trial_days),
+      max_bots: c.max_bots === '' ? 1 : Number(c.max_bots),
+      max_messages: c.max_messages === '' ? 500 : Number(c.max_messages),
+      max_chunks: c.max_chunks === '' ? 100 : Number(c.max_chunks),
+      gemini_model: c.gemini_model || undefined,
+      max_output_tokens: c.max_output_tokens === '' ? undefined : Number(c.max_output_tokens),
+      human_handoff: !!c.human_handoff,
+      lead_capture: !!c.lead_capture,
+      white_label: !!c.white_label,
+      webhook: !!c.webhook,
+      custom_logo: !!c.custom_logo,
+      analytics: !!c.analytics,
+      notes: c.notes || '',
+    };
+  };
+
+  const handleProvision = async () => {
+    setIsProvisioning(true);
+    try {
+      const res = await authFetch(`/api/admin/users/${user.clerk_id}/custom-plan/provision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: buildCandidate() }),
+      }) as any;
+      setCheckoutUrl(res.checkout_url);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      window.dispatchEvent(new CustomEvent('Sapybase:toast', {
+        detail: { kind: 'success', message: 'Polar product created. Copy the checkout link below.' },
+      }));
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      let display: string;
+      if (msg === 'AUTH_REQUIRED') {
+        display = 'Session expired. Sign out and sign back in, then try again.';
+      } else if (msg.includes('already has a linked Polar') || msg.includes('already provisioned')) {
+        display = 'This plan is already provisioned in Polar.';
+      } else if (msg.includes('POLAR_ACCESS_TOKEN') || msg.includes('not configured')) {
+        display = 'Polar API token not configured. Contact support.';
+      } else if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('reach Polar')) {
+        display = 'Polar API is unavailable. Please try again in a moment.';
+      } else if (msg.includes('greater than 0') || msg.includes('trial_days') || msg.includes('price')) {
+        display = 'Invalid plan config — price must be > $0 and trial days 0–30.';
+      } else if (msg === 'FORBIDDEN') {
+        display = 'Access denied. Super Admin required.';
+      } else if (msg && msg !== 'undefined') {
+        // Surface the actual backend message so the issue is visible
+        display = msg;
+      } else {
+        display = 'Provision failed. Check the server logs for details.';
+      }
+      window.dispatchEvent(new CustomEvent('Sapybase:toast', {
+        detail: { kind: 'error', message: display },
+      }));
+    } finally {
+      setIsProvisioning(false);
+    }
+  };
+
+  const handleCopyUrl = () => {
+    if (!checkoutUrl) return;
+    navigator.clipboard.writeText(checkoutUrl).then(() => {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    });
+  };
+
   const validate = () => {
     if (!draft.custom_plan_enabled) return true;
     const c = draft.cfg;
@@ -211,30 +293,12 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       status: draft.status,
     };
     if (draft.custom_plan_enabled) {
-      const c = draft.cfg;
-      const candidate = {
-        plan_name: c.plan_name || 'Custom Plan',
-        monthly_price_usd: c.monthly_price_usd === '' ? 0 : c.monthly_price_usd,
-        max_bots: c.max_bots === '' ? 1 : c.max_bots,
-        max_messages: c.max_messages === '' ? 500 : c.max_messages,
-        max_chunks: c.max_chunks === '' ? 100 : c.max_chunks,
-        gemini_model: c.gemini_model || undefined,
-        max_output_tokens: c.max_output_tokens === '' ? undefined : c.max_output_tokens,
-        human_handoff: !!c.human_handoff,
-        lead_capture: !!c.lead_capture,
-        white_label: !!c.white_label,
-        webhook: !!c.webhook,
-        custom_logo: !!c.custom_logo,
-        analytics: !!c.analytics,
-        notes: c.notes || '',
-      };
+      const candidate = buildCandidate();
       const parsed = customPlanConfigSchema.safeParse(candidate);
       if (!parsed.success) {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('Sapybase:toast', {
-            detail: { kind: 'error', message: parsed.error.issues[0]?.message || 'Invalid plan config.' },
-          }));
-        }
+        window.dispatchEvent(new CustomEvent('Sapybase:toast', {
+          detail: { kind: 'error', message: parsed.error.issues[0]?.message || 'Invalid plan config.' },
+        }));
         return;
       }
       payload.custom_plan_config = {
@@ -364,8 +428,24 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                           onChange={v => setCfg('monthly_price_usd', v)}
                           placeholder="e.g. 299"
                           disabled={isSaving}
-                          hint="For your records only"
+                          hint="Must be > $0 to provision in Polar"
                         />
+                      </div>
+                      <div>
+                        <SectionLabel>Trial Days</SectionLabel>
+                        <input
+                          type="number"
+                          min={0}
+                          max={30}
+                          placeholder="14"
+                          value={draft.cfg.trial_days}
+                          onChange={e => setCfg('trial_days', e.target.value)}
+                          disabled={isSaving}
+                          className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <p className="text-[10px] font-google text-slate-400 dark:text-slate-500 mt-1">
+                          After {draft.cfg.trial_days || 14} days, Polar charges ${draft.cfg.monthly_price_usd || '—'}/mo
+                        </p>
                       </div>
                     </div>
 
@@ -433,6 +513,44 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
             </AnimatePresence>
           </div>
 
+          {/* Checkout URL Display — shown once provisioned */}
+          {(checkoutUrl || user.custom_plan_polar_product_id) && (
+            <div className="border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/10 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
+                <p className="text-sm font-google font-bold text-emerald-700 dark:text-emerald-400">
+                  {checkoutUrl ? 'Polar Product Created' : 'Already Provisioned'}
+                </p>
+              </div>
+              {(checkoutUrl || existingCfg.polar_checkout_url) ? (
+                <>
+                  <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Checkout Link</p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      readOnly
+                      value={checkoutUrl || existingCfg.polar_checkout_url || ''}
+                      className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-300 outline-none truncate rounded-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyUrl}
+                      className="shrink-0 px-4 py-2 text-[10px] font-google font-bold uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-500 transition-colors flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">{copiedUrl ? 'check' : 'content_copy'}</span>
+                      {copiedUrl ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] font-google text-slate-500 dark:text-slate-400 mt-2 flex items-start gap-1">
+                    <span className="material-symbols-outlined text-[12px] mt-0.5 shrink-0">warning</span>
+                    Send this link to the customer. They enter their card to start the trial.
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs font-google text-slate-500 dark:text-slate-400">Plan is provisioned in Polar but checkout URL is not available. Check the database for the product ID.</p>
+              )}
+            </div>
+          )}
+
           <div>
             <SectionLabel>Deployed Bots ({companies.length})</SectionLabel>
             {companies.length === 0 ? (
@@ -456,11 +574,26 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 p-4 flex gap-3">
-          <button onClick={onClose} disabled={isSaving} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50">Cancel</button>
-          <button onClick={handleSave} disabled={isSaving || !isValid} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
+        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 p-4 space-y-2">
+          {/* Create in Polar button — only shown when custom plan is enabled, price > 0, and not yet provisioned */}
+          {draft.custom_plan_enabled && !user.custom_plan_polar_product_id && !checkoutUrl && (
+            <button
+              type="button"
+              onClick={handleProvision}
+              disabled={isProvisioning || isSaving || Number(draft.cfg.monthly_price_usd) <= 0}
+              title={Number(draft.cfg.monthly_price_usd) <= 0 ? 'Price must be > $0 to provision' : undefined}
+              className="w-full px-4 py-3 text-sm font-google font-bold uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[16px]">{isProvisioning ? 'hourglass_empty' : 'add_shopping_cart'}</span>
+              {isProvisioning ? 'Creating in Polar…' : 'Create in Polar & Generate Link'}
+            </button>
+          )}
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={isSaving || isProvisioning} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50">Cancel</button>
+            <button onClick={handleSave} disabled={isSaving || isProvisioning || !isValid} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              {isSaving ? 'Saving…' : 'Save Config'}
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
@@ -495,7 +628,7 @@ export default function AdminPage() {
 
   const limitsMutation = useMutation({
     mutationFn: ({ clerkId, payload }: { clerkId: string; payload: any }) =>
-      authFetch(`/api/admin/users/${clerkId}/limits`, {
+      authFetch(`/api/admin/users/${clerkId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -503,7 +636,10 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
-      setSelectedUser(null);
+      window.dispatchEvent(new CustomEvent('Sapybase:toast', {
+        detail: { kind: 'success', message: 'Plan config saved.' },
+      }));
+      // Panel stays open so admin can proceed to "Create in Polar"
     },
   });
 

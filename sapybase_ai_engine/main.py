@@ -786,6 +786,9 @@ async def startup_event():
     finally:
         release_db_connection(conn)
 
+    # 4. Schedule daily custom-plan reconciliation loop.
+    asyncio.create_task(_custom_plan_reconciliation_loop())
+
 @app.on_event("shutdown")
 def shutdown_db_pool():
     """Close all pooled connections cleanly on server shutdown."""
@@ -1019,6 +1022,7 @@ CUSTOM_PLAN_FEATURE_KEYS = {
 CUSTOM_PLAN_DEFAULTS = {
     "plan_name": "Custom Plan",
     "monthly_price_usd": 0,
+    "trial_days": 14,
     "max_bots": 1,
     "max_messages": 500,
     "max_chunks": 100,
@@ -1031,11 +1035,15 @@ CUSTOM_PLAN_DEFAULTS = {
     "custom_logo": False,
     "analytics": False,
     "notes": "",
+    # Payment metadata — populated by /provision endpoint, not by admin form
+    "polar_checkout_url": None,
+    "polar_created_at": None,
 }
 
 class CustomPlanConfig(BaseModel):
     plan_name: Optional[str] = "Custom Plan"
     monthly_price_usd: Optional[float] = 0
+    trial_days: Optional[int] = 14
     max_bots: Optional[int] = None
     max_messages: Optional[int] = None
     max_chunks: Optional[int] = None
@@ -1048,11 +1056,26 @@ class CustomPlanConfig(BaseModel):
     custom_logo: Optional[bool] = False
     analytics: Optional[bool] = False
     notes: Optional[str] = ""
+    # Payment metadata set by /provision — read-only from admin form
+    polar_checkout_url: Optional[str] = None
+    polar_created_at: Optional[str] = None
 
     @validator("gemini_model")
     def validate_model(cls, v):
         if v and v not in VALID_MODELS:
             raise ValueError(f"gemini_model must be one of: {', '.join(sorted(VALID_MODELS))}")
+        return v
+
+    @validator("monthly_price_usd")
+    def price_positive(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("monthly_price_usd must be 0 or greater")
+        return v
+
+    @validator("trial_days")
+    def trial_days_range(cls, v):
+        if v is not None and not (0 <= v <= 30):
+            raise ValueError("trial_days must be between 0 and 30")
         return v
 
     @validator("max_bots", "max_messages", "max_chunks", "max_output_tokens", pre=True)
@@ -1063,6 +1086,70 @@ class CustomPlanConfig(BaseModel):
 
     class Config:
         extra = "forbid"
+
+
+# ── Custom plan access gate — pure function (tested directly in test suite) ──
+_CUSTOM_PLAN_GATE_MESSAGES: dict[str, str] = {
+    "AWAITING_PAYMENT": "Your custom plan is ready. Complete checkout using the link sent by your account manager.",
+    "TRIAL_EXPIRED_PENDING_CHARGE": "Trial ended; payment is processing. Refresh in a few minutes.",
+    "PERIOD_EXPIRED": "Subscription expired. Update your payment method to restore access.",
+    "PAYMENT_FAILED": "Last charge failed. Update the card on file via the Polar customer portal.",
+    "SUSPENDED": "Subscription suspended. Contact your account manager.",
+    "REVOKED": "Subscription revoked. Contact support.",
+    "REFUNDED": "Subscription refunded. Subscribe again to restore access.",
+    "EXPIRED": "Subscription expired. Re-subscribe to continue.",
+    "UNKNOWN_STATE": "Account state is unclear. Please contact support.",
+}
+_CUSTOM_PLAN_GATE_GRACE = timedelta(hours=48)
+_CUSTOM_PLAN_GATE_BLOCKED = {"PAYMENT_FAILED", "SUSPENDED", "REVOKED", "REFUNDED", "EXPIRED"}
+
+
+def _check_custom_plan_gate(
+    status: Optional[str],
+    billing_end: Optional[datetime],
+    now: datetime,
+    checkout_url: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Evaluate access for a CUSTOM-tier user.
+
+    Returns None if access is allowed.
+    Returns a detail dict {code, message[, checkout_url]} if access should be
+    denied — caller raises HTTPException(status_code=402, detail=<return value>).
+
+    SUPER_ADMIN bypass must be handled by the caller before invoking this.
+    """
+    s = status or "UNKNOWN_STATE"
+    msgs = _CUSTOM_PLAN_GATE_MESSAGES
+
+    def _deny(code: str, msg_key: str, co: Optional[str] = None) -> dict:
+        detail: dict = {"code": f"CUSTOM_PLAN_{code}", "message": msgs[msg_key]}
+        if co:
+            detail["checkout_url"] = co
+        return detail
+
+    if s == "AWAITING_PAYMENT":
+        return _deny("PAYMENT_NOT_STARTED", "AWAITING_PAYMENT", checkout_url)
+    if s == "TRIAL_ACTIVE":
+        if billing_end and now > billing_end:
+            return _deny("TRIAL_EXPIRED_PENDING_CHARGE", "TRIAL_EXPIRED_PENDING_CHARGE")
+        return None
+    if s == "ACTIVE":
+        if billing_end and now > billing_end + _CUSTOM_PLAN_GATE_GRACE:
+            return _deny("PERIOD_EXPIRED", "PERIOD_EXPIRED", checkout_url)
+        return None
+    if s == "CANCELED":
+        if billing_end and now > billing_end:
+            return _deny("EXPIRED", "EXPIRED", checkout_url)
+        return None
+    if s == "PAUSED":
+        return None
+    if s in _CUSTOM_PLAN_GATE_BLOCKED:
+        co = checkout_url if s in ("PAYMENT_FAILED", "EXPIRED") else None
+        msg_key = s if s in msgs else "UNKNOWN_STATE"
+        return _deny(s, msg_key, co)
+    return _deny("UNKNOWN_STATE", "UNKNOWN_STATE")
+
 
 class AdminUpdateUserRequest(BaseModel):
     tier: Optional[UserTier] = None
@@ -1249,6 +1336,13 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         white_label_enabled   = _super or bool(_plan.get("white_label"))
         custom_logo_enabled   = _super or bool(_plan.get("white_label"))
         analytics_enabled     = _super or bool(_plan.get("analytics"))
+
+    # Custom plan access gate (Phase A) — widget/embed path.
+    if tier == "CUSTOM" and role != "SUPER_ADMIN":
+        _co_w = _custom_cfg.get("polar_checkout_url") if _custom_cfg else None
+        _gate_w = _check_custom_plan_gate(_sub_status, _billing_end, datetime.now(timezone.utc), _co_w)
+        if _gate_w:
+            raise HTTPException(status_code=402, detail=_gate_w)
 
     # Package the company data
     company = {
@@ -1585,6 +1679,13 @@ async def get_current_user(request: Request):
                 # with the stale tier; next request will retry the downgrade.
                 print(f"GRACE-PERIOD DOWNGRADE ERROR for user {user_id}: {e}")
 
+        # Custom plan access gate (Phase A). SUPER_ADMIN bypasses (tier forced to PRO above).
+        if tier == "CUSTOM" and role != "SUPER_ADMIN":
+            _checkout_url = custom_plan_cfg.get("polar_checkout_url") if custom_plan_cfg else None
+            _gate = _check_custom_plan_gate(subscription_status, billing_end, datetime.now(timezone.utc), _checkout_url)
+            if _gate:
+                raise HTTPException(status_code=402, detail=_gate)
+
         # Return updated values if they were changed by self-healing
         return {
             "id": user_id,
@@ -1598,7 +1699,7 @@ async def get_current_user(request: Request):
             "billing_period_end": billing_end,
             "custom_plan_config": custom_plan_cfg,
         }
-        
+
     except HTTPException: raise
     except Exception as e:
         print(f"AUTH ERROR: {e}")
@@ -4918,7 +5019,10 @@ def get_all_users(request: Request, admin: dict = Depends(get_admin_user)):
                         WHERE c.user_id = u.id
                     ),
                     '[]'::json
-                ) AS companies
+                ) AS companies,
+                u.custom_plan_polar_product_id,
+                u.subscription_status,
+                u.billing_period_end
             FROM users u
             ORDER BY u.created_at DESC
         """)
@@ -4941,6 +5045,9 @@ def get_all_users(request: Request, admin: dict = Depends(get_admin_user)):
                     "message_limit": plan["messages"],
                 },
                 "companies": r[8] if isinstance(r[8], list) else [],
+                "custom_plan_polar_product_id": r[9],
+                "subscription_status": r[10],
+                "billing_period_end": r[11],
             })
         return result
     finally:
@@ -5133,6 +5240,434 @@ def delete_company_admin(
         return {"status": "success"}
     finally:
         release_db_connection(conn)
+
+class CustomPlanProvisionRequest(BaseModel):
+    config: CustomPlanConfig
+
+    class Config:
+        extra = "forbid"
+
+
+@app.post("/api/admin/users/{clerk_id}/custom-plan/provision")
+@limiter.limit("10/minute")
+async def provision_custom_plan(
+    request: Request,
+    clerk_id: str,
+    req: CustomPlanProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """
+    Phase B: Programmatically create a Polar product for a custom plan.
+
+    Two-step admin flow:
+      1. Admin fills the config form (handled elsewhere — PATCH /admin/users/{clerk_id}).
+      2. Admin presses "Create in Polar & Generate Link" which calls THIS endpoint.
+
+    What this does:
+      - Validates config (price > 0, trial_days 0-30, model valid).
+      - Calls Polar API to create a recurring monthly product with trial.
+      - Stores product_id in users.custom_plan_polar_product_id.
+      - Sets subscription_status = AWAITING_PAYMENT.
+      - Generates checkout URL and stores in custom_plan_config.polar_checkout_url.
+      - Audit-logs everything.
+
+    Idempotency: rejects with 409 if custom_plan_polar_product_id is already set.
+    Admin must clear it (cancel the old subscription first) before re-provisioning.
+    """
+    config = req.config
+
+    # Validate price > 0 for a paid custom plan
+    price = config.monthly_price_usd or 0
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="monthly_price_usd must be greater than 0 for a provisioned custom plan.")
+
+    polar_token = os.getenv("POLAR_ACCESS_TOKEN")
+    if not polar_token:
+        raise HTTPException(status_code=500, detail="POLAR_ACCESS_TOKEN not configured.")
+
+    is_dev = os.getenv("ENV") == "development"
+    polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Fetch current user state
+        cursor.execute(
+            "SELECT id, tier, subscription_status, custom_plan_config, custom_plan_polar_product_id "
+            "FROM users WHERE clerk_id = %s",
+            (clerk_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        user_db_id, current_tier, current_status, current_config_raw, existing_product_id = row
+
+        # Idempotency guard: reject if already provisioned
+        if existing_product_id:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"User already has a linked Polar product ({existing_product_id}). "
+                    "Cancel the existing subscription and clear the product ID before re-provisioning."
+                )
+            )
+
+        # Build Polar product payload
+        plan_name = config.plan_name or "Custom Plan"
+        trial_days = config.trial_days if config.trial_days is not None else 14
+        # Price in cents (Polar uses smallest currency unit)
+        price_cents = int(round(price * 100))
+
+        polar_product_payload = {
+            "name": f"{plan_name} ({clerk_id[:8]})",
+            "description": f"Custom plan for {clerk_id}. Price: ${price}/mo.",
+            "prices": [
+                {
+                    "type": "recurring",
+                    "recurring_interval": "month",
+                    "price_amount": price_cents,
+                    "price_currency": "usd",
+                }
+            ],
+            "metadata": {
+                "clerk_id": clerk_id,
+                "internal_plan": "custom",
+            },
+        }
+
+        # Add trial days if configured
+        if trial_days > 0:
+            polar_product_payload["prices"][0]["trial_period_days"] = trial_days
+
+        # Call Polar API to create the product
+        # Idempotency key = clerk_id ensures retries don't duplicate products
+        idempotency_key = f"custom-plan-{clerk_id}"
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                polar_resp = await client.post(
+                    f"{polar_base_url}/api/v1/products",
+                    json=polar_product_payload,
+                    headers={
+                        "Authorization": f"Bearer {polar_token}",
+                        "Content-Type": "application/json",
+                        "Idempotency-Key": idempotency_key,
+                    }
+                )
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=503, detail="Polar API timeout. Please retry.")
+        except Exception as e:
+            print(f"PROVISION: Polar API request failed for clerk_id={clerk_id}: {e}")
+            raise HTTPException(status_code=503, detail="Could not reach Polar API. Please retry.")
+
+        if not polar_resp.is_success:
+            print(f"PROVISION ERROR: Polar returned {polar_resp.status_code} for clerk_id={clerk_id}: {polar_resp.text}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Polar API error ({polar_resp.status_code}). Check logs and retry."
+            )
+
+        polar_data = polar_resp.json()
+        product_id = polar_data.get("id")
+        if not product_id:
+            print(f"PROVISION ERROR: Polar response missing product id for clerk_id={clerk_id}: {polar_data}")
+            raise HTTPException(status_code=502, detail="Polar returned unexpected response (no product id).")
+
+        # Generate checkout URL for this product
+        # Polar hosted checkout URL — immutable product ID in path
+        if is_dev:
+            checkout_url = f"https://sandbox-buy.polar.sh/{product_id}"
+        else:
+            checkout_url = f"https://buy.polar.sh/{product_id}"
+
+        # Build updated config (merge with existing, add payment metadata)
+        if isinstance(current_config_raw, dict):
+            merged_config = current_config_raw.copy()
+        elif isinstance(current_config_raw, str):
+            try:
+                merged_config = json.loads(current_config_raw)
+            except Exception:
+                merged_config = {}
+        else:
+            merged_config = {}
+
+        # Overlay the submitted config fields
+        submitted = config.model_dump(exclude_none=False)
+        merged_config.update(submitted)
+
+        # Stamp payment metadata
+        merged_config["polar_checkout_url"] = checkout_url
+        merged_config["polar_created_at"] = datetime.now(timezone.utc).isoformat()
+
+        # Atomic DB update — all or nothing
+        cursor.execute(
+            """
+            UPDATE users
+               SET tier = 'CUSTOM',
+                   subscription_status = 'AWAITING_PAYMENT',
+                   custom_plan_config = %s,
+                   custom_plan_polar_product_id = %s
+             WHERE clerk_id = %s
+            """,
+            (json.dumps(merged_config), product_id, clerk_id)
+        )
+        conn.commit()
+
+        log_admin_action(
+            admin["clerk_id"],
+            "CUSTOM_PLAN_PROVISION",
+            clerk_id,
+            {
+                "product_id": product_id,
+                "checkout_url": checkout_url,
+                "price_usd": price,
+                "trial_days": trial_days,
+                "plan_name": plan_name,
+                "polar_env": "sandbox" if is_dev else "production",
+            }
+        )
+
+        print(f"PROVISION: Custom plan created for clerk_id={clerk_id}, product_id={product_id}")
+        return {
+            "status": "success",
+            "product_id": product_id,
+            "checkout_url": checkout_url,
+            "polar_env": "sandbox" if is_dev else "production",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"PROVISION FAILED for clerk_id={clerk_id}: {e}")
+        raise HTTPException(status_code=500, detail="Provision failed. DB was not modified.")
+    finally:
+        release_db_connection(conn)
+
+
+class CustomPlanOverrideRequest(BaseModel):
+    action: str = Field(..., description="One of: activate, suspend, reactivate, cancel, extend")
+    reason: str = Field(..., min_length=1, max_length=500, description="Reason for override (stored in audit log)")
+    extend_days: Optional[int] = Field(None, ge=1, le=365, description="Days to extend billing period (only for 'extend' action)")
+
+    class Config:
+        extra = "forbid"
+
+
+@app.patch("/api/admin/users/{clerk_id}/custom-plan/override")
+@limiter.limit("20/minute")
+async def custom_plan_override(
+    request: Request,
+    clerk_id: str,
+    req: CustomPlanOverrideRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """
+    Phase D: Admin override for custom plan subscription state.
+
+    Actions:
+      activate   — Set ACTIVE, billing_period_end = now+30d. DB-only (no Polar call).
+                   Use for testing or goodwill where no payment is collected.
+      suspend    — Set SUSPENDED. Access blocked. DB-only.
+      reactivate — From SUSPENDED → ACTIVE. DB-only.
+      cancel     — Call Polar API to gracefully cancel; webhook sets CANCELED.
+      extend     — Bump billing_period_end by extend_days. DB-only.
+
+    All actions are audit-logged with admin clerk_id, target, action, reason, and diff.
+    Conflict resolution: SUSPENDED status is sticky — webhooks update other fields
+    but do not flip status away from SUSPENDED until admin calls reactivate.
+    """
+    allowed_actions = {"activate", "suspend", "reactivate", "cancel", "extend"}
+    if req.action not in allowed_actions:
+        raise HTTPException(status_code=400, detail=f"action must be one of: {sorted(allowed_actions)}")
+
+    if req.action == "extend" and req.extend_days is None:
+        raise HTTPException(status_code=400, detail="extend_days is required for action 'extend'.")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Fetch current state with row-level lock to prevent concurrent overrides
+        cursor.execute(
+            """
+            SELECT id, tier, subscription_status, billing_period_end,
+                   custom_plan_polar_product_id, polar_customer_id
+              FROM users WHERE clerk_id = %s FOR UPDATE
+            """,
+            (clerk_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        user_db_id, current_tier, current_status, current_billing_end, polar_product_id, polar_cust_id = row
+
+        if current_tier != "CUSTOM":
+            raise HTTPException(
+                status_code=400,
+                detail=f"User tier is '{current_tier}', not 'CUSTOM'. This endpoint only manages custom plans."
+            )
+
+        now = datetime.now(timezone.utc)
+        changes = {
+            "action": req.action,
+            "reason": req.reason,
+            "before": {
+                "subscription_status": current_status,
+                "billing_period_end": current_billing_end.isoformat() if current_billing_end else None,
+            },
+        }
+
+        if req.action == "activate":
+            new_billing_end = now + timedelta(days=30)
+            cursor.execute(
+                """
+                UPDATE users
+                   SET subscription_status = 'ACTIVE',
+                       billing_period_end = %s
+                 WHERE clerk_id = %s
+                """,
+                (new_billing_end, clerk_id)
+            )
+            changes["after"] = {
+                "subscription_status": "ACTIVE",
+                "billing_period_end": new_billing_end.isoformat(),
+            }
+            changes["note"] = "DB-only override; Polar not called. Future webhooks will override unless status=SUSPENDED."
+
+        elif req.action == "suspend":
+            cursor.execute(
+                "UPDATE users SET subscription_status = 'SUSPENDED' WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+            changes["after"] = {"subscription_status": "SUSPENDED"}
+            changes["note"] = "SUSPENDED is sticky — webhooks will not flip this status until admin reactivates."
+
+        elif req.action == "reactivate":
+            if current_status != "SUSPENDED":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"reactivate is only valid from SUSPENDED status (current: {current_status!r})."
+                )
+            cursor.execute(
+                "UPDATE users SET subscription_status = 'ACTIVE' WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+            changes["after"] = {"subscription_status": "ACTIVE"}
+
+        elif req.action == "extend":
+            if current_billing_end and current_billing_end > now:
+                new_billing_end = current_billing_end + timedelta(days=req.extend_days)
+            else:
+                # Expired or null — extend from now
+                new_billing_end = now + timedelta(days=req.extend_days)
+            cursor.execute(
+                "UPDATE users SET billing_period_end = %s WHERE clerk_id = %s",
+                (new_billing_end, clerk_id)
+            )
+            changes["after"] = {"billing_period_end": new_billing_end.isoformat()}
+            changes["extend_days"] = req.extend_days
+
+        elif req.action == "cancel":
+            # Cancel via Polar API — the webhook will set status=CANCELED with billing_period_end.
+            if not polar_product_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No Polar product linked to this custom plan. Cannot cancel via Polar — use 'suspend' instead."
+                )
+
+            polar_token = os.getenv("POLAR_ACCESS_TOKEN")
+            if not polar_token:
+                raise HTTPException(status_code=500, detail="POLAR_ACCESS_TOKEN not configured.")
+
+            is_dev = os.getenv("ENV") == "development"
+            polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+
+            # Find the active subscription for this customer + product
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    # Fetch subscriptions for this customer filtered by product
+                    params = {"active": "true"}
+                    if polar_cust_id:
+                        params["customer_id"] = polar_cust_id
+                    sub_resp = await client.get(
+                        f"{polar_base_url}/api/v1/subscriptions/",
+                        params=params,
+                        headers={"Authorization": f"Bearer {polar_token}"}
+                    )
+                    if not sub_resp.is_success:
+                        raise HTTPException(
+                            status_code=502,
+                            detail=f"Polar API error fetching subscriptions ({sub_resp.status_code})."
+                        )
+
+                    subs = sub_resp.json().get("items", [])
+                    # Find the subscription matching our product_id
+                    target_sub = next(
+                        (s for s in subs if s.get("product_id") == polar_product_id),
+                        None
+                    )
+
+                    if not target_sub:
+                        raise HTTPException(
+                            status_code=404,
+                            detail="No active Polar subscription found for this custom plan product."
+                        )
+
+                    sub_id = target_sub["id"]
+                    # Graceful cancel: cancel_at_period_end=True (user keeps access until period end)
+                    cancel_resp = await client.patch(
+                        f"{polar_base_url}/api/v1/subscriptions/{sub_id}",
+                        json={"cancel_at_period_end": True},
+                        headers={
+                            "Authorization": f"Bearer {polar_token}",
+                            "Content-Type": "application/json",
+                        }
+                    )
+                    if cancel_resp.status_code not in (200, 204):
+                        raise HTTPException(
+                            status_code=502,
+                            detail=f"Polar cancel failed ({cancel_resp.status_code}): {cancel_resp.text}"
+                        )
+
+            except httpx.TimeoutException:
+                raise HTTPException(status_code=503, detail="Polar API timeout. Please retry.")
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"OVERRIDE CANCEL ERROR for clerk_id={clerk_id}: {e}")
+                raise HTTPException(status_code=503, detail="Could not reach Polar API.")
+
+            changes["after"] = {"note": "Polar graceful cancel issued. Webhook will set CANCELED + billing_period_end."}
+            changes["polar_subscription_id"] = sub_id
+
+        conn.commit()
+
+        log_admin_action(
+            admin["clerk_id"],
+            f"CUSTOM_PLAN_OVERRIDE_{req.action.upper()}",
+            clerk_id,
+            changes
+        )
+
+        print(f"OVERRIDE: admin={admin['clerk_id']} action={req.action} target={clerk_id} reason={req.reason!r}")
+        return {"status": "success", "action": req.action, "changes": changes}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"OVERRIDE FAILED for clerk_id={clerk_id}: {e}")
+        raise HTTPException(status_code=500, detail="Override failed.")
+    finally:
+        release_db_connection(conn)
+
 
 @app.post("/api/webhooks/clerk")
 async def clerk_webhook(
@@ -5407,6 +5942,11 @@ async def polar_webhook(request: Request):
         # until current_period_end. Different from revoked above.
         event_type = "subscription.canceled"
         data = event.data
+    elif "PastDue" in event_class:
+        # Polar subscription.past_due: payment failed, Polar is retrying.
+        # Our status → PAYMENT_FAILED; access denied until payment recovers.
+        event_type = "subscription.past_due"
+        data = event.data
     else:
         # Fallback: try event.type if it exists, otherwise log and ignore
         event_type = getattr(event, "type", None) or event_class
@@ -5459,7 +5999,7 @@ async def polar_webhook(request: Request):
             getattr(data, "modified_at", None)
             or getattr(data, "created_at", None)
         )
-        if event_ts is not None and event_type not in ("order.refunded", "subscription.revoked"):
+        if event_ts is not None and event_type not in ("order.refunded", "subscription.revoked", "subscription.past_due"):
             cursor.execute(
                 "SELECT last_polar_event_at FROM users WHERE clerk_id = %s",
                 (clerk_id,)
@@ -5488,71 +6028,179 @@ async def polar_webhook(request: Request):
             product_name = (getattr(product, "name", "") or "") if product else ""
 
             tier = POLAR_PRODUCT_TIER_MAP.get(product_id) if product_id else None
+            is_custom_plan = False
 
-            if tier is None:
-                # Unknown product ID: refuse to assign a tier rather than
-                # silently downgrading to BASIC. The user stays on whatever
-                # they were before; ops gets a CRITICAL log line and can
-                # update POLAR_PRODUCT_ID_* env vars + rerun via
-                # /api/user/sync-subscription.
-                print(
-                    f"POLAR WEBHOOK CRITICAL: Unknown product_id={product_id} "
-                    f"(name={product_name!r}). Add to POLAR_PRODUCT_ID_* env "
-                    f"and resync. Refusing to assign tier — user state unchanged."
+            if tier is None and product_id:
+                # Custom plan lookup: check if this product_id belongs to a
+                # custom-plan user. Row-level lock prevents concurrent webhook
+                # races on the same user (§10.9).
+                cursor.execute(
+                    "SELECT clerk_id FROM users WHERE custom_plan_polar_product_id = %s FOR UPDATE",
+                    (product_id,)
                 )
-                conn.commit()  # commit the idempotency row so we don't loop
-                return {
-                    "status": "error",
-                    "message": "Unknown product ID; tier assignment skipped (logged for ops)"
-                }
+                custom_row = cursor.fetchone()
+                if custom_row:
+                    tier = "CUSTOM"
+                    is_custom_plan = True
+                    # Reconcile: if the event's clerk_id doesn't match the DB
+                    # record (e.g. pending placeholder vs real), use the DB one.
+                    if custom_row[0] != clerk_id:
+                        print(
+                            f"POLAR WEBHOOK CUSTOM: clerk_id reconciled "
+                            f"from {clerk_id!r} → {custom_row[0]!r} via product_id lookup"
+                        )
+                        clerk_id = custom_row[0]
+                else:
+                    # Truly unknown product — log CRITICAL, return 200 so Polar
+                    # stops retrying. Ops must add the product to env vars.
+                    print(
+                        f"POLAR WEBHOOK CRITICAL: Unknown product_id={product_id} "
+                        f"(name={product_name!r}). Add to POLAR_PRODUCT_ID_* env "
+                        f"and resync. Refusing to assign tier — user state unchanged."
+                    )
+                    conn.commit()  # commit the idempotency row so we don't loop
+                    return {
+                        "status": "error",
+                        "message": "Unknown product ID; tier assignment skipped (logged for ops)"
+                    }
+            elif tier is None:
+                print(
+                    f"POLAR WEBHOOK CRITICAL: No product_id in event (name={product_name!r}). "
+                    f"Cannot resolve tier — user state unchanged."
+                )
+                conn.commit()
+                return {"status": "error", "message": "No product_id in event"}
+            else:
+                # Standard plan: acquire row-level lock before update (§10.9)
+                cursor.execute(
+                    "SELECT id FROM users WHERE clerk_id = %s FOR UPDATE",
+                    (clerk_id,)
+                )
 
-            print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name} ({product_id})")
+            print(f"POLAR SYNC: Event={event_type}, Tier={tier}, Product={product_name} ({product_id}), Custom={is_custom_plan}")
 
             period_end = getattr(data, "current_period_end", None)
             customer_id = getattr(data, "customer_id", None)
-            status = "CANCELED" if getattr(data, "cancel_at_period_end", False) else "ACTIVE"
 
-            if not customer_email:
-                customer_email = f"polar_{customer_id or 'unknown'}@placeholder.invalid"
+            if is_custom_plan:
+                # Determine CUSTOM subscription_status from Polar's subscription status
+                polar_sub_status = getattr(data, "status", None)
+                # For order.paid events (renewals), always → ACTIVE
+                if event_type in ("order.paid", "order.created"):
+                    status = "ACTIVE"
+                elif polar_sub_status == "trialing":
+                    status = "TRIAL_ACTIVE"
+                elif polar_sub_status in ("active",):
+                    status = "ACTIVE"
+                elif getattr(data, "cancel_at_period_end", False):
+                    status = "CANCELED"
+                else:
+                    status = "ACTIVE"
 
+                if not customer_email:
+                    customer_email = f"polar_{customer_id or 'unknown'}@placeholder.invalid"
+
+                # Update only — custom plan users MUST already exist in DB
+                # (admin creates them before the customer ever sees Polar).
+                # SUSPENDED is sticky: webhooks update billing fields but do
+                # not flip status away from SUSPENDED (§9.4 conflict rule).
+                cursor.execute(
+                    """
+                    UPDATE users
+                       SET subscription_status = CASE
+                               WHEN subscription_status = 'SUSPENDED' THEN 'SUSPENDED'
+                               ELSE %s
+                           END,
+                           polar_customer_id = COALESCE(%s, polar_customer_id),
+                           billing_period_end = COALESCE(%s, billing_period_end),
+                           email = CASE
+                               WHEN email = 'unknown@email.com' OR email IS NULL
+                               THEN %s ELSE email
+                           END
+                     WHERE clerk_id = %s
+                    """,
+                    (status, customer_id, period_end, customer_email, clerk_id)
+                )
+                if cursor.rowcount == 0:
+                    print(
+                        f"POLAR WEBHOOK CRITICAL: custom plan event for clerk_id={clerk_id} "
+                        f"but no DB row found. Possible race: admin deleted user mid-checkout."
+                    )
+                    conn.commit()
+                    return {"status": "error", "message": "Custom plan user not found"}
+            else:
+                status = "CANCELED" if getattr(data, "cancel_at_period_end", False) else "ACTIVE"
+
+                if not customer_email:
+                    customer_email = f"polar_{customer_id or 'unknown'}@placeholder.invalid"
+
+                cursor.execute(
+                    """
+                    INSERT INTO users (clerk_id, email, tier, subscription_status, polar_customer_id, billing_period_end)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (clerk_id) DO UPDATE SET
+                        tier = EXCLUDED.tier,
+                        subscription_status = CASE
+                            WHEN users.subscription_status = 'SUSPENDED' THEN 'SUSPENDED'
+                            ELSE EXCLUDED.subscription_status
+                        END,
+                        polar_customer_id = EXCLUDED.polar_customer_id,
+                        billing_period_end = EXCLUDED.billing_period_end,
+                        email = CASE
+                            WHEN users.email = 'unknown@email.com' OR users.email IS NULL
+                            THEN EXCLUDED.email
+                            ELSE users.email
+                        END
+                    RETURNING id
+                    """,
+                    (clerk_id, customer_email, tier, status, customer_id, period_end)
+                )
+
+        elif event_type == "subscription.past_due":
+            # Polar retrying payment — set PAYMENT_FAILED so access gate
+            # blocks the user. Access restores automatically when Polar emits
+            # subscription.active / order.paid on retry success.
+            # For custom plans: keep tier=CUSTOM; for standard: keep tier as-is.
+            # Row-level lock before mutation.
             cursor.execute(
-                """
-                INSERT INTO users (clerk_id, email, tier, subscription_status, polar_customer_id, billing_period_end)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (clerk_id) DO UPDATE SET
-                    tier = EXCLUDED.tier,
-                    subscription_status = EXCLUDED.subscription_status,
-                    polar_customer_id = EXCLUDED.polar_customer_id,
-                    billing_period_end = EXCLUDED.billing_period_end,
-                    email = CASE
-                        WHEN users.email = 'unknown@email.com' OR users.email IS NULL
-                        THEN EXCLUDED.email
-                        ELSE users.email
-                    END
-                RETURNING id
-                """,
-                (clerk_id, customer_email, tier, status, customer_id, period_end)
-            )
-
-        elif event_type == "subscription.revoked":
-            # Immediate access loss — non-payment, fraud, manual ban.
-            cursor.execute(
-                "UPDATE users SET tier = 'FREE', subscription_status = 'REVOKED' WHERE clerk_id = %s",
+                "SELECT id FROM users WHERE clerk_id = %s FOR UPDATE",
                 (clerk_id,)
             )
+            cursor.execute(
+                "UPDATE users SET subscription_status = 'PAYMENT_FAILED' WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+            print(f"POLAR WEBHOOK: subscription.past_due → PAYMENT_FAILED for clerk_id={clerk_id}")
+
+        elif event_type == "subscription.revoked":
+            # Immediate access loss — non-payment (all retries exhausted), fraud, manual ban.
+            # Custom plans: keep tier=CUSTOM so admin can see the state; standard: demote to FREE.
+            cursor.execute(
+                "SELECT id, tier FROM users WHERE clerk_id = %s FOR UPDATE",
+                (clerk_id,)
+            )
+            revoke_row = cursor.fetchone()
+            revoke_tier = revoke_row[1] if revoke_row else None
+            if revoke_tier == "CUSTOM":
+                cursor.execute(
+                    "UPDATE users SET subscription_status = 'REVOKED' WHERE clerk_id = %s",
+                    (clerk_id,)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE users SET tier = 'FREE', subscription_status = 'REVOKED' WHERE clerk_id = %s",
+                    (clerk_id,)
+                )
 
         elif event_type == "subscription.paused":
             # Polar semantics: billing paused, access preserved. Tier untouched.
-            # Status='PAUSED' so the dashboard and support can distinguish
-            # from ACTIVE (no charges accruing).
             cursor.execute(
                 "UPDATE users SET subscription_status = 'PAUSED' WHERE clerk_id = %s",
                 (clerk_id,)
             )
 
         elif event_type == "subscription.resumed":
-            # Resume from pause — flip back to ACTIVE. Tier preserved (it
-            # was never changed during pause).
+            # Resume from pause — flip back to ACTIVE. Tier preserved.
             cursor.execute(
                 "UPDATE users SET subscription_status = 'ACTIVE' WHERE clerk_id = %s",
                 (clerk_id,)
@@ -5560,10 +6208,23 @@ async def polar_webhook(request: Request):
 
         elif event_type == "order.refunded":
             # Policy A: refund = immediate access loss.
+            # Custom plans: keep tier=CUSTOM; standard: demote to FREE.
             cursor.execute(
-                "UPDATE users SET tier = 'FREE', subscription_status = 'REFUNDED' WHERE clerk_id = %s",
+                "SELECT id, tier FROM users WHERE clerk_id = %s FOR UPDATE",
                 (clerk_id,)
             )
+            refund_row = cursor.fetchone()
+            refund_tier = refund_row[1] if refund_row else None
+            if refund_tier == "CUSTOM":
+                cursor.execute(
+                    "UPDATE users SET subscription_status = 'REFUNDED' WHERE clerk_id = %s",
+                    (clerk_id,)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE users SET tier = 'FREE', subscription_status = 'REFUNDED' WHERE clerk_id = %s",
+                    (clerk_id,)
+                )
 
         elif event_type == "refund.failed":
             # Refund didn't actually process — no state change. Log only.
@@ -6237,6 +6898,436 @@ async def get_eval_results(
         ]
 
         return {"runs": runs, "latest_results": latest_results}
+    finally:
+        release_db_connection(conn)
+
+
+# ---------------------------------------------------------------------------
+# Phase E — Custom Plan Reconciliation & Monitoring
+# ---------------------------------------------------------------------------
+
+# How many seconds between daily reconciliation runs (86400 = 24 h).
+_RECONCILE_INTERVAL_SECONDS = 86400
+
+
+async def _run_custom_plan_reconciliation() -> dict:
+    """
+    Diffs Polar subscription state vs DB state for all CUSTOM-tier users.
+
+    Returns a reconciliation report dict. Side-effects:
+    - Prints CRITICAL/WARNING lines for every mismatch found.
+    - Logs a SYSTEM_RECONCILE_CUSTOM_PLAN entry in admin_audit_log.
+
+    Mismatch categories:
+    A) DB has tier=CUSTOM but no custom_plan_polar_product_id and status not
+       terminal — orphan DB row (admin forgot to provision or column cleared).
+    B) DB has custom_plan_polar_product_id but Polar reports subscription
+       canceled/revoked/not-found — likely stale DB state; needs webhook re-delivery.
+    C) Polar subscription status differs from our subscription_status mapping —
+       indicates a missed or dropped webhook.
+    D) AWAITING_PAYMENT for >7 days — customer never started checkout; alert admin.
+    """
+    is_dev = os.getenv("ENV") == "development"
+    polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+    polar_token = os.getenv("POLAR_ACCESS_TOKEN")
+
+    report = {
+        "ran_at": datetime.now(timezone.utc).isoformat(),
+        "polar_reachable": False,
+        "db_custom_users": 0,
+        "mismatches": [],
+        "awaiting_payment_stale": [],
+        "payment_failed_24h": 0,
+    }
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # ── DB side ──────────────────────────────────────────────────────────
+        cursor.execute(
+            """
+            SELECT clerk_id, email, subscription_status, custom_plan_polar_product_id,
+                   billing_period_end, last_polar_event_at, created_at
+              FROM users
+             WHERE tier = 'CUSTOM'
+            """
+        )
+        db_rows = cursor.fetchall()
+        report["db_custom_users"] = len(db_rows)
+
+        # Build a lookup: product_id → db row
+        db_by_product: dict[str, dict] = {}
+        for row in db_rows:
+            clerk_id, email, status, product_id, billing_end, last_event, created_at = row
+            entry = {
+                "clerk_id": clerk_id,
+                "email": email,
+                "subscription_status": status,
+                "custom_plan_polar_product_id": product_id,
+                "billing_period_end": billing_end,
+                "last_polar_event_at": last_event,
+                "created_at": created_at,
+            }
+            if product_id:
+                db_by_product[product_id] = entry
+            else:
+                # Category A: no product_id, check if terminal
+                terminal = {"AWAITING_PAYMENT", "EXPIRED", "REVOKED", "REFUNDED", "CANCELED"}
+                if status not in terminal:
+                    mismatch = {
+                        "type": "ORPHAN_DB_NO_PRODUCT_ID",
+                        "clerk_id": clerk_id,
+                        "email": email,
+                        "subscription_status": status,
+                        "detail": "tier=CUSTOM with no custom_plan_polar_product_id and non-terminal status.",
+                    }
+                    report["mismatches"].append(mismatch)
+                    print(f"RECONCILE WARNING: {mismatch}")
+
+        # Category D: AWAITING_PAYMENT for >7 days
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        for row in db_rows:
+            clerk_id, email, status, product_id, _, _, created_at = row
+            if status == "AWAITING_PAYMENT" and created_at and created_at < seven_days_ago:
+                entry = {"clerk_id": clerk_id, "email": email, "created_at": created_at.isoformat() if created_at else None}
+                report["awaiting_payment_stale"].append(entry)
+                print(f"RECONCILE ALERT: AWAITING_PAYMENT >7d clerk_id={clerk_id} email={email}")
+
+        # Category payment_failed in last 24h count
+        cursor.execute(
+            """
+            SELECT COUNT(*) FROM users
+             WHERE tier = 'CUSTOM'
+               AND subscription_status = 'PAYMENT_FAILED'
+               AND last_polar_event_at >= NOW() - INTERVAL '24 hours'
+            """
+        )
+        report["payment_failed_24h"] = cursor.fetchone()[0] or 0
+        if report["payment_failed_24h"] > 0:
+            print(f"RECONCILE ALERT: {report['payment_failed_24h']} CUSTOM user(s) hit PAYMENT_FAILED in last 24h.")
+
+        # ── Polar side ───────────────────────────────────────────────────────
+        if not polar_token:
+            print("RECONCILE WARNING: POLAR_ACCESS_TOKEN not set — skipping Polar-side diff.")
+            report["polar_reachable"] = False
+        else:
+            # Polar subscription status → our expected DB status mapping
+            polar_to_db_status = {
+                "trialing": "TRIAL_ACTIVE",
+                "active": "ACTIVE",
+                "past_due": "PAYMENT_FAILED",
+                "canceled": "CANCELED",
+                "unpaid": "PAYMENT_FAILED",
+                "incomplete": "AWAITING_PAYMENT",
+                "incomplete_expired": "EXPIRED",
+            }
+
+            try:
+                async with httpx.AsyncClient(timeout=20.0) as client:
+                    # Paginate through all subscriptions (Polar uses cursor pagination)
+                    page_url = f"{polar_base_url}/api/v1/subscriptions/?limit=100"
+                    polar_subs: list[dict] = []
+                    while page_url:
+                        resp = await client.get(
+                            page_url,
+                            headers={"Authorization": f"Bearer {polar_token}"},
+                        )
+                        if resp.status_code != 200:
+                            print(f"RECONCILE ERROR: Polar subscriptions list returned {resp.status_code}.")
+                            break
+                        body = resp.json()
+                        items = body.get("items", [])
+                        polar_subs.extend(items)
+                        next_cursor = body.get("pagination", {}).get("next_cursor")
+                        page_url = f"{polar_base_url}/api/v1/subscriptions/?limit=100&after={next_cursor}" if next_cursor else None
+
+                report["polar_reachable"] = True
+                polar_product_ids = set()
+
+                for sub in polar_subs:
+                    product_id = sub.get("product_id")
+                    if not product_id or product_id not in db_by_product:
+                        continue
+
+                    polar_product_ids.add(product_id)
+                    db_entry = db_by_product[product_id]
+                    polar_status = sub.get("status", "")
+                    expected_db_status = polar_to_db_status.get(polar_status)
+                    actual_db_status = db_entry["subscription_status"]
+
+                    # Category C: Polar status vs our DB status differs
+                    if expected_db_status and actual_db_status != expected_db_status:
+                        # Exclude SUSPENDED — admin override; should not be overwritten by reconcile
+                        if actual_db_status != "SUSPENDED":
+                            mismatch = {
+                                "type": "STATUS_MISMATCH",
+                                "clerk_id": db_entry["clerk_id"],
+                                "email": db_entry["email"],
+                                "polar_subscription_id": sub.get("id"),
+                                "polar_status": polar_status,
+                                "expected_db_status": expected_db_status,
+                                "actual_db_status": actual_db_status,
+                                "last_polar_event_at": db_entry["last_polar_event_at"].isoformat() if db_entry["last_polar_event_at"] else None,
+                                "detail": "Polar subscription status does not match DB. Likely a dropped webhook.",
+                            }
+                            report["mismatches"].append(mismatch)
+                            print(f"RECONCILE WARNING: {mismatch}")
+
+                # Category B: DB has product_id but Polar returned no matching sub
+                for product_id, db_entry in db_by_product.items():
+                    if product_id not in polar_product_ids:
+                        non_terminal = {"TRIAL_ACTIVE", "ACTIVE", "PAYMENT_FAILED", "PAUSED", "AWAITING_PAYMENT"}
+                        if db_entry["subscription_status"] in non_terminal:
+                            mismatch = {
+                                "type": "POLAR_SUBSCRIPTION_MISSING",
+                                "clerk_id": db_entry["clerk_id"],
+                                "email": db_entry["email"],
+                                "custom_plan_polar_product_id": product_id,
+                                "db_status": db_entry["subscription_status"],
+                                "detail": "DB references Polar product but no active subscription found on Polar side.",
+                            }
+                            report["mismatches"].append(mismatch)
+                            print(f"RECONCILE CRITICAL: {mismatch}")
+
+            except httpx.TimeoutException:
+                print("RECONCILE ERROR: Polar API timed out during reconciliation.")
+            except Exception as exc:
+                print(f"RECONCILE ERROR: Unexpected error during Polar fetch: {exc}")
+
+        # Log to audit trail so ops can see history in the DB
+        log_admin_action(
+            "SYSTEM",
+            "SYSTEM_RECONCILE_CUSTOM_PLAN",
+            None,
+            {
+                "db_custom_users": report["db_custom_users"],
+                "mismatches_count": len(report["mismatches"]),
+                "awaiting_payment_stale_count": len(report["awaiting_payment_stale"]),
+                "payment_failed_24h": report["payment_failed_24h"],
+                "polar_reachable": report["polar_reachable"],
+            },
+        )
+
+        mismatch_count = len(report["mismatches"])
+        stale_count = len(report["awaiting_payment_stale"])
+        print(
+            f"RECONCILE COMPLETE: db_custom_users={report['db_custom_users']} "
+            f"mismatches={mismatch_count} stale_awaiting_payment={stale_count} "
+            f"payment_failed_24h={report['payment_failed_24h']} "
+            f"polar_reachable={report['polar_reachable']}"
+        )
+        return report
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"RECONCILE FAILED: {e}")
+        return {**report, "error": str(e)}
+    finally:
+        release_db_connection(conn)
+
+
+async def _custom_plan_reconciliation_loop():
+    """Background loop: run reconciliation once per day."""
+    # Initial delay so the app finishes starting before the first run.
+    await asyncio.sleep(60)
+    while True:
+        try:
+            await _run_custom_plan_reconciliation()
+        except Exception as e:
+            print(f"RECONCILE LOOP ERROR (will retry next cycle): {e}")
+        await asyncio.sleep(_RECONCILE_INTERVAL_SECONDS)
+
+
+@app.post("/api/admin/custom-plan/reconcile")
+@limiter.limit("5/minute")
+async def trigger_custom_plan_reconciliation(
+    request: Request,
+    admin: dict = Depends(get_admin_user),
+):
+    """
+    Phase E: Manually trigger the custom-plan reconciliation job.
+
+    Returns the full reconciliation report. Mismatches are also printed to
+    server logs and recorded in admin_audit_log by the job itself.
+    """
+    report = await _run_custom_plan_reconciliation()
+    return report
+
+
+@app.get("/api/admin/custom-plan/metrics")
+@limiter.limit("30/minute")
+async def custom_plan_metrics(
+    request: Request,
+    admin: dict = Depends(get_admin_user),
+):
+    """
+    Phase E: Subscription-status metrics for all CUSTOM-tier users.
+
+    Returns:
+    - status_counts: mapping of subscription_status → count
+    - awaiting_payment_stale: users with AWAITING_PAYMENT for >7 days
+    - payment_failed_24h: count of CUSTOM users who hit PAYMENT_FAILED in the last 24h
+    - payment_failed_7d: same but last 7 days
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Status distribution
+        cursor.execute(
+            """
+            SELECT subscription_status, COUNT(*) AS cnt
+              FROM users
+             WHERE tier = 'CUSTOM'
+             GROUP BY subscription_status
+             ORDER BY cnt DESC
+            """
+        )
+        status_counts = {row[0] or "NULL": row[1] for row in cursor.fetchall()}
+
+        # AWAITING_PAYMENT stale (>7 days)
+        cursor.execute(
+            """
+            SELECT clerk_id, email, created_at, custom_plan_polar_product_id
+              FROM users
+             WHERE tier = 'CUSTOM'
+               AND subscription_status = 'AWAITING_PAYMENT'
+               AND created_at < NOW() - INTERVAL '7 days'
+             ORDER BY created_at ASC
+            """
+        )
+        stale_rows = cursor.fetchall()
+        awaiting_payment_stale = [
+            {
+                "clerk_id": r[0],
+                "email": r[1],
+                "created_at": r[2].isoformat() if r[2] else None,
+                "custom_plan_polar_product_id": r[3],
+            }
+            for r in stale_rows
+        ]
+
+        # PAYMENT_FAILED spike — last 24h and last 7d
+        cursor.execute(
+            """
+            SELECT
+              COUNT(*) FILTER (WHERE last_polar_event_at >= NOW() - INTERVAL '24 hours') AS last_24h,
+              COUNT(*) FILTER (WHERE last_polar_event_at >= NOW() - INTERVAL '7 days')  AS last_7d
+            FROM users
+            WHERE tier = 'CUSTOM'
+              AND subscription_status = 'PAYMENT_FAILED'
+            """
+        )
+        pf_row = cursor.fetchone()
+        payment_failed_24h = pf_row[0] if pf_row else 0
+        payment_failed_7d = pf_row[1] if pf_row else 0
+
+        return {
+            "status_counts": status_counts,
+            "awaiting_payment_stale": awaiting_payment_stale,
+            "awaiting_payment_stale_count": len(awaiting_payment_stale),
+            "payment_failed_24h": payment_failed_24h,
+            "payment_failed_7d": payment_failed_7d,
+        }
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/admin/custom-plan/dashboard")
+@limiter.limit("30/minute")
+async def custom_plan_dashboard(
+    request: Request,
+    admin: dict = Depends(get_admin_user),
+):
+    """
+    Phase E: Admin dashboard surface for all custom-plan users.
+
+    Returns one record per CUSTOM-tier user with:
+    - clerk_id, email, subscription_status (with color hint: green/amber/red)
+    - billing_period_end
+    - last_polar_event_at (last webhook timestamp)
+    - polar_checkout_url from custom_plan_config (for re-send)
+    - custom_plan_polar_product_id (for building Polar dashboard link)
+    - polar_subscription_link (constructed Polar dashboard URL)
+    - quick_actions: which override actions are valid from current status
+    """
+    is_dev = os.getenv("ENV") == "development"
+    polar_dashboard_base = "https://sandbox-dashboard.polar.sh" if is_dev else "https://dashboard.polar.sh"
+
+    STATUS_COLOR = {
+        "TRIAL_ACTIVE": "green",
+        "ACTIVE": "green",
+        "PAUSED": "green",
+        "AWAITING_PAYMENT": "amber",
+        "CANCELED": "amber",
+        "PAYMENT_FAILED": "red",
+        "SUSPENDED": "red",
+        "REVOKED": "red",
+        "REFUNDED": "red",
+        "EXPIRED": "red",
+    }
+
+    # Which override actions make sense from each status
+    VALID_ACTIONS: dict[str, list[str]] = {
+        "AWAITING_PAYMENT": ["activate", "cancel"],
+        "TRIAL_ACTIVE":     ["suspend", "cancel", "extend"],
+        "ACTIVE":           ["suspend", "cancel", "extend"],
+        "PAYMENT_FAILED":   ["activate", "suspend", "cancel", "extend"],
+        "PAUSED":           ["suspend", "cancel"],
+        "CANCELED":         ["activate"],
+        "EXPIRED":          ["activate"],
+        "SUSPENDED":        ["reactivate", "cancel"],
+        "REVOKED":          ["activate"],
+        "REFUNDED":         ["activate"],
+    }
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT clerk_id, email, subscription_status, billing_period_end,
+                   last_polar_event_at, custom_plan_config, custom_plan_polar_product_id
+              FROM users
+             WHERE tier = 'CUSTOM'
+             ORDER BY
+               CASE subscription_status
+                 WHEN 'PAYMENT_FAILED' THEN 0
+                 WHEN 'SUSPENDED'      THEN 1
+                 WHEN 'AWAITING_PAYMENT' THEN 2
+                 ELSE 3
+               END,
+               email ASC
+            """
+        )
+        rows = cursor.fetchall()
+
+        users = []
+        for row in rows:
+            clerk_id, email, status, billing_end, last_event, cfg_raw, product_id = row
+            cfg = cfg_raw if isinstance(cfg_raw, dict) else (json.loads(cfg_raw) if cfg_raw else {})
+            checkout_url = cfg.get("polar_checkout_url")
+
+            polar_sub_link = None
+            if product_id:
+                polar_sub_link = f"{polar_dashboard_base}/products/{product_id}"
+
+            users.append({
+                "clerk_id": clerk_id,
+                "email": email,
+                "subscription_status": status,
+                "status_color": STATUS_COLOR.get(status or "", "amber"),
+                "billing_period_end": billing_end.isoformat() if billing_end else None,
+                "last_polar_event_at": last_event.isoformat() if last_event else None,
+                "polar_checkout_url": checkout_url,
+                "custom_plan_polar_product_id": product_id,
+                "polar_subscription_link": polar_sub_link,
+                "quick_actions": VALID_ACTIONS.get(status or "", []),
+            })
+
+        return {"custom_plan_users": users, "total": len(users)}
     finally:
         release_db_connection(conn)
 
