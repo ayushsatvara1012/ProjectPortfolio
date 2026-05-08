@@ -7309,16 +7309,16 @@ async def custom_plan_dashboard(
 
     # Which override actions make sense from each status
     VALID_ACTIONS: dict[str, list[str]] = {
-        "AWAITING_PAYMENT": ["activate", "cancel"],
+        "AWAITING_PAYMENT": ["activate", "cancel", "reset"],
         "TRIAL_ACTIVE":     ["suspend", "cancel", "extend"],
         "ACTIVE":           ["suspend", "cancel", "extend"],
-        "PAYMENT_FAILED":   ["activate", "suspend", "cancel", "extend"],
+        "PAYMENT_FAILED":   ["activate", "suspend", "cancel", "extend", "reset"],
         "PAUSED":           ["suspend", "cancel"],
-        "CANCELED":         ["activate"],
-        "EXPIRED":          ["activate"],
-        "SUSPENDED":        ["reactivate", "cancel"],
-        "REVOKED":          ["activate"],
-        "REFUNDED":         ["activate"],
+        "CANCELED":         ["activate", "reset"],
+        "EXPIRED":          ["activate", "reset"],
+        "SUSPENDED":        ["reactivate", "cancel", "reset"],
+        "REVOKED":          ["activate", "reset"],
+        "REFUNDED":         ["activate", "reset"],
     }
 
     conn = get_db_connection()

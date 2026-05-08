@@ -72,6 +72,7 @@ const FEATURE_FLAGS = [
 const ACTION_LABELS: Record<string, string> = {
   activate: 'Activate', suspend: 'Suspend', reactivate: 'Reactivate',
   cancel: 'Cancel Subscription', extend: 'Extend Billing Period',
+  reset: 'Reset Product ID',
 };
 
 const ACTION_STYLE: Record<string, string> = {
@@ -80,6 +81,7 @@ const ACTION_STYLE: Record<string, string> = {
   suspend: 'bg-red-600 hover:bg-red-500 text-white',
   cancel: 'bg-red-600 hover:bg-red-500 text-white',
   extend: 'bg-blue-600 hover:bg-blue-500 text-white',
+  reset: 'bg-orange-600 hover:bg-orange-500 text-white',
 };
 
 const BLANK_CUSTOM_CONFIG = {
