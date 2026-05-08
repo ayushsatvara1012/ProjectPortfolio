@@ -5363,10 +5363,21 @@ async def provision_custom_plan(
             raise HTTPException(status_code=503, detail="Could not reach Polar API. Please retry.")
 
         if not polar_resp.is_success:
-            print(f"PROVISION ERROR: Polar returned {polar_resp.status_code} for clerk_id={clerk_id}: {polar_resp.text}")
+            polar_error_body = polar_resp.text[:500]
+            print(f"PROVISION ERROR: Polar returned {polar_resp.status_code} for clerk_id={clerk_id}: {polar_error_body}")
+            if polar_resp.status_code == 403:
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        f"Polar API returned 403 Forbidden. "
+                        f"Verify POLAR_ACCESS_TOKEN is valid, has 'products:write' scope, "
+                        f"and matches the environment (sandbox vs production). "
+                        f"Polar detail: {polar_error_body}"
+                    )
+                )
             raise HTTPException(
                 status_code=502,
-                detail=f"Polar API error ({polar_resp.status_code}). Check logs and retry."
+                detail=f"Polar API error ({polar_resp.status_code}): {polar_error_body}"
             )
 
         polar_data = polar_resp.json()
