@@ -5331,7 +5331,6 @@ async def provision_custom_plan(
         polar_product_payload = {
             "name": f"{plan_name} ({clerk_id[:8]})",
             "description": f"Custom plan for {clerk_id}. Price: ${price}/mo.",
-            "billing_scheme": "recurring",
             "prices": [
                 {
                     "type": "recurring",
@@ -5354,6 +5353,7 @@ async def provision_custom_plan(
         # Call Polar API to create the product
         # Idempotency key = clerk_id ensures retries don't duplicate products
         idempotency_key = f"custom-plan-{clerk_id}"
+        print(f"PROVISION REQUEST: Sending to Polar for clerk_id={clerk_id}: {json.dumps(polar_product_payload, indent=2, default=str)}")
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 polar_resp = await client.post(
