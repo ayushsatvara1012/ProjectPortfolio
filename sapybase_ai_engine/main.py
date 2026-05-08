@@ -5331,6 +5331,7 @@ async def provision_custom_plan(
         polar_product_payload = {
             "name": f"{plan_name} ({clerk_id[:8]})",
             "description": f"Custom plan for {clerk_id}. Price: ${price}/mo.",
+            "billing_scheme": "recurring",
             "prices": [
                 {
                     "type": "recurring",
