@@ -5478,7 +5478,7 @@ async def provision_custom_plan(
 
 
 class CustomPlanOverrideRequest(BaseModel):
-    action: str = Field(..., description="One of: activate, suspend, reactivate, cancel, extend")
+    action: str = Field(..., description="One of: activate, suspend, reactivate, cancel, extend, reset")
     reason: str = Field(..., min_length=1, max_length=500, description="Reason for override (stored in audit log)")
     extend_days: Optional[int] = Field(None, ge=1, le=365, description="Days to extend billing period (only for 'extend' action)")
 
@@ -5505,12 +5505,13 @@ async def custom_plan_override(
       reactivate — From SUSPENDED → ACTIVE. DB-only.
       cancel     — Call Polar API to gracefully cancel; webhook sets CANCELED.
       extend     — Bump billing_period_end by extend_days. DB-only.
+      reset      — Clear custom_plan_polar_product_id to allow re-provisioning. DB-only.
 
     All actions are audit-logged with admin clerk_id, target, action, reason, and diff.
     Conflict resolution: SUSPENDED status is sticky — webhooks update other fields
     but do not flip status away from SUSPENDED until admin calls reactivate.
     """
-    allowed_actions = {"activate", "suspend", "reactivate", "cancel", "extend"}
+    allowed_actions = {"activate", "suspend", "reactivate", "cancel", "extend", "reset"}
     if req.action not in allowed_actions:
         raise HTTPException(status_code=400, detail=f"action must be one of: {sorted(allowed_actions)}")
 
@@ -5674,6 +5675,14 @@ async def custom_plan_override(
 
             changes["after"] = {"note": "Polar graceful cancel issued. Webhook will set CANCELED + billing_period_end."}
             changes["polar_subscription_id"] = sub_id
+
+        elif req.action == "reset":
+            cursor.execute(
+                "UPDATE users SET custom_plan_polar_product_id = NULL WHERE clerk_id = %s",
+                (clerk_id,)
+            )
+            changes["after"] = {"custom_plan_polar_product_id": None}
+            changes["note"] = "Product ID cleared. User can now re-provision a new custom plan in Polar."
 
         conn.commit()
 
