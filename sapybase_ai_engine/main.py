@@ -5413,22 +5413,36 @@ async def provision_custom_plan(
         # Need to create a checkout link separately via API
         checkout_url = None
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 checkout_payload = {
                     "product_id": product_id,
                 }
-                checkout_resp = await client.post(
+                # Try multiple endpoint variations
+                checkout_endpoints = [
                     f"{polar_base_url}/api/v1/checkout-links",
-                    json=checkout_payload,
-                    headers={"Authorization": f"Bearer {polar_token}"}
-                )
+                    f"{polar_base_url}/api/v1/checkouts",
+                ]
 
-                if checkout_resp.is_success:
-                    checkout_data = checkout_resp.json()
-                    checkout_url = checkout_data.get("url")
-                    print(f"CHECKOUT LINK CREATED: {json.dumps(checkout_data, indent=2, default=str)}")
-                else:
-                    print(f"CHECKOUT LINK ERROR ({checkout_resp.status_code}): {checkout_resp.text[:300]}")
+                for endpoint in checkout_endpoints:
+                    try:
+                        checkout_resp = await client.post(
+                            endpoint,
+                            json=checkout_payload,
+                            headers={"Authorization": f"Bearer {polar_token}"}
+                        )
+
+                        if checkout_resp.status_code in (200, 201):
+                            checkout_data = checkout_resp.json()
+                            checkout_url = checkout_data.get("url") or checkout_data.get("checkout_url")
+                            print(f"CHECKOUT LINK CREATED at {endpoint}: {json.dumps(checkout_data, indent=2, default=str)}")
+                            break
+                        elif checkout_resp.status_code in (307, 308):
+                            print(f"CHECKOUT REDIRECT ({checkout_resp.status_code}) at {endpoint}: location={checkout_resp.headers.get('location')}")
+                        else:
+                            print(f"CHECKOUT LINK ERROR ({checkout_resp.status_code}) at {endpoint}: {checkout_resp.text[:200]}")
+                    except Exception as e:
+                        print(f"CHECKOUT API ATTEMPT {endpoint} failed: {e}")
+                        continue
 
         except Exception as e:
             print(f"CHECKOUT LINK API ERROR: {e}")
