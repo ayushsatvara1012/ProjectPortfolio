@@ -5410,12 +5410,17 @@ async def provision_custom_plan(
             raise HTTPException(status_code=502, detail="Polar returned unexpected response (no product id).")
 
         # Check if Polar provides a checkout URL directly, otherwise construct it
-        # Polar hosted checkout URL — immutable product ID in path
+        # Polar hosted checkout URL can use product ID directly
         polar_checkout_url = polar_data.get("checkout_url")
+
+        # Try multiple URL formats - Polar may support different formats
         if is_dev:
-            checkout_url = polar_checkout_url or f"https://sandbox-buy.polar.sh/products/{product_id}"
+            # Try: /products/{id}, /{id}, or /p/{id}
+            checkout_url = polar_checkout_url or f"https://sandbox-buy.polar.sh/{product_id}"
         else:
-            checkout_url = polar_checkout_url or f"https://buy.polar.sh/products/{product_id}"
+            checkout_url = polar_checkout_url or f"https://buy.polar.sh/{product_id}"
+
+        print(f"CHECKOUT URL: polar returned '{polar_checkout_url}', using: '{checkout_url}'")
 
         # Build updated config (merge with existing, add payment metadata)
         if isinstance(current_config_raw, dict):
