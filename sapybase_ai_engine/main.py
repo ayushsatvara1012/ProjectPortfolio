@@ -1274,6 +1274,9 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     _user_id_for_downgrade = company_data[19]
     _sub_status = company_data[20]
     _billing_end = company_data[21]
+    # Ensure timezone-aware datetime for comparisons (database may return naive datetimes)
+    if _billing_end and isinstance(_billing_end, datetime) and _billing_end.tzinfo is None:
+        _billing_end = _billing_end.replace(tzinfo=timezone.utc)
     if (
         _sub_status == "CANCELED"
         and _billing_end is not None
@@ -1639,6 +1642,11 @@ async def get_current_user(request: Request):
         if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
 
         user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
+        # Ensure timezone-aware datetime for comparisons (database may return naive datetimes)
+        if billing_end and isinstance(billing_end, datetime) and billing_end.tzinfo is None:
+            billing_end = billing_end.replace(tzinfo=timezone.utc)
+        if trial_end_date and isinstance(trial_end_date, datetime) and trial_end_date.tzinfo is None:
+            trial_end_date = trial_end_date.replace(tzinfo=timezone.utc)
         if isinstance(custom_plan_config_raw, dict):
             custom_plan_cfg = custom_plan_config_raw
         elif isinstance(custom_plan_config_raw, str):

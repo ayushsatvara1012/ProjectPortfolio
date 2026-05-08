@@ -81,7 +81,7 @@ export const useAuthenticatedFetch = () => {
     }
 
     return data as T;
-  }, [getToken, isLoaded, isSignedIn, baseUrl]);
+  }, [isLoaded, isSignedIn]);
 };
 
 // Convenience hook — use as `enabled` in useQuery to prevent firing before Clerk is ready
