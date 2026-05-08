@@ -95,7 +95,7 @@ export function resolveEntitlements(
   return {
     canUseCustomLogo: resolve('canUseCustomLogo', 'custom_logo'),
     canWhiteLabel: resolve('canWhiteLabel', 'white_label'),
-    canUseWebhooks: resolve('canUseWebhooks', 'webhooks'),
+    canUseWebhooks: resolve('canUseWebhooks', 'webhook'),
     canUseHumanHandoff: resolve('canUseHumanHandoff', 'human_handoff'),
     canUseLeadCapture: resolve('canUseLeadCapture', 'lead_capture'),
     canUseAnalytics: resolve('canUseAnalytics', 'analytics'),
