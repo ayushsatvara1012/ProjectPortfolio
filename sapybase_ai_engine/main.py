@@ -5335,6 +5335,7 @@ async def provision_custom_plan(
                 {
                     "type": "recurring",
                     "recurring_interval": "month",
+                    "amount_type": "fixed",
                     "price_amount": price_cents,
                     "price_currency": "usd",
                 }
