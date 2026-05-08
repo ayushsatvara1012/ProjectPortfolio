@@ -5331,6 +5331,7 @@ async def provision_custom_plan(
         polar_product_payload = {
             "name": f"{plan_name} ({clerk_id[:8]})",
             "description": f"Custom plan for {clerk_id}. Price: ${price}/mo.",
+            "recurring_interval": "month",
             "prices": [
                 {
                     "type": "recurring",
@@ -5349,6 +5350,8 @@ async def provision_custom_plan(
         # Add trial days if configured
         if trial_days > 0:
             polar_product_payload["prices"][0]["trial_period_days"] = trial_days
+            polar_product_payload["trial_interval"] = "day"
+            polar_product_payload["trial_interval_count"] = trial_days
 
         # Call Polar API to create the product
         # Idempotency key = clerk_id ensures retries don't duplicate products
