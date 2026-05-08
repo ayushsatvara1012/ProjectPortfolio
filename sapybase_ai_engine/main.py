@@ -5400,16 +5400,19 @@ async def provision_custom_plan(
 
         polar_data = polar_resp.json()
         product_id = polar_data.get("id")
+        print(f"PROVISION SUCCESS: Created Polar product for clerk_id={clerk_id}: {json.dumps(polar_data, indent=2, default=str)}")
+
         if not product_id:
             print(f"PROVISION ERROR: Polar response missing product id for clerk_id={clerk_id}: {polar_data}")
             raise HTTPException(status_code=502, detail="Polar returned unexpected response (no product id).")
 
-        # Generate checkout URL for this product
+        # Check if Polar provides a checkout URL directly, otherwise construct it
         # Polar hosted checkout URL — immutable product ID in path
+        polar_checkout_url = polar_data.get("checkout_url")
         if is_dev:
-            checkout_url = f"https://sandbox-buy.polar.sh/{product_id}"
+            checkout_url = polar_checkout_url or f"https://sandbox-buy.polar.sh/products/{product_id}"
         else:
-            checkout_url = f"https://buy.polar.sh/{product_id}"
+            checkout_url = polar_checkout_url or f"https://buy.polar.sh/products/{product_id}"
 
         # Build updated config (merge with existing, add payment metadata)
         if isinstance(current_config_raw, dict):
@@ -5473,6 +5476,80 @@ async def provision_custom_plan(
             conn.rollback()
         print(f"PROVISION FAILED for clerk_id={clerk_id}: {e}")
         raise HTTPException(status_code=500, detail="Provision failed. DB was not modified.")
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/admin/users/{clerk_id}/custom-plan/product-details")
+@limiter.limit("10/minute")
+async def get_custom_plan_product_details(
+    clerk_id: str,
+    admin: dict = Depends(get_admin_user),
+):
+    """
+    Fetch product details from Polar to debug checkout URL issues.
+    Shows the actual product configuration and checkout URL from Polar.
+    """
+    import httpx
+
+    polar_token = os.getenv("POLAR_ACCESS_TOKEN")
+    if not polar_token:
+        raise HTTPException(status_code=500, detail="POLAR_ACCESS_TOKEN not configured.")
+
+    is_dev = os.getenv("ENV") == "development"
+    polar_base_url = "https://sandbox-api.polar.sh" if is_dev else "https://api.polar.sh"
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT custom_plan_polar_product_id, custom_plan_config FROM users WHERE clerk_id = %s",
+            (clerk_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        product_id, config_raw = row
+        if not product_id:
+            raise HTTPException(status_code=400, detail="User has no linked Polar product ID.")
+
+        config = json.loads(config_raw) if isinstance(config_raw, str) else config_raw
+        stored_checkout_url = config.get("polar_checkout_url") if config else None
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                polar_resp = await client.get(
+                    f"{polar_base_url}/api/v1/products/{product_id}",
+                    headers={"Authorization": f"Bearer {polar_token}"}
+                )
+
+                if not polar_resp.is_success:
+                    return {
+                        "status": "error",
+                        "product_id": product_id,
+                        "stored_checkout_url": stored_checkout_url,
+                        "polar_error": {
+                            "status_code": polar_resp.status_code,
+                            "detail": polar_resp.text[:500]
+                        },
+                        "note": "Product ID not found in Polar or API error. Check product was created successfully."
+                    }
+
+                polar_product = polar_resp.json()
+                return {
+                    "status": "success",
+                    "product_id": product_id,
+                    "stored_checkout_url": stored_checkout_url,
+                    "polar_product": polar_product,
+                    "environment": "sandbox" if is_dev else "production",
+                    "note": "Use 'polar_product' data to verify product exists and construct correct checkout URL"
+                }
+
+        except Exception as e:
+            print(f"PRODUCT DETAILS ERROR for product_id={product_id}: {e}")
+            raise HTTPException(status_code=503, detail=f"Could not reach Polar API: {str(e)[:100]}")
+
     finally:
         release_db_connection(conn)
 
