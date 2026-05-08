@@ -5318,8 +5318,15 @@ async def provision_custom_plan(
         # Build Polar product payload
         plan_name = config.plan_name or "Custom Plan"
         trial_days = config.trial_days if config.trial_days is not None else 14
+
+        # Validate trial_days
+        if trial_days < 0 or trial_days > 30:
+            raise HTTPException(status_code=400, detail="trial_days must be between 0 and 30.")
+
         # Price in cents (Polar uses smallest currency unit)
         price_cents = int(round(price * 100))
+        if price_cents < 1:
+            raise HTTPException(status_code=400, detail="Price must be at least $0.01.")
 
         polar_product_payload = {
             "name": f"{plan_name} ({clerk_id[:8]})",
@@ -5372,6 +5379,15 @@ async def provision_custom_plan(
                         f"Polar API returned 403 Forbidden. "
                         f"Verify POLAR_ACCESS_TOKEN is valid, has 'products:write' scope, "
                         f"and matches the environment (sandbox vs production). "
+                        f"Polar detail: {polar_error_body}"
+                    )
+                )
+            elif polar_resp.status_code == 422:
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        f"Polar API validation error (422). "
+                        f"Check: price > $0.01, trial_days 0-30, plan name not empty. "
                         f"Polar detail: {polar_error_body}"
                     )
                 )
