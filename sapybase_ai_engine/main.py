@@ -5409,26 +5409,39 @@ async def provision_custom_plan(
             print(f"PROVISION ERROR: Polar response missing product id for clerk_id={clerk_id}: {polar_data}")
             raise HTTPException(status_code=502, detail="Polar returned unexpected response (no product id).")
 
-        # Check if Polar provides a checkout URL directly
-        # Look for fields like: checkout_url, checkout_link, checkout_id, or hosted_checkout_url
-        polar_checkout_url = (
-            polar_data.get("checkout_url") or
-            polar_data.get("checkout_link") or
-            polar_data.get("hosted_checkout_url") or
-            polar_data.get("checkout_id")
-        )
+        # Polar doesn't return checkout URL in product response
+        # Need to create a checkout link separately via API
+        checkout_url = None
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                checkout_payload = {
+                    "product_id": product_id,
+                }
+                checkout_resp = await client.post(
+                    f"{polar_base_url}/api/v1/checkout-links",
+                    json=checkout_payload,
+                    headers={"Authorization": f"Bearer {polar_token}"}
+                )
 
-        print(f"POLAR RESPONSE KEYS: {list(polar_data.keys())}")
-        print(f"POLAR CHECKOUT URL FIELD: {polar_checkout_url}")
+                if checkout_resp.is_success:
+                    checkout_data = checkout_resp.json()
+                    checkout_url = checkout_data.get("url")
+                    print(f"CHECKOUT LINK CREATED: {json.dumps(checkout_data, indent=2, default=str)}")
+                else:
+                    print(f"CHECKOUT LINK ERROR ({checkout_resp.status_code}): {checkout_resp.text[:300]}")
 
-        # Try multiple URL formats - Polar may support different formats
-        if is_dev:
-            # Try: /products/{id}, /{id}, or /p/{id}
-            checkout_url = polar_checkout_url or f"https://sandbox-buy.polar.sh/{product_id}"
-        else:
-            checkout_url = polar_checkout_url or f"https://buy.polar.sh/{product_id}"
+        except Exception as e:
+            print(f"CHECKOUT LINK API ERROR: {e}")
 
-        print(f"CHECKOUT URL: polar returned '{polar_checkout_url}', using: '{checkout_url}'")
+        # Fallback URL if checkout link creation fails
+        if not checkout_url:
+            if is_dev:
+                checkout_url = f"https://sandbox-buy.polar.sh/{product_id}"
+            else:
+                checkout_url = f"https://buy.polar.sh/{product_id}"
+            print(f"FALLBACK: Using product direct URL: {checkout_url}")
+
+        print(f"FINAL CHECKOUT URL: {checkout_url}")
 
         # Build updated config (merge with existing, add payment metadata)
         if isinstance(current_config_raw, dict):
