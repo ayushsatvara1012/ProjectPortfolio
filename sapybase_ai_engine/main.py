@@ -5483,6 +5483,7 @@ async def provision_custom_plan(
 @app.get("/api/admin/users/{clerk_id}/custom-plan/product-details")
 @limiter.limit("10/minute")
 async def get_custom_plan_product_details(
+    request: Request,
     clerk_id: str,
     admin: dict = Depends(get_admin_user),
 ):
