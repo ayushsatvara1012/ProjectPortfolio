@@ -5409,9 +5409,17 @@ async def provision_custom_plan(
             print(f"PROVISION ERROR: Polar response missing product id for clerk_id={clerk_id}: {polar_data}")
             raise HTTPException(status_code=502, detail="Polar returned unexpected response (no product id).")
 
-        # Check if Polar provides a checkout URL directly, otherwise construct it
-        # Polar hosted checkout URL can use product ID directly
-        polar_checkout_url = polar_data.get("checkout_url")
+        # Check if Polar provides a checkout URL directly
+        # Look for fields like: checkout_url, checkout_link, checkout_id, or hosted_checkout_url
+        polar_checkout_url = (
+            polar_data.get("checkout_url") or
+            polar_data.get("checkout_link") or
+            polar_data.get("hosted_checkout_url") or
+            polar_data.get("checkout_id")
+        )
+
+        print(f"POLAR RESPONSE KEYS: {list(polar_data.keys())}")
+        print(f"POLAR CHECKOUT URL FIELD: {polar_checkout_url}")
 
         # Try multiple URL formats - Polar may support different formats
         if is_dev:
