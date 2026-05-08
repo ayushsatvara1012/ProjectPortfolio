@@ -1016,7 +1016,7 @@ class UserTier(str, Enum):
 
 # ── Custom plan feature flag keys (canonical list) ───────────────────────────
 CUSTOM_PLAN_FEATURE_KEYS = {
-    "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics"
+    "advanced_bot", "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics"
 }
 
 CUSTOM_PLAN_DEFAULTS = {
@@ -1028,6 +1028,7 @@ CUSTOM_PLAN_DEFAULTS = {
     "max_chunks": 100,
     "gemini_model": None,
     "max_output_tokens": None,
+    "advanced_bot": False,
     "human_handoff": False,
     "lead_capture": False,
     "white_label": False,
@@ -1049,6 +1050,7 @@ class CustomPlanConfig(BaseModel):
     max_chunks: Optional[int] = None
     gemini_model: Optional[str] = None
     max_output_tokens: Optional[int] = None
+    advanced_bot: Optional[bool] = False
     human_handoff: Optional[bool] = False
     lead_capture: Optional[bool] = False
     white_label: Optional[bool] = False

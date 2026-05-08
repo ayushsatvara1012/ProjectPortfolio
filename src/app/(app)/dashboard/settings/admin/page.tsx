@@ -61,6 +61,7 @@ const TOKEN_OPTIONS = [
 ];
 
 const FEATURE_FLAGS = [
+  { key: 'advanced_bot', label: 'Advanced Behavior', icon: 'psychology', desc: 'System Prompt, Tone, Quick Questions' },
   { key: 'human_handoff', label: 'Human Handoff', icon: 'support_agent', desc: 'Talk-to-human button + transcript email' },
   { key: 'lead_capture', label: 'Lead Capture', icon: 'contact_mail', desc: 'Collect visitor email/name in widget' },
   { key: 'white_label', label: 'White Label', icon: 'branding_watermark', desc: 'Remove "Powered by Sapybase"' },
@@ -93,6 +94,7 @@ const BLANK_CUSTOM_CONFIG = {
   max_chunks: '',
   gemini_model: '',
   max_output_tokens: '',
+  advanced_bot: false,
   human_handoff: false,
   lead_capture: false,
   white_label: false,
@@ -297,6 +299,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         max_chunks: existingCfg.max_chunks ?? '',
         gemini_model: existingCfg.gemini_model || '',
         max_output_tokens: existingCfg.max_output_tokens ?? '',
+        advanced_bot: !!existingCfg.advanced_bot,
         human_handoff: !!existingCfg.human_handoff,
         lead_capture: !!existingCfg.lead_capture,
         white_label: !!existingCfg.white_label,
@@ -336,6 +339,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       max_chunks: c.max_chunks === '' ? 100 : Number(c.max_chunks),
       gemini_model: c.gemini_model || undefined,
       max_output_tokens: c.max_output_tokens === '' ? undefined : Number(c.max_output_tokens),
+      advanced_bot: !!c.advanced_bot,
       human_handoff: !!c.human_handoff,
       lead_capture: !!c.lead_capture,
       white_label: !!c.white_label,

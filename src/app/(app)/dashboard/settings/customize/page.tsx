@@ -71,7 +71,10 @@ export default function CustomizePage() {
   const showFullOverlay = (isTotallyLocked || isFree) && !hasAnyEntitlement && userRole !== 'SUPER_ADMIN';
   const isAdvancedLocked = !entitlements.canUseAdvancedBot;
   const canHideBranding = entitlements.canWhiteLabel;
-  const isProUser = entitlements.canUseCustomLogo;
+  const canUseCustomLogo = entitlements.canUseCustomLogo;
+  const canUseWebhooks = entitlements.canUseWebhooks && entitlements.canUseLeadCapture;
+  const canUseHumanHandoff = entitlements.canUseHumanHandoff;
+  const hasIntegrationsAccess = canUseWebhooks || canUseHumanHandoff;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100dvh-3rem)]">
@@ -198,7 +201,7 @@ export default function CustomizePage() {
                 customLogoUrl={botSettings.customLogoUrl || ''}
                 primaryColor={botSettings.primaryColor || '#5730F5'}
                 botName={botSettings.name || 'S'}
-                isProUser={isProUser}
+                isProUser={canUseCustomLogo}
                 avatarBgStyle={botSettings.avatarBgStyle || 'none'}
                 onShapeChange={(shapeId) => updateSetting('logoShape', shapeId)}
                 onUrlChange={(url) => updateSetting('customLogoUrl', url)}
@@ -294,44 +297,56 @@ export default function CustomizePage() {
 
             <div className="border-t border-gray-100 dark:border-slate-800 transition-colors" />
 
-            <div className="space-y-4 relative">
-              {!isProUser && (
-                <div className="absolute -inset-4 z-40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help transition-all hover:backdrop-blur-sm">
-                  <div className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-green-600 text-white text-sm uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">lock</span> Pro Required
-                  </div>
-                  <Link href="/dashboard/pricing" className="mt-2 text-md font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
-                </div>
-              )}
-              <div className={!isProUser ? 'opacity-40 grayscale-[0.5] pointer-events-none filter blur-[0.5px]' : ''}>
+            {hasIntegrationsAccess && (
+              <div className="space-y-4">
                 <p className={headingCls + ' flex items-center'}>
                   <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">webhook</span>
                   Integrations
                 </p>
                 <div className="space-y-6">
-                  <div>
-                    <label className={labelCls}>Lead Capture Webhook URL</label>
-                    <input
-                      type="url"
-                      value={botSettings.webhookUrl || ''}
-                      onChange={e => updateSetting('webhookUrl', e.target.value)}
-                      className={inputCls}
-                      placeholder="https://hooks.zapier.com/hooks/catch/..."
-                    />
+                  <div className="relative">
+                    {!canUseWebhooks && (
+                      <div className="absolute -inset-4 z-40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help transition-all hover:backdrop-blur-sm">
+                        <div className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-green-600 text-white text-sm uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm">lock</span> Webhooks Required
+                        </div>
+                        <Link href="/dashboard/pricing" className="mt-2 text-md font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
+                      </div>
+                    )}
+                    <div className={!canUseWebhooks ? 'opacity-40 grayscale-[0.5] pointer-events-none filter blur-[0.5px]' : ''}>
+                      <label className={labelCls}>Lead Capture Webhook URL</label>
+                      <input
+                        type="url"
+                        value={botSettings.webhookUrl || ''}
+                        onChange={e => updateSetting('webhookUrl', e.target.value)}
+                        className={inputCls}
+                        placeholder="https://hooks.zapier.com/hooks/catch/..."
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>Human Handoff — Instant Contact Link</label>
-                    <input
-                      type="url"
-                      value={botSettings.handoffRedirectUrl || ''}
-                      onChange={e => updateSetting('handoffRedirectUrl', e.target.value)}
-                      className={inputCls}
-                      placeholder="https://wa.me/..."
-                    />
+                  <div className="relative">
+                    {!canUseHumanHandoff && (
+                      <div className="absolute -inset-4 z-40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help transition-all hover:backdrop-blur-sm">
+                        <div className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-green-600 text-white text-sm uppercase tracking-widest font-bold font-sans shadow-lg flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm">lock</span> Human Handoff Required
+                        </div>
+                        <Link href="/dashboard/pricing" className="mt-2 text-md font-bold text-slate-800 dark:text-slate-200 underline underline-offset-4 decoration-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">Upgrade Now</Link>
+                      </div>
+                    )}
+                    <div className={!canUseHumanHandoff ? 'opacity-40 grayscale-[0.5] pointer-events-none filter blur-[0.5px]' : ''}>
+                      <label className={labelCls}>Human Handoff — Instant Contact Link</label>
+                      <input
+                        type="url"
+                        value={botSettings.handoffRedirectUrl || ''}
+                        onChange={e => updateSetting('handoffRedirectUrl', e.target.value)}
+                        className={inputCls}
+                        placeholder="https://wa.me/..."
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="pt-4 border-t border-gray-100 dark:border-slate-800 transition-colors">
               <button
