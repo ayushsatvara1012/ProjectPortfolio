@@ -550,6 +550,7 @@ def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> di
             "chunks": cfg.get("max_chunks") or 100,
             "speed": "dedicated",
             # Feature flags carried through so callers can inspect them
+            "advanced_bot": bool(cfg.get("advanced_bot")),
             "human_handoff": bool(cfg.get("human_handoff")),
             "lead_capture": bool(cfg.get("lead_capture")),
             "white_label": bool(cfg.get("white_label")),
