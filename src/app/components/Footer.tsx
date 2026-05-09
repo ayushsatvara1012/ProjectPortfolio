@@ -180,6 +180,9 @@ export default function Footer() {
                 <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">TERMS</Link>
               </div>
             </div>
+            <div>
+                <a href="https://fazier.com/launches/www.sapybase.com" target="_blank"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=neutral" width={120} alt="Fazier badge" /></a>
+            </div>
             <div className="flex items-center gap-3">
               <Activity size={14} className="text-emerald-500" />
               <span className="text-sm uppercase tracking-widest font-bold text-slate-900 dark:text-slate-200 font-sans">
@@ -187,6 +190,8 @@ export default function Footer() {
               </span>
             </div>
           </div>
+
+          
 
         </div>
       </div>
