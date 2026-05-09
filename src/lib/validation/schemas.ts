@@ -48,6 +48,7 @@ export const customPlanConfigSchema = z.object({
   max_chunks: z.coerce.number().int().nonnegative(),
   gemini_model: z.string().optional(),
   max_output_tokens: z.union([z.coerce.number().int().positive(), z.literal('').transform(() => undefined)]).optional(),
+  advanced_bot: z.boolean().optional(),
   human_handoff: z.boolean().optional(),
   lead_capture: z.boolean().optional(),
   white_label: z.boolean().optional(),
