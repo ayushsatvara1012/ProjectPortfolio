@@ -72,6 +72,7 @@
     var gradId = 'sb-fab-grad-' + sfx;
     var clipId = 'sb-fab-clip-' + sfx;
     var filterId = 'sb-fab-shadow-' + sfx;
+    var fallbackId = 'sb-fab-fallback-' + sfx;
     var safeUrl = logoUrl ? String(logoUrl).replace(/"/g, '&quot;') : '';
     var initial = (botName || 'S').charAt(0).toUpperCase();
     var ox = shape.x || 0;
@@ -83,10 +84,17 @@
       var iy = isCustom ? oy : 15 + oy;
       var iw = isCustom ? 100 : 70;
       var ih = isCustom ? 100 : 70;
+      // Render both image and fallback text. Image will show if it loads;
+      // text will show if image fails. Fallback ID allows image onerror to target it.
       content =
         '<g clip-path="url(#' + clipId + ')">' +
         '<image href="' + safeUrl + '" x="' + ix + '" y="' + iy + '" ' +
-        'width="' + iw + '" height="' + ih + '" preserveAspectRatio="xMidYMid slice" />' +
+        'width="' + iw + '" height="' + ih + '" preserveAspectRatio="xMidYMid slice" ' +
+        'onerror="document.getElementById(\'' + fallbackId + '\').style.display=\'block\'" />' +
+        '<text id="' + fallbackId + '" x="' + (50 + ox) + '" y="' + (52 + oy) + '" ' +
+        'text-anchor="middle" dominant-baseline="middle" fill="#ffffff" ' +
+        'style="font-size:38px;font-weight:700;font-family:system-ui,sans-serif;display:none;">' +
+        initial + '</text>' +
         '</g>';
     } else {
       content =
@@ -228,9 +236,14 @@
       const themeColor = cfg.theme_color || '#5730F5';
       const shapeId = cfg.logo_shape || 'circle';
       const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
-      const logoUrl = cfg.custom_logo_url || cfg.logo_url || BRAND_LOGO_URL;
+      let logoUrl = cfg.custom_logo_url || cfg.logo_url || BRAND_LOGO_URL;
       const isCustom = !!cfg.custom_logo_url;
       const botName = cfg.bot_name || 'Sapy AI';
+
+      // Convert relative paths to absolute URLs (e.g. /SB_loading.svg → https://www.sapybase.com/SB_loading.svg)
+      if (logoUrl && logoUrl.startsWith('/')) {
+        logoUrl = ASSET_BASE + logoUrl;
+      }
 
       if (this._fab) {
         const dark = _shadeColor(themeColor, -20);
