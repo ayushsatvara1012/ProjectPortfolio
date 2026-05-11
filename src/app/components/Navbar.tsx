@@ -120,14 +120,14 @@ export default function Navbar() {
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
-                className="relative text-md font-display tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center"
+                className="relative text-md font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center"
                 ref={link.dropdown ? dropdownRef : null}
               >
                 {link.dropdown ? (
                   <button
                     onMouseEnter={() => setIsServicesOpen(true)}
                     onClick={() => setIsServicesOpen(!isServicesOpen)}
-                    className="text-md font-display tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
+                    className="text-md font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
                   >
                     {link.name}
                     <ChevronDown
@@ -142,8 +142,8 @@ export default function Navbar() {
                     >
                       {/* Header strip */}
                       <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-                        <span className="text-[10px] uppercase tracking-widest font-bold font-display text-slate-400 dark:text-slate-500">Services</span>
-                        <span className="text-[10px] uppercase tracking-widest font-bold font-display text-slate-300 dark:text-slate-600">6 modules</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">Services</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold font-google text-slate-300 dark:text-slate-600">6 modules</span>
                       </div>
 
                       {/* Two-column partitioned grid */}
@@ -152,7 +152,7 @@ export default function Navbar() {
                           <div key={group.label} className="flex flex-col gap-px bg-gray-100 dark:bg-slate-800">
                             {/* Partition label */}
                             <div className="bg-slate-50 dark:bg-slate-900 px-4 py-2">
-                              <span className="text-[9px] uppercase tracking-widest font-bold font-display text-slate-400 dark:text-slate-500">{group.label}</span>
+                              <span className="text-[9px] uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">{group.label}</span>
                             </div>
                             {group.items.map((service, idx) => (
                               <a
@@ -178,7 +178,7 @@ export default function Navbar() {
                         onClick={() => setIsServicesOpen(false)}
                         className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group/footer"
                       >
-                        <span className="text-xs font-display font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 group-hover/footer:text-blue-600 dark:group-hover/footer:text-blue-400 transition-colors">View All Services</span>
+                        <span className="text-xs font-google font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 group-hover/footer:text-blue-600 dark:group-hover/footer:text-blue-400 transition-colors">View All Services</span>
                         <ArrowRight size={12} className="text-slate-400 group-hover/footer:text-blue-600 dark:group-hover/footer:text-blue-400 transition-colors" />
                       </Link>
                     </div>
@@ -187,7 +187,7 @@ export default function Navbar() {
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="text-md font-display tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
+                    className="text-md font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
                   >
                     {link.name}
                     <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
@@ -202,14 +202,14 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="modal">
-                  <button className="font-display text-md tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors px-4 py-3">
+                  <button className="font-google text-md tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors px-4 py-3">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full bg-slate-950 flex items-center transition-colors duration-500">
                 <SignUpButton mode="modal">
-                  <button className="bg-slate-900 tracking-widest text-white font-display text-md px-4 lg:px-6 xl:px-8 py-5 h-full transition-all rounded-none shrink-0 duration-500 group">
+                  <button className="bg-slate-900 tracking-widest text-white font-google text-md px-4 lg:px-6 xl:px-8 py-5 h-full transition-all rounded-none shrink-0 duration-500 group">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all duration-500">
                       Get_Started
                     </span>
@@ -221,7 +221,7 @@ export default function Navbar() {
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
                 <Link
                   href="/dashboard"
-                  className="text-md text-slate-900 dark:text-slate-200 font-display hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2"
+                  className="text-md text-slate-900 dark:text-slate-200 font-google hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined">dashboard</span>
                   Dashboard
@@ -279,7 +279,7 @@ export default function Navbar() {
                   {/* Services toggle row */}
                   <button
                     onClick={() => setIsServicesOpen((p) => !p)}
-                    className="w-full px-8 py-5 flex items-center justify-between text-lg font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                    className="w-full px-8 py-5 flex items-center justify-between text-lg font-google uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
                   >
                     <span>{link.name}</span>
                     <ChevronDown
@@ -295,7 +295,7 @@ export default function Navbar() {
                         <div key={group.label}>
                           {/* Partition label */}
                           <div className="px-8 py-2 bg-slate-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
-                            <span className="text-sm uppercase tracking-widest font-bold font-display text-slate-400 dark:text-slate-500">
+                            <span className="text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
                               {group.label}
                             </span>
                           </div>
@@ -323,7 +323,7 @@ export default function Navbar() {
                         onClick={() => setIsOpen(false)}
                         className="flex items-center justify-between px-8 py-4 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
                       >
-                        <span className="text-xs font-display font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">View All Services</span>
+                        <span className="text-xs font-google font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">View All Services</span>
                         <ArrowRight size={12} className="text-blue-600 dark:text-blue-400" />
                       </Link>
                     </div>
@@ -334,7 +334,7 @@ export default function Navbar() {
                   key={`nav-mob-${link.id || link.name}`}
                   href={link.href}
                   onClick={(e) => handleLinkClick(e, link.href)}
-                  className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                  className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-md font-google uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
                 >
                   <span>{link.name}</span>
                   <ArrowRight size={18} className="opacity-40" />
@@ -347,12 +347,12 @@ export default function Navbar() {
           <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 mt-auto border-t border-gray-200 dark:border-slate-800 space-y-4">
             <Show when="signed-out">
               <SignUpButton mode="modal">
-                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">
+                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-md font-google tracking-widest font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">
                   Start_Free_Trial
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
-                <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-display tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-google tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                   Login_to_System
                 </button>
               </SignInButton>
@@ -362,20 +362,20 @@ export default function Navbar() {
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
-                className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-display tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
+                className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-google tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
               >
                 SYSTEM_DASHBOARD
               </Link>
             </Show>
 
             <div className="pt-8 flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <div className="flex gap-6 text-[10px] uppercase tracking-widest font-bold font-sans">
+              <div className="flex gap-6 text-[10px] uppercase tracking-widest font-bold font-google">
                 <a href="https://github.com/ayushsatvara1012" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">GIT</a>
                 <a href="https://www.linkedin.com/in/ayushsatvara" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">LNK</a>
               </div>
               <div className="flex items-center gap-2">
                 <Activity size={12} className="text-emerald-500 animate-pulse" />
-                <span className="text-[10px] uppercase tracking-widest font-bold font-sans">Uptime: 99.99%</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold font-google">Uptime: 99.99%</span>
               </div>
             </div>
           </div>

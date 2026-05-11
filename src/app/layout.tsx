@@ -5,6 +5,7 @@ import {
   Darker_Grotesque,
 } from 'next/font/google';
 import './globals.css';
+import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -71,7 +72,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        {children}
+        <SmoothScrollProvider>
+          {children}
+        </SmoothScrollProvider>
       </body>
     </html>
   );

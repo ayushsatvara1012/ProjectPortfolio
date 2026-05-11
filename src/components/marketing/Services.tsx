@@ -51,15 +51,15 @@ const Services = () => {
           {/* HEADER CELL */}
           <div className="md:col-span-2 bg-white dark:bg-slate-950 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-12 group/header transition-colors duration-500">
             <div className="max-w-2xl space-y-8">
-              <div className="flex items-center gap-3 text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+              <div className="flex items-center gap-3 text-md font-google uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
                 <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 transition-colors">insights</span>
                 <span>Insight_Module_Registry</span>
               </div>
-              <h2 className="text-4xl md:text-5xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase transition-colors">
+              <h2 className="text-4xl md:text-5xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 uppercase transition-colors">
                 YOUR BOT'S <br />
                 <span className="text-blue-600 dark:text-blue-400">Business Intelligence.</span>
               </h2>
-              <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl transition-colors">
+              <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl transition-colors">
                 Every conversation your AI handles generates data. The Insights dashboard turns that data into decisions — who visited, what they asked, what was missed, and what it's worth to you.
               </p>
             </div>
@@ -68,27 +68,27 @@ const Services = () => {
             <div className="py-2 space-y-4 w-full transition-colors duration-500 group-hover/header:border-blue-100 dark:group-hover/header:border-blue-900/40">
               <div className="flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
                 <span>Report Refreshes Every</span>
-                <span className="text-slate-900 dark:text-slate-200 font-sans transition-colors">24h</span>
+                <span className="text-slate-900 dark:text-slate-200 font-google transition-colors">24h</span>
               </div>
               <div className="flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Data Modules</span>
-                <span className="text-blue-600 dark:text-blue-400 font-sans transition-colors">4</span>
+                <span className="text-blue-600 dark:text-blue-400 font-google transition-colors">4</span>
               </div>
               <div className="pl-3 flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Analytics Report</span>
-                <span className="text-blue-600 dark:text-blue-400 font-sans transition-colors">✓</span>
+                <span className="text-blue-600 dark:text-blue-400 font-google transition-colors">✓</span>
               </div>
               <div className="pl-3 flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Lead CRM</span>
-                <span className="text-blue-600 dark:text-blue-400 font-sans transition-colors">✓</span>
+                <span className="text-blue-600 dark:text-blue-400 font-google transition-colors">✓</span>
               </div>
               <div className="pl-3 flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Conversations History</span>
-                <span className="text-blue-600 dark:text-blue-400 font-sans transition-colors">✓</span>
+                <span className="text-blue-600 dark:text-blue-400 font-google transition-colors">✓</span>
               </div>
               <div className="pl-3 flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>ROI Calculator</span>
-                <span className="text-blue-600 dark:text-blue-400 font-sans transition-colors">✓</span>
+                <span className="text-blue-600 dark:text-blue-400 font-google transition-colors">✓</span>
               </div>
               <div className="flex justify-between items-center text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-4 transition-colors">
                 <span>Access</span>
@@ -117,17 +117,17 @@ const Services = () => {
               <div className="space-y-8 relative z-10">
 
                 {/* Eyebrow */}
-                <div className="flex items-center gap-2 text-md font-display tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+                <div className="flex items-center gap-2 text-md font-google tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
                   <span className={`text-blue-600 dark:text-blue-400`}>{`_${mod.id}`}</span>
                   <span className='border-l border-gray-400 pl-2'>{mod.label}</span>
                 </div>
 
                 {/* Content */}
                 <div className="space-y-4">
-                  <h3 className="text-xl md:text-3xl font-display font-bold text-slate-900 dark:text-slate-200 transition-colors">
+                  <h3 className="text-xl md:text-3xl font-google font-bold text-slate-900 dark:text-slate-200 transition-colors">
                     {mod.title}
                   </h3>
-                  <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm transition-colors">
+                  <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm transition-colors">
                     {mod.description}
                   </p>
                 </div>
@@ -135,7 +135,7 @@ const Services = () => {
                 {/* Tags */}
                 <div className="flex flex-wrap gap-2 pt-2">
                   {mod.tags.map(tag => (
-                    <span key={tag} className="border-l border-gray-300 dark:border-slate-700 bg-transparent px-2 py-1 text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+                    <span key={tag} className="border-l border-gray-300 dark:border-slate-700 bg-transparent px-2 py-1 text-md font-google uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
                       {tag}
                     </span>
                   ))}

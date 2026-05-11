@@ -183,19 +183,19 @@ const PerformanceMetrics = () => {
                 {cell.type === "metric" ? (
                   <>
                     {/* Eyebrow Label */}
-                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors duration-500">
+                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors duration-500">
                       <span className="text-indigo-500 transition-colors">{cell.icon}</span>
                       <span>{cell.eyebrow}</span>
                     </div>
 
                     {/* Primary Metric */}
                     <div className="space-y-4">
-                      <div className="text-3xl md:text-5xl font-display tracking-tight text-slate-900 dark:text-slate-200 tabular-nums leading-[0.8] transition-all duration-500 group-hover/cell:translate-x-1">
+                      <div className="text-3xl md:text-5xl font-google tracking-tight text-slate-900 dark:text-slate-200 tabular-nums leading-[0.8] transition-all duration-500 group-hover/cell:translate-x-1">
                         {cell.value}
                       </div>
 
                       {/* Subtext */}
-                      <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-700 dark:text-slate-400 font-sans font-semibold leading-relaxed transition-colors duration-500">
+                      <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-700 dark:text-slate-400 font-google font-semibold leading-relaxed transition-colors duration-500">
                         <span className="material-symbols-outlined text-[20px] text-emerald-500 shrink-0">north_east</span>
                         <span>{cell.subtext}</span>
                       </div>
@@ -204,13 +204,13 @@ const PerformanceMetrics = () => {
                 ) : (
                   <>
                     {/* Heading for Text Cells */}
-                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans transition-colors duration-500">
+                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors duration-500">
                       <div className="h-1.5 w-1.5 rounded-full bg-indigo-300" />
                       <span>{cell.heading}</span>
                     </div>
 
                     {/* Body Text */}
-                    <p className="text-base text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] transition-colors duration-500">
+                    <p className="text-base text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] transition-colors duration-500">
                       {cell.body}
                     </p>
 

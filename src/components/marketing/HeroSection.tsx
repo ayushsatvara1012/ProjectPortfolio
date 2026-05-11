@@ -73,7 +73,7 @@ const HeroSection = () => {
             Next-Gen AI Infrastructure
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
+          <h1 className="text-5xl md:text-7xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
             Autonomous <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">AI Chat Bots</span> <br />
             For Modern <br />{' '}
             <span className="inline-block relative">
@@ -90,14 +90,14 @@ const HeroSection = () => {
             </span>
           </h1>
 
-          <p className="text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
+          <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
             Connect your database, upload your docs, and deploy a custom AI agent in minutes in your <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 dark:from-green-500 to-blue-700 dark:to-blue-500">website</span>.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-1 w-fit transition-colors">
             <button
               onClick={() => isSignedIn ? router.push('/dashboard') : openSignUp()}
-              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-display tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"
+              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-google tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"
             >
               Get Your AI Bot<span className='material-symbols-outlined ml-2'>arrow_forward</span>
               <span
@@ -114,14 +114,14 @@ const HeroSection = () => {
               >Explore Now!</span>
             </button>
 
-            <Button onClick={() => router.push('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-sans text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
+            <Button onClick={() => router.push('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-google text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
               <span className="material-symbols-outlined mr-2">
                 docs
               </span>
               Read Docs
             </Button>
 
-            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-xl font-sans text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-none flex items-center justify-center gap-1">
+            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-xl font-google text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-none flex items-center justify-center gap-1">
               <span className="material-symbols-outlined text-[18px]">
                 experiment
               </span>

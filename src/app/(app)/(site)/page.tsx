@@ -3,10 +3,12 @@ import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
+import ScrollTextParallax from '@/src/components/marketing/ScrollTextParallax';
 import HowItWorks from '@/src/components/marketing/HowItWorks';
 import Metrics from '@/src/components/marketing/Metrics';
 import Services from '@/src/components/marketing/Services';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
+import FeatureIllustration from '@/src/components/marketing/FeatureIllustration';
 
 export const metadata: Metadata = buildMetadata('home');
 
@@ -34,6 +36,8 @@ export default function HomePage() {
       />
       <main className="relative overflow-x-clip">
         <HeroSection />
+        <ScrollTextParallax />
+        <FeatureIllustration />
         <ScrollReveal>
           <HowItWorks />
         </ScrollReveal>

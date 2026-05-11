@@ -205,7 +205,7 @@ const HowItWorks = () => {
                 <span className="material-symbols-outlined text-[14px]">linear_scale</span>
                 <span>Process_Overview | Three_Stages</span>
               </div>
-              <h2 className="text-4xl md:text-5xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 uppercase">
+              <h2 className="text-4xl md:text-5xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 uppercase">
                 From Data to <br />
                 <span className="text-blue-600 dark:text-blue-400">Live Chatbot.</span>
               </h2>
@@ -214,7 +214,7 @@ const HowItWorks = () => {
               </p>
             </div>
             <div className="flex flex-row md:flex-col items-center justify-center md:items-end gap-4 md:gap-2 shrink-0 py-3">
-              <div className="text-4xl md:text-5xl font-display font-black tabular-nums text-slate-900 dark:text-slate-200 flex items-center gap-2">
+              <div className="text-4xl md:text-5xl font-google font-black tabular-nums text-slate-900 dark:text-slate-200 flex items-center gap-2">
                 <span className="material-symbols-outlined text-blue-900" style={{ fontSize: "40px" }}>
                   nest_clock_farsight_analog
                 </span> &lt; 10</div>
@@ -267,7 +267,7 @@ const HowItWorks = () => {
                         ${isActive ? "text-slate-500 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"}`}>
                         {s.label}
                       </div>
-                      <div className={`text-sm md:text-base font-display font-bold leading-tight transition-colors duration-300
+                      <div className={`text-sm md:text-base font-google font-bold leading-tight transition-colors duration-300
                         ${isActive ? "text-slate-900 dark:text-slate-200" : "text-slate-400 dark:text-slate-600"}`}>
                         {s.title}
                       </div>
@@ -300,7 +300,7 @@ const HowItWorks = () => {
                 </div>
 
                 <div className="space-y-3 flex-1">
-                  <h3 className="text-2xl md:text-3xl font-display font-bold text-slate-900 dark:text-slate-200 leading-tight">
+                  <h3 className="text-2xl md:text-3xl font-google font-bold text-slate-900 dark:text-slate-200 leading-tight">
                     {active.value.heading}
                   </h3>
                   <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed">
