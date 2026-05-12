@@ -63,19 +63,28 @@ const HeroSection = () => {
 
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
-      {/* Architectural Grid Container */}
-      <div className="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-px bg-gray-100 dark:bg-slate-800 border-x border-gray-100 dark:border-slate-800 transition-colors duration-500">
+      {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-5rem)] bg-white dark:bg-slate-950 relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+        
+        {/* Background Vector Illustration on the right end */}
+        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-0 flex items-center justify-end pointer-events-none select-none overflow-hidden">
+          <img
+            src="/vector_hero.svg"
+            alt="Hero Background Illustration"
+            className="w-full h-full object-cover lg:object-contain object-right max-h-[850px] opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+          />
+        </div>
 
-        {/* ── LEFT COLUMN: VALUE PROPOSITION ──────────────── */}
-        <div className="bg-white dark:bg-slate-950 p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">
-          <div className="px-2 py-0.5 bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 flex items-center gap-2 w-fit mb-8 rounded-none border border-gray-100 dark:border-slate-800 transition-colors">
+        {/* Text and controls on the left end */}
+        <div className="relative z-10 max-w-xl lg:max-w-2xl flex flex-col justify-center">
+          <div className="px-2 py-0.5 bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 flex items-center gap-2 w-fit mb-8 rounded-none transition-colors">
             <span className="material-symbols-outlined text-[14px]">memory</span>
             Next-Gen AI Infrastructure
           </div>
 
           <h1 className="text-5xl md:text-7xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
-            Autonomous <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">AI Chat Bots</span> <br />
-            For Modern <br />{' '}
+            RAG_First <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">AI Chat Engine</span> <br />
+            for {' '}
             <span className="inline-block relative">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-600">
                 {displayText}
@@ -97,9 +106,9 @@ const HeroSection = () => {
           <div className="flex flex-col sm:flex-row gap-1 w-fit transition-colors">
             <button
               onClick={() => isSignedIn ? router.push('/dashboard') : openSignUp()}
-              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-google tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"
+              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-google tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center p-4"
             >
-              Get Your AI Bot<span className='material-symbols-outlined ml-2'>arrow_forward</span>
+              Get Your Bot<span className='material-symbols-outlined ml-2'>arrow_forward</span>
               <span
                 className="absolute w-38 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left"
               ></span>
@@ -129,9 +138,14 @@ const HeroSection = () => {
             </Button>
           </div>
         </div>
+      </div>
 
-        {/* ── RIGHT COLUMN: HIGH-FIDELITY MICRO-REPLICAS ────── */}
-        <div className="bg-[#FAFAFA] dark:bg-slate-950 relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)] dark:shadow-none transition-colors duration-500">
+        {/*
+          ── COMMENTED OUT RIGHT COLUMN: HIGH-FIDELITY MICRO-REPLICAS ──────
+          Preserved below inside a false conditional render to avoid nested JSX comment syntax errors.
+        */}
+        {false && (
+          <div className="bg-[#FAFAFA] dark:bg-slate-950 relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)] dark:shadow-none transition-colors duration-500">
 
           {/* Blueprint Grid Background */}
           <div
@@ -447,8 +461,7 @@ const HeroSection = () => {
           </div>
 
         </div>
-
-      </div>
+        )}
     </section>
   );
 };
