@@ -183,7 +183,7 @@ const PerformanceMetrics = () => {
                 {cell.type === "metric" ? (
                   <>
                     {/* Eyebrow Label */}
-                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors duration-500">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors duration-500">
                       <span className="text-indigo-500 transition-colors">{cell.icon}</span>
                       <span>{cell.eyebrow}</span>
                     </div>
@@ -195,7 +195,7 @@ const PerformanceMetrics = () => {
                       </div>
 
                       {/* Subtext */}
-                      <div className="flex items-start gap-1.5 text-md uppercase tracking-widest text-slate-700 dark:text-slate-400 font-google font-semibold leading-relaxed transition-colors duration-500">
+                      <div className="flex items-start gap-1.5 text-xs uppercase tracking-widest text-slate-700 dark:text-slate-400 font-google font-semibold leading-relaxed transition-colors duration-500">
                         <span className="material-symbols-outlined text-[20px] text-emerald-500 shrink-0">north_east</span>
                         <span>{cell.subtext}</span>
                       </div>
@@ -204,22 +204,22 @@ const PerformanceMetrics = () => {
                 ) : (
                   <>
                     {/* Heading for Text Cells */}
-                    <div className="flex items-center gap-2 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors duration-500">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors duration-500">
                       <div className="h-1.5 w-1.5 rounded-full bg-indigo-300" />
                       <span>{cell.heading}</span>
                     </div>
 
                     {/* Body Text */}
-                    <p className="text-base text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] transition-colors duration-500">
+                    <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] transition-colors duration-500">
                       {cell.body}
                     </p>
 
                     {/* Technical ID */}
                     <div className="mt-auto pt-8 border-t border-slate-100/50 dark:border-slate-800 flex items-center justify-between opacity-40 transition-colors duration-500">
-                      <span className="text-md font-mono text-slate-500 dark:text-slate-400 uppercase tracking-widest transition-colors duration-500">SY_SYS_ARCH_0{index + 1}</span>
+                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase tracking-widest transition-colors duration-500">SY_SYS_ARCH_0{index + 1}</span>
                       <div className="flex gap-1">
-                        {[40, 60, 80].map(op => (
-                          <div key={op} className={`h-1 w-1 bg-slate-900 dark:bg-slate-200 opacity-${op / 100} transition-colors duration-500`} />
+                        {([40, 60, 80] as const).map((op) => (
+                          <div key={op} className={`h-1 w-1 bg-slate-900 dark:bg-slate-200 transition-colors duration-500 ${op === 40 ? 'opacity-40' : op === 60 ? 'opacity-60' : 'opacity-80'}`} />
                         ))}
                       </div>
                     </div>

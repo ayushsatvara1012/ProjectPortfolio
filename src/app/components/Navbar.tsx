@@ -71,7 +71,7 @@ export default function Navbar() {
   const navLinks: NavLink[] = [
     { name: 'Home', href: '#home', id: 'home' },
     { name: 'Projects', href: '/about#projects', id: 'projects' },
-    { name: 'Services', href: '#services', id: 'services', dropdown: true },
+    { name: 'Services', href: '/services', id: 'services', dropdown: true },
     { name: 'Pricing', href: '/pricing', id: 'pricing' },
     { name: 'Docs', href: '/docs', id: 'docs' },
     { name: 'Contact', href: '/contact', id: 'contact' },
@@ -106,7 +106,7 @@ export default function Navbar() {
   return (
     <>
       <header className="fixed top-0 w-full z-50 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 h-16 transition-colors duration-500">
-        <div className="max-w-screen mx-2 h-full flex items-center justify-between divide-x divide-gray-200 dark:divide-slate-800 border-x border-gray-200 dark:border-slate-800 transition-colors duration-500">
+        <div className="max-w-screen-2xl mx-auto h-full flex items-center justify-between divide-x divide-gray-200 dark:divide-slate-800 border-x border-gray-200 dark:border-slate-800 transition-colors duration-500">
 
           {/* Cell 1: Logo */}
           <div className="px-6 h-full flex items-center shrink-0 min-w-fit">
@@ -116,18 +116,18 @@ export default function Navbar() {
           </div>
 
           {/* Cell 2: Desktop Navigation Links (md+) */}
-          <div className="hidden lg:flex flex-1 te items-center gap-4 lg:gap-8 xl:gap-10 px-6 lg:px-10 h-full">
+          <div className="hidden lg:flex flex-1 items-center gap-4 lg:gap-8 xl:gap-10 px-6 lg:px-10 h-full">
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
-                className="relative text-md font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center"
+                className="relative text-sm font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center"
                 ref={link.dropdown ? dropdownRef : null}
               >
                 {link.dropdown ? (
                   <button
                     onMouseEnter={() => setIsServicesOpen(true)}
                     onClick={() => setIsServicesOpen(!isServicesOpen)}
-                    className="text-md font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
+                    className="text-sm font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
                   >
                     {link.name}
                     <ChevronDown
@@ -157,8 +157,8 @@ export default function Navbar() {
                             {group.items.map((service, idx) => (
                               <a
                                 key={`service-drop-${group.label}-${idx}`}
-                                href="#services"
-                                onClick={(e) => handleLinkClick(e, '#services')}
+                                href="/services"
+                                onClick={(e) => handleLinkClick(e, '/services')}
                                 className="bg-white dark:bg-slate-950 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors flex items-start gap-3 group/item"
                               >
                                 <div className="flex-1 min-w-0">
@@ -187,7 +187,7 @@ export default function Navbar() {
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="text-md font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
+                    className="text-sm font-google tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
                   >
                     {link.name}
                     <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
@@ -202,14 +202,14 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="modal">
-                  <button className="font-google text-md tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors px-4 py-3">
+                  <button className="font-google text-sm tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors px-4 py-3">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full bg-slate-950 flex items-center transition-colors duration-500">
                 <SignUpButton mode="modal">
-                  <button className="bg-slate-900 tracking-widest text-white font-google text-md px-4 lg:px-6 xl:px-8 py-5 h-full transition-all rounded-none shrink-0 duration-500 group">
+                  <button className="bg-slate-900 tracking-widest text-white font-google text-sm px-4 lg:px-6 xl:px-8 py-5 h-full transition-all rounded-none shrink-0 duration-500 group">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all duration-500">
                       Get_Started
                     </span>
@@ -221,7 +221,7 @@ export default function Navbar() {
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
                 <Link
                   href="/dashboard"
-                  className="text-md text-slate-900 dark:text-slate-200 font-google hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2"
+                  className="text-sm text-slate-900 dark:text-slate-200 font-google hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined">dashboard</span>
                   Dashboard
@@ -302,15 +302,15 @@ export default function Navbar() {
                           {group.items.map((service, idx) => (
                             <a
                               key={`mob-svc-${group.label}-${idx}`}
-                              href="#services"
-                              onClick={(e) => handleLinkClick(e, '#services')}
+                              href="/services"
+                              onClick={(e) => handleLinkClick(e, '/services')}
                               className="flex items-center gap-4 px-8 py-3.5 border-b border-gray-50 dark:border-slate-800/60 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
                             >
                               <div className="w-7 h-7 shrink-0 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
                                 {/* icon slot preserved from Vite original */}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-md font-google font-bold text-slate-800 dark:text-slate-200 leading-tight">{service.title}</p>
+                                <p className="text-sm font-google font-bold text-slate-800 dark:text-slate-200 leading-tight">{service.title}</p>
                                 <p className="text-sm font-google text-slate-500 dark:text-slate-400 truncate mt-0.5">{service.desc}</p>
                               </div>
                               <span className="text-sm font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0">{service.price}</span>
@@ -334,7 +334,7 @@ export default function Navbar() {
                   key={`nav-mob-${link.id || link.name}`}
                   href={link.href}
                   onClick={(e) => handleLinkClick(e, link.href)}
-                  className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-md font-google uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                  className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-sm font-google uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
                 >
                   <span>{link.name}</span>
                   <ArrowRight size={18} className="opacity-40" />
@@ -347,12 +347,12 @@ export default function Navbar() {
           <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 mt-auto border-t border-gray-200 dark:border-slate-800 space-y-4">
             <Show when="signed-out">
               <SignUpButton mode="modal">
-                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-md font-google tracking-widest font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">
+                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-sm font-google tracking-widest font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">
                   Start_Free_Trial
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
-                <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-md font-google tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-sm font-google tracking-widest font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                   Login_to_System
                 </button>
               </SignInButton>
@@ -362,7 +362,7 @@ export default function Navbar() {
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
-                className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-md font-google tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
+                className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-sm font-google tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
               >
                 SYSTEM_DASHBOARD
               </Link>

@@ -1,5 +1,7 @@
 'use client';
 
+import React, { useEffect, useState, useRef } from 'react';
+
 const textItems = [
   {
     id: '1',
@@ -23,15 +25,54 @@ const textItems = [
   },
 ];
 
-const ScrollTextParallax = () => {
+const WhatWeSolve = () => {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const viewportCenter = window.innerHeight / 2;
+      let closestIndex: number | null = null;
+      let minDistance = Infinity;
+
+      itemRefs.current.forEach((el, index) => {
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const elCenter = rect.top + rect.height / 2;
+          const distance = Math.abs(viewportCenter - elCenter);
+
+          // Check if element is at least partially in the viewport
+          if (distance < minDistance && rect.top < window.innerHeight && rect.bottom > 0) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        }
+      });
+
+      // Activate if the closest element is reasonably near the vertical center
+      if (minDistance < window.innerHeight / 2.5) {
+        setActiveIndex(closestIndex);
+      } else {
+        setActiveIndex(null);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   return (
     <section className="relative w-full bg-white dark:bg-slate-950 py-20 lg:py-32 overflow-hidden transition-colors duration-500 border-none shadow-none">
       {/* Immersive Full-Screen SVG Background Container */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
         <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500">
-          <div className="absolute inset-0 bg-red-500/5 dark:bg-red-600/10 blur-[120px] rounded-full scale-125 lg:scale-100" />
+          <div className="absolute inset-0 bg-red-500/5 dark:bg-red-600/10  rounded-full p-5 blur-[100px] scale-100 lg:scale-90" />
           <img
-            src="/vector_example.svg"
+            src="/vector_WWS.svg"
             alt="Friction Points Background"
             className="w-full h-full object-cover object-left lg:object-center relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"
           />
@@ -48,7 +89,7 @@ const ScrollTextParallax = () => {
             {/* Title & Text Header Section */}
             <div className="mb-12">
               <div className="px-3 py-1 bg-red-50 dark:bg-red-950/50 text-xs uppercase tracking-widest font-bold text-red-600 dark:text-red-400 w-fit mb-4 rounded-none">
-                Critical Bottlenecks
+                What we are solving
               </div>
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-black tracking-tight text-slate-900 dark:text-white mb-6 leading-none">
                 Is Your Support System <br className="hidden sm:block" />
@@ -57,7 +98,7 @@ const ScrollTextParallax = () => {
                 </span>
               </h2>
               <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
-                Every second of friction results in lost engagement. Discover the core communication gaps costing modern enterprises revenue and customer trust.
+                Where most AI fails, We deliver. For your business where you cannot answer customer queries 24/7, we deliver something that can answer every customer query for you.
               </p>
             </div>
 
@@ -66,13 +107,22 @@ const ScrollTextParallax = () => {
               {textItems.map((item, index) => (
                 <div
                   key={item.id}
+                  ref={(el) => {
+                    itemRefs.current[index] = el;
+                  }}
                   className={`group relative transition-colors duration-300 ${index !== textItems.length - 1
-                      ? 'border-b border-slate-200 dark:border-slate-800'
-                      : ''
+                    ? 'border-b border-slate-200 dark:border-slate-800'
+                    : ''
                     }`}
                 >
                   <div className="py-6 sm:py-6 flex items-center justify-start md:pl-10">
-                    <h3 className="text-xl sm:text-2xl font-google font-medium text-slate-800 dark:text-slate-200 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors duration-300">
+                    <h3
+                      className={`text-xl sm:text-2xl font-google font-medium transition-colors duration-300 ${
+                        activeIndex === index
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-slate-800 dark:text-slate-200 group-hover:text-red-600 dark:group-hover:text-red-400'
+                      }`}
+                    >
                       {item.title}
                     </h3>
                   </div>
@@ -88,4 +138,4 @@ const ScrollTextParallax = () => {
   );
 };
 
-export default ScrollTextParallax;
+export default WhatWeSolve;

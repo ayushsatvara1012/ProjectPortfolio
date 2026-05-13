@@ -219,14 +219,14 @@ const HowItWorks = () => {
                   nest_clock_farsight_analog
                 </span> &lt; 10</div>
               <div className="text-xs uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 md:text-right">
-                Minutes to deploy<br className=" md:block" /> a live AI chatbot
+                Minutes to deploy<br className="hidden md:block" /> a live AI chatbot
               </div>
             </div>
           </div>
 
           {/* ── PIPELINE NAV — 3 tabs ─────────────────────────────────────── */}
-          <div className="bg-white dark:bg-slate-950 transition-colors duration-500">
-            <div className="grid grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800">
+          <div className="bg-white dark:bg-slate-950 transition-colors duration-500 overflow-x-auto">
+            <div className="grid grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 min-w-[480px]">
               {PIPELINE_STEPS.map((s) => {
                 const isActive = activeStep === s.id;
                 return (

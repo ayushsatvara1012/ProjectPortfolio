@@ -3,11 +3,8 @@ import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
-import ScrollTextParallax from '@/src/components/marketing/ScrollTextParallax';
-import HowItWorks from '@/src/components/marketing/HowItWorks';
-import Metrics from '@/src/components/marketing/Metrics';
-import Services from '@/src/components/marketing/Services';
-import ScrollReveal from '@/src/components/marketing/ScrollReveal';
+import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
+import EngineSection from '@/src/components/marketing/EngineSection';
 import FeatureIllustration from '@/src/components/marketing/FeatureIllustration';
 
 export const metadata: Metadata = buildMetadata('home');
@@ -36,17 +33,9 @@ export default function HomePage() {
       />
       <main className="relative overflow-x-clip">
         <HeroSection />
-        <ScrollTextParallax />
+        <WhatWeSolve />
         <FeatureIllustration />
-        <ScrollReveal>
-          <HowItWorks />
-        </ScrollReveal>
-        <ScrollReveal delay={0.05}>
-          <Metrics />
-        </ScrollReveal>
-        <ScrollReveal delay={0.05}>
-          <Services />
-        </ScrollReveal>
+        <EngineSection />
       </main>
     </>
   );

@@ -5,6 +5,9 @@ import { ArrowLeft, ChevronRight, Phone, MessageCircle, Bot, Code2, Globe as Glo
 import { useRouter } from 'next/navigation';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 import Link from 'next/link';
+import HowItWorks from '@/src/components/marketing/HowItWorks';
+import Metrics from '@/src/components/marketing/Metrics';
+import MarketingServices from '@/src/components/marketing/Services';
 
 const services = [
   {
@@ -175,6 +178,17 @@ export default function ServicesClient() {
             </div>
           ))}
         </div>
+      </ScrollReveal>
+
+      {/* Shifted Marketing Sections */}
+      <ScrollReveal>
+        <HowItWorks />
+      </ScrollReveal>
+      <ScrollReveal delay={0.05}>
+        <Metrics />
+      </ScrollReveal>
+      <ScrollReveal delay={0.05}>
+        <MarketingServices />
       </ScrollReveal>
 
       {/* Bottom CTA */}

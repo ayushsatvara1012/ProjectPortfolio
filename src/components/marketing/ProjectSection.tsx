@@ -62,7 +62,7 @@ const ProjectSection = () => {
 
           {/* 1. SECTION HEADER BLOCK */}
           <div className="bg-white dark:bg-slate-950 p-12 md:p-6 flex flex-col justify-center gap-8 transition-colors duration-500">
-            <div className="flex items-center gap-3 text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
+            <div className="flex items-center gap-3 text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">
               <span className="material-symbols-outlined text-[14px]">inventory_2</span>
               <span>Project_Portfolio</span>
             </div>
@@ -124,7 +124,7 @@ const ProjectSection = () => {
                   className="bg-white dark:bg-slate-950 dark:text-slate-400 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white dark:hover:text-slate-200 transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
                   <span className="material-symbols-outlined text-[20px] md:text-[32px] opacity-40 group-hover/btn:opacity-100">code</span>
-                  <span className="text-md tracking-widest font-display">Source</span>
+                  <span className="text-sm tracking-widest font-display">Source</span>
                 </a>
                 <a
                   href={project.launch}
@@ -132,7 +132,7 @@ const ProjectSection = () => {
                   className="bg-white dark:bg-slate-950 dark:text-slate-400 hover:bg-blue-800 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-slate-200 transition-all duration-300 flex flex-row lg:flex-col items-center justify-center p-6 lg:p-8 gap-4 group/btn"
                 >
                   <span className="material-symbols-outlined text-[20px] md:text-[32px] opacity-40 group-hover/btn:opacity-100">arrow_forward</span>
-                  <span className="text-md tracking-widest font-display">Launch</span>
+                  <span className="text-sm tracking-widest font-display">Launch</span>
                 </a>
               </div>
 
@@ -150,7 +150,7 @@ const ProjectSection = () => {
               ].map((m, i) => (
                 <div key={i} className="flex flex-col items-center gap-2">
                   <div className="text-slate-300 dark:text-slate-700 transition-colors">{m.icon}</div>
-                  <span className="text-md font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">{m.label}</span>
+                  <span className="text-sm font-display uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 transition-colors">{m.label}</span>
                   <span className="text-base font-bold text-slate-900 dark:text-slate-200 transition-colors">{m.value}</span>
                 </div>
               ))}

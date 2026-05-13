@@ -255,3 +255,9 @@
     animation-play-state: paused;
   }
 }
+
+@layer utilities {
+  .max-w-8xl {
+    max-width: 96rem;
+  }
+}

@@ -64,8 +64,7 @@ const HeroSection = () => {
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
-      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-5rem)] bg-white dark:bg-slate-950 relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-        
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-white dark:bg-slate-950 relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
         {/* Background Vector Illustration on the right end */}
         <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-0 flex items-center justify-end pointer-events-none select-none overflow-hidden">
           <img
@@ -99,36 +98,36 @@ const HeroSection = () => {
             </span>
           </h1>
 
-          <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
-            Connect your database, upload your docs, and deploy a custom AI agent in minutes in your <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 dark:from-green-500 to-blue-700 dark:to-blue-500">website</span>.
+          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
+            We provide a RAG Agent which can answer every customer query 24/7 for your business and generates leads helping you to increase your sales without any human interference.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-1 w-fit transition-colors">
+          <div className="flex flex-col sm:flex-row gap-2 w-full transition-colors">
             <button
               onClick={() => isSignedIn ? router.push('/dashboard') : openSignUp()}
-              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-sm font-google tracking-widest text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center p-4"
+              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"
             >
               Get Your Bot<span className='material-symbols-outlined ml-2'>arrow_forward</span>
               <span
-                className="absolute w-38 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left"
+                className="absolute w-40 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left"
               ></span>
               <span
-                className="absolute w-38 h-34 -top-10 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-120 transition-transform group-hover:duration-700 duration-700 origin-left"
+                className="absolute w-40 h-36 -top-15 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-[120%] transition-transform group-hover:duration-700 duration-700 origin-left"
               ></span>
               <span
-                className="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-70 transition-transform group-hover:duration-1000 duration-500 origin-left"
+                className="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-75 transition-transform group-hover:duration-1000 duration-500 origin-left"
               ></span>
               <span
                 className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap"
               >Explore Now!</span>
             </button>
 
-            <Button onClick={() => router.push('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-google text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
+            {/* <Button onClick={() => router.push('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-google text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
               <span className="material-symbols-outlined mr-2">
                 docs
               </span>
               Read Docs
-            </Button>
+            </Button> */}
 
             <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-xl font-google text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-none flex items-center justify-center gap-1">
               <span className="material-symbols-outlined text-[18px]">
@@ -140,12 +139,12 @@ const HeroSection = () => {
         </div>
       </div>
 
-        {/*
+      {/*
           ── COMMENTED OUT RIGHT COLUMN: HIGH-FIDELITY MICRO-REPLICAS ──────
           Preserved below inside a false conditional render to avoid nested JSX comment syntax errors.
         */}
-        {false && (
-          <div className="bg-[#FAFAFA] dark:bg-slate-950 relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)] dark:shadow-none transition-colors duration-500">
+      {false && (
+        <div className="bg-[#FAFAFA] dark:bg-slate-950 relative min-h-[650px] overflow-hidden flex flex-col items-center shadow-[inset_5px_5px_8px_-3px_rgba(35,35,35,0.30)] dark:shadow-none transition-colors duration-500">
 
           {/* Blueprint Grid Background */}
           <div
@@ -207,7 +206,7 @@ const HeroSection = () => {
                       >
                         <div className="flex items-center gap-2 mb-6">
                           <span className="material-symbols-outlined text-[16px] text-slate-600 dark:text-slate-400 transition-colors">smart_toy</span>
-                          <h3 className="text-md tracking-widest font-display text-slate-900 dark:text-slate-200 transition-colors">Bot Identity</h3>
+                          <h3 className="text-sm tracking-widest font-display text-slate-900 dark:text-slate-200 transition-colors">Bot Identity</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-8 mb-6">
                           <div className="space-y-4">
@@ -236,10 +235,10 @@ const HeroSection = () => {
 
                             {/* Compatibility Bullet Points */}
                             <div className="pt-2 space-y-1.5">
-                              <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans mb-1 transition-colors">Universal Compatibility</p>
+                              <p className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-sans mb-1 transition-colors">Universal Compatibility</p>
                               <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
                                 {['Next.js', 'React', 'Flutter', 'Angular'].map(tech => (
-                                  <li key={tech} className="flex items-center gap-1.5 text-md font-sans text-slate-600 tracking-wider dark:text-slate-300 font-semibold transition-colors">
+                                  <li key={tech} className="flex items-center gap-1.5 text-sm font-sans text-slate-600 tracking-wider dark:text-slate-300 font-semibold transition-colors">
                                     <div className="w-1 h-1 bg-emerald-500" /> {tech}
                                   </li>
                                 ))}
@@ -461,7 +460,7 @@ const HeroSection = () => {
           </div>
 
         </div>
-        )}
+      )}
     </section>
   );
 };
