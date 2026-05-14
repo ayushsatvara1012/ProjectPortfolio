@@ -1,22 +1,27 @@
 'use client';
 
+import React from 'react';
+
 const FeatureIllustration = () => {
   return (
-    <section className="relative w-full bg-white dark:bg-slate-950 py-20 overflow-hidden flex items-center justify-center transition-colors duration-500 border-none inset-shadow-2xs">
-      {/* Immersive Background SVG Container */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
-        <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-100 transition-opacity duration-500">
-          <div className="absolute inset-0 bg-blue-500/5 dark:bg-blue-600/10 rounded-full p-5 blur-[100px] scale-100 lg:scale-90" />
-          <img
-            src="/vector_ChatBG.svg"
-            alt="Chat Background Vector"
-            className="w-full h-full object-cover object-center relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"
-          />
-        </div>
-      </div>
+    <section className="relative w-full bg-white dark:bg-slate-950 pt-20 pb-16 overflow-hidden flex flex-col items-center justify-start transition-colors duration-500 border-none">
+      {/* Blue radial gradient top-left background */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none select-none"
+        style={{ background: 'radial-gradient(ellipse 55% 45% at 0% 0%, rgba(59,130,246,0.45) 0%, transparent 70%), radial-gradient(ellipse 55% 45% at 100% 0%, rgba(59,130,246,0.45) 0%, transparent 70%)' }}
+      />
 
-      {/* Foreground Illustrations Container */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 flex justify-center w-full">
+      {/* Decorative background illustration — adjust position/size as needed */}
+      <img
+        src="/vector_SBdesign2.svg"
+        alt=""
+        aria-hidden="true"
+        className="absolute pointer-events-none select-none z-0"
+        style={{ bottom: '-272px', left: '-131px', width: '667px', height: 'auto', opacity: 1 }}
+      />
+
+      {/* Feature Showcase Illustrations Container */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 flex justify-center w-full mb-24 sm:mb-32 lg:mb-40">
         {/* Mobile Illustration */}
         <img
           src="/vector2_mobile.svg"

@@ -4,8 +4,9 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
 import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
-import EngineSection from '@/src/components/marketing/EngineSection';
+
 import FeatureIllustration from '@/src/components/marketing/FeatureIllustration';
+import EngineSection from '@/src/components/marketing/EngineSection';
 
 export const metadata: Metadata = buildMetadata('home');
 
@@ -35,7 +36,7 @@ export default function HomePage() {
         <HeroSection />
         <WhatWeSolve />
         <FeatureIllustration />
-        <EngineSection />
+        <EngineSection/>
       </main>
     </>
   );

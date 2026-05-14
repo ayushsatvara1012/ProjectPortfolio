@@ -120,7 +120,7 @@ const WhatWeSolve = () => {
                       className={`text-xl sm:text-2xl font-google font-medium transition-colors duration-300 ${
                         activeIndex === index
                           ? 'text-red-600 dark:text-red-400'
-                          : 'text-slate-800 dark:text-slate-200 group-hover:text-red-600 dark:group-hover:text-red-400'
+                          : 'text-slate-800 dark:text-slate-200'
                       }`}
                     >
                       {item.title}

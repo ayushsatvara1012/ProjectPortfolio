@@ -63,10 +63,11 @@ const HeroSection = () => {
 
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
+
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
-      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-white dark:bg-slate-950 relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
         {/* Background Vector Illustration on the right end */}
-        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-0 flex items-center justify-end pointer-events-none select-none overflow-hidden">
+        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-10 flex items-center justify-end pointer-events-none select-none overflow-hidden">
           <img
             src="/vector_hero.svg"
             alt="Hero Background Illustration"
