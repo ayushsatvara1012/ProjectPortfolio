@@ -7,11 +7,24 @@ const OG_IMAGE = {
 
 export const seoConfig = {
   home: {
-    title: 'Sapybase | Autonomous AI Chatbots for Modern Business',
+    title: 'Sapybase | Train an AI Chatbot on Your Docs & Deploy in Minutes',
     description:
-      'Automate your customer support and sales with Sapybase AI agents. Connect your documents and databases to deploy custom AI chatbots in minutes. Intelligent automation for the modern web.',
+      'Sapybase lets you build a RAG-powered AI chatbot trained on your PDFs, URLs, and documents. Embed it on any website to answer customer questions 24/7, capture leads, and automate support — no coding required.',
     canonical: 'https://www.sapybase.com/',
-    keywords: ['AI chatbot', 'autonomous AI agents', 'customer support automation', 'Sapybase', 'LLM integration', 'RAG pipeline'],
+    keywords: [
+      'AI chatbot for website',
+      'RAG chatbot builder',
+      'train chatbot on documents',
+      'embed AI chatbot',
+      'no-code RAG chatbot',
+      'AI customer support automation',
+      'chatbot trained on PDF',
+      'AI chatbot for small business',
+      'autonomous AI agent',
+      'Sapybase',
+      'LLM integration',
+      'RAG pipeline',
+    ],
     ogImage: OG_IMAGE,
   },
   about: {

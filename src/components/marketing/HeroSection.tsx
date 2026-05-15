@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import AntigravityBackground from './AntigravityBackground';
+
 const TYPEWRITER_WORDS = ['Businesses', 'Freelancers', 'Portfolios'];
 const TYPING_SPEED = 80;
 const DELETING_SPEED = 50;
@@ -65,8 +67,9 @@ const HeroSection = () => {
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
 
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
-      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-        {/* Background Vector Illustration on the right end */}
+      <AntigravityBackground />
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+        {/* Background Vector Illustration 
         <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-10 flex items-center justify-end pointer-events-none select-none overflow-hidden">
           <img
             src="/vector_hero.svg"
@@ -74,19 +77,16 @@ const HeroSection = () => {
             className="w-full h-full object-cover lg:object-contain object-right max-h-[850px] opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
           />
         </div>
+        */}
 
-        {/* Text and controls on the left end */}
-        <div className="relative z-10 max-w-xl lg:max-w-2xl flex flex-col justify-center">
-          <div className="px-2 py-0.5 bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 flex items-center gap-2 w-fit mb-8 rounded-none transition-colors">
-            <span className="material-symbols-outlined text-[14px]">memory</span>
-            Next-Gen AI Infrastructure
-          </div>
+        {/* Text and controls centered */}
+        <div className="relative z-10 max-w-xl lg:max-w-3xl flex flex-col justify-center items-center text-center">
 
-          <h1 className="text-5xl md:text-7xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
-            RAG_First <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">AI Chat Engine</span> <br />
-            for {' '}
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-google font-medium tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors">
+            Train once answer everything
+            for {' '} <br />
             <span className="inline-block relative">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-600">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-700 to-blue-500">
                 {displayText}
               </span>
               <span
@@ -99,14 +99,14 @@ const HeroSection = () => {
             </span>
           </h1>
 
-          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-400 leading-relaxed max-w-lg mb-10 transition-colors">
-            We provide a RAG Agent which can answer every customer query 24/7 for your business and generates leads helping you to increase your sales without any human interference.
+          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors mx-auto">
+            Sapybase turns your documents, URLs, and PDFs into a 24/7 AI support agent — trained on your content, embedded in minutes, and built to convert visitors into leads.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full transition-colors">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">
             <button
               onClick={() => isSignedIn ? router.push('/dashboard') : openSignUp()}
-              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-bold cursor-pointer z-10 group flex items-center justify-center px-8 py-4"
+              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
             >
               Get Your Bot<span className='material-symbols-outlined ml-2'>arrow_forward</span>
               <span
@@ -123,15 +123,9 @@ const HeroSection = () => {
               >Explore Now!</span>
             </button>
 
-            {/* <Button onClick={() => router.push('/docs')} className="bg-slate-100 dark:bg-slate-900 px-8 py-4 text-xl font-google text-slate-900 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors rounded-none flex items-center justify-center">
-              <span className="material-symbols-outlined mr-2">
-                docs
-              </span>
-              Read Docs
-            </Button> */}
 
-            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-xl font-google text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-none flex items-center justify-center gap-1">
-              <span className="material-symbols-outlined text-[18px]">
+            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-lg">
                 experiment
               </span>
               Try Demo

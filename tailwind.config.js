@@ -11,9 +11,12 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Darker Grotesque"', 'sans-serif'], // Sets Darker Grotesque as the default body font
-        display: ['"Bricolage Grotesque"', 'sans-serif'], // Creates a custom font-display class for headers
-        google: ['"Google Sans"', 'sans-serif'], // New Google Sans class
+        sans: ['"Darker Grotesque"', 'sans-serif'],
+        display: ['"Bricolage Grotesque"', 'sans-serif'],
+        google: ['"Google Sans"', 'sans-serif'],
+      },
+      maxWidth: {
+        '8xl': '88rem',
       },
     },
   },

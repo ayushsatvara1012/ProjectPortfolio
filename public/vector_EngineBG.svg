@@ -25,7 +25,7 @@
 <linearGradient id="paint0_linear_136_3720" x1="1402.5" y1="380" x2="295" y2="673" gradientUnits="userSpaceOnUse">
 <stop stop-color="#B2486E"/>
 <stop offset="0.5" stop-color="#2BA1FF"/>
-<stop offset="1" stop-color="#CBCBCB"/>
+<stop offset="1" stop-color="#ffffffff"/>
 </linearGradient>
 </defs>
 </svg>

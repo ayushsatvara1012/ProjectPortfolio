@@ -17,6 +17,8 @@
   "dependencies": {
     "@clerk/nextjs": "^7.2.5",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.96.2",
     "@vercel/analytics": "^1.5.0",
@@ -29,6 +31,7 @@
     "react-markdown": "^10.1.0",
     "rehype-sanitize": "^6.0.0",
     "tech-stack-icons": "^3.5.8",
+    "three": "^0.184.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -39,6 +42,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.184.1",
     "@vitest/coverage-v8": "^4.1.5",
     "autoprefixer": "^10.4.24",
     "concurrently": "^9.2.1",

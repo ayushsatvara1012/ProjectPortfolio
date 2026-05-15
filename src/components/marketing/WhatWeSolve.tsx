@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef } from 'react';
 const textItems = [
   {
     id: '1',
-    title: "Not able to answer the question 24/7",
+    title: "Unable to answer customer questions around the clock",
   },
   {
     id: '2',
@@ -88,17 +88,15 @@ const WhatWeSolve = () => {
 
             {/* Title & Text Header Section */}
             <div className="mb-12">
-              <div className="px-3 py-1 bg-red-50 dark:bg-red-950/50 text-xs uppercase tracking-widest font-bold text-red-600 dark:text-red-400 w-fit mb-4 rounded-none">
-                What we are solving
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-black tracking-tight text-slate-900 dark:text-white mb-6 leading-none">
+
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-medium tracking-tight text-slate-900 dark:text-white mb-6 leading-none">
                 Is Your Support System <br className="hidden sm:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-500 dark:to-orange-400">
+                <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-orange-600 dark:from-red-500 dark:to-orange-400">
                   Holding You Back?
                 </span>
               </h2>
-              <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
-                Where most AI fails, We deliver. For your business where you cannot answer customer queries 24/7, we deliver something that can answer every customer query for you.
+              <p className="text-base md:text-lg font-google text-slate-800 dark:text-slate-200 leading-relaxed max-w-xl">
+                Generic AI chatbots hallucinate. Sapybase grounds every answer in your actual content — so customers get accurate, instant responses, not generic guesses.
               </p>
             </div>
 

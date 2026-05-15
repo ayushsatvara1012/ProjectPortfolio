@@ -31,13 +31,13 @@ const PIPELINE_STEPS = [
   {
     id: 2,
     step: "02",
-    label: "VECTORIZE",
+    label: "UNDERSTAND",
     title: "AI Reads Intent, Not Keywords",
     subtitle: "Why your bot gives smart answers.",
     value: {
       heading: "Beyond keyword search.",
-      body: "Traditional search breaks when a customer types \"what does it cost?\" instead of \"pricing\". Sapybase converts every sentence into a mathematical vector — a fingerprint of its meaning. When a user asks a question, we find the closest meaning, not the closest word.",
-      bullets: ["pgvector semantic search", "Prevents keyword-mismatch failures", "Context-aware retrieval"],
+      body: "Traditional search breaks when a customer types \"what does it cost?\" instead of \"pricing\". Sapybase converts every sentence into a fingerprint of its meaning. When a user asks a question, we find the closest meaning, not the closest word.",
+      bullets: ["Semantic search (meaning-aware)", "Prevents keyword-mismatch failures", "Context-aware retrieval"],
     },
     tech: {
       type: "vector",
@@ -55,7 +55,7 @@ const PIPELINE_STEPS = [
     title: "Live in 60 Seconds",
     subtitle: "One script tag. Every platform.",
     value: {
-      heading: "Ship to production instantly.",
+      heading: "Go live in seconds.",
       body: "No backend to configure. No server to maintain. Paste one script tag into any HTML page — React, Next.js, Webflow, Shopify, plain HTML — and your AI agent starts streaming answers to real customers immediately. Customize the widget color, name, and persona from your dashboard.",
       bullets: ["React · Next.js · Webflow · HTML", "Widget customizable from dashboard", "Streaming answers via WebSocket"],
     },
@@ -179,10 +179,10 @@ const ScriptPanel = ({ data }: { data: any }) => (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Bot streaming live</span>
+          <span className="text-xs font-google text-emerald-400 uppercase tracking-widest">Bot streaming live</span>
         </div>
         <div className="flex items-center gap-2 pl-3.5">
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">platform: any html · load: 4.1kb</span>
+          <span className="text-xs font-google text-slate-500 uppercase tracking-widest">platform: any html · load: 4.1kb</span>
         </div>
       </div>
     </div>
@@ -201,24 +201,24 @@ const HowItWorks = () => {
           {/* ── HEADER CELL ──────────────────────────────────────────────── */}
           <div className="bg-white dark:bg-slate-950 py-12 px-8 sm:px-10 flex flex-col md:flex-row md:items-end justify-between gap-8 transition-colors duration-500">
             <div className="space-y-4 max-w-xl">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
+              <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
                 <span className="material-symbols-outlined text-[14px]">linear_scale</span>
-                <span>Process_Overview | Three_Stages</span>
+                <span>How It Works · 3 Steps</span>
               </div>
-              <h2 className="text-4xl md:text-5xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 uppercase">
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 uppercase">
                 From Data to <br />
                 <span className="text-blue-600 dark:text-blue-400">Live Chatbot.</span>
               </h2>
-              <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed">
-                No machine learning expertise required. Click each stage to understand exactly what happens under the hood.
+              <p className="text-base md:text-lg font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+                No machine learning expertise required. Click each stage to see exactly what happens.
               </p>
             </div>
-            <div className="flex flex-row md:flex-col items-center justify-center md:items-end gap-4 md:gap-2 shrink-0 py-3">
+            <div className="flex flex-col items-start md:items-end gap-2 shrink-0 py-3">
               <div className="text-4xl md:text-5xl font-google font-black tabular-nums text-slate-900 dark:text-slate-200 flex items-center gap-2">
                 <span className="material-symbols-outlined text-blue-900" style={{ fontSize: "40px" }}>
                   nest_clock_farsight_analog
                 </span> &lt; 10</div>
-              <div className="text-xs uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 md:text-right">
+              <div className="text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 md:text-right">
                 Minutes to deploy<br className="hidden md:block" /> a live AI chatbot
               </div>
             </div>
@@ -247,15 +247,14 @@ const HowItWorks = () => {
                     {/* Eyebrow */}
                     <div className={`text-sm uppercase tracking-widest font-bold font-google transition-colors duration-300
                       ${isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-600"}`}>
-                      STEP_{s.step}
+                      STEP {s.step}
                     </div>
 
                     {/* Icon — ghost watermark expands behind tab content */}
                     <div className="relative flex items-start overflow-visible">
                       <span
-                        className={`material-symbols-outlined absolute select-none pointer-events-none transition-all duration-300 z-0 leading-none
+                        className={`material-symbols-outlined absolute select-none pointer-events-none transition-all duration-300 z-0 leading-none text-[60px] md:text-[100px] -top-4 md:-top-6 -right-2
                           ${isActive ? "opacity-[0.1] md:opacity-[0.3] text-blue-600 dark:text-blue-400" : "opacity-[0.04] text-slate-500 dark:text-slate-400"}`}
-                        style={{ fontSize: "100px", top: "-24px", right: "-8px" }}
                       >
                         {s.icon}
                       </span>
@@ -267,7 +266,7 @@ const HowItWorks = () => {
                         ${isActive ? "text-slate-500 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"}`}>
                         {s.label}
                       </div>
-                      <div className={`text-sm md:text-base font-google font-bold leading-tight transition-colors duration-300
+                      <div className={`text-base md:text-lg font-google font-bold leading-tight transition-colors duration-300
                         ${isActive ? "text-slate-900 dark:text-slate-200" : "text-slate-400 dark:text-slate-600"}`}>
                         {s.title}
                       </div>
@@ -293,32 +292,32 @@ const HowItWorks = () => {
             >
               {/* LEFT — value / business explanation */}
               <div className="bg-white dark:bg-slate-950 p-8 md:p-10 flex flex-col gap-6 transition-colors duration-500">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
-                  <span className="text-blue-600 dark:text-blue-400">STEP_{active.step}</span>
+                <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
+                  <span className="text-blue-600 dark:text-blue-400">STEP {active.step}</span>
                   <span className="text-slate-300 dark:text-slate-600">|</span>
                   <span>{active.label}</span>
                 </div>
 
                 <div className="space-y-3 flex-1">
-                  <h3 className="text-2xl md:text-3xl font-google font-bold text-slate-900 dark:text-slate-200 leading-tight">
+                  <h3 className="text-2xl md:text-3xl lg:text-4xl font-google font-bold text-slate-900 dark:text-slate-200 leading-tight">
                     {active.value.heading}
                   </h3>
-                  <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+                  <p className="text-base md:text-lg font-google text-slate-500 dark:text-slate-400 leading-relaxed">
                     {active.value.body}
                   </p>
                 </div>
 
                 <ul className="space-y-2.5">
                   {active.value.bullets.map((b) => (
-                    <li key={b} className="flex items-center gap-3 text-xs font-google text-slate-500 dark:text-slate-400">
-                      <span className="material-symbols-outlined text-[14px] text-emerald-500 shrink-0">check_circle</span>
+                    <li key={b} className="flex items-center gap-3 text-sm md:text-base font-google text-slate-500 dark:text-slate-400">
+                      <span className="material-symbols-outlined text-[16px] text-emerald-500 shrink-0">check_circle</span>
                       {b}
                     </li>
                   ))}
                 </ul>
 
                 <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest">{active.detail}</span>
+                  <span className="text-sm font-google text-slate-400 dark:text-slate-500 uppercase tracking-widest">{active.detail}</span>
                   <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-700">arrow_forward</span>
                 </div>
               </div>
@@ -336,11 +335,11 @@ const HowItWorks = () => {
           <div className="bg-slate-50/50 dark:bg-slate-900 p-8 md:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 transition-colors duration-500">
             <div className="flex items-center gap-4">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <p className="text-xs uppercase tracking-widest font-bold font-google text-slate-500 dark:text-slate-400">
-                System Status: <span className="text-emerald-600 dark:text-emerald-400">Deployment pipeline operational</span>
+              <p className="text-sm uppercase tracking-widest font-bold font-google text-slate-500 dark:text-slate-400">
+                All systems live · <span className="text-emerald-600 dark:text-emerald-400">Ready to deploy</span>
               </p>
             </div>
-            <div className="flex items-center gap-3 text-xs uppercase tracking-widest font-bold font-google text-green-600 dark:text-green-400">
+            <div className="flex items-center gap-3 text-sm uppercase tracking-widest font-bold font-google text-green-600 dark:text-green-400">
               <span className="material-symbols-outlined text-[14px]">credit_card</span>
               No credit card required to start
             </div>

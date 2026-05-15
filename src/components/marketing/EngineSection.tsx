@@ -16,13 +16,12 @@ const EngineSection = () => {
           className="absolute top-0 left-1/2 -translate-x-1/2 w-full min-w-[900px] h-full object-cover pointer-events-none select-none"
         />
       </div>
-      {/* Decorative background illustration — adjust position/size as needed */}
+      {/* Decorative background illustration */}
       <img
         src="/vector_SBdesign2.svg"
         alt=""
         aria-hidden="true"
-        className="absolute pointer-events-none select-none z-0"
-        style={{ top: '-580px', left: '-131px', width: '667px', height: 'auto', opacity: 1 }}
+        className="hidden lg:block absolute pointer-events-none select-none z-0 top-[-581px] left-[-131px] w-[667px] h-auto"
       />
 
       {/* Centered Top Heading */}
@@ -30,7 +29,7 @@ const EngineSection = () => {
         <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-black tracking-tight text-slate-900 dark:text-white leading-none">
           We Provide <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-red-600 dark:to-yellow-400">RAG </span>Engine
         </h2>
-        <p className="font-google text-base sm:text-lg lg:text-xl font-normal text-slate-600 dark:text-slate-100 max-w-2xl mx-auto mt-4 transition-colors duration-300 ease-in-out tracking-widest">A CHATBOT FOR WEBSITES</p>
+        <p className="font-google text-base sm:text-lg lg:text-xl font-normal text-slate-600 dark:text-slate-100 max-w-2xl mx-auto mt-4 transition-colors duration-300 ease-in-out tracking-widest">TRAINED ON YOUR DOCS · GROUNDED IN YOUR DATA</p>
       </div>
 
       {/* Centered Grouped SVGs Container */}
