@@ -67,7 +67,7 @@ const HeroSection = () => {
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
 
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
-      <AntigravityBackground />
+      <AntigravityBackground  />
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
         {/* Background Vector Illustration 
         <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-10 flex items-center justify-end pointer-events-none select-none overflow-hidden">
@@ -124,7 +124,7 @@ const HeroSection = () => {
             </button>
 
 
-            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
+            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
               <span className="material-symbols-outlined text-lg">
                 experiment
               </span>

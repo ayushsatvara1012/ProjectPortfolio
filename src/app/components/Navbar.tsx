@@ -11,6 +11,7 @@ import {
   Show,
 } from '@clerk/nextjs';
 import Logo from './Logo';
+import AntigravityBackground from '../../components/marketing/AntigravityBackground';
 
 type ServiceItem = { title: string; desc: string; price: string };
 type ServiceGroup = { label: string; items: ServiceItem[] };
@@ -19,9 +20,17 @@ type NavLink = { name: string; href: string; id: string; dropdown?: boolean };
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -99,7 +108,11 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 w-full z-50 bg-white dark:bg-slate-950 h-16 transition-colors duration-500">
+      <header className={`fixed top-0 w-full z-50 h-20 transition-all duration-500 ${
+        scrolled
+          ? 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl saturate-150 border-b border-slate-200/40 dark:border-slate-800/50 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
+          : 'bg-transparent border-b border-transparent'
+      }`}>
         <div className="max-w-screen-2xl mx-auto h-full flex items-center justify-between transition-colors duration-500">
 
           {/* Cell 1: Logo */}
@@ -119,7 +132,6 @@ export default function Navbar() {
               >
                 {link.dropdown ? (
                   <button
-                    onMouseEnter={() => setIsServicesOpen(true)}
                     onClick={() => setIsServicesOpen(!isServicesOpen)}
                     className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
                   >
@@ -140,11 +152,30 @@ export default function Navbar() {
                         <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
                           <div>
                             <h3 className="text-2xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-4 tracking-tight">
-                              Built for developers<br/>in the agent-first era
+                              Built for All in the <br/>agent-first era
                             </h3>
-                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
+                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
                               Explore how Sapybase helps you build
                             </p>
+                            
+                            {/* Desktop-only Shape Visualization */}
+                            <div className="relative w-full h-48 overflow-hidden rounded-2xl">
+                              <AntigravityBackground
+                                effectStyle="water_drop"
+                                particleCount={100}
+                                particleType="dot"
+                                particleSize={0.07}
+                                colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
+                                particleSeparation={0.6}
+                                speed={1}
+                                cameraPosition={[0, 0, 26]}
+                                parallaxBaseY={0}
+                                parallaxX={0}
+                                parallaxY={0}
+                                fog={null}
+                                containerClassName="absolute inset-0 pointer-events-none"
+                              />
+                            </div>
                           </div>
                           <Link href="/services" onClick={() => setIsServicesOpen(false)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
                             See overview
@@ -154,7 +185,6 @@ export default function Navbar() {
                         {/* Right Content - Services List */}
                         <div className="w-1/2 flex flex-col gap-0.5">
                           {serviceGroups.flatMap(group => group.items).map((service, idx) => {
-                            const icons = ['smart_toy', 'account_tree', 'code_blocks', 'api', 'speed', 'cloud'];
                             return (
                               <Link
                                 key={`service-drop-${idx}`}
@@ -163,9 +193,7 @@ export default function Navbar() {
                                 className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
-                                  <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-slate-500 group-hover/item:text-slate-800 dark:group-hover/item:text-slate-200 transition-colors">
-                                    {icons[idx]}
-                                  </span>
+                                  <img src="/logo2.svg" alt="" className="w-5 h-5 opacity-100 group-hover/item:opacity-100 transition-opacity" />
                                   <span className="text-[15px] font-google text-slate-700 dark:text-slate-300 group-hover/item:text-slate-900 dark:group-hover/item:text-slate-100 transition-colors">
                                     {service.title}
                                   </span>
@@ -195,20 +223,20 @@ export default function Navbar() {
           </div>
 
           {/* Cell 3: Auth & Account (Desktop md+) */}
-          <div className="hidden lg:flex items-center h-full overflow-hidden shrink-0 transition-colors duration-500">
+          <div className="hidden lg:flex items-center h-full overflow-hidden shrink-0 transition-colors duration-500 ">
             <Show when="signed-out">
-              <div className="h-full bg-white dark:bg-slate-950 flex items-center px-2 lg:px-4 transition-colors duration-500">
+              <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="modal">
-                  <button className="font-google text-base  text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
+                  <button className="text-md font-google font-regular tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full flex items-center transition-colors duration-500">
                 <SignUpButton mode="modal">
-                  <button className=" text-slate-900 dark:text-slate-200 font-google text-base px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
+                  <button className=" text-slate-600 dark:text-slate-200 text-md font-google font-regular tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-400 to-blue-500 transition-all duration-500">
-                      Get_Started
+                      Get Started
                     </span>
                   </button>
                 </SignUpButton>
@@ -240,7 +268,7 @@ export default function Navbar() {
           {/* Mobile Actions (Hamburger & Auth) */}
           <div className="flex items-center lg:hidden h-full transition-colors duration-500">
             <Show when="signed-in">
-              <div className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center border-l border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-500">
+              <div className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center overflow-hidden transition-colors duration-500">
                 <UserButton
                   appearance={{
                     elements: {
@@ -253,7 +281,7 @@ export default function Navbar() {
             </Show>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-slate-200 active:bg-slate-50 dark:active:bg-slate-900 transition-colors border-l border-gray-200 dark:border-slate-800 rounded-none"
+              className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-slate-200 active:bg-slate-50 dark:active:bg-slate-900 transition-colors rounded-none"
               aria-label="Toggle Menu"
             >
               {isOpen ? <span className="material-symbols-outlined text-[20px]">close</span> : <span className="material-symbols-outlined text-[20px]">menu</span>}
@@ -264,67 +292,82 @@ export default function Navbar() {
 
       {/* Zero-Scroll Mobile Dropdown Menu */}
       <div
-        className={`fixed top-16 left-0 w-full h-[calc(100vh-64px)] z-40 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${
+        className={`fixed top-20 left-0 w-full h-[calc(100vh-80px)] z-40 bg-white/70 dark:bg-slate-950/70 backdrop-blur-3xl saturate-150 border-b border-gray-200/40 dark:border-slate-800/40 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${
           isOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'
         }`}
       >
-        <div className="flex-1 flex flex-col h-full overflow-y-auto">
-          <div className="flex flex-col bg-white dark:bg-slate-950">
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overscroll-contain">
+          <div className="flex flex-col bg-transparent">
             {navLinks.map((link) =>
               link.dropdown ? (
-                <div key={`nav-mob-${link.id}`} className="border-b border-gray-100 dark:border-slate-800">
+                <div key={`nav-mob-${link.id}`} className="border-b border-gray-50 dark:border-slate-800/60">
                   {/* Services toggle row */}
                   <button
                     onClick={() => setIsServicesOpen((p) => !p)}
-                    className="w-full px-8 py-5 flex items-center justify-between text-lg font-google uppercase  font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                    className="w-full px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
                   >
                     <span>{link.name}</span>
                     <span
-                      className={`material-symbols-outlined text-[16px] opacity-40 transition-transform duration-200 ${isServicesOpen ? 'rotate-180' : ''}`}
+                      className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isServicesOpen ? 'rotate-180' : ''}`}
                     >
-                      keyboard_arrow_down
+                      expand_more
                     </span>
                   </button>
 
                   {/* Services sub-items */}
-                  <div className={`overflow-hidden transition-all duration-300 ${isServicesOpen ? 'max-h-[600px]' : 'max-h-0'}`}>
-                    <div className="border-t border-gray-100 dark:border-slate-800">
-                      {serviceGroups.map((group) => (
-                        <div key={group.label}>
-                          {/* Partition label */}
-                          <div className="px-8 py-2 bg-slate-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
-                            <span className="text-sm uppercase  font-bold font-google text-slate-400 dark:text-slate-600">
-                              {group.label}
+                  <div className={`grid transition-all duration-500 ease-in-out ${isServicesOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className="overflow-hidden">
+                    <div className="px-6 pb-8 flex flex-col gap-1">
+                      
+                      {/* Integrated Services Header (Mirroring Desktop) */}
+                      <div className="px-2 py-4 mb-2">
+                        <h4 className="text-xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-2 tracking-tight">
+                          Built for All in the <br/>agent-first era
+                        </h4>
+                        <p className="text-sm font-google text-slate-500 dark:text-slate-400">
+                          Explore how Sapybase helps you build
+                        </p>
+                      </div>
+
+                      {serviceGroups.flatMap(group => group.items).map((service, idx) => {
+                        return (
+                          <Link
+                            key={`mob-svc-${idx}`}
+                            href="/services"
+                            onClick={() => {
+                              setIsOpen(false);
+                              setIsServicesOpen(false);
+                            }}
+                            className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-300"
+                          >
+                            <div className="flex items-center gap-4">
+                              <img src="/logo2.svg" alt="" className="w-5 h-5 opacity-40 group-hover/item:opacity-80 transition-opacity" />
+                              <div className="flex flex-col">
+                                <span className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-200 transition-colors">
+                                  {service.title}
+                                </span>
+                                <span className="text-xs font-google text-slate-500 dark:text-slate-500">
+                                  {service.price}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="material-symbols-outlined text-[16px] text-slate-300 dark:text-slate-600 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors">
+                              chevron_right
                             </span>
-                          </div>
-                          {group.items.map((service, idx) => (
-                            <a
-                              key={`mob-svc-${group.label}-${idx}`}
-                              href="/services"
-                              onClick={(e) => handleLinkClick(e, '/services')}
-                              className="flex items-center gap-4 px-8 py-3.5 border-b border-gray-50 dark:border-slate-800/60 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-                            >
-                              <div className="w-7 h-7 shrink-0 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400">
-                                {/* icon slot preserved from Vite original */}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-google font-bold text-slate-800 dark:text-slate-200 leading-tight">{service.title}</p>
-                                <p className="text-sm font-google text-slate-600 dark:text-slate-400 truncate mt-0.5">{service.desc}</p>
-                              </div>
-                              <span className="text-sm font-mono font-bold text-slate-400 dark:text-slate-600 shrink-0">{service.price}</span>
-                            </a>
-                          ))}
-                        </div>
-                      ))}
+                          </Link>
+                        );
+                      })}
+                      
                       <Link
                         href="/services"
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-between px-8 py-4 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
+                        className="mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-slate-100 dark:bg-slate-800 text-sm font-google font-medium text-slate-900 dark:text-white transition-colors"
                       >
-                        <span className="text-xs font-google font-bold uppercase  text-blue-600 dark:text-blue-400">View All Services</span>
-                        <span className="material-symbols-outlined text-[12px] text-blue-600 dark:text-blue-400">arrow_forward</span>
+                        View All Services
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                       </Link>
                     </div>
+                  </div>
                   </div>
                 </div>
               ) : (
@@ -332,17 +375,17 @@ export default function Navbar() {
                   key={`nav-mob-${link.id || link.name}`}
                   href={link.href}
                   onClick={(e) => handleLinkClick(e, link.href)}
-                  className="w-full border-b border-gray-100 dark:border-slate-800 px-8 py-5 sm:py-6 flex items-center justify-between text-sm font-google uppercase  font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                  className="w-full border-b border-gray-50 dark:border-slate-800/60 px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
                 >
                   <span>{link.name}</span>
-                  <span className="material-symbols-outlined text-[18px] opacity-40">arrow_forward</span>
+                  <span className="material-symbols-outlined text-[18px] opacity-40">chevron_right</span>
                 </a>
               )
             )}
           </div>
 
           {/* Mobile Bottom CTA Section */}
-          <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 mt-auto border-t border-gray-200 dark:border-slate-800 space-y-4">
+          <div className="p-6 sm:p-8 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl mt-auto border-t border-gray-200/30 dark:border-slate-800/40 space-y-4">
             <Show when="signed-out">
               <SignUpButton mode="modal">
                 <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-sm font-google  font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">

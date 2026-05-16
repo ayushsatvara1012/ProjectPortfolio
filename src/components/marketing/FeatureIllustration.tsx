@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import AntigravityBackground from './AntigravityBackground';
 
 const features = [
   {
@@ -33,25 +32,7 @@ const features = [
 
 const FeatureIllustration = () => {
   return (
-    <section className="relative w-full bg-white dark:bg-slate-950 px-6 py-20 md:px-12 md:py-28 lg:px-20 lg:py-22 overflow-hidden flex justify-center transition-colors duration-500">
-      
-      {/* Right-side half-screen background with seamless fade */}
-      <div 
-        className="absolute right-0 top-0 bottom-0 w-full lg:w-1/2 z-0 pointer-events-none"
-        style={{
-          maskImage: 'linear-gradient(to right, transparent, black 20%)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent, black 20%)'
-        }}
-      >
-        <AntigravityBackground
-          particleCount={100}
-          particleType="dot"
-          effectStyle="ripples"
-          particleSeparation={0.5}
-          speed={0.4}
-          containerClassName="absolute inset-0 z-0 pointer-events-none opacity-60"
-        />
-      </div>
+    <section className="relative w-full px-6 py-20 md:px-12 md:py-28 lg:px-20 lg:py-22 flex justify-center">
 
       {/* Content wrapper centered on screen, text on the left */}
       <div className="relative z-10 w-full max-w-7xl flex flex-col items-start text-left">
@@ -68,13 +49,15 @@ const FeatureIllustration = () => {
                   {feature.title}
                 </p>
 
-                <p className="font-google text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                <p className="font-google text-sm font-semibold text-blue-600 dark:text-blue-400 tracking-widest">
                   Solves: {feature.solves}
                 </p>
 
-                <p className="font-google text-lg text-slate-600 dark:text-slate-400 leading-relaxed mt-2">
+                <p className="font-google text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
                   {feature.body}
                 </p>
+
+                <div className="h-px w-full bg-slate-100 dark:bg-slate-900 mt-2" />
               </div>
             </li>
           ))}

@@ -115,11 +115,10 @@ const WhatWeSolve = () => {
                 >
                   <div className="py-6 sm:py-6 flex items-center justify-start md:pl-10">
                     <h3
-                      className={`text-xl sm:text-2xl font-google font-medium transition-colors duration-300 ${
-                        activeIndex === index
+                      className={`text-xl sm:text-2xl font-google font-medium transition-colors duration-300 ${activeIndex === index
                           ? 'text-red-600 dark:text-red-400'
                           : 'text-slate-800 dark:text-slate-200'
-                      }`}
+                        }`}
                     >
                       {item.title}
                     </h3>

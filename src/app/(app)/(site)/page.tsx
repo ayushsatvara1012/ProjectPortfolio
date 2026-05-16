@@ -5,7 +5,7 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 import HeroSection from '@/src/components/marketing/HeroSection';
 import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
 
-import FeatureIllustration from '@/src/components/marketing/FeatureIllustration';
+import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection';
 import EngineSection from '@/src/components/marketing/EngineSection';
 import HowItWorks from '@/src/components/marketing/HowItWorks';
 
@@ -103,8 +103,8 @@ export default function HomePage() {
       <main className="relative overflow-x-clip">
         <HeroSection />
         <WhatWeSolve />
-        <FeatureIllustration />
-        <EngineSection/>
+        <ScrollTravelSection />
+        <EngineSection />
         <HowItWorks />
       </main>
     </>
