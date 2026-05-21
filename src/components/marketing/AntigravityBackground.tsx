@@ -1,8 +1,16 @@
 'use client';
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, Component, type ReactNode } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+
+class WebGLErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  render() {
+    return this.state.error ? (this.props.fallback ?? null) : this.props.children;
+  }
+}
 
 export type WaveStyle = 'classic' | 'ripples' | 'vortex' | 'matrix' | 'dome' | 'flat' | 'globe' | 'water_drop';
 export type ParticleType = 'capsule' | 'box' | 'dot';
@@ -369,23 +377,25 @@ const AntigravityBackground: React.FC<AntigravityBackgroundProps> = ({
     >
       {className && <div className={className} />}
 
-      <Canvas camera={{ position: cameraPosition, fov: 60 }} dpr={[1, 2]}>
-        {fog && <fog attach="fog" args={[fog.color, fog.near, fog.far]} />}
-        <WaveParticles
-          effectStyle={effectStyle}
-          colorPalette={colorPalette}
-          particleType={particleType}
-          particleCount={particleCount}
-          particleSize={particleSize}
-          particleSeparation={particleSeparation}
-          parallaxX={parallaxX}
-          parallaxY={parallaxY}
-          parallaxBaseY={parallaxBaseY}
-          randomness={randomness}
-          speed={speed}
-          morphProgressRef={morphProgressRef}
-        />
-      </Canvas>
+      <WebGLErrorBoundary>
+        <Canvas camera={{ position: cameraPosition, fov: 60 }} dpr={[1, 2]}>
+          {fog && <fog attach="fog" args={[fog.color, fog.near, fog.far]} />}
+          <WaveParticles
+            effectStyle={effectStyle}
+            colorPalette={colorPalette}
+            particleType={particleType}
+            particleCount={particleCount}
+            particleSize={particleSize}
+            particleSeparation={particleSeparation}
+            parallaxX={parallaxX}
+            parallaxY={parallaxY}
+            parallaxBaseY={parallaxBaseY}
+            randomness={randomness}
+            speed={speed}
+            morphProgressRef={morphProgressRef}
+          />
+        </Canvas>
+      </WebGLErrorBoundary>
     </div>
   );
 };

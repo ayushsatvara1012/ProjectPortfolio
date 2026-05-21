@@ -51,7 +51,7 @@
 @layer base {
   html {
     scroll-behavior: auto;
-    overflow-x: clip;
+    overflow-x: clip; /* `clip` not `hidden` — avoids creating a scroll container so position:sticky still works */
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
