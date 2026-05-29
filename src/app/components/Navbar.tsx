@@ -19,11 +19,25 @@ type NavLink = { name: string; href: string; id: string; dropdown?: boolean };
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [isServicesOpenDesktop, setIsServicesOpenDesktop] = useState(false);
+  const [isServicesOpenMobile, setIsServicesOpenMobile] = useState(false);
+  const [renderCanvas, setRenderCanvas] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    if (isServicesOpenDesktop) {
+      setRenderCanvas(true);
+    } else {
+      timeoutId = setTimeout(() => {
+        setRenderCanvas(false);
+      }, 300);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [isServicesOpenDesktop]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -31,6 +45,31 @@ export default function Navbar() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash;
+      const scrollToHash = () => {
+        const element = document.querySelector(hash);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+          return true;
+        }
+        return false;
+      };
+
+      if (!scrollToHash()) {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (scrollToHash() || attempts > 20) {
+            clearInterval(interval);
+          }
+        }, 100);
+        return () => clearInterval(interval);
+      }
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,7 +84,7 @@ export default function Navbar() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsServicesOpen(false);
+        setIsServicesOpenDesktop(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -84,22 +123,20 @@ export default function Navbar() {
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     setIsOpen(false);
-    setIsServicesOpen(false);
+    setIsServicesOpenDesktop(false);
+    setIsServicesOpenMobile(false);
 
-    if (href.startsWith('#')) {
-      if (pathname === '/') {
-        const targetElement = document.querySelector(href);
+    const [basePath, hash] = href.split('#');
+    const targetPath = basePath || '/';
+
+    if (hash) {
+      if (pathname === targetPath) {
+        const targetElement = document.querySelector(`#${hash}`);
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth' });
         }
       } else {
-        router.push('/');
-        setTimeout(() => {
-          const targetElement = document.querySelector(href);
-          if (targetElement) {
-            targetElement.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 100);
+        router.push(href);
       }
     } else {
       router.push(href);
@@ -108,7 +145,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className={`fixed top-0 w-full z-50 h-20 transition-all duration-500 ${
+      <header className={`fixed top-0 w-full z-50 h-20 transition-[background-color,border-color,box-shadow] duration-500 will-change-[background-color] ${
         scrolled
           ? 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl saturate-150 border-b border-slate-200/40 dark:border-slate-800/50 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
           : 'bg-transparent border-b border-transparent'
@@ -127,25 +164,25 @@ export default function Navbar() {
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
-                className="relative text-md font-google font-regular antialiased tracking-wider text-slate-800 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
+                className="relative text-base font-google font-normal antialiased tracking-wider text-slate-800 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
                 ref={link.dropdown ? dropdownRef : null}
               >
                 {link.dropdown ? (
                   <button
-                    onClick={() => setIsServicesOpen(!isServicesOpen)}
+                    onClick={() => setIsServicesOpenDesktop(!isServicesOpenDesktop)}
                     className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
                   >
                     {link.name}
                     <span
-                      className={`material-symbols-outlined text-black dark:text-white text-[12px] opacity-40 transition-transform duration-200 ${isServicesOpen ? 'rotate-180' : ''}`}
+                      className={`material-symbols-outlined text-black dark:text-white text-[12px] opacity-40 transition-transform duration-200 ${isServicesOpenDesktop ? 'rotate-180' : ''}`}
                     >
                       keyboard_arrow_down
                     </span>
 
                     {/* Desktop Dropdown */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none rounded-3xl border border-gray-100 dark:border-slate-800/60 transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpen ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
-                      onMouseLeave={() => setIsServicesOpen(false)}
+                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none rounded-3xl border border-gray-100 dark:border-slate-800/60 transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpenDesktop ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      onMouseLeave={() => setIsServicesOpenDesktop(false)}
                     >
                       <div className="flex p-8">
                         {/* Left Content */}
@@ -160,24 +197,26 @@ export default function Navbar() {
                             
                             {/* Desktop-only Shape Visualization */}
                             <div className="relative w-full h-48 overflow-hidden rounded-2xl">
-                              <AntigravityBackground
-                                effectStyle="water_drop"
-                                particleCount={100}
-                                particleType="dot"
-                                particleSize={0.07}
-                                colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
-                                particleSeparation={0.6}
-                                speed={1}
-                                cameraPosition={[0, 0, 26]}
-                                parallaxBaseY={0}
-                                parallaxX={0}
-                                parallaxY={0}
-                                fog={null}
-                                containerClassName="absolute inset-0 pointer-events-none"
-                              />
+                              {renderCanvas && (
+                                <AntigravityBackground
+                                  effectStyle="water_drop"
+                                  particleCount={100}
+                                  particleType="dot"
+                                  particleSize={0.07}
+                                  colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
+                                  particleSeparation={0.6}
+                                  speed={1}
+                                  cameraPosition={[0, 0, 26]}
+                                  parallaxBaseY={0}
+                                  parallaxX={0}
+                                  parallaxY={0}
+                                  fog={null}
+                                  containerClassName="absolute inset-0 pointer-events-none"
+                                />
+                              )}
                             </div>
                           </div>
-                          <Link href="/services" onClick={() => setIsServicesOpen(false)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
+                          <Link href="/services" onClick={() => setIsServicesOpenDesktop(false)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
                             See overview
                           </Link>
                         </div>
@@ -186,14 +225,14 @@ export default function Navbar() {
                         <div className="w-1/2 flex flex-col gap-0.5">
                           {serviceGroups.flatMap(group => group.items).map((service, idx) => {
                             return (
-                              <Link
+                               <Link
                                 key={`service-drop-${idx}`}
                                 href="/services"
-                                onClick={() => setIsServicesOpen(false)}
+                                onClick={() => setIsServicesOpenDesktop(false)}
                                 className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
-                                  <img src="/logo2.svg" alt="" className="w-5 h-5 opacity-100 group-hover/item:opacity-100 transition-opacity" />
+                                  <img src="/logo2.svg" alt="" loading="lazy" decoding="async" className="w-5 h-5 opacity-100 group-hover/item:opacity-100 transition-opacity" />
                                   <span className="text-[15px] font-google text-slate-700 dark:text-slate-300 group-hover/item:text-slate-900 dark:group-hover/item:text-slate-100 transition-colors">
                                     {service.title}
                                   </span>
@@ -227,14 +266,14 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="modal">
-                  <button className="text-md font-google font-regular tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
+                  <button className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full flex items-center transition-colors duration-500">
                 <SignUpButton mode="modal">
-                  <button className=" text-slate-600 dark:text-slate-200 text-md font-google font-regular tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
+                  <button className=" text-slate-600 dark:text-slate-200 text-base font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-400 to-blue-500 transition-all duration-500">
                       Get Started
                     </span>
@@ -246,9 +285,9 @@ export default function Navbar() {
               <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
                 <Link
                   href="/dashboard"
-                  className="text-sm text-slate-900 dark:text-slate-200 font-google hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2"
+                  className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-2"
                 >
-                  <span className="material-symbols-outlined">dashboard</span>
+                  <span className="material-symbols-outlined ">dashboard</span>
                   Dashboard
                 </Link>
                 <div className="h-10 w-10 group/user p-0 flex items-center justify-center">
@@ -283,6 +322,8 @@ export default function Navbar() {
               onClick={() => setIsOpen(!isOpen)}
               className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-slate-200 active:bg-slate-50 dark:active:bg-slate-900 transition-colors rounded-none"
               aria-label="Toggle Menu"
+              aria-expanded={isOpen}
+              aria-controls="mobile-nav-menu"
             >
               {isOpen ? <span className="material-symbols-outlined text-[20px]">close</span> : <span className="material-symbols-outlined text-[20px]">menu</span>}
             </button>
@@ -292,6 +333,7 @@ export default function Navbar() {
 
       {/* Zero-Scroll Mobile Dropdown Menu */}
       <div
+        id="mobile-nav-menu"
         className={`fixed top-20 left-0 w-full h-[calc(100vh-80px)] z-40 bg-white/70 dark:bg-slate-950/70 backdrop-blur-3xl saturate-150 border-b border-gray-200/40 dark:border-slate-800/40 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${
           isOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'
         }`}
@@ -303,19 +345,19 @@ export default function Navbar() {
                 <div key={`nav-mob-${link.id}`} className="border-b border-gray-50 dark:border-slate-800/60">
                   {/* Services toggle row */}
                   <button
-                    onClick={() => setIsServicesOpen((p) => !p)}
+                    onClick={() => setIsServicesOpenMobile((p) => !p)}
                     className="w-full px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
                   >
                     <span>{link.name}</span>
                     <span
-                      className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isServicesOpen ? 'rotate-180' : ''}`}
+                      className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isServicesOpenMobile ? 'rotate-180' : ''}`}
                     >
                       expand_more
                     </span>
                   </button>
 
                   {/* Services sub-items */}
-                  <div className={`grid transition-all duration-500 ease-in-out ${isServicesOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className={`grid transition-all duration-500 ease-in-out ${isServicesOpenMobile ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                   <div className="overflow-hidden">
                     <div className="px-6 pb-8 flex flex-col gap-1">
                       
@@ -336,12 +378,12 @@ export default function Navbar() {
                             href="/services"
                             onClick={() => {
                               setIsOpen(false);
-                              setIsServicesOpen(false);
+                              setIsServicesOpenMobile(false);
                             }}
                             className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-300"
                           >
                             <div className="flex items-center gap-4">
-                              <img src="/logo2.svg" alt="" className="w-5 h-5 opacity-40 group-hover/item:opacity-80 transition-opacity" />
+                              <img src="/logo2.svg" alt="" loading="lazy" decoding="async" className="w-5 h-5 opacity-40 group-hover/item:opacity-80 transition-opacity" />
                               <div className="flex flex-col">
                                 <span className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-200 transition-colors">
                                   {service.title}

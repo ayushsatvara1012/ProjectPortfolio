@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const PIPELINE_STEPS = [
   {
@@ -9,44 +10,25 @@ const PIPELINE_STEPS = [
     label: "INGEST",
     title: "Connect Your Data",
     subtitle: "Zero manual entry. Pure extraction.",
-    value: {
-      heading: "Your knowledge, on autopilot.",
-      body: "Sapybase securely crawls your website or accepts PDF uploads and extracts every meaningful sentence — product descriptions, FAQs, pricing tables, policy pages — without you copying a single line. The moment you hit connect, your content becomes the brain of your chatbot.",
-      bullets: ["PDF · URL · Raw Text supported", "Auto-sync on content change", "No manual data entry"],
-    },
-    tech: {
-      type: "terminal",
-      label: "INGESTION LOG",
-      lines: [
-        { key: "source", value: '"pricing.html"', color: "text-emerald-400" },
-        { key: "status", value: '"extracted"', color: "text-blue-400" },
-        { key: "tokens", value: "1405", color: "text-amber-400" },
-        { key: "chunks", value: "18", color: "text-violet-400" },
-        { key: "elapsed", value: '"0.84s"', color: "text-slate-400" },
-      ],
-    },
-    icon: "upload_file",
-    detail: "PDF · URL · Raw Text",
+    description: "Sapybase securely crawls your website or accepts PDF uploads and extracts every meaningful sentence — product details, FAQs, pricing tables, policies — without you copying a single line. The moment you connect, your content becomes the brain of your chatbot.",
+    bullets: [
+      "Auto-sync on website content changes",
+      "Upload PDFs, CSVs, or enter raw text",
+      "No manual database configuration required"
+    ],
   },
   {
     id: 2,
     step: "02",
     label: "UNDERSTAND",
     title: "AI Reads Intent, Not Keywords",
-    subtitle: "Why your bot gives smart answers.",
-    value: {
-      heading: "Beyond keyword search.",
-      body: "Traditional search breaks when a customer types \"what does it cost?\" instead of \"pricing\". Sapybase converts every sentence into a fingerprint of its meaning. When a user asks a question, we find the closest meaning, not the closest word.",
-      bullets: ["Semantic search (meaning-aware)", "Prevents keyword-mismatch failures", "Context-aware retrieval"],
-    },
-    tech: {
-      type: "vector",
-      label: "EMBEDDING SAMPLE",
-      word: "Pricing",
-      vector: [0.421, -0.892, 0.115, 0.673, -0.234, 0.889, -0.451, 0.102],
-    },
-    icon: "psychology",
-    detail: "pgvector · Semantic Search",
+    subtitle: "Semantic intent-matching.",
+    description: "Traditional search breaks when a customer types 'what does it cost?' instead of 'pricing'. Sapybase converts every sentence into a semantic fingerprint (a vector). When a user asks a question, we match the closest meaning, not just words, preventing chatbot failures.",
+    bullets: [
+      "Semantic matching (meaning-aware search)",
+      "Protects against chatbot hallucination",
+      "Context-aware conversation memory"
+    ],
   },
   {
     id: 3,
@@ -54,309 +36,962 @@ const PIPELINE_STEPS = [
     label: "DEPLOY",
     title: "Live in 60 Seconds",
     subtitle: "One script tag. Every platform.",
-    value: {
-      heading: "Go live in seconds.",
-      body: "No backend to configure. No server to maintain. Paste one script tag into any HTML page — React, Next.js, Webflow, Shopify, plain HTML — and your AI agent starts streaming answers to real customers immediately. Customize the widget color, name, and persona from your dashboard.",
-      bullets: ["React · Next.js · Webflow · HTML", "Widget customizable from dashboard", "Streaming answers via WebSocket"],
-    },
-    tech: {
-      type: "script",
-      label: "EMBED SNIPPET",
-      snippet: `<script
-  src="https://cdn.Sapybase.com/widget.js"
-  data-bot-id="sb_prod_x7k9m"
-  data-theme="blue"
-  defer
-></script>`,
-    },
-    icon: "rocket_launch",
-    detail: "React · Next.js · HTML · Webflow",
+    description: "No backend to configure, no servers to maintain. Simply copy a single line of script and paste it into any HTML page — React, Next.js, Webflow, Shopify, or WordPress. Your AI agent starts streaming answers to visitors immediately.",
+    bullets: [
+      "Compatible with React, Next.js, Webflow, HTML",
+      "Customize widget colors & avatar from dashboard",
+      "Instant real-time WebSocket answer streaming"
+    ],
   },
 ];
 
-/* ── Terminal mock ─────────────────────────────────────────────────────── */
-const TerminalPanel = ({ data }: { data: any }) => (
-  <div className="flex flex-col h-full">
-    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-      <div className="flex gap-1.5">
-        <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-        <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-      </div>
-      <span className="text-[9px] font-mono uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">{data.label}</span>
-    </div>
-    <div className="flex-1 p-5 font-mono text-sm bg-slate-950 dark:bg-slate-950 overflow-hidden">
-      <span className="text-slate-600 text-xs">| extraction output</span>
-      <div className="mt-3 space-y-1.5">
-        <span className="text-slate-500">{"{"}</span>
-        {data.lines.map((l: any) => (
-          <div key={l.key} className="pl-4">
-            <span className="text-slate-400">&quot;{l.key}&quot;</span>
-            <span className="text-slate-600">: </span>
-            <span className={l.color}>{l.value}</span>
-            <span className="text-slate-600">,</span>
-          </div>
-        ))}
-        <span className="text-slate-500">{"}"}</span>
-      </div>
-      <div className="mt-4 flex items-center gap-2">
-        <span className="text-emerald-500 text-xs">✓</span>
-        <span className="text-emerald-400 text-xs font-mono">Knowledge base updated</span>
-      </div>
-    </div>
-  </div>
-);
+const QUESTIONS_DATA = [
+  { query: "what does it cost?", match: "97%", intent: "Pricing Details" },
+  { query: "how do I set it up?", match: "99%", intent: "Deployment Guide" },
+  { query: "is there a free trial?", match: "95%", intent: "Free Tier Policy" },
+];
 
-/* ── Vector mock ───────────────────────────────────────────────────────── */
-const VectorPanel = ({ data }: { data: any }) => (
-  <div className="flex flex-col h-full">
-    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-      <span className="material-symbols-outlined text-[12px] text-blue-500">schema</span>
-      <span className="text-[9px] font-mono uppercase tracking-widest text-slate-400 dark:text-slate-500">{data.label}</span>
-    </div>
-    <div className="flex-1 p-5 bg-slate-950 dark:bg-slate-950 flex flex-col justify-center gap-5">
-      <div className="flex items-center gap-3">
-        <div className="px-3 py-1.5 border border-blue-500/40 bg-blue-500/10 font-mono text-sm text-blue-400 tracking-widest">
-          &quot;{data.word}&quot;
-        </div>
-        <span className="material-symbols-outlined text-[16px] text-slate-600">arrow_forward</span>
-        <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">1536-dim vector</span>
-      </div>
-      <div className="space-y-1">
-        <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">embedding[0..7]</span>
-        <div className="flex flex-wrap gap-1.5 mt-1.5">
-          {data.vector.map((v: number, i: number) => (
-            <div key={i} className="px-2 py-1 border border-slate-700 bg-slate-900 font-mono text-xs text-slate-400">
-              {v > 0 ? (
-                <span className="text-emerald-400">{v.toFixed(3)}</span>
-              ) : (
-                <span className="text-rose-400">{v.toFixed(3)}</span>
-              )}
-            </div>
-          ))}
-          <div className="px-2 py-1 border border-slate-800 font-mono text-xs text-slate-600">...</div>
-        </div>
-      </div>
-      <div className="pt-3 border-t border-slate-800">
-        <p className="text-[10px] font-mono text-slate-500 leading-relaxed">
-          cosine_similarity(&quot;what does it cost?&quot;, embedding[&quot;Pricing&quot;]) = <span className="text-emerald-400">0.97</span>
-        </p>
-      </div>
-    </div>
-  </div>
-);
-
-/* ── Script embed mock ─────────────────────────────────────────────────── */
-const ScriptPanel = ({ data }: { data: any }) => (
-  <div className="flex flex-col h-full">
-    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-      <span className="material-symbols-outlined text-[12px] text-violet-500">code</span>
-      <span className="text-[9px] font-mono uppercase tracking-widest text-slate-400 dark:text-slate-500">{data.label}</span>
-    </div>
-    <div className="flex-1 p-5 bg-slate-950 dark:bg-slate-950 flex flex-col justify-between gap-5">
-      <pre className="font-mono text-xs leading-relaxed text-slate-300 whitespace-pre overflow-x-auto">
-        <span className="text-slate-500">&lt;</span>
-        <span className="text-blue-400">script</span>
-        {"\n  "}
-        <span className="text-amber-300">src</span>
-        <span className="text-slate-500">=</span>
-        <span className="text-emerald-400">&quot;https://cdn.Sapybase.com/widget.js&quot;</span>
-        {"\n  "}
-        <span className="text-amber-300">data-bot-id</span>
-        <span className="text-slate-500">=</span>
-        <span className="text-emerald-400">&quot;sb_prod_x7k9m&quot;</span>
-        {"\n  "}
-        <span className="text-amber-300">data-theme</span>
-        <span className="text-slate-500">=</span>
-        <span className="text-emerald-400">&quot;blue&quot;</span>
-        {"\n  "}
-        <span className="text-violet-400">defer</span>
-        {"\n"}
-        <span className="text-slate-500">&gt;&lt;/</span>
-        <span className="text-blue-400">script</span>
-        <span className="text-slate-500">&gt;</span>
-      </pre>
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-google text-emerald-400 uppercase tracking-widest">Bot streaming live</span>
-        </div>
-        <div className="flex items-center gap-2 pl-3.5">
-          <span className="text-xs font-google text-slate-500 uppercase tracking-widest">platform: any html · load: 4.1kb</span>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const HowItWorks = () => {
-  const [activeStep, setActiveStep] = useState(1);
-  const active = PIPELINE_STEPS.find((s) => s.id === activeStep)!;
+// ── Shared engine logo node ──────────────────────────────────────────────────
+// Accepts optional `phase` to show thinking/resolved ring states.
+// The outer div is sized and positioned by the caller.
+function EngineLogoNode({ phase }: { phase?: "typing" | "sending" | "thinking" | "resolved" }) {
+  const isThinking = phase === "thinking";
+  const isResolved = phase === "resolved";
 
   return (
-    <section id="how-it-works" className="bg-white dark:bg-slate-950 overflow-x-clip transition-colors duration-500">
-      <div className="max-w-8xl mx-auto">
-        <div className="grid grid-cols-1 gap-px bg-slate-200 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-800 transition-colors duration-500">
+    <div className="relative w-full h-full">
+      {/* Outer pulse ring — visible only while thinking */}
+      {isThinking && (
+        <motion.div
+          className="absolute inset-0 rounded-full border border-blue-500/30"
+          animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+        />
+      )}
 
-          {/* ── HEADER CELL ──────────────────────────────────────────────── */}
-          <div className="bg-white dark:bg-slate-950 py-12 px-8 sm:px-10 flex flex-col md:flex-row md:items-end justify-between gap-8 transition-colors duration-500">
-            <div className="space-y-4 max-w-xl">
-              <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
-                <span className="material-symbols-outlined text-[14px]">linear_scale</span>
-                <span>How It Works · 3 Steps</span>
-              </div>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 uppercase">
-                From Data to <br />
-                <span className="text-blue-600 dark:text-blue-400">Live Chatbot.</span>
-              </h2>
-              <p className="text-base md:text-lg font-google text-slate-500 dark:text-slate-400 leading-relaxed">
-                No machine learning expertise required. Click each stage to see exactly what happens.
-              </p>
-            </div>
-            <div className="flex flex-col items-start md:items-end gap-2 shrink-0 py-3">
-              <div className="text-4xl md:text-5xl font-google font-black tabular-nums text-slate-900 dark:text-slate-200 flex items-center gap-2">
-                <span className="material-symbols-outlined text-blue-900" style={{ fontSize: "40px" }}>
-                  nest_clock_farsight_analog
-                </span> &lt; 10</div>
-              <div className="text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 md:text-right">
-                Minutes to deploy<br className="hidden md:block" /> a live AI chatbot
-              </div>
-            </div>
-          </div>
+      {/* Spinning gradient border */}
+      <motion.div
+        className="absolute inset-0 rounded-full border-2 border-transparent border-t-indigo-500 border-r-blue-400"
+        animate={isThinking ? { rotate: 360 } : { rotate: 0 }}
+        transition={
+          isThinking
+            ? { duration: 1, repeat: Infinity, ease: "linear" }
+            : { duration: 0.5 }
+        }
+      />
 
-          {/* ── PIPELINE NAV — 3 tabs ─────────────────────────────────────── */}
-          <div className="bg-white dark:bg-slate-950 transition-colors duration-500 overflow-x-auto">
-            <div className="grid grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 min-w-[480px]">
-              {PIPELINE_STEPS.map((s) => {
-                const isActive = activeStep === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setActiveStep(s.id)}
-                    className={`group relative flex flex-col gap-3 p-5 md:p-8 text-left transition-all duration-300 cursor-pointer
-                      ${isActive
-                        ? "bg-white dark:bg-slate-950"
-                        : "bg-slate-50/60 dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-900"
-                      }`}
-                  >
-                    {/* Active top border indicator */}
-                    <div className={`absolute top-0 left-0 right-0 h-0.5 transition-all duration-300
-                      ${isActive ? "bg-blue-600 dark:bg-blue-400" : "bg-transparent group-hover:bg-slate-200 dark:group-hover:bg-slate-700"}`}
-                    />
+      {/* Inner disc */}
+      <div
+        className={`absolute inset-[10%] rounded-full border bg-white dark:bg-slate-900 flex items-center justify-center shadow-md transition-all duration-300 ${
+          isThinking
+            ? "border-blue-500/40 dark:border-blue-400/40 shadow-blue-500/10"
+            : isResolved
+            ? "border-emerald-500/40 dark:border-emerald-400/40 shadow-emerald-500/10"
+            : "border-slate-200 dark:border-slate-800"
+        }`}
+      >
+        <motion.img
+          src="/logo2.svg"
+          alt="Sapybase Engine"
+          className="w-[58%] h-[58%] object-contain"
+          animate={isThinking ? { scale: [1, 1.12, 1] } : { scale: [1, 1.05, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
+    </div>
+  );
+}
 
-                    {/* Eyebrow */}
-                    <div className={`text-sm uppercase tracking-widest font-bold font-google transition-colors duration-300
-                      ${isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-600"}`}>
-                      STEP {s.step}
-                    </div>
+// ── SVG gradient defs reused across step 1 ───────────────────────────────────
+// IDs are scoped to prevent collisions when all three previews are mounted.
+function Step1SVGDefs() {
+  return (
+    <defs>
+      <linearGradient id="s1-glow-a" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0" />
+        <stop offset="50%"  stopColor="#3B82F6" stopOpacity="1" />
+        <stop offset="100%" stopColor="#6366F1" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="s1-glow-b" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"   stopColor="#6366F1" stopOpacity="0" />
+        <stop offset="50%"  stopColor="#4F46E5" stopOpacity="1" />
+        <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+  );
+}
 
-                    {/* Icon — ghost watermark expands behind tab content */}
-                    <div className="relative flex items-start overflow-visible">
-                      <span
-                        className={`material-symbols-outlined absolute select-none pointer-events-none transition-all duration-300 z-0 leading-none text-[60px] md:text-[100px] -top-4 md:-top-6 -right-2
-                          ${isActive ? "opacity-[0.1] md:opacity-[0.3] text-blue-600 dark:text-blue-400" : "opacity-[0.04] text-slate-500 dark:text-slate-400"}`}
-                      >
-                        {s.icon}
-                      </span>
-                    </div>
+// ── Step 2 visual (semantic understanding) ───────────────────────────────────
+// Coordinate mapping (viewBox 0 0 500 500):
+//   search bar   → left-[80%] top-[50%]  → SVG (400, 250)
+//   engine logo  → left-[20%] top-[50%]  → SVG (100, 250)
+//   intent card  → left-[20%] top-[82%]  → SVG (100, 410)
+function StepTwoVisual({
+  phase,
+  typedText,
+  currentData,
+  isMobile = false,
+}: {
+  phase: "typing" | "sending" | "thinking" | "resolved";
+  typedText: string;
+  currentData: (typeof QUESTIONS_DATA)[0];
+  isMobile?: boolean;
+}) {
+  const active = phase === "sending" || phase === "thinking" || phase === "resolved";
 
-                    {/* Label + title */}
-                    <div>
-                      <div className={`text-sm uppercase tracking-widest font-bold font-google mb-1 transition-colors duration-300
-                        ${isActive ? "text-slate-500 dark:text-slate-400" : "text-slate-400 dark:text-slate-600"}`}>
-                        {s.label}
-                      </div>
-                      <div className={`text-base md:text-lg font-google font-bold leading-tight transition-colors duration-300
-                        ${isActive ? "text-slate-900 dark:text-slate-200" : "text-slate-400 dark:text-slate-600"}`}>
-                        {s.title}
-                      </div>
-                    </div>
+  return (
+    <div className="relative w-full h-full">
+      <svg
+        viewBox="0 0 500 500"
+        className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
+      >
+        <defs>
+          {/* Horizontal: search bar (400) → engine (100) — right-to-left gradient */}
+          <linearGradient id="s2-horiz" x1="100%" y1="0%" x2="0%" y2="0%">
+            <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#6366F1" stopOpacity="1"   />
+          </linearGradient>
+          {/* Vertical: engine (250) → intent card (410) */}
+          <linearGradient id="s2-vert" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="#6366F1" stopOpacity="1" />
+            <stop offset="100%" stopColor="#10B981" stopOpacity="1" />
+          </linearGradient>
+        </defs>
 
-                    {/* Active caret pointing down */}
-                    {isActive && (
-                      <div className="absolute -bottom-[9px] left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-slate-950 border-b border-r border-slate-200 dark:border-slate-800 rotate-45 z-10" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        {/* Base dashed horizontal line: search (400,250) ← engine (100,250) */}
+        <path
+          d="M 400 250 L 100 250"
+          stroke="#E2E8F0"
+          strokeWidth="1.5"
+          fill="none"
+          className="dark:stroke-slate-800"
+          strokeDasharray="4 4"
+        />
 
-          {/* ── EXPLAINER PANEL ──────────────────────────────────────────── */}
-          <div className="bg-white dark:bg-slate-950 transition-all duration-300">
-            {/* Panel inner: two columns on desktop */}
-            <div
-              key={activeStep}
-              className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 dark:bg-slate-800"
-              style={{ animation: "fadeSlideIn 0.25s ease-out both" }}
+        {/* Animated overlay when request is in-flight */}
+        {active && (
+          <motion.path
+            key={`s2-horiz-${currentData.query}`}
+            d="M 400 250 L 100 250"
+            stroke="url(#s2-horiz)"
+            strokeWidth="2.5"
+            fill="none"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+          />
+        )}
+
+        {/* Moving data packet */}
+        {phase === "sending" && (
+          <>
+            <motion.circle
+              key={`pkt-core-${currentData.query}`}
+              cx={400} cy={250} r={5}
+              fill="#3B82F6"
+              animate={{ cx: 100 }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+            />
+            <motion.circle
+              key={`pkt-glow-${currentData.query}`}
+              cx={400} cy={250} r={10}
+              fill="#3B82F6"
+              fillOpacity={0.3}
+              animate={{ cx: 100 }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+            />
+          </>
+        )}
+
+        {/* Vertical line from engine bottom (100,275) to intent card (100,395) */}
+        {phase === "resolved" && (
+          <>
+            <path
+              d="M 100 275 L 100 395"
+              stroke="#E2E8F0"
+              strokeWidth="1.5"
+              fill="none"
+              className="dark:stroke-slate-800"
+              strokeDasharray="3 3"
+            />
+            <motion.path
+              key={`s2-vert-${currentData.query}`}
+              d="M 100 275 L 100 395"
+              stroke="url(#s2-vert)"
+              strokeWidth="2"
+              fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            />
+          </>
+        )}
+      </svg>
+
+      {/* Search bar — RIGHT anchor: left-[80%] top-[50%] */}
+      {/* w-[38%]: center at 80% + half-width 19% = 99% — stays inside overflow-hidden */}
+      <div className="absolute left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[38%] z-10">
+        <div className="border border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm">
+          <span className="material-symbols-outlined text-[15px] text-blue-500 shrink-0">
+            search
+          </span>
+          <span className="text-[11px] font-mono text-slate-800 dark:text-slate-200 min-h-[16px] flex items-center w-full overflow-hidden">
+            <span className="truncate">{typedText}</span>
+            {phase === "typing" && (
+              <motion.span
+                animate={{ opacity: [1, 0, 1] }}
+                transition={{ repeat: Infinity, duration: 0.8 }}
+                className="shrink-0 inline-block w-[1.5px] h-[12px] bg-blue-500 ml-0.5 rounded-full"
+              />
+            )}
+          </span>
+        </div>
+      </div>
+
+      {/* Engine node — mobile only; desktop uses the shared overlay */}
+      {isMobile && (
+        <div className="absolute left-[20%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[22%] aspect-square z-10 pointer-events-none">
+          <EngineLogoNode phase={phase} />
+          <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
+            Sapybase Engine
+          </span>
+        </div>
+      )}
+
+      {/* Intent resolution card — below engine: SVG vertical line at x=100 (20%)
+          falls inside the card's span (4% → 58%), so no SVG changes needed.
+          Left-anchored at 4% to avoid the -translate-x-1/2 left-clip. */}
+      <div className="absolute left-[4%] top-[82%] -translate-y-1/2 w-[56%] z-20 flex flex-col items-center gap-2">
+        <AnimatePresence mode="wait">
+          {phase === "thinking" && (
+            <motion.div
+              key="thinking"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="flex items-center gap-1.5 text-[9px] font-mono text-indigo-500 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/20 px-2.5 py-1 rounded-md border border-indigo-100/60 dark:border-indigo-900/30 whitespace-nowrap"
             >
-              {/* LEFT — value / business explanation */}
-              <div className="bg-white dark:bg-slate-950 p-8 md:p-10 flex flex-col gap-6 transition-colors duration-500">
-                <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">
-                  <span className="text-blue-600 dark:text-blue-400">STEP {active.step}</span>
-                  <span className="text-slate-300 dark:text-slate-600">|</span>
-                  <span>{active.label}</span>
-                </div>
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping shrink-0" />
+              Analyzing intent…
+            </motion.div>
+          )}
 
-                <div className="space-y-3 flex-1">
-                  <h3 className="text-2xl md:text-3xl lg:text-4xl font-google font-bold text-slate-900 dark:text-slate-200 leading-tight">
-                    {active.value.heading}
-                  </h3>
-                  <p className="text-base md:text-lg font-google text-slate-500 dark:text-slate-400 leading-relaxed">
-                    {active.value.body}
-                  </p>
-                </div>
-
-                <ul className="space-y-2.5">
-                  {active.value.bullets.map((b) => (
-                    <li key={b} className="flex items-center gap-3 text-sm md:text-base font-google text-slate-500 dark:text-slate-400">
-                      <span className="material-symbols-outlined text-[16px] text-emerald-500 shrink-0">check_circle</span>
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-sm font-google text-slate-400 dark:text-slate-500 uppercase tracking-widest">{active.detail}</span>
-                  <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-700">arrow_forward</span>
-                </div>
+          {phase === "resolved" && (
+            <motion.div
+              key="resolved"
+              initial={{ opacity: 0, scale: 0.92, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -4 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              className="w-full flex flex-col items-center gap-1.5"
+            >
+              <div className="flex items-center gap-1.5 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1 text-[9px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                Query Embedding
+                <span className="text-blue-500 font-bold mx-0.5">→</span>
+                <span className="text-slate-800 dark:text-slate-200 font-bold">
+                  {currentData.match} Match
+                </span>
               </div>
-
-              {/* RIGHT — tech visualization */}
-              <div className="bg-slate-50/50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[280px] md:min-h-0 transition-colors duration-500">
-                {active.tech.type === "terminal" && <TerminalPanel data={active.tech} />}
-                {active.tech.type === "vector" && <VectorPanel data={active.tech} />}
-                {active.tech.type === "script" && <ScriptPanel data={active.tech} />}
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 dark:border-emerald-500/40 rounded-lg px-2.5 py-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap">
+                <span className="material-symbols-outlined text-[12px] text-emerald-500 shrink-0">
+                  check_circle
+                </span>
+                {currentData.intent}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3 visual (deployment / live widget) ─────────────────────────────────
+// Vertical layout:
+//   snippet  → left-[50%] top-[22%]  → SVG center (250, 110), bottom ≈ y=140
+//   browser  → left-[50%] top-[64%]  → SVG center (250, 320), top    ≈ y=202
+//   arrow    → M 250 142 L 250 200   (vertical, center-aligned)
+function StepThreeVisual() {
+  const [phase, setPhase] = useState<"copying" | "transferring" | "installing" | "active">("copying");
+  const [copied, setCopied] = useState(false);
+  const [chatPhase, setChatPhase] = useState<"hidden" | "user-typing" | "bot-thinking" | "bot-typing">("hidden");
+  const [typedUser, setTypedUser] = useState("");
+  const [typedBot, setTypedBot] = useState("");
+
+  const userQuery = "is it live?";
+  const botAnswer = "Live & streaming answers! 🚀";
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (phase === "copying") {
+      setCopied(false);
+      setChatPhase("hidden");
+      setTypedUser("");
+      setTypedBot("");
+
+      // Cursor moves and clicks
+      timer = setTimeout(() => {
+        setCopied(true);
+        timer = setTimeout(() => {
+          setPhase("transferring");
+        }, 600);
+      }, 1400);
+    } else if (phase === "transferring") {
+      timer = setTimeout(() => {
+        setPhase("installing");
+      }, 1000);
+    } else if (phase === "installing") {
+      timer = setTimeout(() => {
+        setPhase("active");
+        setChatPhase("user-typing");
+      }, 1000);
+    } else if (phase === "active") {
+      if (chatPhase === "user-typing") {
+        if (typedUser.length < userQuery.length) {
+          timer = setTimeout(() => {
+            setTypedUser(userQuery.slice(0, typedUser.length + 1));
+          }, 80);
+        } else {
+          timer = setTimeout(() => {
+            setChatPhase("bot-thinking");
+          }, 600);
+        }
+      } else if (chatPhase === "bot-thinking") {
+        timer = setTimeout(() => {
+          setChatPhase("bot-typing");
+        }, 1200);
+      } else if (chatPhase === "bot-typing") {
+        if (typedBot.length < botAnswer.length) {
+          timer = setTimeout(() => {
+            setTypedBot(botAnswer.slice(0, typedBot.length + 1));
+          }, 50);
+        } else {
+          timer = setTimeout(() => {
+            setPhase("copying");
+          }, 3500);
+        }
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [phase, chatPhase, typedUser, typedBot]);
+
+  return (
+    <div className="relative w-full h-full">
+
+      {/* ── SVG: vertical arrow connecting snippet → browser ─────────────────
+          Snippet center:  top-[22%] = y=110; card height ~30px → bottom y≈140
+          Browser top:     top-[64%] = y=320; aspect-16/9 w=84% → h≈47% →
+                           top edge at 64%−23.5% = 40.5% → y≈202
+          Arrow: M 250 142 L 250 200
+      ────────────────────────────────────────────────────────────────────── */}
+      <svg
+        viewBox="0 0 500 500"
+        className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
+      >
+        <defs>
+          <linearGradient id="s3-vert" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#10B981" stopOpacity="1"   />
+          </linearGradient>
+        </defs>
+
+        {/* Base dashed connector */}
+        <path
+          d="M 250 142 L 250 200"
+          stroke="#E2E8F0"
+          strokeWidth="1.5"
+          fill="none"
+          className="dark:stroke-slate-800"
+          strokeDasharray="3 3"
+        />
+
+        {/* Animated glow overlay */}
+        {(phase === "transferring" || phase === "installing" || phase === "active") && (
+          <motion.path
+            d="M 250 142 L 250 200"
+            stroke="url(#s3-vert)"
+            strokeWidth="2.5"
+            fill="none"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.7, ease: "easeInOut" }}
+          />
+        )}
+
+        {/* Data packet travelling snippet → browser */}
+        {phase === "transferring" && (
+          <>
+            <motion.circle cx={250} cy={142} r={5}  fill="#10B981"             animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
+            <motion.circle cx={250} cy={142} r={10} fill="#10B981" fillOpacity={0.3} animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
+          </>
+        )}
+      </svg>
+
+      {/* ── TOP: Code snippet — compact, full-width, centered ──────────────── */}
+      {/* Center at top-[22%] → SVG y=110. Width 82% → 410px at 500px canvas. */}
+      <div className="absolute left-[50%] top-[22%] -translate-x-1/2 -translate-y-1/2 w-[82%] z-10">
+        <div className="relative border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2 shadow-md">
+
+          {/* macOS traffic-light dots */}
+          <div className="flex gap-1 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-rose-400/60" />
+            <span className="w-2 h-2 rounded-full bg-amber-400/60" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400/60" />
+          </div>
+
+          {/* Inline code snippet */}
+          <div className="flex-1 font-mono text-[9px] text-slate-600 dark:text-slate-400 leading-normal overflow-hidden select-none">
+            <span className="text-blue-500">&lt;script</span>{" "}
+            <span className="text-purple-500">src</span>=<span className="text-emerald-600 dark:text-emerald-400">&quot;sapy.js&quot;</span>{" "}
+            <span className="text-purple-500">data-id</span>=<span className="text-emerald-600 dark:text-emerald-400">&quot;sb-12&quot;</span>
+            <span className="text-blue-500">&gt;&lt;/script&gt;</span>
+          </div>
+
+          {/* Copy button */}
+          <motion.button
+            animate={copied ? { scale: [1, 0.92, 1] } : {}}
+            transition={{ duration: 0.15 }}
+            className={`shrink-0 flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[8px] font-mono font-medium transition-colors ${
+              copied
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[10px]">
+              {copied ? "check" : "content_copy"}
+            </span>
+            {copied ? "Copied!" : "Copy"}
+          </motion.button>
+
+          {/* Virtual cursor click animation */}
+          {phase === "copying" && (
+            <motion.div
+              className="absolute z-20 pointer-events-none text-blue-500"
+              initial={{ x: 80, y: 40, opacity: 0 }}
+              animate={{
+                x: [80, 76, 76, 80],
+                y: [40, 8,  8,  40],
+                scale:   [1,  1,  0.85, 1],
+                opacity: [0,  1,  1,    0],
+              }}
+              transition={{ duration: 1.4, times: [0, 0.5, 0.65, 1], ease: "easeInOut" }}
+            >
+              <svg className="w-3 h-3 drop-shadow-md fill-current" viewBox="0 0 24 24">
+                <path d="M4.5 2v17.5l4.7-4.7 3.8 9 2.5-1.1-3.8-9 6.2-.2L4.5 2z" />
+              </svg>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* ── BOTTOM: Browser mockup — large, centered ───────────────────────────
+          Center at top-[64%] → SVG y=320. Width 84% (420px at 500px canvas).
+          aspect-[16/9] → height 236px (47.2% of canvas). Top edge ≈ y=202.
+          Chat widget at w-[50%] of browser → 210px. Clearly readable.
+      ────────────────────────────────────────────────────────────────────── */}
+      <div className="absolute left-[50%] top-[64%] -translate-x-1/2 -translate-y-1/2 w-[84%] z-10">
+        <div
+          className={`relative border bg-white dark:bg-slate-900 rounded-xl overflow-hidden flex flex-col aspect-[16/9] shadow-lg transition-all duration-500 ${
+            phase === "installing"
+              ? "border-emerald-500/60 shadow-emerald-500/10 scale-[1.01]"
+              : phase === "active"
+              ? "border-slate-200 dark:border-slate-800/80"
+              : "border-slate-200 dark:border-slate-800/80 opacity-60"
+          }`}
+        >
+          {/* Browser chrome bar */}
+          <div className="bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/60 shrink-0">
+            <div className="flex gap-1 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+            </div>
+            <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/50 rounded px-2 py-0.5 text-[8px] font-mono text-slate-400 dark:text-slate-500 text-center truncate select-none">
+              yourwebsite.com
             </div>
           </div>
 
-          {/* ── STATUS STRIP ─────────────────────────────────────────────── */}
-          <div className="bg-slate-50/50 dark:bg-slate-900 p-8 md:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 transition-colors duration-500">
-            <div className="flex items-center gap-4">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <p className="text-sm uppercase tracking-widest font-bold font-google text-slate-500 dark:text-slate-400">
-                All systems live · <span className="text-emerald-600 dark:text-emerald-400">Ready to deploy</span>
-              </p>
+          {/* Page body */}
+          <div className="relative flex-1 p-3 flex flex-col gap-2 bg-slate-50/30 dark:bg-slate-900/30 overflow-hidden">
+            {/* Skeleton content */}
+            <div className="h-2 w-1/3 bg-slate-200 dark:bg-slate-800 rounded-full" />
+            <div className="h-1.5 w-2/3 bg-slate-100 dark:bg-slate-800/60 rounded-full" />
+            <div className="h-1.5 w-1/2 bg-slate-100 dark:bg-slate-800/60 rounded-full" />
+
+            {/* Script installed confirmation */}
+            <AnimatePresence>
+              {phase === "installing" && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  className="absolute inset-0 m-auto w-[65%] h-[55%] bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-xl flex items-center justify-center gap-2 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-emerald-500 animate-ping">
+                    sensors
+                  </span>
+                  Script Installed!
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── Live chat widget — now 50% of the wider browser ──────────── */}
+            {phase === "active" && (
+              <div className="absolute inset-0 flex flex-col justify-end items-end p-2">
+                <AnimatePresence mode="wait">
+                  {chatPhase === "hidden" ? (
+                    <motion.div
+                      key="launcher"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shadow-lg"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-white">chat_bubble</span>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="chat-box"
+                      initial={{ opacity: 0, y: 14, scale: 0.88 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 14, scale: 0.88 }}
+                      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                      className="w-[50%] h-[90%] bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col shadow-2xl overflow-hidden"
+                    >
+                      {/* Chat header */}
+                      <div className="bg-blue-500 px-3 py-2 flex items-center gap-2 shrink-0">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] font-google font-bold text-white uppercase tracking-wider">
+                          Live Assistant
+                        </span>
+                      </div>
+
+                      {/* Messages */}
+                      <div className="flex-1 p-2.5 flex flex-col gap-2 overflow-hidden text-[10px] font-sans">
+                        {typedUser && (
+                          <motion.div
+                            initial={{ opacity: 0, x: 8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="self-end bg-blue-500 text-white rounded-xl rounded-tr-none px-2.5 py-1.5 max-w-[85%] text-right font-medium leading-snug"
+                          >
+                            {typedUser}
+                          </motion.div>
+                        )}
+
+                        {chatPhase === "bot-thinking" && (
+                          <div className="self-start flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl rounded-tl-none px-3 py-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                          </div>
+                        )}
+
+                        {typedBot && (
+                          <motion.div
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="self-start bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-xl rounded-tl-none px-2.5 py-1.5 max-w-[85%] font-medium leading-snug"
+                          >
+                            {typedBot}
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Status badge — below browser, centered */}
+      <AnimatePresence>
+        {phase === "active" && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.3 }}
+            className="absolute bottom-[3%] left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 rounded-full px-3 py-1"
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+            <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+              Bot streaming live
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function HowItWorks() {
+  const [activeStep, setActiveStep] = useState(1);
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [phase, setPhase] = useState<"typing" | "sending" | "thinking" | "resolved">("typing");
+  const [typedText, setTypedText] = useState("");
+
+  const currentData = QUESTIONS_DATA[currentIdx];
+
+  // Step 2 typewriter + animation cycle
+  useEffect(() => {
+    if (activeStep !== 2) {
+      setPhase("typing");
+      setTypedText("");
+      return;
+    }
+
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (phase === "typing") {
+      const full = currentData.query;
+      if (typedText.length < full.length) {
+        timer = setTimeout(() => setTypedText(full.slice(0, typedText.length + 1)), 60);
+      } else {
+        timer = setTimeout(() => setPhase("sending"), 800);
+      }
+    } else if (phase === "sending") {
+      timer = setTimeout(() => setPhase("thinking"), 900);
+    } else if (phase === "thinking") {
+      timer = setTimeout(() => setPhase("resolved"), 1500);
+    } else if (phase === "resolved") {
+      timer = setTimeout(() => {
+        setTypedText("");
+        setCurrentIdx((p) => (p + 1) % QUESTIONS_DATA.length);
+        setPhase("typing");
+      }, 3000);
+    }
+
+    return () => clearTimeout(timer);
+  }, [phase, typedText, currentIdx, currentData, activeStep]);
+
+  // IntersectionObserver — auto-activates the step nearest viewport centre
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            const idx = stepRefs.current.findIndex((el) => el === e.target);
+            if (idx !== -1) setActiveStep(idx + 1);
+          }
+        });
+      },
+      { rootMargin: "-30% 0px -40% 0px", threshold: 0.1 }
+    );
+
+    stepRefs.current.forEach((r) => r && observer.observe(r));
+    return () => observer.disconnect();
+  }, []);
+
+  const handleStepClick = (id: number) => {
+    setActiveStep(id);
+    stepRefs.current[id - 1]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  // ── Per-step preview panels ────────────────────────────────────────────────
+  // All absolute-positioned elements use percentage coordinates that match the
+  // SVG viewBox (0 0 500 500) via the mapping: left-[X%] ↔ SVG x = X * 5.
+  //
+  //  Left anchor   left-[20%]  →  SVG x = 100
+  //  Right anchor  left-[80%]  →  SVG x = 400
+  //  Top row       top-[20%]   →  SVG y = 100
+  //  Middle row    top-[50%]   →  SVG y = 250
+  //  Bottom row    top-[80%]   →  SVG y = 400
+
+  const renderPreview = (stepId: number, isMobile = false) => {
+    switch (stepId) {
+      // ── STEP 1: INGEST ────────────────────────────────────────────────────
+      case 1:
+        return (
+          <div className="relative w-full h-full">
+            <svg
+              viewBox="0 0 500 500"
+              className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
+            >
+              <Step1SVGDefs />
+
+              {/* Base dashed paths: source nodes (100,y) → engine (400,250) */}
+              <path d="M 100 100 C 240 100, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
+              <path d="M 100 250 L 400 250"                   stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
+              <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
+
+              {/* Animated glow pulses travelling along each path */}
+              <motion.path
+                d="M 100 100 C 240 100, 260 250, 400 250"
+                stroke="url(#s1-glow-a)"
+                strokeWidth="2.5"
+                fill="none"
+                initial={{ pathLength: 0.2, pathOffset: 0 }}
+                animate={{ pathOffset: [0, 1] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              />
+              <motion.path
+                d="M 100 250 L 400 250"
+                stroke="url(#s1-glow-b)"
+                strokeWidth="2.5"
+                fill="none"
+                initial={{ pathLength: 0.2, pathOffset: 0 }}
+                animate={{ pathOffset: [0, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 0.5 }}
+              />
+              <motion.path
+                d="M 100 400 C 240 400, 260 250, 400 250"
+                stroke="url(#s1-glow-a)"
+                strokeWidth="2.5"
+                fill="none"
+                initial={{ pathLength: 0.2, pathOffset: 0 }}
+                animate={{ pathOffset: [0, 1] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "linear", delay: 0.2 }}
+              />
+            </svg>
+
+            {/* Source nodes — LEFT column at 20%, tops 20% / 50% / 80% */}
+            {(
+              [
+                { icon: "language",    top: "20%" },
+                { icon: "description", top: "50%" },
+                { icon: "table_chart", top: "80%" },
+              ] as const
+            ).map(({ icon, top }) => (
+              <div
+                key={icon}
+                className="absolute w-[13%] aspect-square -translate-x-1/2 -translate-y-1/2 z-10"
+                style={{ left: "20%", top }}
+              >
+                <div className="w-full h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
+                  <span className="material-symbols-outlined text-[clamp(12px,1.8vw,22px)] text-slate-500 dark:text-slate-400">
+                    {icon}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {/* Engine node — RIGHT anchor, mobile only (desktop uses shared overlay) */}
+            {isMobile && (
+              <div className="absolute w-[22%] aspect-square left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                <EngineLogoNode />
+                <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
+                  Sapybase Engine
+                </span>
+              </div>
+            )}
+          </div>
+        );
+
+      // ── STEP 2: UNDERSTAND ────────────────────────────────────────────────
+      case 2:
+        return (
+          <StepTwoVisual
+            phase={phase}
+            typedText={typedText}
+            currentData={currentData}
+            isMobile={isMobile}
+          />
+        );
+
+      // ── STEP 3: DEPLOY ────────────────────────────────────────────────────
+      case 3:
+        return <StepThreeVisual />;
+
+      default:
+        return null;
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <section
+      id="how-it-works"
+      className="relative w-full bg-white dark:bg-slate-950 transition-colors duration-500 py-24 sm:py-32 overflow-x-clip border-none shadow-none"
+    >
+      {/* Ambient background glows */}
+      <div className="absolute top-1/3 left-10 w-96 h-96 bg-blue-500/5 dark:bg-blue-600/10 rounded-full blur-[120px] pointer-events-none select-none" />
+      <div className="absolute bottom-1/3 right-10 w-96 h-96 bg-indigo-500/5 dark:bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none select-none" />
+
+      <div className="max-w-7xl mx-auto px-6 sm:px-12 lg:px-20 relative z-10">
+
+        {/* Section header */}
+        <div className="mb-20 max-w-3xl">
+          <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 mb-4">
+            <span className="material-symbols-outlined text-[16px] text-blue-500">linear_scale</span>
+            <span>How It Works</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
+            Data to{" "}
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+              Live AI Chatbot
+            </span>{" "}
+            in Minutes
+          </h2>
+          <p className="text-lg font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+            No machine learning expertise required. Sapybase simplifies the ingestion,
+            comprehension, and deployment of your custom AI agent in three easy steps.
+          </p>
+        </div>
+
+        {/* Two-column layout */}
+        <div className="flex flex-col lg:flex-row gap-16 lg:gap-24 items-stretch">
+
+          {/* ── LEFT: sticky visual preview (desktop only) ──────────────────── */}
+          <div className="hidden lg:flex w-full lg:w-[48%] flex-col relative self-stretch">
+
+            <div className="sticky top-[calc(50vh-250px)] w-full aspect-square max-w-[500px] mx-auto overflow-hidden">
+
+              {/* Sliding track: 300% wide, each panel is 1/3 (= card width) */}
+              <div
+                className="flex h-full w-[300%] transition-transform duration-700 ease-in-out will-change-transform"
+                style={{ transform: `translate3d(-${(activeStep - 1) * 33.333}%, 0, 0)` }}
+              >
+                {[1, 2, 3].map((id) => (
+                  <div
+                    key={id}
+                    className="w-1/3 h-full shrink-0 flex items-center justify-center"
+                  >
+                    {renderPreview(id)}
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Shared engine overlay ────────────────────────────────────
+                  Positioned on the CARD (not a slide) so it can animate
+                  across slides without a jump.
+
+                  Two layers:
+                    outer div  — CSS transition on `left` for the slide motion
+                    inner div  — framer-motion for enter/exit opacity+scale
+                                 (avoids transform conflict with -translate-x/y)
+              ──────────────────────────────────────────────────────────────── */}
+              <div
+                className="absolute top-[50%] z-30 pointer-events-none -translate-x-1/2 -translate-y-1/2 w-[22%] aspect-square"
+                style={{
+                  left: activeStep === 2 ? "20%" : "80%",
+                  transition: "left 700ms cubic-bezier(0.32, 0.94, 0.6, 1)",
+                }}
+              >
+                <AnimatePresence>
+                  {activeStep < 3 && (
+                    <motion.div
+                      key="engine-overlay"
+                      initial={{ opacity: 0, scale: 0.75 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.75 }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      className="relative w-full h-full flex flex-col items-center"
+                    >
+                      <EngineLogoNode phase={activeStep === 2 ? phase : undefined} />
+                      <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
+                        Sapy Engine
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
             </div>
-            <div className="flex items-center gap-3 text-sm uppercase tracking-widest font-bold font-google text-green-600 dark:text-green-400">
-              <span className="material-symbols-outlined text-[14px]">credit_card</span>
-              No credit card required to start
-            </div>
+          </div>
+
+          {/* ── RIGHT: scrolling step cards ─────────────────────────────────── */}
+          <div className="w-full lg:w-[52%] flex flex-col gap-8">
+            {PIPELINE_STEPS.map((s) => {
+              const isActive = activeStep === s.id;
+              return (
+                <div
+                  key={s.id}
+                  ref={(el) => { stepRefs.current[s.id - 1] = el; }}
+                  onClick={() => handleStepClick(s.id)}
+                  className={`group relative p-5 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-500 cursor-pointer flex flex-col gap-4 ${
+                    isActive
+                      ? "bg-white dark:bg-slate-950"
+                      : "bg-slate-50/40 dark:bg-slate-900/10"
+                  }`}
+                >
+
+                  {/* Header row */}
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`font-mono text-sm font-bold uppercase tracking-widest transition-colors duration-300 ${
+                        isActive
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-slate-400 dark:text-slate-600"
+                      }`}
+                    >
+                      Step {s.step} · {s.label}
+                    </span>
+                    <span
+                      className={`material-symbols-outlined text-[20px] transition-all duration-300 ${
+                        isActive
+                          ? "text-blue-500 translate-x-0"
+                          : "text-slate-300 dark:text-slate-700 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
+                      }`}
+                    >
+                      chevron_right
+                    </span>
+                  </div>
+
+                  {/* Title & description */}
+                  <div className="space-y-2">
+                    <h3
+                      className={`text-2xl font-google font-bold leading-tight transition-colors duration-300 ${
+                        isActive
+                          ? "text-slate-900 dark:text-white"
+                          : "text-slate-500 dark:text-slate-500"
+                      }`}
+                    >
+                      {s.title}
+                    </h3>
+                    <p
+                      className={`text-base font-google leading-relaxed transition-colors duration-300 ${
+                        isActive
+                          ? "text-slate-600 dark:text-slate-400"
+                          : "text-slate-400 dark:text-slate-600"
+                      }`}
+                    >
+                      {s.description}
+                    </p>
+                  </div>
+
+                  {/* Expandable: bullets + mobile preview */}
+                  <div
+                    className={`grid transition-all duration-500 ease-in-out ${
+                      isActive ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="overflow-hidden flex flex-col gap-6">
+                      <ul className="space-y-2.5">
+                        {s.bullets.map((b) => (
+                          <li
+                            key={b}
+                            className="flex items-center gap-3 text-sm font-google text-slate-600 dark:text-slate-400"
+                          >
+                            <span className="material-symbols-outlined text-[16px] text-emerald-500 shrink-0">
+                              check_circle
+                            </span>
+                            <span>{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* Mobile preview — hidden on lg+ where the sticky panel handles it */}
+                      <div className="lg:hidden aspect-square w-full sm:max-w-full md:max-w-[380px] mx-auto overflow-hidden flex items-center justify-center">
+                        <div className="relative w-full h-full">
+                          {renderPreview(s.id, true)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
         </div>
       </div>
-
-      {/* Keyframe for panel swap animation */}
-      <style jsx>{`
-        @keyframes fadeSlideIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0);   }
-        }
-      `}</style>
     </section>
   );
-};
-
-export default HowItWorks;
+}

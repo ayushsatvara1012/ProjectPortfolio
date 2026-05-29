@@ -30,38 +30,39 @@ const WhatWeSolve = () => {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const viewportCenter = window.innerHeight / 2;
-      let closestIndex: number | null = null;
-      let minDistance = Infinity;
+    const intersectingMap = new Map<number, boolean>();
 
-      itemRefs.current.forEach((el, index) => {
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          const elCenter = rect.top + rect.height / 2;
-          const distance = Math.abs(viewportCenter - elCenter);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const index = itemRefs.current.findIndex(el => el === entry.target);
+          if (index !== -1) {
+            intersectingMap.set(index, entry.isIntersecting);
+          }
+        });
 
-          // Check if element is at least partially in the viewport
-          if (distance < minDistance && rect.top < window.innerHeight && rect.bottom > 0) {
-            minDistance = distance;
-            closestIndex = index;
+        // Find the active index from the intersecting ones
+        let activeIdx: number | null = null;
+        for (let i = 0; i < textItems.length; i++) {
+          if (intersectingMap.get(i)) {
+            activeIdx = i;
+            break; // take the first one that intersects
           }
         }
-      });
-
-      // Activate if the closest element is reasonably near the vertical center
-      if (minDistance < window.innerHeight / 2.5) {
-        setActiveIndex(closestIndex);
-      } else {
-        setActiveIndex(null);
+        setActiveIndex(activeIdx);
+      },
+      {
+        rootMargin: '-40% 0px -40% 0px',
+        threshold: 0,
       }
-    };
+    );
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    itemRefs.current.forEach((el) => {
+      if (el) observer.observe(el);
+    });
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
     };
   }, []);
 
@@ -74,6 +75,8 @@ const WhatWeSolve = () => {
           <img
             src="/vector_WWS.svg"
             alt="Friction Points Background"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover object-left lg:object-center relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"
           />
         </div>

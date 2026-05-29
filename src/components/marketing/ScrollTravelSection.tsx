@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import AntigravityBackground from './AntigravityBackground';
 import FeatureIllustration from './FeatureIllustration';
 import NewSection from './NewSection';
@@ -10,6 +10,8 @@ export default function ScrollTravelSection() {
   const featureRef = useRef<HTMLDivElement>(null);
   const bgRef      = useRef<HTMLDivElement>(null);  // 200vw canvas container
   const maskRef    = useRef<HTMLDivElement>(null);  // viewport-sized clip + mask
+  const [isVisible, setIsVisible] = useState(false);
+  const rafIdRef = useRef<number | null>(null);
 
   // Written every rAF frame, read inside Three.js useFrame — zero React re-renders.
   const morphProgressRef = useRef(0);
@@ -66,11 +68,43 @@ export default function ScrollTravelSection() {
         mask.style.webkitMaskImage = gradient;
       }
 
-      rafId = requestAnimationFrame(tick);
+      rafIdRef.current = requestAnimationFrame(tick);
     };
 
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsVisible(entry.isIntersecting);
+
+      if (entry.isIntersecting) {
+        if (!rafIdRef.current) {
+          rafIdRef.current = requestAnimationFrame(tick);
+        }
+        if (bgRef.current) {
+          bgRef.current.style.display = 'block';
+        }
+      } else {
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+        if (bgRef.current) {
+          bgRef.current.style.display = 'none';
+        }
+      }
+    }, {
+      rootMargin: '200px 0px 200px 0px',
+      threshold: 0
+    });
+
+    if (wrapperRef.current) {
+      observer.observe(wrapperRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -101,6 +135,7 @@ export default function ScrollTravelSection() {
               right: '-50%',
               transform: 'translateX(25vw)',
               willChange: 'transform',
+              display: 'none',
             }}
           >
             <AntigravityBackground

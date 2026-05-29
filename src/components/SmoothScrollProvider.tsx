@@ -9,6 +9,9 @@ function ScrollResetter() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      return;
+    }
     window.scrollTo(0, 0);
   }, [pathname, searchParams]);
 
@@ -27,14 +30,26 @@ export default function SmoothScrollProvider({
       smoothWheel: true,
     });
 
+    let rafId: number;
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
 
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        lenis.stop();
+      } else {
+        lenis.start();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       lenis.destroy();
     };
   }, []);

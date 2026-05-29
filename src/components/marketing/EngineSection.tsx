@@ -13,6 +13,8 @@ const EngineSection = () => {
           src="/vector_EngineBG.svg"
           alt=""
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
           className="absolute top-0 left-1/2 -translate-x-1/2 w-full min-w-[900px] h-full object-cover pointer-events-none select-none"
         />
       </div>
@@ -21,6 +23,8 @@ const EngineSection = () => {
         src="/vector_SBdesign2.svg"
         alt=""
         aria-hidden="true"
+        loading="lazy"
+        decoding="async"
         className="hidden lg:block absolute pointer-events-none select-none z-0 top-[-581px] left-[-131px] w-[667px] h-auto"
       />
 
@@ -40,6 +44,8 @@ const EngineSection = () => {
           <img
             src="/vector_SBengine.svg"
             alt="Sapybase Engine Vector"
+            loading="lazy"
+            decoding="async"
             className="w-full max-w-lg lg:max-w-[700px] h-auto object-contain transition-all duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"
           />
         </div>
@@ -49,6 +55,8 @@ const EngineSection = () => {
           <img
             src="/vector_chat.svg"
             alt="Sapybase Chat Vector"
+            loading="lazy"
+            decoding="async"
             className="w-full max-w-[320px] sm:max-w-md lg:max-w-[450px] h-auto object-contain transition-all duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"
           />
         </div>
