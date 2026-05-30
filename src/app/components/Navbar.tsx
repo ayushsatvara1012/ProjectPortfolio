@@ -111,7 +111,7 @@ export default function Navbar() {
   ];
 
   const navLinks: NavLink[] = [
-    { name: 'Home', href: '#home', id: 'home' },
+    { name: 'Home', href: '/#home', id: 'home' },
     { name: 'Projects', href: '/about#projects', id: 'projects' },
     { name: 'Services', href: '/services', id: 'services', dropdown: true },
     { name: 'Pricing', href: '/pricing', id: 'pricing' },
@@ -154,7 +154,7 @@ export default function Navbar() {
 
           {/* Cell 1: Logo */}
           <div className="px-6 h-full flex items-center shrink-0 min-w-fit">
-            <a href="#home" onClick={(e) => handleLinkClick(e, '#home')} className="flex items-center">
+            <a href="/#home" onClick={(e) => handleLinkClick(e, '/#home')} className="flex items-center">
               <Logo className="h-10 w-auto" />
             </a>
           </div>
@@ -170,7 +170,7 @@ export default function Navbar() {
                 {link.dropdown ? (
                   <button
                     onClick={() => setIsServicesOpenDesktop(!isServicesOpenDesktop)}
-                    className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group"
+                    className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
                   >
                     {link.name}
                     <span
@@ -232,7 +232,7 @@ export default function Navbar() {
                                 className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
-                                  <img src="/logo2.svg" alt="" loading="lazy" decoding="async" className="w-5 h-5 opacity-100 group-hover/item:opacity-100 transition-opacity" />
+                                  <img src="/logo2-straight.svg" alt="" decoding="async" className="w-5 h-5 opacity-70 group-hover/item:opacity-100 transition-opacity" />
                                   <span className="text-[15px] font-google text-slate-700 dark:text-slate-300 group-hover/item:text-slate-900 dark:group-hover/item:text-slate-100 transition-colors">
                                     {service.title}
                                   </span>
@@ -383,7 +383,7 @@ export default function Navbar() {
                             className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-300"
                           >
                             <div className="flex items-center gap-4">
-                              <img src="/logo2.svg" alt="" loading="lazy" decoding="async" className="w-5 h-5 opacity-40 group-hover/item:opacity-80 transition-opacity" />
+                              <img src="/logo2-straight.svg" alt="" decoding="async" className="w-5 h-5 opacity-40 group-hover/item:opacity-80 transition-opacity" />
                               <div className="flex flex-col">
                                 <span className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-200 transition-colors">
                                   {service.title}

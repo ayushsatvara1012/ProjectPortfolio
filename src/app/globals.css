@@ -2,9 +2,8 @@
 @plugin "@tailwindcss/typography";
 @theme {
   --font-sans: "Darker Grotesque", sans-serif;
-  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-display: "Google Sans", sans-serif;
   --font-darker: "Darker Grotesque", sans-serif;
-  --font-bricolage: "Bricolage Grotesque", sans-serif;
   --font-google: "Google Sans", sans-serif;
 }
 

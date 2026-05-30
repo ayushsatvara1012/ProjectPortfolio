@@ -28,7 +28,7 @@ export const CoreProjectsCell = ({ projects }: { projects: { title: string, tech
                   }`}>
                   {p.tag}
                 </span>
-                <span className="text-base font-display font-bold text-slate-900 dark:text-slate-100 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors">
+                <span className="text-base font-google font-bold text-slate-900 dark:text-slate-100 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors">
                   {p.title}
                 </span>
               </div>
@@ -39,7 +39,7 @@ export const CoreProjectsCell = ({ projects }: { projects: { title: string, tech
               )}
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-xs font-display font-bold text-green-600 dark:text-green-500 whitespace-nowrap">
+              <span className="text-xs font-google font-bold text-green-600 dark:text-green-500 whitespace-nowrap">
                 {p.result}
               </span>
               <span className={`material-symbols-outlined text-[16px] text-slate-300 dark:text-slate-700 transition-transform duration-200 ${activeProject === i ? 'rotate-90 text-blue-500' : 'group-hover/row:text-blue-500'}`}>
@@ -54,7 +54,7 @@ export const CoreProjectsCell = ({ projects }: { projects: { title: string, tech
         <div className="border border-dashed border-slate-200 dark:border-slate-800 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-400 mb-1">Founding Status</p>
-            <p className="text-4xl font-display font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
+            <p className="text-4xl font-google font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none">
               100% Bootstrapped
             </p>
           </div>

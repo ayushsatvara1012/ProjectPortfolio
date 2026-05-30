@@ -41,7 +41,7 @@ export const HeroCell = () => (
     <div className="relative z-10 flex flex-col justify-between flex-1 p-8 lg:p-12">
       <div>
         <Label icon="person">Founder · Lead Engineer</Label>
-        <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-100 mb-6">
+        <h1 className="text-5xl md:text-7xl font-google font-semibold tracking-tight leading-none text-slate-900 dark:text-slate-100 mb-6">
           Built by One<br />
           <span className="text-blue-600">Scaled for</span><br />
           the World.
@@ -69,7 +69,7 @@ export const ProfileCell = () => (
     <div className="absolute bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-950/90 border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex items-center justify-between">
       <div>
         <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-400">MS Computer Science</p>
-        <p className="text-sm font-display font-bold text-slate-900 dark:text-slate-200">NYIT · GPA 3.26</p>
+        <p className="text-sm font-google font-bold text-slate-900 dark:text-slate-200">NYIT · GPA 3.26</p>
       </div>
       <span className="material-symbols-outlined text-[18px] text-slate-300 dark:text-slate-700">school</span>
     </div>
@@ -84,12 +84,12 @@ export const MetricsStrip = () => (
       { eyebrow: 'Deploy Time', value: '< 10 min', icon: 'rocket_launch', accent: 'text-blue-500' },
       { eyebrow: 'Platforms Supported', value: 'Any HTML', icon: 'devices', accent: 'text-green-500' },
     ].map((m, i) => (
-      <div key={i} className="bg-white dark:bg-slate-950 p-8 lg:p-10 flex flex-col gap-3 group/cell transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-slate-900">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">
-          <span className={`material-symbols-outlined text-[14px] ${m.accent}`}>{m.icon}</span>
+      <div key={i} className="bg-white dark:bg-slate-950 p-8 lg:p-10 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-xs tracking-widest font-medium text-slate-400 dark:text-slate-500 font-google">
+          <span className={`material-symbols-outlined text-base ${m.accent}`}>{m.icon}</span>
           {m.eyebrow}
         </div>
-        <div className="text-4xl md:text-5xl font-display font-black tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none group-hover/cell:translate-x-0.5 transition-transform duration-200">
+        <div className="text-3xl md:text-4xl font-google font-semibold tracking-wider text-slate-900 dark:text-slate-100 tabular-nums leading-none group-hover/cell:translate-x-0.5 transition-transform duration-200">
           {m.value}
         </div>
       </div>
@@ -103,7 +103,7 @@ export const TechStackCell = ({ stack }: { stack: { name: string, note: string }
     <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
       {stack.map((t, i) => (
         <div key={i} className="flex items-center justify-between py-2.5 group/row">
-          <span className="text-sm font-display font-bold text-slate-800 dark:text-slate-200 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors duration-150">
+          <span className="text-sm font-google font-bold text-slate-800 dark:text-slate-200 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors duration-150">
             {t.name}
           </span>
           <span className="text-xs font-google text-slate-400 dark:text-slate-600 uppercase tracking-wider">
@@ -116,31 +116,31 @@ export const TechStackCell = ({ stack }: { stack: { name: string, note: string }
 );
 
 export const EducationCell = () => (
-  <Cell className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors duration-200">
+  <Cell>
     <Label icon="school">Education</Label>
     <div className="flex flex-col gap-6">
       <div className="border-l-2 border-blue-500 pl-4">
         <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-400 mb-1">2023 – 2025</p>
-        <h3 className="text-lg font-display font-bold text-slate-900 dark:text-slate-100 leading-tight">
+        <h3 className="text-lg font-google font-bold text-slate-900 dark:text-slate-100 leading-tight">
           MS Computer Science
         </h3>
         <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-1">
           New York Institute of Technology
         </p>
         <div className="inline-flex items-center gap-1.5 mt-3 px-2 py-0.5 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-          <span className="text-xs font-display font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">GPA 3.26 / 4.0</span>
+          <span className="text-xs font-google font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">GPA 3.26 / 4.0</span>
         </div>
       </div>
       <div className="border-l-2 border-slate-200 dark:border-slate-800 pl-4">
         <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-400 mb-1">2019 – 2023</p>
-        <h3 className="text-lg font-display font-bold text-slate-900 dark:text-slate-100 leading-tight">
+        <h3 className="text-lg font-google font-bold text-slate-900 dark:text-slate-100 leading-tight">
           BTech Information Technology
         </h3>
         <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-1">
           KSV University
         </p>
         <div className="inline-flex items-center gap-1.5 mt-3 px-2 py-0.5 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-          <span className="text-xs font-display font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">CGPA 7.52 / 10</span>
+          <span className="text-xs font-google font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">CGPA 7.52 / 10</span>
         </div>
       </div>
     </div>
@@ -148,15 +148,15 @@ export const EducationCell = () => (
 );
 
 export const CertificationsCell = ({ certifications }: { certifications: { name: string, issuer: string }[] }) => (
-  <Cell className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors duration-200">
+  <Cell >
     <Label icon="workspace_premium">Certifications</Label>
     <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
       {certifications.map((c, i) => (
         <div key={i} className="flex flex-col gap-0.5 py-3 group/row">
-          <span className="text-sm font-display font-bold text-slate-800 dark:text-slate-200 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors duration-150 leading-snug">
+          <span className="text-base font-google font-bold text-slate-800 dark:text-slate-200 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors duration-150 leading-snug pb-3">
             {c.name}
           </span>
-          <span className="text-xs font-google text-slate-400 dark:text-slate-600 uppercase tracking-wider">
+          <span className="text-sm font-google text-slate-400 dark:text-slate-600 uppercase tracking-wider">
             {c.issuer}
           </span>
         </div>
@@ -166,7 +166,7 @@ export const CertificationsCell = ({ certifications }: { certifications: { name:
 );
 
 export const DeliverablesCell = () => (
-  <Cell className="bg-slate-50/50 dark:bg-slate-900 hover:bg-slate-100/60 dark:hover:bg-slate-900/70 transition-colors duration-200">
+  <Cell >
     <Label icon="lightbulb">What We Deliver</Label>
     <div className="flex flex-col gap-5">
       {[
@@ -198,8 +198,8 @@ export const DeliverablesCell = () => (
         <div key={i} className="flex gap-3">
           <span className={`material-symbols-outlined text-[18px] mt-0.5 shrink-0 ${p.accent}`}>{p.icon}</span>
           <div>
-            <p className="text-sm font-display font-bold text-slate-900 dark:text-slate-100 leading-none mb-1">{p.heading}</p>
-            <p className="text-xs font-google text-slate-500 dark:text-slate-400 leading-relaxed">{p.body}</p>
+            <p className="text-base font-google font-semibold text-slate-900 dark:text-slate-100 leading-none mb-1">{p.heading}</p>
+            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed">{p.body}</p>
           </div>
         </div>
       ))}
@@ -213,7 +213,7 @@ export const CTAStrip = () => (
       <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-500 mb-4">
         Deployment Status · <span className="text-green-500">Optimal</span>
       </p>
-      <h2 className="text-4xl md:text-6xl font-display font-black tracking-tight text-white leading-none">
+      <h2 className="text-4xl md:text-6xl font-google font-black tracking-tight text-white leading-none">
         Performance-First.<br />
         <span className="text-blue-500">Always.</span>
       </h2>
@@ -221,14 +221,14 @@ export const CTAStrip = () => (
     <div className="flex flex-col sm:flex-row gap-3 shrink-0">
       <Link
         href="/contact"
-        className="inline-flex items-center gap-2 px-7 py-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-display font-bold uppercase tracking-wider transition-colors duration-150"
+        className="inline-flex items-center gap-2 px-7 py-4 bg-blue-600 hover:bg-blue-500 text-white text-base font-google font-medium tracking-wider transition-colors duration-150 rounded-full"
       >
         Start Building
         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
       </Link>
       <Link
         href="/services"
-        className="inline-flex items-center gap-2 px-7 py-4 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white text-sm font-display font-bold uppercase tracking-wider transition-colors duration-150"
+        className="inline-flex items-center gap-2 px-7 py-4 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white text-base font-google font-medium tracking-wider transition-colors duration-150 rounded-full"
       >
         View Services
       </Link>

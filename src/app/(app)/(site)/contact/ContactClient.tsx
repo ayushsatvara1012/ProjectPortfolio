@@ -6,6 +6,7 @@ import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 
 export default function ContactClient() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [selectedService, setSelectedService] = useState('Custom AI Chatbot');
   const [alertConfig, setAlertConfig] = useState<{ open: boolean; type: 'success' | 'error' | 'warning' | 'development'; msg: string }>({
     open: false,
     type: 'success',
@@ -18,7 +19,7 @@ export default function ContactClient() {
     setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 3000);
   };
 
-  const showDev = (event: React.MouseEvent) => {
+  const showDev = (event: React.FormEvent | React.MouseEvent) => {
     event.preventDefault();
     setAlertConfig({ open: true, type: 'development', msg: 'Try using our whatsapp' });
     setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 3000);
@@ -31,80 +32,277 @@ export default function ContactClient() {
   ];
 
   return (
-    <section id="contact" className="relative py-12 sm:py-20 bg-white dark:bg-slate-950 overflow-hidden">
-      {/* Background Grid - Scaled for Mobile */}
-      <div className="absolute inset-0 opacity-[0.2] dark:opacity-[0.1] pointer-events-none"
-        style={{ backgroundImage: 'linear-gradient(var(--color-border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px)', backgroundSize: 'clamp(20px, 5vw, 40px) clamp(20px, 5vw, 40px)' }} />
+    <section id="contact" className="relative w-full bg-white dark:bg-slate-950 py-24 sm:py-32 overflow-x-clip transition-colors duration-500">
+      {/* Ambient glows (same as HowItWorks) */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/5 dark:bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/5 dark:bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="max-w-8xl mx-auto px-4 relative z-10">
-        {/* Header - Centered on Mobile, Left-aligned on Desktop */}
-        <div className="my-10 text-center sm:mb-10 sm:mt-0 lg:mb-10 lg:mt-0 lg:text-left">
-          <div className="inline-flex items-center gap-2 px-2 py-1 rounded-none bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4">
-            <span className="material-symbols-outlined text-[16px] text-blue-600">terminal</span>
-            <span className="text-sm font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200">Sapybase_v2.0</span>
-          </div>
-          <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200">
-            Let's <span className="text-blue-600">Connect.</span>
-          </h1>
-        </div>
-
+      {/* max-w-8xl container */}
+      <div className="max-w-8xl mx-auto px-6 sm:px-12 lg:px-20 relative z-10">
         <ScrollReveal>
-          <div className="flex flex-col-reverse lg:grid lg:grid-cols-2 gap-8 lg:gap-16 items-start">
-            {/* LEFT: FAQ & Contact Nodes */}
-            <div className="w-full space-y-6">
-              <div className="space-y-3">
-                <h2 className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 text-center lg:text-left">Frequently Asked Questions</h2>
-                {faqs.map((faq, i) => (
-                  <div key={i} className="rounded-none border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900 overflow-hidden transition-all">
-                    <button
-                      onClick={() => setActiveFaq(activeFaq === i ? null : i)}
-                      className="w-full px-5 py-4 flex items-center justify-between text-left group"
-                    >
-                      <span className="text-lg font-display text-slate-700 dark:text-slate-200 tracking-tight">{faq.q}</span>
-                      <span className={`material-symbols-outlined transition-transform duration-300 text-[16px] text-slate-400 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 ${activeFaq === i ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''}`}>expand_more</span>
-                    </button>
-                    <div className={`px-5 transition-all duration-300 ease-in-out ${activeFaq === i ? 'pb-5 max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}>
-                      <p className="text-lg font-sans font-medium text-slate-600 dark:text-slate-200 leading-relaxed border-l-2 border-slate-200 dark:border-slate-800 pl-4">{faq.a}</p>
-                    </div>
-                  </div>
-                ))}
+          {/* Main Grid: Info on left, Form on right */}
+          <div className="flex flex-col-reverse lg:grid lg:grid-cols-2 gap-12 lg:gap-16 items-start mb-20 sm:mb-28">
+            
+            {/* LEFT COLUMN (50%) - Sticky on Desktop */}
+            <div className="w-full lg:sticky lg:top-32 space-y-12 lg:pl-8">
+              
+              <div>
+                {/* 1. SECTION LABEL */}
+                <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 mb-4">
+                  <span className="material-symbols-outlined text-[16px] text-blue-500">connect_without_contact</span>
+                  <span>Get In Touch</span>
+                </div>
+
+                {/* 2. HEADING */}
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-slate-200 mb-4">
+                  Let's build something <br />
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+                    remarkable together.
+                  </span>
+                </h1>
+
+                {/* 3. SUBHEADING */}
+                <p className="text-base md:text-lg font-google text-slate-500 dark:text-slate-400 max-w-md leading-relaxed">
+                  Have an idea, project, or question? Drop us a line and let's turn your vision into a high-performance solution.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1">
-                <div onClick={showError} className="p-4 rounded-none bg-emerald-50 dark:bg-emerald-900/20 border border-dashed border-emerald-200 dark:border-emerald-800/40 flex flex-row items-center justify-center text-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors text-emerald-600 dark:text-emerald-400 cursor-pointer">
-                  <span className="material-symbols-outlined text-[18px]">forum</span>
-                  <span className="text-md font-display uppercase tracking-widest font-bold">Track Your Project Status</span>
+              {/* 4. CONTACT METHODS */}
+              <div className="space-y-3">
+                {/* Email Entry */}
+                <a 
+                  href="mailto:ayushsatvara2002@gmail.com"
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-blue-500 text-[20px]">mail</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-google text-slate-500 dark:text-slate-400">Direct line</span>
+                    <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200">ayushsatvara2002@gmail.com</span>
+                  </div>
+                </a>
+
+                {/* LinkedIn Entry */}
+                <a 
+                  href="https://linkedin.com/in/ayushsatvara"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-blue-500 text-[20px]">work</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-google text-slate-500 dark:text-slate-400">Professional network</span>
+                    <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200">/in/ayushsatvara</span>
+                  </div>
+                </a>
+
+                {/* WhatsApp Entry */}
+                <div 
+                  onClick={showDev}
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950 cursor-pointer"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-blue-500 text-[20px]">chat</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-google text-slate-500 dark:text-slate-400">Fastest response</span>
+                    <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200">Message us directly</span>
+                  </div>
                 </div>
+
+                {/* Project Status Tracker entry */}
+                <div 
+                  onClick={showError} 
+                  className="rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-800/40 p-4 flex items-center justify-center gap-2 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-colors bg-emerald-50/10 dark:bg-emerald-950/5 text-emerald-600 dark:text-emerald-400 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">forum</span>
+                  <span className="text-sm uppercase tracking-widest font-bold font-google">Track Your Project Status</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT COLUMN (50%) */}
+            <div className="w-full lg:pr-4">
+              <div className="rounded-3xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950 p-5 sm:p-8 lg:p-10 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none transition-all duration-300">
+                
+                {/* CARD HEADER */}
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-6 mb-8">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-blue-500">bolt</span>
+                    <span className="text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500">Project Brief</span>
+                  </div>
+                  <span className="text-sm font-google text-slate-400 dark:text-slate-500">
+                    Let's collaborate
+                  </span>
+                </div>
+
+                {/* FORM */}
+                <form onSubmit={showDev} className="space-y-6">
+                  {/* Row 1: Name and Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="name" className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
+                        Name
+                      </label>
+                      <input 
+                        type="text" 
+                        id="name"
+                        required
+                        placeholder="Name" 
+                        className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="email" className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
+                        Email
+                      </label>
+                      <input 
+                        type="email" 
+                        id="email"
+                        required
+                        placeholder="Email" 
+                        className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Service selector */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
+                      Service
+                    </label>
+                    
+                    {/* Visual pill selector (3 cols on sm+, wrap on mobile) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[
+                        'Custom AI Chatbot',
+                        'RAG Pipeline',
+                        'Full-Stack Web App',
+                        'Performance & SEO',
+                        'Other'
+                      ].map((service) => {
+                        const isSelected = selectedService === service;
+                        return (
+                          <button
+                            key={service}
+                            type="button"
+                            onClick={() => setSelectedService(service)}
+                            className={`px-4 py-3 text-sm font-google font-medium rounded-xl border text-center transition-all duration-200 ${
+                              isSelected
+                                ? 'bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400'
+                                : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors'
+                            }`}
+                          >
+                            {service}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <input type="hidden" name="service" value={selectedService} />
+                  </div>
+
+                  {/* Row 3: Textarea */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="message" className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
+                      Tell us about your project
+                    </label>
+                    <textarea 
+                      id="message"
+                      rows={5}
+                      required
+                      placeholder="What are you building? Timeline? Budget range?" 
+                      className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full resize-none"
+                    />
+                  </div>
+
+                  {/* SUBMIT BUTTON */}
+                  <div className="w-full flex flex-col items-center lg:items-stretch">
+                    <button 
+                      type="submit" 
+                      className="w-full sm:w-auto lg:w-full overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
+                    >
+                      {/* Wave layer 1 — lightest blue, reveals first */}
+                      <span className="absolute w-[150%] h-50 -top-26 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-500 duration-1000 origin-left" />
+                      {/* Wave layer 2 — mid blue */}
+                      <span className="absolute w-[75%] h-36 -top-22 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-700 duration-700 origin-left" />
+                      {/* Wave layer 3 — dark blue, reveals last */}
+                      <span className="absolute w-[30%] h-32 -top-14 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-1000 duration-500 origin-left" />
+                      
+                      {/* Hover label — fades in on top of waves */}
+                      <span className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute z-10 whitespace-nowrap flex items-center gap-2">
+                        Send It →
+                      </span>
+                      {/* Default label */}
+                      <span className="relative z-10 flex items-center gap-2 group-hover:opacity-0 transition-opacity duration-300">
+                        Send Message
+                        <span className="material-symbols-outlined text-[18px]">send</span>
+                      </span>
+                    </button>
+
+                    {/* FOOTER NOTE */}
+                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 text-center mt-3">
+                      We respond within 24 hours. No spam, ever.
+                    </p>
+                  </div>
+
+                </form>
+
               </div>
             </div>
 
-            {/* RIGHT: Form Terminal */}
-            <div className="w-full relative">
-              <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none p-6 md:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="material-symbols-outlined text-[20px] text-blue-600">bolt</span>
-                  <h3 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200">Project Briefing</h3>
-                </div>
+          </div>
 
-                <form className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Your Identity</label>
-                      <input type="text" placeholder="Name" className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-1 focus:ring-blue-500/50 focus:border-blue-400 transition-colors outline-none" />
+          {/* 5. FAQ ACCORDION - FULL SPAN */}
+          <div className="w-full pt-16 border-t border-slate-200/60 dark:border-slate-800/40">
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="text-center">
+                <h3 className="text-sm font-google uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-3">
+                  Frequently Asked Questions
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {faqs.map((faq, i) => {
+                  const isOpen = activeFaq === i;
+                  return (
+                    <div 
+                      key={i} 
+                      className="rounded-xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950 overflow-hidden transition-colors duration-300"
+                    >
+                      <button
+                        onClick={() => setActiveFaq(isOpen ? null : i)}
+                        className="w-full px-5 py-4 flex items-center justify-between text-left group transition-colors duration-300"
+                      >
+                        <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
+                          {faq.q}
+                        </span>
+                        <span 
+                          className={`material-symbols-outlined transition-transform duration-300 text-[16px] text-slate-400 dark:text-slate-500 group-hover:text-blue-500 ${
+                            isOpen ? 'rotate-180 text-blue-500' : ''
+                          }`}
+                        >
+                          expand_more
+                        </span>
+                      </button>
+                      
+                      <div 
+                        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                          isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                        }`}
+                        style={{ display: 'grid' }}
+                      >
+                        <div className="overflow-hidden">
+                          <p className="px-5 pb-5 text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+                            {faq.a}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Channel</label>
-                      <input type="email" placeholder="Email" className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-1 focus:ring-blue-500/50 focus:border-blue-400 transition-colors outline-none" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-md font-display uppercase tracking-widest font-bold text-slate-400 dark:text-slate-200 ml-1">Architecture Overview</label>
-                    <textarea rows={4} placeholder="Describe your vision..." className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-none px-4 py-3 text-sm font-mono focus:ring-1 focus:ring-blue-500/50 focus:border-blue-400 transition-colors outline-none resize-none"></textarea>
-                  </div>
-                  <button onClick={showDev} type='button' className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:opacity-90 text-md font-display uppercase tracking-widest font-bold text-white px-8 py-5 rounded-none flex items-center justify-center gap-2 transition-all active:scale-[0.99] group">
-                    Deploy Message <span className="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">send</span>
-                  </button>
-                </form>
+                  );
+                })}
               </div>
             </div>
           </div>

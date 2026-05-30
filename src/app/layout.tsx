@@ -1,16 +1,17 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import {
-  Bricolage_Grotesque,
+  Google_Sans,
   Darker_Grotesque,
 } from 'next/font/google';
 import './globals.css';
 import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
 
-const bricolage = Bricolage_Grotesque({
+const googleSans = Google_Sans({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-display',
+  variable: '--font-google',
+  weight: ['400', '500', '600', '700'],
 });
 
 const darker = Darker_Grotesque({
@@ -44,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${darker.variable}`}>
+    <html lang="en" className={`${googleSans.variable} ${darker.variable}`}>
       <head>
         {/* Google tag (gtag.js) */}
         <Script
@@ -62,10 +63,9 @@ export default function RootLayout({
         </Script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0..1,-50..200"
-        />
+        <Script id="material-symbols-font" strategy="afterInteractive">
+          {`var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap';document.head.appendChild(l);`}
+        </Script>
       </head>
       <body>
         <SmoothScrollProvider>

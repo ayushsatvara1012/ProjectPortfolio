@@ -54,14 +54,20 @@ const QUESTIONS_DATA = [
 // ── Shared engine logo node ──────────────────────────────────────────────────
 // Accepts optional `phase` to show thinking/resolved ring states.
 // The outer div is sized and positioned by the caller.
-function EngineLogoNode({ phase }: { phase?: "typing" | "sending" | "thinking" | "resolved" }) {
+function EngineLogoNode({
+  phase,
+  reducedMotion = false,
+}: {
+  phase?: "typing" | "sending" | "thinking" | "resolved";
+  reducedMotion?: boolean;
+}) {
   const isThinking = phase === "thinking";
   const isResolved = phase === "resolved";
 
   return (
     <div className="relative w-full h-full">
-      {/* Outer pulse ring — visible only while thinking */}
-      {isThinking && (
+      {/* Outer pulse ring — desktop only, skipped on mobile to save GPU */}
+      {isThinking && !reducedMotion && (
         <motion.div
           className="absolute inset-0 rounded-full border border-blue-500/30"
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
@@ -69,12 +75,12 @@ function EngineLogoNode({ phase }: { phase?: "typing" | "sending" | "thinking" |
         />
       )}
 
-      {/* Spinning gradient border */}
+      {/* Spinning gradient border — static on mobile */}
       <motion.div
         className="absolute inset-0 rounded-full border-2 border-transparent border-t-indigo-500 border-r-blue-400"
-        animate={isThinking ? { rotate: 360 } : { rotate: 0 }}
+        animate={isThinking && !reducedMotion ? { rotate: 360 } : { rotate: 0 }}
         transition={
-          isThinking
+          isThinking && !reducedMotion
             ? { duration: 1, repeat: Infinity, ease: "linear" }
             : { duration: 0.5 }
         }
@@ -90,13 +96,22 @@ function EngineLogoNode({ phase }: { phase?: "typing" | "sending" | "thinking" |
             : "border-slate-200 dark:border-slate-800"
         }`}
       >
-        <motion.img
-          src="/logo2.svg"
-          alt="Sapybase Engine"
-          className="w-[58%] h-[58%] object-contain"
-          animate={isThinking ? { scale: [1, 1.12, 1] } : { scale: [1, 1.05, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-        />
+        {/* Logo breathing animation — skipped on mobile */}
+        {reducedMotion ? (
+          <img
+            src="/logo2.svg"
+            alt="Sapybase Engine"
+            className="w-[58%] h-[58%] object-contain"
+          />
+        ) : (
+          <motion.img
+            src="/logo2.svg"
+            alt="Sapybase Engine"
+            className="w-[58%] h-[58%] object-contain"
+            animate={isThinking ? { scale: [1, 1.12, 1] } : { scale: [1, 1.05, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )}
       </div>
     </div>
   );
@@ -182,8 +197,8 @@ function StepTwoVisual({
           />
         )}
 
-        {/* Moving data packet */}
-        {phase === "sending" && (
+        {/* Moving data packet — skipped on mobile to reduce concurrent animations */}
+        {phase === "sending" && !isMobile && (
           <>
             <motion.circle
               key={`pkt-core-${currentData.query}`}
@@ -251,7 +266,7 @@ function StepTwoVisual({
       {/* Engine node — mobile only; desktop uses the shared overlay */}
       {isMobile && (
         <div className="absolute left-[20%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[22%] aspect-square z-10 pointer-events-none">
-          <EngineLogoNode phase={phase} />
+          <EngineLogoNode phase={phase} reducedMotion />
           <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
             Sapybase Engine
           </span>
@@ -282,7 +297,9 @@ function StepTwoVisual({
               initial={{ opacity: 0, scale: 0.92, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: -4 }}
-              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              transition={isMobile
+                ? { type: "tween", duration: 0.2 }
+                : { type: "spring", stiffness: 280, damping: 22 }}
               className="w-full flex flex-col items-center gap-1.5"
             >
               <div className="flex items-center gap-1.5 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1 text-[9px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -311,7 +328,7 @@ function StepTwoVisual({
 //   snippet  → left-[50%] top-[22%]  → SVG center (250, 110), bottom ≈ y=140
 //   browser  → left-[50%] top-[64%]  → SVG center (250, 320), top    ≈ y=202
 //   arrow    → M 250 142 L 250 200   (vertical, center-aligned)
-function StepThreeVisual() {
+function StepThreeVisual({ isMobile = false }: { isMobile?: boolean }) {
   const [phase, setPhase] = useState<"copying" | "transferring" | "installing" | "active">("copying");
   const [copied, setCopied] = useState(false);
   const [chatPhase, setChatPhase] = useState<"hidden" | "user-typing" | "bot-thinking" | "bot-typing">("hidden");
@@ -330,42 +347,42 @@ function StepThreeVisual() {
       setTypedUser("");
       setTypedBot("");
 
-      // Cursor moves and clicks
+      // Mobile: skip cursor delay, copy immediately
       timer = setTimeout(() => {
         setCopied(true);
         timer = setTimeout(() => {
           setPhase("transferring");
         }, 600);
-      }, 1400);
+      }, isMobile ? 600 : 1400);
     } else if (phase === "transferring") {
       timer = setTimeout(() => {
         setPhase("installing");
-      }, 1000);
+      }, isMobile ? 500 : 1000);
     } else if (phase === "installing") {
       timer = setTimeout(() => {
         setPhase("active");
         setChatPhase("user-typing");
-      }, 1000);
+      }, isMobile ? 500 : 1000);
     } else if (phase === "active") {
       if (chatPhase === "user-typing") {
         if (typedUser.length < userQuery.length) {
           timer = setTimeout(() => {
             setTypedUser(userQuery.slice(0, typedUser.length + 1));
-          }, 80);
+          }, isMobile ? 50 : 80);
         } else {
           timer = setTimeout(() => {
             setChatPhase("bot-thinking");
-          }, 600);
+          }, 400);
         }
       } else if (chatPhase === "bot-thinking") {
         timer = setTimeout(() => {
           setChatPhase("bot-typing");
-        }, 1200);
+        }, isMobile ? 600 : 1200);
       } else if (chatPhase === "bot-typing") {
         if (typedBot.length < botAnswer.length) {
           timer = setTimeout(() => {
             setTypedBot(botAnswer.slice(0, typedBot.length + 1));
-          }, 50);
+          }, isMobile ? 30 : 50);
         } else {
           timer = setTimeout(() => {
             setPhase("copying");
@@ -375,7 +392,7 @@ function StepThreeVisual() {
     }
 
     return () => clearTimeout(timer);
-  }, [phase, chatPhase, typedUser, typedBot]);
+  }, [phase, chatPhase, typedUser, typedBot, isMobile]);
 
   return (
     <div className="relative w-full h-full">
@@ -420,8 +437,8 @@ function StepThreeVisual() {
           />
         )}
 
-        {/* Data packet travelling snippet → browser */}
-        {phase === "transferring" && (
+        {/* Data packet travelling snippet → browser — skipped on mobile */}
+        {phase === "transferring" && !isMobile && (
           <>
             <motion.circle cx={250} cy={142} r={5}  fill="#10B981"             animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
             <motion.circle cx={250} cy={142} r={10} fill="#10B981" fillOpacity={0.3} animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
@@ -465,8 +482,8 @@ function StepThreeVisual() {
             {copied ? "Copied!" : "Copy"}
           </motion.button>
 
-          {/* Virtual cursor click animation */}
-          {phase === "copying" && (
+          {/* Virtual cursor click animation — desktop only */}
+          {phase === "copying" && !isMobile && (
             <motion.div
               className="absolute z-20 pointer-events-none text-blue-500"
               initial={{ x: 80, y: 40, opacity: 0 }}
@@ -547,7 +564,9 @@ function StepThreeVisual() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       exit={{ scale: 0 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      transition={isMobile
+                        ? { type: "tween", duration: 0.15 }
+                        : { type: "spring", stiffness: 300, damping: 20 }}
                       className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shadow-lg"
                     >
                       <span className="material-symbols-outlined text-[16px] text-white">chat_bubble</span>
@@ -558,7 +577,9 @@ function StepThreeVisual() {
                       initial={{ opacity: 0, y: 14, scale: 0.88 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 14, scale: 0.88 }}
-                      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                      transition={isMobile
+                        ? { type: "tween", duration: 0.2 }
+                        : { type: "spring", stiffness: 260, damping: 22 }}
                       className="w-[50%] h-[90%] bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col shadow-2xl overflow-hidden"
                     >
                       {/* Chat header */}
@@ -636,6 +657,14 @@ export default function HowItWorks() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [phase, setPhase] = useState<"typing" | "sending" | "thinking" | "resolved">("typing");
   const [typedText, setTypedText] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const currentData = QUESTIONS_DATA[currentIdx];
 
@@ -721,16 +750,18 @@ export default function HowItWorks() {
               <path d="M 100 250 L 400 250"                   stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
               <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
 
-              {/* Animated glow pulses travelling along each path */}
-              <motion.path
-                d="M 100 100 C 240 100, 260 250, 400 250"
-                stroke="url(#s1-glow-a)"
-                strokeWidth="2.5"
-                fill="none"
-                initial={{ pathLength: 0.2, pathOffset: 0 }}
-                animate={{ pathOffset: [0, 1] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-              />
+              {/* Animated glow pulses — mobile shows only the middle path */}
+              {!isMobile && (
+                <motion.path
+                  d="M 100 100 C 240 100, 260 250, 400 250"
+                  stroke="url(#s1-glow-a)"
+                  strokeWidth="2.5"
+                  fill="none"
+                  initial={{ pathLength: 0.2, pathOffset: 0 }}
+                  animate={{ pathOffset: [0, 1] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+                />
+              )}
               <motion.path
                 d="M 100 250 L 400 250"
                 stroke="url(#s1-glow-b)"
@@ -740,15 +771,17 @@ export default function HowItWorks() {
                 animate={{ pathOffset: [0, 1] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 0.5 }}
               />
-              <motion.path
-                d="M 100 400 C 240 400, 260 250, 400 250"
-                stroke="url(#s1-glow-a)"
-                strokeWidth="2.5"
-                fill="none"
-                initial={{ pathLength: 0.2, pathOffset: 0 }}
-                animate={{ pathOffset: [0, 1] }}
-                transition={{ duration: 2.8, repeat: Infinity, ease: "linear", delay: 0.2 }}
-              />
+              {!isMobile && (
+                <motion.path
+                  d="M 100 400 C 240 400, 260 250, 400 250"
+                  stroke="url(#s1-glow-a)"
+                  strokeWidth="2.5"
+                  fill="none"
+                  initial={{ pathLength: 0.2, pathOffset: 0 }}
+                  animate={{ pathOffset: [0, 1] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "linear", delay: 0.2 }}
+                />
+              )}
             </svg>
 
             {/* Source nodes — LEFT column at 20%, tops 20% / 50% / 80% */}
@@ -775,7 +808,7 @@ export default function HowItWorks() {
             {/* Engine node — RIGHT anchor, mobile only (desktop uses shared overlay) */}
             {isMobile && (
               <div className="absolute w-[22%] aspect-square left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                <EngineLogoNode />
+                <EngineLogoNode reducedMotion />
                 <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
                   Sapybase Engine
                 </span>
@@ -797,7 +830,7 @@ export default function HowItWorks() {
 
       // ── STEP 3: DEPLOY ────────────────────────────────────────────────────
       case 3:
-        return <StepThreeVisual />;
+        return <StepThreeVisual isMobile={isMobile} />;
 
       default:
         return null;
@@ -822,9 +855,9 @@ export default function HowItWorks() {
             <span className="material-symbols-outlined text-[16px] text-blue-500">linear_scale</span>
             <span>How It Works</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-normal tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
             Data to{" "}
-            <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
               Live AI Chatbot
             </span>{" "}
             in Minutes
