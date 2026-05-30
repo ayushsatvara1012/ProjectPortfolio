@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useMemo, Component, type ReactNode } from 'react';
+import React, { useRef, useMemo, useEffect, Component, type ReactNode } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -49,6 +49,7 @@ const WaveParticles = ({
   randomness,
   speed,
   morphProgressRef,
+  isInViewportRef,
 }: {
   effectStyle: WaveStyle;
   colorPalette: string[];
@@ -62,6 +63,7 @@ const WaveParticles = ({
   randomness: number;
   speed: number;
   morphProgressRef?: { current: number };
+  isInViewportRef: { current: boolean };
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
@@ -72,6 +74,13 @@ const WaveParticles = ({
   const numParticles = particleCount * particleCount;
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const target = useMemo(() => new THREE.Vector3(), []);
+
+  const enterTimeRef = useRef<number | null>(null);
+  const particleRevealThresholds = useMemo(() => {
+    const arr = new Float32Array(numParticles);
+    for (let i = 0; i < numParticles; i++) arr[i] = Math.random();
+    return arr;
+  }, [numParticles]);
 
   // Detailed World Map Sampling for Globe Style
   const [landMask, setLandMask] = React.useState<Uint8Array | null>(null);
@@ -103,7 +112,20 @@ const WaveParticles = ({
 
   useFrame((state) => {
     if (!meshRef.current) return;
-    const time = state.clock.getElapsedTime() * speed;
+
+    // Halt GPU loop entirely when off-screen
+    if (!isInViewportRef.current) {
+      enterTimeRef.current = null;
+      return;
+    }
+
+    const elapsed = state.clock.getElapsedTime();
+
+    // Track first in-viewport frame for staggered particle reveal
+    if (enterTimeRef.current === null) enterTimeRef.current = elapsed;
+    const revealProgress = Math.min(1, (elapsed - enterTimeRef.current) / 2.0);
+
+    const time = elapsed * speed;
 
     state.raycaster.setFromCamera(state.pointer, state.camera);
     state.raycaster.ray.intersectPlane(plane, target);
@@ -314,6 +336,12 @@ const WaveParticles = ({
         dummyColor.lerpColors(colors[index1], colors[index2], fraction);
         meshRef.current.setColorAt(i, dummyColor);
 
+        // Staggered entrance: each particle fades in when revealProgress crosses its threshold
+        const revealFade = revealProgress < particleRevealThresholds[i]
+          ? 0
+          : Math.min(1, (revealProgress - particleRevealThresholds[i]) / 0.06);
+        scale *= revealFade;
+
         dummy.position.set(x, y, z);
         dummy.scale.set(scale, scale, scale);
         dummy.updateMatrix();
@@ -370,8 +398,23 @@ const AntigravityBackground: React.FC<AntigravityBackgroundProps> = ({
   containerClassName = "absolute inset-0 w-full h-full z-0 bg-transparent overflow-hidden pointer-events-auto",
   morphProgressRef,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isInViewportRef = useRef(true);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => { isInViewportRef.current = entry.isIntersecting; },
+      { threshold: 0 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       className={containerClassName}
       style={{ touchAction: 'none' }}
     >
@@ -393,6 +436,7 @@ const AntigravityBackground: React.FC<AntigravityBackgroundProps> = ({
             randomness={randomness}
             speed={speed}
             morphProgressRef={morphProgressRef}
+            isInViewportRef={isInViewportRef}
           />
         </Canvas>
       </WebGLErrorBoundary>

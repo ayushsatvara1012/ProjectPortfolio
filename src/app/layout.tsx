@@ -1,23 +1,14 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import {
-  Google_Sans,
-  Darker_Grotesque,
-} from 'next/font/google';
+import { Google_Sans } from 'next/font/google';
 import './globals.css';
 import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
 
 const googleSans = Google_Sans({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-google',
-  weight: ['400', '500', '600', '700'],
-});
-
-const darker = Darker_Grotesque({
-  subsets: ['latin'],
-  display: 'swap',
   variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
 });
 
 // A fallback minimal metadata in case a route misses it.
@@ -45,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${googleSans.variable} ${darker.variable}`}>
+    <html lang="en" className={googleSans.variable}>
       <head>
         {/* Google tag (gtag.js) */}
         <Script
@@ -67,7 +58,7 @@ export default function RootLayout({
           {`var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap';document.head.appendChild(l);`}
         </Script>
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <SmoothScrollProvider>
           {children}
         </SmoothScrollProvider>

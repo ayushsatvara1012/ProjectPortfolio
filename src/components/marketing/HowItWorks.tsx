@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const PIPELINE_STEPS = [
@@ -70,6 +70,7 @@ function EngineLogoNode({
       {isThinking && !reducedMotion && (
         <motion.div
           className="absolute inset-0 rounded-full border border-blue-500/30"
+          style={{ willChange: "transform, opacity" }}
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
         />
@@ -78,6 +79,7 @@ function EngineLogoNode({
       {/* Spinning gradient border — static on mobile */}
       <motion.div
         className="absolute inset-0 rounded-full border-2 border-transparent border-t-indigo-500 border-r-blue-400"
+        style={{ willChange: "transform" }}
         animate={isThinking && !reducedMotion ? { rotate: 360 } : { rotate: 0 }}
         transition={
           isThinking && !reducedMotion
@@ -108,6 +110,7 @@ function EngineLogoNode({
             src="/logo2.svg"
             alt="Sapybase Engine"
             className="w-[58%] h-[58%] object-contain"
+            style={{ willChange: "transform" }}
             animate={isThinking ? { scale: [1, 1.12, 1] } : { scale: [1, 1.05, 1] }}
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           />
@@ -244,8 +247,8 @@ function StepTwoVisual({
       </svg>
 
       {/* Search bar — RIGHT anchor: left-[80%] top-[50%] */}
-      {/* w-[38%]: center at 80% + half-width 19% = 99% — stays inside overflow-hidden */}
-      <div className="absolute left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[38%] z-10">
+      {/* w-[50%]: increased from 38% to better accommodate text display */}
+      <div className="absolute left-[78%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[42%] z-10">
         <div className="border border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm rounded-xl px-3 py-2.5 flex items-center gap-2 shadow-sm">
           <span className="material-symbols-outlined text-[15px] text-blue-500 shrink-0">
             search
@@ -650,29 +653,31 @@ function StepThreeVisual({ isMobile = false }: { isMobile?: boolean }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-export default function HowItWorks() {
-  const [activeStep, setActiveStep] = useState(1);
-  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+// ── Typewriter state isolated into its own component ─────────────────────────
+// Only this tiny node re-renders on every 60ms character tick.
+// The parent re-renders only on phase transitions (~4× per cycle vs ~50×).
+type TypewriterPhase = "typing" | "sending" | "thinking" | "resolved";
+
+function TypewriterLabel({
+  isActive,
+  isMobile,
+  onPhaseChange,
+}: {
+  isActive: boolean;
+  isMobile: boolean;
+  onPhaseChange?: (phase: TypewriterPhase) => void;
+}) {
+  const [phase, setPhase]           = useState<TypewriterPhase>("typing");
+  const [typedText, setTypedText]   = useState("");
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [phase, setPhase] = useState<"typing" | "sending" | "thinking" | "resolved">("typing");
-  const [typedText, setTypedText] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check, { passive: true });
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
   const currentData = QUESTIONS_DATA[currentIdx];
 
-  // Step 2 typewriter + animation cycle
   useEffect(() => {
-    if (activeStep !== 2) {
+    if (!isActive) {
       setPhase("typing");
       setTypedText("");
+      setCurrentIdx(0);
+      onPhaseChange?.("typing");
       return;
     }
 
@@ -683,22 +688,48 @@ export default function HowItWorks() {
       if (typedText.length < full.length) {
         timer = setTimeout(() => setTypedText(full.slice(0, typedText.length + 1)), 60);
       } else {
-        timer = setTimeout(() => setPhase("sending"), 800);
+        timer = setTimeout(() => { setPhase("sending"); onPhaseChange?.("sending"); }, 800);
       }
     } else if (phase === "sending") {
-      timer = setTimeout(() => setPhase("thinking"), 900);
+      timer = setTimeout(() => { setPhase("thinking"); onPhaseChange?.("thinking"); }, 900);
     } else if (phase === "thinking") {
-      timer = setTimeout(() => setPhase("resolved"), 1500);
+      timer = setTimeout(() => { setPhase("resolved"); onPhaseChange?.("resolved"); }, 1500);
     } else if (phase === "resolved") {
       timer = setTimeout(() => {
         setTypedText("");
         setCurrentIdx((p) => (p + 1) % QUESTIONS_DATA.length);
         setPhase("typing");
+        onPhaseChange?.("typing");
       }, 3000);
     }
 
     return () => clearTimeout(timer);
-  }, [phase, typedText, currentIdx, currentData, activeStep]);
+  }, [phase, typedText, currentIdx, currentData, isActive, onPhaseChange]);
+
+  return (
+    <StepTwoVisual
+      phase={phase}
+      typedText={typedText}
+      currentData={currentData}
+      isMobile={isMobile}
+    />
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function HowItWorks() {
+  const [activeStep, setActiveStep] = useState(1);
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [step2Phase, setStep2Phase] = useState<TypewriterPhase>("typing");
+  const [isMobile, setIsMobile] = useState(false);
+  const handleStep2Phase = useCallback((p: TypewriterPhase) => setStep2Phase(p), []);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // IntersectionObserver — auto-activates the step nearest viewport centre
   useEffect(() => {
@@ -820,11 +851,10 @@ export default function HowItWorks() {
       // ── STEP 2: UNDERSTAND ────────────────────────────────────────────────
       case 2:
         return (
-          <StepTwoVisual
-            phase={phase}
-            typedText={typedText}
-            currentData={currentData}
+          <TypewriterLabel
+            isActive={activeStep === 2}
             isMobile={isMobile}
+            onPhaseChange={handleStep2Phase}
           />
         );
 
@@ -847,7 +877,7 @@ export default function HowItWorks() {
       <div className="absolute top-1/3 left-10 w-96 h-96 bg-blue-500/5 dark:bg-blue-600/10 rounded-full blur-[120px] pointer-events-none select-none" />
       <div className="absolute bottom-1/3 right-10 w-96 h-96 bg-indigo-500/5 dark:bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none select-none" />
 
-      <div className="max-w-7xl mx-auto px-6 sm:px-12 lg:px-20 relative z-10">
+      <div className="max-w-8xl mx-auto px-6 sm:px-12 lg:px-20 relative z-10">
 
         {/* Section header */}
         <div className="mb-20 max-w-3xl">
@@ -855,7 +885,7 @@ export default function HowItWorks() {
             <span className="material-symbols-outlined text-[16px] text-blue-500">linear_scale</span>
             <span>How It Works</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-normal tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
             Data to{" "}
             <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
               Live AI Chatbot
@@ -874,7 +904,7 @@ export default function HowItWorks() {
           {/* ── LEFT: sticky visual preview (desktop only) ──────────────────── */}
           <div className="hidden lg:flex w-full lg:w-[48%] flex-col relative self-stretch">
 
-            <div className="sticky top-[calc(50vh-250px)] w-full aspect-square max-w-[500px] mx-auto overflow-hidden">
+            <div className="sticky top-[calc(50vh-250px)] w-full aspect-square max-w-[550px] mx-auto overflow-hidden">
 
               {/* Sliding track: 300% wide, each panel is 1/3 (= card width) */}
               <div
@@ -917,7 +947,7 @@ export default function HowItWorks() {
                       transition={{ duration: 0.35, ease: "easeOut" }}
                       className="relative w-full h-full flex flex-col items-center"
                     >
-                      <EngineLogoNode phase={activeStep === 2 ? phase : undefined} />
+                      <EngineLogoNode phase={activeStep === 2 ? step2Phase : undefined} />
                       <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
                         Sapy Engine
                       </span>

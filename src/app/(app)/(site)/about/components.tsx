@@ -208,7 +208,7 @@ export const DeliverablesCell = () => (
 );
 
 export const CTAStrip = () => (
-  <div className="border-x border-b border-slate-200 dark:border-slate-800 bg-slate-950 dark:bg-slate-950 p-12 md:p-20 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 transition-colors duration-500">
+  <div className="bg-slate-950 dark:bg-slate-950 p-12 md:p-20 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 transition-colors duration-500">
     <div>
       <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-500 mb-4">
         Deployment Status · <span className="text-green-500">Optimal</span>
