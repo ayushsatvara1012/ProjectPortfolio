@@ -67,7 +67,7 @@ export default function PricingClient() {
         <Image src="/robo_nature.webp" alt="Hero background" fill className="object-cover object-top !fixed -z-10" priority />
         <div className="!fixed inset-0 bg-linear-to-b from-slate-950/70 via-slate-950/60 to-slate-950/90 sm:bg-linear-to-r sm:from-slate-950/85 sm:via-slate-950/70 sm:to-slate-950/30 z-0" />
 
-        <div className="relative z-10 flex-1 flex flex-col justify-end sm:justify-center max-w-7xl mx-auto w-full px-4 pt-28 pb-12">
+        <div className="relative z-10 flex-1 flex flex-col justify-center sm:justify-center max-w-7xl mx-auto w-full px-4 pt-28 pb-12">
           <div className="max-w-xl lg:max-w-2xl">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={heroInView ? { opacity: 1, y: 0 } : {}} className="flex items-center gap-2 mb-5">
               <span className="material-symbols-outlined text-[14px] text-blue-400">auto_awesome</span>
@@ -311,13 +311,15 @@ export default function PricingClient() {
                         <div key={row.label} className="flex group border-t border-gray-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-blue-950/30 transition-all duration-200 relative">
                           {/* Feature Label with Tooltip */}
                           <div className="w-1/3 px-6 py-5 bg-white dark:bg-white/[0.01] group-hover:bg-slate-100 dark:group-hover:bg-slate-900/50 transition-colors duration-200 border-r border-gray-100 dark:border-slate-800/50">
-                            <div className="flex items-center gap-2 group/tooltip">
-                              <p className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200">{row.label}</p>
-                              <span className="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-600 cursor-help opacity-0 group-hover/tooltip:opacity-100 transition-opacity">help</span>
-                              {/* Tooltip */}
-                              <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 bg-slate-900 dark:bg-slate-800 text-white dark:text-slate-100 text-xs rounded-lg p-3 whitespace-normal w-64 shadow-lg border border-slate-700 dark:border-slate-600">
-                                {FEATURE_DESCRIPTIONS[row.label]}
-                                <div className="absolute top-full left-6 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-slate-800" />
+                            <div className="flex items-center gap-2 relative">
+                              <p className="text-base font-google font-regular text-slate-900 dark:text-slate-200">{row.label}</p>
+                              <div className="relative group/helpicon">
+                                <span className="material-symbols-outlined text-xs text-slate-400 dark:text-slate-600 cursor-help transition-colors hover:text-slate-600 dark:hover:text-slate-400">info</span>
+                                {/* Tooltip */}
+                                <div className="absolute left-0 bottom-full mb-3 opacity-0 pointer-events-none group-hover/helpicon:opacity-100 group-hover/helpicon:pointer-events-auto translate-y-1 group-hover/helpicon:translate-y-0 transition-all duration-200 ease-in-out z-50 bg-slate-900 dark:bg-slate-800 text-white dark:text-slate-100 text-xs rounded-lg p-3 whitespace-normal w-64 shadow-lg border border-slate-700 dark:border-slate-600">
+                                  {FEATURE_DESCRIPTIONS[row.label]}
+                                  <div className="absolute top-full left-6 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-slate-800" />
+                                </div>
                               </div>
                             </div>
                           </div>

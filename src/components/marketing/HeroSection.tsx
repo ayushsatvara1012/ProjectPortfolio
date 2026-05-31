@@ -64,19 +64,11 @@ const HeroSection = () => {
 
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
       <AntigravityBackground
-        particleCount={isMobile ? 20 : 50}
+        particleCount={isMobile ? 100 : 50}
         particleType={isMobile ? 'dot' : 'capsule'}
+        particleSeparation={isMobile ? 2 : 4}
       />
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-        {/* Background Vector Illustration 
-        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[60%] z-10 flex items-center justify-end pointer-events-none select-none overflow-hidden">
-          <img
-            src="/vector_hero.svg"
-            alt="Hero Background Illustration"
-            className="w-full h-full object-cover lg:object-contain object-right max-h-[850px] opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-          />
-        </div>
-        */}
 
         {/* Text and controls centered */}
         <div className="relative z-10 max-w-xl lg:max-w-3xl flex flex-col justify-center items-center text-center">

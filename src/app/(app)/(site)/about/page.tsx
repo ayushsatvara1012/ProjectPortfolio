@@ -111,7 +111,7 @@ export default function AboutPage() {
         <CTAStrip />
       </ScrollReveal>
 
-      <div className="h-px bg-slate-200 dark:bg-slate-800 max-w-8xl mx-auto px-6 md:px-12" />
+      {/* <div className="h-px bg-slate-200 dark:bg-slate-800 max-w-8xl mx-auto px-6 md:px-12" /> */}
       <div className="pb-8" />
     </div>
   );

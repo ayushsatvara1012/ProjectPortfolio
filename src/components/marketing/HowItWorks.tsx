@@ -125,12 +125,13 @@ function EngineLogoNode({
 function Step1SVGDefs() {
   return (
     <defs>
-      <linearGradient id="s1-glow-a" x1="0%" y1="0%" x2="100%" y2="0%">
+      {/* userSpaceOnUse avoids degenerate-bbox failures on zero-height/zero-width paths */}
+      <linearGradient id="s1-glow-a" gradientUnits="userSpaceOnUse" x1="100" y1="250" x2="400" y2="250">
         <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0" />
         <stop offset="50%"  stopColor="#3B82F6" stopOpacity="1" />
         <stop offset="100%" stopColor="#6366F1" stopOpacity="0" />
       </linearGradient>
-      <linearGradient id="s1-glow-b" x1="0%" y1="0%" x2="100%" y2="0%">
+      <linearGradient id="s1-glow-b" gradientUnits="userSpaceOnUse" x1="100" y1="250" x2="400" y2="250">
         <stop offset="0%"   stopColor="#6366F1" stopOpacity="0" />
         <stop offset="50%"  stopColor="#4F46E5" stopOpacity="1" />
         <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
@@ -194,14 +195,16 @@ function StepTwoVisual({
             stroke="url(#s2-horiz)"
             strokeWidth="2.5"
             fill="none"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
+            pathLength={100}
+            strokeDasharray="100"
+            initial={{ strokeDashoffset: 100 }}
+            animate={{ strokeDashoffset: 0 }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
           />
         )}
 
-        {/* Moving data packet — skipped on mobile to reduce concurrent animations */}
-        {phase === "sending" && !isMobile && (
+        {/* Moving data packet */}
+        {phase === "sending" && (
           <>
             <motion.circle
               key={`pkt-core-${currentData.query}`}
@@ -238,8 +241,10 @@ function StepTwoVisual({
               stroke="url(#s2-vert)"
               strokeWidth="2"
               fill="none"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
+              pathLength={100}
+              strokeDasharray="100"
+              initial={{ strokeDashoffset: 100 }}
+              animate={{ strokeDashoffset: 0 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
             />
           </>
@@ -269,7 +274,7 @@ function StepTwoVisual({
       {/* Engine node — mobile only; desktop uses the shared overlay */}
       {isMobile && (
         <div className="absolute left-[20%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[22%] aspect-square z-10 pointer-events-none">
-          <EngineLogoNode phase={phase} reducedMotion />
+          <EngineLogoNode phase={phase} />
           <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
             Sapybase Engine
           </span>
@@ -331,7 +336,7 @@ function StepTwoVisual({
 //   snippet  → left-[50%] top-[22%]  → SVG center (250, 110), bottom ≈ y=140
 //   browser  → left-[50%] top-[64%]  → SVG center (250, 320), top    ≈ y=202
 //   arrow    → M 250 142 L 250 200   (vertical, center-aligned)
-function StepThreeVisual({ isMobile = false }: { isMobile?: boolean }) {
+function StepThreeVisual({ isMobile = false, isActive = true }: { isMobile?: boolean; isActive?: boolean }) {
   const [phase, setPhase] = useState<"copying" | "transferring" | "installing" | "active">("copying");
   const [copied, setCopied] = useState(false);
   const [chatPhase, setChatPhase] = useState<"hidden" | "user-typing" | "bot-thinking" | "bot-typing">("hidden");
@@ -342,6 +347,15 @@ function StepThreeVisual({ isMobile = false }: { isMobile?: boolean }) {
   const botAnswer = "Live & streaming answers! 🚀";
 
   useEffect(() => {
+    if (!isActive) {
+      setPhase("copying");
+      setCopied(false);
+      setChatPhase("hidden");
+      setTypedUser("");
+      setTypedBot("");
+      return;
+    }
+
     let timer: ReturnType<typeof setTimeout>;
 
     if (phase === "copying") {
@@ -395,7 +409,7 @@ function StepThreeVisual({ isMobile = false }: { isMobile?: boolean }) {
     }
 
     return () => clearTimeout(timer);
-  }, [phase, chatPhase, typedUser, typedBot, isMobile]);
+  }, [phase, chatPhase, typedUser, typedBot, isMobile, isActive]);
 
   return (
     <div className="relative w-full h-full">
@@ -434,14 +448,16 @@ function StepThreeVisual({ isMobile = false }: { isMobile?: boolean }) {
             stroke="url(#s3-vert)"
             strokeWidth="2.5"
             fill="none"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
+            pathLength={100}
+            strokeDasharray="100"
+            initial={{ strokeDashoffset: 100 }}
+            animate={{ strokeDashoffset: 0 }}
             transition={{ duration: 0.7, ease: "easeInOut" }}
           />
         )}
 
-        {/* Data packet travelling snippet → browser — skipped on mobile */}
-        {phase === "transferring" && !isMobile && (
+        {/* Data packet travelling snippet → browser */}
+        {phase === "transferring" && (
           <>
             <motion.circle cx={250} cy={142} r={5}  fill="#10B981"             animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
             <motion.circle cx={250} cy={142} r={10} fill="#10B981" fillOpacity={0.3} animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
@@ -764,7 +780,7 @@ export default function HowItWorks() {
   //  Middle row    top-[50%]   →  SVG y = 250
   //  Bottom row    top-[80%]   →  SVG y = 400
 
-  const renderPreview = (stepId: number, isMobile = false) => {
+  const renderPreview = (stepId: number, isMobile = false, isActive = true) => {
     switch (stepId) {
       // ── STEP 1: INGEST ────────────────────────────────────────────────────
       case 1:
@@ -781,37 +797,20 @@ export default function HowItWorks() {
               <path d="M 100 250 L 400 250"                   stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
               <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
 
-              {/* Animated glow pulses — mobile shows only the middle path */}
+              {/* Animated glow pulses — native SVG <animate> uses user-unit coords directly,
+                  avoiding Framer Motion's CSS-px / viewBox scale mismatch on mobile */}
               {!isMobile && (
-                <motion.path
-                  d="M 100 100 C 240 100, 260 250, 400 250"
-                  stroke="url(#s1-glow-a)"
-                  strokeWidth="2.5"
-                  fill="none"
-                  initial={{ pathLength: 0.2, pathOffset: 0 }}
-                  animate={{ pathOffset: [0, 1] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-                />
+                <path d="M 100 100 C 240 100, 260 250, 400 250" stroke="url(#s1-glow-a)" strokeWidth="2.5" fill="none" strokeDasharray="76 304">
+                  <animate attributeName="stroke-dashoffset" from="0" to="-380" dur="2.5s" repeatCount="indefinite" calcMode="linear" />
+                </path>
               )}
-              <motion.path
-                d="M 100 250 L 400 250"
-                stroke="url(#s1-glow-b)"
-                strokeWidth="2.5"
-                fill="none"
-                initial={{ pathLength: 0.2, pathOffset: 0 }}
-                animate={{ pathOffset: [0, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 0.5 }}
-              />
+              <path d="M 100 250 L 400 250" stroke="url(#s1-glow-b)" strokeWidth="2.5" fill="none" strokeDasharray="60 240">
+                <animate attributeName="stroke-dashoffset" from="0" to="-300" dur="2s" begin="0.5s" repeatCount="indefinite" calcMode="linear" />
+              </path>
               {!isMobile && (
-                <motion.path
-                  d="M 100 400 C 240 400, 260 250, 400 250"
-                  stroke="url(#s1-glow-a)"
-                  strokeWidth="2.5"
-                  fill="none"
-                  initial={{ pathLength: 0.2, pathOffset: 0 }}
-                  animate={{ pathOffset: [0, 1] }}
-                  transition={{ duration: 2.8, repeat: Infinity, ease: "linear", delay: 0.2 }}
-                />
+                <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="url(#s1-glow-a)" strokeWidth="2.5" fill="none" strokeDasharray="76 304">
+                  <animate attributeName="stroke-dashoffset" from="0" to="-380" dur="2.8s" begin="0.2s" repeatCount="indefinite" calcMode="linear" />
+                </path>
               )}
             </svg>
 
@@ -839,7 +838,7 @@ export default function HowItWorks() {
             {/* Engine node — RIGHT anchor, mobile only (desktop uses shared overlay) */}
             {isMobile && (
               <div className="absolute w-[22%] aspect-square left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                <EngineLogoNode reducedMotion />
+                <EngineLogoNode />
                 <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
                   Sapybase Engine
                 </span>
@@ -852,7 +851,7 @@ export default function HowItWorks() {
       case 2:
         return (
           <TypewriterLabel
-            isActive={activeStep === 2}
+            isActive={isActive}
             isMobile={isMobile}
             onPhaseChange={handleStep2Phase}
           />
@@ -860,7 +859,7 @@ export default function HowItWorks() {
 
       // ── STEP 3: DEPLOY ────────────────────────────────────────────────────
       case 3:
-        return <StepThreeVisual isMobile={isMobile} />;
+        return <StepThreeVisual isMobile={isMobile} isActive={isActive} />;
 
       default:
         return null;
@@ -916,7 +915,7 @@ export default function HowItWorks() {
                     key={id}
                     className="w-1/3 h-full shrink-0 flex items-center justify-center"
                   >
-                    {renderPreview(id)}
+                    {renderPreview(id, false, activeStep === id)}
                   </div>
                 ))}
               </div>
@@ -1043,7 +1042,7 @@ export default function HowItWorks() {
                       {/* Mobile preview — hidden on lg+ where the sticky panel handles it */}
                       <div className="lg:hidden aspect-square w-full sm:max-w-full md:max-w-[380px] mx-auto overflow-hidden flex items-center justify-center">
                         <div className="relative w-full h-full">
-                          {renderPreview(s.id, true)}
+                          {renderPreview(s.id, true, activeStep === s.id)}
                         </div>
                       </div>
                     </div>

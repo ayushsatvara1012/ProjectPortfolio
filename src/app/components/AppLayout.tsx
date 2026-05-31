@@ -371,7 +371,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
       </aside>
       {/* Main content */}
-      <main className={`flex-1 relative mt-16 min-h-[calc(100vh-4rem)] bg-[#f8f9fa] dark:bg-[#05070a] flex flex-col min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-4rem)] lg:overflow-hidden' : ''}`}>
+      <main className={`flex-1 relative mt-16 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-[#05070a] flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-4rem)]'}`}>
         <div className={`flex-1 flex flex-col pt-0 ${isFullHeightPane ? 'lg:min-h-0 lg:overflow-hidden' : ''}`}>
           <DashboardErrorBoundary>
             <Suspense fallback={null}>

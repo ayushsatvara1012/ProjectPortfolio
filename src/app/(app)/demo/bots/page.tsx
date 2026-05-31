@@ -7,12 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getBotConfig, getKnowledge, isTrained } from '@/src/lib/demo/demoStorage';
 
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
-    demo: { label: 'Demo', cls: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400' },
+    demo: { label: 'Demo', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-white/[0.04]' },
 };
 
 export default function DemoMyBotsPage() {
     const router = useRouter();
-    const [botConfig, setBotConfig] = React.useState<any>(getBotConfig());
+    const [botConfig, setBotConfig] = React.useState<any>(null);
     const [chunks, setChunks] = React.useState<any[]>([]);
     const [trained, setTrained] = React.useState<boolean>(false);
     const [mounted, setMounted] = React.useState(false);
@@ -23,6 +23,10 @@ export default function DemoMyBotsPage() {
         setTrained(isTrained());
         setMounted(true);
     }, []);
+
+    if (!mounted || !botConfig) {
+        return null; // Don't paint until hydrated so server/client configs match.
+    }
 
     const chunksUsed = chunks.length;
     const msgUsed = 0;
@@ -51,47 +55,44 @@ export default function DemoMyBotsPage() {
     const speedInfo = SPEED_BADGE[plan.speed_tier];
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 transition-all duration-500 relative overflow-hidden">
-            <div className="absolute inset-0 bg-cover bg-center bg-no-repeat sm:bg-fixed opacity-100" style={{ backgroundImage: "url('/nature.webp')" }} />
-            <div className="absolute inset-0 bg-white/40 dark:bg-slate-950/70 backdrop-blur-[2px] pointer-events-none" />
-
+        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#05070a] transition-all duration-500 relative overflow-hidden">
             <div className="relative flex flex-col h-full z-10">
                 {/* Header */}
-                <div className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-md px-4 py-4 sm:px-8 sm:py-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between transition-colors">
+                <div className="px-6 py-6 sm:px-8 sm:py-8 flex items-center justify-between transition-colors">
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="material-symbols-outlined text-[16px] text-slate-600 dark:text-slate-400">smart_toy</span>
-                            <h1 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200">My Bots</h1>
+                        <div className="flex items-center gap-2.5 mb-1.5">
+                            <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">smart_toy</span>
+                            <h1 className="text-2xl md:text-3xl font-display font-semibold text-slate-900 dark:text-slate-200">My Bots</h1>
                         </div>
-                        <p className="text-md font-display text-slate-500 dark:text-slate-400">Manage all your AI assistants across your plan.</p>
+                        <p className="text-sm md:text-base font-display text-slate-500 dark:text-slate-400">Manage all your AI assistants across your plan.</p>
                     </div>
                     <div className="hidden sm:flex items-center gap-3">
-                        <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-bold font-google border rounded-none ${speedInfo.cls}`}>
+                        <span className={`px-3 py-1.5 text-xs font-medium font-google rounded-full ${speedInfo.cls}`}>
                             {speedInfo.label} Speed
                         </span>
-                        <span className="text-md font-google text-slate-500 dark:text-slate-400">
+                        <span className="text-sm font-google text-slate-500 dark:text-slate-400">
                             {plan.current_bots} / {plan.max_bots} bots
                         </span>
                     </div>
                 </div>
 
                 {/* Plan Stats */}
-                <div className="grid grid-cols-3 gap-px bg-gray-200/30 dark:bg-slate-800/30 border-b border-gray-100 dark:border-slate-800 transition-colors">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-6 md:px-8 mb-6">
                     {[
                         { label: 'Plan', value: plan.tier },
-                        { label: 'Msgs / Bot / Mo', value: plan.message_limit.toLocaleString() },
-                        { label: 'Knowledge Chunks', value: plan.chunk_limit.toLocaleString() },
+                        { label: 'Messages / bot / mo', value: plan.message_limit.toLocaleString() },
+                        { label: 'Knowledge chunks', value: plan.chunk_limit.toLocaleString() },
                     ].map((s, i) => (
-                        <div key={i} className="bg-white/50 dark:bg-slate-950/70 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 transition-colors">
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-0.5">{s.label}</p>
-                            <p className="text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
+                        <div key={i} className="bg-white dark:bg-white/[0.02] px-5 py-4 rounded-2xl transition-colors">
+                            <p className="text-xs text-slate-400 dark:text-slate-500 font-google mb-1">{s.label}</p>
+                            <p className="text-base md:text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
                         </div>
                     ))}
                 </div>
 
                 {/* Bots Grid */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         <AnimatePresence>
                             <motion.div
                                 key={bot.id}
@@ -99,20 +100,19 @@ export default function DemoMyBotsPage() {
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 flex flex-col transition-colors"
+                                className="bg-white dark:bg-white/[0.02] rounded-2xl flex flex-col transition-colors shadow-sm"
                             >
-                                <div className="h-1 w-full" style={{ backgroundColor: bot.theme_color }} />
-                                <div className="p-5 flex flex-col flex-1 gap-3">
+                                <div className="p-6 flex flex-col flex-1 gap-4">
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <h3 className="text-md font-google font-bold text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
-                                            <p className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mt-0.5">{bot.company_name}</p>
+                                            <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500 font-google mt-0.5">{bot.company_name}</p>
                                         </div>
                                         <div
-                                            className="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800 flex items-center justify-center"
-                                            style={{ backgroundColor: bot.theme_color + '20' }}
+                                            className="w-9 h-9 rounded-xl flex items-center justify-center"
+                                            style={{ backgroundColor: bot.theme_color + '15' }}
                                         >
-                                            <span className="material-symbols-outlined text-[16px]" style={{ color: bot.theme_color }}>smart_toy</span>
+                                            <span className="material-symbols-outlined text-[18px]" style={{ color: bot.theme_color }}>smart_toy</span>
                                         </div>
                                     </div>
 
@@ -120,51 +120,51 @@ export default function DemoMyBotsPage() {
                                         href={bot.allowed_origin}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-sm tracking-wide font-medium text-blue-600 dark:text-slate-500 font-google truncate flex items-center gap-2"
+                                        className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-google flex items-center gap-2 min-w-0"
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">link</span>
-                                        {bot.allowed_origin || 'No origin set'}
+                                        <span className="material-symbols-outlined text-[15px] shrink-0">link</span>
+                                        <span className="truncate">{bot.allowed_origin || 'No origin set'}</span>
                                     </a>
 
                                     {/* Training status */}
-                                    <div className={`flex items-center gap-2 px-3 py-2 border text-[10px] uppercase tracking-widest font-bold font-google ${trained ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500'}`}>
-                                        <span className="material-symbols-outlined text-[14px]">{trained ? 'check_circle' : 'radio_button_unchecked'}</span>
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium font-google ${trained ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-white/[0.04] text-slate-500 dark:text-slate-400'}`}>
+                                        <span className="material-symbols-outlined text-[15px]">{trained ? 'check_circle' : 'radio_button_unchecked'}</span>
                                         {trained ? `${chunksUsed} chunks trained` : 'Not trained yet'}
                                     </div>
 
                                     {/* Usage bar */}
                                     <div>
-                                        <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mb-1">
+                                        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 font-google mb-1.5">
                                             <span>Usage</span>
                                             <span>{bot.messages_used} / {plan.message_limit}</span>
                                         </div>
-                                        <div className="h-1 bg-slate-100 dark:bg-slate-800 w-full">
+                                        <div className="h-1.5 bg-slate-100 dark:bg-white/[0.04] w-full rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-slate-900 dark:bg-blue-500 transition-all"
+                                                className="h-full bg-slate-800 dark:bg-slate-300 rounded-full transition-all"
                                                 style={{ width: `${Math.min((bot.messages_used / plan.message_limit) * 100, 100)}%` }}
                                             />
                                         </div>
                                     </div>
 
                                     {/* Actions */}
-                                    <div className="flex gap-2 mt-auto pt-3 border-t border-gray-100 dark:border-slate-800">
+                                    <div className="flex gap-2 mt-auto pt-2">
                                         <button
                                             onClick={() => router.push('/demo/train')}
-                                            className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                                            className="flex-1 py-2.5 text-sm font-medium font-sans rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[12px]">psychology</span> Train
+                                            <span className="material-symbols-outlined text-[15px]">psychology</span> Train
                                         </button>
                                         <button
                                             onClick={() => router.push('/demo/customize')}
-                                            className="flex-1 py-2 text-[10px] uppercase tracking-widest font-bold font-sans border border-gray-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                                            className="flex-1 py-2.5 text-sm font-medium font-sans rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[12px]">settings</span> Settings
+                                            <span className="material-symbols-outlined text-[15px]">settings</span> Settings
                                         </button>
                                         <button
                                             onClick={() => router.push('/demo/chat')}
-                                            className="flex items-center justify-center p-2 border border-blue-100 dark:border-blue-900/40 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                                            className="flex items-center justify-center p-2.5 rounded-xl bg-blue-55/90 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[14px]">chat</span>
+                                            <span className="material-symbols-outlined text-[16px]">chat</span>
                                         </button>
                                     </div>
                                 </div>
@@ -174,16 +174,16 @@ export default function DemoMyBotsPage() {
                         {/* Locked slot */}
                         <motion.div
                             layout
-                            className="border-2 border-dashed border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors cursor-not-allowed"
+                            className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors cursor-not-allowed"
                         >
-                            <span className="material-symbols-outlined text-[20px] text-slate-300 dark:text-slate-600 mb-3">lock</span>
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-300 dark:text-slate-600 font-sans text-center">Bot Limit Reached</p>
+                            <span className="material-symbols-outlined text-[22px] text-slate-300 dark:text-slate-600 mb-3">lock</span>
+                            <p className="text-sm font-medium text-slate-400 dark:text-slate-600 font-sans text-center">Bot limit reached</p>
                             <Link
                                 href="/sign-up"
                                 onClick={e => e.stopPropagation()}
-                                className="mt-3 text-[10px] uppercase tracking-widest font-bold font-sans text-blue-600 dark:text-blue-400 hover:underline"
+                                className="mt-3 text-sm font-medium font-sans text-slate-600 dark:text-slate-400 hover:underline"
                             >
-                                Sign Up for More →
+                                Sign up for more →
                             </Link>
                         </motion.div>
                     </div>

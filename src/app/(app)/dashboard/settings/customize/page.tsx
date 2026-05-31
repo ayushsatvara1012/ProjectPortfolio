@@ -101,7 +101,7 @@ export default function CustomizePage() {
         </div>
 
         {/* Scrollable cards body */}
-        <div className={`px-4 md:px-5 pb-6 space-y-4 relative flex-1 min-h-0 overflow-y-auto custom-scrollbar ${showFullOverlay ? 'overflow-hidden select-none' : ''}`}>
+        <div data-lenis-prevent className={`px-4 md:px-5 pb-6 space-y-4 relative flex-1 min-h-0 overflow-y-auto custom-scrollbar ${showFullOverlay ? 'overflow-hidden select-none' : ''}`}>
 
           {/* Full upgrade overlay */}
           {showFullOverlay && (

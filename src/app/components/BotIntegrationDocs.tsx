@@ -229,7 +229,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://www.sap
     <div className="min-h-screen bg-transparent font-google transition-colors duration-500">
 
       {/* ── Mobile sticky nav ── */}
-      <div ref={menuRef} className="lg:hidden sticky top-16 z-30 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-100 dark:border-white/[0.04] px-4 py-3 transition-colors duration-500">
+      <div ref={menuRef} className="lg:hidden sticky top-20 z-30 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-100 dark:border-white/[0.04] px-4 py-3 transition-colors duration-500">
         <button
           onClick={() => setIsMenuOpen(p => !p)}
           className="flex items-center justify-between w-full"
@@ -540,7 +540,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://www.sap
                 <h2 className="text-lg md:text-xl lg:text-2xl font-medium tracking-tight text-white dark:text-slate-200 leading-snug">
                   Ready to automate your customer support?
                 </h2>
-                <p className="text-sm lg:text-base font-normal text-slate-455 dark:text-slate-400 lg:text-slate-400 lg:dark:text-slate-300 leading-relaxed max-w-xs mx-auto">
+                <p className="text-base font-normal text-slate-100 lg:text-slate-400 lg:dark:text-slate-300 leading-relaxed max-w-xs mx-auto">
                   Set up your AI chatbot in minutes — no code required on most platforms.
                 </p>
                 <div className="pt-2">

@@ -442,6 +442,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         className="ml-auto relative z-[110] flex flex-col w-full sm:max-w-xl md:w-1/2 lg:w-1/2 h-full bg-white dark:bg-slate-950 shadow-2xl overflow-y-auto sm:rounded-l-2xl"
+        data-lenis-prevent
       >
         {/* Header */}
         <div className="flex items-start justify-between p-5 sm:p-6 sticky top-0 bg-white dark:bg-slate-950 z-10 border-b border-slate-100 dark:border-white/[0.04]">

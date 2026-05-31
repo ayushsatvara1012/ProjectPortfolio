@@ -6,30 +6,23 @@ import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/app/compone
 import BotPreview from '@/src/app/components/BotPreview';
 import { BotAvatar } from '@/src/app/components/LogoCustomizer';
 import { BotSettingsContext } from '@/src/lib/context/BotSettingsContext';
+
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
 const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
 
-const inputCls = "w-full text-md font-medium font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
-const labelCls = "block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
-const headingCls = "text-xl font-medium font-google mb-4 transition-colors text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-600 dark:from-blue-400 dark:to-green-500";
+const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
+const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
+const sectionHeadingCls = "text-sm font-semibold font-google text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-4 transition-colors";
+const cardCls = "bg-white dark:bg-white/[0.02] rounded-2xl p-5 transition-colors duration-500";
 
 // Shape / gradient / FAB definitions now imported from AvatarShared.ts
-// (single source of truth — no local copies to drift)
-
-// ── Inline Logo Customizer ──
 // Derive LOGO_SHAPE_DATA from FAB_SHAPES so paths stay in sync automatically.
 const LOGO_SHAPE_DATA = (['circle', 'squircle', 'bento', 'sharp'] as const).map(id => ({
     id,
     label: id.charAt(0).toUpperCase() + id.slice(1),
     path: FAB_SHAPES[id].path,
 }));
-
-const AVATAR_BG_STYLES = [
-    { id: 'none', label: 'None' },
-    { id: 'solid', label: 'Solid' },
-    { id: 'gradient', label: 'Gradient' },
-];
 
 const InlineLogoCustomizer = ({
     logoShape, customLogoUrl, primaryColor, botName,
@@ -40,8 +33,6 @@ const InlineLogoCustomizer = ({
     onBgStyleChange: (v: string) => void; onPrimaryColorChange: (v: string) => void;
 }) => {
     const fileRef = React.useRef<HTMLInputElement>(null);
-
-    const shapeClass = logoShape === 'square' ? 'rounded-none' : logoShape === 'rounded' ? 'rounded-xl' : 'rounded-full';
 
     const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -57,8 +48,8 @@ const InlineLogoCustomizer = ({
             <div className="flex items-center gap-4">
                 <BotAvatar shapeId={logoShape} logoUrl={customLogoUrl} botName={botName} themeColor={primaryColor} size="lg" bgStyle={avatarBgStyle} />
                 <div className="flex-1 min-w-0">
-                    <p className="text-md font-semibold font-google text-slate-700 dark:text-slate-300">{botName || 'Bot'}</p>
-                    <p className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-0.5">Avatar preview</p>
+                    <p className="text-sm font-semibold font-google text-slate-700 dark:text-slate-300">{botName || 'Bot'}</p>
+                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5">Avatar preview</p>
                 </div>
             </div>
 
@@ -70,7 +61,7 @@ const InlineLogoCustomizer = ({
                         type="color"
                         value={primaryColor || '#5730F5'}
                         onChange={e => onPrimaryColorChange(e.target.value)}
-                        className="w-12 h-10 border border-gray-200 dark:border-slate-700 p-1 cursor-pointer"
+                        className="w-12 h-10 border border-gray-200 dark:border-slate-800 p-1 cursor-pointer bg-transparent rounded-lg shrink-0"
                     />
                     <input
                         type="text"
@@ -95,19 +86,19 @@ const InlineLogoCustomizer = ({
                                 onClick={() => onShapeChange(s.id)}
                                 className="group relative flex flex-col items-center gap-3 transition-all duration-300"
                             >
-                                <div className={`flex items-center justify-center transition-all duration-300 ${isSelected ? 'text-blue-500 scale-110' : 'text-slate-300 group-hover:text-slate-400 group-hover:scale-105'}`}>
+                                <div className={`flex items-center justify-center transition-all duration-300 ${isSelected ? 'text-blue-500 scale-110' : 'text-slate-300 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 group-hover:scale-105'}`}>
                                     <div className="w-10 h-10 flex items-center justify-center">
                                         <svg viewBox="0 0 100 100" className="w-full h-full" fill="currentColor">
                                             <path d={s.path} />
                                         </svg>
                                     </div>
                                     {isSelected && (
-                                        <div className="absolute -top-1 -right-1 bg-white dark:bg-slate-900 rounded-full">
+                                        <div className="absolute -top-1 -right-1 bg-white dark:bg-slate-900 rounded-full shadow-sm">
                                             <span className="material-symbols-outlined text-[16px] text-blue-500 block p-0.5">check_circle</span>
                                         </div>
                                     )}
                                 </div>
-                                <span className={`text-sm font-medium font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                <span className={`text-xs font-semibold font-google transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
                                     {s.label}
                                 </span>
                             </button>
@@ -119,7 +110,7 @@ const InlineLogoCustomizer = ({
             {/* Avatar bg style */}
             <div>
                 <label className={labelCls}>Avatar Background</label>
-                <div className="flex flex-wrap gap-6 py-2">
+                <div className="flex flex-wrap gap-4 py-2">
                     {Object.entries(AVATAR_GRADIENTS).map(([baseId, gradData]) => {
                         const isSelected = (avatarBgStyle || 'none') === baseId;
                         const hasGradient = gradData !== null;
@@ -131,15 +122,15 @@ const InlineLogoCustomizer = ({
                                 className="group relative flex flex-col items-center gap-2 transition-all duration-300"
                             >
                                 <div
-                                    className={`w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center ${isSelected ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : 'ring-1 ring-gray-200 hover:scale-105'}`}
-                                    style={hasGradient ? { background: `linear-gradient(135deg, ${gradData[0]}, ${gradData[1]})` } : { backgroundColor: '#fff' }}
+                                    className={`w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center ${isSelected ? 'ring-2 ring-offset-2 ring-blue-500 scale-110 dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-800 hover:scale-105'}`}
+                                    style={hasGradient ? { background: `linear-gradient(135deg, ${gradData[0]}, ${gradData[1]})` } : { backgroundColor: 'transparent' }}
                                 >
                                     {!hasGradient && <span className="material-symbols-outlined text-[16px] text-slate-400">block</span>}
                                     {isSelected && hasGradient && (
                                         <span className="material-symbols-outlined text-[18px] text-white font-bold">check</span>
                                     )}
                                 </div>
-                                <span className={`text-sm font-normal font-google transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                <span className={`text-xs font-semibold font-google capitalize transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
                                     {baseId}
                                 </span>
                             </button>
@@ -166,9 +157,9 @@ const InlineLogoCustomizer = ({
                 <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="w-full py-2.5 border border-dashed border-gray-300 dark:border-slate-700 text-[10px] uppercase tracking-widest font-bold font-sans text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-2.5 border border-dashed border-slate-300 dark:border-slate-800 rounded-xl text-sm font-semibold font-google text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-all flex items-center justify-center gap-2"
                 >
-                    <span className="material-symbols-outlined text-[14px]">upload</span> Upload Image
+                    <span className="material-symbols-outlined text-[16px]">upload</span> Upload Image
                 </button>
             </div>
         </div>
@@ -207,26 +198,35 @@ export default function DemoCustomizePage() {
     const TONES = ['Professional', 'Friendly', 'Humorous', 'Technical', 'Concise'];
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[#E8EBF0] dark:bg-slate-900 transition-colors duration-500 min-h-[calc(100vh-3rem)] overflow-x-hidden">
+        <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-[#f8f9fa] dark:bg-[#05070a] transition-colors duration-500">
 
-            {/* ── LEFT: Settings Form ── */}
-            <div className="bg-white dark:bg-slate-950 flex flex-col relative transition-colors">
-                <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 shrink-0 transition-colors">
-                    <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-0.5 transition-colors">Customize</h2>
-                    <p className="text-md font-display text-slate-500 dark:text-slate-500 leading-relaxed transition-colors">Configure your bot's visual identity. Changes reflect instantly in the preview.</p>
+            {/* ── LEFT: Settings ── */}
+            <div className="flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden border-r border-slate-100 dark:border-white/[0.04] transition-colors duration-500">
+                
+                {/* Header */}
+                <div className="px-6 md:px-8 pt-6 pb-4 shrink-0">
+                    <div className="flex items-center gap-2.5 mb-1">
+                        <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">palette</span>
+                        <h1 className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">Customize bot</h1>
+                    </div>
+                    <p className="text-sm font-google text-slate-500 dark:text-slate-400 transition-colors">Changes reflect instantly in the preview.</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 font-google mt-1.5">
+                        Demo Mode — local changes only
+                    </p>
                 </div>
 
-                <div className="p-8 overflow-y-auto custom-scrollbar lg:max-h-[calc(100vh-9.5rem)]">
-                    <div className="space-y-8">
+                {/* Scrollable cards body */}
+                <div data-lenis-prevent className="px-6 md:px-8 pb-6 space-y-4 relative flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-4">
 
                         {/* ── Bot Appearance ── */}
-                        <div className="space-y-6">
-                            <p className={headingCls + ' flex items-center'}>
-                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">palette</span>
-                                Bot Appearance
+                        <div className={cardCls + ' space-y-4'}>
+                            <p className={sectionHeadingCls}>
+                                <span className="material-symbols-outlined text-[16px] text-slate-400">palette</span>
+                                Bot appearance
                             </p>
                             <div>
-                                <label className={labelCls}>Bot Name</label>
+                                <label className={labelCls}>Bot name</label>
                                 <input
                                     type="text"
                                     value={settings.name || ''}
@@ -236,7 +236,7 @@ export default function DemoCustomizePage() {
                                 />
                             </div>
                             <div>
-                                <label className={labelCls}>Greeting Message</label>
+                                <label className={labelCls}>Greeting message</label>
                                 <input
                                     type="text"
                                     value={settings.greeting || ''}
@@ -246,35 +246,31 @@ export default function DemoCustomizePage() {
                                 />
                             </div>
 
-                            {/* Hide Branding toggle */}
-                            <div className="relative">
-                                <div className="flex items-start justify-between gap-4 p-4 border border-gray-200 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 transition-colors">
-                                    <div className="min-w-0">
-                                        <p className="text-md font-semibold font-google text-slate-800 dark:text-slate-200 transition-colors">
-                                            Remove "Powered by Sapybase" branding
-                                        </p>
-                                        <p className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
-                                            Hide the Sapybase footer from your widget.
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => updateSetting('hideBranding', !settings.hideBranding)}
-                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${settings.hideBranding ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`}
-                                    >
-                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${settings.hideBranding ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </button>
+                            {/* Branding toggle */}
+                            <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-white/[0.02] transition-colors">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium font-google text-slate-800 dark:text-slate-200 transition-colors">
+                                        Remove "Powered by Sapybase" branding
+                                    </p>
+                                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                                        Hide the Sapybase footer from your widget.
+                                    </p>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => updateSetting('hideBranding', !settings.hideBranding)}
+                                    className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${settings.hideBranding ? 'bg-slate-900 dark:bg-white' : 'bg-slate-200 dark:bg-slate-700'}`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white dark:bg-slate-900 rounded-full shadow transition-transform duration-200 ${settings.hideBranding ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
                             </div>
                         </div>
 
-                        <div className="border-t border-gray-100 dark:border-slate-800 transition-colors" />
-
                         {/* ── Logo & Avatar Shape ── */}
-                        <div className="space-y-4">
-                            <p className={headingCls + ' flex items-center'}>
-                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">image</span>
-                                Logo & Avatar Shape
+                        <div className={cardCls}>
+                            <p className={sectionHeadingCls}>
+                                <span className="material-symbols-outlined text-[16px] text-slate-400">image</span>
+                                Logo &amp; avatar shape
                             </p>
                             <InlineLogoCustomizer
                                 logoShape={settings.logoShape || 'circle'}
@@ -289,15 +285,18 @@ export default function DemoCustomizePage() {
                             />
                         </div>
 
-                        <div className="border-t border-gray-100 dark:border-slate-800 transition-colors" />
-
                         {/* ── Advanced: Tone + System Prompt + Quick Questions ── */}
-                        <div className="space-y-6">
-                            <div className="mb-6">
-                                <label className={labelCls}>Company Tone</label>
-                                <div className="grid grid-cols-2 gap-2">
+                        <div className={cardCls + ' space-y-4'}>
+                            <p className={sectionHeadingCls}>
+                                <span className="material-symbols-outlined text-[16px] text-slate-400">psychology</span>
+                                Advanced behavior
+                            </p>
+
+                            <div>
+                                <label className={labelCls}>Company tone</label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {TONES.map(tone => (
-                                        <label key={tone} className="flex items-center gap-2 p-3 border border-gray-100 dark:border-slate-800 bg-[#FAFAFA] dark:bg-slate-900 cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
+                                        <label key={tone} className="flex items-center gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-white/[0.02] rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors">
                                             <input
                                                 type="checkbox"
                                                 checked={(Array.isArray(settings.companyTone) ? settings.companyTone : []).includes(tone)}
@@ -306,30 +305,30 @@ export default function DemoCustomizePage() {
                                                     const next = e.target.checked ? [...prev, tone] : prev.filter((t: string) => t !== tone);
                                                     updateSetting('companyTone', next);
                                                 }}
-                                                className="w-4 h-4 accent-slate-900 dark:accent-blue-600"
+                                                className="w-4 h-4 accent-slate-900 dark:accent-blue-500 shrink-0"
                                             />
-                                            <span className="text-lg font-google text-slate-700 dark:text-slate-300">{tone}</span>
+                                            <span className="text-sm font-google text-slate-700 dark:text-slate-300">{tone}</span>
                                         </label>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="mb-6">
-                                <label className={labelCls}>System Prompt / Instructions</label>
+                            <div>
+                                <label className={labelCls}>System prompt / instructions</label>
                                 <textarea
                                     value={settings.systemPrompt || ''}
                                     onChange={e => updateSetting('systemPrompt', e.target.value)}
-                                    className={inputCls + ' min-h-[120px] resize-none py-3'}
+                                    className={inputCls + ' min-h-[120px] resize-none'}
                                     placeholder="Example: You are a helpful assistant for Sapybase..."
                                 />
                             </div>
 
                             <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className={labelCls + ' mb-0'}>Quick Questions</label>
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className={labelCls + ' mb-0'}>Quick questions</label>
                                     <button
                                         onClick={() => updateSetting('quickQuestions', [...(Array.isArray(settings.quickQuestions) ? settings.quickQuestions : []), ''])}
-                                        className="p-1 px-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-500 text-[10px] uppercase tracking-widest font-bold font-sans transition-colors flex items-center gap-1.5"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium font-google bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
                                     >
                                         <span className="material-symbols-outlined text-[12px]">add</span> Add
                                     </button>
@@ -345,7 +344,7 @@ export default function DemoCustomizePage() {
                                                     newQs[idx] = e.target.value;
                                                     updateSetting('quickQuestions', newQs);
                                                 }}
-                                                className={inputCls + ' text-md font-semibold py-2'}
+                                                className={inputCls}
                                             />
                                             <button
                                                 onClick={() => {
@@ -353,7 +352,7 @@ export default function DemoCustomizePage() {
                                                     newQs.splice(idx, 1);
                                                     updateSetting('quickQuestions', newQs);
                                                 }}
-                                                className="p-2 text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                                                className="p-2 text-slate-400 hover:text-red-500 transition-colors shrink-0 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10"
                                             >
                                                 <span className="material-symbols-outlined text-[16px]">delete</span>
                                             </button>
@@ -363,57 +362,51 @@ export default function DemoCustomizePage() {
                             </div>
                         </div>
 
-                        <div className="border-t border-gray-100 dark:border-slate-800 transition-colors" />
-
                         {/* ── Integrations ── */}
-                        <div className="space-y-4">
-                            <p className={headingCls + ' flex items-center'}>
-                                <span className="material-symbols-outlined inline text-[14px] mr-1.5 text-slate-500 dark:text-slate-500 transition-colors">webhook</span>
+                        <div className={cardCls + ' space-y-4'}>
+                            <p className={sectionHeadingCls}>
+                                <span className="material-symbols-outlined text-[16px] text-slate-400">webhook</span>
                                 Integrations
                             </p>
-                            <div className="space-y-6">
-                                <div>
-                                    <label className={labelCls}>Lead Capture Webhook URL</label>
-                                    <input
-                                        type="url"
-                                        value={settings.webhookUrl || ''}
-                                        onChange={e => updateSetting('webhookUrl', e.target.value)}
-                                        className={inputCls}
-                                        placeholder="https://hooks.zapier.com/hooks/catch/..."
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Human Handoff — Instant Contact Link</label>
-                                    <input
-                                        type="url"
-                                        value={settings.handoffRedirectUrl || ''}
-                                        onChange={e => updateSetting('handoffRedirectUrl', e.target.value)}
-                                        className={inputCls}
-                                        placeholder="https://wa.me/..."
-                                    />
-                                </div>
+                            <div>
+                                <label className={labelCls}>Lead capture webhook URL</label>
+                                <input
+                                    type="url"
+                                    value={settings.webhookUrl || ''}
+                                    onChange={e => updateSetting('webhookUrl', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="https://hooks.zapier.com/hooks/catch/..."
+                                />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Human handoff — instant contact link</label>
+                                <input
+                                    type="url"
+                                    value={settings.handoffRedirectUrl || ''}
+                                    onChange={e => updateSetting('handoffRedirectUrl', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="https://wa.me/..."
+                                />
                             </div>
                         </div>
 
-                        {/* ── Save Button ── */}
-                        <div className="pt-4 border-t border-gray-100 dark:border-slate-800 transition-colors">
-                            <button
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                className="w-full py-4 min-h-[48px] bg-gradient-to-r from-blue-600 to-green-600 text-white text-lg uppercase tracking-widest font-bold font-sans hover:opacity-90 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
-                            >
-                                {isSaving ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        PERSISTING...
-                                    </>
-                                ) : 'SAVE_CONFIG'}
-                            </button>
-                        </div>
+                        {/* ── Save button ── */}
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="w-full py-3.5 min-h-[48px] bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold font-google rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
+                        >
+                            {isSaving ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
+                                    Saving…
+                                </>
+                            ) : 'Save settings'}
+                        </button>
 
                         {/* Inline success alert */}
                         {alertOpen && (
-                            <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">
+                            <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 rounded-xl">
                                 <span className="material-symbols-outlined text-[18px]">check_circle</span>
                                 <p className="text-sm font-semibold font-google">Settings saved successfully!</p>
                             </div>
@@ -423,45 +416,49 @@ export default function DemoCustomizePage() {
                 </div>
             </div>
 
-            {/* ── RIGHT: Preview Column ── */}
-            <div className={`overflow-hidden border-t lg:border-t-0 lg:border-l w-full relative transition-colors flex flex-col items-center justify-center p-0 lg:p-8 ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-[#FAFAFA] border-gray-100'}`}>
+            {/* ── RIGHT: Preview ── */}
+            <div className={`relative flex items-center justify-center border-t lg:border-t-0 min-h-[450px] lg:min-h-0 lg:flex-1 lg:shrink-0 overflow-hidden transition-colors ${isDark ? 'dark bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                 <div
-                    className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-100 transition-opacity duration-700"
-                    style={{ backgroundImage: "url('/nature_1.webp')" }}
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-700"
+                    style={{ backgroundImage: "url('/nature_1.webp')", backgroundColor: '#e2e8f0' }}
                 />
                 <div className="absolute inset-0 bg-white/50 dark:bg-slate-950/60 backdrop-blur-[1px] pointer-events-none transition-colors duration-500" />
 
-                <div className="absolute bottom-8 lg:top-2 lg:bottom-auto left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-full px-4 text-center">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Check contrast in both modes</p>
+                {/* Theme toggle */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+                    <p className="text-xs font-medium font-google text-slate-500 dark:text-slate-400">Check contrast in both modes</p>
                     <button
                         onClick={() => setIsDark(!isDark)}
-                        className="flex items-center gap-2.5 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all"
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all border border-slate-200 dark:border-slate-700"
                     >
                         <div className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                            <span className="material-symbols-outlined text-[14px] text-slate-700 dark:text-slate-300">
+                            <span className="material-symbols-outlined text-[13px] text-slate-700 dark:text-slate-300">
                                 {isDark ? 'light_mode' : 'dark_mode'}
                             </span>
                         </div>
-                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-700 dark:text-slate-300">
-                            {isDark ? 'Light Mode' : 'Dark Mode'} — <span className="text-blue-500 dark:text-amber-500">Switch</span>
+                        <span className="text-xs font-medium font-google text-slate-700 dark:text-slate-300">
+                            {isDark ? 'Light mode' : 'Dark mode'}
                         </span>
                     </button>
                 </div>
 
-                <div className="w-full lg:w-full flex lg:items-center lg:justify-center origin-top lg:origin-center scale-[0.82] lg:scale-100 transition-transform duration-500 py-4 lg:py-0 relative z-10">
-                    <BotSettingsContext.Provider value={{
-                        botSettings: settings,
-                        updateSetting: () => {},
-                        saveSettings: async () => ({ success: true }),
-                        fetchSettings: async () => {},
-                        isLoading: false,
-                        isSaving: false,
-                        error: null,
-                        previewOpen: false,
-                        setPreviewOpen: () => {},
-                    }}>
-                        <BotPreview theme={isDark ? 'dark' : 'light'} />
-                    </BotSettingsContext.Provider>
+                {/* Bot preview */}
+                <div className="relative z-10 flex items-center justify-center w-full py-20 lg:py-0">
+                    <div className="scale-[0.75] sm:scale-[0.82] lg:scale-100 transition-transform duration-500">
+                        <BotSettingsContext.Provider value={{
+                            botSettings: settings,
+                            updateSetting: () => {},
+                            saveSettings: async () => ({ success: true }),
+                            fetchSettings: async () => {},
+                            isLoading: false,
+                            isSaving: false,
+                            error: null,
+                            previewOpen: false,
+                            setPreviewOpen: () => {},
+                        }}>
+                            <BotPreview theme={isDark ? 'dark' : 'light'} />
+                        </BotSettingsContext.Provider>
+                    </div>
                 </div>
             </div>
 

@@ -27,13 +27,20 @@ const features = [
 
 const NewSection = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const ragRef = useRef<HTMLSpanElement>(null);
+  const ragRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
 
-    const onScroll = () => {
+    const onScrollOrResize = () => {
+      if (window.innerWidth < 1024) {
+        if (ragRef.current) {
+          ragRef.current.style.opacity = '1';
+        }
+        return;
+      }
+
       const rect = section.getBoundingClientRect();
       const vh = window.innerHeight;
       // How much of the section is visible as a fraction 0→1
@@ -41,28 +48,33 @@ const NewSection = () => {
       // Start fading in at 30%, fully visible at 55%
       const opacity = Math.max(0, Math.min(1, (visible - 0.7) / 0.25));
       if (ragRef.current) {
-        ragRef.current.style.opacity = (opacity * 0.15).toString();
+        ragRef.current.style.opacity = (opacity * 0.4).toString();
       }
     };
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
+    onScrollOrResize();
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
   }, []);
 
   return (
     <section ref={sectionRef} className="relative w-full min-h-screen flex items-center">
-      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-20 grid grid-cols-1 lg:grid-cols-[40%_60%] gap-12 py-20 lg:py-28">
+      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-20 grid grid-cols-1 lg:grid-cols-[35%_65%] gap-12 py-20 lg:py-28">
 
         {/* Left column — AntigravityBackground travels here */}
-        <div className="hidden lg:flex items-center justify-center">
-          <span
+        <div className="flex items-center justify-center">
+          <div
             ref={ragRef}
-            className="font-google text-4xl leading-none tracking-tight text-slate-900 dark:text-white select-none pointer-events-none"
-            style={{ opacity: 0, transition: 'opacity 0.4s ease-out' }}
+            className="font-google text-2xl sm:text-3xl lg:text-4xl leading-tight tracking-tight text-slate-900 dark:text-white select-none pointer-events-none text-center lg:text-left flex flex-col items-center lg:items-start opacity-100 lg:opacity-0"
+            style={{ transition: 'opacity 0.4s ease-out' }}
           >
-            Retrieval <br /> Augmented <br />Generation
-          </span>
+            <span>An agent that never hallucinates and always answer based on your data.</span>
+            <span className="text-slate-500 text-base mt-4 lg:self-end">"RAG - Retrieval Augmented Generation"</span>
+          </div>
         </div>
 
         {/* Right column — content */}
@@ -71,7 +83,7 @@ const NewSection = () => {
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight text-slate-900 dark:text-white leading-tight mb-4">
               Smarter than off-the-shelf chatbots
             </h2>
-            <p className="text-xl font-google font-medium text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg">
+            <p className="text-xl font-google font-regular text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg">
               A chatbot that actually knows your business — trained on your docs, speaks in your voice, lives on your site.
             </p>
           </div>
@@ -86,7 +98,7 @@ const NewSection = () => {
                   <p className="font-google font-medium text-xl text-slate-900 dark:text-white leading-snug">
                     {f.title}
                   </p>
-                  <p className="font-google font-medium text-base text-slate-500 dark:text-slate-400 leading-relaxed">
+                  <p className="font-google font-regular text-base text-slate-500 dark:text-slate-400 leading-relaxed">
                     {f.body}
                   </p>
                 </div>

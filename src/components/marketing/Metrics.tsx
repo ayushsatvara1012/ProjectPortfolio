@@ -103,7 +103,7 @@ const PerformanceMetrics = () => {
           <div className="absolute bottom-0 left-[-100vw] right-[-100vw] h-px bg-slate-200 dark:bg-slate-800 transition-colors duration-500 group-hover/grid:bg-indigo-100 dark:group-hover/grid:bg-indigo-900/40" />
 
           {/* 1/2/3 Column Checkerboard Grid Architecture */}
-          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[1fr] gap-px bg-slate-200 dark:bg-slate-800 relative z-10 border-x border-slate-200 dark:border-slate-800 transition-colors duration-500">
+          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:auto-rows-[1fr] gap-px bg-slate-200 dark:bg-slate-800 relative z-10 transition-colors duration-500">
             {/* Glowing Snake Overlay (Desktop Only) */}
             <div className="absolute inset-0 pointer-events-none z-20 hidden lg:block">
               <svg className="w-full h-full" viewBox="0 0 300 300" preserveAspectRatio="none">
@@ -215,7 +215,7 @@ const PerformanceMetrics = () => {
                     </p>
 
                     {/* Technical ID */}
-                    <div className="mt-auto pt-8 border-t border-slate-100/50 dark:border-slate-800 flex items-center justify-between opacity-40 transition-colors duration-500">
+                    <div className="mt-auto pt-8 flex items-center justify-between opacity-40 transition-colors duration-500">
                       <span className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase tracking-widest transition-colors duration-500">SY_SYS_ARCH_0{index + 1}</span>
                       <div className="flex gap-1">
                         {([40, 60, 80] as const).map((op) => (

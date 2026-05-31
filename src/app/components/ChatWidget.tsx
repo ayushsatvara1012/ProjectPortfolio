@@ -13,7 +13,7 @@ import { FAB_SHAPES, SHAPE_CLASS_MAP, AVATAR_GRADIENTS } from './avatar/AvatarSh
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE = IS_DEV ? '' : 'https://www.sapybase.com';
-const BrandLogo = `${ASSET_BASE}/SB_loading.svg`;
+const BrandLogo = `${ASSET_BASE}/logo2-straight.svg`;
 
 // Send a message to the host page only when we have a validated origin.
 // `__SapybaseParentOrigin` is set by `src/app/embed/[botId]/page.tsx` after
@@ -1126,7 +1126,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       <p className="text-lg font-google font-medium leading-none text-white">{BOT_NAME}</p>
                       <div className="absolute -bottom-1.5 flex items-center gap-1 place-items-center">
                         <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-sm text-green-500 google font-semibold leading-none pb-1">online</span>
+                        <span className="text-xs text-green-500 google font-normal leading-none pb-1">online</span>
                       </div>
                     </div>
                   </div>
@@ -1261,8 +1261,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               {!configData.white_label_enabled && (
                 <div className="shrink-0 pt-2 flex justify-center items-center">
                   <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
-                    <Image src={BrandLogo} alt="Sapybase" width={20} height={20} className="opacity-50 group-hover:opacity-100 transition-opacity" />
+                    className="flex items-center gap-1.5 text-[9px] font-sans font-normal tracking-wide text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
+                    <Image src={BrandLogo} alt="Sapybase" width={15} height={15} className="opacity-50 group-hover:opacity-100 transition-opacity" />
                     Powered by Sapybase
                   </a>
                 </div>

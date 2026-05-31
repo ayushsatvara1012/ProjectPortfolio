@@ -181,7 +181,7 @@ export default function Navbar() {
 
                     {/* Desktop Dropdown */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md shadow-none rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpenDesktop ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 backdrop-blur-md shadow-none rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpenDesktop ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
                       onMouseLeave={() => setIsServicesOpenDesktop(false)}
                     >
                       <div className="flex p-8">
@@ -427,13 +427,13 @@ export default function Navbar() {
         <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
             <Show when="signed-out">
               <SignUpButton mode="modal">
-                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-sm font-google font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3">
-                  Start_Free_Trial
+                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-base font-google font-medium hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-full mb-3">
+                  Start Free Trial
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
-                <button className="w-full text-slate-900 dark:text-slate-200 py-6 text-sm font-google font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                  Login_to_System
+                <button className="w-full text-slate-900 dark:text-slate-200 py-6 text-base font-google font-medium rounded-full hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border border-slate-300 dark:border-slate-700">
+                  Login to System
                 </button>
               </SignInButton>
             </Show>
@@ -442,9 +442,9 @@ export default function Navbar() {
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
-                className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-6 text-sm font-google  font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all rounded-none block text-center"
+                className="w-full bg-slate-900 dark:bg-blue-600 text-white py-6 text-base font-google  font-medium hover:bg-slate-800 dark:hover:bg-blue-500 transition-all rounded-full flex items-center justify-center gap-2 tracking-wider"
               >
-                SYSTEM_DASHBOARD
+               <span className='material-symbols-outlined text-base text-white'>dashboard</span> Dashboard
               </Link>
             </Show>
 

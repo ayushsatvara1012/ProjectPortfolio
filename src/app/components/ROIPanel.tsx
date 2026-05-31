@@ -89,7 +89,7 @@ const ROIPanel = ({ selectedBotId, authFetch, isAuthorized }: ROIPanelProps) => 
         : 0;
 
     return (
-        <div className="flex flex-col gap-4 flex-1 transition-colors duration-500 overflow-y-auto custom-scrollbar p-6 md:p-8">
+        <div className="flex flex-col gap-4 flex-1 transition-colors duration-500 overflow-y-auto custom-scrollbar md:p-8">
 
             {/* Header */}
             <div className={`${cellCls} p-6 sm:p-8`}>
