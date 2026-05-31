@@ -11,9 +11,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Darker Grotesque"', 'sans-serif'],
-        display: ['"Bricolage Grotesque"', 'sans-serif'],
-        google: ['"Google Sans"', 'sans-serif'],
+        sans: ['var(--font-google)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-google)', 'system-ui', 'sans-serif'],
+        google: ['var(--font-google)', 'system-ui', 'sans-serif'],
       },
       maxWidth: {
         '8xl': '88rem',

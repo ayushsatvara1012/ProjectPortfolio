@@ -102,6 +102,22 @@ export const PLANS = [
   },
 ];
 
+export const FEATURE_DESCRIPTIONS: Record<string, string> = {
+  'AI Bots': 'Number of independent AI chatbot instances you can create and deploy across different websites or use cases.',
+  'Messages / bot / month': 'Monthly message quota per chatbot. Each customer message to your bot counts as one message. Resets monthly.',
+  'Knowledge chunks / bot': 'Units of text (≈512 tokens each) your bot stores from documents, URLs, and FAQs. More chunks = richer knowledge base.',
+  'Response speed': 'Latency and priority for generating responses. Ultra = <1s average, Dedicated = <2s, Priority = <3s, Standard = <5s.',
+  'Custom branding & colors': 'Customize the chat widget color scheme, fonts, and styling to match your brand guidelines.',
+  'White-label (remove Sapybase)': 'Remove all Sapybase branding and logos from the chat widget. Display your brand exclusively.',
+  'Human handoff': 'Enable bot-to-agent handoff. The bot can transfer conversations to live agents with full transcript context.',
+  'Lead capture / CRM': 'Capture visitor contact info from chat. Basic = name/email only. Full CRM = integrations with Zapier, webhooks, etc.',
+  'Webhooks & Zapier': 'Connect your bot to 10,000+ apps via Zapier, or send custom data to your backend via webhooks.',
+  'Analytics & exports': 'Track bot performance. Basic = dashboard views. Advanced = CSV exports. Full = ROI reports & custom metrics.',
+  'Support channel': 'Community = public forum. Priority = email within 24h. SLA = guaranteed response time. Dedicated = direct contact.',
+  'Onboarding call': 'Scheduled onboarding call with our team to set up your bot, integrate data sources, and configure features.',
+  'Guaranteed uptime SLA': '99.9% uptime guarantee with service level agreement (SLA). Applies to Pro and Business plans only.',
+};
+
 export const COMPARISON_FEATURES = [
   {
     category: 'Bots & Capacity', rows: [
@@ -206,15 +222,8 @@ export const BottomCTA = () => (
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              href="/dashboard/pricing"
-              className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-green-600 text-white px-8 py-4 text-xs font-display font-bold uppercase tracking-widest hover:opacity-90 transition-all active:scale-[0.98]"
-            >
-              Get Started Free
-              <ArrowRight size={14} />
-            </Link>
-            <Link
               href="/demo/bots"
-              className="inline-flex items-center justify-center gap-2 border border-slate-700 text-slate-300 px-8 py-4 text-xs font-display font-bold uppercase tracking-widest hover:bg-slate-800 transition-all"
+              className="inline-flex items-center justify-center gap-2 border border-slate-700 text-slate-300 px-8 py-4 text-base font-display font-medium tracking-wider hover:bg-slate-800 transition-all rounded-full"
             >
               Try Demo
               <span className="material-symbols-outlined text-[14px]">play_arrow</span>

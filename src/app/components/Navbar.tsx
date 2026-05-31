@@ -147,8 +147,8 @@ export default function Navbar() {
     <>
       <header className={`fixed top-0 w-full z-50 h-20 transition-[background-color,border-color,box-shadow] duration-500 will-change-[background-color] ${
         scrolled
-          ? 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl saturate-150 border-b border-slate-200/40 dark:border-slate-800/50 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
-          : 'bg-transparent border-b border-transparent'
+          ? 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl saturate-150 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
+          : 'bg-transparent'
       }`}>
         <div className="max-w-screen-2xl mx-auto h-full flex items-center justify-between transition-colors duration-500">
 
@@ -181,19 +181,16 @@ export default function Navbar() {
 
                     {/* Desktop Dropdown */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none rounded-3xl border border-gray-100 dark:border-slate-800/60 transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpenDesktop ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      className={`absolute top-full -left-1/4 w-[760px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md shadow-none rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpenDesktop ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
                       onMouseLeave={() => setIsServicesOpenDesktop(false)}
                     >
                       <div className="flex p-8">
                         {/* Left Content */}
                         <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
                           <div>
-                            <h3 className="text-2xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-4 tracking-tight">
-                              Built for All in the <br/>agent-first era
+                            <h3 className="text-2xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-6 tracking-tight">
+                              Built for the agent-first era
                             </h3>
-                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                              Explore how Sapybase helps you build
-                            </p>
                             
                             {/* Desktop-only Shape Visualization */}
                             <div className="relative w-full h-48 overflow-hidden rounded-2xl">
@@ -262,7 +259,7 @@ export default function Navbar() {
           </div>
 
           {/* Cell 3: Auth & Account (Desktop md+) */}
-          <div className="hidden lg:flex items-center h-full overflow-hidden shrink-0 transition-colors duration-500 ">
+          <div className="hidden lg:flex items-center h-full overflow-hidden shrink-0">
             <Show when="signed-out">
               <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="modal">
@@ -282,10 +279,10 @@ export default function Navbar() {
               </div>
             </Show>
             <Show when="signed-in">
-              <div className="h-full bg-white dark:bg-slate-950 flex items-center px-3 lg:px-6 gap-6 transition-colors duration-500">
+              <div className="h-full flex items-center px-3 lg:px-6 gap-6 transition-[background-color] duration-500 bg-transparent">
                 <Link
                   href="/dashboard"
-                  className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-2"
+                  className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2"
                 >
                   <span className="material-symbols-outlined ">dashboard</span>
                   Dashboard
@@ -305,9 +302,9 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Actions (Hamburger & Auth) */}
-          <div className="flex items-center lg:hidden h-full transition-colors duration-500">
+          <div className="flex items-center lg:hidden h-full">
             <Show when="signed-in">
-              <div className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center overflow-hidden transition-colors duration-500">
+              <div className="h-16 w-16 flex items-center justify-center overflow-hidden transition-[background-color] duration-500 bg-transparent">
                 <UserButton
                   appearance={{
                     elements: {
@@ -320,7 +317,7 @@ export default function Navbar() {
             </Show>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="h-16 w-16 bg-white dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-slate-200 active:bg-slate-50 dark:active:bg-slate-900 transition-colors rounded-none"
+              className="h-16 w-16 flex items-center justify-center text-slate-900 dark:text-slate-200 rounded-none transition-colors bg-transparent active:bg-slate-50 dark:active:bg-slate-900"
               aria-label="Toggle Menu"
               aria-expanded={isOpen}
               aria-controls="mobile-nav-menu"
@@ -331,14 +328,16 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Zero-Scroll Mobile Dropdown Menu */}
+      {/* Mobile Navigation Menu */}
       <div
         id="mobile-nav-menu"
-        className={`fixed top-20 left-0 w-full h-[calc(100vh-80px)] z-40 bg-white/70 dark:bg-slate-950/70 backdrop-blur-3xl saturate-150 border-b border-gray-200/40 dark:border-slate-800/40 transition-all duration-500 ease-in-out lg:hidden flex flex-col overflow-hidden ${
-          isOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'
+        className={`fixed inset-0 top-20 z-40 bg-white dark:bg-slate-950 transition-all duration-500 ease-in-out lg:hidden flex flex-col ${
+          isOpen ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
         }`}
+        style={{ touchAction: 'pan-y' }}
       >
-        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overscroll-contain">
+        {/* Scrollable Nav Items */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex flex-col bg-transparent">
             {navLinks.map((link) =>
               link.dropdown ? (
@@ -358,17 +357,14 @@ export default function Navbar() {
 
                   {/* Services sub-items */}
                   <div className={`grid transition-all duration-500 ease-in-out ${isServicesOpenMobile ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden">
+                  <div className="overflow-y-auto max-h-[50vh]" style={{ touchAction: 'pan-y' }}>
                     <div className="px-6 pb-8 flex flex-col gap-1">
                       
                       {/* Integrated Services Header (Mirroring Desktop) */}
                       <div className="px-2 py-4 mb-2">
                         <h4 className="text-xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-2 tracking-tight">
-                          Built for All in the <br/>agent-first era
+                          Built for the agent-first era
                         </h4>
-                        <p className="text-sm font-google text-slate-500 dark:text-slate-400">
-                          Explore how Sapybase helps you build
-                        </p>
                       </div>
 
                       {serviceGroups.flatMap(group => group.items).map((service, idx) => {
@@ -425,17 +421,18 @@ export default function Navbar() {
               )
             )}
           </div>
+        </div>
 
-          {/* Mobile Bottom CTA Section */}
-          <div className="p-6 sm:p-8 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl mt-auto border-t border-gray-200/30 dark:border-slate-800/40 space-y-4">
+        {/* Mobile Bottom CTA Section */}
+        <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
             <Show when="signed-out">
               <SignUpButton mode="modal">
-                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-sm font-google  font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3 border-4 border-l-green-500 dark:border-y-slate-950 dark:border-r-slate-950">
+                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-sm font-google font-bold hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-none mb-3">
                   Start_Free_Trial
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
-                <button className="w-full border border-gray-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 py-6 text-sm font-google  font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                <button className="w-full text-slate-900 dark:text-slate-200 py-6 text-sm font-google font-bold rounded-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                   Login_to_System
                 </button>
               </SignInButton>
@@ -461,7 +458,6 @@ export default function Navbar() {
                 <span className="text-[10px] uppercase  font-bold font-google">Uptime: 99.99%</span>
               </div>
             </div>
-          </div>
         </div>
       </div>
     </>

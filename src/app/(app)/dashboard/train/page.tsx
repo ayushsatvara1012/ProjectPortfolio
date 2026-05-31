@@ -20,9 +20,9 @@ const TABS = [
 ];
 
 // Grid primitives
-const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
-const inputCls = "w-full px-3 py-2.5 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-sm text-slate-900 dark:text-slate-200 transition-colors rounded-sm";
-const labelCls = "block text-md font-google uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1.5 transition-colors";
+const cellCls = 'bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500';
+const inputCls = "w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
+const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
 
 // ── Source Browser Sub-Component ──────────────────────────────────────────────
 const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refreshUser, isFree }: any) => {
@@ -148,7 +148,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
             {!sourcesLoading && sources.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                     <span className="material-symbols-outlined text-[48px] text-gray-200 dark:text-slate-700 mb-4">auto_stories</span>
-                    <p className="text-md uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No sources yet</p>
+                    <p className="text-sm uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No sources yet</p>
                     <p className="text-sm text-slate-400 dark:text-slate-600 font-display mb-6">Add a URL, paste text, or upload a document to start training your bot.</p>
                 </div>
             )}
@@ -185,36 +185,36 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
 
             {selectedSource && (
                 <>
-                    <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 border border-gray-100 dark:border-slate-800 rounded-xs">
+                    <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl">
                         <div className="flex items-center gap-2">
-                             <span className="material-symbols-outlined text-[18px] text-blue-500">
+                             <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">
                                 {selectedSource.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf'
                                     : ['.csv', '.xlsx', '.xls'].some(ext => selectedSource.toLowerCase().endsWith(ext)) ? 'table_chart'
                                     : 'language'}
                             </span>
-                            <span className="text-xs font-bold font-google uppercase tracking-widest text-slate-700 dark:text-slate-300 truncate flex-1">
+                            <span className="text-sm font-medium font-google text-slate-700 dark:text-slate-300 truncate flex-1">
                                 {selectedSource}
                             </span>
                         </div>
-                        
-                        <div className="flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
+
+                        <div className="flex items-center justify-between pt-2">
                             <button
                                 onClick={toggleAll}
                                 disabled={chunks.length === 0}
-                                className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+                                className="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
                             >
-                                <span className="material-symbols-outlined text-[14px]">
+                                <span className="material-symbols-outlined text-[16px]">
                                     {selectedChunks.size === chunks.length && chunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
                                 </span>
-                                {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect All' : 'Select All'}
+                                {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect all' : 'Select all'}
                             </button>
-                            <span className="text-[10px] font-google font-bold text-slate-400 dark:text-slate-500">
-                                {chunksLoading ? '...' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} segments`}
+                            <span className="text-xs font-medium font-google text-slate-400 dark:text-slate-500">
+                                {chunksLoading ? '…' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} segments`}
                             </span>
                         </div>
                     </div>
 
-                    <div className="max-h-[240px] overflow-y-auto custom-scrollbar border border-gray-100 dark:border-slate-800 divide-y divide-gray-50 dark:divide-slate-800 transition-colors">
+                    <div className="max-h-[240px] overflow-y-auto custom-scrollbar transition-colors">
                         {chunksLoading ? (
                             <div className="p-6 text-center">
                                 <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 animate-spin mx-auto mb-2 rounded-full" />
@@ -249,7 +249,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                         <button
                             onClick={handleDeleteSelected}
                             disabled={selectedChunks.size === 0 || isDeleting}
-                            className="w-full py-2.5 min-h-[40px] bg-red-600 dark:bg-red-700 text-white text-xs uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                            className="w-full py-3 min-h-[44px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-sm font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                         >
                             {isDeleting ? (
                                 <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
@@ -511,18 +511,18 @@ export default function TrainPage() {
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 
     return (
-        <div className="flex flex-col h-full bg-[#E8EBF0] dark:bg-slate-900 overflow-hidden transition-colors duration-500">
-            <div className="bg-white dark:bg-slate-950 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">
+        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#05070a] overflow-hidden transition-colors duration-500">
+            <div className="px-6 py-7 md:px-8 md:py-8 shrink-0 transition-colors duration-500">
+                <div className="flex items-center gap-2.5 mb-2">
+                    <span className="material-symbols-outlined text-[22px] text-slate-500 dark:text-slate-400 transition-colors">
                         psychology
                     </span>
-                    <h1 className="text-xl md:text-2xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">Train AI</h1>
+                    <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">Train AI</h1>
                 </div>
-                <p className="text-md font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Ingest knowledge sources into your AI's vector brain.</p>
+                <p className="text-sm md:text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Ingest knowledge sources into your AI's vector brain.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-[#E8EBF0] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 px-6 md:px-8 mb-6">
                 {ctxLoading ? (
                     Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-4 md:p-8`}><StatSkeleton /></div>)
                 ) : (
@@ -531,16 +531,16 @@ export default function TrainPage() {
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
-                                    <h4 className="text-md uppercase font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Data Storage</h4>
+                                    <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Data storage</h4>
                                 </div>
                                 {chunkLimit >= 999999 && (
-                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
+                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
                                 )}
                             </div>
                             <div className="flex items-end gap-1 mb-3">
                                 <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
                                 {chunkLimit < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>}
-                                <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
+                                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
                             </div>
                             {chunkPct !== null && (
                                 <>
@@ -549,8 +549,8 @@ export default function TrainPage() {
                                             animate={{ width: `${chunkPct}%` }}
                                             className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
                                     </div>
-                                    <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
-                                        {Math.round(chunkPct)}% Storage Used
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 transition-colors">
+                                        {Math.round(chunkPct)}% storage used
                                     </p>
                                 </>
                             )}
@@ -559,7 +559,7 @@ export default function TrainPage() {
                         <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">vital_signs</span>
-                                <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
+                                <p className="text-sm font-semibold font-google text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
                             </div>
                             <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
                                 {totalMessages ?? 0} <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">msgs</span>
@@ -569,7 +569,7 @@ export default function TrainPage() {
                         <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">bolt</span>
-                                <p className="text-md uppercase tracking-widest font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">System Tier</p>
+                                <p className="text-sm font-semibold font-google text-slate-600 dark:text-slate-400 transition-colors">System tier</p>
                             </div>
                             <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
                                 {userTier || '—'} <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">plan</span>
@@ -580,26 +580,26 @@ export default function TrainPage() {
                            <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">database</span>
-                                    <h4 className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google transition-colors">Total Usage</h4>
+                                    <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Total usage</h4>
                                 </div>
                                 {(messageLimit ?? 0) >= 999999 && (
-                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-md uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
+                                    <span className="px-2 py-0.5 bg-white dark:bg-slate-950 text-sm uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
                                 )}
                             </div>
                             <div className="flex items-end gap-1 mb-3">
                                 <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{messagesUsed ?? 0}</span>
                                 {(messageLimit ?? 0) < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {messageLimit}</span>}
-                                <span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
+                                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
                             </div>
                             {(messageLimit ?? 0) < 999999 && (
                                 <>
-                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
+                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-white/[0.04] overflow-hidden transition-colors">
                                         <motion.div initial={{ width: 0 }}
                                             animate={{ width: `${Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100)}%` }}
-                                            className={`h-full ${(messagesUsed / messageLimit) >= 1 ? 'bg-red-500' : (messagesUsed / messageLimit) >= 0.8 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
+                                            className={`h-full bg-slate-900 dark:bg-slate-250`} />
                                     </div>
-                                    <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-3 transition-colors">
-                                        <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% CAP</span>
+                                    <div className="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 transition-colors">
+                                        <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% cap</span>
                                         <span className="flex items-center gap-1">
                                             <span className="material-symbols-outlined text-[12px]">schedule</span> {periodEndStr}
                                         </span>
@@ -611,37 +611,37 @@ export default function TrainPage() {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-[#E8EBF0] dark:bg-slate-800 overflow-hidden transition-colors duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 px-6 md:px-8 overflow-hidden transition-colors duration-500">
                 <div className={`lg:col-span-12 ${cellCls} p-4 md:p-8 relative overflow-y-auto custom-scrollbar`}>
                     {isFree && (
-                        <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-950/95 flex flex-col items-center justify-center gap-5 p-6 md:p-10 transition-colors duration-500">
-                            <div className="w-12 h-12 border-2 border-slate-900 dark:border-slate-700 flex items-center justify-center transition-colors">
+                        <div className="absolute inset-0 z-20 bg-[#f8f9fa]/95 dark:bg-[#05070a]/95 flex flex-col items-center justify-center gap-5 p-6 md:p-10 transition-colors duration-500">
+                            <div className="w-12 h-12 flex items-center justify-center bg-slate-100 dark:bg-white/[0.04]">
                                 <span className="material-symbols-outlined text-[28px] text-slate-900 dark:text-slate-200 transition-colors">
                                     lock
                                 </span>
                             </div>
                             <div className="text-center">
                                 <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">Trial Plan Required</p>
-                                <p className="text-md font-display text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm transition-colors">
+                                <p className="text-base font-display text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm transition-colors">
                                     Vector training is available on Starter and Scale plans. Unlock your bot's brain today.
                                 </p>
                             </div>
-                            <a href="/dashboard/pricing" className="px-8 py-3 bg-linear-to-r from-blue-600 to-green-600 text-white text-md uppercase tracking-widest font-bold hover:opacity-90 transition-all flex items-center active:scale-95">
-                                Upgrade Now
+                            <a href="/dashboard/pricing" className="px-7 py-3 bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold rounded-xl hover:opacity-90 transition-all flex items-center active:scale-95">
+                                Upgrade now
                             </a>
                         </div>
                     )}
 
-                    <h2 className="text-md font-display font-bold text-slate-900 dark:text-slate-200 mb-4 transition-colors">Knowledge Sources</h2>
+                    <h2 className="text-lg font-semibold font-display text-slate-900 dark:text-slate-200 mb-5 transition-colors">Knowledge sources</h2>
 
-                    <div className="flex border border-gray-100 dark:border-slate-800 mb-5 overflow-x-auto transition-colors">
+                    <div className="flex mb-6 overflow-x-auto transition-colors bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1 gap-1">
                         {TABS.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 px-2 md:px-3 text-sm font-google uppercase tracking-widest font-bold transition-colors min-h-[44px] shrink-0 border-b-2 ${activeTab === t.id
-                                        ? 'border-slate-900 dark:border-blue-500 text-slate-900 dark:text-slate-200 bg-[#FAFAFA] dark:bg-slate-900'
-                                        : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-[#FAFAFA] dark:hover:bg-slate-800'
+                                className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 px-3 text-sm font-medium font-google rounded-lg transition-colors min-h-[40px] shrink-0 ${activeTab === t.id
+                                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 shadow-sm'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                                     }`}>
-                                <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
+                                <span className="material-symbols-outlined text-[17px]">{t.icon}</span>
                                 <span className="hidden sm:inline">{t.label}</span>
                             </button>
                         ))}
@@ -673,13 +673,13 @@ export default function TrainPage() {
                             <div>
                                 <label className={labelCls}>PDF Archive</label>
                                 <div onClick={() => fileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-white/[0.04] hover:bg-slate-200 dark:hover:bg-white/[0.08] cursor-pointer transition-colors">
                                     <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">
                                         cloud_upload
                                     </span>
                                     <div className="text-center w-full">
                                         <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">{file ? file.name : 'Drop PDF here'}</p>
-                                        <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
+                                        <p className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
                                         <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
@@ -687,7 +687,7 @@ export default function TrainPage() {
                                 </div>
                                 {file && (
                                     <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-md font-google text-red-500 hover:text-red-700">
+                                        className="mt-2 flex items-center gap-1 text-sm font-google text-red-500 hover:text-red-700">
                                         <span className="material-symbols-outlined text-[16px]">close</span> Remove {file.name}
                                     </button>
                                 )}
@@ -697,13 +697,13 @@ export default function TrainPage() {
                             <div>
                                 <label className={labelCls}>CSV / Excel File</label>
                                 <div onClick={() => csvFileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#FAFAFA] dark:bg-slate-900 border border-dashed border-gray-200 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-white/[0.04] hover:bg-slate-200 dark:hover:bg-white/[0.08] cursor-pointer transition-colors">
                                     <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">table_chart</span>
                                     <div className="text-center w-full">
                                         <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">
                                             {csvFile ? csvFile.name : 'Drop CSV or Excel file here'}
                                         </p>
-                                        <p className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
+                                        <p className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
                                         <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">.csv, .xlsx, .xls — max 5 MB</p>
                                     </div>
                                     <input
@@ -723,7 +723,7 @@ export default function TrainPage() {
                                 </div>
                                 {csvFile && (
                                     <button type="button" onClick={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-md font-google text-red-500 hover:text-red-700">
+                                        className="mt-2 flex items-center gap-1 text-sm font-google text-red-500 hover:text-red-700">
                                         <span className="material-symbols-outlined text-[16px]">close</span> Remove {csvFile.name}
                                     </button>
                                 )}
@@ -772,24 +772,24 @@ export default function TrainPage() {
                             />
                         )}
                         <button type="submit" disabled={isTraining || isLockedOut}
-                            className="w-full py-3 min-h-[44px] bg-linear-to-r from-blue-600 to-green-600 text-white text-md uppercase tracking-widest font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
+                            className="w-full py-3.5 min-h-[48px] rounded-xl bg-linear-to-r from-blue-600 to-green-600 text-white text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
                             {trainingJobId ? (
                                 <>
-                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Training... {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} chunks
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Training… {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} chunks
                                 </>
                             ) : trainMutation.isPending ? (
-                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Uploading...</>
-                            ) : isLockedOut ? 'Quota Exceeded' : 'Start Training Sequence'}
+                                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Uploading…</>
+                            ) : isLockedOut ? 'Quota exceeded' : 'Start training'}
                         </button>
                     </form>
                 </div>
             </div>
 
-            <div className={`${cellCls} p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar border-t border-gray-100 dark:border-slate-800`}>
-                <div className="flex items-center gap-2 mb-5">
-                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">folder_open</span>
-                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 transition-colors">Manage Knowledge</h2>
+            <div className={`${cellCls} p-6 md:p-8 mx-6 md:mx-8 mb-6 flex-1 overflow-y-auto custom-scrollbar`}>
+                <div className="flex items-center gap-2.5 mb-5">
+                    <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400 transition-colors">folder_open</span>
+                    <h2 className="text-lg font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">Manage knowledge</h2>
                 </div>
 
                 <SourceBrowser
@@ -802,23 +802,23 @@ export default function TrainPage() {
                 />
 
                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
-                    <div className="flex items-start gap-3 mb-4 p-3 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 transition-colors">
+                    <div className="flex items-start gap-3 mb-4 p-4 bg-red-50/50 dark:bg-red-900/10 rounded-xl transition-colors">
                         <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
                             delete_forever
                         </span>
-                        <p className="text-lg font-medium tracking-wide text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
+                        <p className="text-sm font-medium text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
                             Deleting permanently removes all trained data for this bot. This action cannot be undone.
                         </p>
                     </div>
                     <button
                         onClick={handlePurge}
                         disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
-                        className="w-full py-3 min-h-[44px] bg-red-600 dark:bg-red-700 text-white text-md uppercase tracking-widest font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        className="w-full py-3.5 min-h-[48px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-sm font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                         {isPurging ? (
-                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin" /> Deleting...</>
+                            <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Deleting…</>
                         ) : (
-                            <><span className="material-symbols-outlined text-[20px]">delete</span> Delete All Knowledge ({chunksUsed})</>
+                            <><span className="material-symbols-outlined text-[18px]">delete</span> Delete all knowledge ({chunksUsed})</>
                         )}
                     </button>
                 </div>

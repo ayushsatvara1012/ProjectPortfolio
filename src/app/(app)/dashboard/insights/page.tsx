@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 // ── Style primitives matching AppTrainAI ────────────────────────────────────
-const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500';
 
 const ActivityCalendar = ({ data }: { data: any[] }) => {
     const [selectedCell, setSelectedCell] = useState<any>(null);
@@ -66,13 +66,13 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
             {/* Calendar Grid (50%) */}
             <div className="w-full lg:w-1/2 flex flex-col gap-4">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-google uppercase tracking-widest font-bold text-slate-500">Activity Overview</span>
+                    <span className="text-xs font-medium font-google text-slate-500">Activity overview</span>
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
-                            <div className="w-2 h-2 rounded-full border border-slate-200" /> IDLE
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <div className="w-2 h-2 rounded-full border border-slate-200" /> Idle
                         </div>
-                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
-                            <div className="w-2 h-2 rounded-full bg-blue-500/50" /> ACTIVE
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <div className="w-2 h-2 rounded-full bg-blue-500/50" /> Active
                         </div>
                     </div>
                 </div>
@@ -89,16 +89,16 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                                 key={dateStr}
                                 onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
                                 onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-md cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
+                                className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-xl cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
                                 style={{
                                     backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
                                     borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
                                 }}
                             >
-                                <span className={`text-[11px] sm:text-[14px] leading-none font-mono font-bold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                                <span className={`text-[12px] sm:text-[14px] leading-none font-mono font-semibold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
                                     {new Date(dateStr).getDate()}
                                 </span>
-                                <span className={`text-[7px] sm:text-[9px] uppercase tracking-widest font-google font-bold leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>
+                                <span className={`text-[8px] sm:text-[9px] font-google font-medium leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>
                                     {new Date(dateStr).toLocaleDateString(undefined, { month: 'short' })}
                                 </span>
                             </div>
@@ -114,67 +114,67 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         key={selectedCell.date}
-                        className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/40 p-6 rounded-lg shadow-sm flex-1 ring-1 ring-blue-500/5"
+                        className="flex flex-col bg-slate-50 dark:bg-slate-900/40 p-6 rounded-2xl flex-1"
                     >
-                        <div className="flex flex-col gap-1 mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
-                            <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-blue-500 dark:text-blue-400 font-google">Daily Inspector</span>
-                            <span className="text-lg font-bold text-slate-900 dark:text-slate-100 font-google">
+                        <div className="flex flex-col gap-1 mb-6 pb-4">
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google">Daily inspector</span>
+                            <span className="text-lg font-semibold text-slate-900 dark:text-slate-100 font-google">
                                 {formatDateStr(selectedCell.date)}
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="flex flex-col p-3 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-sm">
-                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google">Total Activity</span>
-                                <span className="text-2xl font-bold font-google text-slate-900 dark:text-slate-100 mt-1">{selectedCell.total_questions || 0}</span>
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="flex flex-col p-4 bg-white dark:bg-white/[0.02] rounded-xl">
+                                <span className="text-xs text-slate-400 font-google mb-1">Total activity</span>
+                                <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-100">{selectedCell.total_questions || 0}</span>
                             </div>
-                            <div className="flex flex-col p-3 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-sm">
-                                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-google">Unique Users</span>
-                                <span className="text-2xl font-bold font-google text-blue-600 dark:text-blue-400 mt-1">{selectedCell.interacted_users || 0}</span>
+                            <div className="flex flex-col p-4 bg-white dark:bg-white/[0.02] rounded-xl">
+                                <span className="text-xs text-slate-400 font-google mb-1">Unique users</span>
+                                <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200">{selectedCell.interacted_users || 0}</span>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-2">
-                                <span className="text-xs font-google text-slate-500 dark:text-slate-400">Answered Correct</span>
-                                <span className="text-sm font-bold text-green-600 dark:text-green-500">{selectedCell.answered_questions || 0}</span>
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-white/[0.02] transition-colors">
+                                <span className="text-sm font-google text-slate-500 dark:text-slate-400">Answered correctly</span>
+                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
                             </div>
-                            <div className="flex items-center justify-between p-2">
-                                <span className="text-xs font-google text-slate-500 dark:text-slate-400">Failed Response</span>
-                                <span className={`text-sm font-bold ${selectedCell.unanswered_questions > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-white/[0.02] transition-colors">
+                                <span className="text-sm font-google text-slate-500 dark:text-slate-400">Failed response</span>
+                                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
                                     {selectedCell.unanswered_questions || 0}
                                 </span>
                             </div>
                         </div>
 
-                        <div className="mt-8 flex-1 flex flex-col gap-5">
+                        <div className="mt-6 flex-1 flex flex-col gap-5">
                             <div className="flex flex-col">
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold font-google mb-3 flex items-center gap-2">
+                                <span className="text-xs font-medium text-slate-400 font-google mb-3 flex items-center gap-2">
                                     <span className="w-1 h-3 bg-blue-500 rounded-full" />
-                                    Top Questions
+                                    Top questions
                                 </span>
                                 {selectedCell.top_questions?.length > 0 ? (
                                     <div className="space-y-2">
                                         {selectedCell.top_questions.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-xs font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-slate-800/50 p-2 rounded-sm border border-slate-100 dark:border-slate-800">
+                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-white/[0.02] p-3 rounded-xl">
                                                 "{q}"
                                             </p>
                                         ))}
                                     </div>
                                 ) : (
-                                    <span className="text-xs font-google text-slate-400 italic">No activity recorded</span>
+                                    <span className="text-sm font-google text-slate-400 italic">No activity recorded</span>
                                 )}
                             </div>
 
                             {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered?.length > 0 && (
-                                <div className="flex flex-col border-t border-red-500/10 pt-5">
-                                    <span className="text-[10px] uppercase tracking-widest text-red-400 font-bold font-google mb-3 flex items-center gap-2">
-                                        <span className="w-1 h-3 bg-red-500 rounded-full" />
-                                        Unanswered Queries
+                                <div className="flex flex-col pt-4">
+                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google mb-3 flex items-center gap-2">
+                                        <span className="w-1 h-3 bg-slate-400/60 rounded-full" />
+                                        Unanswered queries
                                     </span>
                                     <div className="space-y-2">
                                         {selectedCell.top_unanswered.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-xs font-google text-red-500/80 leading-relaxed border-l-2 border-red-500/30 pl-3">
+                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed pl-3">
                                                 "{q}"
                                             </p>
                                         ))}
@@ -184,9 +184,9 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         </div>
                     </motion.div>
                 ) : (
-                    <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 p-8 rounded-lg items-center justify-center h-full">
+                    <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 p-8 rounded-2xl items-center justify-center h-full">
                         <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">radar</span>
-                        <p className="text-xs font-google text-slate-400 uppercase tracking-widest font-bold text-center">Select a day<br />to inspect activity</p>
+                        <p className="text-sm font-google text-slate-400 text-center">Select a day<br />to inspect activity</p>
                     </div>
                 )}
             </div>
@@ -263,22 +263,22 @@ export default function AppInsights() {
 
     // ── Rendering Helpers ────────────────────────────────────────────────────
     const renderHeader = () => (
-        <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 shrink-0 border-b border-gray-100 dark:border-slate-800 transition-colors duration-500 min-w-0 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="px-6 py-7 sm:px-8 sm:py-8 shrink-0 transition-colors duration-500 min-w-0 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                 <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors shrink-0">
+                    <div className="flex items-center gap-2.5 mb-2">
+                        <span className="material-symbols-outlined text-[22px] text-slate-500 dark:text-slate-400 transition-colors shrink-0">
                             insights
                         </span>
-                        <h1 className="text-xl md:text-2xl font-google font-black tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors truncate">
+                        <h1 className="text-2xl md:text-3xl font-google font-semibold tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors truncate">
                             Sapybase Insights
                         </h1>
                     </div>
-                    <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
+                    <p className="text-sm md:text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
                         AI-synthesized business intelligence from your chat logs. Reports refresh every 24 hours.
                     </p>
                     {lastGeneratedAt && activeTab === 'analytics' && (
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google mt-1.5 transition-colors">
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-google mt-2 transition-colors">
                             Last generated: {lastGeneratedAt}
                         </p>
                     )}
@@ -287,17 +287,17 @@ export default function AppInsights() {
                     <button
                         onClick={() => handleGenerate(false)}
                         disabled={isGenerating || !selectedBotId}
-                        className="w-full sm:w-auto shrink-0 px-8 py-3 min-h-[44px] bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        className="w-full sm:w-auto shrink-0 px-7 py-3 min-h-[44px] rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                         {isGenerating ? (
                             <>
-                                <div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin rounded-full" />
+                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" />
                                 Synthesizing...
                             </>
                         ) : (
                             <>
                                 <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                                Generate Report
+                                Generate report
                             </>
                         )}
                     </button>
@@ -306,14 +306,14 @@ export default function AppInsights() {
 
             {/* Persistent Bot Selector */}
             {canAnalytics && bots.length > 1 && (
-                <div className="mt-5 pt-5 border-t border-gray-50 dark:border-slate-800/50 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
+                <div className="mt-5 pt-5 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
                         Reporting for
                     </span>
                     <select
                         value={selectedBotId}
                         onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 min-w-0 max-w-xs px-3 py-2 bg-transparent border border-gray-100 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 text-sm font-mono text-slate-900 dark:text-slate-200 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
+                        className="flex-1 min-w-0 max-w-xs px-3 py-2.5 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors"
                     >
                         {bots.map((b: any) => (
                             <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
@@ -323,45 +323,25 @@ export default function AppInsights() {
             )}
 
             {/* Tabs */}
-            <div className="mt-6 overflow-x-auto scrollbar-hide">
-                <div className="flex items-center gap-4 sm:gap-6 border-b border-gray-100 dark:border-slate-800 min-w-max sm:min-w-0">
-                    <button
-                        onClick={() => setActiveTab('analytics')}
-                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'analytics'
-                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                            }`}
-                    >
-                        Analytics Report
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('leads')}
-                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'leads'
-                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                            }`}
-                    >
-                        Leads CRM
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('conversations')}
-                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'conversations'
-                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                            }`}
-                    >
-                        Conversations
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('roi')}
-                        className={`pb-3 px-0 text-sm font-google tracking-widest uppercase font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'roi'
-                                ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
-                                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                            }`}
-                    >
-                        <span className="material-symbols-outlined text-[14px]">savings</span>
-                        ROI
-                    </button>
+            <div className="mt-7 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1">
+                    {[
+                        { id: 'analytics', label: 'Analytics' },
+                        { id: 'leads', label: 'Leads CRM' },
+                        { id: 'conversations', label: 'Conversations' },
+                        { id: 'roi', label: 'ROI' },
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${activeTab === tab.id
+                                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
             </div>
         </div>
@@ -398,12 +378,12 @@ export default function AppInsights() {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col h-full w-full min-w-0 bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-500"
+            className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-[#05070a] overflow-hidden transition-colors duration-500"
         >
             {renderHeader()}
 
             {/* Content Area */}
-            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col">
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-6">
 
                 {activeTab === 'leads' && (
                     <LeadsPanel
@@ -439,25 +419,25 @@ export default function AppInsights() {
                         )}
 
                         {canAnalytics && reportData && !isGenerating && !error && (
-                            <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 w-full overflow-hidden">
+                            <div className="flex flex-col gap-4 flex-1 w-full overflow-hidden">
 
                                 {/* ── ROI Scorecards (Top Row) ── */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800 w-full min-w-0">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full min-w-0">
                                     {/* Support Hours Saved */}
                                     <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                         <div className="flex items-center gap-2 mb-3">
                                             <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span>
-                                            <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Support Hours Saved</h3>
+                                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Support hours saved</h3>
                                         </div>
-                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{Math.floor((Number((reportData?.roi_metrics?.support_savings || '$0').replace(/[^0-9.-]+/g, "")) || 0) / 25)}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
+                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{Math.floor((Number((reportData?.roi_metrics?.support_savings || '$0').replace(/[^0-9.-]+/g, "")) || 0) / 25)}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
                                         <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
                                     </div>
 
                                     {/* Estimated Savings */}
                                     <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                         <div className="flex items-center gap-2 mb-3">
-                                            <span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span>
-                                            <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Estimated Savings</h3>
+                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">savings</span>
+                                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Estimated savings</h3>
                                         </div>
                                         <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.support_savings || '$0.00'}</span></div>
                                         <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
@@ -466,31 +446,31 @@ export default function AppInsights() {
                                     {/* Leads Captured / Potential Revenue */}
                                     <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                                         <div className="flex items-center gap-2 mb-3">
-                                            <span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span>
-                                            <h3 className="text-md uppercase font-bold tracking-widest text-slate-600 dark:text-slate-400 font-google">Potential Revenue</h3>
+                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">leaderboard</span>
+                                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Potential revenue</h3>
                                         </div>
-                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.potential_revenue || '$0.00'}</span><span className="text-md uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
+                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.potential_revenue || '$0.00'}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
                                         <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 overflow-hidden transition-colors duration-500 flex-1 w-full min-w-0">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden transition-colors duration-500 flex-1 w-full min-w-0">
                                     {/* Left Column: Top Trends & Temporal */}
-                                    <div className={`lg:col-span-7 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500`}>
+                                    <div className={`lg:col-span-7 flex flex-col gap-4 transition-colors duration-500`}>
                                         <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
                                             <div className="flex items-center gap-2 mb-6">
                                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
-                                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
-                                                    Top Customer Trends
+                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">
+                                                    Top customer trends
                                                 </h2>
                                             </div>
-                                            <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
                                                 The most common subjects and questions your users are asking.
                                             </p>
-                                            <div className="space-y-px bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-800">
+                                            <div className="space-y-2">
                                                 {reportData?.top_trends?.map((trend: string, idx: number) => (
                                                     <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                                        <div className="w-8 h-8 shrink-0 bg-white dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
+                                                        <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-white/[0.04] flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
                                                             {String(idx + 1).padStart(2, '0')}
                                                         </div>
                                                         <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
@@ -503,23 +483,23 @@ export default function AppInsights() {
                                     </div>
 
                                     {/* Right Column: Knowledge Gaps + Advice */}
-                                    <div className="lg:col-span-5 flex flex-col gap-px bg-white dark:bg-slate-800 transition-colors duration-500">
+                                    <div className="lg:col-span-5 flex flex-col gap-4 transition-colors duration-500">
                                         <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
                                             <div className="flex items-center gap-2 mb-4">
-                                                <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">warning</span>
-                                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">
-                                                    High Value Gaps
+                                                <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">warning</span>
+                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">
+                                                    High value gaps
                                                 </h2>
                                             </div>
-                                            <p className="text-md font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
+                                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
                                                 Questions your bot failed to answer. Train these topics to secure leads.
                                             </p>
-                                            <div className="space-y-2 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar pr-1">
+                                            <div className="space-y-2 mb-4 overflow-y-auto max-h-[240px] custom-scrollbar pr-1">
                                                 {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap: string, idx: number) => (
-                                                    <div key={idx} className="flex items-start gap-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-                                                        <span className="material-symbols-outlined text-[16px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">help_center</span>
+                                                    <div key={idx} className="flex items-start gap-3 p-4 bg-slate-100 dark:bg-white/[0.04]">
+                                                        <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">help_center</span>
                                                         <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
-                                                        <Link href={`/dashboard/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
+                                                        <Link href={`/dashboard/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
                                                     </div>
                                                 )) : (
                                                     <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No critical knowledge gaps detected.</p>
@@ -528,7 +508,7 @@ export default function AppInsights() {
 
                                             <div className="flex items-center gap-2 mb-4">
                                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
-                                                <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Actionable Advice</h2>
+                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Actionable advice</h2>
                                             </div>
                                             <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
                                                 {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
@@ -537,13 +517,12 @@ export default function AppInsights() {
                                     </div>
                                 </div>
 
-
                                 {/* ── Peak Activity Full Row ── */}
-                                <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800">
+                                <div className="flex flex-col gap-4 mb-4">
                                     <div className={`${cellCls} p-4 sm:p-8`}>
                                         <div className="flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">calendar_month</span>
-                                            <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">30-Day Peak Activity</h2>
+                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">calendar_month</span>
+                                            <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">30-day peak activity</h2>
                                         </div>
                                         <div className="w-full">
                                             <ActivityCalendar data={reportData?.peak_activity_blocks} />
@@ -552,33 +531,33 @@ export default function AppInsights() {
                                 </div>
 
                                 {/* ── Recent Conversations Log ── */}
-                                <div className="flex flex-col gap-px bg-white dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 w-full overflow-hidden">
+                                <div className="flex flex-col gap-4 mb-4 w-full overflow-hidden">
                                     <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto overflow-y-hidden scrollbar-hide`}>
                                         <div className="flex items-center gap-2 mb-6">
                                             <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5 shrink-0">history</span>
-                                            <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Recent Activity Log</h2>
+                                            <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Recent activity log</h2>
                                         </div>
                                         <div className="w-full min-w-0">
-                                            <div className="hidden md:grid grid-cols-12 gap-4 pb-3 border-b border-gray-100 dark:border-slate-800 mb-3 px-4">
+                                            <div className="hidden md:grid grid-cols-12 gap-4 pb-3 mb-3 px-4">
                                                 <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
                                                 <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
                                                 <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
                                             </div>
                                             <div className="space-y-3 md:space-y-1">
                                                 {reportData?.recent_conversations?.map((log: any, idx: number) => (
-                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-3 sm:px-4 bg-slate-50 md:bg-transparent dark:bg-slate-900/50 md:dark:bg-transparent rounded-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors md:items-center min-w-0">
+                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-3 sm:px-4 bg-[#f1f3f5]/50 md:bg-transparent dark:bg-slate-900/20 md:dark:bg-transparent rounded-sm hover:bg-[#f1f3f5]/75 dark:hover:bg-slate-900/30 transition-colors md:items-center min-w-0">
                                                         <div className="col-span-8 min-w-0 text-sm font-google font-medium text-slate-700 dark:text-slate-300 break-words md:truncate">
                                                             {log.query}
                                                         </div>
                                                         <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
                                                             <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
                                                             {log.unanswered ? (
-                                                                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-900/50 px-2 py-0.5 rounded-sm">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[-1px]"></span> Unanswered
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/[0.04] px-2.5 py-1 rounded-full">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400/60 dark:bg-slate-500/50"></span> Unanswered
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-900/50 px-2 py-0.5 rounded-sm">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[-1px]"></span> Handled
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-white/[0.08] px-2.5 py-1 rounded-full">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200 animate-pulse"></span> Handled
                                                                 </span>
                                                             )}
                                                         </div>
@@ -604,7 +583,7 @@ export default function AppInsights() {
                         {canAnalytics && error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 shrink-0">
                                 <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
-                                <p className="text-md font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
+                                <p className="text-sm font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
                                 <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
                             </div>
                         )}
@@ -616,10 +595,10 @@ export default function AppInsights() {
                                     <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
                                 </div>
                                 <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-3">No Conversations Yet</h2>
-                                <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
+                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
                                     Your bot hasn't had any conversations yet. Check back once users start interacting!
                                 </p>
-                                <Link href="/dashboard/bots" className="px-8 py-3 bg-slate-900 dark:bg-blue-600 text-white text-md uppercase tracking-widest font-bold hover:bg-slate-800 transition-all active:scale-95">View My Bots</Link>
+                                <Link href="/dashboard/bots" className="px-7 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold rounded-xl hover:bg-slate-700 transition-all active:scale-95">View my bots</Link>
                             </div>
                         )}
 
@@ -630,7 +609,7 @@ export default function AppInsights() {
                                     <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
                                 </div>
                                 <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">No Report Generated Yet</h2>
-                                <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">Click "Generate Report" above to synthesize your chat logs.</p>
+                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">Click "Generate Report" above to synthesize your chat logs.</p>
                             </div>
                         )}
 
@@ -639,7 +618,7 @@ export default function AppInsights() {
                             <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
                                 <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
                                 <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
-                                <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
+                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
                             </div>
                         )}
                     </>

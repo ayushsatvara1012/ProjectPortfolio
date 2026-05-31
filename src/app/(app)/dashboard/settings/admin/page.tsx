@@ -13,26 +13,26 @@ import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
 const TIERS = ['FREE', 'BASIC', 'STARTER', 'PRO', 'ENTERPRISE', 'CUSTOM'];
 
 const TIER_STYLE: Record<string, string> = {
-  FREE: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700',
-  BASIC: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 border border-sky-200 dark:border-sky-800',
-  STARTER: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800',
-  PRO: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
-  ENTERPRISE: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 border border-violet-200 dark:border-violet-800',
-  CUSTOM: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800',
-  SUPER_ADMIN: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800',
+  FREE: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  BASIC: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+  STARTER: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  PRO: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  ENTERPRISE: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+  CUSTOM: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  SUPER_ADMIN: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
 };
 
 const SUB_STATUS_STYLE: Record<string, string> = {
-  ACTIVE:           'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
-  TRIAL_ACTIVE:     'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-800',
-  AWAITING_PAYMENT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
-  PAYMENT_FAILED:   'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-  SUSPENDED:        'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-  CANCELED:         'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
-  PAUSED:           'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
-  EXPIRED:          'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
-  REVOKED:          'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-  REFUNDED:         'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
+  ACTIVE:           'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  TRIAL_ACTIVE:     'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+  AWAITING_PAYMENT: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  PAYMENT_FAILED:   'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  SUSPENDED:        'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  CANCELED:         'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+  PAUSED:           'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  EXPIRED:          'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+  REVOKED:          'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  REFUNDED:         'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
 };
 
 const SUB_STATUS_DOT: Record<string, string> = {
@@ -61,19 +61,19 @@ const TOKEN_OPTIONS = [
 ];
 
 const FEATURE_FLAGS = [
-  { key: 'advanced_bot', label: 'Advanced Behavior', icon: 'psychology', desc: 'System Prompt, Tone, Quick Questions' },
-  { key: 'human_handoff', label: 'Human Handoff', icon: 'support_agent', desc: 'Talk-to-human button + transcript email' },
-  { key: 'lead_capture', label: 'Lead Capture', icon: 'contact_mail', desc: 'Collect visitor email/name in widget' },
-  { key: 'white_label', label: 'White Label', icon: 'branding_watermark', desc: 'Remove "Powered by Sapybase"' },
+  { key: 'advanced_bot', label: 'Advanced behavior', icon: 'psychology', desc: 'System prompt, tone, quick questions' },
+  { key: 'human_handoff', label: 'Human handoff', icon: 'support_agent', desc: 'Talk-to-human button + transcript email' },
+  { key: 'lead_capture', label: 'Lead capture', icon: 'contact_mail', desc: 'Collect visitor email / name in widget' },
+  { key: 'white_label', label: 'White label', icon: 'branding_watermark', desc: 'Remove "Powered by Sapybase"' },
   { key: 'webhook', label: 'Webhooks', icon: 'webhook', desc: 'Zapier / Make integration' },
-  { key: 'custom_logo', label: 'Custom Logo', icon: 'image', desc: 'Upload own logo URL' },
+  { key: 'custom_logo', label: 'Custom logo', icon: 'image', desc: 'Upload own logo URL' },
   { key: 'analytics', label: 'Analytics', icon: 'bar_chart', desc: 'Insights & ROI reports' },
 ];
 
 const ACTION_LABELS: Record<string, string> = {
   activate: 'Activate', suspend: 'Suspend', reactivate: 'Reactivate',
-  cancel: 'Cancel Subscription', extend: 'Extend Billing Period',
-  reset: 'Reset Product ID',
+  cancel: 'Cancel subscription', extend: 'Extend billing period',
+  reset: 'Reset product ID',
 };
 
 const ACTION_STYLE: Record<string, string> = {
@@ -106,7 +106,7 @@ const BLANK_CUSTOM_CONFIG = {
 
 // ── Shared small components ───────────────────────────────────────────────────
 const TierBadge = ({ tier }: { tier: string }) => (
-  <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-google font-bold uppercase tracking-widest rounded-none ${TIER_STYLE[tier] || TIER_STYLE.FREE}`}>
+  <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${TIER_STYLE[tier] || TIER_STYLE.FREE}`}>
     {tier || 'FREE'}
   </span>
 );
@@ -114,7 +114,7 @@ const TierBadge = ({ tier }: { tier: string }) => (
 const StatusBadge = ({ status }: { status: string }) => {
   const active = status !== 'suspended';
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-google font-bold uppercase tracking-widest rounded-none ${active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800'}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-red-500'}`} />
       {active ? 'Active' : 'Suspended'}
     </span>
@@ -125,9 +125,9 @@ const SubscriptionStatusBadge = ({ status }: { status: string }) => {
   const style = SUB_STATUS_STYLE[status] || SUB_STATUS_STYLE.EXPIRED;
   const dot = SUB_STATUS_DOT[status] || 'bg-slate-400';
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-google font-bold uppercase tracking-widest border rounded-none ${style}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${style}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-      {status?.replace(/_/g, ' ') || 'UNKNOWN'}
+      {status?.replace(/_/g, ' ') || 'Unknown'}
     </span>
   );
 };
@@ -137,14 +137,14 @@ const UsageBar = ({ used = 0, limit = 0 }: { used?: number; limit?: number }) =>
   const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-blue-500';
   return (
     <div className="w-full">
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-[10px] font-google font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-xs font-medium font-google text-slate-400 dark:text-slate-500">
           {used.toLocaleString()} / {limit > 0 ? limit.toLocaleString() : '∞'}
         </span>
-        <span className="text-[10px] font-google font-bold text-slate-400 dark:text-slate-500">{Math.round(pct)}%</span>
+        <span className="text-xs font-medium font-google text-slate-400 dark:text-slate-500">{Math.round(pct)}%</span>
       </div>
-      <div className="h-1 w-full bg-gray-100 dark:bg-slate-800">
-        <div className={`h-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+      <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full">
+        <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -155,7 +155,7 @@ const Toggle = ({ checked, onChange, label, disabled }: { checked: boolean; onCh
     type="button"
     onClick={() => !disabled && onChange(!checked)}
     disabled={disabled}
-    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${checked ? 'bg-blue-600' : 'bg-gray-200 dark:bg-slate-700'}`}
+    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${checked ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`}
     role="switch"
     aria-checked={checked}
   >
@@ -164,15 +164,13 @@ const Toggle = ({ checked, onChange, label, disabled }: { checked: boolean; onCh
   </button>
 );
 
-const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-  <label className="block text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
-    {children}
-  </label>
-);
+const inputCls = "w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+const selectCls = "w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50";
+const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2";
 
 const NumInput = ({ label, value, onChange, placeholder, disabled, hint }: { label: string; value: any; onChange: (v: string) => void; placeholder: string; disabled?: boolean; hint?: string }) => (
   <div>
-    <SectionLabel>{label}</SectionLabel>
+    <label className={labelCls}>{label}</label>
     <input
       type="number"
       min={0}
@@ -180,9 +178,9 @@ const NumInput = ({ label, value, onChange, placeholder, disabled, hint }: { lab
       value={value}
       onChange={e => onChange(e.target.value)}
       disabled={disabled}
-      className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      className={inputCls}
     />
-    {hint && <p className="text-[10px] font-google text-slate-400 dark:text-slate-500 mt-1">{hint}</p>}
+    {hint && <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-1.5">{hint}</p>}
   </div>
 );
 
@@ -215,58 +213,62 @@ const QuickActionModal = ({
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="relative z-10 w-full sm:max-w-md bg-white dark:bg-slate-950 border-t sm:border border-gray-100 dark:border-slate-800 shadow-2xl"
+        className="relative z-10 w-full sm:max-w-md bg-white dark:bg-slate-950 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-5 sm:p-6">
           <div>
-            <p className="text-sm font-google font-bold text-slate-900 dark:text-slate-100">{ACTION_LABELS[action] || action}</p>
-            <p className="text-[10px] font-google text-slate-400 dark:text-slate-500 truncate max-w-[240px]">{targetUser?.email}</p>
+            <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100">{ACTION_LABELS[action] || action}</p>
+            <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate max-w-[240px] mt-0.5">{targetUser?.email}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded-lg">
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-5 space-y-4">
+        <div className="px-5 sm:px-6 pb-4 space-y-4">
           {action === 'extend' && (
             <div>
-              <SectionLabel>Extend by (days)</SectionLabel>
+              <label className={labelCls}>Extend by (days)</label>
               <input
                 type="number"
                 min={1}
                 max={365}
                 value={extendDays}
                 onChange={e => setExtendDays(Number(e.target.value))}
-                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className={inputCls}
               />
-              <p className="text-[10px] font-google text-slate-400 mt-1">1–365 days</p>
+              <p className="text-xs font-google text-slate-400 mt-1.5">1–365 days</p>
             </div>
           )}
           <div>
-            <SectionLabel>Reason (optional)</SectionLabel>
+            <label className={labelCls}>Reason (optional)</label>
             <textarea
               rows={3}
               maxLength={500}
               placeholder="Reason for this action..."
               value={reason}
               onChange={e => setReason(e.target.value)}
-              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors rounded-none resize-none"
+              className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors resize-none"
             />
-            <p className="text-[10px] font-google text-slate-400 text-right">{reason.length}/500</p>
+            <p className="text-xs font-google text-slate-400 text-right mt-1">{reason.length}/500</p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 p-4 sm:p-5 border-t border-gray-100 dark:border-slate-800">
-          <button onClick={onClose} disabled={isPending} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50">
+        <div className="flex gap-3 px-5 sm:px-6 pb-5 sm:pb-6">
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+          >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={isPending || (action === 'extend' && (extendDays < 1 || extendDays > 365))}
-            className={`flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${ACTION_STYLE[action] || 'bg-slate-900 text-white hover:bg-slate-800'}`}
+            className={`flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${ACTION_STYLE[action] || 'bg-slate-900 text-white hover:bg-slate-800'}`}
           >
             {isPending && <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>}
             {isPending ? 'Applying…' : 'Confirm'}
@@ -439,34 +441,35 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="ml-auto relative z-[110] flex flex-col w-full sm:max-w-xl md:w-1/2 lg:w-1/2 h-full bg-white dark:bg-slate-950 border-l border-gray-100 dark:border-slate-800 shadow-2xl overflow-y-auto"
+        className="ml-auto relative z-[110] flex flex-col w-full sm:max-w-xl md:w-1/2 lg:w-1/2 h-full bg-white dark:bg-slate-950 shadow-2xl overflow-y-auto sm:rounded-l-2xl"
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-4 sm:p-6 border-b border-gray-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
+        <div className="flex items-start justify-between p-5 sm:p-6 sticky top-0 bg-white dark:bg-slate-950 z-10 border-b border-slate-100 dark:border-white/[0.04]">
           <div className="flex-1 min-w-0 pr-4">
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <TierBadge tier={draft.custom_plan_enabled ? 'CUSTOM' : draft.tier} />
               <StatusBadge status={draft.status} />
               {user.role === 'SUPER_ADMIN' && <TierBadge tier="SUPER_ADMIN" />}
             </div>
-            <p className="text-sm font-google font-bold text-slate-900 dark:text-slate-100 truncate" title={user.email}>{user.email}</p>
-            <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">{user.clerk_id}</p>
+            <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 truncate" title={user.email}>{user.email}</p>
+            <p className="text-xs font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">{user.clerk_id}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors shrink-0">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded-lg shrink-0">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 p-4 sm:p-6 space-y-6">
+        <div className="flex-1 p-5 sm:p-6 space-y-5">
+
           {/* Access Tier */}
           <div>
-            <SectionLabel>Access Tier</SectionLabel>
+            <label className={labelCls}>Access tier</label>
             <select
               value={draft.custom_plan_enabled ? 'CUSTOM' : draft.tier}
               onChange={e => handleTierChange(e.target.value)}
               disabled={isSaving}
-              className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none"
+              className={selectCls}
             >
               {TIERS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -474,33 +477,33 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
 
           {/* Account Status */}
           <div>
-            <SectionLabel>Account Status</SectionLabel>
+            <label className={labelCls}>Account status</label>
             <button
               type="button"
               onClick={() => set('status', draft.status === 'suspended' ? 'active' : 'suspended')}
               disabled={isSaving}
-              className={`w-full flex items-center justify-between px-4 py-3 border text-sm font-google font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${draft.status === 'suspended'
-                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'
-                : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'}`}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold font-google transition-colors disabled:opacity-50 ${draft.status === 'suspended'
+                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'
+                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'}`}
             >
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[16px]">{draft.status === 'suspended' ? 'block' : 'check_circle'}</span>
-                {draft.status === 'suspended' ? 'Activate Account' : 'Suspend Account'}
+                {draft.status === 'suspended' ? 'Activate account' : 'Suspend account'}
               </span>
               <StatusBadge status={draft.status} />
             </button>
           </div>
 
           {/* Custom Plan Builder */}
-          <div className={`border-2 transition-colors ${draft.custom_plan_enabled ? 'border-emerald-400 dark:border-emerald-600' : 'border-gray-100 dark:border-slate-800'}`}>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[14px] text-emerald-600 dark:text-emerald-400">build</span>
+          <div className={`bg-slate-50 dark:bg-white/[0.02] rounded-2xl transition-all ${draft.custom_plan_enabled ? 'ring-2 ring-emerald-400 dark:ring-emerald-600' : ''}`}>
+            <div className="flex items-center justify-between p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">build</span>
                 </div>
                 <div>
-                  <p className="text-sm font-google font-bold text-slate-900 dark:text-slate-100">Custom Plan Builder</p>
-                  <p className="text-[10px] font-google text-slate-400 dark:text-slate-500">Agency / white-glove configuration</p>
+                  <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100">Custom plan builder</p>
+                  <p className="text-xs font-google text-slate-400 dark:text-slate-500">Agency / white-glove configuration</p>
                 </div>
               </div>
               <Toggle checked={draft.custom_plan_enabled} onChange={handleToggleCustom} label="Enable custom plan" disabled={isSaving} />
@@ -513,57 +516,55 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                   exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }}
                   className="overflow-hidden"
                 >
-                  <div className="px-4 pb-4 space-y-5 border-t border-gray-100 dark:border-slate-800 pt-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="px-5 pb-5 space-y-5 border-t border-slate-100 dark:border-white/[0.04] pt-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="col-span-1 sm:col-span-2">
-                        <SectionLabel>Plan Label</SectionLabel>
+                        <label className={labelCls}>Plan label</label>
                         <input
                           type="text" placeholder="e.g. Agency Pro" value={draft.cfg.plan_name}
                           onChange={e => setCfg('plan_name', e.target.value)} disabled={isSaving}
-                          className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none"
+                          className={inputCls}
                         />
                       </div>
+                      <NumInput label="Monthly price (USD)" value={draft.cfg.monthly_price_usd} onChange={v => setCfg('monthly_price_usd', v)} placeholder="e.g. 299" disabled={isSaving} hint="Must be > $0 to provision in Polar" />
                       <div>
-                        <NumInput label="Monthly Price (USD)" value={draft.cfg.monthly_price_usd} onChange={v => setCfg('monthly_price_usd', v)} placeholder="e.g. 299" disabled={isSaving} hint="Must be > $0 to provision in Polar" />
-                      </div>
-                      <div>
-                        <SectionLabel>Trial Days</SectionLabel>
+                        <label className={labelCls}>Trial days</label>
                         <input
                           type="number" min={0} max={30} placeholder="14" value={draft.cfg.trial_days}
                           onChange={e => setCfg('trial_days', e.target.value)} disabled={isSaving}
-                          className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className={inputCls}
                         />
-                        <p className="text-[10px] font-google text-slate-400 dark:text-slate-500 mt-1">
+                        <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-1.5">
                           After {draft.cfg.trial_days || 14} days, Polar charges ${draft.cfg.monthly_price_usd || '—'}/mo
                         </p>
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[12px]">tune</span>Resource Limits
+                      <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">tune</span>Resource limits
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <NumInput label="Max Bots" value={draft.cfg.max_bots} onChange={v => setCfg('max_bots', v)} placeholder="10" disabled={isSaving} />
+                        <NumInput label="Max bots" value={draft.cfg.max_bots} onChange={v => setCfg('max_bots', v)} placeholder="10" disabled={isSaving} />
                         <NumInput label="Messages / mo" value={draft.cfg.max_messages} onChange={v => setCfg('max_messages', v)} placeholder="5000" disabled={isSaving} />
                         <NumInput label="Storage (chunks)" value={draft.cfg.max_chunks} onChange={v => setCfg('max_chunks', v)} placeholder="1000" disabled={isSaving} />
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[12px]">auto_awesome</span>AI Model Configuration
+                      <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">auto_awesome</span>AI model configuration
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <SectionLabel>Gemini Model</SectionLabel>
-                          <select value={draft.cfg.gemini_model} onChange={e => setCfg('gemini_model', e.target.value)} disabled={isSaving} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none">
+                          <label className={labelCls}>Gemini model</label>
+                          <select value={draft.cfg.gemini_model} onChange={e => setCfg('gemini_model', e.target.value)} disabled={isSaving} className={selectCls}>
                             {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                           </select>
                         </div>
                         <div>
-                          <SectionLabel>Max Output Tokens</SectionLabel>
-                          <select value={draft.cfg.max_output_tokens} onChange={e => setCfg('max_output_tokens', e.target.value)} disabled={isSaving} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none">
+                          <label className={labelCls}>Max output tokens</label>
+                          <select value={draft.cfg.max_output_tokens} onChange={e => setCfg('max_output_tokens', e.target.value)} disabled={isSaving} className={selectCls}>
                             {TOKEN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                           </select>
                         </div>
@@ -571,17 +572,17 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                     </div>
 
                     <div>
-                      <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[12px]">toggle_on</span>Feature Access
+                      <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">toggle_on</span>Feature access
                       </p>
-                      <div className="space-y-0 border border-gray-100 dark:border-slate-800">
+                      <div className="bg-white dark:bg-white/[0.02] rounded-xl overflow-hidden">
                         {FEATURE_FLAGS.map((f, i) => (
-                          <div key={f.key} className={`flex items-center justify-between px-4 py-3 ${i < FEATURE_FLAGS.length - 1 ? 'border-b border-gray-100 dark:border-slate-800' : ''}`}>
+                          <div key={f.key} className={`flex items-center justify-between px-4 py-3 ${i < FEATURE_FLAGS.length - 1 ? 'border-b border-slate-100 dark:border-white/[0.04]' : ''}`}>
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 shrink-0">{f.icon}</span>
                               <div className="min-w-0">
-                                <p className="text-xs font-google font-bold text-slate-900 dark:text-slate-200">{f.label}</p>
-                                <p className="text-[10px] font-google text-slate-400 dark:text-slate-500 truncate">{f.desc}</p>
+                                <p className="text-sm font-medium font-google text-slate-900 dark:text-slate-200">{f.label}</p>
+                                <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate">{f.desc}</p>
                               </div>
                             </div>
                             <Toggle checked={!!draft.cfg[f.key]} onChange={v => setCfg(f.key, v)} label={f.label} disabled={isSaving} />
@@ -591,8 +592,9 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                     </div>
 
                     <div>
-                      <SectionLabel>Internal Notes</SectionLabel>
-                      <textarea rows={2} placeholder="Deal notes..." value={draft.cfg.notes} onChange={e => setCfg('notes', e.target.value)} disabled={isSaving} className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2.5 text-sm font-google text-slate-900 dark:text-slate-200 focus:ring-1 focus:ring-blue-500 outline-none transition-colors disabled:opacity-50 rounded-none resize-none" />
+                      <label className={labelCls}>Internal notes</label>
+                      <textarea rows={2} placeholder="Deal notes..." value={draft.cfg.notes} onChange={e => setCfg('notes', e.target.value)} disabled={isSaving}
+                        className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 resize-none" />
                     </div>
                   </div>
                 </motion.div>
@@ -602,24 +604,24 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
 
           {/* Checkout URL display */}
           {(checkoutUrl || user.custom_plan_polar_product_id) && (
-            <div className="border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/10 p-4">
+            <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
-                <p className="text-sm font-google font-bold text-emerald-700 dark:text-emerald-400">
-                  {checkoutUrl ? 'Polar Product Created' : 'Already Provisioned'}
+                <p className="text-sm font-semibold font-google text-emerald-700 dark:text-emerald-400">
+                  {checkoutUrl ? 'Polar product created' : 'Already provisioned'}
                 </p>
               </div>
               {(checkoutUrl || existingCfg.polar_checkout_url) ? (
                 <>
-                  <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Checkout Link</p>
+                  <label className={labelCls}>Checkout link</label>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <input readOnly value={checkoutUrl || existingCfg.polar_checkout_url || ''} className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-300 outline-none truncate rounded-none" />
-                    <button type="button" onClick={handleCopyUrl} className="shrink-0 px-4 py-2 text-[10px] font-google font-bold uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-500 transition-colors flex items-center gap-1.5">
+                    <input readOnly value={checkoutUrl || existingCfg.polar_checkout_url || ''} className="flex-1 min-w-0 px-4 py-3 bg-white dark:bg-white/[0.04] text-xs font-mono text-slate-700 dark:text-slate-300 rounded-xl outline-none truncate" />
+                    <button type="button" onClick={handleCopyUrl} className="shrink-0 px-4 py-3 text-sm font-semibold font-google bg-emerald-600 text-white hover:bg-emerald-500 rounded-xl transition-colors flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[14px]">{copiedUrl ? 'check' : 'content_copy'}</span>
-                      {copiedUrl ? 'Copied!' : 'Copy'}
+                      {copiedUrl ? 'Copied' : 'Copy'}
                     </button>
                   </div>
-                  <p className="text-[10px] font-google text-slate-500 dark:text-slate-400 mt-2 flex items-start gap-1">
+                  <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2 flex items-start gap-1">
                     <span className="material-symbols-outlined text-[12px] mt-0.5 shrink-0">warning</span>
                     Send this link to the customer. They enter their card to start the trial.
                   </p>
@@ -632,18 +634,18 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
 
           {/* Deployed Bots */}
           <div>
-            <SectionLabel>Deployed Bots ({companies.length})</SectionLabel>
+            <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3">Deployed bots ({companies.length})</p>
             {companies.length === 0 ? (
-              <p className="text-[10px] font-google text-slate-400 text-center py-4 border border-dashed border-gray-100">No bots.</p>
+              <p className="text-xs font-google text-slate-400 text-center py-6 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08]">No bots deployed.</p>
             ) : (
               <div className="space-y-2">
                 {companies.map((bot: any, i: number) => (
-                  <div key={bot.id || i} className="p-3 border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 flex justify-between items-center gap-2">
+                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-white/[0.02] rounded-xl flex justify-between items-center gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
-                      <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-[10px] font-mono text-blue-400 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
+                      <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
+                      <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-xs font-mono text-blue-500 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
                     </div>
-                    <span className={`shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-slate-500 border border-gray-200'}`}>
+                    <span className={`shrink-0 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                       {bot.is_active !== false ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -654,22 +656,26 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-gray-100 dark:border-slate-800 p-4 space-y-2">
+        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-white/[0.04] p-5 space-y-3">
           {draft.custom_plan_enabled && !user.custom_plan_polar_product_id && !checkoutUrl && (
             <button
               type="button" onClick={handleProvision}
               disabled={isProvisioning || isSaving || Number(draft.cfg.monthly_price_usd) <= 0}
               title={Number(draft.cfg.monthly_price_usd) <= 0 ? 'Price must be > $0 to provision' : undefined}
-              className="w-full px-4 py-3 text-sm font-google font-bold uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 text-sm font-semibold font-google rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-[16px]">{isProvisioning ? 'hourglass_empty' : 'add_shopping_cart'}</span>
-              {isProvisioning ? 'Creating in Polar…' : 'Create in Polar & Generate Link'}
+              {isProvisioning ? 'Creating in Polar…' : 'Create in Polar & generate link'}
             </button>
           )}
           <div className="flex gap-3">
-            <button onClick={onClose} disabled={isSaving || isProvisioning} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50">Cancel</button>
-            <button onClick={handleSave} disabled={isSaving || isProvisioning || !isValid} className="flex-1 px-4 py-3 text-sm font-google font-bold uppercase tracking-widest bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-800 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              {isSaving ? 'Saving…' : 'Save Config'}
+            <button onClick={onClose} disabled={isSaving || isProvisioning}
+              className="flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={isSaving || isProvisioning || !isValid}
+              className="flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              {isSaving ? 'Saving…' : 'Save config'}
             </button>
           </div>
         </div>
@@ -678,7 +684,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
   );
 };
 
-// ── Shared helpers for plan rows ──────────────────────────────────────────────
+// ── Shared helpers ────────────────────────────────────────────────────────────
 const fmtDate = (iso: string | null) => {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -697,14 +703,14 @@ const fmtRelative = (iso: string | null) => {
 const PlanRowDetail = ({ planUser, onAction }: { planUser: any; onAction: (action: string, u: any) => void }) => {
   const cfg = planUser.custom_plan_config || {};
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 py-2">
-      <div className="space-y-1">
-        <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 mb-2">Plan Config</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 py-2">
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium font-google text-slate-400 mb-3">Plan config</p>
         {[
           ['Plan', cfg.plan_name || '—'],
           ['Price', cfg.monthly_price_usd != null ? `$${cfg.monthly_price_usd}/mo` : '—'],
           ['Trial', cfg.trial_days != null ? `${cfg.trial_days} days` : '—'],
-          ['Max Bots', cfg.max_bots ?? '—'],
+          ['Max bots', cfg.max_bots ?? '—'],
           ['Messages', cfg.max_messages ?? '—'],
           ['Chunks', cfg.max_chunks ?? '—'],
         ].map(([k, v]) => (
@@ -715,15 +721,15 @@ const PlanRowDetail = ({ planUser, onAction }: { planUser: any; onAction: (actio
         ))}
       </div>
       <div className="space-y-2">
-        <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 mb-2">Polar</p>
+        <p className="text-xs font-medium font-google text-slate-400 mb-3">Polar</p>
         {planUser.polar_checkout_url && (
           <a href={planUser.polar_checkout_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-google text-blue-500 hover:underline">
-            <span className="material-symbols-outlined text-[13px]">open_in_new</span>Checkout Link
+            <span className="material-symbols-outlined text-[13px]">open_in_new</span>Checkout link
           </a>
         )}
         {planUser.polar_subscription_link && (
           <a href={planUser.polar_subscription_link} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-google text-blue-500 hover:underline">
-            <span className="material-symbols-outlined text-[13px]">open_in_new</span>Polar Dashboard
+            <span className="material-symbols-outlined text-[13px]">open_in_new</span>Polar dashboard
           </a>
         )}
         {!planUser.polar_checkout_url && !planUser.polar_subscription_link && (
@@ -731,10 +737,11 @@ const PlanRowDetail = ({ planUser, onAction }: { planUser: any; onAction: (actio
         )}
       </div>
       <div>
-        <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 mb-2">Quick Actions</p>
+        <p className="text-xs font-medium font-google text-slate-400 mb-3">Quick actions</p>
         <div className="flex flex-wrap gap-2">
           {(planUser.quick_actions || []).map((act: string) => (
-            <button key={act} onClick={() => onAction(act, planUser)} className={`px-3 py-1.5 text-[10px] font-google font-bold uppercase tracking-widest transition-colors ${ACTION_STYLE[act] || 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+            <button key={act} onClick={() => onAction(act, planUser)}
+              className={`px-3 py-2 text-xs font-semibold font-google rounded-xl transition-colors ${ACTION_STYLE[act] || 'bg-slate-900 text-white hover:bg-slate-700'}`}>
               {ACTION_LABELS[act] || act}
             </button>
           ))}
@@ -747,34 +754,34 @@ const PlanRowDetail = ({ planUser, onAction }: { planUser: any; onAction: (actio
   );
 };
 
-// Desktop-only table rows (must render only <tr> elements — no divs)
 const CustomPlanTableRow = ({ planUser, onAction }: { planUser: any; onAction: (action: string, u: any) => void }) => {
   const [expanded, setExpanded] = useState(false);
   return (
     <>
-      <tr className="border-b border-gray-50 dark:border-slate-900 hover:bg-gray-50/50 dark:hover:bg-slate-900/50 transition-colors">
-        <td className="py-3 px-3 min-w-0">
-          <p className="text-sm font-google text-slate-900 dark:text-slate-100 truncate max-w-[200px]">{planUser.email}</p>
+      <tr className="border-b border-slate-50 dark:border-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
+        <td className="py-3.5 px-4 min-w-0">
+          <p className="text-sm font-google text-slate-900 dark:text-slate-100 truncate max-w-[120px] sm:max-w-[200px]">{planUser.email}</p>
         </td>
-        <td className="py-3 px-3">
+        <td className="py-3.5 px-4">
           <SubscriptionStatusBadge status={planUser.subscription_status} />
         </td>
-        <td className="py-3 px-3 text-xs font-google text-slate-500 dark:text-slate-400 whitespace-nowrap">
+        <td className="py-3.5 px-4 text-xs font-google text-slate-500 dark:text-slate-400 whitespace-nowrap">
           {fmtDate(planUser.billing_period_end)}
         </td>
-        <td className="py-3 px-3 text-xs font-google text-slate-500 dark:text-slate-400 whitespace-nowrap">
+        <td className="py-3.5 px-4 text-xs font-google text-slate-500 dark:text-slate-400 whitespace-nowrap">
           {fmtRelative(planUser.last_polar_event_at)}
         </td>
-        <td className="py-3 px-3 text-right">
-          <button onClick={() => setExpanded(e => !e)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1">
+        <td className="py-3.5 px-4 text-right">
+          <button onClick={() => setExpanded(e => !e)}
+            className="px-3 py-1.5 text-xs font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors inline-flex items-center gap-1">
             <span className="material-symbols-outlined text-[13px]">{expanded ? 'expand_less' : 'expand_more'}</span>
             {expanded ? 'Collapse' : 'Expand'}
           </button>
         </td>
       </tr>
       {expanded && (
-        <tr className="bg-gray-50/70 dark:bg-slate-900/70">
-          <td colSpan={5} className="px-3 pb-4 pt-2">
+        <tr className="bg-slate-50/70 dark:bg-slate-900/70">
+          <td colSpan={5} className="px-4 pb-5 pt-3">
             <PlanRowDetail planUser={planUser} onAction={onAction} />
           </td>
         </tr>
@@ -783,36 +790,35 @@ const CustomPlanTableRow = ({ planUser, onAction }: { planUser: any; onAction: (
   );
 };
 
-// Mobile-only card (must render only a div — never inside a tbody)
 const CustomPlanCard = ({ planUser, onAction }: { planUser: any; onAction: (action: string, u: any) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const cfg = planUser.custom_plan_config || {};
   return (
-    <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-4 flex flex-col gap-3">
+    <div className="bg-white dark:bg-white/[0.02] rounded-2xl p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-google font-semibold text-slate-900 dark:text-slate-100 break-all">{planUser.email}</p>
+          <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 break-all">{planUser.email}</p>
           <div className="mt-1.5"><SubscriptionStatusBadge status={planUser.subscription_status} /></div>
         </div>
-        <button onClick={() => setExpanded(e => !e)} className="shrink-0 p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+        <button onClick={() => setExpanded(e => !e)} className="shrink-0 p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg">
           <span className="material-symbols-outlined text-[20px]">{expanded ? 'expand_less' : 'expand_more'}</span>
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs font-google">
+      <div className="grid grid-cols-2 gap-3 text-xs font-google">
         <div>
-          <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-0.5">Billing End</p>
+          <p className="text-xs font-medium text-slate-400 mb-0.5">Billing end</p>
           <p className="text-slate-700 dark:text-slate-300">{fmtDate(planUser.billing_period_end)}</p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-0.5">Last Event</p>
+          <p className="text-xs font-medium text-slate-400 mb-0.5">Last event</p>
           <p className="text-slate-700 dark:text-slate-300">{fmtRelative(planUser.last_polar_event_at)}</p>
         </div>
       </div>
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-            <div className="pt-3 border-t border-gray-100 dark:border-slate-800 space-y-4">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <div className="pt-4 border-t border-slate-100 dark:border-white/[0.04] space-y-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                 {[['Plan', cfg.plan_name || '—'], ['Price', cfg.monthly_price_usd != null ? `$${cfg.monthly_price_usd}/mo` : '—'], ['Bots', cfg.max_bots ?? '—'], ['Messages', cfg.max_messages ?? '—']].map(([k, v]) => (
                   <div key={k} className="text-xs font-google">
                     <span className="text-slate-400">{k}: </span>
@@ -822,11 +828,12 @@ const CustomPlanCard = ({ planUser, onAction }: { planUser: any; onAction: (acti
               </div>
               <div className="flex flex-wrap gap-3">
                 {planUser.polar_checkout_url && <a href={planUser.polar_checkout_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">open_in_new</span>Checkout</a>}
-                {planUser.polar_subscription_link && <a href={planUser.polar_subscription_link} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">open_in_new</span>Polar Dashboard</a>}
+                {planUser.polar_subscription_link && <a href={planUser.polar_subscription_link} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">open_in_new</span>Polar dashboard</a>}
               </div>
               <div className="flex flex-wrap gap-2">
                 {(planUser.quick_actions || []).map((act: string) => (
-                  <button key={act} onClick={() => onAction(act, planUser)} className={`px-3 py-2 text-[10px] font-google font-bold uppercase tracking-widest transition-colors ${ACTION_STYLE[act] || 'bg-slate-900 text-white'}`}>
+                  <button key={act} onClick={() => onAction(act, planUser)}
+                    className={`px-3 py-2 text-xs font-semibold font-google rounded-xl transition-colors ${ACTION_STYLE[act] || 'bg-slate-900 text-white'}`}>
                     {ACTION_LABELS[act] || act}
                   </button>
                 ))}
@@ -846,21 +853,14 @@ export default function AdminPage() {
   const { userRole } = useUserRole();
   const authFetch = useAuthenticatedFetch();
 
-  // Tab state
   const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics'>('users');
-
-  // Users tab state
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
   const [selectedUser, setSelectedUser] = useState<any>(null);
-
-  // Custom Plans tab state
   const [planSearch, setPlanSearch] = useState('');
   const [planStatusFilter, setPlanStatusFilter] = useState('ALL');
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [actionTargetUser, setActionTargetUser] = useState<any>(null);
-
-  // Metrics tab state
   const [reconcileResult, setReconcileResult] = useState<any>(null);
   const [isReconciling, setIsReconciling] = useState(false);
 
@@ -955,33 +955,50 @@ export default function AdminPage() {
   };
 
   if (userRole !== 'SUPER_ADMIN') {
-    return <div className="p-20 text-center">Unauthorized. Super Admin only.</div>;
+    return <div className="p-20 text-center text-sm font-google text-slate-500">Unauthorized. Super admin only.</div>;
   }
 
   const PLAN_STATUSES = ['ALL', 'ACTIVE', 'TRIAL_ACTIVE', 'AWAITING_PAYMENT', 'PAYMENT_FAILED', 'SUSPENDED', 'CANCELED', 'PAUSED', 'EXPIRED'];
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-slate-950">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-4 pt-5 sm:px-6 sm:pt-8">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-display font-black uppercase tracking-tight leading-tight pb-4 sm:pb-6">
-          Super Admin <span className="text-slate-400">Console</span>
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+
+      {/* ── Header ── */}
+      <div className="px-6 md:px-8 pt-8 pb-0 shrink-0">
+        <h1 className="text-2xl md:text-3xl font-semibold font-google text-slate-900 dark:text-slate-200 mb-6">
+          Super admin console
         </h1>
 
-        {/* Tab bar */}
-        <div className="flex overflow-x-auto scrollbar-hide border-b border-gray-100 dark:border-slate-800 -mb-px">
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          {[
+            { label: 'Total users', value: stats.total_users, icon: 'group' },
+            { label: 'Total bots', value: stats.total_companies, icon: 'smart_toy' },
+            { label: 'Active bots', value: stats.active_bots, icon: 'bolt' },
+            { label: 'Messages', value: stats.total_messages?.toLocaleString(), icon: 'forum' },
+            { label: 'Custom plans', value: stats.custom_plan_count, icon: 'build' },
+          ].map((s, i) => (
+            <div key={i} className="bg-white dark:bg-white/[0.02] rounded-2xl p-5 transition-colors duration-500">
+              <p className="text-xs font-medium font-google text-slate-400 dark:text-slate-500 mb-1 truncate">{s.label}</p>
+              <h3 className="text-xl md:text-2xl font-semibold font-google truncate text-slate-900 dark:text-slate-100">{s.value}</h3>
+            </div>
+          ))}
+        </div>
+
+        {/* Pill tab bar */}
+        <div className="flex items-center bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1 w-fit">
           {([
-            { key: 'users', label: 'All Users', icon: 'group' },
-            { key: 'plans', label: 'Custom Plans', icon: 'build' },
+            { key: 'users', label: 'All users', icon: 'group' },
+            { key: 'plans', label: 'Custom plans', icon: 'build' },
             { key: 'metrics', label: 'Metrics', icon: 'bar_chart' },
           ] as const).map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-google font-bold uppercase tracking-widest whitespace-nowrap border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? 'border-slate-900 dark:border-blue-500 text-slate-900 dark:text-white'
-                  : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
@@ -989,76 +1006,62 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Users tab sub-controls */}
-        {activeTab === 'users' && (
-          <div className="pt-4 pb-4 sm:pb-6 flex flex-col md:flex-row gap-3">
+      {/* ── Tab: Users ── */}
+      {activeTab === 'users' && (
+        <div className="flex-1 px-6 md:px-8 py-6 space-y-5">
+          {/* Search + filters */}
+          <div className="flex flex-col md:flex-row gap-3">
             <input
-              type="text" placeholder="Search users..." value={searchTerm}
+              type="text" placeholder="Search by email or Clerk ID…" value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="flex-1 max-w-full md:max-w-md bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 px-4 py-2.5 text-sm font-google outline-none"
+              className="flex-1 max-w-full md:max-w-md px-4 py-3 bg-white dark:bg-white/[0.02] text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
             />
-            <div className="-mx-4 sm:-mx-6 md:mx-0 px-4 sm:px-6 md:px-0 overflow-x-auto scrollbar-hide">
-              <div className="flex gap-1 min-w-max">
+            <div className="overflow-x-auto scrollbar-hide">
+              <div className="flex gap-1.5 min-w-max bg-white dark:bg-white/[0.02] rounded-xl p-1">
                 {['ALL', ...TIERS].map(t => (
                   <button key={t} onClick={() => setTierFilter(t)}
-                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest whitespace-nowrap ${tierFilter === t ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors'}`}>
+                    className={`px-3 py-1.5 text-xs font-medium font-google rounded-lg whitespace-nowrap transition-colors ${tierFilter === t ? 'bg-slate-900 dark:bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
                     {t}
                   </button>
                 ))}
               </div>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* ── Stats bar (always visible) ──────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-gray-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
-        {[
-          { label: 'Total Users', value: stats.total_users, icon: 'group' },
-          { label: 'Total Bots', value: stats.total_companies, icon: 'smart_toy' },
-          { label: 'Active Bots', value: stats.active_bots, icon: 'bolt' },
-          { label: 'Messages', value: stats.total_messages?.toLocaleString(), icon: 'forum' },
-          { label: 'Custom Plans', value: stats.custom_plan_count, icon: 'build' },
-        ].map((s, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 p-4 sm:p-6">
-            <p className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 mb-1 truncate">{s.label}</p>
-            <h3 className="text-base sm:text-lg md:text-xl font-display font-bold truncate text-slate-900 dark:text-slate-100">{s.value}</h3>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Tab: Users ──────────────────────────────────────────────────────── */}
-      {activeTab === 'users' && (
-        <div className="flex-1 p-4 sm:p-6 bg-white dark:bg-slate-950">
           {isLoading ? <SkeletonLoader.Table /> : (
             <>
-              <div className="hidden md:block overflow-x-auto">
+              {/* Desktop table */}
+              <div className="hidden md:block bg-white dark:bg-white/[0.02] rounded-2xl overflow-hidden transition-colors duration-500">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-100 dark:border-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-400">
-                      <th className="py-4 px-2">User / Clerk ID</th>
-                      <th className="py-4 px-2">Tier / Status</th>
-                      <th className="py-4 px-2">Usage</th>
-                      <th className="py-4 px-2 text-right">Action</th>
+                    <tr className="border-b border-slate-100 dark:border-white/[0.04]">
+                      <th className="py-4 px-5 text-xs font-medium font-google text-slate-400">User / Clerk ID</th>
+                      <th className="py-4 px-5 text-xs font-medium font-google text-slate-400">Tier / Status</th>
+                      <th className="py-4 px-5 text-xs font-medium font-google text-slate-400">Usage</th>
+                      <th className="py-4 px-5 text-xs font-medium font-google text-slate-400 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-slate-900">
+                  <tbody className="divide-y divide-slate-50 dark:divide-white/[0.02]">
                     {filteredUsers.map((u: any) => (
-                      <tr key={u.clerk_id} className="hover:bg-gray-50/50 dark:hover:bg-slate-900/50 transition-colors">
-                        <td className="py-4 px-2 min-w-0">
-                          <p className="text-sm font-google text-slate-900 dark:text-slate-100 truncate max-w-[260px]">{u.email}</p>
-                          <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[260px]">{u.clerk_id}</p>
+                      <tr key={u.clerk_id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                        <td className="py-4 px-5 min-w-0">
+                          <p className="text-sm font-google text-slate-900 dark:text-slate-100 truncate max-w-[140px] md:max-w-[260px]">{u.email}</p>
+                          <p className="text-xs font-mono text-slate-400 dark:text-slate-500 truncate max-w-[140px] md:max-w-[260px] mt-0.5">{u.clerk_id}</p>
                         </td>
-                        <td className="py-4 px-2 space-y-1">
-                          <TierBadge tier={u.tier} /><br />
-                          <StatusBadge status={u.status} />
+                        <td className="py-4 px-5 space-y-1.5">
+                          <div><TierBadge tier={u.tier} /></div>
+                          <div><StatusBadge status={u.status} /></div>
                         </td>
-                        <td className="py-4 px-2">
+                        <td className="py-4 px-5 min-w-[160px]">
                           <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
                         </td>
-                        <td className="py-4 px-2 text-right">
-                          <button onClick={() => setSelectedUser(u)} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-800 text-white hover:bg-blue-600 transition-colors">Manage</button>
+                        <td className="py-4 px-5 text-right">
+                          <button onClick={() => setSelectedUser(u)}
+                            className="px-4 py-2 text-xs font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 dark:hover:bg-slate-700 transition-colors">
+                            Manage
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1066,23 +1069,21 @@ export default function AdminPage() {
                 </table>
               </div>
 
-              <div className="md:hidden flex flex-col gap-3">
+              {/* Mobile cards */}
+              <div className="md:hidden flex flex-col gap-4">
                 {filteredUsers.map((u: any) => (
-                  <div key={u.clerk_id} className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-4 flex flex-col gap-3 min-w-0">
+                  <div key={u.clerk_id} className="bg-white dark:bg-white/[0.02] rounded-2xl p-5 flex flex-col gap-4 transition-colors duration-500">
                     <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">User</p>
-                      <p className="text-sm font-google font-semibold break-all">{u.email}</p>
-                      <p className="text-[10px] font-mono text-slate-400 break-all">{u.clerk_id}</p>
+                      <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 break-all">{u.email}</p>
+                      <p className="text-xs font-mono text-slate-400 break-all mt-0.5">{u.clerk_id}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <TierBadge tier={u.tier} />
                       <StatusBadge status={u.status} />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1.5">Usage</p>
-                      <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
-                    </div>
-                    <button onClick={() => setSelectedUser(u)} className="self-start px-3 py-2 min-h-[40px] text-[10px] font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-800 text-white hover:bg-blue-600 transition-colors">
+                    <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
+                    <button onClick={() => setSelectedUser(u)}
+                      className="self-start px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors">
                       Manage
                     </button>
                   </div>
@@ -1093,21 +1094,20 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── Tab: Custom Plans ────────────────────────────────────────────────── */}
+      {/* ── Tab: Custom Plans ── */}
       {activeTab === 'plans' && (
-        <div className="flex-1 p-4 sm:p-6 bg-white dark:bg-slate-950 space-y-4">
-          {/* Search + status filter */}
+        <div className="flex-1 px-6 md:px-8 py-6 space-y-5">
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text" placeholder="Search by email…" value={planSearch}
               onChange={e => setPlanSearch(e.target.value)}
-              className="flex-1 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 px-4 py-2.5 text-sm font-google outline-none"
+              className="flex-1 px-4 py-3 bg-white dark:bg-white/[0.02] text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
             />
             <div className="overflow-x-auto scrollbar-hide">
-              <div className="flex gap-1 min-w-max">
+              <div className="flex gap-1.5 min-w-max bg-white dark:bg-white/[0.02] rounded-xl p-1">
                 {PLAN_STATUSES.map(s => (
                   <button key={s} onClick={() => setPlanStatusFilter(s)}
-                    className={`px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${planStatusFilter === s ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors'}`}>
+                    className={`px-3 py-1.5 text-xs font-medium font-google rounded-lg whitespace-nowrap transition-colors ${planStatusFilter === s ? 'bg-slate-900 dark:bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
                     {s === 'ALL' ? 'All' : s.replace(/_/g, ' ')}
                   </button>
                 ))}
@@ -1115,32 +1115,32 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Table (md+) */}
           {dashboardQuery.isLoading ? (
             <SkeletonLoader.Table />
           ) : dashboardQuery.isError ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 bg-white dark:bg-white/[0.02] rounded-2xl">
               <p className="text-sm font-google text-red-500 mb-3">Failed to load custom plans.</p>
-              <button onClick={() => dashboardQuery.refetch()} className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-slate-900 text-white hover:bg-blue-600 transition-colors">Retry</button>
+              <button onClick={() => dashboardQuery.refetch()}
+                className="px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                Retry
+              </button>
             </div>
           ) : planUsers.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-gray-100 dark:border-slate-800">
+            <div className="text-center py-16 bg-white dark:bg-white/[0.02] rounded-2xl border border-dashed border-slate-200 dark:border-white/[0.08]">
               <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2 block">build_circle</span>
               <p className="text-sm font-google text-slate-400">No custom plan users found.</p>
             </div>
           ) : (
             <>
-              {/* Desktop table */}
-              {/* Desktop table — only <tr> elements inside <tbody> */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden md:block bg-white dark:bg-white/[0.02] rounded-2xl overflow-hidden transition-colors duration-500">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-100 dark:border-slate-800 text-[10px] uppercase tracking-widest font-bold text-slate-400">
-                      <th className="py-3 px-3">Email</th>
-                      <th className="py-3 px-3">Status</th>
-                      <th className="py-3 px-3">Billing End</th>
-                      <th className="py-3 px-3">Last Event</th>
-                      <th className="py-3 px-3 text-right">Detail</th>
+                    <tr className="border-b border-slate-100 dark:border-white/[0.04]">
+                      <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Email</th>
+                      <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Status</th>
+                      <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Billing end</th>
+                      <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Last event</th>
+                      <th className="py-4 px-4 text-xs font-medium font-google text-slate-400 text-right">Detail</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1155,8 +1155,7 @@ export default function AdminPage() {
                 </table>
               </div>
 
-              {/* Mobile cards — divs only, never inside a table */}
-              <div className="md:hidden flex flex-col gap-3">
+              <div className="md:hidden flex flex-col gap-4">
                 {planUsers.map((u: any) => (
                   <CustomPlanCard
                     key={u.clerk_id}
@@ -1170,15 +1169,18 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── Tab: Metrics ─────────────────────────────────────────────────────── */}
+      {/* ── Tab: Metrics ── */}
       {activeTab === 'metrics' && (
-        <div className="flex-1 p-4 sm:p-6 bg-white dark:bg-slate-950 space-y-6">
+        <div className="flex-1 px-6 md:px-8 py-6 space-y-5">
           {metricsQuery.isLoading ? (
             <SkeletonLoader.Table />
           ) : metricsQuery.isError ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 bg-white dark:bg-white/[0.02] rounded-2xl">
               <p className="text-sm font-google text-red-500 mb-3">Failed to load metrics.</p>
-              <button onClick={() => metricsQuery.refetch()} className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-slate-900 text-white hover:bg-blue-600 transition-colors">Retry</button>
+              <button onClick={() => metricsQuery.refetch()}
+                className="px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                Retry
+              </button>
             </div>
           ) : (() => {
             const metrics = metricsQuery.data || {};
@@ -1199,15 +1201,15 @@ export default function AdminPage() {
             return (
               <>
                 {/* Status distribution */}
-                <div>
-                  <p className="text-[10px] font-google font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[12px]">donut_small</span>
-                    Subscription Status Distribution
+                <div className="bg-white dark:bg-white/[0.02] rounded-2xl p-6 transition-colors duration-500">
+                  <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-5 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">donut_small</span>
+                    Subscription status distribution
                   </p>
                   {total === 0 ? (
-                    <p className="text-sm font-google text-slate-400 py-6 text-center border border-dashed border-gray-100 dark:border-slate-800">No custom plan users yet.</p>
+                    <p className="text-sm font-google text-slate-400 py-6 text-center">No custom plan users yet.</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {Object.entries(statusCounts)
                         .filter(([, count]) => (count as number) > 0)
                         .sort(([, a], [, b]) => (b as number) - (a as number))
@@ -1215,14 +1217,12 @@ export default function AdminPage() {
                           const pct = Math.round(((count as number) / total) * 100);
                           return (
                             <div key={status}>
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-2">
-                                  <SubscriptionStatusBadge status={status} />
-                                </div>
-                                <span className="text-xs font-google font-bold text-slate-500 dark:text-slate-400">{count as number} <span className="font-normal text-slate-400">({pct}%)</span></span>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <SubscriptionStatusBadge status={status} />
+                                <span className="text-xs font-medium font-google text-slate-500 dark:text-slate-400">{count as number} <span className="font-normal text-slate-400">({pct}%)</span></span>
                               </div>
-                              <div className="h-2 w-full bg-gray-100 dark:bg-slate-800">
-                                <div className={`h-full transition-all duration-700 ${barColor[status] || 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
+                              <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full">
+                                <div className={`h-full rounded-full transition-all duration-700 ${barColor[status] || 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           );
@@ -1234,17 +1234,17 @@ export default function AdminPage() {
                 {/* Alert boxes */}
                 <div className="space-y-3">
                   {staleCount > 0 && (
-                    <div className="border-l-4 border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-4">
-                      <p className="text-sm font-google font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-5 border-l-4 border-amber-400">
+                      <p className="text-sm font-semibold font-google text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
                         <span className="material-symbols-outlined text-[16px]">hourglass_top</span>
                         {staleCount} user{staleCount > 1 ? 's' : ''} awaiting payment for 7+ days
                       </p>
-                      <div className="mt-3 space-y-1.5">
+                      <div className="space-y-1.5">
                         {stale.map((u: any) => (
                           <div key={u.clerk_id} className="flex items-center justify-between gap-2 flex-wrap">
                             <p className="text-xs font-google text-amber-800 dark:text-amber-300">{u.email}</p>
                             {u.custom_plan_polar_product_id && (
-                              <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400">{u.custom_plan_polar_product_id}</span>
+                              <span className="text-xs font-mono text-amber-600 dark:text-amber-400">{u.custom_plan_polar_product_id}</span>
                             )}
                           </div>
                         ))}
@@ -1253,8 +1253,8 @@ export default function AdminPage() {
                   )}
 
                   {failed24h > 0 && (
-                    <div className="border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 p-4">
-                      <p className="text-sm font-google font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                    <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-5 border-l-4 border-red-500">
+                      <p className="text-sm font-semibold font-google text-red-700 dark:text-red-400 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[16px]">credit_card_off</span>
                         {failed24h} payment failure{failed24h > 1 ? 's' : ''} in the last 24 hours
                         {failed7d > 0 && <span className="font-normal text-red-500">({failed7d} in 7d)</span>}
@@ -1263,8 +1263,8 @@ export default function AdminPage() {
                   )}
 
                   {staleCount === 0 && failed24h === 0 && total > 0 && (
-                    <div className="border-l-4 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 p-4">
-                      <p className="text-sm font-google font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-5 border-l-4 border-emerald-400">
+                      <p className="text-sm font-semibold font-google text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[16px]">check_circle</span>
                         No alerts — all custom plans look healthy.
                       </p>
@@ -1272,48 +1272,48 @@ export default function AdminPage() {
                   )}
                 </div>
 
-                {/* Reconciliation box */}
-                <div className="border border-gray-100 dark:border-slate-800 p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                {/* Reconciliation */}
+                <div className="bg-white dark:bg-white/[0.02] rounded-2xl p-6 transition-colors duration-500">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     <div>
-                      <p className="text-sm font-google font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[16px] text-slate-500">sync</span>
-                        Manual Reconciliation
+                        Manual reconciliation
                       </p>
-                      <p className="text-[10px] font-google text-slate-400 dark:text-slate-500 mt-0.5">Cross-check DB state against Polar subscriptions and flag mismatches.</p>
+                      <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5">Cross-check DB state against Polar subscriptions and flag mismatches.</p>
                     </div>
                     <button
                       onClick={handleRunReconcile}
                       disabled={isReconciling}
-                      className="shrink-0 px-4 py-2.5 text-xs font-google font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-800 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      className="shrink-0 px-5 py-3 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       {isReconciling
                         ? <><span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>Running…</>
-                        : <><span className="material-symbols-outlined text-[14px]">sync</span>Run Reconciliation</>
+                        : <><span className="material-symbols-outlined text-[14px]">sync</span>Run reconciliation</>
                       }
                     </button>
                   </div>
 
                   {reconcileResult && (
-                    <div className="mt-2 border-t border-gray-100 dark:border-slate-800 pt-4">
+                    <div className="border-t border-slate-100 dark:border-white/[0.04] pt-4">
                       {reconcileResult.mismatches?.length > 0 ? (
                         <>
-                          <p className="text-xs font-google font-bold text-red-600 dark:text-red-400 mb-3 flex items-center gap-1.5">
+                          <p className="text-sm font-semibold font-google text-red-600 dark:text-red-400 mb-3 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-[14px]">warning</span>
                             {reconcileResult.mismatches.length} mismatch{reconcileResult.mismatches.length > 1 ? 'es' : ''} found
                           </p>
                           <div className="space-y-2 max-h-48 overflow-y-auto">
                             {reconcileResult.mismatches.map((m: any, i: number) => (
-                              <div key={i} className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 text-xs font-google text-red-700 dark:text-red-400">
-                                <span className="font-bold">{m.clerk_id || m.email}</span>: {m.issue || JSON.stringify(m)}
+                              <div key={i} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-xs font-google text-red-700 dark:text-red-400">
+                                <span className="font-semibold">{m.clerk_id || m.email}</span>: {m.issue || JSON.stringify(m)}
                               </div>
                             ))}
                           </div>
                         </>
                       ) : (
-                        <p className="text-xs font-google text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                        <p className="text-sm font-medium font-google text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                          No mismatches found — DB and Polar are in sync.
+                          No mismatches — DB and Polar are in sync.
                         </p>
                       )}
                     </div>
@@ -1325,7 +1325,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── Slide-over for user management ──────────────────────────────────── */}
+      {/* ── Slide-over ── */}
       <AnimatePresence>
         {selectedUser && (
           <ManageSlideOver
@@ -1337,7 +1337,7 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Quick action modal ───────────────────────────────────────────────── */}
+      {/* ── Quick action modal ── */}
       <AnimatePresence>
         {activeAction && actionTargetUser && (
           <QuickActionModal
