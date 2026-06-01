@@ -118,9 +118,9 @@ export default function DemoChatPage() {
     const showHero = messages.length <= 1;
 
     return (
-        <div className="flex flex-col bg-[#f8f9fa] dark:bg-[#05070a] overflow-hidden transition-colors duration-500 font-google" style={{ height: 'calc(100vh - 5rem)' }}>
+        <div className="flex flex-col bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500 font-google" style={{ height: 'calc(100vh - 5rem)' }}>
             {/* Header */}
-            <div className="bg-[#f8f9fa] dark:bg-[#05070a] px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 relative z-10">
+            <div className="bg-[#f8f9fa] dark:bg-slate-950 px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 relative z-10">
                 <div className="flex justify-between items-center max-w-3xl mx-auto">
                     <div className="flex items-center gap-3">
                         <div className="relative">
@@ -173,7 +173,7 @@ export default function DemoChatPage() {
                                             key={i}
                                             onClick={() => sendMessage(q)}
                                             disabled={isLoading}
-                                            className="p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-white/[0.02] hover:bg-slate-50 dark:hover:bg-white/[0.04] text-sm text-slate-700 dark:text-slate-300 transition-all font-google cursor-pointer leading-relaxed hover:border-slate-300 dark:hover:border-slate-700 shadow-sm"
+                                            className="p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 transition-all font-google cursor-pointer leading-relaxed hover:border-slate-300 dark:hover:border-slate-700 shadow-sm"
                                         >
                                             {q}
                                         </button>
@@ -192,7 +192,7 @@ export default function DemoChatPage() {
                                     )}
                                     <div className={`flex flex-col max-w-[80%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         {msg.role === 'user' ? (
-                                            <div className="px-5 py-3 rounded-2xl bg-slate-100 dark:bg-white/[0.04] text-slate-800 dark:text-slate-200">
+                                            <div className="px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
                                                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                                             </div>
                                         ) : (
@@ -222,7 +222,7 @@ export default function DemoChatPage() {
             </div>
 
             {/* Input area */}
-            <div className="pb-6 pt-3 px-4 bg-[#f8f9fa] dark:bg-[#05070a] border-t border-slate-100 dark:border-slate-800/40 transition-colors">
+            <div className="pb-6 pt-3 px-4 bg-[#f8f9fa] dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800/40 transition-colors">
                 <div className="max-w-3xl mx-auto">
                     {/* Quick questions (only shown when active chat is running and cap not reached) */}
                     {quickQs.length > 0 && !showHero && !isCapReached && (
@@ -232,14 +232,14 @@ export default function DemoChatPage() {
                                     key={i}
                                     onClick={() => sendMessage(q)}
                                     disabled={isLoading}
-                                    className="text-xs px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-all bg-white dark:bg-white/[0.02] truncate max-w-[200px]"
+                                    className="text-xs px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all bg-white dark:bg-slate-900 truncate max-w-[200px]"
                                 >
                                     {q}
                                 </button>
                             ))}
                         </div>
                     )}
-                    <form onSubmit={e => { e.preventDefault(); sendMessage(); }} className="flex items-center gap-2 bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-slate-800/80 rounded-full pl-5 pr-2 py-1 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/30 transition-all">
+                    <form onSubmit={e => { e.preventDefault(); sendMessage(); }} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-full pl-5 pr-2 py-1 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/30 transition-all">
                         <input
                             value={input}
                             onChange={e => setInput(e.target.value)}
@@ -250,7 +250,7 @@ export default function DemoChatPage() {
                         <button
                             type="submit"
                             disabled={isLoading || !input.trim() || isCapReached}
-                            className="p-2 rounded-full disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-all flex items-center justify-center shrink-0"
+                            className="p-2 rounded-full disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center shrink-0"
                             style={!isCapReached && input.trim() ? { color: THEME_COLOR } : { color: '#94a3b8' }}
                         >
                             <span className="material-symbols-outlined text-[20px]">send</span>

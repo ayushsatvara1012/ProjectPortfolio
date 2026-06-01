@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getBotConfig, getKnowledge, isTrained } from '@/src/lib/demo/demoStorage';
 
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
-    demo: { label: 'Demo', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-white/[0.04]' },
+    demo: { label: 'Demo', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800' },
 };
 
 export default function DemoMyBotsPage() {
@@ -55,7 +55,7 @@ export default function DemoMyBotsPage() {
     const speedInfo = SPEED_BADGE[plan.speed_tier];
 
     return (
-        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#05070a] transition-all duration-500 relative overflow-hidden">
+        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-500 relative overflow-hidden">
             <div className="relative flex flex-col h-full z-10">
                 {/* Header */}
                 <div className="px-6 py-6 sm:px-8 sm:py-8 flex items-center justify-between transition-colors">
@@ -83,7 +83,7 @@ export default function DemoMyBotsPage() {
                         { label: 'Messages / bot / mo', value: plan.message_limit.toLocaleString() },
                         { label: 'Knowledge chunks', value: plan.chunk_limit.toLocaleString() },
                     ].map((s, i) => (
-                        <div key={i} className="bg-white dark:bg-white/[0.02] px-5 py-4 rounded-2xl transition-colors">
+                        <div key={i} className="bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl transition-colors">
                             <p className="text-xs text-slate-400 dark:text-slate-500 font-google mb-1">{s.label}</p>
                             <p className="text-base md:text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
                         </div>
@@ -100,7 +100,7 @@ export default function DemoMyBotsPage() {
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-white dark:bg-white/[0.02] rounded-2xl flex flex-col transition-colors shadow-sm"
+                                className="bg-white dark:bg-slate-900 rounded-2xl flex flex-col transition-colors shadow-sm"
                             >
                                 <div className="p-6 flex flex-col flex-1 gap-4">
                                     <div className="flex items-start justify-between">
@@ -127,7 +127,7 @@ export default function DemoMyBotsPage() {
                                     </a>
 
                                     {/* Training status */}
-                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium font-google ${trained ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-white/[0.04] text-slate-500 dark:text-slate-400'}`}>
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium font-google ${trained ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                                         <span className="material-symbols-outlined text-[15px]">{trained ? 'check_circle' : 'radio_button_unchecked'}</span>
                                         {trained ? `${chunksUsed} chunks trained` : 'Not trained yet'}
                                     </div>
@@ -138,7 +138,7 @@ export default function DemoMyBotsPage() {
                                             <span>Usage</span>
                                             <span>{bot.messages_used} / {plan.message_limit}</span>
                                         </div>
-                                        <div className="h-1.5 bg-slate-100 dark:bg-white/[0.04] w-full rounded-full overflow-hidden">
+                                        <div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full rounded-full overflow-hidden">
                                             <div
                                                 className="h-full bg-slate-800 dark:bg-slate-300 rounded-full transition-all"
                                                 style={{ width: `${Math.min((bot.messages_used / plan.message_limit) * 100, 100)}%` }}
@@ -156,7 +156,7 @@ export default function DemoMyBotsPage() {
                                         </button>
                                         <button
                                             onClick={() => router.push('/demo/customize')}
-                                            className="flex-1 py-2.5 text-sm font-medium font-sans rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                            className="flex-1 py-2.5 text-sm font-medium font-sans rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                                         >
                                             <span className="material-symbols-outlined text-[15px]">settings</span> Settings
                                         </button>

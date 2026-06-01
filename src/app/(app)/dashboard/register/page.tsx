@@ -12,9 +12,9 @@ import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import BotIntegrationDocs from '@/src/app/components/BotIntegrationDocs';
 import { useAuthenticatedFetch, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
-const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
+const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
 const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
-const cardCls = "bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500";
+const cardCls = "bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500";
 
 const AppRegistration = () => {
     const { user, isLoaded, isSignedIn } = useUser();
@@ -139,14 +139,14 @@ const AppRegistration = () => {
     const frontendUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     if (!isLoaded) return (
-        <div className="flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+        <div className="flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
             <div className="w-6 h-6 border-2 border-slate-300 dark:border-slate-600 border-t-slate-700 dark:border-t-slate-300 rounded-full animate-spin" />
         </div>
     );
 
     if (!isSignedIn) {
         return (
-            <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-900 transition-colors duration-500 items-center justify-center p-8">
+            <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-500 items-center justify-center p-8">
                 <div className={`${cardCls} p-8 w-full max-w-md text-center`}>
                     <span className="material-symbols-outlined text-[40px] text-slate-300 dark:text-slate-600 mb-4 block">account_circle</span>
                     <h2 className="text-xl font-semibold font-google text-slate-900 dark:text-slate-200 mb-2">Sign in required</h2>
@@ -160,7 +160,7 @@ const AppRegistration = () => {
     }
 
     return (
-        <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+        <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
 
             {/* Header */}
             <div className="px-6 md:px-8 pt-8 pb-6 shrink-0">
@@ -205,9 +205,9 @@ const AppRegistration = () => {
                                             initial={{ opacity: 0, x: -8 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: 0.05 + i * 0.07 }}
-                                            className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-white/[0.02] transition-colors"
+                                            className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 transition-colors"
                                         >
-                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
                                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">{f.icon}</span>
                                             </div>
                                             <div>
@@ -222,7 +222,7 @@ const AppRegistration = () => {
                             {/* Right: form */}
                             <div className={`${cardCls} p-6 md:p-8 relative`}>
                                 {isLocked && (
-                                    <div className="absolute inset-0 z-50 bg-white/80 dark:bg-white/[0.02]/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-2xl transition-colors">
+                                    <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-2xl transition-colors">
                                         <span className="material-symbols-outlined text-[32px] text-slate-400 dark:text-slate-500 mb-4">lock</span>
                                         <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200 mb-2">Upgrade required</h3>
                                         <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-[260px] mb-6">
@@ -270,7 +270,7 @@ const AppRegistration = () => {
                                                     <input type="text" name="themeColor" value={formData.themeColor}
                                                         onChange={handleChange}
                                                         className={inputCls + ' pl-10 pr-12 font-mono uppercase'} />
-                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg overflow-hidden border border-slate-200 dark:border-white/[0.08]">
+                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                                                         <input type="color" name="themeColor" value={formData.themeColor}
                                                             onChange={handleChange}
                                                             className="absolute inset-[-6px] w-[calc(100%+12px)] h-[calc(100%+12px)] cursor-pointer" />
@@ -295,7 +295,7 @@ const AppRegistration = () => {
                                         <button type="submit" disabled={isLoading}
                                             className="w-full py-3.5 min-h-[48px] bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold font-google rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50">
                                             {isLoading
-                                                ? <><div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" /> Provisioning…</>
+                                                ? <><div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-slate-800/50 border-t-white dark:border-t-slate-800 rounded-full animate-spin" /> Provisioning…</>
                                                 : <>Create bot <span className="material-symbols-outlined text-[16px]">arrow_forward</span></>
                                             }
                                         </button>
@@ -330,7 +330,7 @@ const AppRegistration = () => {
                                     Train AI <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
                                 </button>
                                 <button onClick={handleReset}
-                                    className="px-5 py-2.5 bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 text-sm font-semibold font-google rounded-xl hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors active:scale-[0.98]">
+                                    className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold font-google rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-[0.98]">
                                     New bot
                                 </button>
                             </div>
@@ -345,10 +345,10 @@ const AppRegistration = () => {
                                     <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">vpn_key</span>
                                     <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400">Secure API key</p>
                                 </div>
-                                <div className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-slate-100 dark:border-white/[0.04]">
+                                <div className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800">
                                     <span className="flex-1 truncate text-sm font-mono text-slate-900 dark:text-slate-200">{registrationData.apiKey}</span>
                                     <button onClick={() => handleCopy(registrationData.apiKey, 'key')}
-                                        className="p-2 rounded-lg bg-slate-100 dark:bg-white/[0.06] text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-white/[0.10] transition-colors shrink-0">
+                                        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shrink-0">
                                         <span className="material-symbols-outlined text-[16px]">
                                             {copied === 'key' ? 'check' : 'content_copy'}
                                         </span>
@@ -364,7 +364,7 @@ const AppRegistration = () => {
                                         <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400">Quick embed</p>
                                     </div>
                                     <button onClick={() => handleCopy(`<script src="${frontendUrl}/widget.js" data-api-key="${registrationData.apiKey}" defer></script>`, 'snippet')}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors">
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                                         <span className="material-symbols-outlined text-[15px]">
                                             {copied === 'snippet' ? 'check' : 'content_copy'}
                                         </span>

@@ -31,7 +31,7 @@ const ACCOUNT_TABS = [
   { id: 'apikeys', label: 'API keys', icon: 'vpn_key' },
 ];
 
-const cellCls = 'bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
 // ── Profile Tab ───────────────────────────────────────────────────────────────
 const ProfileTab = () => {
@@ -69,7 +69,7 @@ const ProfileTab = () => {
       </div>
 
       {/* Info notice */}
-      <div className="flex items-start gap-3 px-5 py-4 bg-slate-50 dark:bg-white/[0.02] rounded-2xl border border-dashed border-slate-200 dark:border-white/[0.08]">
+      <div className="flex items-start gap-3 px-5 py-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
         <span className="material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500 mt-0.5 shrink-0">info</span>
         <div>
           <p className="text-sm font-semibold font-google text-slate-700 dark:text-slate-300">Click your avatar to manage your profile</p>
@@ -225,7 +225,7 @@ const BillingTab = () => {
             <button
               onClick={handleUpgrade('STARTER')}
               disabled={!!processing}
-              className="py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/[0.10] transition-colors disabled:opacity-50 active:scale-[0.98]"
+              className="py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 active:scale-[0.98]"
             >
               Upgrade to Starter — $19
             </button>
@@ -348,7 +348,7 @@ const ApiKeysTab = () => {
             <button
               key={bot.id}
               onClick={() => { setSelectedBotId(bot.id); setNewKey(''); setCopied(false); }}
-              className={`w-full px-5 py-4 flex items-center justify-between transition-colors ${i < bots.length - 1 ? 'border-b border-slate-100 dark:border-white/[0.04]' : ''} ${selectedBotId === bot.id ? 'bg-slate-50 dark:bg-white/[0.03]' : 'hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
+              className={`w-full px-5 py-4 flex items-center justify-between transition-colors ${i < bots.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''} ${selectedBotId === bot.id ? 'bg-slate-50 dark:bg-slate-900' : 'hover:bg-slate-50 dark:hover:bg-slate-900'}`}
             >
               <div className="text-left min-w-0">
                 <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 truncate">{bot.bot_name || bot.company_name}</p>
@@ -364,7 +364,7 @@ const ApiKeysTab = () => {
 
       {/* Selected bot meta */}
       {selectedBot && (
-        <div className="px-5 py-4 bg-slate-50 dark:bg-white/[0.02] rounded-2xl space-y-1">
+        <div className="px-5 py-4 bg-slate-50 dark:bg-slate-900 rounded-2xl space-y-1">
           <p className="text-xs font-google text-slate-500 dark:text-slate-400">
             <span className="font-medium text-slate-600 dark:text-slate-300">Created: </span>
             {selectedBot.created_at ? new Date(selectedBot.created_at).toLocaleDateString() : '—'}
@@ -379,7 +379,7 @@ const ApiKeysTab = () => {
       {newKey && (
         <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl">
           <p className="text-xs font-medium font-google text-emerald-600 dark:text-emerald-400 mb-3">New key — shown once</p>
-          <div className="flex gap-2 bg-white dark:bg-white/[0.04] px-4 py-3 rounded-xl font-mono text-sm items-center">
+          <div className="flex gap-2 bg-white dark:bg-slate-800 px-4 py-3 rounded-xl font-mono text-sm items-center">
             <span className="flex-1 truncate select-all text-slate-800 dark:text-slate-200">
               {showKey ? newKey : '•'.repeat(Math.min(newKey.length, 48))}
             </span>
@@ -442,7 +442,7 @@ export default function AccountPage() {
         </p>
 
         {/* Pill tab bar */}
-        <div className="mt-6 flex items-center bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1 w-fit">
+        <div className="mt-6 flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
           {ACCOUNT_TABS.map(tab => (
             <button
               key={tab.id}

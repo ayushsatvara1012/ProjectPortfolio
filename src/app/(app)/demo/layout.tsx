@@ -69,14 +69,14 @@ const SidebarContent = ({ onClose, expanded = true, trained, handleReset }: any)
     useEffect(() => { if (!expanded) setSettingsOpen(false); }, [expanded]);
 
     return (
-        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-900/40 transition-colors duration-500">
+        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 transition-colors duration-500">
             {/* Mobile close row */}
             {onClose && (
                 <div className="flex items-center justify-between px-4 py-3 lg:hidden transition-colors">
                     <div className="flex items-center gap-2" />
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-white/[0.02] min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-slate-900 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                     >
                         <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400 transition-colors">close</span>
                     </button>
@@ -151,7 +151,7 @@ const SidebarContent = ({ onClose, expanded = true, trained, handleReset }: any)
             </nav>
 
             {/* User footer */}
-            <div className="px-5 py-4 flex items-center gap-3 min-h-[64px] bg-[#f8f9fa] dark:bg-slate-900/40 transition-colors duration-500 overflow-hidden">
+            <div className="px-5 py-4 flex items-center gap-3 min-h-[64px] bg-[#f8f9fa] dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
                 <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">JD</div>
                 <div className={`flex-1 min-w-0 transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
                     <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate transition-colors">
@@ -198,12 +198,12 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
     const isFullHeightPane = pathname === '/demo/customize';
 
     return (
-        <div className="flex min-h-screen w-full overflow-x-hidden bg-[#f8f9fa] dark:bg-[#05070a] antialiased transition-colors duration-500">
-            <header className="fixed top-0 left-0 right-0 h-16 bg-[#f8f9fa] dark:bg-[#05070a] border-b border-slate-200/50 dark:border-slate-800/50 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
+        <div className="flex min-h-screen w-full overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 antialiased transition-colors duration-500">
+            <header className="fixed top-0 left-0 right-0 h-16 bg-[#f8f9fa] dark:bg-slate-950 border-b border-slate-200/50 dark:border-slate-800/50 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
                 <div className="flex items-center gap-2 lg:w-[calc(256px-1rem)]">
                     <button
                         onClick={() => setSidebarOpen(true)}
-                        className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-white/[0.02] min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                        className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-slate-900 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                         aria-label="Open menu"
                     >
                         <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">menu</span>
@@ -220,7 +220,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                         <span className="truncate max-w-[140px] text-slate-600 dark:text-slate-400 font-google text-sm transition-colors">
                             Jane Doe (Demo)
                         </span>
-                        <span className="shrink-0 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/[0.04] rounded-full transition-colors">
+                        <span className="shrink-0 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
                             DEMO
                         </span>
                         <span className="material-symbols-outlined text-[16px] shrink-0 text-slate-400 dark:text-slate-600">chevron_right</span>
@@ -272,14 +272,14 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
             <aside
                 onMouseEnter={() => setSidebarExpanded(true)}
                 onMouseLeave={() => setSidebarExpanded(false)}
-                className={`hidden lg:flex lg:flex-col fixed left-0 bottom-0 z-30 bg-[#f8f9fa] dark:bg-slate-900/40 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
+                className={`hidden lg:flex lg:flex-col fixed left-0 bottom-0 z-30 bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
                 style={{ top: '4rem' }}
             >
                 <SidebarContent onClose={null} expanded={sidebarExpanded} trained={trained} handleReset={handleReset} />
             </aside>
 
             {/* Main content */}
-            <main className={`flex-1 relative mt-16 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-[#05070a] flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-4rem)]'}`} style={{ marginTop: '4rem' }}>
+            <main className={`flex-1 relative mt-16 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-4rem)]'}`} style={{ marginTop: '4rem' }}>
                 <div className={`flex-1 flex flex-col pt-0 ${isFullHeightPane ? 'lg:min-h-0 lg:overflow-hidden' : ''}`}>
                     <Suspense fallback={null}>
                         <div className={`flex-1 relative ${isFullHeightPane ? 'flex flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>{children}</div>
@@ -287,7 +287,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                 </div>
 
                 {/* Demo Dashboard Footer */}
-                {!isFullHeightPane && <footer className="md:col-span-12 bg-[#f8f9fa] dark:bg-[#05070a] px-6 py-5 md:px-8 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500">
+                {!isFullHeightPane && <footer className="md:col-span-12 bg-[#f8f9fa] dark:bg-slate-950 px-6 py-5 md:px-8 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500">
                     <div className="flex flex-col md:flex-row items-center gap-6 text-sm text-slate-500 dark:text-slate-400 font-sans">
                         <p className="text-center">© 2026 Sapybase LLC — Engineered with precision.</p>
                         <div className="flex gap-5">

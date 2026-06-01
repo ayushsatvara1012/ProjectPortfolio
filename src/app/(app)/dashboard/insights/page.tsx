@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 // ── Style primitives matching AppTrainAI ────────────────────────────────────
-const cellCls = 'bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
 const ActivityCalendar = ({ data }: { data: any[] }) => {
     const [selectedCell, setSelectedCell] = useState<any>(null);
@@ -114,7 +114,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         key={selectedCell.date}
-                        className="flex flex-col bg-slate-50 dark:bg-slate-900/40 p-6 rounded-2xl flex-1"
+                        className="flex flex-col bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl flex-1"
                     >
                         <div className="flex flex-col gap-1 mb-6 pb-4">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google">Daily inspector</span>
@@ -124,22 +124,22 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="flex flex-col p-4 bg-white dark:bg-white/[0.02] rounded-xl">
+                            <div className="flex flex-col p-4 bg-white dark:bg-slate-800 rounded-xl">
                                 <span className="text-xs text-slate-400 font-google mb-1">Total activity</span>
                                 <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-100">{selectedCell.total_questions || 0}</span>
                             </div>
-                            <div className="flex flex-col p-4 bg-white dark:bg-white/[0.02] rounded-xl">
+                            <div className="flex flex-col p-4 bg-white dark:bg-slate-800 rounded-xl">
                                 <span className="text-xs text-slate-400 font-google mb-1">Unique users</span>
                                 <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200">{selectedCell.interacted_users || 0}</span>
                             </div>
                         </div>
 
                         <div className="space-y-1">
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-white/[0.02] transition-colors">
+                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800 transition-colors">
                                 <span className="text-sm font-google text-slate-500 dark:text-slate-400">Answered correctly</span>
                                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
                             </div>
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-white/[0.02] transition-colors">
+                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800 transition-colors">
                                 <span className="text-sm font-google text-slate-500 dark:text-slate-400">Failed response</span>
                                 <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
                                     {selectedCell.unanswered_questions || 0}
@@ -156,7 +156,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                                 {selectedCell.top_questions?.length > 0 ? (
                                     <div className="space-y-2">
                                         {selectedCell.top_questions.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-white/[0.02] p-3 rounded-xl">
+                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-slate-800 p-3 rounded-xl">
                                                 "{q}"
                                             </p>
                                         ))}
@@ -313,7 +313,7 @@ export default function AppInsights() {
                     <select
                         value={selectedBotId}
                         onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 min-w-0 max-w-xs px-3 py-2.5 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors"
+                        className="flex-1 min-w-0 max-w-xs px-3 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-sm font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors"
                     >
                         {bots.map((b: any) => (
                             <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
@@ -324,7 +324,7 @@ export default function AppInsights() {
 
             {/* Tabs */}
             <div className="mt-7 overflow-x-auto scrollbar-hide">
-                <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1">
+                <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
                     {[
                         { id: 'analytics', label: 'Analytics' },
                         { id: 'leads', label: 'Leads CRM' },
@@ -335,7 +335,7 @@ export default function AppInsights() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${activeTab === tab.id
-                                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 shadow-sm'
+                                    ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 shadow-sm'
                                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                 }`}
                         >
@@ -378,7 +378,7 @@ export default function AppInsights() {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-[#05070a] overflow-hidden transition-colors duration-500"
+            className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500"
         >
             {renderHeader()}
 
@@ -470,7 +470,7 @@ export default function AppInsights() {
                                             <div className="space-y-2">
                                                 {reportData?.top_trends?.map((trend: string, idx: number) => (
                                                     <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                                        <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-white/[0.04] flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
+                                                        <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
                                                             {String(idx + 1).padStart(2, '0')}
                                                         </div>
                                                         <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
@@ -496,7 +496,7 @@ export default function AppInsights() {
                                             </p>
                                             <div className="space-y-2 mb-4 overflow-y-auto max-h-[240px] custom-scrollbar pr-1">
                                                 {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap: string, idx: number) => (
-                                                    <div key={idx} className="flex items-start gap-3 p-4 bg-slate-100 dark:bg-white/[0.04]">
+                                                    <div key={idx} className="flex items-start gap-3 p-4 bg-slate-100 dark:bg-slate-800">
                                                         <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">help_center</span>
                                                         <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
                                                         <Link href={`/dashboard/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
@@ -552,11 +552,11 @@ export default function AppInsights() {
                                                         <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
                                                             <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
                                                             {log.unanswered ? (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/[0.04] px-2.5 py-1 rounded-full">
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-slate-400/60 dark:bg-slate-500/50"></span> Unanswered
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-white/[0.08] px-2.5 py-1 rounded-full">
+                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-full">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200 animate-pulse"></span> Handled
                                                                 </span>
                                                             )}

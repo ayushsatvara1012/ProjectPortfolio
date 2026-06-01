@@ -164,9 +164,9 @@ const Toggle = ({ checked, onChange, label, disabled }: { checked: boolean; onCh
   </button>
 );
 
-const inputCls = "w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-const selectCls = "w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50";
-const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2";
+const inputCls = "w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+const selectCls = "w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50";
+const labelCls = "block text-base font-medium font-google text-slate-600 dark:text-slate-400 mb-2";
 
 const NumInput = ({ label, value, onChange, placeholder, disabled, hint }: { label: string; value: any; onChange: (v: string) => void; placeholder: string; disabled?: boolean; hint?: string }) => (
   <div>
@@ -250,7 +250,7 @@ const QuickActionModal = ({
               placeholder="Reason for this action..."
               value={reason}
               onChange={e => setReason(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors resize-none"
+              className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors resize-none"
             />
             <p className="text-xs font-google text-slate-400 text-right mt-1">{reason.length}/500</p>
           </div>
@@ -261,14 +261,14 @@ const QuickActionModal = ({
           <button
             onClick={onClose}
             disabled={isPending}
-            className="flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={isPending || (action === 'extend' && (extendDays < 1 || extendDays > 365))}
-            className={`flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${ACTION_STYLE[action] || 'bg-slate-900 text-white hover:bg-slate-800'}`}
+            className={`flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${ACTION_STYLE[action] || 'bg-slate-900 text-white hover:bg-slate-800'}`}
           >
             {isPending && <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>}
             {isPending ? 'Applying…' : 'Confirm'}
@@ -435,7 +435,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
     <div className="fixed inset-0 z-[100] flex" role="dialog" aria-modal="true">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/40 dark:bg-slate-950/80 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.div
@@ -445,14 +445,14 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         data-lenis-prevent
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-5 sm:p-6 sticky top-0 bg-white dark:bg-slate-950 z-10 border-b border-slate-100 dark:border-white/[0.04]">
+        <div className="flex items-start justify-between p-5 sm:p-6 sticky top-0 bg-white dark:bg-slate-950 z-10 border-b border-slate-100 dark:border-slate-800">
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <TierBadge tier={draft.custom_plan_enabled ? 'CUSTOM' : draft.tier} />
               <StatusBadge status={draft.status} />
               {user.role === 'SUPER_ADMIN' && <TierBadge tier="SUPER_ADMIN" />}
             </div>
-            <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 truncate" title={user.email}>{user.email}</p>
+            <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 truncate" title={user.email}>{user.email}</p>
             <p className="text-xs font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">{user.clerk_id}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded-lg shrink-0">
@@ -483,7 +483,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
               type="button"
               onClick={() => set('status', draft.status === 'suspended' ? 'active' : 'suspended')}
               disabled={isSaving}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold font-google transition-colors disabled:opacity-50 ${draft.status === 'suspended'
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-semibold font-google transition-colors disabled:opacity-50 ${draft.status === 'suspended'
                 ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'
                 : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'}`}
             >
@@ -496,14 +496,14 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
           </div>
 
           {/* Custom Plan Builder */}
-          <div className={`bg-slate-50 dark:bg-white/[0.02] rounded-2xl transition-all ${draft.custom_plan_enabled ? 'ring-2 ring-emerald-400 dark:ring-emerald-600' : ''}`}>
+          <div className={`bg-slate-50 dark:bg-slate-900 rounded-2xl transition-all ${draft.custom_plan_enabled ? 'ring-2 ring-emerald-400 dark:ring-emerald-600' : ''}`}>
             <div className="flex items-center justify-between p-5">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
                   <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">build</span>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100">Custom plan builder</p>
+                  <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100">Custom plan builder</p>
                   <p className="text-xs font-google text-slate-400 dark:text-slate-500">Agency / white-glove configuration</p>
                 </div>
               </div>
@@ -517,7 +517,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                   exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }}
                   className="overflow-hidden"
                 >
-                  <div className="px-5 pb-5 space-y-5 border-t border-slate-100 dark:border-white/[0.04] pt-5">
+                  <div className="px-5 pb-5 space-y-5 border-t border-slate-100 dark:border-slate-800 pt-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="col-span-1 sm:col-span-2">
                         <label className={labelCls}>Plan label</label>
@@ -542,7 +542,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                      <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[14px]">tune</span>Resource limits
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -553,7 +553,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                      <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>AI model configuration
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -573,16 +573,16 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                      <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[14px]">toggle_on</span>Feature access
                       </p>
-                      <div className="bg-white dark:bg-white/[0.02] rounded-xl overflow-hidden">
+                      <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
                         {FEATURE_FLAGS.map((f, i) => (
-                          <div key={f.key} className={`flex items-center justify-between px-4 py-3 ${i < FEATURE_FLAGS.length - 1 ? 'border-b border-slate-100 dark:border-white/[0.04]' : ''}`}>
+                          <div key={f.key} className={`flex items-center justify-between px-4 py-3 ${i < FEATURE_FLAGS.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''}`}>
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 shrink-0">{f.icon}</span>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium font-google text-slate-900 dark:text-slate-200">{f.label}</p>
+                                <p className="text-base font-medium font-google text-slate-900 dark:text-slate-200">{f.label}</p>
                                 <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate">{f.desc}</p>
                               </div>
                             </div>
@@ -595,7 +595,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                     <div>
                       <label className={labelCls}>Internal notes</label>
                       <textarea rows={2} placeholder="Deal notes..." value={draft.cfg.notes} onChange={e => setCfg('notes', e.target.value)} disabled={isSaving}
-                        className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 resize-none" />
+                        className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 resize-none" />
                     </div>
                   </div>
                 </motion.div>
@@ -608,7 +608,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
             <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
-                <p className="text-sm font-semibold font-google text-emerald-700 dark:text-emerald-400">
+                <p className="text-base font-semibold font-google text-emerald-700 dark:text-emerald-400">
                   {checkoutUrl ? 'Polar product created' : 'Already provisioned'}
                 </p>
               </div>
@@ -616,8 +616,8 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
                 <>
                   <label className={labelCls}>Checkout link</label>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <input readOnly value={checkoutUrl || existingCfg.polar_checkout_url || ''} className="flex-1 min-w-0 px-4 py-3 bg-white dark:bg-white/[0.04] text-xs font-mono text-slate-700 dark:text-slate-300 rounded-xl outline-none truncate" />
-                    <button type="button" onClick={handleCopyUrl} className="shrink-0 px-4 py-3 text-sm font-semibold font-google bg-emerald-600 text-white hover:bg-emerald-500 rounded-xl transition-colors flex items-center gap-1.5">
+                    <input readOnly value={checkoutUrl || existingCfg.polar_checkout_url || ''} className="flex-1 min-w-0 px-4 py-3 bg-white dark:bg-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 rounded-xl outline-none truncate" />
+                    <button type="button" onClick={handleCopyUrl} className="shrink-0 px-4 py-3 text-base font-semibold font-google bg-emerald-600 text-white hover:bg-emerald-500 rounded-xl transition-colors flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[14px]">{copiedUrl ? 'check' : 'content_copy'}</span>
                       {copiedUrl ? 'Copied' : 'Copy'}
                     </button>
@@ -635,15 +635,15 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
 
           {/* Deployed Bots */}
           <div>
-            <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-3">Deployed bots ({companies.length})</p>
+            <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3">Deployed bots ({companies.length})</p>
             {companies.length === 0 ? (
-              <p className="text-xs font-google text-slate-400 text-center py-6 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08]">No bots deployed.</p>
+              <p className="text-xs font-google text-slate-400 text-center py-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">No bots deployed.</p>
             ) : (
               <div className="space-y-2">
                 {companies.map((bot: any, i: number) => (
-                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-white/[0.02] rounded-xl flex justify-between items-center gap-2">
+                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl flex justify-between items-center gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
+                      <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
                       <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-xs font-mono text-blue-500 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
                     </div>
                     <span className={`shrink-0 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -657,13 +657,13 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-white/[0.04] p-5 space-y-3">
+        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 p-5 space-y-3">
           {draft.custom_plan_enabled && !user.custom_plan_polar_product_id && !checkoutUrl && (
             <button
               type="button" onClick={handleProvision}
               disabled={isProvisioning || isSaving || Number(draft.cfg.monthly_price_usd) <= 0}
               title={Number(draft.cfg.monthly_price_usd) <= 0 ? 'Price must be > $0 to provision' : undefined}
-              className="w-full px-4 py-3 text-sm font-semibold font-google rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 text-base font-semibold font-google rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-[16px]">{isProvisioning ? 'hourglass_empty' : 'add_shopping_cart'}</span>
               {isProvisioning ? 'Creating in Polar…' : 'Create in Polar & generate link'}
@@ -671,11 +671,11 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
           )}
           <div className="flex gap-3">
             <button onClick={onClose} disabled={isSaving || isProvisioning}
-              className="flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50">
+              className="flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
               Cancel
             </button>
             <button onClick={handleSave} disabled={isSaving || isProvisioning || !isValid}
-              className="flex-1 px-4 py-3 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              className="flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
               {isSaving ? 'Saving…' : 'Save config'}
             </button>
           </div>
@@ -761,7 +761,7 @@ const CustomPlanTableRow = ({ planUser, onAction }: { planUser: any; onAction: (
     <>
       <tr className="border-b border-slate-50 dark:border-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
         <td className="py-3.5 px-4 min-w-0">
-          <p className="text-sm font-google text-slate-900 dark:text-slate-100 truncate max-w-[120px] sm:max-w-[200px]">{planUser.email}</p>
+          <p className="text-base font-google text-slate-900 dark:text-slate-100 truncate max-w-[120px] sm:max-w-[200px]">{planUser.email}</p>
         </td>
         <td className="py-3.5 px-4">
           <SubscriptionStatusBadge status={planUser.subscription_status} />
@@ -774,7 +774,7 @@ const CustomPlanTableRow = ({ planUser, onAction }: { planUser: any; onAction: (
         </td>
         <td className="py-3.5 px-4 text-right">
           <button onClick={() => setExpanded(e => !e)}
-            className="px-3 py-1.5 text-xs font-semibold font-google rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors inline-flex items-center gap-1">
+            className="px-3 py-1.5 text-xs font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1">
             <span className="material-symbols-outlined text-[13px]">{expanded ? 'expand_less' : 'expand_more'}</span>
             {expanded ? 'Collapse' : 'Expand'}
           </button>
@@ -795,10 +795,10 @@ const CustomPlanCard = ({ planUser, onAction }: { planUser: any; onAction: (acti
   const [expanded, setExpanded] = useState(false);
   const cfg = planUser.custom_plan_config || {};
   return (
-    <div className="bg-white dark:bg-white/[0.02] rounded-2xl p-5 flex flex-col gap-3">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 break-all">{planUser.email}</p>
+          <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 break-all">{planUser.email}</p>
           <div className="mt-1.5"><SubscriptionStatusBadge status={planUser.subscription_status} /></div>
         </div>
         <button onClick={() => setExpanded(e => !e)} className="shrink-0 p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg">
@@ -818,7 +818,7 @@ const CustomPlanCard = ({ planUser, onAction }: { planUser: any; onAction: (acti
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-            <div className="pt-4 border-t border-slate-100 dark:border-white/[0.04] space-y-4">
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                 {[['Plan', cfg.plan_name || '—'], ['Price', cfg.monthly_price_usd != null ? `$${cfg.monthly_price_usd}/mo` : '—'], ['Bots', cfg.max_bots ?? '—'], ['Messages', cfg.max_messages ?? '—']].map(([k, v]) => (
                   <div key={k} className="text-xs font-google">
@@ -956,13 +956,13 @@ export default function AdminPage() {
   };
 
   if (userRole !== 'SUPER_ADMIN') {
-    return <div className="p-20 text-center text-sm font-google text-slate-500">Unauthorized. Super admin only.</div>;
+    return <div className="p-20 text-center text-base font-google text-slate-500">Unauthorized. Super admin only.</div>;
   }
 
   const PLAN_STATUSES = ['ALL', 'ACTIVE', 'TRIAL_ACTIVE', 'AWAITING_PAYMENT', 'PAYMENT_FAILED', 'SUSPENDED', 'CANCELED', 'PAUSED', 'EXPIRED'];
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
 
       {/* ── Header ── */}
       <div className="px-6 md:px-8 pt-8 pb-0 shrink-0">
@@ -979,7 +979,7 @@ export default function AdminPage() {
             { label: 'Messages', value: stats.total_messages?.toLocaleString(), icon: 'forum' },
             { label: 'Custom plans', value: stats.custom_plan_count, icon: 'build' },
           ].map((s, i) => (
-            <div key={i} className="bg-white dark:bg-white/[0.02] rounded-2xl p-5 transition-colors duration-500">
+            <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl p-5 transition-colors duration-500">
               <p className="text-xs font-medium font-google text-slate-400 dark:text-slate-500 mb-1 truncate">{s.label}</p>
               <h3 className="text-xl md:text-2xl font-semibold font-google truncate text-slate-900 dark:text-slate-100">{s.value}</h3>
             </div>
@@ -987,7 +987,7 @@ export default function AdminPage() {
         </div>
 
         {/* Pill tab bar */}
-        <div className="flex items-center bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1 w-fit">
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
           {([
             { key: 'users', label: 'All users', icon: 'group' },
             { key: 'plans', label: 'Custom plans', icon: 'build' },
@@ -996,7 +996,7 @@ export default function AdminPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-base font-medium font-google rounded-lg whitespace-nowrap transition-all ${
                 activeTab === tab.key
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
@@ -1017,10 +1017,10 @@ export default function AdminPage() {
             <input
               type="text" placeholder="Search by email or Clerk ID…" value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="flex-1 max-w-full md:max-w-md px-4 py-3 bg-white dark:bg-white/[0.02] text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
+              className="flex-1 max-w-full md:max-w-md px-4 py-3 bg-white dark:bg-slate-900 text-base font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
             />
             <div className="overflow-x-auto scrollbar-hide">
-              <div className="flex gap-1.5 min-w-max bg-white dark:bg-white/[0.02] rounded-xl p-1">
+              <div className="flex gap-1.5 min-w-max bg-white dark:bg-slate-900 rounded-xl p-1">
                 {['ALL', ...TIERS].map(t => (
                   <button key={t} onClick={() => setTierFilter(t)}
                     className={`px-3 py-1.5 text-xs font-medium font-google rounded-lg whitespace-nowrap transition-colors ${tierFilter === t ? 'bg-slate-900 dark:bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
@@ -1034,21 +1034,21 @@ export default function AdminPage() {
           {isLoading ? <SkeletonLoader.Table /> : (
             <>
               {/* Desktop table */}
-              <div className="hidden md:block bg-white dark:bg-white/[0.02] rounded-2xl overflow-hidden transition-colors duration-500">
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl overflow-hidden transition-colors duration-500">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 dark:border-white/[0.04]">
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
                       <th className="py-4 px-5 text-xs font-medium font-google text-slate-400">User / Clerk ID</th>
                       <th className="py-4 px-5 text-xs font-medium font-google text-slate-400">Tier / Status</th>
                       <th className="py-4 px-5 text-xs font-medium font-google text-slate-400">Usage</th>
                       <th className="py-4 px-5 text-xs font-medium font-google text-slate-400 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-white/[0.02]">
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                     {filteredUsers.map((u: any) => (
-                      <tr key={u.clerk_id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                      <tr key={u.clerk_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900 transition-colors">
                         <td className="py-4 px-5 min-w-0">
-                          <p className="text-sm font-google text-slate-900 dark:text-slate-100 truncate max-w-[140px] md:max-w-[260px]">{u.email}</p>
+                          <p className="text-base font-google text-slate-900 dark:text-slate-100 truncate max-w-[140px] md:max-w-[260px]">{u.email}</p>
                           <p className="text-xs font-mono text-slate-400 dark:text-slate-500 truncate max-w-[140px] md:max-w-[260px] mt-0.5">{u.clerk_id}</p>
                         </td>
                         <td className="py-4 px-5 space-y-1.5">
@@ -1073,9 +1073,9 @@ export default function AdminPage() {
               {/* Mobile cards */}
               <div className="md:hidden flex flex-col gap-4">
                 {filteredUsers.map((u: any) => (
-                  <div key={u.clerk_id} className="bg-white dark:bg-white/[0.02] rounded-2xl p-5 flex flex-col gap-4 transition-colors duration-500">
+                  <div key={u.clerk_id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 flex flex-col gap-4 transition-colors duration-500">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold font-google text-slate-900 dark:text-slate-100 break-all">{u.email}</p>
+                      <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 break-all">{u.email}</p>
                       <p className="text-xs font-mono text-slate-400 break-all mt-0.5">{u.clerk_id}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1102,10 +1102,10 @@ export default function AdminPage() {
             <input
               type="text" placeholder="Search by email…" value={planSearch}
               onChange={e => setPlanSearch(e.target.value)}
-              className="flex-1 px-4 py-3 bg-white dark:bg-white/[0.02] text-sm font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
+              className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 text-base font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
             />
             <div className="overflow-x-auto scrollbar-hide">
-              <div className="flex gap-1.5 min-w-max bg-white dark:bg-white/[0.02] rounded-xl p-1">
+              <div className="flex gap-1.5 min-w-max bg-white dark:bg-slate-900 rounded-xl p-1">
                 {PLAN_STATUSES.map(s => (
                   <button key={s} onClick={() => setPlanStatusFilter(s)}
                     className={`px-3 py-1.5 text-xs font-medium font-google rounded-lg whitespace-nowrap transition-colors ${planStatusFilter === s ? 'bg-slate-900 dark:bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
@@ -1119,24 +1119,24 @@ export default function AdminPage() {
           {dashboardQuery.isLoading ? (
             <SkeletonLoader.Table />
           ) : dashboardQuery.isError ? (
-            <div className="text-center py-12 bg-white dark:bg-white/[0.02] rounded-2xl">
-              <p className="text-sm font-google text-red-500 mb-3">Failed to load custom plans.</p>
+            <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl">
+              <p className="text-base font-google text-red-500 mb-3">Failed to load custom plans.</p>
               <button onClick={() => dashboardQuery.refetch()}
                 className="px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 text-white hover:bg-slate-700 transition-colors">
                 Retry
               </button>
             </div>
           ) : planUsers.length === 0 ? (
-            <div className="text-center py-16 bg-white dark:bg-white/[0.02] rounded-2xl border border-dashed border-slate-200 dark:border-white/[0.08]">
+            <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
               <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2 block">build_circle</span>
-              <p className="text-sm font-google text-slate-400">No custom plan users found.</p>
+              <p className="text-base font-google text-slate-400">No custom plan users found.</p>
             </div>
           ) : (
             <>
-              <div className="hidden md:block bg-white dark:bg-white/[0.02] rounded-2xl overflow-hidden transition-colors duration-500">
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl overflow-hidden transition-colors duration-500">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 dark:border-white/[0.04]">
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
                       <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Email</th>
                       <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Status</th>
                       <th className="py-4 px-4 text-xs font-medium font-google text-slate-400">Billing end</th>
@@ -1176,8 +1176,8 @@ export default function AdminPage() {
           {metricsQuery.isLoading ? (
             <SkeletonLoader.Table />
           ) : metricsQuery.isError ? (
-            <div className="text-center py-12 bg-white dark:bg-white/[0.02] rounded-2xl">
-              <p className="text-sm font-google text-red-500 mb-3">Failed to load metrics.</p>
+            <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl">
+              <p className="text-base font-google text-red-500 mb-3">Failed to load metrics.</p>
               <button onClick={() => metricsQuery.refetch()}
                 className="px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 text-white hover:bg-slate-700 transition-colors">
                 Retry
@@ -1202,13 +1202,13 @@ export default function AdminPage() {
             return (
               <>
                 {/* Status distribution */}
-                <div className="bg-white dark:bg-white/[0.02] rounded-2xl p-6 transition-colors duration-500">
-                  <p className="text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-5 flex items-center gap-1.5">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 transition-colors duration-500">
+                  <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-5 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[14px]">donut_small</span>
                     Subscription status distribution
                   </p>
                   {total === 0 ? (
-                    <p className="text-sm font-google text-slate-400 py-6 text-center">No custom plan users yet.</p>
+                    <p className="text-base font-google text-slate-400 py-6 text-center">No custom plan users yet.</p>
                   ) : (
                     <div className="space-y-4">
                       {Object.entries(statusCounts)
@@ -1236,7 +1236,7 @@ export default function AdminPage() {
                 <div className="space-y-3">
                   {staleCount > 0 && (
                     <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-5 border-l-4 border-amber-400">
-                      <p className="text-sm font-semibold font-google text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
+                      <p className="text-base font-semibold font-google text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
                         <span className="material-symbols-outlined text-[16px]">hourglass_top</span>
                         {staleCount} user{staleCount > 1 ? 's' : ''} awaiting payment for 7+ days
                       </p>
@@ -1255,7 +1255,7 @@ export default function AdminPage() {
 
                   {failed24h > 0 && (
                     <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-5 border-l-4 border-red-500">
-                      <p className="text-sm font-semibold font-google text-red-700 dark:text-red-400 flex items-center gap-2">
+                      <p className="text-base font-semibold font-google text-red-700 dark:text-red-400 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[16px]">credit_card_off</span>
                         {failed24h} payment failure{failed24h > 1 ? 's' : ''} in the last 24 hours
                         {failed7d > 0 && <span className="font-normal text-red-500">({failed7d} in 7d)</span>}
@@ -1265,7 +1265,7 @@ export default function AdminPage() {
 
                   {staleCount === 0 && failed24h === 0 && total > 0 && (
                     <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-5 border-l-4 border-emerald-400">
-                      <p className="text-sm font-semibold font-google text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                      <p className="text-base font-semibold font-google text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[16px]">check_circle</span>
                         No alerts — all custom plans look healthy.
                       </p>
@@ -1274,7 +1274,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Reconciliation */}
-                <div className="bg-white dark:bg-white/[0.02] rounded-2xl p-6 transition-colors duration-500">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 transition-colors duration-500">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     <div>
                       <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
@@ -1286,7 +1286,7 @@ export default function AdminPage() {
                     <button
                       onClick={handleRunReconcile}
                       disabled={isReconciling}
-                      className="shrink-0 px-5 py-3 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      className="shrink-0 px-5 py-3 text-base font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       {isReconciling
                         ? <><span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>Running…</>
@@ -1296,10 +1296,10 @@ export default function AdminPage() {
                   </div>
 
                   {reconcileResult && (
-                    <div className="border-t border-slate-100 dark:border-white/[0.04] pt-4">
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
                       {reconcileResult.mismatches?.length > 0 ? (
                         <>
-                          <p className="text-sm font-semibold font-google text-red-600 dark:text-red-400 mb-3 flex items-center gap-1.5">
+                          <p className="text-base font-semibold font-google text-red-600 dark:text-red-400 mb-3 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-[14px]">warning</span>
                             {reconcileResult.mismatches.length} mismatch{reconcileResult.mismatches.length > 1 ? 'es' : ''} found
                           </p>
@@ -1312,7 +1312,7 @@ export default function AdminPage() {
                           </div>
                         </>
                       ) : (
-                        <p className="text-sm font-medium font-google text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                        <p className="text-base font-medium font-google text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-[14px]">check_circle</span>
                           No mismatches — DB and Polar are in sync.
                         </p>

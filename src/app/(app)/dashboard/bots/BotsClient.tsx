@@ -44,9 +44,9 @@ function DeleteConfirmModal({ botName, onConfirm, onCancel }: { botName: string;
 }
 
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
-  standard: { label: 'Standard', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-white/[0.04]' },
-  priority: { label: 'Priority', cls: 'text-slate-900 bg-slate-200 dark:text-slate-200 dark:bg-white/[0.08]' },
-  dedicated: { label: 'Dedicated', cls: 'text-slate-950 bg-slate-300 dark:text-slate-100 dark:bg-white/[0.12]' },
+  standard: { label: 'Standard', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800' },
+  priority: { label: 'Priority', cls: 'text-slate-900 bg-slate-200 dark:text-slate-200 dark:bg-slate-700' },
+  dedicated: { label: 'Dedicated', cls: 'text-slate-950 bg-slate-300 dark:text-slate-100 dark:bg-slate-600' },
   none: { label: 'No Access', cls: 'text-red-500 bg-red-500/10' },
 };
 
@@ -130,7 +130,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
 
   return (
     <>
-    <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#05070a] transition-all duration-500 relative overflow-hidden">
+    <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-500 relative overflow-hidden">
 
       <div className="relative flex flex-col h-full z-10">
         <DemoMigrationBanner />
@@ -161,7 +161,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
               { label: 'Messages / bot / mo', value: plan.message_limit >= 999999 ? 'Unlimited' : plan.message_limit.toLocaleString() },
               { label: 'Knowledge chunks', value: plan.chunk_limit >= 999999 ? 'Unlimited' : plan.chunk_limit.toLocaleString() },
             ].map((s, i) => (
-              <div key={i} className="bg-white dark:bg-white/[0.02] px-5 py-4 rounded-2xl transition-colors">
+              <div key={i} className="bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl transition-colors">
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-google mb-1">{s.label}</p>
                 <p className="text-base md:text-lg font-google font-semibold text-slate-900 dark:text-slate-200">{s.value}</p>
               </div>
@@ -179,14 +179,14 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
               <AnimatePresence>
                 {bots.map(bot => (
                   <motion.div key={bot.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-white dark:bg-white/[0.02] rounded-2xl flex flex-col transition-colors shadow-sm">
+                    className="bg-white dark:bg-slate-900 rounded-2xl flex flex-col transition-colors shadow-sm">
                     <div className="p-6 flex flex-col flex-1 gap-4">
                       <div className="flex items-start justify-between">
                         <div>
                           <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-google mt-0.5">{bot.company_name}</p>
                         </div>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-white/[0.04]">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800">
                           <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-300">smart_toy</span>
                         </div>
                       </div>
@@ -202,7 +202,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
                           <span>{bot.messages_used} / {plan?.message_limit && plan.message_limit >= 999999 ? '∞' : plan?.message_limit}</span>
                         </div>
                         {plan && plan.message_limit < 999999 && (
-                          <div className="h-1.5 bg-slate-100 dark:bg-white/[0.04] w-full rounded-full overflow-hidden">
+                          <div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full rounded-full overflow-hidden">
                             <div className="h-full bg-slate-800 dark:bg-slate-300 rounded-full transition-all" style={{ width: `${Math.min((bot.messages_used / (plan?.message_limit || 1)) * 100, 100)}%` }} />
                           </div>
                         )}
@@ -220,7 +220,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
                           <span className="material-symbols-outlined text-[15px]">psychology</span> Train
                         </button>
                         <button onClick={() => router.push(`/dashboard/settings/customize?edit=${bot.id}`)}
-                          className="flex-1 py-2.5 text-sm font-medium font-sans rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                          className="flex-1 py-2.5 text-sm font-medium font-sans rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
                           <span className="material-symbols-outlined text-[15px]">settings</span> Settings
                         </button>
                         <button onClick={() => handleDelete(bot.id, bot.bot_name)} disabled={deletingId === bot.id}
@@ -234,11 +234,11 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
               </AnimatePresence>
 
               <motion.div layout
-                className={`rounded-2xl flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors ${canAdd ? 'cursor-pointer bg-white dark:bg-white/[0.02] group shadow-sm' : 'bg-slate-50/60 dark:bg-slate-900/20 cursor-not-allowed'}`}
+                className={`rounded-2xl flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors ${canAdd ? 'cursor-pointer bg-white dark:bg-slate-900 group shadow-sm' : 'bg-slate-50/60 dark:bg-slate-900/20 cursor-not-allowed'}`}
                 onClick={() => canAdd && router.push('/dashboard/register')}>
                 {canAdd ? (
                   <>
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-colors bg-slate-100 dark:bg-white/[0.04]">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-colors bg-slate-100 dark:bg-slate-800">
                       <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-slate-500 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">add</span>
                     </div>
                     <p className="text-sm font-medium text-slate-400 dark:text-slate-500 font-sans group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors text-center">Add new bot</p>

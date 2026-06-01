@@ -828,7 +828,7 @@ export default function HowItWorks() {
                 style={{ left: "20%", top }}
               >
                 <div className="w-full h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
-                  <span className="material-symbols-outlined text-[clamp(12px,1.8vw,22px)] text-slate-500 dark:text-slate-400">
+                  <span className="material-symbols-outlined text-[clamp(20px,3vw,38px)] text-slate-500 dark:text-slate-400">
                     {icon}
                   </span>
                 </div>

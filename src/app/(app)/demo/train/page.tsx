@@ -11,8 +11,8 @@ const TABS = [
     { id: 'text', label: 'Text', icon: 'notes' },
 ];
 
-const cellCls = 'bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500';
-const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
 const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
 
 export default function DemoTrainAIPage() {
@@ -144,7 +144,7 @@ export default function DemoTrainAIPage() {
                             demo-knowledge
                         </span>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-white/[0.04] pt-2 mt-1">
+                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
                         <button
                             onClick={toggleAll}
                             disabled={allChunks.length === 0}
@@ -165,7 +165,7 @@ export default function DemoTrainAIPage() {
                     {allChunks.map((chunk: string, i: number) => (
                         <label
                             key={i}
-                            className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.02] rounded-xl transition-colors ${selectedChunks.has(i) ? 'bg-blue-50/50 dark:bg-blue-900/30' : ''}`}
+                            className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors ${selectedChunks.has(i) ? 'bg-blue-50/50 dark:bg-blue-900/30' : ''}`}
                         >
                             <input
                                 type="checkbox"
@@ -195,7 +195,7 @@ export default function DemoTrainAIPage() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#05070a] overflow-hidden transition-colors duration-500">
+        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500">
             {/* Page Header */}
             <div className="px-6 py-7 md:px-8 md:py-8 shrink-0 transition-colors duration-500">
                 <div className="flex items-center gap-2.5 mb-2">
@@ -300,7 +300,7 @@ export default function DemoTrainAIPage() {
                     </h2>
 
                     {/* Tabs */}
-                    <div className="flex mb-6 overflow-x-auto transition-colors bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1 gap-1">
+                    <div className="flex mb-6 overflow-x-auto transition-colors bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
                         {TABS.map(t => (
                             <button
                                 key={t.id}
@@ -341,7 +341,7 @@ export default function DemoTrainAIPage() {
                                 <label className={labelCls}>PDF Archive</label>
                                 <div
                                     onClick={() => fileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-white/[0.04] hover:bg-slate-200 dark:hover:bg-white/[0.08] cursor-pointer transition-colors rounded-xl border border-dashed border-slate-200 dark:border-slate-800"
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors rounded-xl border border-dashed border-slate-200 dark:border-slate-800"
                                 >
                                     <span className="material-symbols-outlined text-[32px] text-slate-650 dark:text-slate-400 transition-colors">cloud_upload</span>
                                     <div className="text-center w-full px-2">
@@ -386,7 +386,7 @@ export default function DemoTrainAIPage() {
                                 <label className={labelCls}>CSV / Excel File</label>
                                 <div
                                     onClick={() => csvFileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-white/[0.04] hover:bg-slate-200 dark:hover:bg-white/[0.08] cursor-pointer transition-colors rounded-xl border border-dashed border-slate-200 dark:border-slate-800"
+                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors rounded-xl border border-dashed border-slate-200 dark:border-slate-800"
                                 >
                                     <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">table_chart</span>
                                     <div className="text-center w-full px-2">
@@ -494,7 +494,7 @@ export default function DemoTrainAIPage() {
                     <DemoSourceBrowser />
 
                     {/* Danger Zone */}
-                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/[0.04] transition-colors">
+                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 transition-colors">
                         <div className="flex items-start gap-3 mb-4 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl transition-colors">
                             <span className="material-symbols-outlined text-[18px] text-red-550 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
                                 delete_forever

@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
 
-const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
+const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
 const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
-const cardCls = "bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500";
+const cardCls = "bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500";
 
 export default function DemoCreateBotPage() {
     const router = useRouter();
@@ -97,9 +97,9 @@ export default function DemoCreateBotPage() {
                                             initial={{ opacity: 0, x: -8 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: 0.05 + i * 0.07 }}
-                                            className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-white/[0.02] transition-colors"
+                                            className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 transition-colors"
                                         >
-                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
                                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">{f.icon}</span>
                                             </div>
                                             <div>
@@ -150,7 +150,7 @@ export default function DemoCreateBotPage() {
                                                     onChange={handleChange}
                                                     className={inputCls + ' pl-10 pr-12 font-mono uppercase'}
                                                 />
-                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg overflow-hidden border border-slate-200 dark:border-white/[0.08]">
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                                                     <input
                                                         type="color"
                                                         name="themeColor"
@@ -216,7 +216,7 @@ export default function DemoCreateBotPage() {
                                 </button>
                                 <button
                                     onClick={handleReset}
-                                    className="px-5 py-2.5 bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 text-sm font-semibold font-google rounded-xl hover:bg-slate-200 dark:hover:bg-white/[0.08] transition-colors active:scale-[0.98] cursor-pointer"
+                                    className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold font-google rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-[0.98] cursor-pointer"
                                 >
                                     New bot
                                 </button>
@@ -230,11 +230,11 @@ export default function DemoCreateBotPage() {
                                     <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">vpn_key</span>
                                     <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400">Demo Session ID</p>
                                 </div>
-                                <div className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-slate-100 dark:border-white/[0.04]">
+                                <div className="flex items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                     <span className="flex-1 truncate text-sm font-mono text-slate-900 dark:text-slate-200">{registrationData.apiKey}</span>
                                     <button
                                         onClick={() => handleCopy(registrationData.apiKey)}
-                                        className="p-2 rounded-lg bg-slate-100 dark:bg-white/[0.06] text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-white/[0.10] transition-colors shrink-0 cursor-pointer"
+                                        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shrink-0 cursor-pointer"
                                     >
                                         {copied
                                             ? <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-450">check</span>

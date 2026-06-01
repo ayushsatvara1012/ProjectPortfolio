@@ -14,7 +14,7 @@ const POLAR_URLS: Record<string, string | undefined> = {
     BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_URL,
 };
 
-const cellCls = 'bg-white dark:bg-white/[0.02] rounded-2xl transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
 const BASIC_COUPON = 'SAPYAI2026';
 
@@ -198,7 +198,7 @@ const AppPricing = () => {
                                     Detecting…
                                 </div>
                             ) : (
-                                <div className="flex items-center bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1">
+                                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
                                     {(Object.keys(CURRENCIES) as Array<keyof typeof CURRENCIES>).map(curr => (
                                         <button
                                             key={curr}
@@ -232,13 +232,13 @@ const AppPricing = () => {
                                 >
                                     {/* Badge */}
                                     {(plan as any).badge && (
-                                        <span className="absolute top-4 right-4 text-xs font-medium font-google bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-full">
+                                        <span className="absolute top-4 right-4 text-xs font-medium font-google bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-full">
                                             {(plan as any).badge}
                                         </span>
                                     )}
 
                                     {/* Icon */}
-                                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/[0.06] flex items-center justify-center mb-5 shrink-0">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-5 shrink-0">
                                         <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">{plan.icon}</span>
                                     </div>
 
@@ -272,7 +272,7 @@ const AppPricing = () => {
                                     <div className="space-y-2.5 flex-1 mb-6">
                                         {plan.features.map(f => (
                                             <div key={f} className="flex items-center gap-2.5">
-                                                <div className="w-4 h-4 rounded-full bg-slate-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                                                <div className="w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
                                                     <span className="material-symbols-outlined text-[10px] text-slate-500 dark:text-slate-400">check</span>
                                                 </div>
                                                 <span className="text-sm font-google text-slate-600 dark:text-slate-400">{f}</span>
@@ -286,10 +286,10 @@ const AppPricing = () => {
                                         disabled={isLoading || isCurrent}
                                         className={`w-full py-3 min-h-[44px] text-sm font-semibold font-google rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
                                             isCurrent
-                                                ? 'bg-slate-100 dark:bg-white/[0.04] text-slate-400 dark:text-slate-500'
+                                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                                                 : plan.highlight
                                                     ? 'bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200'
-                                                    : 'bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/[0.10]'
+                                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600'
                                         }`}
                                     >
                                         {isCurrent ? (
@@ -314,14 +314,14 @@ const AppPricing = () => {
                         transition={{ delay: plans.length * 0.06 }}
                         className={`${cellCls} p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6`}
                     >
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
                             <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">build</span>
                         </div>
 
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                                 <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Custom plan</h3>
-                                <span className="text-xs font-medium font-google bg-slate-100 dark:bg-white/[0.06] text-slate-500 dark:text-slate-400 px-2.5 py-0.5 rounded-full">For agencies</span>
+                                <span className="text-xs font-medium font-google bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2.5 py-0.5 rounded-full">For agencies</span>
                             </div>
                             <p className="text-sm font-google text-slate-500 dark:text-slate-400">
                                 Need unlimited bots, custom quotas, full white-label, or admin-managed config? We'll build a plan around your needs.

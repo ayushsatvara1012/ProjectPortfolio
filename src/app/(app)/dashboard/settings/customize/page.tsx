@@ -11,10 +11,10 @@ import LogoCustomizer from '@/src/app/components/LogoCustomizer';
 import BotPreview from '@/src/app/components/BotPreview';
 import Alert from '@/src/app/components/Alert';
 
-const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
+const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
 const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
 const sectionHeadingCls = "text-sm font-semibold font-google text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-4 transition-colors";
-const cardCls = "bg-white dark:bg-white/[0.02] rounded-2xl p-5 transition-colors duration-500";
+const cardCls = "bg-white dark:bg-slate-900 rounded-2xl p-5 transition-colors duration-500";
 
 const LockOverlay = ({ label, href = '/dashboard/pricing' }: { label: string; href?: string }) => (
   <div className="absolute inset-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help rounded-2xl transition-all">
@@ -86,10 +86,10 @@ export default function CustomizePage() {
   const hasIntegrationsAccess = canUseWebhooks || canUseHumanHandoff;
 
   return (
-    <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+    <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
 
       {/* ── LEFT: Settings ── */}
-      <div className="flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden border-r border-slate-100 dark:border-white/[0.04] transition-colors duration-500">
+      <div className="flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden border-r border-slate-100 dark:border-slate-800 transition-colors duration-500">
 
         {/* Header */}
         <div className="px-6 md:px-8 pt-6 pb-4 shrink-0">
@@ -200,7 +200,7 @@ export default function CustomizePage() {
               </div>
 
               {/* Branding toggle */}
-              <div className={`flex items-start justify-between gap-4 p-4 rounded-xl transition-colors ${canHideBranding ? 'bg-slate-50 dark:bg-white/[0.02]' : 'bg-slate-50 dark:bg-white/[0.02] opacity-50'}`}>
+              <div className={`flex items-start justify-between gap-4 p-4 rounded-xl transition-colors ${canHideBranding ? 'bg-slate-50 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-800 opacity-50'}`}>
                 <div className="min-w-0">
                   <p className="text-sm font-medium font-google text-slate-800 dark:text-slate-200 transition-colors">
                     Remove "Powered by Sapybase" branding
@@ -255,7 +255,7 @@ export default function CustomizePage() {
                     {['Professional', 'Friendly', 'Humorous', 'Technical', 'Concise'].map(tone => (
                       <label
                         key={tone}
-                        className="flex items-center gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-white/[0.02] rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors"
+                        className="flex items-center gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                       >
                         <input
                           type="checkbox"
@@ -289,7 +289,7 @@ export default function CustomizePage() {
                     <label className={labelCls + ' mb-0'}>Quick questions</label>
                     <button
                       onClick={() => updateSetting('quickQuestions', [...(Array.isArray(botSettings.quickQuestions) ? botSettings.quickQuestions : []), ''])}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium font-google bg-slate-100 dark:bg-white/[0.04] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/[0.08] rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium font-google bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
                       <span className="material-symbols-outlined text-[12px]">add</span>
                       Add
@@ -381,7 +381,7 @@ export default function CustomizePage() {
               className="w-full py-3.5 min-h-[48px] bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold font-google rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
             >
               {isSaving
-                ? <><div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" /> Saving…</>
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-slate-800/50 border-t-white dark:border-t-slate-800 rounded-full animate-spin" /> Saving…</>
                 : 'Save settings'
               }
             </button>
