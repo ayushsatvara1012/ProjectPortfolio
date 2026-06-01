@@ -16,15 +16,13 @@ const navLinks = [
   { name: 'Contact', href: '/contact' },
 ];
 
-const stackList = [
-  'React 19 / Next.js',
-  'Python 3.12 / FastAPI',
-  'PostgreSQL / Supabase',
-  'Tailwind CSS v4',
-  'Lucide / Framer',
-  'AWS Cloud',
-  'Docker Container',
-  'Git Workflow',
+const usecaseList = [
+'E-commerce support',
+'SaaS customer success',
+'Local business FAQs',
+'Agency client bots',
+'Real estate inquiries',
+'HR & internal knowledge bases',
 ];
 
 export default function Footer() {
@@ -65,9 +63,9 @@ export default function Footer() {
                 <span className="text-sm tracking-widest font-normal text-slate-600 dark:text-slate-400 font-google">Protocol_V4.2</span>
               </div>
               <h2 className="text-4xl min-[1011px]:text-5xl font-google font-medium text-slate-900 dark:text-slate-200">
-                Ready to architect your <br />
+                Join businesses using Sapybase to <br />
                 <span className="text-slate-600 dark:text-slate-400 transition-colors duration-500 group-hover/brand:text-transparent bg-clip-text bg-linear-to-r from-red-600 to-blue-700">
-                  next digital frontier?
+                  answer customers 24/7
                 </span>
               </h2>
             </div>
@@ -106,14 +104,14 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Tech Stack */}
+            {/* Use Cases */}
             <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors">
               <div className="flex items-center gap-2 text-sm tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google">
                 <div className="h-1.5 w-1.5 rounded-none bg-slate-900 dark:bg-slate-200" />
-                <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Tech Stack</span>
+                <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Use Cases</span>
               </div>
               <ul className="space-y-4">
-                {stackList.map((name, idx) => (
+                {usecaseList.map((name, idx) => (
                   <li key={idx} className="text-slate-600 dark:text-slate-300 text-sm tracking-wider font-normal font-google cursor-default">
                     {name}
                   </li>
@@ -173,7 +171,7 @@ export default function Footer() {
           {/* Bottom legend row */}
           <div className="min-[1011px]:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 min-[1011px]:px-8 min-[1011px]:py-4 border-t border-white dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
             <div className="flex flex-col min-[1011px]:flex-row items-center gap-6 text-sm tracking-widest font-normal text-slate-600 dark:text-slate-400 font-google">
-              <p className="text-center">© 2026 Sapybase LLC — Engineered with precision for 🌏</p>
+              <p className="text-center">© 2026 Sapybase LLC — Built to make AI work for every business.</p>
               <div className="hidden min-[1011px]:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
               <div className="flex gap-6">
                 <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Privacy</Link>

@@ -3,11 +3,14 @@ import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
+// import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
 import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
 
 import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection';
 import EngineSection from '@/src/components/marketing/EngineSection';
 import HowItWorks from '@/src/components/marketing/HowItWorks';
+import Testimonials from '@/src/components/marketing/Testimonials';
+import PricingPreview from '@/src/components/marketing/PricingPreview';
 
 export const metadata: Metadata = buildMetadata('home');
 
@@ -102,10 +105,13 @@ export default function HomePage() {
       />
       <main className="relative overflow-x-clip">
         <HeroSection />
+        {/* <SocialProofBar /> */}
         <WhatWeSolve />
         <ScrollTravelSection />
         {/* <EngineSection /> */}
         <HowItWorks />
+        <Testimonials />
+        <PricingPreview />
       </main>
     </>
   );

@@ -23,7 +23,7 @@ const PIPELINE_STEPS = [
     label: "UNDERSTAND",
     title: "AI Reads Intent, Not Keywords",
     subtitle: "Semantic intent-matching.",
-    description: "Traditional search breaks when a customer types 'what does it cost?' instead of 'pricing'. Sapybase converts every sentence into a semantic fingerprint (a vector). When a user asks a question, we match the closest meaning, not just words, preventing chatbot failures.",
+    description: "Traditional search breaks when a customer types 'what does it cost?' instead of 'pricing'. Sapybase converts every sentence into an AI fingerprint that understands meaning, not just keywords. When a user asks a question, we match the closest meaning, not just words, preventing chatbot failures.",
     bullets: [
       "Semantic matching (meaning-aware search)",
       "Protects against chatbot hallucination",
@@ -38,7 +38,7 @@ const PIPELINE_STEPS = [
     subtitle: "One script tag. Every platform.",
     description: "No backend to configure, no servers to maintain. Simply copy a single line of script and paste it into any HTML page — React, Next.js, Webflow, Shopify, or WordPress. Your AI agent starts streaming answers to visitors immediately.",
     bullets: [
-      "Compatible with React, Next.js, Webflow, HTML",
+      "Works on Shopify, WordPress, Wix, Squarespace, Webflow, Framer — if it accepts HTML, it works",
       "Customize widget colors & avatar from dashboard",
       "Instant real-time WebSocket answer streaming"
     ],
@@ -870,7 +870,7 @@ export default function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="relative w-full bg-white dark:bg-slate-950 transition-colors duration-500 py-24 sm:py-32 overflow-x-clip border-none shadow-none"
+      className="relative w-full bg-white dark:bg-slate-950 transition-colors duration-500 py-10 sm:py-12 overflow-x-clip border-none shadow-none"
     >
       {/* Ambient background glows */}
       <div className="absolute top-1/3 left-10 w-96 h-96 bg-blue-500/5 dark:bg-blue-600/10 rounded-full blur-[120px] pointer-events-none select-none" />
@@ -885,15 +885,13 @@ export default function HowItWorks() {
             <span>How It Works</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
-            Data to{" "}
+            From your content to a live AI chatbot —{" "}
             <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
-              Live AI Chatbot
-            </span>{" "}
-            in Minutes
+              in 10 minutes
+            </span>
           </h2>
           <p className="text-lg font-google text-slate-500 dark:text-slate-400 leading-relaxed">
-            No machine learning expertise required. Sapybase simplifies the ingestion,
-            comprehension, and deployment of your custom AI agent in three easy steps.
+            No developers. No data scientists. No machine learning experience. Just your website content and few minutes.
           </p>
         </div>
 

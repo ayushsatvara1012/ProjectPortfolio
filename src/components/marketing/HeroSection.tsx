@@ -6,7 +6,7 @@ import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import AntigravityBackground from './AntigravityBackground';
 
-const TYPEWRITER_WORDS = ['Businesses', 'Freelancers', 'Portfolios'];
+const TYPEWRITER_WORDS = ['E-commerce stores', 'SaaS companies', 'Local businesses', 'Service agencies'];
 const TYPING_SPEED = 80;
 const DELETING_SPEED = 50;
 const PAUSE_AFTER_TYPE = 1800;
@@ -75,10 +75,10 @@ const HeroSection = () => {
 
           <h1 
             className="text-5xl sm:text-6xl md:text-7xl font-google font-medium tracking-tight leading-none text-slate-900 dark:text-slate-200 mb-6 transition-colors"
-            aria-label="Train once answer everything for Businesses, Freelancers, and Portfolios"
+            aria-label="Your site answers every question 24/7 for businesses, SaaS companies, local businesses, and service agencies"
           >
             <span aria-hidden="true">
-              Train once answer everything
+              Your site answers every question 24/7
               for {' '} <br />
               <span className="inline-block relative">
                 <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-700 to-blue-500">
@@ -96,7 +96,7 @@ const HeroSection = () => {
           </h1>
 
           <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors mx-auto">
-            Sapybase turns your documents, URLs, and PDFs into a 24/7 AI support agent — trained on your content, embedded in minutes, and built to convert visitors into leads.
+            Upload your website content or PDFs. Sapybase builds an AI agent that answers customer questions 24/7, captures leads automatically, and shows you exactly what it earned you — all without writing a single line of code.
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">

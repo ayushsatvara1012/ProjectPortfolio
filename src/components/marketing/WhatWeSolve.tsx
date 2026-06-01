@@ -5,23 +5,23 @@ import React, { useEffect, useState, useRef } from 'react';
 const textItems = [
   {
     id: '1',
-    title: "Unable to answer customer questions around the clock",
+    title: "Customers leaving at midnight with questions you can't answer",
   },
   {
     id: '2',
-    title: "Customer leaving your site unsatisfied",
+    title: "Visitors abandoning your site because no one responded",
   },
   {
     id: '3',
-    title: "Response times affecting user experience",
+    title: "Losing sales to competitors who replied faster",
   },
   {
     id: '4',
-    title: "Manual support burden overwhelming your team",
+    title: "Your team drowning in the same five questions every day",
   },
   {
     id: '5',
-    title: "Missing revenue opportunities in conversations",
+    title: "Leads slipping away because nobody captured their contact",
   },
 ];
 
@@ -67,7 +67,7 @@ const WhatWeSolve = () => {
   }, []);
 
   return (
-    <section className="relative w-full bg-white dark:bg-slate-950 py-20 lg:py-32 overflow-hidden transition-colors duration-500 border-none shadow-none">
+    <section className="relative w-full bg-white dark:bg-slate-950 py-10 lg:py-12 overflow-hidden transition-colors duration-500 border-none shadow-none">
       {/* Immersive Full-Screen SVG Background Container */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
         <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500">
@@ -93,13 +93,13 @@ const WhatWeSolve = () => {
             <div className="mb-12">
 
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-medium tracking-tight text-slate-900 dark:text-white mb-6 leading-none">
-                Is Your Support System <br className="hidden sm:block" />
+                Every missed question is a&nbsp;
                 <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-orange-600 dark:from-red-500 dark:to-orange-400">
-                  Holding You Back?
+                  missed sale.
                 </span>
               </h2>
               <p className="text-base md:text-lg font-google text-slate-800 dark:text-slate-200 leading-relaxed max-w-xl">
-                Generic AI chatbots hallucinate. Sapybase grounds every answer in your actual content — so customers get accurate, instant responses, not generic guesses.
+                Most AI chatbots make things up. Sapybase only answers from your actual content — so customers get accurate answers, and you never have to apologize for wrong information again.
               </p>
             </div>
 

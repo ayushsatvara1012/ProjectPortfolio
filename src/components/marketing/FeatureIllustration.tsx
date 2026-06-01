@@ -5,7 +5,7 @@ import React from 'react';
 const features = [
   {
     title: 'Answers questions at 3am, 3pm, and every minute in between.',
-    solves: 'nobody answering at midnight.',
+    solves: 'lost sales from after-hours visitors',
     body: 'Your bot is always on. Customers get instant answers, you get a full night\'s sleep.',
   },
   {
@@ -20,12 +20,12 @@ const features = [
   },
   {
     title: 'Takes the repeat questions off your team\'s plate.',
-    solves: 'support burden.',
+    solves: 'team time wasted on repetitive questions',
     body: 'Your humans handle the hard stuff. The bot handles the same five questions asked fifty times a day.',
   },
   {
     title: 'Captures leads when it can\'t answer.',
-    solves: 'missed revenue.',
+    solves: 'conversations that end without a contact',
     body: 'If a question is too specific, it grabs their email and routes it to your team. No conversation gets lost.',
   },
 ];
@@ -37,7 +37,9 @@ const FeatureIllustration = () => {
       {/* Content wrapper centered on screen, text on the left */}
       <div className="relative z-10 w-full max-w-7xl flex flex-col items-start text-left">
         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight text-slate-900 dark:text-white mb-16 max-w-2xl leading-tight">
-          Hire one bot instead of ten more support agents
+          One bot. <br className="hidden sm:block" />At a fraction of the cost.
+          <br className="hidden sm:block" />
+          Handles what would take 3 support agents.
         </h2>
 
         <ol className="w-full max-w-2xl space-y-12 list-none">

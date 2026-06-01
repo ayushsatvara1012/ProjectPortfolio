@@ -36,7 +36,7 @@ const INSIGHT_MODULES = [
     icon: "savings",
     accentKey: "emerald",
     title: "Your Return on Investment",
-    description: "See the real dollar value your chatbot delivers — support hours saved, cost avoided against human agent rates, and revenue potential from leads captured. Know exactly what the bot earns you.",
+    description: "See exactly what your chatbot earns you this month — hours of support saved, cost avoided compared to a human agent, and revenue potential from captured leads. The average Sapybase bot saves businesses 40+ support hours a month.",
     tags: ["HOURS_SAVED", "COST_AVOIDED", "REVENUE_POTENTIAL"],
   }
 ];
@@ -88,11 +88,6 @@ const Services = () => {
         {/* HEADER BLOCK */}
         <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-12 mb-16">
           <div className="max-w-2xl space-y-4">
-            <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 mb-2">
-              <span className="material-symbols-outlined text-[16px] text-blue-500">insights</span>
-              <span>Insight Module Registry</span>
-            </div>
-            
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-slate-200">
               Your Bot's <br />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">

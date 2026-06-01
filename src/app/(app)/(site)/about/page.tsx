@@ -69,12 +69,8 @@ export default function AboutPage() {
       <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pt-20 pb-0">
         <div className="max-w-8xl mx-auto px-6 md:px-12 py-6 flex items-center justify-between">
           <div className="inline-flex items-center gap-2 px-4 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full ">
-            <span className="material-symbols-outlined text-[14px] text-blue-600">terminal</span>
-            <span className="text-xs font-google uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500">Sapybase_v2.0 · About</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs font-google font-bold uppercase tracking-widest text-green-600 dark:text-green-500">Available</span>
+            <span className="material-symbols-outlined text-[14px] text-blue-600">history_edu</span>
+            <span className="text-sm font-google tracking-widest font-regular text-slate-400 dark:text-slate-500">The story behind Sapybase</span>
           </div>
         </div>
       </div>

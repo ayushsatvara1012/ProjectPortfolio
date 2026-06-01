@@ -47,9 +47,11 @@ export const HeroCell = () => (
           the World.
         </h1>
         <p className="text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed max-w-md">
-          I'm <strong className="text-slate-900 dark:text-slate-200 font-bold">Ayush Satvara</strong> — the solo architect, engineer, and founder
-          behind Sapybase. Every line of infrastructure, from the RAG pipeline to the
-          React UI, was designed and shipped by one person.
+          I built Sapybase because I kept seeing businesses lose customers to unanswered questions — and the existing chatbot solutions were either too generic, too expensive, or required a developer to set up.
+          <br /><br />
+          Sapybase is the product I wanted to exist: an AI agent that actually knows your business, never makes things up, and shows you exactly what it's earning you.
+          <br /><br />
+          — Ayush Satvara, Founder
         </p>
       </div>
     </div>

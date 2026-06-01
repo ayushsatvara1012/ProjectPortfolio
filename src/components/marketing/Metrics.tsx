@@ -29,8 +29,8 @@ const PerformanceMetrics = () => {
   const gridData = [
     {
       type: "metric",
-      eyebrow: "BOT RESPONSE TIME",
-      value: "< 2s",
+      eyebrow: "Answers in",
+      value: "under 2 seconds",
       subtext: "Your visitors get answers instantly — faster than any human support agent.",
       icon: <span className="material-symbols-outlined text-[14px]">bolt</span>
     },
@@ -41,8 +41,8 @@ const PerformanceMetrics = () => {
     },
     {
       type: "metric",
-      eyebrow: "DEPLOY TIME",
-      value: "< 10 min",
+      eyebrow: "Live on your site in",
+      value: "under 10 minutes",
       subtext: "From zero to a live chatbot on your website in under ten minutes.",
       icon: <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
     },
@@ -53,8 +53,8 @@ const PerformanceMetrics = () => {
     },
     {
       type: "metric",
-      eyebrow: "CHATBOT UPTIME",
-      value: "99.9%",
+      eyebrow: "Always available",
+      value: "99.9% uptime",
       subtext: "Your AI support agent never sleeps, never calls in sick, never goes on holiday.",
       icon: <span className="material-symbols-outlined text-[14px]">verified_user</span>
     },
@@ -65,8 +65,8 @@ const PerformanceMetrics = () => {
     },
     {
       type: "metric",
-      eyebrow: "PLATFORMS SUPPORTED",
-      value: "Any HTML",
+      eyebrow: "Works on",
+      value: "Shopify · WordPress · Webflow · React · HTML",
       subtext: "React, Next.js, Webflow, Shopify, WordPress — if it renders HTML, it works.",
       icon: <span className="material-symbols-outlined text-[14px]">devices</span>
     },
@@ -77,8 +77,8 @@ const PerformanceMetrics = () => {
     },
     {
       type: "metric",
-      eyebrow: "KNOWLEDGE SOURCES",
-      value: "PDF · URL · Text",
+      eyebrow: "Feed It Yours",
+      value: "PDFs, Website URLs, or Plain Text",
       subtext: "Three ways to feed your bot — whichever fits your workflow best.",
       icon: <span className="material-symbols-outlined text-[14px]">database</span>
     }
@@ -228,6 +228,26 @@ const PerformanceMetrics = () => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* ── 6th metric — full-width ROI highlight banner ─────────────────────
+            Kept OUTSIDE the snake grid on purpose: the gliding-path animation and
+            the 3×3 checkerboard math (viewBox 300×300, thirds) stay intact, and the
+            banner spans the full width cleanly on every breakpoint. */}
+        <div className="relative border-b border-slate-200 dark:border-slate-800 bg-linear-to-r from-emerald-50/50 via-white to-white dark:from-emerald-950/20 dark:via-slate-950 dark:to-slate-950 px-8 lg:px-12 py-10 lg:py-14 flex flex-col md:flex-row md:items-center md:justify-between gap-8 transition-colors duration-500">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400 font-google">
+              <span className="material-symbols-outlined text-[16px]">savings</span>
+              <span>Average Support Hours Saved</span>
+            </div>
+            <div className="text-5xl md:text-7xl font-google tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-[0.85]">
+              40+{' '}
+              <span className="text-2xl md:text-4xl font-medium text-slate-400 dark:text-slate-500">hrs / month</span>
+            </div>
+          </div>
+          <p className="max-w-sm text-base font-google text-slate-600 dark:text-slate-400 leading-relaxed">
+            That&apos;s a full work-week of repetitive questions your team no longer has to answer — handled automatically, every single month.
+          </p>
         </div>
 
       </div>

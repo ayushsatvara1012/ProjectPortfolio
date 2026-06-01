@@ -2,37 +2,36 @@ const OG_IMAGE = {
   url: 'https://www.sapybase.com/SB_Brand-removebg.png',
   width: 1200,
   height: 630,
-  alt: 'Sapybase — Autonomous AI Chatbots',
+  alt: 'Sapybase — AI Chatbot That Knows Your Business',
 };
 
 export const seoConfig = {
   home: {
-    title: 'Sapybase | Train an AI Chatbot on Your Docs & Deploy in Minutes',
+    title: 'Sapybase — AI Chatbot That Knows Your Business | Deploy in 10 Minutes',
     description:
-      'Sapybase lets you build a RAG-powered AI chatbot trained on your PDFs, URLs, and documents. Embed it on any website to answer customer questions 24/7, capture leads, and automate support — no coding required.',
+      'Add a 24/7 AI support agent to your website in 10 minutes. Sapybase trains on your content — PDFs, URLs, or text — answers customer questions accurately, captures leads, and shows you the exact ROI. No coding required.',
     canonical: 'https://www.sapybase.com/',
     keywords: [
       'AI chatbot for website',
-      'RAG chatbot builder',
-      'train chatbot on documents',
-      'embed AI chatbot',
-      'no-code RAG chatbot',
-      'AI customer support automation',
-      'chatbot trained on PDF',
-      'AI chatbot for small business',
-      'autonomous AI agent',
+      'no-code AI chatbot',
+      'customer support automation',
+      'chatbot that reads my documents',
+      'AI support agent small business',
+      'website chatbot no coding',
+      'automated customer support',
+      'chatbot lead capture',
+      'AI FAQ bot',
+      'PDF chatbot',
       'Sapybase',
-      'LLM integration',
-      'RAG pipeline',
     ],
     ogImage: OG_IMAGE,
   },
   about: {
-    title: 'About Sapybase | The Future of Autonomous AI Agents',
+    title: 'About Sapybase — Built to Make AI Work for Every Business',
     description:
-      'Sapybase is an engineering studio dedicated to building autonomous AI infrastructure. We simplify complex AI integration for businesses of all sizes, ensuring speed and reliability.',
+      'Sapybase was built by Ayush Satvara to give every business — not just tech companies — access to accurate, reliable AI support automation. Learn the story and the team.',
     canonical: 'https://www.sapybase.com/about',
-    keywords: ['about Sapybase', 'AI engineering studio', 'autonomous AI infrastructure', 'Ayush Satvara'],
+    keywords: ['about Sapybase', 'Sapybase founder', 'Ayush Satvara', 'AI customer support platform', 'business AI chatbot'],
     ogImage: OG_IMAGE,
   },
   contact: {
@@ -44,11 +43,11 @@ export const seoConfig = {
     ogImage: OG_IMAGE,
   },
   services: {
-    title: 'AI Chatbot Solutions & Custom Integration | Sapybase',
+    title: 'Sapybase AI Chatbot — Features & Capabilities',
     description:
-      'Explore Sapybase AI-driven solutions: from custom LLM training (RAG) to seamless multi-platform integration. Build intelligent systems that grow with your business.',
+      'From lead capture to ROI analytics, see everything your Sapybase chatbot does automatically — 24/7 support, conversation memory, custom branding, and real-time insights.',
     canonical: 'https://www.sapybase.com/services',
-    keywords: ['AI services', 'custom LLM training', 'RAG pipeline', 'chatbot integration', 'multi-platform AI'],
+    keywords: ['AI chatbot features', 'chatbot lead capture', 'chatbot ROI analytics', 'AI customer support features', 'no-code chatbot platform'],
     ogImage: OG_IMAGE,
   },
   pricing: {

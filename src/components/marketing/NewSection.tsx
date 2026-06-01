@@ -20,7 +20,7 @@ const features = [
   },
   {
     icon: '/time_icon.svg',
-    title: 'Live in under 500 seconds',
+    title: 'Live in under 10 minutes',
     body: 'Drop in one line of code. Match your brand colors and logo. Done — no engineers required.',
   },
 ];
@@ -63,7 +63,7 @@ const NewSection = () => {
 
   return (
     <section ref={sectionRef} className="relative w-full min-h-screen flex items-center">
-      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-20 grid grid-cols-1 lg:grid-cols-[35%_65%] gap-12 py-20 lg:py-28">
+      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-20 grid grid-cols-1 lg:grid-cols-[35%_65%] gap-12 py-10 lg:py-12">
 
         {/* Left column — AntigravityBackground travels here */}
         <div className="flex items-center justify-center">
@@ -81,10 +81,10 @@ const NewSection = () => {
         <div className="flex flex-col justify-center gap-8">
           <div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight text-slate-900 dark:text-white leading-tight mb-4">
-              Smarter than off-the-shelf chatbots
+              A chatbot that actually knows your business
             </h2>
             <p className="text-xl font-google font-regular text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg">
-              A chatbot that actually knows your business — trained on your docs, speaks in your voice, lives on your site.
+              Trained on your content. Speaks in your voice. Honest when it doesn't know something.
             </p>
           </div>
 
