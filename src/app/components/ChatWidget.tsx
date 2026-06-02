@@ -219,13 +219,8 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
               <stop offset="0%" stopColor={fabGradient[0]} /><stop offset="100%" stopColor={fabGradient[1]} />
             </linearGradient>
           )}
-          <filter id="fab-drop-shadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor={`${themeColor}8C`} />
-            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={`${themeColor}59`} />
-          </filter>
         </defs>
         <path d={fabPath} fill={fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)'}
-          filter="url(#fab-drop-shadow)"
           className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
         {showImage && isCustomLogo && (
           <g clipPath="url(#fab-clip)">
@@ -256,7 +251,6 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
           </text>
         )}
         <path d={fabPath} fill="transparent" filter="url(#neumorphic-3d-inset)" className="pointer-events-none" />
-        <path d={fabPath} fill="none" stroke="white" strokeWidth="0.8" className="aura-path opacity-30 dark:stroke-slate-500/30" />
         <path d={fabPath} fill="none" stroke={themeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20" />
       </svg>
     </motion.button>
@@ -600,7 +594,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
           <ThinkingLogo size={40} className="origin-left" themeColor={themeColor} />
         </div>
         {hasContent && (
-          <div className="leading-relaxed text-sm">
+          <div className="leading-relaxed text-base font-normal tracking-wide font-google">
             <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
               {sanitizeStreamMarkdown(displayedText)}
             </ReactMarkdown>
@@ -612,7 +606,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
   }
 
   return (
-    <div className="relative leading-relaxed text-sm">
+    <div className="relative leading-relaxed text-base font-normal font-google">
       <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
         {content}
       </ReactMarkdown>
@@ -1183,7 +1177,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20" />
               </div>
               <div ref={scrollContainerRef} onScroll={handleScrollContainer}
-                className="flex-1 p-4 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar">
+                className="flex-1 min-h-0 p-4 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar">
                 <div className="flex flex-col gap-5">
                   <AnimatePresence initial={false}>
                     {messages.map((msg, idx) => {
@@ -1225,7 +1219,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                               {msg.role === 'bot' ? <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span> : <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>}
                               <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'user' ? 'w-fit max-w-[85%] self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'text-white rounded-2xl rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`} style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}>
                                 {msg.role === 'user' ? (
-                                  <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
+                                  <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-normal font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
                                 ) : (
                                   <div className="min-w-0 max-w-full text-base font-google leading-relaxed">
                                     <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} onStreamTick={() => scrollToBottom(false)} />

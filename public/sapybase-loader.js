@@ -64,7 +64,6 @@
     var sfx = Math.random().toString(36).slice(2, 8);
     var gradId = 'sb-fab-grad-' + sfx;
     var clipId = 'sb-fab-clip-' + sfx;
-    var filterId = 'sb-fab-shadow-' + sfx;
     var fallbackId = 'sb-fab-fallback-' + sfx;
     var safeUrl = logoUrl ? String(logoUrl).replace(/"/g, '&quot;') : '';
     var initial = (botName || 'S').charAt(0).toUpperCase();
@@ -107,12 +106,8 @@
       '<stop offset="100%" stop-color="' + darkColor + '"/>' +
       '</linearGradient>' +
       '<clipPath id="' + clipId + '"><path d="' + shape.path + '"/></clipPath>' +
-      '<filter id="' + filterId + '" x="-30%" y="-30%" width="160%" height="160%">' +
-      '<feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="' + _hexToRgba(darkColor, 0.55) + '" result="shadow1"/>' +
-      '<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="' + _hexToRgba(darkColor, 0.35) + '"/>' +
-      '</filter>' +
       '</defs>' +
-      '<path d="' + shape.path + '" fill="url(#' + gradId + ')" filter="url(#' + filterId + ')"/>' +
+      '<path d="' + shape.path + '" fill="url(#' + gradId + ')"/>' +
       content +
       '</svg>'
     );
@@ -248,10 +243,6 @@
         this._fab.style.overflow = 'visible';
         this._fab.innerHTML = _buildFabSvg(shape, themeColor, dark, logoUrl, isCustom, botName);
       }
-
-      if (this._pulse) {
-        this._pulse.style.background = _hexToRgba(themeColor, 0.45);
-      }
     }
 
     // SEO injection: emits two ld+json blocks into the host <head>.
@@ -332,19 +323,6 @@
         '  pointer-events: none;',
         '}',
         '.fab-wrap.ready { opacity: 1; transform: scale(1); pointer-events: auto; }',
-        '.fab-pulse {',
-        '  position: absolute; inset: 0;',
-        '  border-radius: 50%;',
-        '  background: ' + _hexToRgba(themeColor, 0.45) + ';',
-        '  animation: sb-pulse 2.2s ease-out infinite;',
-        '  pointer-events: none;',
-        '}',
-        '.fab-wrap.open .fab-pulse { animation-play-state: paused; opacity: 0; }',
-        '@keyframes sb-pulse {',
-        '  0%   { transform: scale(1);    opacity: 0.5; }',
-        '  70%  { transform: scale(1.65); opacity: 0; }',
-        '  100% { transform: scale(1.65); opacity: 0; }',
-        '}',
         '.fab {',
         '  width: 64px; height: 64px; border-radius: 50%; cursor: pointer;',
         '  background: transparent; border: none;',
@@ -412,11 +390,6 @@
       const fabWrap = document.createElement('div');
       fabWrap.className = 'fab-wrap';
       this._fabWrap = fabWrap;
-
-      const pulse = document.createElement('div');
-      pulse.className = 'fab-pulse';
-      this._pulse = pulse;
-      fabWrap.appendChild(pulse);
 
       const fab = document.createElement('button');
       fab.className = 'fab';

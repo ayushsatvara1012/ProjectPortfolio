@@ -1,18 +1,19 @@
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
-import Projects from '@/src/components/marketing/ProjectSection';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
-import { 
-  HeroCell, 
-  ProfileCell, 
-  MetricsStrip, 
-  TechStackCell, 
-  EducationCell, 
-  CertificationsCell, 
-  DeliverablesCell, 
-  CTAStrip 
+import Testimonials from '@/src/components/marketing/Testimonials';
+import SocialProofBar from '@/src/components/marketing/SocialProofBar';
+import {
+  HeroCell,
+  BeliefSection,
+  GeometricDivider,
+  StorySection,
+  PrinciplesSection,
+  DeliverablesCell,
+  MetricsStrip,
+  CTAStrip,
 } from './components';
-import { CoreProjectsCell } from './AboutClient';
+import FounderSection from './FounderSection';
 
 export const metadata: Metadata = buildMetadata('about');
 
@@ -61,54 +62,79 @@ const CERTIFICATIONS = [
   { name: 'Android Studio Masterclass', issuer: 'Udemy' },
 ];
 
+const EDUCATION = [
+  {
+    period: '2023 – 2025',
+    degree: 'MS Computer Science',
+    school: 'New York Institute of Technology',
+    score: 'GPA 3.26 / 4.0',
+  },
+  {
+    period: '2019 – 2023',
+    degree: 'BTech Information Technology',
+    school: 'KSV University',
+    score: 'CGPA 7.52 / 10',
+  },
+];
+
+// Placeholder copy — refine to taste.
+const QUALITIES = [
+  {
+    icon: 'speed',
+    title: 'Performance-first',
+    body: 'Every page targets a 100 Lighthouse score. Speed is a feature, not an afterthought.',
+  },
+  {
+    icon: 'visibility',
+    title: 'No black box',
+    body: 'Systems should be inspectable. I build tools that show their work, not hide it.',
+  },
+  {
+    icon: 'bolt',
+    title: 'Ship, then iterate',
+    body: 'Real feedback beats perfect plans. I get things live fast and improve in the open.',
+  },
+  {
+    icon: 'handshake',
+    title: 'Built for trust',
+    body: 'Accuracy over hype — products that earn confidence by never making things up.',
+  },
+];
+
 export default function AboutPage() {
   return (
     <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-clip transition-colors duration-500">
-      
-      {/* HEADER STRIP */}
-      <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pt-20 pb-0">
-        <div className="max-w-8xl mx-auto px-6 md:px-12 py-6 flex items-center justify-between">
-          <div className="inline-flex items-center gap-2 px-4 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full ">
-            <span className="material-symbols-outlined text-[14px] text-blue-600">history_edu</span>
-            <span className="text-sm font-google tracking-widest font-regular text-slate-400 dark:text-slate-500">The story behind Sapybase</span>
-          </div>
-        </div>
-      </div>
 
-      <div className="max-w-8xl mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-colors duration-500">
-          <HeroCell />
-          <ProfileCell />
-        </div>
-      </div>
+      {/* 1 · Mission */}
+      <HeroCell />
 
-      <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
-        <MetricsStrip />
+      {/* 2 · What we believe */}
+      <ScrollReveal><BeliefSection /></ScrollReveal>
+
+      {/* Geometric Divider */}
+      <ScrollReveal><GeometricDivider /></ScrollReveal>
+
+      {/* 3 · Our story */}
+      <ScrollReveal><StorySection /></ScrollReveal>
+
+      {/* 4 · Our principles */}
+      <ScrollReveal><PrinciplesSection qualities={QUALITIES} /></ScrollReveal>
+
+      {/* 5 · What we build */}
+      <ScrollReveal><DeliverablesCell /></ScrollReveal>
+
+      {/* 7 · Meet the founder */}
+      <ScrollReveal>
+        <FounderSection
+          stack={STACK}
+          certifications={CERTIFICATIONS}
+          projects={PROJECTS_DATA}
+          education={EDUCATION}
+        />
       </ScrollReveal>
 
-      <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 border-x border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
-          <TechStackCell stack={STACK} />
-          <CoreProjectsCell projects={PROJECTS_DATA} />
-        </div>
-      </ScrollReveal>
-
-      <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-slate-200 dark:bg-slate-800 border-x border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
-          <EducationCell />
-          <CertificationsCell certifications={CERTIFICATIONS} />
-          <DeliverablesCell />
-        </div>
-      </ScrollReveal>
-
-      <ScrollReveal><Projects /></ScrollReveal>
-
-      <ScrollReveal className="max-w-8xl mx-auto px-6 md:px-12">
-        <CTAStrip />
-      </ScrollReveal>
-
-      {/* <div className="h-px bg-slate-200 dark:bg-slate-800 max-w-8xl mx-auto px-6 md:px-12" /> */}
-      <div className="pb-8" />
+      {/* 8 · CTA */}
+      <ScrollReveal><CTAStrip /></ScrollReveal>
     </div>
   );
 }
