@@ -15,11 +15,8 @@ const googleSans = Google_Sans({
 export const metadata: Metadata = {
   title: 'Sapybase',
   icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/SB_Brand-removebg.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: [{ url: '/favicon_180.svg', sizes: '180x180' }],
+    icon: [{ url: '/logo2.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/logo2.svg' }],
   },
 };
 

@@ -29,7 +29,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
 
   const BOT_NAME = name || 'Sapy AI';
   const THEME_COLOR = primaryColor || '#5730F5';
-  const LOGO_URL = customLogoUrl || `${ASSET_BASE_URL}/SB_loading.svg`;
+  const LOGO_URL = customLogoUrl || '';
 
   const isDark = theme === 'dark';
 
@@ -61,6 +61,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
                     themeColor={THEME_COLOR}
                     size="md"
                     bgStyle={avatarBgStyle || 'none'}
+                    isCustom={!!customLogoUrl}
                   />
                   <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 animate-pulse z-10" />
                 </div>

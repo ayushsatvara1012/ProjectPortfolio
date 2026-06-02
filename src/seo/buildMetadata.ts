@@ -14,13 +14,13 @@ export function buildMetadata(key: SeoKey): Metadata {
       url: entry.canonical,
       title: entry.title,
       description: entry.description,
-      images: [entry.ogImage],
+      // og:image is supplied by the file-based opengraph-image route.
     },
     twitter: {
       card: 'summary_large_image',
       title: entry.title,
       description: entry.description,
-      images: [entry.ogImage.url],
+      // twitter:image is supplied by the file-based twitter-image route.
     },
   };
 }

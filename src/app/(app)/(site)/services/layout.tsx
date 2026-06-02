@@ -8,13 +8,13 @@ export const metadata: Metadata = {
     title: 'AI Chatbot Solutions & Custom Integration | Sapybase',
     description: 'Custom AI chatbot deployment, RAG training, embedding, and white-label services from Sapybase.',
     url: 'https://www.sapybase.com/services',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    // og:image is supplied by the file-based opengraph-image route.
   },
   twitter: {
     card: 'summary_large_image',
     title: 'AI Chatbot Solutions & Custom Integration | Sapybase',
     description: 'Custom AI chatbot deployment, RAG training, embedding, and white-label services from Sapybase.',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    // twitter:image is supplied by the file-based twitter-image route.
   },
 };
 

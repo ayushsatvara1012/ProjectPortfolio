@@ -8,13 +8,13 @@ export const metadata: Metadata = {
     title: 'Build Your AI Bot | Contact Sapybase',
     description: 'Get in touch with the Sapybase team for sales, support, partnerships, or general questions.',
     url: 'https://www.sapybase.com/contact',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    // og:image is supplied by the file-based opengraph-image route.
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Build Your AI Bot | Contact Sapybase',
     description: 'Get in touch with the Sapybase team for sales, support, partnerships, or general questions.',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    // twitter:image is supplied by the file-based twitter-image route.
   },
 };
 

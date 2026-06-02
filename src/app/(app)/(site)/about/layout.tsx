@@ -8,13 +8,13 @@ export const metadata: Metadata = {
     title: 'About Sapybase | The Future of Autonomous AI Agents',
     description: 'The story, mission, and team behind Sapybase — purpose-built AI chatbots that actually answer your customers.',
     url: 'https://www.sapybase.com/about',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    // og:image is supplied by the file-based opengraph-image route.
   },
   twitter: {
     card: 'summary_large_image',
     title: 'About Sapybase | The Future of Autonomous AI Agents',
     description: 'The story, mission, and team behind Sapybase — purpose-built AI chatbots that actually answer your customers.',
-    images: ['https://www.sapybase.com/SB_Brand-removebg.png'],
+    // twitter:image is supplied by the file-based twitter-image route.
   },
 };
 

@@ -37,19 +37,19 @@ const PROJECTS_DATA = [
     title: 'Sapybase Portfolio',
     tech: 'React · Vite · Tailwind v4 · SEO',
     result: '100 Lighthouse',
-    tag: 'LIVE',
+    tag: 'Live',
   },
   {
     title: 'LuminaLib AI',
     tech: 'FastAPI · pgvector · RAG',
     result: '<80ms retrieval',
-    tag: 'DEPLOYED',
+    tag: 'Deployed',
   },
   {
     title: 'V-Comm Platform',
     tech: 'IAM · S3 · EC2 · Route53',
     result: '99.9% uptime',
-    tag: 'PRODUCTION',
+    tag: 'Production',
   },
 ];
 

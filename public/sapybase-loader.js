@@ -71,17 +71,19 @@
     var oy = shape.y || 0;
 
     var content = '';
+    var fill = isCustom ? 'url(#' + gradId + ')' : '#ffffff';
+
     if (safeUrl) {
-      var ix = isCustom ? ox : 15 + ox;
-      var iy = isCustom ? oy : 15 + oy;
-      var iw = isCustom ? 100 : 70;
-      var ih = isCustom ? 100 : 70;
+      var ix = isCustom ? ox : 20 + ox;
+      var iy = isCustom ? oy : 20 + oy;
+      var iw = isCustom ? 100 : 60;
+      var ih = isCustom ? 100 : 60;
       // Render both image and fallback text. Image will show if it loads;
       // text will show if image fails. Fallback ID allows image onerror to target it.
       content =
         '<g clip-path="url(#' + clipId + ')">' +
         '<image href="' + safeUrl + '" x="' + ix + '" y="' + iy + '" ' +
-        'width="' + iw + '" height="' + ih + '" preserveAspectRatio="xMidYMid slice" ' +
+        'width="' + iw + '" height="' + ih + '" preserveAspectRatio="xMidYMid meet" ' +
         'onerror="document.getElementById(\'' + fallbackId + '\').style.display=\'block\'" />' +
         '<text id="' + fallbackId + '" x="' + (50 + ox) + '" y="' + (52 + oy) + '" ' +
         'text-anchor="middle" dominant-baseline="middle" fill="#ffffff" ' +
@@ -107,7 +109,7 @@
       '</linearGradient>' +
       '<clipPath id="' + clipId + '"><path d="' + shape.path + '"/></clipPath>' +
       '</defs>' +
-      '<path d="' + shape.path + '" fill="url(#' + gradId + ')"/>' +
+      '<path d="' + shape.path + '" fill="' + fill + '"/>' +
       content +
       '</svg>'
     );
@@ -224,7 +226,7 @@
       const themeColor = cfg.theme_color || '#5730F5';
       const shapeId = cfg.logo_shape || 'circle';
       const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
-      let logoUrl = cfg.custom_logo_url || cfg.logo_url || '';
+      let logoUrl = cfg.custom_logo_url || '/logo2.svg';
       const isCustom = !!cfg.custom_logo_url;
       const botName = cfg.bot_name || 'Sapy AI';
 

@@ -4,6 +4,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { AVATAR_GRADIENTS, FAB_SHAPES, SHAPE_CLASS_MAP } from './avatar/AvatarShared';
 
+const IS_DEV = process.env.NODE_ENV === 'development';
+const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
+
 // ── Shape catalogue (for shape picker UI) ─────────────────────────────────────
 export const SHAPES = [
   {
@@ -100,6 +103,7 @@ type BotAvatarProps = {
   size?: 'sm' | 'md' | 'lg';
   themeColor?: string;
   bgStyle?: string;
+  isCustom?: boolean;
 };
 
 export function BotAvatar({
@@ -109,6 +113,7 @@ export function BotAvatar({
   size = 'md',
   themeColor = '#5730F5',
   bgStyle = 'none',
+  isCustom = true,
 }: BotAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
@@ -130,11 +135,14 @@ export function BotAvatar({
   const offsetY = shape.y || 0;
 
   const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
-  const initial = (botName || 'S').charAt(0).toUpperCase();
   const showImage = !!(logoUrl && logoUrl.trim() && !imgFailed);
+  const useFallback = !showImage || !isCustom;
+  const FallbackLogoUrl = `${ASSET_BASE_URL}/logo2.svg`;
 
-  // L1 fill: gradient when bgStyle set, otherwise themeColor
-  const baseFill = gradient ? `url(#${uid}-grad)` : themeColor;
+  // L1 fill: white backdrop when fallback logo is shown, otherwise themeColor or gradient
+  const baseFill = useFallback
+    ? '#ffffff'
+    : (gradient ? `url(#${uid}-grad)` : themeColor);
 
   // EC2: sizes in SVG coordinate units (viewBox is 0 0 100 100)
   const sizePx = { sm: 28, md: 40, lg: 56 }[size] ?? 40;
@@ -167,7 +175,7 @@ export function BotAvatar({
 
       {/* L2: white/slate backdrop clipped to shape — EC1 transparent PNG fix.
            EC8: if gradient bgStyle, show gradient not white so it shows through. */}
-      {showImage && (
+      {showImage && !useFallback && (
         <g clipPath={`url(#${uid}-clip)`}>
           {gradient ? (
             <rect x="0" y="0" width="100" height="100" fill={`url(#${uid}-grad)`} />
@@ -178,7 +186,7 @@ export function BotAvatar({
       )}
 
       {/* L3: custom logo clipped precisely to shape — EC2 tail coverage */}
-      {showImage && (
+      {showImage && !useFallback && (
         <g clipPath={`url(#${uid}-clip)`}>
           <image
             href={logoUrl}
@@ -191,23 +199,20 @@ export function BotAvatar({
         </g>
       )}
 
-      {/* L4: initial letter when no image — EC3, EC11 */}
-      {!showImage && (
-        <text
-          x={50 + offsetX}
-          y={52 + offsetY}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#ffffff"
-          style={{
-            fontSize: `${fontSize}px`,
-            fontFamily: 'var(--font-display, sans-serif)',
-            fontWeight: 700,
-          }}
-        >
-          {initial}
-        </text>
-      )}
+      {/* L4: fallback logo when no custom image or image fails to load */}
+      {useFallback ? (
+        <g clipPath={`url(#${uid}-clip)`}>
+          <image
+            href={FallbackLogoUrl}
+            xlinkHref={FallbackLogoUrl}
+            x={20 + offsetX}
+            y={20 + offsetY}
+            width={60}
+            height={60}
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </g>
+      ) : null}
     </svg>
   );
 }
@@ -235,6 +240,8 @@ export const FabWidgetPreview = ({
   const BOT_NAME = botName || 'S';
   const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
   const idPrefix = 'fab-preview';
+  const useFallback = !logoUrl || !isCustomUrl;
+  const FallbackLogoUrl = `${ASSET_BASE_URL}/logo2.svg`;
 
   return (
     <svg
@@ -278,14 +285,14 @@ export const FabWidgetPreview = ({
       <path
         d={FAB_PATH}
         fill={
-          gradient
-            ? `url(#${idPrefix}-grad)`
-            : logoUrl && isCustomUrl
-              ? THEME_COLOR
-              : `url(#${idPrefix}-light)`
+          useFallback
+            ? '#ffffff'
+            : gradient
+              ? `url(#${idPrefix}-grad)`
+              : THEME_COLOR
         }
         className={
-          !gradient && (!logoUrl || !isCustomUrl)
+          !gradient && !useFallback
             ? `dark:fill-[url(#${idPrefix}-dark)] transition-all duration-500`
             : 'transition-all duration-500'
         }
@@ -303,32 +310,29 @@ export const FabWidgetPreview = ({
       )}
 
       {/* Image clipped to shape — slice for custom URLs fills the full clip area */}
-      {logoUrl && (
+      {!useFallback ? (
         <g clipPath={`url(#${idPrefix}-clip)`}>
           <image
             href={logoUrl}
-            x={isCustomUrl ? (fabShape.x || 0) : (15 + (fabShape.x || 0))}
-            y={isCustomUrl ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
-            width={isCustomUrl ? 100 : 70}
-            height={isCustomUrl ? 100 : 70}
-            preserveAspectRatio={isCustomUrl ? 'xMidYMid slice' : 'xMidYMid meet'}
+            x={fabShape.x || 0}
+            y={fabShape.y || 0}
+            width={100}
+            height={100}
+            preserveAspectRatio="xMidYMid slice"
           />
         </g>
-      )}
-
-      {/* Fallback initial letter */}
-      {!logoUrl && (
-        <text
-          x={50 + (fabShape.x || 0)}
-          y={52 + (fabShape.y || 0)}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={gradient ? '#ffffff' : THEME_COLOR}
-          className="font-bold select-none pointer-events-none"
-          style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}
-        >
-          {(BOT_NAME || 'S').charAt(0).toUpperCase()}
-        </text>
+      ) : (
+        <g clipPath={`url(#${idPrefix}-clip)`}>
+          <image
+            href={FallbackLogoUrl}
+            xlinkHref={FallbackLogoUrl}
+            x={20 + (fabShape.x || 0)}
+            y={20 + (fabShape.y || 0)}
+            width={60}
+            height={60}
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </g>
       )}
 
       {/* 3D inset shadow overlay */}

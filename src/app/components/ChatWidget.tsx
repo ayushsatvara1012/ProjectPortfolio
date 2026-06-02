@@ -81,11 +81,14 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
   const offsetY = shape.y || 0;
 
   const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
-  const initial = String(botName || 'S').charAt(0).toUpperCase();
   const showImage = logoUrl && logoUrl.trim() && !imgFailed;
+  const useFallback = !showImage || !isCustom;
+  const FallbackLogoUrl = `${ASSET_BASE}/logo2.svg`;
 
-  // L1 fill: gradient when bgStyle set, otherwise themeColor or white backdrop
-  const baseFill = gradient ? `url(#${uid}-grad)` : (showImage ? (transparentBgImage ? 'transparent' : '#ffffff') : themeColor);
+  // L1 fill: white backdrop when fallback logo is shown, otherwise themeColor or gradient or custom white
+  const baseFill = useFallback
+    ? '#ffffff'
+    : (gradient ? `url(#${uid}-grad)` : (transparentBgImage ? 'transparent' : '#ffffff'));
 
   return (
     <div className={`${sizeClass} shrink-0 ${hasShadow ? 'shadow-sm' : ''} relative flex items-center justify-center`}>
@@ -111,7 +114,7 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
         <path d={FAB_PATH} fill={baseFill} />
 
         {/* L2: Image clipped precisely to shape */}
-        {showImage && isCustom && (
+        {!useFallback ? (
           <g clipPath={`url(#${uid}-clip)`}>
             <image
               href={logoUrl}
@@ -124,34 +127,20 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
               onError={() => setImgFailed(true)}
             />
           </g>
-        )}
-        {showImage && !isCustom && (
+        ) : (
           <g clipPath={`url(#${uid}-clip)`}>
-            <g transform={`translate(${15 + offsetX}, ${15 + offsetY})`}>
-              <svg viewBox="100 15 200 200" width="70" height="70" preserveAspectRatio="xMidYMid meet">
-                <path d="M128,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5" /><path d="M276,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5" /><path d="M128,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060" /><path d="M276,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060" /><path d="M201,44h-3c-1.105,0-2,.8954-2,2v3c0,1.1046.895,2,2,2h3c1.105,0,2-.8954,2-2v-3c0-1.1046-.895-2-2-2Z" opacity="0.45" fill="#5730f5" /><path d="M148,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M170,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M258,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M258,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M148,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M236,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M192,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M214,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M170,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#5730f5" /><path d="M236,100h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" transform="translate(0 -1.000054)" fill="#5730f5" /><path d="M192,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M214,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M170,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M236,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M148,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M258,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M192,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M213,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" />
-              </svg>
-            </g>
+            <image
+              href={FallbackLogoUrl}
+              xlinkHref={FallbackLogoUrl}
+              x={20 + offsetX}
+              y={20 + offsetY}
+              width={60}
+              height={60}
+              preserveAspectRatio="xMidYMid meet"
+            />
           </g>
         )}
 
-        {/* L3: Fallback Initial */}
-        {!showImage && (
-          <text
-            x={50 + offsetX}
-            y={52 + offsetY}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#ffffff"
-            style={{
-              fontSize: sizeClass.includes('w-10') ? '38px' : '28px',
-              fontFamily: 'var(--font-display, sans-serif)',
-              fontWeight: 700,
-            }}
-          >
-            {initial}
-          </text>
-        )}
       </svg>
     </div>
   );
@@ -184,7 +173,8 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
   }, [logoUrl]);
 
   const showImage = logoUrl && !imgFailed;
-  const initial = (botName || 'S').charAt(0).toUpperCase();
+  const useFallback = !showImage || !isCustomLogo;
+  const FallbackLogoUrl = `${ASSET_BASE}/logo2.svg`;
 
   return (
     <motion.button whileTap={{ scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -220,9 +210,9 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
             </linearGradient>
           )}
         </defs>
-        <path d={fabPath} fill={fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)'}
-          className={!fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
-        {showImage && isCustomLogo && (
+        <path d={fabPath} fill={useFallback ? '#ffffff' : (fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)')}
+          className={!useFallback && !fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
+        {!useFallback ? (
           <g clipPath="url(#fab-clip)">
             <image
               href={logoUrl}
@@ -235,20 +225,18 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
               onError={() => setImgFailed(true)}
             />
           </g>
-        )}
-        {showImage && !isCustomLogo && (
+        ) : (
           <g clipPath="url(#fab-clip)">
-            <g transform={`translate(${15 + (fabShapeX || 0)}, ${15 + (fabShapeY || 0)})`}>
-              <svg viewBox="100 15 200 200" width="70" height="70" preserveAspectRatio="xMidYMid meet">
-                <path d="M128,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5" /><path d="M276,104h-4c-1.105,0-2,.895-2,2v4c0,1.105.895,2,2,2h4c1.105,0,2-.895,2-2v-4c0-1.105-.895-2-2-2Z" opacity="0.45" fill="#5730f5" /><path d="M128,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060" /><path d="M276,146h-4c-.552,0-1,.448-1,1v4c0,.552.448,1,1,1h4c.552,0,1-.448,1-1v-4c0-.552-.448-1-1-1Z" opacity="0.4" fill="#0f2060" /><path d="M201,44h-3c-1.105,0-2,.8954-2,2v3c0,1.1046.895,2,2,2h3c1.105,0,2-.8954,2-2v-3c0-1.1046-.895-2-2-2Z" opacity="0.45" fill="#5730f5" /><path d="M148,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M170,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M258,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M258,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M148,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M236,59h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M192,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M214,77h-10c-2.209,0-4,1.7909-4,4v10c0,2.2091,1.791,4,4,4h10c2.209,0,4-1.7909,4-4v-10c0-2.2091-1.791-4-4-4Z" fill="#0f2060" /><path d="M170,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#5730f5" /><path d="M236,100h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" transform="translate(0 -1.000054)" fill="#5730f5" /><path d="M192,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M214,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M170,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M236,137h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M148,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M258,121h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M192,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" /><path d="M213,99h-10c-2.209,0-4,1.791-4,4v10c0,2.209,1.791,4,4,4h10c2.209,0,4-1.791,4-4v-10c0-2.209-1.791-4-4-4Z" fill="#0f2060" />
-              </svg>
-            </g>
+            <image
+              href={FallbackLogoUrl}
+              xlinkHref={FallbackLogoUrl}
+              x={20 + (fabShapeX || 0)}
+              y={20 + (fabShapeY || 0)}
+              width={60}
+              height={60}
+              preserveAspectRatio="xMidYMid meet"
+            />
           </g>
-        )}
-        {!showImage && (
-          <text x={50 + (fabShapeX || 0)} y={52 + (fabShapeY || 0)} textAnchor="middle" dominantBaseline="middle" fill={fabGradient ? '#ffffff' : themeColor} className="font-bold select-none pointer-events-none" style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
-            {initial}
-          </text>
         )}
         <path d={fabPath} fill="transparent" filter="url(#neumorphic-3d-inset)" className="pointer-events-none" />
         <path d={fabPath} fill="none" stroke={themeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-20" />
@@ -269,6 +257,8 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
   const BOT_NAME = botName || 'S';
   const gradient = AVATAR_BG_STYLE !== 'none' ? AVATAR_GRADIENTS[AVATAR_BG_STYLE] : null;
   const idPrefix = 'preview';
+  const FallbackLogoUrl = `${ASSET_BASE}/logo2.svg`;
+  const useFallback = !logoUrl || !isCustomUrl;
 
   return (
     <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 shrink-0 drop-shadow-sm" overflow="visible">
@@ -299,20 +289,18 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
           </linearGradient>
         )}
       </defs>
-      <path d={FAB_PATH} fill={gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`}
-        className={!gradient ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
-      {logoUrl && (
+      <path d={FAB_PATH} fill={useFallback ? '#ffffff' : (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`)}
+        className={!useFallback && !gradient ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
+      {!useFallback ? (
         <g clipPath={`url(#${idPrefix}-fab-clip)`}>
-          <image href={logoUrl} xlinkHref={logoUrl} x={isCustomUrl ? (fabShape.x || 0) : (15 + (fabShape.x || 0))} y={isCustomUrl ? (fabShape.y || 0) : (15 + (fabShape.y || 0))}
-            width={isCustomUrl ? 100 : 70} height={isCustomUrl ? 100 : 70} preserveAspectRatio="xMidYMid meet" />
+          <image href={logoUrl} xlinkHref={logoUrl} x={fabShape.x || 0} y={fabShape.y || 0}
+            width={100} height={100} preserveAspectRatio="xMidYMid slice" />
         </g>
-      )}
-      {!logoUrl && (
-        <text x={50 + (fabShape.x || 0)} y={52 + (fabShape.y || 0)} textAnchor="middle" dominantBaseline="middle"
-          fill={gradient ? '#ffffff' : THEME_COLOR} className="font-bold select-none pointer-events-none"
-          style={{ fontSize: '26px', fontFamily: 'var(--font-display, sans-serif)' }}>
-          {(BOT_NAME || 'S').charAt(0).toUpperCase()}
-        </text>
+      ) : (
+        <g clipPath={`url(#${idPrefix}-fab-clip)`}>
+          <image href={FallbackLogoUrl} xlinkHref={FallbackLogoUrl} x={20 + (fabShape.x || 0)} y={20 + (fabShape.y || 0)}
+            width={60} height={60} preserveAspectRatio="xMidYMid meet" />
+        </g>
       )}
       <path d={FAB_PATH} fill="transparent" filter={`url(#${idPrefix}-neumorphic-3d-inset)`} className="pointer-events-none" />
     </svg>
@@ -1108,12 +1096,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   <div className="relative flex items-center gap-3 pl-4">
                     <div className="relative">
                       <BotAvatar
-                        shapeId="circle"
+                        shapeId={LOGO_SHAPE}
                         logoUrl={LOGO_URL}
                         botName={BOT_NAME}
                         themeColor={THEME_COLOR}
-                        sizeClass="w-10 h-10 rounded-full"
+                        sizeClass={`w-10 h-10 ${SHAPE_CLASS_MAP[LOGO_SHAPE] || 'rounded-full'}`}
                         isCustom={!!configData.custom_logo_url}
+                        bgStyle={AVATAR_BG_STYLE}
                       />
                     </div>
                     <div className="flex flex-col justify-center">

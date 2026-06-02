@@ -71,7 +71,16 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [hoveredTag, setHoveredTag] = useState<string | null>(null);
-  const [connections, setConnections] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const [connections, setConnections] = useState<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    cp1x: number;
+    cp1y: number;
+    cp2x: number;
+    cp2y: number;
+  }[]>([]);
 
   useEffect(() => {
     if (expanded && sectionRef.current) {
@@ -96,24 +105,81 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
       if (!sourceEl) return;
 
       const sourceRect = sourceEl.getBoundingClientRect();
-      const x1 = sourceRect.left + sourceRect.width / 2 - containerRect.left;
-      const y1 = sourceRect.top + sourceRect.height / 2 - containerRect.top;
-
       const map = CONNECTIONS_MAP[hoveredTag];
       if (!map) return;
 
+      const sLeft = sourceRect.left - containerRect.left;
+      const sRight = sourceRect.right - containerRect.left;
+      const sTop = sourceRect.top - containerRect.top;
+      const sBottom = sourceRect.bottom - containerRect.top;
+      const sCenterX = sLeft + sourceRect.width / 2;
+      const sCenterY = sTop + sourceRect.height / 2;
+
       const newConnections: typeof connections = [];
+
+      const calculatePoints = (dRect: DOMRect) => {
+        const dLeft = dRect.left - containerRect.left;
+        const dRight = dRect.right - containerRect.left;
+        const dTop = dRect.top - containerRect.top;
+        const dBottom = dRect.bottom - containerRect.top;
+        const dCenterX = dLeft + dRect.width / 2;
+        const dCenterY = dTop + dRect.height / 2;
+
+        const distX = sLeft > dRight ? sLeft - dRight : dLeft > sRight ? dLeft - sRight : 0;
+        const distY = sTop > dBottom ? sTop - dBottom : dTop > sBottom ? dTop - sBottom : 0;
+
+        let x1, y1, x2, y2, cp1x, cp1y, cp2x, cp2y;
+
+        if (distX > distY) {
+          // Horizontal connection
+          if (sCenterX < dCenterX) {
+            x1 = sRight;
+            y1 = sCenterY;
+            x2 = dLeft;
+            y2 = dCenterY;
+          } else {
+            x1 = sLeft;
+            y1 = sCenterY;
+            x2 = dRight;
+            y2 = dCenterY;
+          }
+          const dx = x2 - x1;
+          cp1x = x1 + dx * 0.5;
+          cp1y = y1;
+          cp2x = x2 - dx * 0.5;
+          cp2y = y2;
+        } else {
+          // Vertical connection
+          if (sCenterY < dCenterY) {
+            x1 = sCenterX;
+            y1 = sBottom;
+            x2 = Math.max(dLeft, Math.min(dRight, sCenterX));
+            y2 = dTop;
+          } else {
+            x1 = sCenterX;
+            y1 = sTop;
+            x2 = Math.max(dLeft, Math.min(dRight, sCenterX));
+            y2 = dBottom;
+          }
+          const dy = y2 - y1;
+          cp1x = x1;
+          cp1y = y1 + dy * 0.5;
+          cp2x = x2;
+          cp2y = y2 - dy * 0.5;
+        }
+
+        // Prevent degenerate bounding box for SVG linear gradients (occurs on vertical/horizontal lines)
+        if (Math.abs(x1 - x2) < 1) x2 = x1 + 1;
+        if (Math.abs(y1 - y2) < 1) y2 = y1 + 1;
+
+        return { x1, y1, x2, y2, cp1x, cp1y, cp2x, cp2y };
+      };
 
       map.projects.forEach((proj) => {
         const el = container.querySelector(`[data-project-title="${proj}"]`);
         if (el) {
           const rect = el.getBoundingClientRect();
-          newConnections.push({
-            x1,
-            y1,
-            x2: rect.left + 16 - containerRect.left,
-            y2: rect.top + rect.height / 2 - containerRect.top,
-          });
+          newConnections.push(calculatePoints(rect));
         }
       });
 
@@ -121,12 +187,7 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
         const el = container.querySelector(`[data-cert-name="${cert}"]`);
         if (el) {
           const rect = el.getBoundingClientRect();
-          newConnections.push({
-            x1,
-            y1,
-            x2: rect.left + 8 - containerRect.left,
-            y2: rect.top + rect.height / 2 - containerRect.top,
-          });
+          newConnections.push(calculatePoints(rect));
         }
       });
 
@@ -250,7 +311,7 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
                         {connections.map((c, idx) => (
                           <g key={idx}>
                             <motion.path
-                              d={`M ${c.x1} ${c.y1} C ${(c.x1 + c.x2) / 2} ${c.y1}, ${(c.x1 + c.x2) / 2} ${c.y2}, ${c.x2} ${c.y2}`}
+                              d={`M ${c.x1} ${c.y1} C ${c.cp1x} ${c.cp1y}, ${c.cp2x} ${c.cp2y}, ${c.x2} ${c.y2}`}
                               stroke="url(#dossier-line-grad)"
                               strokeWidth="1.5"
                               strokeDasharray="4 4"
@@ -283,7 +344,7 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
                               <p className="text-xs font-google font-bold uppercase tracking-widest text-slate-400 mb-1">
                                 {e.period}
                               </p>
-                              <h5 className="text-base font-google font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                              <h5 className="text-base font-google font-medium text-slate-900 dark:text-slate-100 leading-tight">
                                 {e.degree}
                               </h5>
                               <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-0.5">
@@ -302,7 +363,7 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
                         <SectionLabel icon="folder_open">Projects</SectionLabel>
                         <div className="flex flex-col divide-y divide-slate-200/70 dark:divide-slate-800/70">
                           {projects.map((p, i) => {
-                            const live = p.tag === 'LIVE' || p.tag === 'DEPLOYED';
+                            const live = p.tag === 'Live' || p.tag === 'Deployed';
                             const isLinked = hoveredTag && CONNECTIONS_MAP[hoveredTag]?.projects.includes(p.title);
                             return (
                               <div
@@ -317,25 +378,24 @@ const FounderSection = ({ stack, certifications, projects, education }: FounderS
                                 }`}
                               >
                                 <div className="flex items-center gap-3 min-w-0">
-                                  <span
-                                    className={`text-[10px] font-google font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border shrink-0 ${
-                                      live
-                                        ? 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                                        : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                    }`}
-                                  >
-                                    {p.tag}
-                                  </span>
                                   <div className="min-w-0">
-                                    <p className="text-sm font-google font-semibold text-slate-900 dark:text-slate-100 truncate">
+                                    <p className="text-base font-google font-medium text-slate-900 dark:text-slate-100 truncate">
                                       {p.title}
                                     </p>
-                                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate">
-                                      {p.tech}
-                                    </p>
+                                    <div className="flex items-center gap-1.5 text-sm font-google text-slate-400 dark:text-slate-500">
+                                      <span className="truncate">{p.tech}</span>
+                                      <span className="text-slate-300 dark:text-slate-700">•</span>
+                                      <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 ${
+                                        live
+                                          ? 'text-emerald-600 dark:text-emerald-500'
+                                          : 'text-blue-600 dark:text-blue-500'
+                                      }`}>
+                                        {p.tag}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                                <span className="text-xs font-google font-bold text-emerald-600 dark:text-emerald-500 whitespace-nowrap">
+                                <span className="text-xs font-google font-normal text-emerald-600 dark:text-emerald-500 whitespace-nowrap">
                                   {p.result}
                                 </span>
                               </div>

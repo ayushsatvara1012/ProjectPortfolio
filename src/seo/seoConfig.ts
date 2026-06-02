@@ -1,10 +1,3 @@
-const OG_IMAGE = {
-  url: 'https://www.sapybase.com/SB_Brand-removebg.png',
-  width: 1200,
-  height: 630,
-  alt: 'Sapybase — AI Chatbot That Knows Your Business',
-};
-
 export const seoConfig = {
   home: {
     title: 'Sapybase — AI Chatbot That Knows Your Business | Deploy in 10 Minutes',
@@ -24,7 +17,6 @@ export const seoConfig = {
       'PDF chatbot',
       'Sapybase',
     ],
-    ogImage: OG_IMAGE,
   },
   about: {
     title: 'About Sapybase — Built to Make AI Work for Every Business',
@@ -32,7 +24,6 @@ export const seoConfig = {
       'Sapybase was built by Ayush Satvara to give every business — not just tech companies — access to accurate, reliable AI support automation. Learn the story and the team.',
     canonical: 'https://www.sapybase.com/about',
     keywords: ['about Sapybase', 'Sapybase founder', 'Ayush Satvara', 'AI customer support platform', 'business AI chatbot'],
-    ogImage: OG_IMAGE,
   },
   contact: {
     title: 'Build Your AI Bot | Contact Sapybase',
@@ -40,7 +31,6 @@ export const seoConfig = {
       'Ready to automate? Contact Sapybase for a consultation on deploying custom AI chatbots for your business. Scalable, intelligent, and production-ready solutions.',
     canonical: 'https://www.sapybase.com/contact',
     keywords: ['contact Sapybase', 'AI chatbot consultation', 'deploy AI bot', 'custom AI solution'],
-    ogImage: OG_IMAGE,
   },
   services: {
     title: 'Sapybase AI Chatbot — Features & Capabilities',
@@ -48,7 +38,6 @@ export const seoConfig = {
       'From lead capture to ROI analytics, see everything your Sapybase chatbot does automatically — 24/7 support, conversation memory, custom branding, and real-time insights.',
     canonical: 'https://www.sapybase.com/services',
     keywords: ['AI chatbot features', 'chatbot lead capture', 'chatbot ROI analytics', 'AI customer support features', 'no-code chatbot platform'],
-    ogImage: OG_IMAGE,
   },
   pricing: {
     title: 'Pricing Plans | Sapybase AI Chatbot',
@@ -56,14 +45,12 @@ export const seoConfig = {
       'Simple, transparent pricing for every stage of your business. Start free, scale as you grow — from solo projects to enterprise AI deployments with Sapybase.',
     canonical: 'https://www.sapybase.com/pricing',
     keywords: ['Sapybase pricing', 'AI chatbot plans', 'chatbot subscription', 'enterprise AI pricing'],
-    ogImage: OG_IMAGE,
   },
   docs: {
     title: 'Documentation | Sapybase',
     description: 'Step-by-step guide to integrating, training, and customizing your Sapybase AI chatbot.',
     canonical: 'https://www.sapybase.com/docs',
     keywords: ['Sapybase docs', 'chatbot integration guide', 'AI bot setup', 'API documentation'],
-    ogImage: OG_IMAGE,
   },
   privacy: {
     title: 'Privacy Policy | Sapybase',
@@ -71,7 +58,6 @@ export const seoConfig = {
       'Read the Sapybase privacy policy to understand how we collect, use, and protect your personal information.',
     canonical: 'https://www.sapybase.com/privacy-policy',
     keywords: ['Sapybase privacy policy', 'data protection', 'GDPR'],
-    ogImage: OG_IMAGE,
   },
   terms: {
     title: 'Terms & Conditions | Sapybase',
@@ -79,7 +65,6 @@ export const seoConfig = {
       'Review the Sapybase terms and conditions governing use of our services, intellectual property, and service agreements.',
     canonical: 'https://www.sapybase.com/terms-and-conditions',
     keywords: ['Sapybase terms', 'terms of service', 'service agreement'],
-    ogImage: OG_IMAGE,
   },
 } as const;
 

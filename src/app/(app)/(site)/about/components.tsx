@@ -352,12 +352,12 @@ export const StorySection = () => (
           </h2>
           <div className="mt-6 flex flex-col gap-5 text-base md:text-lg font-google text-slate-600 dark:text-slate-300 leading-relaxed">
             <p>
-              I kept seeing businesses lose customers to unanswered questions — and the existing chatbot
+              I kept seeing businesses lose customers because of not able to cope up with the generative AI trend — and the existing chatbot
               solutions were either too generic, too expensive, or required a developer just to set up.
             </p>
             <p>
-              So I built the product I wanted to exist: an AI agent that actually knows your business,
-              never makes things up, and shows you exactly what it&apos;s earning you.
+              So I built the products I wanted to exist: which actually knows your business,
+              never makes things up, and shows you exactly where the leads are coming from and what it&apos;s earning you.
             </p>
           </div>
           <p className="mt-6 text-sm font-google font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
