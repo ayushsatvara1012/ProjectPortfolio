@@ -470,30 +470,11 @@ def require_fresh_admin(request: Request):
         )
     return auth_state
 
-# ── Plan Definitions ────────────────────────────────────────────────────────
-PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
-    "BASIC":      {"max_bots": 1,   "messages": 500,    "chunks": 100,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
-    "STARTER":    {"max_bots": 2,   "messages": 2000,   "chunks": 500,   "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": False, "analytics": False},
-    "PRO":        {"max_bots": 5,   "messages": 5000,   "chunks": 2000,  "speed": "dedicated", "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
-    "BUSINESS":   {"max_bots": 15,  "messages": 15000,  "chunks": 10000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
-}
+# ── Plan / model definitions — extracted to config.py ──
+# Re-exported so main.PLAN_LIMITS / get_plan() / get_tier_model() and the test
+# suite resolve unchanged. These are immutable; functions below read them here.
+from config import PLAN_LIMITS, MODEL_MAPPING, VALID_MODELS, UNLIMITED_PLAN
 
-# ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
-# Maps user tiers to specific models for cost efficiency and performance.
-MODEL_MAPPING = {
-    "FREE":       "gemini-2.5-flash-lite",
-    "BASIC":      "gemini-2.5-flash-lite",
-    "STARTER":    "gemini-2.5-flash",
-    "PRO":        "gemini-2.5-pro",
-    "BUSINESS":   "gemini-2.5-pro",
-    "ENTERPRISE": "gemini-3.1-pro-preview",
-}
-
-VALID_MODELS = set(MODEL_MAPPING.values()) | {
-    "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
-}
 
 def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dict = None):
     """
@@ -536,8 +517,6 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
         max_output_tokens=max_tokens,
         temperature=0.7,
     )
-
-UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
 
 def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> dict:
     if role == "SUPER_ADMIN":
@@ -1305,25 +1284,9 @@ def _check_fts_column() -> bool:
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 
 
-def safe_json_loads(val):
-    if isinstance(val, str):
-        try:
-            return json.loads(val)
-        except Exception:
-            return []
-    return val or []
-
-
-def normalize_quick_questions(raw):
-    """Convert stored quick_questions (old {label,prompt} or new plain string) to list[str]."""
-    items = safe_json_loads(raw)
-    result = []
-    for item in items:
-        if isinstance(item, dict):
-            result.append(item.get("label") or item.get("prompt") or "")
-        elif isinstance(item, str):
-            result.append(item)
-    return [q for q in result if q]
+# Pure parsing helpers extracted to parsing_utils.py; re-exported so
+# `from main import ...` / `main.X` and the test suite resolve unchanged.
+from parsing_utils import safe_json_loads, normalize_quick_questions
 
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
