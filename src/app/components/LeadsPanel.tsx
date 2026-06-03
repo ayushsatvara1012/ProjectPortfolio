@@ -7,6 +7,31 @@ import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 
 const cellCls = 'bg-white dark:bg-slate-950 transition-colors duration-500';
 
+const BAND_STYLES: Record<string, string> = {
+    HOT: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-900/40',
+    WARM: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/40',
+    COLD: 'text-slate-500 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-800/40 dark:border-slate-700',
+};
+
+const ScoreBadge = ({ score, band, reasons }: { score: number | null; band: string | null; reasons?: string[] }) => {
+    if (score === null || score === undefined || !band) {
+        return (
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-300 dark:text-slate-600 font-google">
+                Unscored
+            </span>
+        );
+    }
+    const cls = BAND_STYLES[band] || BAND_STYLES.COLD;
+    return (
+        <span
+            title={reasons && reasons.length ? reasons.join(' · ') : undefined}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold font-google whitespace-nowrap ${cls}`}
+        >
+            {band} · {score}
+        </span>
+    );
+};
+
 interface LeadsPanelProps {
     selectedBotId: string;
     authFetch: any;
@@ -15,13 +40,15 @@ interface LeadsPanelProps {
 
 const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps) => {
     const [page, setPage] = useState(1);
+    const [sort, setSort] = useState('recent');   // 'recent' | 'score'
+    const [band, setBand] = useState('all');       // 'all' | 'HOT' | 'WARM' | 'COLD'
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const { getToken } = useAuth();
 
     const { data: leadsData, isLoading } = useQuery({
-        queryKey: ['leads', selectedBotId, page],
-        queryFn: () => authFetch(`/api/leads/${selectedBotId}?page=${page}&limit=50`),
+        queryKey: ['leads', selectedBotId, page, sort, band],
+        queryFn: () => authFetch(`/api/leads/${selectedBotId}?page=${page}&limit=50&sort=${sort}&band=${band}`),
         enabled: !!selectedBotId && isAuthorized,
         staleTime: 60_000,
     });
@@ -88,14 +115,40 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                         Total Leads: {total}
                     </h2>
                 </div>
-                {total > 0 && (
-                    <button
-                        onClick={handleExport}
-                        className="px-4 py-2 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 text-sm font-bold font-google uppercase tracking-widest flex items-center justify-center gap-2 transition-colors active:scale-95"
-                    >
-                        <span className="material-symbols-outlined text-[16px]">download</span>
-                        Export CSV
-                    </button>
+                {(total > 0 || band !== 'all') && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Band filter */}
+                        {(['all', 'HOT', 'WARM', 'COLD'] as const).map(b => (
+                            <button
+                                key={b}
+                                onClick={() => { setBand(b); setPage(1); }}
+                                className={`px-3 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google transition-colors rounded-sm ${band === b
+                                    ? (b === 'HOT' ? 'bg-red-500 text-white'
+                                        : b === 'WARM' ? 'bg-amber-500 text-white'
+                                            : b === 'COLD' ? 'bg-slate-500 text-white'
+                                                : 'bg-slate-900 dark:bg-blue-600 text-white')
+                                    : 'border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900'}`}
+                            >
+                                {b === 'all' ? 'All' : b}
+                            </button>
+                        ))}
+                        {/* Sort toggle */}
+                        <button
+                            onClick={() => { setSort(s => s === 'score' ? 'recent' : 'score'); setPage(1); }}
+                            className="px-3 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google rounded-sm border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900 flex items-center gap-1.5 transition-colors"
+                            title="Toggle sort order"
+                        >
+                            <span className="material-symbols-outlined text-[14px]">sort</span>
+                            {sort === 'score' ? 'Score' : 'Recent'}
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="px-4 py-2 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 text-sm font-bold font-google uppercase tracking-widest flex items-center justify-center gap-2 transition-colors active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">download</span>
+                            Export CSV
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -105,9 +158,13 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                     <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                         <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">inbox</span>
                     </div>
-                    <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">No leads captured yet</h2>
+                    <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">
+                        {band !== 'all' ? `No ${band.toLowerCase()} leads` : 'No leads captured yet'}
+                    </h2>
                     <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed">
-                        Once your bot triggers the lead form, contacts will appear here.
+                        {band !== 'all'
+                            ? 'No leads in this band yet. Try a different filter.'
+                            : 'Once your bot triggers the lead form, contacts will appear here.'}
                     </p>
                 </div>
             ) : (
@@ -119,8 +176,11 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                             <div key={lead.id} className="p-4 flex flex-col gap-3">
                                 {/* Contact row */}
                                 <div className="flex items-start justify-between gap-2">
-                                    <div className="flex flex-col gap-0.5 min-w-0">
-                                        <span className="font-semibold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
+                                    <div className="flex flex-col gap-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-semibold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
+                                            <ScoreBadge score={lead.score} band={lead.band} reasons={lead.reasons} />
+                                        </div>
                                         {lead.name && (
                                             <span className="text-sm text-slate-500 dark:text-slate-400 font-google tracking-wide">{lead.name}</span>
                                         )}
@@ -177,10 +237,11 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                         <table className="w-full text-left border-collapse min-w-[800px]">
                             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900/90 shadow-sm transition-colors border-b border-gray-100 dark:border-slate-800 backdrop-blur-sm">
                                 <tr>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[40%]">Contact Info</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[40%]">Context / Query</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[30%]">Contact Info</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[12%]">Score</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[33%]">Context / Query</th>
                                     <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[15%]">Captured At</th>
-                                    <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-[5%]">Action</th>
+                                    <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-[10%]">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
@@ -191,6 +252,9 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                                                 <span className="font-bold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
                                                 {lead.name && <span className="text-md text-slate-500 dark:text-slate-400 font-mono tracking-wide">{lead.name}</span>}
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
+                                            <ScoreBadge score={lead.score} band={lead.band} reasons={lead.reasons} />
                                         </td>
                                         <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
                                             <p className="text-md font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap break-words">

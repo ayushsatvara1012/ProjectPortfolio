@@ -631,6 +631,42 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       : Math.random().toString(36).substring(2, 15)
   );
 
+  // Widget session token (anti quota-drain). Minted from /api/widget/session and
+  // sent as x-Sapybase-session on every /api/chat call. Stored in a ref; lazily
+  // re-minted when missing or within 60s of expiry.
+  const sessionTokenRef = useRef<{ token: string; exp: number } | null>(null);
+
+  const getSessionToken = useCallback(async (): Promise<string | null> => {
+    if (!activeApiKey) return null;
+    const cached = sessionTokenRef.current;
+    if (cached && cached.exp - Date.now() > 60_000) return cached.token;
+    try {
+      const parentOrigin = (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin || '';
+      const res = await fetch(`${activeApiUrl}/api/widget/session`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': activeApiKey,
+          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+        },
+      });
+      if (!res.ok) {
+        console.warn(`[Sapybase] session token mint failed: ${res.status}`);
+        return null; // 503 during soft-launch = not configured; chat still works
+      }
+      const data = await res.json();
+      const ttlMs = (Number(data.expires_in) || 1800) * 1000;
+      sessionTokenRef.current = { token: data.token, exp: Date.now() + ttlMs };
+      return data.token;
+    } catch (err) {
+      console.warn('[Sapybase] session token mint error:', err);
+      return null;
+    }
+  }, [activeApiKey, activeApiUrl]);
+
+  useEffect(() => {
+    if (activeApiKey) void getSessionToken();
+  }, [activeApiKey, getSessionToken]);
+
   const leadCaptureEnabledRef = useRef(false);
 
   useEffect(() => {
@@ -873,12 +909,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     const SSE_MAX_RETRIES = 1;
     try {
       const parentOriginChat = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const sessionToken = await getSessionToken();
       await fetchEventSource(`${activeApiUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': resolvedApiKey,
           ...(parentOriginChat ? { 'x-Sapybase-parent-origin': parentOriginChat } : {}),
+          ...(sessionToken ? { 'x-Sapybase-session': sessionToken } : {}),
         },
         body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId }),
         signal: ctrl.signal,
@@ -900,6 +938,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             throw new Error('CACHE_HIT');
           }
           if (!response.ok) {
+            if (response.status === 401) {
+              sessionTokenRef.current = null; // force re-mint on next send
+            }
             if (response.status === 402) {
               let detail = null;
               try { detail = await response.json(); } catch { /* noop */ }

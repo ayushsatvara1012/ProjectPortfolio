@@ -15,6 +15,10 @@ export const seoConfig = {
       'chatbot lead capture',
       'AI FAQ bot',
       'PDF chatbot',
+      'customer support analytics',
+      'chatbot ROI tracking',
+      'AI support insights',
+      'conversation analytics',
       'Sapybase',
     ],
   },
@@ -37,7 +41,7 @@ export const seoConfig = {
     description:
       'From lead capture to ROI analytics, see everything your Sapybase chatbot does automatically — 24/7 support, conversation memory, custom branding, and real-time insights.',
     canonical: 'https://www.sapybase.com/services',
-    keywords: ['AI chatbot features', 'chatbot lead capture', 'chatbot ROI analytics', 'AI customer support features', 'no-code chatbot platform'],
+    keywords: ['AI chatbot features', 'chatbot lead capture', 'chatbot ROI analytics', 'AI customer support features', 'no-code chatbot platform', 'AI support insights', 'chatbot conversation analytics', 'support automation ROI'],
   },
   pricing: {
     title: 'Pricing Plans | Sapybase AI Chatbot',
@@ -65,6 +69,19 @@ export const seoConfig = {
       'Review the Sapybase terms and conditions governing use of our services, intellectual property, and service agreements.',
     canonical: 'https://www.sapybase.com/terms-and-conditions',
     keywords: ['Sapybase terms', 'terms of service', 'service agreement'],
+  },
+  blog: {
+    title: 'Blog — AI Chatbot Guides, ROI, and Best Practices | Sapybase',
+    description:
+      'Practical guides on launching AI support chatbots, measuring chatbot ROI, capturing leads, and keeping answers accurate. Written for non-technical teams.',
+    canonical: 'https://www.sapybase.com/blog',
+    keywords: [
+      'AI chatbot guides',
+      'chatbot best practices',
+      'customer support automation blog',
+      'AI support insights',
+      'chatbot ROI',
+    ],
   },
 } as const;
 

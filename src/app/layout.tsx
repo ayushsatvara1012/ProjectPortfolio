@@ -51,9 +51,16 @@ export default function RootLayout({
         </Script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <Script id="material-symbols-font" strategy="afterInteractive">
-          {`var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap';document.head.appendChild(l);`}
-        </Script>
+        {/* Material Symbols icon font — preloaded so icons are present on first paint (no ligature-text flash) */}
+        <link
+          rel="preload"
+          as="style"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap"
+        />
       </head>
       <body suppressHydrationWarning>
         <SmoothScrollProvider>

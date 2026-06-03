@@ -7,6 +7,7 @@ import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthen
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import LeadsPanel from '@/src/app/components/LeadsPanel';
 import ConversationsPanel from '@/src/app/components/ConversationsPanel';
+import FixesNeededPanel from '@/src/app/components/FixesNeededPanel';
 import ROIPanel from '@/src/app/components/ROIPanel';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -329,6 +330,7 @@ export default function AppInsights() {
                         { id: 'analytics', label: 'Analytics' },
                         { id: 'leads', label: 'Leads CRM' },
                         { id: 'conversations', label: 'Conversations' },
+                        { id: 'fixes', label: 'Fixes Needed' },
                         { id: 'roi', label: 'ROI' },
                     ].map(tab => (
                         <button
@@ -395,6 +397,14 @@ export default function AppInsights() {
 
                 {activeTab === 'conversations' && (
                     <ConversationsPanel
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        isAuthorized={canAnalytics}
+                    />
+                )}
+
+                {activeTab === 'fixes' && (
+                    <FixesNeededPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
                         isAuthorized={canAnalytics}

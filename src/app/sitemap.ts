@@ -1,24 +1,37 @@
 import { MetadataRoute } from 'next'
+import { allPosts } from '@/src/content/blog'
+
+const baseUrl = 'https://www.sapybase.com'
+
+// Real content-update dates. Bump a route's date only when its CONTENT
+// meaningfully changes — this is the signal Google uses for crawl priority.
+const routes: { path: string; lastModified: string; priority: number }[] = [
+  { path: '',                      lastModified: '2026-06-02', priority: 1.0 },
+  { path: '/pricing',              lastModified: '2026-06-02', priority: 0.8 },
+  { path: '/about',                lastModified: '2026-06-02', priority: 0.8 },
+  { path: '/contact',              lastModified: '2026-05-30', priority: 0.8 },
+  { path: '/services',             lastModified: '2026-05-30', priority: 0.8 },
+  { path: '/docs',                 lastModified: '2026-05-30', priority: 0.8 },
+  { path: '/blog',                 lastModified: '2026-06-02', priority: 0.7 },
+  { path: '/privacy-policy',       lastModified: '2026-05-30', priority: 0.5 },
+  { path: '/terms-and-conditions', lastModified: '2026-05-30', priority: 0.5 },
+]
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://www.sapybase.com'
-  
-  // List all public routes that should be indexed
-  const routes = [
-    '',
-    '/pricing',
-    '/about',
-    '/contact',
-    '/services',
-    '/docs',
-    '/privacy-policy',
-    '/terms-and-conditions',
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date(),
+  const staticEntries = routes.map(({ path, lastModified, priority }) => ({
+    url: `${baseUrl}${path}`,
+    lastModified: new Date(lastModified),
     changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
+    priority,
   }))
 
-  return routes
+  // Each blog article, using its own content-update date.
+  const blogEntries = allPosts.map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.dateModified),
+    changeFrequency: 'monthly' as const,
+    priority: 0.6,
+  }))
+
+  return [...staticEntries, ...blogEntries]
 }

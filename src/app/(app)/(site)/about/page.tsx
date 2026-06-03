@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
+import BreadcrumbJsonLd from '@/src/components/seo/BreadcrumbJsonLd';
 import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 import Testimonials from '@/src/components/marketing/Testimonials';
 import SocialProofBar from '@/src/components/marketing/SocialProofBar';
@@ -104,6 +105,7 @@ const QUALITIES = [
 export default function AboutPage() {
   return (
     <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 overflow-x-clip transition-colors duration-500">
+      <BreadcrumbJsonLd trail={[{ name: 'About', path: '/about' }]} />
 
       {/* 1 · Mission */}
       <HeroCell />
