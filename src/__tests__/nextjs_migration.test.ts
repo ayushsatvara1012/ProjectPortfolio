@@ -81,7 +81,7 @@ describe('useAuthenticatedFetch', () => {
     );
   });
 
-  it('prefixes NEXT_PUBLIC_API_URL to relative paths', async () => {
+  it('keeps URLs relative in the browser (prefix is SSR-only)', async () => {
     const originalUrl = process.env.NEXT_PUBLIC_API_URL;
     process.env.NEXT_PUBLIC_API_URL = 'https://sapyai.onrender.com';
 
@@ -96,7 +96,9 @@ describe('useAuthenticatedFetch', () => {
     const { result } = renderHook(() => useAuthenticatedFetch());
     await result.current('/api/companies');
 
-    expect(mockFetch.mock.calls[0][0]).toBe('https://sapyai.onrender.com/api/companies');
+    // In the browser, requests are same-origin (relative) to avoid CORS and
+    // work behind the proxy; NEXT_PUBLIC_API_URL only applies during SSR.
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/companies');
     process.env.NEXT_PUBLIC_API_URL = originalUrl;
   });
 
