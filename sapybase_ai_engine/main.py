@@ -68,6 +68,8 @@ CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
 POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+# Shared secret for internal scheduled jobs (e.g. the weekly digest cron trigger).
+CRON_SECRET = os.getenv("CRON_SECRET", "")
 
 # 1a. Structured Logging
 logger = logging.getLogger(__name__)
@@ -612,22 +614,8 @@ print(f"POLAR PRODUCT MAP: {len(POLAR_PRODUCT_TIER_MAP)} products mapped: {sorte
 # gates abuse and runaway loops (429). BUSINESS gets the highest ceiling AND
 # the priority Gemini model (see MODEL_MAPPING) — so "ultra" is genuinely
 # both lower-latency model AND higher concurrent throughput.
-TIER_RATE_LIMITS = {
-    # NOTE on FREE: it is gated UPSTREAM by its monthly quota
-    # (PLAN_LIMITS["FREE"]["messages"] == 0), which returns 402 MESSAGE_LIMIT_EXCEEDED
-    # before any LLM call. The 0 values below mean "no per-tier rate cap enforced in
-    # this gate" — FREE never reaches the LLM path here, so it needs no rate ceiling.
-    # per_day is an anti-abuse backstop: it bounds how fast a single tenant's monthly
-    # quota / LLM spend can be drained (e.g. by widget-key replay), well above any
-    # legitimate single-bot daily volume.
-    "FREE":       {"per_minute": 0,   "per_hour": 0,      "per_day": 0},
-    "BASIC":      {"per_minute": 20,  "per_hour": 200,    "per_day": 1200},
-    "STARTER":    {"per_minute": 40,  "per_hour": 800,    "per_day": 4800},
-    "PRO":        {"per_minute": 80,  "per_hour": 2000,   "per_day": 12000},
-    "BUSINESS":   {"per_minute": 200, "per_hour": 5000,   "per_day": 30000},   # ultra-speed tier
-    "ENTERPRISE": {"per_minute": 500, "per_hour": 999999, "per_day": 999999},
-    "CUSTOM":     {"per_minute": 100, "per_hour": 3000,   "per_day": 18000},   # safe default; override via custom_plan_config
-}
+# ── Tier-aware per-minute caps — extracted to config.py (re-exported) ──
+from config import TIER_RATE_LIMITS
 
 
 # ── Widget session tokens (anti quota-drain) ─────────────────────────────────
@@ -988,210 +976,37 @@ app.add_middleware(
     max_age=86400,
 )
 
-# 4. Define Request/Response Models
-class RegisterRequest(BaseModel):
-    company_name: str
-    allowed_origin: str # e.g., "https://www.globex.com"
-    theme_color: str = "#5730F5"
-    company_tone: str = "Professional and helpful"
+# 4. Define Request/Response Models — extracted to models.py and re-exported so
+# `from main import ChatRequest` (etc.) and the test suite resolve unchanged.
+from models import (
+    RegisterRequest, ChatMessage, ChatRequest, ChatResponse, LeadCaptureRequest,
+    SubscriptionRequest, HandoffMessage, HandoffRequest, UserRole, UserTier,
+    CustomPlanConfig, AdminUpdateUserRequest, CompanyUpdate, RoiBenchmarkUpdate,
+    DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
+    CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
+)
 
-def _load_jailbreak_patterns():
-    patterns_path = os.path.join(os.path.dirname(__file__), "jailbreak_patterns.json")
-    try:
-        with open(patterns_path) as f:
-            return json.load(f)
-    except Exception as e:
-        logger.warning(f"Failed to load jailbreak_patterns.json: {e}; using empty list")
-        return []
+# ── Prompt-injection / jailbreak hardening — extracted to input_safety.py ──
+# The mutable JAILBREAK_PATTERNS now lives in input_safety; sanitize_message()
+# reads it live, and the admin reload endpoint calls input_safety.reload_patterns().
+# _strip_control_tags is re-exported (used in the chat path + test suite).
+import input_safety
+from input_safety import _strip_control_tags, sanitize_message
 
-JAILBREAK_PATTERNS = _load_jailbreak_patterns()
+# ── Logo validation limits / allowlists — extracted to config.py (re-exported) ──
+from config import VALID_LOGO_SHAPES, BLOCKED_LOGO_URL_PATTERNS, MAX_LOGO_BYTES
 
+# (ChatMessage … UserTier moved to models.py — re-exported above)
 
-def _strip_control_tags(text: str) -> str:
-    """Remove our own prompt control tokens from untrusted content (retrieved
-    chunks) so a poisoned document can't inject a fake delimiter to 'escape'
-    its sandbox in the system prompt. Indirect-prompt-injection hardening."""
-    if not text:
-        return ""
-    for tok in ("<knowledge_base>", "</knowledge_base>", "<user_query>", "</user_query>"):
-        text = text.replace(tok, "").replace(tok.upper(), "")
-    return text
+# ── Custom plan feature keys / defaults — extracted to config.py (re-exported) ──
+from config import CUSTOM_PLAN_FEATURE_KEYS, CUSTOM_PLAN_DEFAULTS
 
-VALID_LOGO_SHAPES = {"circle", "squircle", "bento", "sharp"}
-
-# Regex patterns for blocked logo URL patterns (SSRF + abuse prevention)
-BLOCKED_LOGO_URL_PATTERNS = [
-    r"^data:",                              # Base64 data URIs — never allowed
-    r"(?i)localhost",                       # Loopback by name
-    r"127\.\d+\.\d+\.\d+",                 # 127.x.x.x loopback
-    r"192\.168\.\d+\.\d+",                 # RFC-1918 private class C
-    r"10\.\d+\.\d+\.\d+",                  # RFC-1918 private class A
-    r"172\.(1[6-9]|2\d|3[01])\.\d+\.\d+", # RFC-1918 private class B
-    r"169\.254\.\d+\.\d+",                 # Link-local (AWS metadata etc.)
-    r"(?i)cdn\.discordapp\.com",            # Ephemeral/expiring Discord CDNs
-    r"(?i)files\.slack\.com",              # Slack file CDN (auth-gated)
-    r"(?i)media\.giphy\.com",             # Giphy (inconsistent CORS)
-    r"0\.0\.0\.0",                         # Null route
-    r"::1",                                # IPv6 loopback
-    r"(?i)\.internal",                     # Internal service names
-    r"(?i)metadata\.google\.internal",     # GCP metadata endpoint
-    r"(?i)169\.254\.169\.254",             # AWS/Azure metadata endpoint
-]
-
-MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB hard ceiling
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
-    history: Optional[list[ChatMessage]] = Field(None, description="Last N chat messages for context-aware caching")
-    session_id: Optional[str] = Field(None, description="Client-side session tracking id")
-
-    @validator('message')
-    def sanitize_jailbreak_patterns(cls, v):
-        """
-        Defense-in-depth: Strips known prompt injection trigger phrases from
-        user input. Does NOT block the request — silently neutralizes the
-        attack vector while preserving the user's legitimate intent.
-        """
-        sanitized = v
-        for pattern in JAILBREAK_PATTERNS:
-            sanitized = re.sub(pattern, '[FILTERED]', sanitized)
-        return sanitized.strip()
-
-class ChatResponse(BaseModel):
-    reply: str
-    sources: list[str]
-
-class LeadCaptureRequest(BaseModel):
-    email: str = Field(..., max_length=255)
-    name: Optional[str] = Field(None, max_length=100)
-    context: Optional[str] = Field(None, max_length=500)
-    
-    @validator('email')
-    def validate_email(cls, v):
-        import re
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(pattern, v.strip()):
-            raise ValueError('Invalid email address')
-        return v.strip().lower()
-
-class SubscriptionRequest(BaseModel):
-    tier: str # Starter, Pro, Enterprise
-
-class HandoffMessage(BaseModel):
-    role: str
-    content: str
-
-class HandoffRequest(BaseModel):
-    transcript: List[HandoffMessage]
-    visitor_email: Optional[str] = None
-    visitor_name: Optional[str] = None
-
-class UserRole(str, Enum):
-    SUPER_ADMIN = "SUPER_ADMIN"
-    ADMIN = "ADMIN"
-    USER = "USER"
-
-class UserTier(str, Enum):
-    FREE = "FREE"
-    BASIC = "BASIC"
-    STARTER = "STARTER"
-    PRO = "PRO"
-    ENTERPRISE = "ENTERPRISE"
-    CUSTOM = "CUSTOM"
-
-# ── Custom plan feature flag keys (canonical list) ───────────────────────────
-CUSTOM_PLAN_FEATURE_KEYS = {
-    "advanced_bot", "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics"
-}
-
-CUSTOM_PLAN_DEFAULTS = {
-    "plan_name": "Custom Plan",
-    "monthly_price_usd": 0,
-    "trial_days": 14,
-    "max_bots": 1,
-    "max_messages": 500,
-    "max_chunks": 100,
-    "gemini_model": None,
-    "max_output_tokens": None,
-    "advanced_bot": False,
-    "human_handoff": False,
-    "lead_capture": False,
-    "white_label": False,
-    "webhook": False,
-    "custom_logo": False,
-    "analytics": False,
-    "notes": "",
-    # Payment metadata — populated by /provision endpoint, not by admin form
-    "polar_checkout_url": None,
-    "polar_created_at": None,
-}
-
-class CustomPlanConfig(BaseModel):
-    plan_name: Optional[str] = "Custom Plan"
-    monthly_price_usd: Optional[float] = 0
-    trial_days: Optional[int] = 14
-    max_bots: Optional[int] = None
-    max_messages: Optional[int] = None
-    max_chunks: Optional[int] = None
-    gemini_model: Optional[str] = None
-    max_output_tokens: Optional[int] = None
-    advanced_bot: Optional[bool] = False
-    human_handoff: Optional[bool] = False
-    lead_capture: Optional[bool] = False
-    white_label: Optional[bool] = False
-    webhook: Optional[bool] = False
-    custom_logo: Optional[bool] = False
-    analytics: Optional[bool] = False
-    notes: Optional[str] = ""
-    # Payment metadata set by /provision — read-only from admin form
-    polar_checkout_url: Optional[str] = None
-    polar_created_at: Optional[str] = None
-
-    @validator("gemini_model")
-    def validate_model(cls, v):
-        if v and v not in VALID_MODELS:
-            raise ValueError(f"gemini_model must be one of: {', '.join(sorted(VALID_MODELS))}")
-        return v
-
-    @validator("monthly_price_usd")
-    def price_positive(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("monthly_price_usd must be 0 or greater")
-        return v
-
-    @validator("trial_days")
-    def trial_days_range(cls, v):
-        if v is not None and not (0 <= v <= 30):
-            raise ValueError("trial_days must be between 0 and 30")
-        return v
-
-    @validator("max_bots", "max_messages", "max_chunks", "max_output_tokens", pre=True)
-    def non_negative(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("Must be 0 or greater")
-        return v
-
-    model_config = ConfigDict(extra="forbid")
+# (CustomPlanConfig moved to models.py — re-exported above)
 
 
-# ── Custom plan access gate — pure function (tested directly in test suite) ──
-_CUSTOM_PLAN_GATE_MESSAGES: dict[str, str] = {
-    "AWAITING_PAYMENT": "Your custom plan is ready. Complete checkout using the link sent by your account manager.",
-    "TRIAL_EXPIRED_PENDING_CHARGE": "Trial ended; payment is processing. Refresh in a few minutes.",
-    "PERIOD_EXPIRED": "Subscription expired. Update your payment method to restore access.",
-    "PAYMENT_FAILED": "Last charge failed. Update the card on file via the Polar customer portal.",
-    "SUSPENDED": "Subscription suspended. Contact your account manager.",
-    "REVOKED": "Subscription revoked. Contact support.",
-    "REFUNDED": "Subscription refunded. Subscribe again to restore access.",
-    "EXPIRED": "Subscription expired. Re-subscribe to continue.",
-    "UNKNOWN_STATE": "Account state is unclear. Please contact support.",
-}
-_CUSTOM_PLAN_GATE_GRACE = timedelta(hours=48)
-_CUSTOM_PLAN_GATE_BLOCKED = {"PAYMENT_FAILED", "SUSPENDED", "REVOKED", "REFUNDED", "EXPIRED"}
+# ── Custom plan access gate constants — extracted to config.py (re-exported) ──
+# The gate function (_check_custom_plan_gate) stays in main; these are its inputs.
+from config import _CUSTOM_PLAN_GATE_MESSAGES, _CUSTOM_PLAN_GATE_GRACE, _CUSTOM_PLAN_GATE_BLOCKED
 
 
 def _check_custom_plan_gate(
@@ -1241,12 +1056,7 @@ def _check_custom_plan_gate(
     return _deny("UNKNOWN_STATE", "UNKNOWN_STATE")
 
 
-class AdminUpdateUserRequest(BaseModel):
-    tier: Optional[UserTier] = None
-    status: Optional[str] = None
-    custom_plan_config: Optional[CustomPlanConfig] = None
-
-    model_config = ConfigDict(extra="forbid")
+# (AdminUpdateUserRequest moved to models.py — re-exported above)
 
 # 5. Initialize Google AI Models
 embeddings_model_doc = get_embedding_model("retrieval_document")
@@ -1320,7 +1130,8 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    c.system_prompt, c.bot_name, c.logo_url, c.initial_message, c.quick_questions,
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
                    u.email, c.handoff_redirect_url, c.hide_branding,
-                   u.id, u.subscription_status, u.billing_period_end
+                   u.id, u.subscription_status, u.billing_period_end,
+                   c.hot_lead_alerts_enabled, c.alert_email, c.slack_webhook_url
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1446,6 +1257,10 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "owner_email": company_data[16],
         "handoff_redirect_url": company_data[17],
         "hide_branding": bool(company_data[18]),
+        # company_data[19..21] = u.id, subscription_status, billing_period_end (used above)
+        "hot_lead_alerts_enabled": True if company_data[22] is None else bool(company_data[22]),
+        "alert_email": company_data[23],
+        "slack_webhook_url": company_data[24],
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -1832,7 +1647,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
+                       hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1842,7 +1658,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 """
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
-                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding
+                       logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
+                       hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1872,6 +1689,10 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "webhook_url": company_row[15],
             "handoff_redirect_url": company_row[16],
             "hide_branding": bool(company_row[17]),
+            "hot_lead_alerts_enabled": True if company_row[18] is None else bool(company_row[18]),
+            "alert_email": company_row[19],
+            "weekly_digest_enabled": True if company_row[20] is None else bool(company_row[20]),
+            "slack_webhook_url": company_row[21],
         }
     finally:
         release_db_connection(conn)
@@ -2076,50 +1897,7 @@ Output nothing else."""
         print(f"[RERANKER] Failed, using raw retrieval order: {e}")
         return candidates[:top_k], None
 
-class CompanyUpdate(BaseModel):
-    company_id:       Optional[str]  = None
-    company_name:     Optional[str]  = None
-    company_tone:     Optional[str]  = None
-    theme_color:      Optional[str]  = None
-    bot_name:         Optional[str]  = None
-    logo_url:         Optional[str]  = None   # existing Sapybase default logo path
-    initial_message:  Optional[str]  = None
-    system_prompt:    Optional[str]  = None
-    allowed_origin:   Optional[str]  = None
-    quick_questions:  Optional[list] = None
-    ai_model:         Optional[str]  = None
-    # ── v13 new fields ──
-    logo_shape:       Optional[str]  = None   # circle | squircle | bento | sharp
-    custom_logo_url:  Optional[str]  = None   # tenant-provided HTTPS image URL
-    avatar_bg_style:  Optional[str]  = None   # e.g. none, hacker, sunset
-    # ── v15 integrations ──
-    webhook_url:           Optional[str]  = None   # HTTPS URL for lead capture webhooks
-    # ── v17 human handoff ──
-    handoff_redirect_url:  Optional[str]  = None   # WhatsApp/Calendly/etc link shown after handoff
-    # ── v18 white-label ──
-    hide_branding:         Optional[bool] = None   # True = remove "Powered by Sapybase" footer
-
-    @validator('webhook_url')
-    def validate_webhook_url(cls, v):
-        if v is not None and v.strip():
-            if not v.strip().startswith('https://'):
-                raise ValueError("webhook_url must start with https://")
-        return v.strip() if v else v
-
-    @validator('handoff_redirect_url')
-    def validate_handoff_redirect_url(cls, v):
-        if v is not None and v.strip():
-            if not v.strip().startswith('https://'):
-                raise ValueError("handoff_redirect_url must start with https://")
-        return v.strip() if v else v
-
-    @validator('logo_shape')
-    def validate_logo_shape(cls, v):
-        if v is not None and v not in VALID_LOGO_SHAPES:
-            raise ValueError(f"logo_shape must be one of: {', '.join(sorted(VALID_LOGO_SHAPES))}")
-        return v
-
-    model_config = ConfigDict(extra="forbid")
+# (CompanyUpdate moved to models.py — re-exported above)
 
 @app.patch("/api/company")
 async def update_company_details(
@@ -2153,6 +1931,19 @@ async def update_company_details(
                 detail={
                     "code": "TIER_REQUIRED",
                     "message": "Webhook integration requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                }
+            )
+
+    # ── PRO-only gate: slack_webhook_url (lead handoff integration) ──
+    if update.slack_webhook_url is not None and update.slack_webhook_url.strip():
+        custom_slack_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("webhook"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_slack_ok:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Slack lead handoff requires the Pro plan.",
                     "upgrade_url": "/app/pricing"
                 }
             )
@@ -2876,6 +2667,37 @@ async def _fire_webhook(webhook_url: str, lead_data: dict, secret: str | None, c
     logger.error(f"WEBHOOK FIRE FAILED after {len(delays)} attempts: {webhook_url}")
 
 
+from slack_handoff import is_valid_slack_webhook, build_slack_lead_message
+
+
+async def _fire_slack(slack_url: str, bot_name: str, lead: dict):
+    """POST a captured lead to the owner's Slack Incoming Webhook (best-effort).
+
+    Re-validates the host as an SSRF guard (defense in depth — the URL is also
+    validated at write time). Retries once on transient failure; never raises,
+    so a Slack outage can't affect lead capture."""
+    if not is_valid_slack_webhook(slack_url):
+        logger.error("SLACK HANDOFF: invalid/non-Slack webhook URL, skipping.")
+        return
+
+    payload = build_slack_lead_message(bot_name, lead)
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    headers = {"Content-Type": "application/json"}
+
+    for attempt, delay in enumerate((0, 2), start=1):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(slack_url, content=body, headers=headers)
+            if resp.is_success:
+                return
+            logger.warning(f"SLACK HANDOFF attempt {attempt} non-2xx: {resp.status_code}")
+        except Exception as exc:
+            logger.warning(f"SLACK HANDOFF attempt {attempt} error: {str(exc)[:200]}")
+    logger.error("SLACK HANDOFF FAILED after retries.")
+
+
 async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None):
     """Email the chat transcript to the business owner when a visitor requests human support."""
     smtp_user = os.getenv("SMTP_USER")
@@ -2925,6 +2747,74 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
             server.sendmail(smtp_user, owner_email, email_msg.as_string())
     except Exception as e:
         print(f"HANDOFF EMAIL ERROR: {e}")
+
+
+# ── Instant HOT-lead alert (speed-to-lead) — pure builders in lead_alerts.py ──
+from lead_alerts import should_alert_hot_lead, build_hot_lead_email, resolve_alert_recipient
+from weekly_digest import (
+    iso_week_key, resolve_digest_recipient, summarize_leads,
+    should_send_digest, build_digest_email,
+)
+
+
+def _send_digest_email(to_email: str, bot_name: str, stats: dict, period_label: str) -> bool:
+    """Send the weekly results digest. Returns True on success, False if SMTP is
+    unconfigured or the send fails (caller logs/continues — one bad send must not
+    abort the batch)."""
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    if not smtp_user or not smtp_pass or not to_email:
+        print("WEEKLY DIGEST: SMTP_USER/SMTP_PASS not configured, skipping email.")
+        return False
+
+    subject, html = build_digest_email(bot_name, stats, period_label)
+    email_msg = MIMEMultipart("alternative")
+    email_msg["Subject"] = subject
+    email_msg["From"] = smtp_user
+    email_msg["To"] = to_email
+    email_msg.attach(MIMEText(html, "html"))
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, to_email, email_msg.as_string())
+        return True
+    except Exception as e:
+        print(f"WEEKLY DIGEST EMAIL ERROR ({to_email}): {e}")
+        return False
+
+
+async def _send_hot_lead_email(owner_email: str, bot_name: str, lead: dict):
+    """Email the business owner the moment a HOT lead is captured, so they can
+    follow up while the visitor is still engaged."""
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    if not smtp_user or not smtp_pass or not owner_email:
+        print("HOT LEAD EMAIL: SMTP_USER/SMTP_PASS not configured, skipping email.")
+        return
+
+    subject, html = build_hot_lead_email(bot_name, lead)
+    email_msg = MIMEMultipart("alternative")
+    email_msg["Subject"] = subject
+    email_msg["From"] = smtp_user
+    email_msg["To"] = owner_email
+    lead_email = lead.get("email")
+    if lead_email:
+        email_msg["Reply-To"] = lead_email
+    email_msg.attach(MIMEText(html, "html"))
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, owner_email, email_msg.as_string())
+    except Exception as e:
+        print(f"HOT LEAD EMAIL ERROR: {e}")
 
 
 def _get_company_key(request: Request) -> str:
@@ -3001,6 +2891,41 @@ async def capture_lead(
                 company.get("webhook_secret"),
                 str(company["id"]),
                 str(lead_id),
+            )
+
+        # Slack handoff: post every captured lead to the owner's channel (non-blocking).
+        slack_url = company.get("slack_webhook_url")
+        if slack_url:
+            background_tasks.add_task(
+                _fire_slack,
+                slack_url,
+                company.get("bot_name", ""),
+                {
+                    "email": payload.email,
+                    "name": payload.name,
+                    "context": payload.context,
+                    "score": scored["score"],
+                    "band": scored["band"],
+                },
+            )
+
+        # Speed-to-lead: email the owner immediately for HOT leads (non-blocking).
+        # Respects the owner's opt-in toggle and optional alert_email override
+        # (falls back to the account email). resolve_alert_recipient() returns
+        # None when alerts are off or no address is available.
+        alert_to = resolve_alert_recipient(company)
+        if should_alert_hot_lead(scored["band"]) and alert_to:
+            background_tasks.add_task(
+                _send_hot_lead_email,
+                alert_to,
+                company.get("bot_name", ""),
+                {
+                    "email": payload.email,
+                    "name": payload.name,
+                    "context": payload.context,
+                    "score": scored["score"],
+                    "reasons": scored["reasons"],
+                },
             )
 
         return {"status": "success", "lead_id": str(lead_id)}
@@ -3402,9 +3327,7 @@ def list_fixes_needed(
 
 # ── ROI BENCHMARKS ENDPOINTS ──────────────────────────────────────────────────
 
-class RoiBenchmarkUpdate(BaseModel):
-    avg_human_cost_per_ticket: float
-    avg_lead_value: float
+# (RoiBenchmarkUpdate moved to models.py — re-exported above)
 
 
 @app.get("/api/roi-benchmarks/{company_id}")
@@ -4783,11 +4706,7 @@ def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
 
 # ── KNOWLEDGE MANAGEMENT ENDPOINTS ────────────────────────────────────────────
 
-class DeleteChunksRequest(BaseModel):
-    chunk_ids: list[str] = Field(..., max_length=500, description="List of chunk UUIDs to delete (max 500)")
-
-class DeleteSourceRequest(BaseModel):
-    source_name: str = Field(..., description="The exact filename/URL source to delete fully.")
+# (DeleteChunksRequest, DeleteSourceRequest moved to models.py — re-exported above)
 
 @app.get("/api/knowledge/sources/{company_id}")
 def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user)):
@@ -5237,14 +5156,118 @@ def reload_jailbreak_patterns(request: Request, x_admin_key: str = Header(None))
     """Reload jailbreak patterns from disk without a redeploy. Requires x-admin-key header."""
     if not ADMIN_SECRET or x_admin_key != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Unauthorized")
-    global JAILBREAK_PATTERNS
     try:
-        JAILBREAK_PATTERNS = _load_jailbreak_patterns()
-        logger.info(f"Reloaded {len(JAILBREAK_PATTERNS)} jailbreak patterns from disk")
-        return {"status": "ok", "pattern_count": len(JAILBREAK_PATTERNS)}
+        count = input_safety.reload_patterns()
+        logger.info(f"Reloaded {count} jailbreak patterns from disk")
+        return {"status": "ok", "pattern_count": count}
     except Exception as e:
         logger.error(f"Failed to reload jailbreak patterns: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/internal/run-weekly-digest")
+def run_weekly_digest(request: Request, x_cron_secret: str = Header(None)):
+    """Send the weekly results digest to each eligible company.
+
+    Trigger from an external scheduler (Render Cron / GitHub Actions /
+    cron-job.org) with the `x-cron-secret` header. Idempotent within an ISO
+    week: a company is emailed at most once per week (tracked via
+    companies.last_weekly_digest_week), so re-running mid-week is safe. Empty
+    weeks (no leads) are skipped so owners aren't trained to ignore the email.
+    One company's failure never aborts the batch.
+    """
+    if not CRON_SECRET or x_cron_secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    now = datetime.now(timezone.utc)
+    week_key = iso_week_key(now)
+    period_label = (
+        f"Week of {(now - timedelta(days=7)).strftime('%b %d')} – "
+        f"{now.strftime('%b %d, %Y')}"
+    )
+    processed = sent = skipped = 0
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT c.id, c.bot_name, u.email, c.alert_email,
+                   c.weekly_digest_enabled, c.last_weekly_digest_week
+            FROM companies c JOIN users u ON c.user_id = u.id
+            WHERE c.is_active = true
+            """
+        )
+        companies = cursor.fetchall()
+        cursor.close()
+
+        for row in companies:
+            processed += 1
+            company = {
+                "id": row[0], "bot_name": row[1], "owner_email": row[2],
+                "alert_email": row[3], "weekly_digest_enabled": row[4],
+            }
+            # Already sent this week, alerts off, or no recipient → skip.
+            if row[5] == week_key:
+                skipped += 1
+                continue
+            recipient = resolve_digest_recipient(company)
+            if not recipient:
+                skipped += 1
+                continue
+
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT email, name, context, score, score_band
+                    FROM lead_capture
+                    WHERE company_id = %s AND created_at > NOW() - INTERVAL '7 days'
+                    """,
+                    (company["id"],)
+                )
+                leads = [
+                    {"email": r[0], "name": r[1], "context": r[2], "score": r[3], "band": r[4]}
+                    for r in cur.fetchall()
+                ]
+                cur.close()
+            except Exception as e:
+                logger.error(f"Weekly digest: lead query failed for {company['id']}: {e}")
+                skipped += 1
+                continue
+
+            stats = summarize_leads(leads)
+            if not should_send_digest(stats):
+                skipped += 1
+                continue
+
+            if _send_digest_email(recipient, company["bot_name"] or "Your bot", stats, period_label):
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE companies SET last_weekly_digest_week = %s WHERE id = %s",
+                        (week_key, company["id"])
+                    )
+                    conn.commit()
+                    cur.close()
+                    sent += 1
+                except Exception as e:
+                    conn.rollback()
+                    logger.error(f"Weekly digest: failed to mark week for {company['id']}: {e}")
+                    skipped += 1
+            else:
+                skipped += 1
+
+        return {"status": "ok", "week": week_key,
+                "processed": processed, "sent": sent, "skipped": skipped}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Weekly digest run failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
 
 @app.get("/api/admin/companies")
 @limiter.limit("30/minute")
@@ -5425,9 +5448,7 @@ def update_user_limits(
     return update_user_admin(request, clerk_id, req, admin, _fresh)
 
 
-class TrialExtensionRequest(BaseModel):
-    days: int = Field(..., ge=1, le=180, description="Number of days to extend the trial (1-180)")
-    reason: Optional[str] = Field(None, max_length=500, description="Internal reason for the extension (audit log)")
+# (TrialExtensionRequest moved to models.py — re-exported above)
 
 
 @app.post("/api/admin/users/{clerk_id}/extend-trial")
@@ -5528,10 +5549,7 @@ def delete_company_admin(
     finally:
         release_db_connection(conn)
 
-class CustomPlanProvisionRequest(BaseModel):
-    config: CustomPlanConfig
-
-    model_config = ConfigDict(extra="forbid")
+# (CustomPlanProvisionRequest moved to models.py — re-exported above)
 
 
 @app.post("/api/admin/users/{clerk_id}/custom-plan/provision")
@@ -5884,12 +5902,7 @@ async def get_custom_plan_product_details(
         release_db_connection(conn)
 
 
-class CustomPlanOverrideRequest(BaseModel):
-    action: str = Field(..., description="One of: activate, suspend, reactivate, cancel, extend, reset")
-    reason: str = Field(..., min_length=1, max_length=500, description="Reason for override (stored in audit log)")
-    extend_days: Optional[int] = Field(None, ge=1, le=365, description="Days to extend billing period (only for 'extend' action)")
-
-    model_config = ConfigDict(extra="forbid")
+# (CustomPlanOverrideRequest moved to models.py — re-exported above)
 
 
 @app.patch("/api/admin/users/{clerk_id}/custom-plan/override")
@@ -7040,14 +7053,7 @@ async def gdpr_delete_user(current_user: dict = Depends(get_current_user)):
 
 # ── EVALUATION PIPELINE ───────────────────────────────────────────────────────
 
-class EvalQuestion(BaseModel):
-    question: str = Field(..., max_length=1000)
-    expected_answer: str = Field(..., max_length=3000)
-
-class EvalRunRequest(BaseModel):
-    company_id: str
-    run_label: str = Field(..., max_length=100, description="A short label for this run, e.g. 'after-hyde'")
-    questions: List[EvalQuestion] = Field(..., min_length=1, max_length=50)
+# (EvalQuestion, EvalRunRequest moved to models.py — re-exported above)
 
 
 async def _judge_single(

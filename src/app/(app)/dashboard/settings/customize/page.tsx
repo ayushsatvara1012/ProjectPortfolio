@@ -16,6 +16,41 @@ const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text
 const sectionHeadingCls = "text-sm font-semibold font-google text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-4 transition-colors";
 const cardCls = "bg-white dark:bg-slate-900 rounded-2xl p-5 transition-colors duration-500";
 
+// Lightweight client-side email check (the backend is the source of truth).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SLACK_WEBHOOK_PREFIX = "https://hooks.slack.com/";
+
+// Accessible on/off switch — keyboard focusable, exposes role="switch" + state.
+const Toggle = ({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    disabled={disabled}
+    onClick={() => !disabled && onChange(!checked)}
+    className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed ${
+      checked && !disabled ? 'bg-slate-900 dark:bg-white' : 'bg-slate-200 dark:bg-slate-700'
+    }`}
+  >
+    <span
+      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white dark:bg-slate-900 rounded-full shadow transition-transform duration-200 ${
+        checked && !disabled ? 'translate-x-5' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
 const LockOverlay = ({ label, href = '/dashboard/pricing' }: { label: string; href?: string }) => (
   <div className="absolute inset-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center group cursor-help rounded-2xl transition-all">
     <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-semibold font-google rounded-xl shadow-lg">
@@ -84,6 +119,14 @@ export default function CustomizePage() {
   const canUseWebhooks = entitlements.canUseWebhooks && entitlements.canUseLeadCapture;
   const canUseHumanHandoff = entitlements.canUseHumanHandoff;
   const hasIntegrationsAccess = canUseWebhooks || canUseHumanHandoff;
+  const canUseLeadCapture = entitlements.canUseLeadCapture;
+
+  // ── Inline validation for lead-alert fields (non-blocking until save) ──
+  const alertEmailTrimmed = (botSettings.alertEmail || '').trim();
+  const slackUrlTrimmed = (botSettings.slackWebhookUrl || '').trim();
+  const alertEmailInvalid = alertEmailTrimmed !== '' && !EMAIL_RE.test(alertEmailTrimmed);
+  const slackUrlInvalid = slackUrlTrimmed !== '' && !slackUrlTrimmed.startsWith(SLACK_WEBHOOK_PREFIX);
+  const leadAlertsInvalid = alertEmailInvalid || slackUrlInvalid;
 
   return (
     <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
@@ -363,11 +406,138 @@ export default function CustomizePage() {
               </div>
             )}
 
+            {/* ── Lead alerts & notifications ── */}
+            <div className={cardCls + ' relative'}>
+              {!canUseLeadCapture && <LockOverlay label="Lead capture (Pro) required" />}
+
+              <p className={sectionHeadingCls + (!canUseLeadCapture ? ' opacity-40' : '')}>
+                <span className="material-symbols-outlined text-[16px] text-slate-400">notifications_active</span>
+                Lead alerts &amp; notifications
+              </p>
+
+              <div className={`space-y-4 ${!canUseLeadCapture ? 'opacity-40 grayscale-[0.5] pointer-events-none blur-[0.5px]' : ''}`}>
+
+                {/* Instant hot-lead alert */}
+                <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium font-google text-slate-800 dark:text-slate-200 transition-colors">
+                      Instant hot-lead alerts
+                    </p>
+                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                      Get an email the moment a high-intent visitor converts, so you can follow up while they're still engaged.
+                    </p>
+                  </div>
+                  <Toggle
+                    label="Instant hot-lead alerts"
+                    checked={botSettings.hotLeadAlertsEnabled}
+                    onChange={(v) => updateSetting('hotLeadAlertsEnabled', v)}
+                    disabled={!canUseLeadCapture}
+                  />
+                </div>
+
+                {/* Weekly results digest */}
+                <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium font-google text-slate-800 dark:text-slate-200 transition-colors">
+                      Weekly results email
+                    </p>
+                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
+                      A weekly digest of new leads, hot prospects, and who to follow up with first.
+                    </p>
+                  </div>
+                  <Toggle
+                    label="Weekly results email"
+                    checked={botSettings.weeklyDigestEnabled}
+                    onChange={(v) => updateSetting('weeklyDigestEnabled', v)}
+                    disabled={!canUseLeadCapture}
+                  />
+                </div>
+
+                {/* Alert recipient email */}
+                <div>
+                  <label className={labelCls} htmlFor="alert-email">Send alerts to</label>
+                  <input
+                    id="alert-email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    spellCheck={false}
+                    value={botSettings.alertEmail}
+                    onChange={(e) => updateSetting('alertEmail', e.target.value)}
+                    className={inputCls + (alertEmailInvalid ? ' ring-1 ring-red-400 dark:ring-red-500' : '')}
+                    placeholder="Defaults to your account email"
+                    aria-invalid={alertEmailInvalid}
+                    aria-describedby="alert-email-hint"
+                  />
+                  <p
+                    id="alert-email-hint"
+                    className={`text-xs font-google mt-1.5 leading-relaxed transition-colors ${
+                      alertEmailInvalid ? 'text-red-500 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
+                    {alertEmailInvalid
+                      ? 'Enter a valid email address (e.g. you@company.com).'
+                      : 'Used for both hot-lead alerts and the weekly digest. Leave blank to use your account email.'}
+                  </p>
+                </div>
+
+                {/* Slack handoff webhook */}
+                <div>
+                  <label className={labelCls} htmlFor="slack-url">Slack channel — Incoming Webhook URL</label>
+                  <input
+                    id="slack-url"
+                    type="url"
+                    spellCheck={false}
+                    autoComplete="off"
+                    value={botSettings.slackWebhookUrl}
+                    onChange={(e) => updateSetting('slackWebhookUrl', e.target.value)}
+                    className={inputCls + (slackUrlInvalid ? ' ring-1 ring-red-400 dark:ring-red-500' : '')}
+                    placeholder="https://hooks.slack.com/services/..."
+                    aria-invalid={slackUrlInvalid}
+                    aria-describedby="slack-url-hint"
+                  />
+                  <p
+                    id="slack-url-hint"
+                    className={`text-xs font-google mt-1.5 leading-relaxed transition-colors ${
+                      slackUrlInvalid ? 'text-red-500 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
+                    {slackUrlInvalid ? (
+                      'Must be a Slack Incoming Webhook (starts with https://hooks.slack.com/).'
+                    ) : (
+                      <>
+                        Post every new lead to a Slack channel.{' '}
+                        <a
+                          href="https://api.slack.com/messaging/webhooks"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                        >
+                          Create a webhook →
+                        </a>
+                      </>
+                    )}
+                  </p>
+                </div>
+
+              </div>
+            </div>
+
             {/* ── Save button ── */}
             <button
               onClick={async () => {
                 if (showFullOverlay) {
                   setAlert({ open: true, type: 'error', msg: 'Upgrade required to save changes.' });
+                  return;
+                }
+                if (leadAlertsInvalid) {
+                  setAlert({
+                    open: true,
+                    type: 'error',
+                    msg: alertEmailInvalid
+                      ? 'Please enter a valid alert email address before saving.'
+                      : 'Slack webhook URL must start with https://hooks.slack.com/.',
+                  });
                   return;
                 }
                 const res = await saveSettings(selectedBotId);

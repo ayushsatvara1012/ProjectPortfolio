@@ -19,6 +19,11 @@ type BotSettings = {
   webhookUrl: string;
   handoffRedirectUrl: string;
   hideBranding: boolean;
+  // ── Conversion engine: lead alerts & notifications ──
+  hotLeadAlertsEnabled: boolean;
+  alertEmail: string;
+  weeklyDigestEnabled: boolean;
+  slackWebhookUrl: string;
 };
 
 type BotSettingsContextValue = {
@@ -49,6 +54,10 @@ const DEFAULT_SETTINGS: BotSettings = {
   webhookUrl: '',
   handoffRedirectUrl: '',
   hideBranding: false,
+  hotLeadAlertsEnabled: true,
+  alertEmail: '',
+  weeklyDigestEnabled: true,
+  slackWebhookUrl: '',
 };
 
 const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
@@ -74,6 +83,12 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     webhookUrl: company.webhook_url || '',
     handoffRedirectUrl: company.handoff_redirect_url || '',
     hideBranding: company.hide_branding === true,
+    // Default booleans to true when the backend omits them (undefined) so
+    // existing customers keep alerts/digests; only an explicit false disables.
+    hotLeadAlertsEnabled: company.hot_lead_alerts_enabled !== false,
+    alertEmail: company.alert_email || '',
+    weeklyDigestEnabled: company.weekly_digest_enabled !== false,
+    slackWebhookUrl: company.slack_webhook_url || '',
   };
 };
 
@@ -140,6 +155,10 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
           webhook_url: botSettings.webhookUrl || null,
           handoff_redirect_url: botSettings.handoffRedirectUrl || null,
           hide_branding: botSettings.hideBranding,
+          hot_lead_alerts_enabled: botSettings.hotLeadAlertsEnabled,
+          alert_email: botSettings.alertEmail.trim() || null,
+          weekly_digest_enabled: botSettings.weeklyDigestEnabled,
+          slack_webhook_url: botSettings.slackWebhookUrl.trim() || null,
         }),
       });
       // Invalidate cached company details so the next read fetches fresh data.
