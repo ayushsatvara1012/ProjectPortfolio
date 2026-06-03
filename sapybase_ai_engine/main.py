@@ -32,7 +32,7 @@ from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, Up
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, validator
 from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
 from polar_sdk.webhooks import WebhookVerificationError, validate_event
@@ -1196,8 +1196,7 @@ class CustomPlanConfig(BaseModel):
             raise ValueError("Must be 0 or greater")
         return v
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 # ── Custom plan access gate — pure function (tested directly in test suite) ──
@@ -1268,8 +1267,7 @@ class AdminUpdateUserRequest(BaseModel):
     status: Optional[str] = None
     custom_plan_config: Optional[CustomPlanConfig] = None
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 # 5. Initialize Google AI Models
 embeddings_model_doc = get_embedding_model("retrieval_document")
@@ -2158,8 +2156,7 @@ class CompanyUpdate(BaseModel):
             raise ValueError(f"logo_shape must be one of: {', '.join(sorted(VALID_LOGO_SHAPES))}")
         return v
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 @app.patch("/api/company")
 async def update_company_details(
@@ -2589,14 +2586,28 @@ async def chat_endpoint(
         # ── END CACHE LOOKUP (miss — continue to full RAG + Gemini) ──────────
 
         # 2. HyDE query expansion + Vector Search (RAG) + Reranking
+        _t0 = time.perf_counter()
         hyde_text = await hyde_expand(chat_req.message)
-        query_vector = embeddings_model_query.embed_query(hyde_text)
+        _t_hyde = time.perf_counter()
+        query_vector = await embeddings_model_query.aembed_query(hyde_text)
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
+        _t_embed = time.perf_counter()
 
         # Hybrid retrieval (BM25 uses original query; vector uses HyDE-expanded embedding)
-        candidate_docs = retrieve_knowledge(conn, company["id"], query_vector, query_text=chat_req.message)
+        candidate_docs = await asyncio.to_thread(retrieve_knowledge, conn, company["id"], query_vector, query_text=chat_req.message)
+        _t_retrieve = time.perf_counter()
         retrieved_docs, rerank_top_score = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
+        _t_rerank = time.perf_counter()
+        logger.info(
+            "CHAT TIMING company=%s hyde=%.0fms embed=%.0fms retrieve=%.0fms rerank=%.0fms rag_total=%.0fms",
+            company["id"],
+            (_t_hyde - _t0) * 1000,
+            (_t_embed - _t_hyde) * 1000,
+            (_t_retrieve - _t_embed) * 1000,
+            (_t_rerank - _t_retrieve) * 1000,
+            (_t_rerank - _t0) * 1000,
+        )
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
         # ── Runtime values from company record ─────────────────────────────────
         bot_name        = company.get("bot_name") or "Sapy AI"
@@ -2957,86 +2968,13 @@ def _get_company_key(request: Request) -> str:
     api_key = request.headers.get("x-api-key", "")
     return f"company:{hashlib.sha256(api_key.encode()).hexdigest()[:16]}"
 
-# ── LEAD SCORING (deterministic, no LLM) ─────────────────────────────────────
-
-# Free/consumer email providers — a business domain is a stronger B2B signal.
-_FREE_EMAIL_DOMAINS = {
-    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "ymail.com",
-    "outlook.com", "hotmail.com", "live.com", "msn.com",
-    "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
-    "gmx.com", "zoho.com", "yandex.com", "mail.com", "pm.me",
-}
-
-_BUYING_KEYWORDS = (
-    "quote", "pricing", "price", "how much", "cost", "buy", "purchase",
-    "hire", "sign up", "signup", "get started", "book a", "schedule",
-    "free trial", "trial", "demo", "subscribe", "upgrade", "checkout",
-    "order", "invoice", "budget", "proposal",
+# ── LEAD SCORING (deterministic, no LLM) — extracted to lead_scoring.py ──
+# Re-exported here so `from main import _score_lead` and `main._score_lead`
+# (used by endpoints and the test suite) keep resolving unchanged.
+from lead_scoring import (
+    _FREE_EMAIL_DOMAINS, _BUYING_KEYWORDS, _CONTACT_KEYWORDS,
+    _email_domain, _score_lead,
 )
-
-_CONTACT_KEYWORDS = (
-    "talk to a human", "talk to sales", "speak to someone", "speak to a person",
-    "real person", "contact you", "contact us", "reach out", "get in touch",
-    "sales team", "support team", "call me", "email me",
-)
-
-
-def _email_domain(email):
-    if not email or "@" not in email:
-        return ""
-    return email.rsplit("@", 1)[-1].strip().lower()
-
-
-def _score_lead(context, email, name):
-    """Deterministic 0..100 lead quality score with explainable reasons.
-
-    Pure function — no I/O, no LLM. Signals:
-      * buying-intent keywords in conversation context  (+40 max)
-      * sales/human-contact intent keywords             (+20 max)
-      * business (non-free-provider) email domain        (+25)
-      * visitor provided a name                          (+5)
-      * substantive multi-turn context                   (+10 max)
-
-    Returns {"score": int, "band": "HOT"|"WARM"|"COLD", "reasons": [str, ...]}.
-    """
-    ctx = (context or "").lower()
-    reasons = []
-    score = 0
-
-    buy_hits = sorted({kw for kw in _BUYING_KEYWORDS if kw in ctx})
-    if buy_hits:
-        score += min(40, 20 + 10 * (len(buy_hits) - 1))   # 1 hit=20, 2=30, 3+=40
-        reasons.append("buying intent (" + ", ".join(buy_hits[:3]) + ")")
-
-    contact_hits = sorted({kw for kw in _CONTACT_KEYWORDS if kw in ctx})
-    if contact_hits:
-        score += min(20, 12 + 8 * (len(contact_hits) - 1))  # 1=12, 2+=20
-        reasons.append("wants to talk to sales/human")
-
-    domain = _email_domain(email)
-    if domain and domain not in _FREE_EMAIL_DOMAINS:
-        score += 25
-        reasons.append("business email (" + domain + ")")
-    elif domain:
-        reasons.append("personal email")
-
-    if name and name.strip():
-        score += 5
-        reasons.append("provided name")
-
-    turns = [t for t in ctx.split("||") if len(t.strip()) >= 8]
-    if len(turns) >= 3:
-        score += 10
-        reasons.append("engaged (3+ messages)")
-    elif len(turns) == 2:
-        score += 5
-        reasons.append("engaged (2 messages)")
-
-    score = max(0, min(100, score))
-    band = "HOT" if score >= 70 else "WARM" if score >= 40 else "COLD"
-    if not reasons:
-        reasons.append("no strong signals")
-    return {"score": score, "band": band, "reasons": reasons}
 
 
 @app.post("/api/leads/capture")
@@ -3421,49 +3359,10 @@ def list_conversations(
         release_db_connection(conn)
 
 
-# ── FIXES NEEDED (gap worklist) ─────────────────────────────────────────────
-
-def _build_fixes_list(rows, min_confidence: float = 0.4, limit: int = 50):
-    """Pure: turn aggregated chat_logs rows into a ranked 'fixes needed' worklist.
-
-    Each input row is a sequence:
-        (representative_query, ask_count, last_asked_iso, group_confidence, has_unanswered)
-    where group_confidence is the AVG grounding for the question (None if unknown).
-
-    Classification per question group:
-      * 'unanswered'     -> bot fell back at least once  (highest priority)
-      * 'low_confidence' -> always answered, but typical grounding was weak
-                            (group_confidence is not None AND < threshold)
-      * excluded         -> answered well, OR grounding unknown (NULL: cache hits /
-                            pre-migration rows are never falsely flagged)
-
-    Ordering: unanswered first, then ask_count desc, then last_asked desc.
-    """
-    items = []
-    for row in rows:
-        query, ask_count, last_asked, group_conf, has_unanswered = row
-        q = (query or "").strip()
-        if not q:
-            continue
-        if has_unanswered:
-            category = "unanswered"
-        elif group_conf is not None and group_conf < min_confidence:
-            category = "low_confidence"
-        else:
-            continue
-        items.append({
-            "query": q,
-            "ask_count": int(ask_count or 0),
-            "last_asked": last_asked,
-            "confidence": (round(float(group_conf), 2) if group_conf is not None else None),
-            "category": category,
-        })
-
-    # Stable multi-key sort (apply least-significant key first).
-    items.sort(key=lambda it: it["last_asked"] or "", reverse=True)
-    items.sort(key=lambda it: it["ask_count"], reverse=True)
-    items.sort(key=lambda it: 0 if it["category"] == "unanswered" else 1)
-    return items[:limit]
+# ── FIXES NEEDED (gap worklist) — extracted to fixes_logic.py ──
+# Re-exported so `from main import _build_fixes_list` and `main._build_fixes_list`
+# (used by the endpoint below and the test suite) keep resolving unchanged.
+from fixes_logic import _build_fixes_list
 
 
 @app.get("/api/fixes-needed/{company_id}")
@@ -4514,7 +4413,7 @@ async def train_chatbot(
         validate_safe_url(url.strip())
         try:
             jina_url = f"https://r.jina.ai/{url.strip()}"
-            response = requests.get(jina_url, headers={"User-Agent": "SapybaseBot/1.0"}, timeout=15)
+            response = await asyncio.to_thread(requests.get, jina_url, headers={"User-Agent": "SapybaseBot/1.0"}, timeout=15)
             if response.status_code != 200 or len(response.text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
             # Store with the normalised URL so metadata.source matches source_name.
@@ -5669,8 +5568,7 @@ def delete_company_admin(
 class CustomPlanProvisionRequest(BaseModel):
     config: CustomPlanConfig
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 @app.post("/api/admin/users/{clerk_id}/custom-plan/provision")
@@ -6028,8 +5926,7 @@ class CustomPlanOverrideRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=500, description="Reason for override (stored in audit log)")
     extend_days: Optional[int] = Field(None, ge=1, le=365, description="Days to extend billing period (only for 'extend' action)")
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 @app.patch("/api/admin/users/{clerk_id}/custom-plan/override")
@@ -7187,7 +7084,7 @@ class EvalQuestion(BaseModel):
 class EvalRunRequest(BaseModel):
     company_id: str
     run_label: str = Field(..., max_length=100, description="A short label for this run, e.g. 'after-hyde'")
-    questions: List[EvalQuestion] = Field(..., min_items=1, max_items=50)
+    questions: List[EvalQuestion] = Field(..., min_length=1, max_length=50)
 
 
 async def _judge_single(
@@ -7301,14 +7198,14 @@ async def run_eval(
         hyde_text = await hyde_expand(eq.question)
 
         # 2. Embed
-        query_vector = embeddings_model_query.embed_query(hyde_text)
+        query_vector = await embeddings_model_query.aembed_query(hyde_text)
         if len(query_vector) > 768:
             query_vector = query_vector[:768]
 
         # 3. Retrieve + rerank (same pipeline as live chat)
         conn = get_db_connection()
         try:
-            candidates = retrieve_knowledge(conn, body.company_id, query_vector, query_text=eq.question)
+            candidates = await asyncio.to_thread(retrieve_knowledge, conn, body.company_id, query_vector, query_text=eq.question)
         finally:
             release_db_connection(conn)
 
