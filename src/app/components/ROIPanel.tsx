@@ -76,6 +76,9 @@ const ROIPanel = ({ selectedBotId, authFetch, isAuthorized }: ROIPanelProps) => 
     }
 
     const stats = (data as any)?.stats || {};
+    const roi = (data as any)?.roi || {};
+    const realizedRevenue = roi.realized_revenue || 0;
+    const wonDeals = roi.won_deals || 0;
 
     // Live preview: recalculate as user types
     const previewCost = parseFloat(costPerTicket) || 0;
@@ -129,6 +132,28 @@ const ROIPanel = ({ selectedBotId, authFetch, isAuthorized }: ROIPanelProps) => 
                         Answer rate: {answerRate}%
                     </p>
                 </div>
+            </div>
+
+            {/* ── Proven (realized) revenue — closed-won deals ── */}
+            <div className={`${cellCls} p-6 sm:p-8 border border-emerald-200 dark:border-emerald-900/40`}>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0">
+                            <span className="material-symbols-outlined text-[18px] text-emerald-600 dark:text-emerald-400">paid</span>
+                        </div>
+                        <div>
+                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wide">Proven revenue · closed-won</span>
+                            <p className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 mt-0.5">{fmt(realizedRevenue)}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-xl sm:text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{wonDeals.toLocaleString()}</span>
+                        <p className="text-xs font-medium text-slate-400 font-google mt-0.5">deals won (all-time)</p>
+                    </div>
+                </div>
+                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
+                    Actual revenue from leads you marked <span className="font-semibold text-emerald-700 dark:text-emerald-400">Won</span>. Update lead outcomes in the Leads tab to grow this number.
+                </p>
             </div>
 
             {/* ── Activity Stats ── */}

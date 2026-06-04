@@ -17,6 +17,7 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 from psycopg2 import pool
 from enum import Enum
 from typing import Optional, List
@@ -984,6 +985,14 @@ from models import (
     CustomPlanConfig, AdminUpdateUserRequest, CompanyUpdate, RoiBenchmarkUpdate,
     DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
+    LeadOutcomeUpdate,
+)
+
+# ── Lead outcome / pipeline analytics — extracted to lead_outcomes.py ──
+# Re-exported so `from main import summarize_pipeline` / `main.X` and the test
+# suite resolve unchanged.
+from lead_outcomes import (
+    LEAD_STATUSES, normalize_status, resolve_outcome_value, summarize_pipeline,
 )
 
 # ── Prompt-injection / jailbreak hardening — extracted to input_safety.py ──
@@ -1131,7 +1140,8 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    c.logo_shape, c.custom_logo_url, c.avatar_bg_style, u.tier, u.role, c.webhook_url,
                    u.email, c.handoff_redirect_url, c.hide_branding,
                    u.id, u.subscription_status, u.billing_period_end,
-                   c.hot_lead_alerts_enabled, c.alert_email, c.slack_webhook_url
+                   c.hot_lead_alerts_enabled, c.alert_email, c.slack_webhook_url,
+                   c.booking_url
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1261,6 +1271,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "hot_lead_alerts_enabled": True if company_data[22] is None else bool(company_data[22]),
         "alert_email": company_data[23],
         "slack_webhook_url": company_data[24],
+        "booking_url": company_data[25],
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
@@ -1648,7 +1659,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
-                       hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url
+                       hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
+                       booking_url
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1659,7 +1671,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 SELECT id, company_name, company_tone, theme_color, allowed_origin,
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
-                       hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url
+                       hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
+                       booking_url
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1693,6 +1706,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "alert_email": company_row[19],
             "weekly_digest_enabled": True if company_row[20] is None else bool(company_row[20]),
             "slack_webhook_url": company_row[21],
+            "booking_url": company_row[22],
         }
     finally:
         release_db_connection(conn)
@@ -1944,6 +1958,19 @@ async def update_company_details(
                 detail={
                     "code": "TIER_REQUIRED",
                     "message": "Slack lead handoff requires the Pro plan.",
+                    "upgrade_url": "/app/pricing"
+                }
+            )
+
+    # ── PRO-only gate: booking_url (instant-booking CTA for qualified leads) ──
+    if update.booking_url is not None and update.booking_url.strip():
+        custom_booking_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("lead_capture"))
+        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_booking_ok:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "TIER_REQUIRED",
+                    "message": "Instant booking link requires the Pro plan.",
                     "upgrade_url": "/app/pricing"
                 }
             )
@@ -2698,12 +2725,15 @@ async def _fire_slack(slack_url: str, bot_name: str, lead: dict):
     logger.error("SLACK HANDOFF FAILED after retries.")
 
 
+# Transactional email transport: picks Resend → Gmail SMTP → no-op at send time.
+# `_email_from_header` is re-exported so `from main import _email_from_header`
+# (used by the test suite) keeps resolving.
+from email_provider import send_transactional_email, email_from_header as _email_from_header
+
+
 async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None):
     """Email the chat transcript to the business owner when a visitor requests human support."""
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    if not smtp_user or not smtp_pass or not owner_email:
-        print("HANDOFF EMAIL: SMTP_USER/SMTP_PASS not configured, skipping email.")
+    if not owner_email:
         return
 
     rows = []
@@ -2730,23 +2760,8 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
     </div>
     """
 
-    email_msg = MIMEMultipart("alternative")
-    email_msg["Subject"] = f"[{bot_name}] {visitor_label} requested human support"
-    email_msg["From"] = smtp_user
-    email_msg["To"] = owner_email
-    if visitor_email:
-        email_msg["Reply-To"] = visitor_email
-    email_msg.attach(MIMEText(html, "html"))
-
-    try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls(context=context)
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_user, owner_email, email_msg.as_string())
-    except Exception as e:
-        print(f"HANDOFF EMAIL ERROR: {e}")
+    subject = f"[{bot_name}] {visitor_label} requested human support"
+    send_transactional_email(owner_email, subject, html, reply_to=visitor_email or None)
 
 
 # ── Instant HOT-lead alert (speed-to-lead) — pure builders in lead_alerts.py ──
@@ -2755,66 +2770,28 @@ from weekly_digest import (
     iso_week_key, resolve_digest_recipient, summarize_leads,
     should_send_digest, build_digest_email,
 )
+from booking import should_offer_booking, is_valid_booking_url
+from action_center import build_action_queue
+from attribution import parse_utm, summarize_attribution
 
 
 def _send_digest_email(to_email: str, bot_name: str, stats: dict, period_label: str) -> bool:
-    """Send the weekly results digest. Returns True on success, False if SMTP is
-    unconfigured or the send fails (caller logs/continues — one bad send must not
-    abort the batch)."""
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    if not smtp_user or not smtp_pass or not to_email:
-        print("WEEKLY DIGEST: SMTP_USER/SMTP_PASS not configured, skipping email.")
+    """Send the weekly results digest. Returns True on success, False if no email
+    provider is configured or the send fails (caller logs/continues — one bad
+    send must not abort the batch)."""
+    if not to_email:
         return False
-
     subject, html = build_digest_email(bot_name, stats, period_label)
-    email_msg = MIMEMultipart("alternative")
-    email_msg["Subject"] = subject
-    email_msg["From"] = smtp_user
-    email_msg["To"] = to_email
-    email_msg.attach(MIMEText(html, "html"))
-
-    try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls(context=context)
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_user, to_email, email_msg.as_string())
-        return True
-    except Exception as e:
-        print(f"WEEKLY DIGEST EMAIL ERROR ({to_email}): {e}")
-        return False
+    return send_transactional_email(to_email, subject, html)
 
 
 async def _send_hot_lead_email(owner_email: str, bot_name: str, lead: dict):
     """Email the business owner the moment a HOT lead is captured, so they can
     follow up while the visitor is still engaged."""
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    if not smtp_user or not smtp_pass or not owner_email:
-        print("HOT LEAD EMAIL: SMTP_USER/SMTP_PASS not configured, skipping email.")
+    if not owner_email:
         return
-
     subject, html = build_hot_lead_email(bot_name, lead)
-    email_msg = MIMEMultipart("alternative")
-    email_msg["Subject"] = subject
-    email_msg["From"] = smtp_user
-    email_msg["To"] = owner_email
-    lead_email = lead.get("email")
-    if lead_email:
-        email_msg["Reply-To"] = lead_email
-    email_msg.attach(MIMEText(html, "html"))
-
-    try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls(context=context)
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_user, owner_email, email_msg.as_string())
-    except Exception as e:
-        print(f"HOT LEAD EMAIL ERROR: {e}")
+    send_transactional_email(owner_email, subject, html, reply_to=lead.get("email") or None)
 
 
 def _get_company_key(request: Request) -> str:
@@ -2859,13 +2836,22 @@ async def capture_lead(
             return {"status": "duplicate", "message": "Lead already captured recently"}
 
         scored = _score_lead(payload.context, payload.email, payload.name)
+        # Attribution: trust explicit UTM params from the widget, else backfill
+        # by parsing them out of the captured page_url.
+        _utm = parse_utm(payload.page_url)
+        utm_source = payload.utm_source or _utm["utm_source"]
+        utm_medium = payload.utm_medium or _utm["utm_medium"]
+        utm_campaign = payload.utm_campaign or _utm["utm_campaign"]
         cursor.execute(
             """
-            INSERT INTO lead_capture (company_id, email, name, context, score, score_band, score_reasons)
-            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+            INSERT INTO lead_capture
+                (company_id, email, name, context, score, score_band, score_reasons,
+                 page_url, referrer, utm_source, utm_medium, utm_campaign)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """,
             (company["id"], payload.email, payload.name, payload.context,
-             scored["score"], scored["band"], "; ".join(scored["reasons"]))
+             scored["score"], scored["band"], "; ".join(scored["reasons"]),
+             payload.page_url, payload.referrer, utm_source, utm_medium, utm_campaign)
         )
         lead_id = cursor.fetchone()[0]
         conn.commit()
@@ -2928,7 +2914,14 @@ async def capture_lead(
                 },
             )
 
-        return {"status": "success", "lead_id": str(lead_id)}
+        # Speed-to-lead: offer an instant booking CTA to qualified (HOT/WARM)
+        # leads when the owner has set a scheduling link. COLD leads and bots
+        # without a booking_url get None, so the widget simply shows no CTA.
+        resp = {"status": "success", "lead_id": str(lead_id)}
+        booking_url = company.get("booking_url")
+        if booking_url and should_offer_booking(scored["band"]):
+            resp["booking_url"] = booking_url
+        return resp
     except Exception as e:
         if conn: conn.rollback()
         print(f"LEAD CAPTURE ERROR: {e}")
@@ -2965,9 +2958,10 @@ def list_leads(
     limit: int = 50,
     sort: str = "recent",   # "recent" | "score"
     band: str = "all",      # "all" | "HOT" | "WARM" | "COLD"
+    status: str = "all",    # "all" | "new" | "contacted" | "won" | "lost"
     user: dict = Depends(get_current_user)
 ):
-    """Fetch paginated leads for the dashboard, with optional score sort/band filter."""
+    """Fetch paginated leads for the dashboard, with optional score/band/status filter."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -2995,23 +2989,32 @@ def list_leads(
 
         # Whitelisted sort/filter (never interpolate raw user input into SQL).
         band_filter = band if band in ("HOT", "WARM", "COLD") else None
+        status_filter = status if status in LEAD_STATUSES else None
         band_clause = "AND score_band = %s" if band_filter else ""
+        status_clause = "AND status = %s" if status_filter else ""
+        filter_clause = f"{band_clause} {status_clause}"
+        # Filter params, in the same order the clauses appear in the SQL.
+        filter_params = []
+        if band_filter:
+            filter_params.append(band_filter)
+        if status_filter:
+            filter_params.append(status_filter)
         order_clause = ("ORDER BY score DESC NULLS LAST, created_at DESC"
                         if sort == "score" else "ORDER BY created_at DESC")
 
-        count_params = [company_id] + ([band_filter] if band_filter else [])
         cursor.execute(
-            f"SELECT COUNT(*) FROM lead_capture WHERE company_id = %s {band_clause}",
-            tuple(count_params)
+            f"SELECT COUNT(*) FROM lead_capture WHERE company_id = %s {filter_clause}",
+            tuple([company_id] + filter_params)
         )
         total = cursor.fetchone()[0]
 
-        select_params = [company_id] + ([band_filter] if band_filter else []) + [limit, offset]
+        select_params = [company_id] + filter_params + [limit, offset]
         cursor.execute(
             f"""
-            SELECT id, email, name, context, created_at, score, score_band, score_reasons
+            SELECT id, email, name, context, created_at, score, score_band, score_reasons,
+                   status, value_usd, status_updated_at
             FROM lead_capture
-            WHERE company_id = %s {band_clause}
+            WHERE company_id = %s {filter_clause}
             {order_clause}
             LIMIT %s OFFSET %s
             """,
@@ -3030,6 +3033,9 @@ def list_leads(
                 "score": r[5],
                 "band": r[6],
                 "reasons": [s.strip() for s in r[7].split(";")] if r[7] else [],
+                "status": r[8] or "new",
+                "value_usd": float(r[9]) if r[9] is not None else None,
+                "status_updated_at": r[10].isoformat() if r[10] else None,
             })
             
         return {
@@ -3071,6 +3077,143 @@ def delete_lead(
         raise e
     finally:
         release_db_connection(conn)
+
+
+def _require_lead_management(user: dict):
+    """Shared Pro/lead-capture tier gate for lead-management endpoints."""
+    user_tier = (user.get("tier") or "FREE").upper()
+    user_role = user.get("role") or ""
+    custom_plan_cfg = user.get("custom_plan_config") or {}
+    if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("lead_capture"):
+        raise HTTPException(status_code=402, detail={
+            "code": "TIER_REQUIRED",
+            "message": "Lead management requires the Pro plan or a custom plan with lead capture enabled.",
+            "upgrade_url": "/app/pricing"
+        })
+
+
+@app.patch("/api/leads/{company_id}/{lead_id}/outcome")
+def update_lead_outcome(
+    company_id: str,
+    lead_id: str,
+    payload: LeadOutcomeUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Move a lead through the sales pipeline (new → contacted → won/lost) and,
+    when won, record the deal value. This is what turns the ROI dashboard from
+    *potential* into *realized* revenue. Owner-only; Pro/lead-capture gated."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        _require_lead_management(user)
+
+        # A deal value only persists for a 'won' lead; cleared for any other status.
+        value = resolve_outcome_value(payload.status, payload.value_usd)
+
+        cursor.execute(
+            """
+            UPDATE lead_capture
+            SET status = %s, value_usd = %s, status_updated_at = NOW()
+            WHERE id = %s AND company_id = %s
+            RETURNING id, status, value_usd, status_updated_at
+            """,
+            (payload.status, value, lead_id, company_id)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Lead not found or unauthorized.")
+
+        log_admin_action(
+            cursor, user["id"], "UPDATE_LEAD_OUTCOME",
+            f"Lead {lead_id} → {payload.status}" + (f" (${value})" if value else "")
+        )
+        conn.commit()
+        return {
+            "status": "success",
+            "lead": {
+                "id": row[0],
+                "status": row[1],
+                "value_usd": float(row[2]) if row[2] is not None else None,
+                "status_updated_at": row[3].isoformat() if row[3] else None,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"LEAD OUTCOME UPDATE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/leads/{company_id}/pipeline")
+def get_lead_pipeline(company_id: str, user: dict = Depends(get_current_user)):
+    """Pipeline + realized-revenue summary for a bot: counts by status, win rate,
+    conversion rate, and total/avg won deal value. Powers the closed-loop view."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        _require_lead_management(user)
+
+        cursor.execute(
+            "SELECT status, value_usd FROM lead_capture WHERE company_id = %s",
+            (company_id,)
+        )
+        leads = [{"status": r[0], "value_usd": r[1]} for r in cursor.fetchall()]
+        return summarize_pipeline(leads)
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/leads/{company_id}/action-center")
+def get_action_center(company_id: str, limit: int = 25, user: dict = Depends(get_current_user)):
+    """Prioritized 'leads needing attention' worklist: open (new/contacted)
+    leads ranked HOT-first, uncontacted-first, oldest-going-cold-first. Drives
+    the owner to the single most valuable next action. Ranking math is pure
+    (action_center.build_action_queue)."""
+    safe_limit = max(1, min(int(limit) if limit else 25, 100))
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        _require_lead_management(user)
+
+        cursor.execute(
+            "SELECT id, email, name, context, score, score_band, status, "
+            "created_at, status_updated_at "
+            "FROM lead_capture WHERE company_id = %s AND status IN ('new', 'contacted')",
+            (company_id,)
+        )
+        leads = [
+            {
+                "id": str(r[0]), "email": r[1], "name": r[2], "context": r[3],
+                "score": r[4], "score_band": r[5], "status": r[6],
+                "created_at": r[7], "status_updated_at": r[8],
+            }
+            for r in cursor.fetchall()
+        ]
+        return build_action_queue(leads, now=datetime.now(timezone.utc), limit=safe_limit)
+    finally:
+        release_db_connection(conn)
+
 
 @app.get("/api/leads/{company_id}/export")
 def export_leads(
@@ -3382,9 +3525,21 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
         )
         leads_30d = cursor.fetchone()[0] or 0
 
+        # Realized revenue: actual closed-won deal value (the closed-loop figure).
+        cursor.execute(
+            "SELECT COALESCE(SUM(value_usd), 0), COUNT(*) FROM lead_capture "
+            "WHERE company_id = %s AND status = 'won'",
+            (company_id,)
+        )
+        won_row = cursor.fetchone()
+        realized_revenue = round(float(won_row[0] or 0), 2)
+        won_deals = won_row[1] or 0
+
         support_savings = round(answered_30d * avg_cost, 2)
         potential_revenue = round(leads_30d * avg_lead, 2)
         total_roi = round(support_savings + potential_revenue, 2)
+        # Realized total prefers proven revenue over the assumed estimate.
+        realized_total = round(support_savings + realized_revenue, 2)
 
         return {
             "benchmarks": {
@@ -3400,6 +3555,9 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
                 "support_savings": support_savings,
                 "potential_revenue": potential_revenue,
                 "total_roi": total_roi,
+                "realized_revenue": realized_revenue,
+                "won_deals": won_deals,
+                "realized_total": realized_total,
             }
         }
     finally:
@@ -3452,6 +3610,149 @@ def update_roi_benchmarks(
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        release_db_connection(conn)
+
+
+# ── CONVERSION FUNNEL: nested-stage analytics — pure helpers in funnel.py ─────
+from funnel import build_funnel, build_quality_breakdown
+
+_FUNNEL_WINDOWS = (0, 7, 30, 90)  # 0 = all-time
+
+
+@app.get("/api/funnel/{company_id}")
+def get_conversion_funnel(
+    company_id: str,
+    window_days: int = 30,
+    user: dict = Depends(get_current_user),
+):
+    """Conversion funnel (conversations → leads → contacted → won) plus a
+    lead-quality breakdown, over a selectable created_at window.
+
+    Same analytics tier gate as the ROI dashboard. Stages are strictly nested
+    so drop-off is always valid; the pure math lives in funnel.py.
+    """
+    wd = window_days if window_days in _FUNNEL_WINDOWS else 30
+    win_sql = "" if wd == 0 else " AND created_at >= NOW() - (INTERVAL '1 day' * %s)"
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "The conversion funnel requires the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
+
+        win_params = [] if wd == 0 else [wd]
+
+        # Stage 1: distinct conversations (engaged sessions). Legacy rows with a
+        # NULL session_id are excluded — funnel.py clamps any resulting inversion.
+        cursor.execute(
+            "SELECT COUNT(DISTINCT session_id) FROM chat_logs "
+            "WHERE company_id = %s AND session_id IS NOT NULL" + win_sql,
+            tuple([company_id] + win_params)
+        )
+        conversations = cursor.fetchone()[0] or 0
+
+        # Stages 2-4 + realized won value in one pass over lead_capture.
+        cursor.execute(
+            "SELECT COUNT(*), "
+            "COUNT(*) FILTER (WHERE status <> 'new'), "
+            "COUNT(*) FILTER (WHERE status = 'won'), "
+            "COALESCE(SUM(value_usd) FILTER (WHERE status = 'won'), 0) "
+            "FROM lead_capture WHERE company_id = %s" + win_sql,
+            tuple([company_id] + win_params)
+        )
+        lead_row = cursor.fetchone()
+        leads_total = lead_row[0] or 0
+        contacted = lead_row[1] or 0
+        won = lead_row[2] or 0
+        won_value = round(float(lead_row[3] or 0), 2)
+
+        # Lead-quality breakdown (orthogonal to the funnel).
+        cursor.execute(
+            "SELECT score_band, COUNT(*) FROM lead_capture "
+            "WHERE company_id = %s" + win_sql + " GROUP BY score_band",
+            tuple([company_id] + win_params)
+        )
+        quality_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+        funnel = build_funnel({
+            "conversations": conversations,
+            "leads": leads_total,
+            "contacted": contacted,
+            "won": won,
+        })
+        return {
+            "window_days": wd,
+            "funnel": funnel,
+            "won_value": won_value,
+            "quality": build_quality_breakdown(quality_counts),
+        }
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/leads/{company_id}/attribution")
+def get_lead_attribution(
+    company_id: str,
+    window_days: int = 30,
+    limit: int = 8,
+    user: dict = Depends(get_current_user),
+):
+    """Lead source attribution: which sources (UTM / referrer / Direct) produce
+    the most leads and the most won revenue, over a selectable window. Same
+    analytics tier gate as the funnel; aggregation is pure (attribution.py)."""
+    wd = window_days if window_days in _FUNNEL_WINDOWS else 30
+    win_sql = "" if wd == 0 else " AND created_at >= NOW() - (INTERVAL '1 day' * %s)"
+    safe_limit = max(1, min(int(limit) if limit else 8, 50))
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        user_tier = (user.get("tier") or "FREE").upper()
+        user_role = user.get("role") or ""
+        custom_plan_cfg = user.get("custom_plan_config") or {}
+        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "Lead attribution requires the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
+
+        win_params = [] if wd == 0 else [wd]
+        cursor.execute(
+            "SELECT referrer, utm_source, status, value_usd FROM lead_capture "
+            "WHERE company_id = %s" + win_sql,
+            tuple([company_id] + win_params)
+        )
+        leads = [
+            {"referrer": r[0], "utm_source": r[1], "status": r[2], "value_usd": r[3]}
+            for r in cursor.fetchall()
+        ]
+        result = summarize_attribution(leads, limit=safe_limit)
+        result["window_days"] = wd
+        return result
     finally:
         release_db_connection(conn)
 

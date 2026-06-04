@@ -56,6 +56,7 @@ export interface CompanyDetails {
   webhook_url?: string;
   handoff_redirect_url?: string;
   hide_branding?: boolean;
+  booking_url?: string;
 }
 
 export interface CompanyDetailsResponse {

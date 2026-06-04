@@ -9,6 +9,8 @@ import LeadsPanel from '@/src/app/components/LeadsPanel';
 import ConversationsPanel from '@/src/app/components/ConversationsPanel';
 import FixesNeededPanel from '@/src/app/components/FixesNeededPanel';
 import ROIPanel from '@/src/app/components/ROIPanel';
+import FunnelPanel from '@/src/app/components/FunnelPanel';
+import ActionCenterPanel from '@/src/app/components/ActionCenterPanel';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 
@@ -223,7 +225,7 @@ export default function AppInsights() {
     const [error, setError] = useState('');
     const [isGhostTown, setIsGhostTown] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' or 'leads'
+    const [activeTab, setActiveTab] = useState('action'); // Action Center first — drive the next sale
 
     // Silently try to load a cached report on mount
     useEffect(() => {
@@ -327,8 +329,10 @@ export default function AppInsights() {
             <div className="mt-7 overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
                     {[
+                        { id: 'action', label: 'Action Center' },
                         { id: 'analytics', label: 'Analytics' },
                         { id: 'leads', label: 'Leads CRM' },
+                        { id: 'funnel', label: 'Funnel' },
                         { id: 'conversations', label: 'Conversations' },
                         { id: 'fixes', label: 'Fixes Needed' },
                         { id: 'roi', label: 'ROI' },
@@ -387,11 +391,27 @@ export default function AppInsights() {
             {/* Content Area */}
             <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-6">
 
+                {activeTab === 'action' && (
+                    <ActionCenterPanel
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        isAuthorized={canLeadCapture}
+                    />
+                )}
+
                 {activeTab === 'leads' && (
                     <LeadsPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
                         isAuthorized={canLeadCapture}
+                    />
+                )}
+
+                {activeTab === 'funnel' && (
+                    <FunnelPanel
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        isAuthorized={canAnalytics}
                     />
                 )}
 

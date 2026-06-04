@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field, validator
 from config import VALID_MODELS, VALID_LOGO_SHAPES
 from input_safety import sanitize_message
 from slack_handoff import is_valid_slack_webhook
+from lead_outcomes import LEAD_STATUSES, normalize_status
+from booking import is_valid_booking_url
 
 
 class RegisterRequest(BaseModel):
@@ -50,6 +52,12 @@ class LeadCaptureRequest(BaseModel):
     email: str = Field(..., max_length=255)
     name: Optional[str] = Field(None, max_length=100)
     context: Optional[str] = Field(None, max_length=500)
+    # ── attribution (best-effort, from the widget; untrusted → length-capped) ──
+    page_url: Optional[str] = Field(None, max_length=2048)
+    referrer: Optional[str] = Field(None, max_length=2048)
+    utm_source: Optional[str] = Field(None, max_length=255)
+    utm_medium: Optional[str] = Field(None, max_length=255)
+    utm_campaign: Optional[str] = Field(None, max_length=255)
 
     @validator('email')
     def validate_email(cls, v):
@@ -58,6 +66,14 @@ class LeadCaptureRequest(BaseModel):
         if not re.match(pattern, v.strip()):
             raise ValueError('Invalid email address')
         return v.strip().lower()
+
+    @validator('page_url', 'referrer', 'utm_source', 'utm_medium', 'utm_campaign')
+    def blank_to_none(cls, v):
+        # Normalize empty/whitespace to None so 'Direct' attribution is clean.
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None
 
 
 class SubscriptionRequest(BaseModel):
@@ -173,6 +189,19 @@ class CompanyUpdate(BaseModel):
     alert_email:             Optional[str]  = None  # override recipient; blank = account email
     weekly_digest_enabled:   Optional[bool] = None  # owner opt-in for the weekly results email
     slack_webhook_url:       Optional[str]  = None  # Slack Incoming Webhook for lead handoff
+    booking_url:             Optional[str]  = None  # HTTPS scheduling link offered to qualified leads
+
+    @validator('booking_url')
+    def validate_booking_url(cls, v):
+        # Allow clearing (None/blank); otherwise must be a valid HTTPS link.
+        if v is None:
+            return v
+        v = v.strip()
+        if v == "":
+            return ""
+        if not is_valid_booking_url(v):
+            raise ValueError("booking_url must start with https://")
+        return v
 
     @validator('slack_webhook_url')
     def validate_slack_webhook_url(cls, v):
@@ -220,6 +249,23 @@ class CompanyUpdate(BaseModel):
         if v is not None and v not in VALID_LOGO_SHAPES:
             raise ValueError(f"logo_shape must be one of: {', '.join(sorted(VALID_LOGO_SHAPES))}")
         return v
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class LeadOutcomeUpdate(BaseModel):
+    status: str = Field(..., description="Pipeline state: new | contacted | won | lost")
+    value_usd: Optional[float] = Field(
+        None, ge=0, le=10_000_000,
+        description="Realized deal value (only meaningful when status is 'won')",
+    )
+
+    @validator("status")
+    def validate_status(cls, v):
+        nv = normalize_status(v)
+        if nv is None:
+            raise ValueError(f"status must be one of: {', '.join(LEAD_STATUSES)}")
+        return nv
 
     model_config = ConfigDict(extra="forbid")
 

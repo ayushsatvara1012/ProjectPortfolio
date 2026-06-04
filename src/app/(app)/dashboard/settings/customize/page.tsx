@@ -124,9 +124,11 @@ export default function CustomizePage() {
   // ── Inline validation for lead-alert fields (non-blocking until save) ──
   const alertEmailTrimmed = (botSettings.alertEmail || '').trim();
   const slackUrlTrimmed = (botSettings.slackWebhookUrl || '').trim();
+  const bookingUrlTrimmed = (botSettings.bookingUrl || '').trim();
   const alertEmailInvalid = alertEmailTrimmed !== '' && !EMAIL_RE.test(alertEmailTrimmed);
   const slackUrlInvalid = slackUrlTrimmed !== '' && !slackUrlTrimmed.startsWith(SLACK_WEBHOOK_PREFIX);
-  const leadAlertsInvalid = alertEmailInvalid || slackUrlInvalid;
+  const bookingUrlInvalid = bookingUrlTrimmed !== '' && !bookingUrlTrimmed.toLowerCase().startsWith('https://');
+  const leadAlertsInvalid = alertEmailInvalid || slackUrlInvalid || bookingUrlInvalid;
 
   return (
     <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
@@ -520,6 +522,33 @@ export default function CustomizePage() {
                   </p>
                 </div>
 
+                {/* Instant booking link (Calendly / Cal.com / …) */}
+                <div>
+                  <label className={labelCls} htmlFor="booking-url">Booking link — instant &ldquo;Book a call&rdquo; for hot leads</label>
+                  <input
+                    id="booking-url"
+                    type="url"
+                    spellCheck={false}
+                    autoComplete="off"
+                    value={botSettings.bookingUrl}
+                    onChange={(e) => updateSetting('bookingUrl', e.target.value)}
+                    className={inputCls + (bookingUrlInvalid ? ' ring-1 ring-red-400 dark:ring-red-500' : '')}
+                    placeholder="https://calendly.com/your-team/intro"
+                    aria-invalid={bookingUrlInvalid}
+                    aria-describedby="booking-url-hint"
+                  />
+                  <p
+                    id="booking-url-hint"
+                    className={`text-xs font-google mt-1.5 leading-relaxed transition-colors ${
+                      bookingUrlInvalid ? 'text-red-500 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
+                    {bookingUrlInvalid
+                      ? 'Must be a secure link (starts with https://).'
+                      : 'Qualified (hot &amp; warm) leads see a “Book a call” button the moment they leave their details. Works with Calendly, Cal.com, HubSpot Meetings, etc.'}
+                  </p>
+                </div>
+
               </div>
             </div>
 
@@ -536,7 +565,9 @@ export default function CustomizePage() {
                     type: 'error',
                     msg: alertEmailInvalid
                       ? 'Please enter a valid alert email address before saving.'
-                      : 'Slack webhook URL must start with https://hooks.slack.com/.',
+                      : slackUrlInvalid
+                        ? 'Slack webhook URL must start with https://hooks.slack.com/.'
+                        : 'Booking link must start with https://.',
                   });
                   return;
                 }

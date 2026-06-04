@@ -24,6 +24,7 @@ type BotSettings = {
   alertEmail: string;
   weeklyDigestEnabled: boolean;
   slackWebhookUrl: string;
+  bookingUrl: string;
 };
 
 type BotSettingsContextValue = {
@@ -58,6 +59,7 @@ const DEFAULT_SETTINGS: BotSettings = {
   alertEmail: '',
   weeklyDigestEnabled: true,
   slackWebhookUrl: '',
+  bookingUrl: '',
 };
 
 const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
@@ -89,6 +91,7 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     alertEmail: company.alert_email || '',
     weeklyDigestEnabled: company.weekly_digest_enabled !== false,
     slackWebhookUrl: company.slack_webhook_url || '',
+    bookingUrl: company.booking_url || '',
   };
 };
 
@@ -159,6 +162,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
           alert_email: botSettings.alertEmail.trim() || null,
           weekly_digest_enabled: botSettings.weeklyDigestEnabled,
           slack_webhook_url: botSettings.slackWebhookUrl.trim() || null,
+          booking_url: botSettings.bookingUrl.trim() || null,
         }),
       });
       // Invalidate cached company details so the next read fetches fresh data.

@@ -310,7 +310,7 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
 // ── LeadCaptureForm ───────────────────────────────────────────────────────────
 
 function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey, contextString, error: externalError }: {
-  onSubmit: (name: string) => void; onDismiss: () => void; themeColor: string;
+  onSubmit: (name: string, bookingUrl?: string) => void; onDismiss: () => void; themeColor: string;
   activeApiUrl: string; apiKey: string; contextString: string; error?: string;
 }) {
   const [email, setEmail] = useState('');
@@ -329,8 +329,20 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
     }
     setIsSubmitting(true);
     try {
-      const parentOrigin = (typeof window !== 'undefined'
-        && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const w = (typeof window !== 'undefined' ? (window as any) : {});
+      const parentOrigin = w.__SapybaseParentOrigin || '';
+      // Attribution (best-effort): the loader can expose the merchant page URL via
+      // __SapybaseParentUrl; otherwise document.referrer is the next-best signal.
+      // UTM is parsed here as a backup — the backend also backfills from page_url.
+      const pageUrl = w.__SapybaseParentUrl || (typeof document !== 'undefined' ? document.referrer : '') || '';
+      const referrer = (typeof document !== 'undefined' ? document.referrer : '') || '';
+      let utmSource: string | undefined, utmMedium: string | undefined, utmCampaign: string | undefined;
+      try {
+        const q = new URL(pageUrl).searchParams;
+        utmSource = q.get('utm_source') || undefined;
+        utmMedium = q.get('utm_medium') || undefined;
+        utmCampaign = q.get('utm_campaign') || undefined;
+      } catch { /* pageUrl not a parseable URL — skip UTM */ }
       const res = await fetch(`${activeApiUrl}/api/leads/capture`, {
         method: 'POST',
         headers: {
@@ -338,11 +350,22 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
           'x-api-key': apiKey,
           ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
         },
-        body: JSON.stringify({ email: parsed.data.email, name: parsed.data.name ?? '', context: contextString }),
+        body: JSON.stringify({
+          email: parsed.data.email,
+          name: parsed.data.name ?? '',
+          context: contextString,
+          page_url: pageUrl || undefined,
+          referrer: referrer || undefined,
+          utm_source: utmSource,
+          utm_medium: utmMedium,
+          utm_campaign: utmCampaign,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to submit.');
-      onSubmit(name);
+      // Speed-to-lead: the backend returns booking_url only for qualified leads
+      // when the owner has set a scheduling link.
+      onSubmit(name, typeof data.booking_url === 'string' ? data.booking_url : undefined);
     } catch {
       setLocalError('Something went wrong. Please try again.');
     } finally {
@@ -435,12 +458,13 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Message = {
-  role: 'user' | 'bot' | 'lead_capture' | 'handoff_form' | 'handoff_confirmed';
+  role: 'user' | 'bot' | 'lead_capture' | 'handoff_form' | 'handoff_confirmed' | 'lead_confirmed';
   content?: string;
   isStreaming?: boolean;
   id?: string;
   visitorEmail?: string;
   redirectUrl?: string;
+  bookingUrl?: string;
 };
 
 type ConfigData = {
@@ -1218,7 +1242,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                          className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-[95%]' : 'max-w-[85%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
+                          className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' || msg.role === 'lead_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-[95%]' : 'max-w-[85%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
                           {msg.role === 'handoff_form' ? (
                             <HandoffContactForm themeColor={THEME_COLOR} onSubmit={submitHandoff}
                               onDismiss={() => setMessages(prev => prev.filter(m => m.id !== 'handoff-form'))} />
@@ -1236,12 +1260,34 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                 </a>
                               )}
                             </div>
+                          ) : msg.role === 'lead_confirmed' ? (
+                            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm w-full self-start text-left mt-2 space-y-3">
+                              <p className="text-sm font-google font-bold text-emerald-600 dark:text-emerald-400 text-center">🎉 Got it!</p>
+                              <p className="text-xs font-google text-slate-500 dark:text-slate-400 text-center">
+                                {msg.content || 'We’ve received your details and will be in touch shortly.'}
+                              </p>
+                              <p className="text-xs font-google text-slate-600 dark:text-slate-300 text-center font-semibold">
+                                Want to talk sooner? Book a time that works for you:
+                              </p>
+                              {msg.bookingUrl && (
+                                <a href={msg.bookingUrl} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-sm font-google font-bold text-white transition-opacity hover:opacity-90"
+                                  style={{ backgroundColor: THEME_COLOR }}>
+                                  <span className="material-symbols-outlined text-[16px]">calendar_month</span> Book a call
+                                </a>
+                              )}
+                            </div>
                           ) : msg.role === 'lead_capture' ? (
                             <LeadCaptureForm themeColor={THEME_COLOR} activeApiUrl={activeApiUrl} apiKey={activeApiKey ?? ''}
                               contextString={messages.slice(Math.max(0, idx - 4), idx).filter(m => m.role === 'user').map(m => m.content).join(' || ')}
-                              onSubmit={(name) => {
+                              onSubmit={(name, bookingUrl) => {
                                 leadCapturedRef.current = true;
-                                setMessages(prev => prev.map(m => m.id === 'lead-form' ? { role: 'bot', content: `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉` } : m));
+                                const thanks = `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉`;
+                                setMessages(prev => prev.map(m => m.id === 'lead-form'
+                                  ? (bookingUrl
+                                    ? { role: 'lead_confirmed', content: thanks, bookingUrl, id: 'lead-confirmed' }
+                                    : { role: 'bot', content: thanks })
+                                  : m));
                               }}
                               onDismiss={() => { leadCapturedRef.current = true; setMessages(prev => prev.filter(m => m.id !== 'lead-form')); }} />
                           ) : (

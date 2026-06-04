@@ -13,6 +13,17 @@ const BAND_STYLES: Record<string, string> = {
     COLD: 'text-slate-500 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-800/40 dark:border-slate-700',
 };
 
+// Sales pipeline states (must match backend lead_outcomes.LEAD_STATUSES).
+const STATUS_OPTIONS = ['new', 'contacted', 'won', 'lost'] as const;
+const STATUS_STYLES: Record<string, string> = {
+    new: 'text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-300 dark:bg-slate-800/40 dark:border-slate-700',
+    contacted: 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-900/40',
+    won: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-900/40',
+    lost: 'text-slate-400 bg-slate-50 border-slate-200 dark:text-slate-500 dark:bg-slate-800/40 dark:border-slate-700',
+};
+
+const fmtMoney = (n: number) => '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
 const ScoreBadge = ({ score, band, reasons }: { score: number | null; band: string | null; reasons?: string[] }) => {
     if (score === null || score === undefined || !band) {
         return (
@@ -42,13 +53,15 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
     const [page, setPage] = useState(1);
     const [sort, setSort] = useState('recent');   // 'recent' | 'score'
     const [band, setBand] = useState('all');       // 'all' | 'HOT' | 'WARM' | 'COLD'
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all' | new | contacted | won | lost
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [valueDraft, setValueDraft] = useState<Record<string, string>>({});
     const queryClient = useQueryClient();
     const { getToken } = useAuth();
 
     const { data: leadsData, isLoading } = useQuery({
-        queryKey: ['leads', selectedBotId, page, sort, band],
-        queryFn: () => authFetch(`/api/leads/${selectedBotId}?page=${page}&limit=50&sort=${sort}&band=${band}`),
+        queryKey: ['leads', selectedBotId, page, sort, band, statusFilter],
+        queryFn: () => authFetch(`/api/leads/${selectedBotId}?page=${page}&limit=50&sort=${sort}&band=${band}&status=${statusFilter}`),
         enabled: !!selectedBotId && isAuthorized,
         staleTime: 60_000,
     });
@@ -60,6 +73,89 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
             setDeleteConfirm(null);
         },
     });
+
+    // Move a lead through the pipeline (and record value on 'won'). Also refresh
+    // the ROI panel so realized revenue updates immediately.
+    const outcomeMutation = useMutation({
+        mutationFn: ({ leadId, status, value }: { leadId: string; status: string; value?: number | null }) =>
+            authFetch(`/api/leads/${selectedBotId}/${leadId}/outcome`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, value_usd: value ?? null }),
+            }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['leads', selectedBotId] });
+            queryClient.invalidateQueries({ queryKey: ['roi-benchmarks', selectedBotId] });
+        },
+    });
+
+    const handleStatusChange = (lead: any, newStatus: string) => {
+        // On 'won', keep the existing value so the deal isn't zeroed; edit it via
+        // the inline value field. Any other status clears the value server-side.
+        outcomeMutation.mutate({
+            leadId: lead.id,
+            status: newStatus,
+            value: newStatus === 'won' ? (lead.value_usd ?? 0) : null,
+        });
+    };
+
+    const handleSaveValue = (lead: any) => {
+        const parsed = parseFloat(valueDraft[lead.id]);
+        outcomeMutation.mutate({
+            leadId: lead.id,
+            status: 'won',
+            value: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+        });
+    };
+
+    const renderStatusCell = (lead: any) => {
+        const status = lead.status || 'new';
+        return (
+            <div className="flex flex-col gap-1.5 items-start">
+                <div className="relative">
+                    <select
+                        value={status}
+                        onChange={(e) => handleStatusChange(lead, e.target.value)}
+                        disabled={outcomeMutation.isPending}
+                        aria-label="Lead status"
+                        className={`appearance-none cursor-pointer pl-2.5 pr-7 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold font-google focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors disabled:opacity-50 ${STATUS_STYLES[status]}`}
+                    >
+                        {STATUS_OPTIONS.map(s => (
+                            <option key={s} value={s} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 normal-case tracking-normal">
+                                {s.charAt(0).toUpperCase() + s.slice(1)}
+                            </option>
+                        ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[14px] opacity-60 pointer-events-none">expand_more</span>
+                </div>
+                {status === 'won' && (
+                    <div className="flex items-center gap-1">
+                        <span className="text-xs font-mono text-slate-400">$</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            inputMode="decimal"
+                            value={valueDraft[lead.id] ?? (lead.value_usd ?? '')}
+                            onChange={(e) => setValueDraft(prev => ({ ...prev, [lead.id]: e.target.value }))}
+                            onBlur={() => { if (valueDraft[lead.id] !== undefined) handleSaveValue(lead); }}
+                            placeholder="0"
+                            aria-label="Deal value in USD"
+                            className="w-20 px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-xs font-mono text-slate-900 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                        />
+                        <button
+                            onClick={() => handleSaveValue(lead)}
+                            disabled={outcomeMutation.isPending}
+                            title="Save deal value"
+                            className="w-6 h-6 flex items-center justify-center rounded-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-[14px]">check</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const handleExport = async () => {
         try {
@@ -115,8 +211,25 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                         Total Leads: {total}
                     </h2>
                 </div>
-                {(total > 0 || band !== 'all') && (
+                {(total > 0 || band !== 'all' || statusFilter !== 'all') && (
                     <div className="flex flex-wrap items-center gap-2">
+                        {/* Status filter */}
+                        <div className="relative">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                                aria-label="Filter by pipeline status"
+                                className="appearance-none cursor-pointer pl-3 pr-8 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google rounded-sm border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-transparent hover:bg-gray-50 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors"
+                            >
+                                <option value="all" className="normal-case tracking-normal">All statuses</option>
+                                {STATUS_OPTIONS.map(s => (
+                                    <option key={s} value={s} className="normal-case tracking-normal">
+                                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                                    </option>
+                                ))}
+                            </select>
+                            <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] text-slate-400 pointer-events-none">expand_more</span>
+                        </div>
                         {/* Band filter */}
                         {(['all', 'HOT', 'WARM', 'COLD'] as const).map(b => (
                             <button
@@ -159,11 +272,15 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                         <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">inbox</span>
                     </div>
                     <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">
-                        {band !== 'all' ? `No ${band.toLowerCase()} leads` : 'No leads captured yet'}
+                        {band !== 'all'
+                            ? `No ${band.toLowerCase()} leads`
+                            : statusFilter !== 'all'
+                                ? `No ${statusFilter} leads`
+                                : 'No leads captured yet'}
                     </h2>
                     <p className="text-md font-display text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed">
-                        {band !== 'all'
-                            ? 'No leads in this band yet. Try a different filter.'
+                        {band !== 'all' || statusFilter !== 'all'
+                            ? 'No leads match this filter. Try a different one.'
                             : 'Once your bot triggers the lead form, contacts will appear here.'}
                     </p>
                 </div>
@@ -216,6 +333,12 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                                     )}
                                 </div>
 
+                                {/* Pipeline status */}
+                                <div className="flex items-center gap-3">
+                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google shrink-0">Status</span>
+                                    {renderStatusCell(lead)}
+                                </div>
+
                                 {/* Context */}
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">Context / Query</span>
@@ -234,13 +357,14 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
 
                     {/* ── Desktop table (hidden on mobile) ── */}
                     <div className="hidden sm:flex flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
-                        <table className="w-full text-left border-collapse min-w-[800px]">
+                        <table className="w-full text-left border-collapse min-w-[940px]">
                             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900/90 shadow-sm transition-colors border-b border-gray-100 dark:border-slate-800 backdrop-blur-sm">
                                 <tr>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[30%]">Contact Info</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[12%]">Score</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[33%]">Context / Query</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[15%]">Captured At</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[24%]">Contact Info</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[11%]">Score</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[16%]">Status / Value</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[26%]">Context / Query</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[13%]">Captured At</th>
                                     <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-[10%]">Action</th>
                                 </tr>
                             </thead>
@@ -255,6 +379,9 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                                         </td>
                                         <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
                                             <ScoreBadge score={lead.score} band={lead.band} reasons={lead.reasons} />
+                                        </td>
+                                        <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
+                                            {renderStatusCell(lead)}
                                         </td>
                                         <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50 align-top">
                                             <p className="text-md font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed whitespace-pre-wrap break-words">
