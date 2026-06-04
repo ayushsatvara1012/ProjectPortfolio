@@ -114,23 +114,39 @@ describe('Custom Plan Features - Entitlements Resolution', () => {
       expect(entitlements.canUseWebhooks).toBe(false);
     });
 
-    it('should fall back to STARTER tier defaults', () => {
+    it('should fall back to STARTER (Starter $19) tier defaults — bot only', () => {
       const entitlements = resolveEntitlements('USER', 'STARTER', null);
 
       expect(entitlements.canUseAdvancedBot).toBe(true);
-      expect(entitlements.canWhiteLabel).toBe(true);
+      // Re-scoped: Starter has no conversion engine, no white-label.
+      expect(entitlements.canUseLeadCapture).toBe(false);
+      expect(entitlements.canWhiteLabel).toBe(false);
       expect(entitlements.canUseCustomLogo).toBe(false);
+      expect(entitlements.canUseAnalytics).toBe(false);
     });
 
-    it('should fall back to PRO tier defaults', () => {
+    it('should fall back to PRO (Growth $49) tier defaults — lead capture only', () => {
       const entitlements = resolveEntitlements('USER', 'PRO', null);
 
       expect(entitlements.canUseAdvancedBot).toBe(true);
-      expect(entitlements.canUseCustomLogo).toBe(true);
+      expect(entitlements.canUseLeadCapture).toBe(true);
+      // Deep BI + integrations are Scale-only.
+      expect(entitlements.canUseAnalytics).toBe(false);
+      expect(entitlements.canUseWebhooks).toBe(false);
+      expect(entitlements.canUseHumanHandoff).toBe(false);
+      expect(entitlements.canWhiteLabel).toBe(false);
+      expect(entitlements.canUseCustomLogo).toBe(false);
+    });
+
+    it('should fall back to BUSINESS (Scale $99) tier defaults — everything', () => {
+      const entitlements = resolveEntitlements('USER', 'BUSINESS', null);
+
+      expect(entitlements.canUseLeadCapture).toBe(true);
+      expect(entitlements.canUseAnalytics).toBe(true);
       expect(entitlements.canUseWebhooks).toBe(true);
       expect(entitlements.canUseHumanHandoff).toBe(true);
       expect(entitlements.canWhiteLabel).toBe(true);
-      expect(entitlements.canUseAnalytics).toBe(true);
+      expect(entitlements.canUseCustomLogo).toBe(true);
     });
   });
 
@@ -357,9 +373,9 @@ describe('Custom Plan Features - Entitlements Resolution', () => {
       const entitlements2 = resolveEntitlements('USER', 'PRO', null);
       const entitlements3 = resolveEntitlements('USER', 'Pro', null);
 
-      expect(entitlements1.canUseCustomLogo).toBe(entitlements2.canUseCustomLogo);
-      expect(entitlements2.canUseCustomLogo).toBe(entitlements3.canUseCustomLogo);
-      expect(entitlements1.canUseCustomLogo).toBe(true);
+      expect(entitlements1.canUseLeadCapture).toBe(entitlements2.canUseLeadCapture);
+      expect(entitlements2.canUseLeadCapture).toBe(entitlements3.canUseLeadCapture);
+      expect(entitlements1.canUseLeadCapture).toBe(true);
     });
   });
 });

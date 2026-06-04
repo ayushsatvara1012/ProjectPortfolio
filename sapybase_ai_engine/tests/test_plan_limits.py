@@ -26,9 +26,12 @@ class TestPlanLimits:
 
     def test_higher_tiers_have_more_messages(self):
         limits, _, _ = _import()
-        assert limits["BASIC"]["messages"] < limits["STARTER"]["messages"]
+        # Commercial ladder: Starter < Growth(PRO) < Scale(BUSINESS) < Enterprise.
+        # BASIC is a legacy alias of Starter (equal), no longer sold.
+        assert limits["BASIC"]["messages"] == limits["STARTER"]["messages"]
         assert limits["STARTER"]["messages"] < limits["PRO"]["messages"]
-        assert limits["PRO"]["messages"] < limits["ENTERPRISE"]["messages"]
+        assert limits["PRO"]["messages"] < limits["BUSINESS"]["messages"]
+        assert limits["BUSINESS"]["messages"] < limits["ENTERPRISE"]["messages"]
 
     def test_higher_tiers_have_more_chunks(self):
         limits, _, _ = _import()

@@ -7,7 +7,6 @@ import Image from 'next/image';
 import { ArrowRight, Mail } from 'lucide-react';
 import {
   PRICE_MATRIX,
-  BASIC_COUPON,
   CURRENCIES,
   PLANS,
   COMPARISON_FEATURES,
@@ -51,13 +50,14 @@ export default function PricingClient() {
     detect();
   }, []);
 
+  // Annual = 2 months free → per-month equivalent is monthly × 10 / 12.
   const formatPrice = (val: number) =>
     val === 0
       ? 'Free'
       : new Intl.NumberFormat(CURRENCIES[currency].locale, {
         style: 'currency', currency,
-        minimumFractionDigits: val % 1 === 0 ? 0 : 1,
-      }).format(billingPeriod === 'annual' ? Math.round(val * 0.9) : val);
+        minimumFractionDigits: 0,
+      }).format(billingPeriod === 'annual' ? Math.round((val * 10) / 12) : val);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-500 overflow-x-hidden overflow-y-visible">
@@ -161,16 +161,8 @@ export default function PricingClient() {
             </div>
           </div>
 
-          {/* Coupon banner */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={cardsInView ? { opacity: 1, y: 0 } : {}} className="mb-12 px-5 py-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl flex items-center gap-3 w-fit">
-            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[16px] shrink-0">local_offer</span>
-            <p className="text-sm font-google text-emerald-700 dark:text-emerald-300">
-              Basic plan is <span className="font-semibold">{formatPrice(PRICE_MATRIX.BASIC[currency])}/mo</span> — use coupon <span className="bg-emerald-100 dark:bg-emerald-900/50 px-2 py-1 rounded-lg font-mono text-[12px] font-semibold tracking-normal normal-case">{BASIC_COUPON}</span> at checkout for 100% off
-            </p>
-          </motion.div>
-
           {/* Plan Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {PLANS.map((plan, i) => {
               const price = PRICE_MATRIX[plan.id as keyof typeof PRICE_MATRIX][currency];
               return (
@@ -202,23 +194,16 @@ export default function PricingClient() {
 
                     {/* Pricing */}
                     <div className="mb-8 pb-8 border-b border-gray-200 dark:border-slate-800/40">
-                      {plan.id === 'BASIC' ? (
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-google font-bold text-slate-400 dark:text-slate-500 line-through">
-                              {formatPrice(price)}/mo
-                            </span>
-                            <span className="text-3xl font-display font-black text-emerald-600 dark:text-emerald-400">Free</span>
-                          </div>
-                          <span className="text-xs font-google text-slate-500 dark:text-slate-400">with coupon code</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-display font-black text-slate-900 dark:text-slate-100">
-                            {formatPrice(price)}
-                          </span>
-                          <span className="text-sm font-google text-slate-500 dark:text-slate-400">/month</span>
-                        </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-display font-black text-slate-900 dark:text-slate-100">
+                          {formatPrice(price)}
+                        </span>
+                        <span className="text-sm font-google text-slate-500 dark:text-slate-400">/month</span>
+                      </div>
+                      {billingPeriod === 'annual' && (
+                        <span className="text-xs font-google text-emerald-600 dark:text-emerald-400 mt-1 block">
+                          billed annually · 2 months free
+                        </span>
                       )}
                     </div>
 
@@ -238,14 +223,12 @@ export default function PricingClient() {
                     <Link
                       href="/dashboard/pricing"
                       className={`w-full py-4 text-sm font-display font-bold uppercase tracking-widest flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98] ${
-                        plan.id === 'BASIC'
-                          ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/30'
-                          : plan.badge
-                            ? 'bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-800 dark:hover:bg-slate-100 shadow-lg'
-                            : 'bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-200 border border-gray-200 dark:border-slate-800/60 hover:bg-slate-200 dark:hover:bg-white/[0.10]'
+                        plan.badge
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-800 dark:hover:bg-slate-100 shadow-lg'
+                          : 'bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-200 border border-gray-200 dark:border-slate-800/60 hover:bg-slate-200 dark:hover:bg-white/[0.10]'
                       }`}
                     >
-                      {plan.id === 'BASIC' ? 'Start Free' : `Get ${plan.name}`}
+                      {`Get ${plan.name}`}
                       <ArrowRight size={14} />
                     </Link>
                   </div>

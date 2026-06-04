@@ -1,20 +1,17 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronDown, Zap, Rocket, Building2, Globe } from 'lucide-react';
+import { ChevronDown, Rocket, Building2, Globe } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DATA
  ───────────────────────────────────────────────────────────────────────────── */
 
 export const PRICE_MATRIX = {
-  BASIC: { USD: 9, INR: 749 },
   STARTER: { USD: 19, INR: 1599 },
   PRO: { USD: 49, INR: 3999 },
   BUSINESS: { USD: 99, INR: 7999 },
 };
-
-export const BASIC_COUPON = 'SAPYAI2026';
 
 export const CURRENCIES = {
   USD: { symbol: '$', label: 'USD', locale: 'en-US' },
@@ -23,81 +20,61 @@ export const CURRENCIES = {
 
 export const PLANS = [
   {
-    id: 'BASIC',
-    name: 'Basic',
-    icon: 'bolt',
-    LucideIcon: Zap,
-    description: 'Start free. No credit card required.',
-    badge: null,
-    accent: 'slate',
-    features: [
-      '1 AI Bot',
-      '500 messages / month',
-      '100 knowledge chunks',
-      'Standard response speed',
-      'Sapybase branding',
-      'Basic analytics',
-      'Community support',
-    ],
-  },
-  {
     id: 'STARTER',
     name: 'Starter',
     icon: 'rocket_launch',
     LucideIcon: Rocket,
-    description: 'For growing businesses deploying 2 bots.',
-    badge: 'Most Popular',
-    accent: 'blue',
+    description: 'A smart AI chatbot on your site, fully on-brand.',
+    badge: null,
+    accent: 'slate',
     features: [
-      '2 AI Bots',
-      '2,000 messages / bot / month',
-      '500 knowledge chunks per bot',
-      'Priority response speed',
+      '1 AI Bot',
+      '1,500 messages / month',
+      '300 knowledge chunks',
       'Custom branding & colors',
-      'Lead capture (CRM-ready)',
-      'Standard analytics',
-      'Priority email support',
+      'Custom prompt & tone',
+      'Email support',
     ],
   },
   {
     id: 'PRO',
-    name: 'Pro',
-    icon: 'corporate_fare',
+    name: 'Growth',
+    icon: 'trending_up',
     LucideIcon: Building2,
-    description: 'Scale to 5 bots with full white-label.',
-    badge: null,
-    accent: 'indigo',
+    description: 'Turn visitors into leads — capture, score & act.',
+    badge: 'Most Popular',
+    accent: 'blue',
     features: [
-      '5 AI Bots',
-      '5,000 messages / bot / month',
-      '2,000 knowledge chunks per bot',
-      'Dedicated response speed',
-      'Full white-label',
-      'Webhooks & Zapier',
-      'Advanced analytics & exports',
-      'Lead capture (full CRM)',
-      'SLA & dedicated support',
+      '3 AI Bots',
+      '5,000 messages / month',
+      '1,500 knowledge chunks',
+      'Everything in Starter, plus:',
+      'Lead capture & scoring (HOT/WARM/COLD)',
+      'Instant hot-lead alerts + booking CTA',
+      'Action Center (prioritized worklist)',
+      'Weekly results email',
+      'Priority support',
     ],
   },
   {
     id: 'BUSINESS',
-    name: 'Business',
-    icon: 'domain',
+    name: 'Scale',
+    icon: 'insights',
     LucideIcon: Globe,
-    description: 'Full platform for high-growth teams & enterprises.',
+    description: 'See what drives revenue, then scale it.',
     badge: 'Full Platform',
     accent: 'emerald',
     features: [
-      '15 AI Bots',
-      '15,000 messages / bot / month',
-      '10,000 knowledge chunks per bot',
-      'Ultra response speed',
-      'Full white-label',
-      'Human handoff (transcript + URL)',
-      'Full CRM lead capture',
-      'Webhooks & Zapier',
-      'Full analytics & ROI reports',
-      'Dedicated SLA support',
+      '5 AI Bots',
+      '15,000 messages / month',
+      '5,000 knowledge chunks',
+      'Everything in Growth, plus:',
+      'ROI dashboard + Conversion funnel',
+      'Lead source attribution',
+      'Slack handoff + Webhooks',
+      'Human handoff',
+      'Full white-label + custom logo',
+      'Dedicated support',
     ],
   },
 ];
@@ -121,41 +98,48 @@ export const FEATURE_DESCRIPTIONS: Record<string, string> = {
 export const COMPARISON_FEATURES = [
   {
     category: 'Bots & Capacity', rows: [
-      { label: 'AI Bots', basic: '1', starter: '2', pro: '5', business: '15' },
-      { label: 'Messages / bot / month', basic: '500', starter: '2,000', pro: '5,000', business: '15,000' },
-      { label: 'Knowledge chunks / bot', basic: '100', starter: '500', pro: '2,000', business: '10,000' },
-      { label: 'Response speed', basic: 'Standard', starter: 'Priority', pro: 'Dedicated', business: 'Ultra' },
+      { label: 'AI Bots', starter: '1', pro: '3', business: '5' },
+      { label: 'Messages / bot / month', starter: '1,500', pro: '5,000', business: '15,000' },
+      { label: 'Knowledge chunks / bot', starter: '300', pro: '1,500', business: '5,000' },
+      { label: 'Response speed', starter: 'Standard', pro: 'Priority', business: 'Ultra' },
     ]
   },
   {
     category: 'Branding & Customization', rows: [
-      { label: 'Custom branding & colors', basic: false, starter: true, pro: true, business: true },
-      { label: 'White-label (remove Sapybase)', basic: false, starter: false, pro: true, business: true },
-      { label: 'Human handoff', basic: false, starter: false, pro: false, business: true },
+      { label: 'Custom branding & colors', starter: true, pro: true, business: true },
+      { label: 'White-label (remove Sapybase)', starter: false, pro: false, business: true },
+      { label: 'Human handoff', starter: false, pro: false, business: true },
     ]
   },
   {
-    category: 'Integrations', rows: [
-      { label: 'Lead capture / CRM', basic: false, starter: 'Basic', pro: 'Full CRM', business: 'Full CRM' },
-      { label: 'Webhooks & Zapier', basic: false, starter: false, pro: true, business: true },
-      { label: 'Analytics & exports', basic: 'Basic', starter: 'Standard', pro: 'Advanced + CSV', business: 'Full + ROI' },
+    category: 'Conversion engine', rows: [
+      { label: 'Lead capture & scoring', starter: false, pro: true, business: true },
+      { label: 'Hot-lead alerts + booking CTA', starter: false, pro: true, business: true },
+      { label: 'Action Center (worklist)', starter: false, pro: true, business: true },
+      { label: 'Weekly results email', starter: false, pro: true, business: true },
     ]
   },
   {
-    category: 'Support & SLA', rows: [
-      { label: 'Support channel', basic: 'Community', starter: 'Priority email', pro: 'SLA email', business: 'Dedicated SLA' },
-      { label: 'Onboarding call', basic: false, starter: false, pro: false, business: true },
-      { label: 'Guaranteed uptime SLA', basic: false, starter: false, pro: true, business: true },
+    category: 'Business intelligence & integrations', rows: [
+      { label: 'ROI dashboard & Conversion funnel', starter: false, pro: false, business: true },
+      { label: 'Lead source attribution', starter: false, pro: false, business: true },
+      { label: 'Slack handoff & Webhooks', starter: false, pro: false, business: true },
+    ]
+  },
+  {
+    category: 'Support', rows: [
+      { label: 'Support channel', starter: 'Email', pro: 'Priority', business: 'Dedicated' },
+      { label: 'Onboarding call', starter: false, pro: false, business: true },
     ]
   },
 ];
 
 export const FAQS = [
   { q: 'Can I switch plans at any time?', a: 'Yes. Upgrades take effect immediately. Downgrades take effect at the end of your current billing cycle.' },
-  { q: 'Is the Basic plan really free ?', a: 'Yes — Basic is free using the coupon code SAPYAI2026 at checkout with no credit card required. We may add new features to paid plans but will never remove Basic features.' },
-  { q: 'What payment methods do you accept?', a: 'We accept all major credit/debit cards and UPI (India) via our Polar checkout. Invoices available for Business plans.' },
+  { q: 'Can I try it before paying?', a: 'Yes — start a 14-day trial of Growth to experience lead capture and the Action Center, then pick the plan that fits. No long-term commitment.' },
+  { q: 'What payment methods do you accept?', a: 'We accept all major credit/debit cards and UPI (India) via our Polar checkout. Invoices available on the Scale and Enterprise plans.' },
   { q: 'What are "knowledge chunks"?', a: 'Knowledge chunks are the units of text (approximately 512 tokens each) your bot stores from your documents, URLs, or FAQs. More chunks = richer, more accurate answers.' },
-  { q: 'Do you offer annual billing?', a: 'Annual billing with a 10% discount is available on Starter, Pro, and Business. Contact us to set it up.' },
+  { q: 'Do you offer annual billing?', a: 'Yes — pay annually and get 2 months free (about 17% off) on Starter, Growth, and Scale. Toggle annual billing on this page.' },
   { q: 'What is human handoff?', a: 'Human handoff lets your bot transfer a conversation to a live agent — passing the full transcript and optionally redirecting to a support URL you configure.' },
 ];
 

@@ -11,7 +11,7 @@ import { PLANS, PRICE_MATRIX } from '@/src/app/(app)/(site)/pricing/components';
  ───────────────────────────────────────────────────────────────────────────── */
 
 const PREVIEW_FEATURE_COUNT = 3; // keep it a preview, not the full feature list
-const PREVIEW_PLAN_IDS = ['BASIC', 'STARTER', 'PRO']; // Business is shown only on the full /pricing page
+const PREVIEW_PLAN_IDS = ['STARTER', 'PRO', 'BUSINESS']; // the three self-serve tiers
 
 const PricingPreview = () => {
   return (

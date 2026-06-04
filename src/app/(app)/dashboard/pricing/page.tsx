@@ -7,16 +7,22 @@ import { useRouter } from 'next/navigation';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import Alert from '@/src/app/components/Alert';
 
+// Monthly Polar checkout links per tier.
 const POLAR_URLS: Record<string, string | undefined> = {
-    BASIC: process.env.NEXT_PUBLIC_POLAR_BASIC_URL,
     STARTER: process.env.NEXT_PUBLIC_POLAR_STARTER_URL,
     PRO: process.env.NEXT_PUBLIC_POLAR_PRO_URL,
     BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_URL,
 };
 
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+// Annual Polar checkout links per tier (2 months free). Set these in env when
+// the annual products exist in Polar; falls back to monthly if unset.
+const POLAR_URLS_ANNUAL: Record<string, string | undefined> = {
+    STARTER: process.env.NEXT_PUBLIC_POLAR_STARTER_ANNUAL_URL,
+    PRO: process.env.NEXT_PUBLIC_POLAR_PRO_ANNUAL_URL,
+    BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_ANNUAL_URL,
+};
 
-const BASIC_COUPON = 'SAPYAI2026';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
 const CURRENCIES = {
     USD: { symbol: '$', label: 'USD', locale: 'en-US' },
@@ -24,7 +30,6 @@ const CURRENCIES = {
 };
 
 const PRICE_MATRIX = {
-    BASIC: { USD: 9, INR: 749 },
     STARTER: { USD: 19, INR: 1599 },
     PRO: { USD: 49, INR: 3999 },
     BUSINESS: { USD: 99, INR: 7999 },
@@ -38,6 +43,7 @@ const AppPricing = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [selectedTier, setSelectedTier] = useState<string | null>(null);
     const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
+    const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
     const [isDetecting, setIsDetecting] = useState(true);
     const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'development', msg: '' });
 
@@ -46,12 +52,13 @@ const AppPricing = () => {
         setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
     };
 
+    // Annual = 2 months free → per-month equivalent is monthly × 10 / 12.
     const formatPrice = (val: number) =>
         new Intl.NumberFormat(CURRENCIES[currency].locale, {
             style: 'currency',
             currency,
-            minimumFractionDigits: val % 1 === 0 ? 0 : 1,
-        }).format(val);
+            minimumFractionDigits: 0,
+        }).format(billingPeriod === 'annual' ? Math.round((val * 10) / 12) : val);
 
     useEffect(() => {
         const CACHE_KEY = 'sb_currency';
@@ -104,38 +111,30 @@ const AppPricing = () => {
 
     const plans = [
         {
-            name: 'Basic', id: 'BASIC',
-            price: PRICE_MATRIX.BASIC[currency],
-            description: 'For solo founders and small projects.',
-            icon: 'bolt',
-            highlight: false,
-            features: ['1 AI bot', '500 messages / mo', 'Basic analytics'],
-        },
-        {
             name: 'Starter', id: 'STARTER',
             price: PRICE_MATRIX.STARTER[currency],
-            description: 'For growing businesses with real traction.',
+            description: 'A smart AI chatbot on your site, fully on-brand.',
             icon: 'rocket_launch',
+            highlight: false,
+            features: ['1 AI bot', '1,500 messages / mo', 'Custom branding & prompt'],
+        },
+        {
+            name: 'Growth', id: 'PRO',
+            price: PRICE_MATRIX.PRO[currency],
+            description: 'Turn visitors into leads — capture, score & act.',
+            icon: 'trending_up',
             highlight: true,
             badge: 'Most popular',
-            features: ['2 AI bots', '2,000 messages / bot / mo', 'Lead capture'],
+            features: ['3 AI bots', '5,000 messages / mo', 'Lead capture + alerts + Action Center'],
         },
         {
-            name: 'Pro', id: 'PRO',
-            price: PRICE_MATRIX.PRO[currency],
-            description: 'Scale your support and lead ops.',
-            icon: 'corporate_fare',
-            highlight: false,
-            features: ['5 AI bots', '5,000 messages / bot / mo', 'Full white-label'],
-        },
-        {
-            name: 'Business', id: 'BUSINESS',
+            name: 'Scale', id: 'BUSINESS',
             price: PRICE_MATRIX.BUSINESS[currency],
-            description: 'Full platform for high-growth teams.',
-            icon: 'domain',
+            description: 'See what drives revenue, then scale it.',
+            icon: 'insights',
             highlight: false,
             badge: 'Full platform',
-            features: ['15 AI bots', '15,000 messages / bot / mo', 'Human handoff'],
+            features: ['5 AI bots', '15,000 messages / mo', 'ROI, funnel, attribution + white-label'],
         },
     ];
 
@@ -143,7 +142,11 @@ const AppPricing = () => {
         if (!user) { window.location.href = '/sign-in'; return; }
         if (tier === userTier) return;
 
-        const checkoutUrl = POLAR_URLS[tier];
+        // Prefer the annual checkout link when annual is selected; fall back to
+        // monthly if the annual product isn't configured yet.
+        const checkoutUrl = billingPeriod === 'annual'
+            ? (POLAR_URLS_ANNUAL[tier] || POLAR_URLS[tier])
+            : POLAR_URLS[tier];
         if (!checkoutUrl) {
             showAlert('error', 'Billing system is currently unavailable. Please try again later.');
             return;
@@ -179,14 +182,24 @@ const AppPricing = () => {
                                 Choose the plan that fits your stage. Upgrade or downgrade anytime.
                             </p>
 
-                            {/* Coupon badge */}
-                            <div className="mt-4 inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-xl">
-                                <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[14px]">local_offer</span>
-                                <p className="text-xs font-medium font-google text-emerald-700 dark:text-emerald-300">
-                                    Basic plan is free — use coupon{' '}
-                                    <span className="font-mono bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 rounded-md">{BASIC_COUPON}</span>
-                                    {' '}at checkout
-                                </p>
+                            {/* Billing period toggle */}
+                            <div className="mt-4 inline-flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                                {(['monthly', 'annual'] as const).map(period => (
+                                    <button
+                                        key={period}
+                                        onClick={() => setBillingPeriod(period)}
+                                        aria-pressed={billingPeriod === period}
+                                        className={`px-4 py-2 text-sm font-medium font-google rounded-lg transition-all capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${billingPeriod === period
+                                            ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                                        }`}
+                                    >
+                                        {period}
+                                        {period === 'annual' && (
+                                            <span className="ml-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">2 MO FREE</span>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -219,7 +232,7 @@ const AppPricing = () => {
 
                 {/* ── Plan Cards ── */}
                 <div className="px-6 md:px-8 pb-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         {plans.map((plan, i) => {
                             const isCurrent = plan.id === userTier;
                             return (
@@ -248,23 +261,16 @@ const AppPricing = () => {
 
                                     {/* Price */}
                                     <div className="mb-5">
-                                        {plan.id === 'BASIC' ? (
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-2xl font-google font-bold text-slate-400 dark:text-slate-500 line-through">
-                                                        {formatPrice(plan.price)}
-                                                    </span>
-                                                    <span className="text-2xl font-google font-bold text-emerald-600 dark:text-emerald-400">Free</span>
-                                                </div>
-                                                <span className="text-xs font-google text-slate-400">with coupon at checkout</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-2xl font-google font-bold text-slate-900 dark:text-slate-200">
-                                                    {formatPrice(plan.price)}
-                                                </span>
-                                                <span className="text-xs font-google text-slate-400 dark:text-slate-500">/mo</span>
-                                            </div>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-2xl font-google font-bold text-slate-900 dark:text-slate-200">
+                                                {formatPrice(plan.price)}
+                                            </span>
+                                            <span className="text-xs font-google text-slate-400 dark:text-slate-500">/mo</span>
+                                        </div>
+                                        {billingPeriod === 'annual' && (
+                                            <span className="text-xs font-google text-emerald-600 dark:text-emerald-400 mt-1 block">
+                                                billed annually · 2 months free
+                                            </span>
                                         )}
                                     </div>
 

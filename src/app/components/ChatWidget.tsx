@@ -210,7 +210,7 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
             </linearGradient>
           )}
         </defs>
-        <path d={fabPath} fill={useFallback ? '#ffffff' : (fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)')}
+        <path d={fabPath} fill={useFallback ? '#010521' : (fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)')}
           className={!useFallback && !fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
         {!useFallback ? (
           <g clipPath="url(#fab-clip)">
@@ -289,7 +289,7 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
           </linearGradient>
         )}
       </defs>
-      <path d={FAB_PATH} fill={useFallback ? '#ffffff' : (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`)}
+      <path d={FAB_PATH} fill={useFallback ? '#004BC4' : (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`)}
         className={!useFallback && !gradient ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
       {!useFallback ? (
         <g clipPath={`url(#${idPrefix}-fab-clip)`}>

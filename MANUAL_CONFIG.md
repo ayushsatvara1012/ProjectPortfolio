@@ -123,19 +123,21 @@ minified **`public/widget.js`**, which is generated outside this repo.
 
 ---
 
-## 4. Plan / tier gating  **[Platform]** — verify, usually already set
+## 4. Plan / tier gating  **[Platform]** — enforced in code, no action needed
 
-These features are gated to **PRO / ENTERPRISE** (or a CUSTOM plan with the
-matching flag). No new config if your plans are already defined, but confirm:
+Re-scoped commercial tiers (display → internal key):
+**Starter `STARTER` $19 · Growth `PRO` $49 · Scale `BUSINESS` $99 · Enterprise (contact).**
 
-| Feature | Required entitlement |
-|---------|----------------------|
-| Lead capture, hot-lead alerts, booking link | `lead_capture` (Pro+) |
-| Slack lead handoff | Pro+ (CUSTOM: `webhook`) |
-| ROI dashboard, Conversion funnel | `analytics` (Pro+) |
+| Feature | Starter | Growth | Scale |
+|---------|:--:|:--:|:--:|
+| RAG bot + UI customization | ✅ | ✅ | ✅ |
+| Lead capture, scoring, alerts, booking, Action Center, digest | — | ✅ | ✅ |
+| ROI dashboard, Funnel, Attribution, Slack, webhooks, handoff, white-label | — | — | ✅ |
 
-- [ ] Confirm `PLAN_LIMITS` / custom-plan flags grant these on the plans you
-      intend to sell them on.
+- Enforcement is **server-side** via `has_entitlement()` reading `config.py ›
+  PLAN_LIMITS` (the single source of truth); `src/lib/auth/entitlements.ts`
+  mirrors it for UI gating only. To re-scope later, edit `PLAN_LIMITS` (and the
+  mirror) — every endpoint follows automatically.
 
 ---
 
@@ -167,6 +169,34 @@ See `sapybase_ai_engine/.env.example` for the annotated list.
 | `SMTP_USER` / `SMTP_PASS` | Gmail SMTP fallback | other email option |
 | `EMAIL_FROM_NAME` | Sender display name (default `Sapybase`) | optional |
 | `CRON_SECRET` | Guards + authorizes the weekly-digest cron | for weekly digest |
+| `NEXT_PUBLIC_POLAR_{STARTER,PRO,BUSINESS}_URL` | Monthly checkout links (frontend) | for billing |
+| `NEXT_PUBLIC_POLAR_{STARTER,PRO,BUSINESS}_ANNUAL_URL` | Annual checkout links (frontend) | for annual billing |
+| `POLAR_PRODUCT_ID_{STARTER,PRO,BUSINESS}` | Monthly product IDs → tier (webhook) | for billing |
+| `POLAR_PRODUCT_ID_{STARTER,PRO,BUSINESS}_ANNUAL` | Annual product IDs → tier (webhook) | for annual billing |
+
+---
+
+## 6b. Pricing & billing setup (Polar)  **[Platform]**
+
+The pricing UI is updated (Starter/Growth/Scale, monthly + annual toggle), but
+checkout needs Polar products created and wired:
+
+1. **Create products in Polar** — for each tier (Starter $19, Growth $49,
+   Scale $99), create a **monthly** price and an **annual** price (annual =
+   monthly × 10, i.e. 2 months free): $190 / $490 / $990.
+2. **Frontend checkout links** — copy each product's checkout URL into the
+   `NEXT_PUBLIC_POLAR_*_URL` (monthly) and `NEXT_PUBLIC_POLAR_*_ANNUAL_URL`
+   (annual) env vars. The annual toggle uses the `_ANNUAL` link (falls back to
+   monthly if unset).
+3. **Backend webhook mapping** — set `POLAR_PRODUCT_ID_*` and
+   `POLAR_PRODUCT_ID_*_ANNUAL` so the Polar webhook resolves a purchase to the
+   right tier (annual IDs map to the same tier as monthly).
+4. **Migrate any legacy users** off the dropped $9 Basic tier:
+   ```sql
+   UPDATE users SET tier = 'STARTER' WHERE tier = 'BASIC';
+   ```
+   (`BASIC` still works as a Starter-equivalent alias if you skip this, but
+   migrating keeps reporting clean.)
 
 ---
 

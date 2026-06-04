@@ -71,7 +71,7 @@
     var oy = shape.y || 0;
 
     var content = '';
-    var fill = isCustom ? 'url(#' + gradId + ')' : '#ffffff';
+    var fill = isCustom ? 'url(#' + gradId + ')' : '#004BC4';
 
     if (safeUrl) {
       var ix = isCustom ? ox : 20 + ox;

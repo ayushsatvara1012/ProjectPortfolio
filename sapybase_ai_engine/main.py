@@ -598,13 +598,23 @@ app.state.limiter = limiter
 POLAR_PRODUCT_TIER_MAP = {
     pid: tier
     for tier, pid in {
-        "BASIC": os.getenv("POLAR_PRODUCT_ID_BASIC"),
+        # Monthly products
+        "BASIC": os.getenv("POLAR_PRODUCT_ID_BASIC"),  # legacy
         "STARTER": os.getenv("POLAR_PRODUCT_ID_STARTER"),
         "PRO": os.getenv("POLAR_PRODUCT_ID_PRO"),
         "BUSINESS": os.getenv("POLAR_PRODUCT_ID_BUSINESS"),
         "ENTERPRISE": os.getenv("POLAR_PRODUCT_ID_ENTERPRISE"),  # may be None
+        # Annual products map to the SAME tier (different Polar product IDs).
+        "STARTER_ANNUAL": os.getenv("POLAR_PRODUCT_ID_STARTER_ANNUAL"),
+        "PRO_ANNUAL": os.getenv("POLAR_PRODUCT_ID_PRO_ANNUAL"),
+        "BUSINESS_ANNUAL": os.getenv("POLAR_PRODUCT_ID_BUSINESS_ANNUAL"),
     }.items()
     if pid
+}
+# Annual product IDs grant the base tier (strip the _ANNUAL suffix on resolve).
+POLAR_PRODUCT_TIER_MAP = {
+    pid: (tier[:-7] if tier.endswith("_ANNUAL") else tier)
+    for pid, tier in POLAR_PRODUCT_TIER_MAP.items()
 }
 print(f"POLAR PRODUCT MAP: {len(POLAR_PRODUCT_TIER_MAP)} products mapped: {sorted(POLAR_PRODUCT_TIER_MAP.values())}")
 
@@ -1938,68 +1948,23 @@ async def update_company_details(
     # ── PRO-only gate: webhook_url ──
     custom_plan_cfg = user.get("custom_plan_config") or {}
     if update.webhook_url is not None and update.webhook_url.strip():
-        custom_webhook_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("webhook"))
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_webhook_ok:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Webhook integration requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                }
-            )
+        require_entitlement(user, "webhook", "Webhook integration")
 
     # ── PRO-only gate: slack_webhook_url (lead handoff integration) ──
     if update.slack_webhook_url is not None and update.slack_webhook_url.strip():
-        custom_slack_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("webhook"))
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_slack_ok:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Slack lead handoff requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                }
-            )
+        require_entitlement(user, "webhook", "Slack lead handoff")
 
     # ── PRO-only gate: booking_url (instant-booking CTA for qualified leads) ──
     if update.booking_url is not None and update.booking_url.strip():
-        custom_booking_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("lead_capture"))
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_booking_ok:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Instant booking link requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                }
-            )
+        require_entitlement(user, "lead_capture", "Instant booking link")
 
     # ── PRO-only gate: handoff_redirect_url ──
     if update.handoff_redirect_url is not None and update.handoff_redirect_url.strip():
-        custom_handoff_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("human_handoff"))
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_handoff_ok:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Human handoff link requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                }
-            )
+        require_entitlement(user, "human_handoff", "Human handoff link")
 
     # ── PRO-only gate: custom_logo_url ──
     if update.custom_logo_url is not None and update.custom_logo_url.strip():
-        custom_logo_ok = tier == "CUSTOM" and bool(custom_plan_cfg.get("custom_logo"))
-        if tier not in ("PRO", "ENTERPRISE") and role != "SUPER_ADMIN" and not custom_logo_ok:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "TIER_REQUIRED",
-                    "message": "Custom logo URL requires the Pro plan.",
-                    "upgrade_url": "/app/pricing"
-                }
-            )
+        require_entitlement(user, "custom_logo", "Custom logo URL")
         # Run the hardened async validator (HEAD check + size probe)
         await validate_logo_url(update.custom_logo_url.strip())
 
@@ -2978,7 +2943,7 @@ def list_leads(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("lead_capture"):
+        if not has_entitlement(user, "lead_capture"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "Lead management requires the Pro plan or a custom plan with lead capture enabled.",
@@ -3079,17 +3044,36 @@ def delete_lead(
         release_db_connection(conn)
 
 
-def _require_lead_management(user: dict):
-    """Shared Pro/lead-capture tier gate for lead-management endpoints."""
-    user_tier = (user.get("tier") or "FREE").upper()
-    user_role = user.get("role") or ""
-    custom_plan_cfg = user.get("custom_plan_config") or {}
-    if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("lead_capture"):
+def has_entitlement(user: dict, flag: str) -> bool:
+    """Single server-side source of truth for paid-feature access (boolean).
+
+    Reads the boolean `flag` (e.g. 'lead_capture', 'analytics', 'webhook',
+    'white_label', 'human_handoff') from PLAN_LIMITS for the user's tier, honoring
+    SUPER_ADMIN (always True) and CUSTOM plans (per custom_plan_config). Because
+    every gate reads PLAN_LIMITS, re-scoping a tier is a one-line change in
+    config.py — no endpoint edits, no hardcoded tier lists to drift.
+    """
+    if (user.get("role") or "") == "SUPER_ADMIN":
+        return True
+    tier = (user.get("tier") or "FREE").upper()
+    if tier == "CUSTOM":
+        return bool((user.get("custom_plan_config") or {}).get(flag))
+    return bool(PLAN_LIMITS.get(tier, PLAN_LIMITS["FREE"]).get(flag))
+
+
+def require_entitlement(user: dict, flag: str, feature_label: str = None):
+    """Raise 402 TIER_REQUIRED unless the user is entitled to `flag`."""
+    if not has_entitlement(user, flag):
         raise HTTPException(status_code=402, detail={
             "code": "TIER_REQUIRED",
-            "message": "Lead management requires the Pro plan or a custom plan with lead capture enabled.",
-            "upgrade_url": "/app/pricing"
+            "message": f"{feature_label or 'This feature'} requires a higher plan.",
+            "upgrade_url": "/app/pricing",
         })
+
+
+def _require_lead_management(user: dict):
+    """Shared lead-capture tier gate for lead-management endpoints."""
+    require_entitlement(user, "lead_capture", "Lead management")
 
 
 @app.patch("/api/leads/{company_id}/{lead_id}/outcome")
@@ -3235,7 +3219,7 @@ def export_leads(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("lead_capture"):
+        if not has_entitlement(user, "lead_capture"):
             raise HTTPException(status_code=402, detail="Export requires the Pro plan or a custom plan with lead capture enabled.")
 
         cursor.execute(
@@ -3306,7 +3290,7 @@ def list_conversations(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "Conversation transcripts require the Pro plan or a custom plan with analytics enabled.",
@@ -3426,7 +3410,7 @@ def list_fixes_needed(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "The Fixes Needed worklist requires the Pro plan or a custom plan with analytics enabled.",
@@ -3490,7 +3474,7 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "ROI Dashboard requires the Pro plan or a custom plan with analytics enabled.",
@@ -3585,7 +3569,7 @@ def update_roi_benchmarks(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "ROI Dashboard requires the Pro plan or a custom plan with analytics enabled.",
@@ -3649,7 +3633,7 @@ def get_conversion_funnel(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "The conversion funnel requires the Pro plan or a custom plan with analytics enabled.",
@@ -3733,7 +3717,7 @@ def get_lead_attribution(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=402, detail={
                 "code": "TIER_REQUIRED",
                 "message": "Lead attribution requires the Pro plan or a custom plan with analytics enabled.",
@@ -3788,7 +3772,7 @@ def generate_insight_report(
         user_tier = (user.get("tier") or "FREE").upper()
         user_role = user.get("role") or ""
         custom_plan_cfg = user.get("custom_plan_config") or {}
-        if user_role != "SUPER_ADMIN" and user_tier not in ["PRO", "ENTERPRISE"] and not custom_plan_cfg.get("analytics"):
+        if not has_entitlement(user, "analytics"):
             raise HTTPException(status_code=403, detail={
                 "code": "TIER_REQUIRED",
                 "message": "Insights reports are a premium feature requiring the Professional plan or a custom plan with analytics enabled.",

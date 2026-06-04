@@ -16,19 +16,21 @@ function parseCustomPlanFeatures(raw: unknown): FeatureMap | null {
 }
 
 // Tier-default capability matrix. Checked after SUPER_ADMIN and custom plan.
+// MUST mirror sapybase_ai_engine/config.py › PLAN_LIMITS (backend is the source
+// of truth; this only drives UI gating — every capability is ALSO enforced
+// server-side via has_entitlement()). Commercial mapping:
+//   Starter = STARTER ($19) · Growth = PRO ($49) · Scale = BUSINESS ($99).
 const TIER_DEFAULTS: Record<string, Partial<Entitlements>> = {
   FREE: {},
-  BASIC: {},
-  STARTER: { canWhiteLabel: true, canUseAdvancedBot: true },
+  // Starter: RAG bot + UI customization only. No conversion engine.
+  BASIC: { canUseAdvancedBot: true }, // legacy alias of Starter
+  STARTER: { canUseAdvancedBot: true },
+  // Growth: + lead capture / scoring / alerts / booking / Action Center / digest.
   PRO: {
-    canUseCustomLogo: true,
-    canWhiteLabel: true,
-    canUseWebhooks: true,
-    canUseHumanHandoff: true,
     canUseLeadCapture: true,
-    canUseAnalytics: true,
     canUseAdvancedBot: true,
   },
+  // Scale: everything — deep BI, integrations, white-label.
   BUSINESS: {
     canUseCustomLogo: true,
     canWhiteLabel: true,

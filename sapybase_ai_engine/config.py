@@ -8,13 +8,21 @@ and the test suite resolve unchanged.
 from datetime import timedelta
 
 # ── Plan Definitions ────────────────────────────────────────────────────────
+# Commercial tiers (display name → internal key):
+#   Starter  → STARTER  ($19/mo)  — RAG bot + UI customization. No conversion engine.
+#   Growth   → PRO      ($49/mo)  — + lead capture/scoring, alerts, booking, Action Center, digest.
+#   Scale    → BUSINESS ($99/mo)  — + deep BI (ROI/funnel/attribution), Slack, webhooks, handoff, white-label.
+#   Enterprise → ENTERPRISE/CUSTOM (contact) — everything, custom limits.
+# FREE = inactive/trial state. BASIC = LEGACY alias (no longer sold; mirrors Starter
+# so any pre-existing BASIC rows degrade gracefully — migrate them to STARTER).
+# This is the single backend source of truth; src/lib/auth/entitlements.ts MUST mirror it.
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
-    "BASIC":      {"max_bots": 1,   "messages": 500,    "chunks": 100,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False},
-    "STARTER":    {"max_bots": 2,   "messages": 2000,   "chunks": 500,   "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": False, "analytics": False},
-    "PRO":        {"max_bots": 5,   "messages": 5000,   "chunks": 2000,  "speed": "dedicated", "human_handoff": False, "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
-    "BUSINESS":   {"max_bots": 15,  "messages": 15000,  "chunks": 10000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True},
+    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
+    "BASIC":      {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},  # legacy alias of Starter
+    "STARTER":    {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
+    "PRO":        {"max_bots": 3,   "messages": 5000,   "chunks": 1500,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
+    "BUSINESS":   {"max_bots": 5,   "messages": 15000,  "chunks": 5000,  "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True},
 }
 
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
