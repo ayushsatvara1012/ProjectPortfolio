@@ -2,18 +2,75 @@ import { NextResponse } from 'next/server';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const DEMO_MSG_CAP = 10;
+const DEMO_HOURLY_LIMIT = 50; // Hard server-side cap per IP per hour
+
+// ─── Server-side rate limiter (in-memory, per IP) ───────────────────────────
+// Tracks request timestamps per IP to enforce hourly limits. Prevents abuse
+// of the free demo API regardless of what messageCount the client claims.
+const demoRateLimitMap = new Map<string, number[]>();
+
+function getClientIp(req: Request): string {
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp;
+  // Fallback: if no proxy headers, use a generic key. In production,
+  // your proxy should always set x-forwarded-for.
+  return 'unknown';
+}
+
+function checkDemoRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const oneHourAgo = now - 3600000;
+
+  let timestamps = demoRateLimitMap.get(ip) || [];
+  // Prune old entries outside the 1-hour window
+  timestamps = timestamps.filter(t => t > oneHourAgo);
+
+  if (timestamps.length >= DEMO_HOURLY_LIMIT) {
+    return false; // Rate limit exceeded
+  }
+
+  // Add this request and store back
+  timestamps.push(now);
+  demoRateLimitMap.set(ip, timestamps);
+
+  // Cleanup: if the map grows too large, prune oldest IPs (shouldn't happen
+  // in normal traffic, but defends against memory leaks from scrapers).
+  if (demoRateLimitMap.size > 10000) {
+    const entries = Array.from(demoRateLimitMap.entries());
+    entries.sort((a, b) => Math.min(...a[1]) - Math.min(...b[1]));
+    for (let i = 0; i < entries.length / 2; i++) {
+      demoRateLimitMap.delete(entries[i][0]);
+    }
+  }
+
+  return true;
+}
 
 export async function POST(req: Request) {
     try {
+        const clientIp = getClientIp(req);
+
+        // Server-side rate limit (ENFORCED, not bypassable via messageCount)
+        if (!checkDemoRateLimit(clientIp)) {
+            return NextResponse.json({
+                text: `Demo rate limit reached (${DEMO_HOURLY_LIMIT} requests/hour). Please sign up for full access.`
+            }, { status: 429 });
+        }
+
         const { question, contextChunks, botConfig, messageCount } = await req.json();
 
+        // Secondary: client-side message counter (for UX, but not the security boundary)
         if (messageCount >= DEMO_MSG_CAP) {
             return NextResponse.json({
                 text: `You've reached the demo message limit (${DEMO_MSG_CAP} messages). Sign up for a free account to keep going — no credit card required!`
             });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.NEXT_PUBLIC_DEMO_GEMINI_KEY;
+        const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             return NextResponse.json({
                 text: 'Demo chat requires a Gemini API key configured in the environment. Please contact the site admin.'
