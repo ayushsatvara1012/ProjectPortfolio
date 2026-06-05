@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import Logo from '@/src/app/components/Logo';
+import VaayuLogo from '@/src/app/components/VaayuLogo';
 import { isTrained, resetDemo } from '@/src/lib/demo/demoStorage';
 
 const TOP_NAV = [
@@ -208,9 +208,8 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                     >
                         <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">menu</span>
                     </button>
-                    <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-                        <Logo className="h-6 w-auto" />
-                        <span className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100 transition-colors">Sapybase</span>
+                    <Link href="/" aria-label="Vaayu home" className="flex items-center hover:opacity-80 transition-opacity">
+                        <VaayuLogo size={26} className="text-slate-900 dark:text-slate-100" />
                     </Link>
                 </div>
 

@@ -42,6 +42,9 @@ interface ActionCenterPanelProps {
 
 const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized }: ActionCenterPanelProps) => {
     const queryClient = useQueryClient();
+    // Remembers which outcome the user clicked so the button registers green/red
+    // before the lead drops out of the queue on refetch.
+    const [acted, setActed] = React.useState<Record<string, 'won' | 'lost'>>({});
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['action-center', selectedBotId],
@@ -105,26 +108,22 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized }: ActionCen
     );
 
     return (
-        <div className="flex flex-col gap-4 flex-1 transition-colors duration-500 overflow-y-auto custom-scrollbar md:p-8">
+        <div className="flex flex-col gap-3 flex-1 transition-colors duration-500 overflow-y-auto custom-scrollbar md:p-8">
 
-            {/* Header */}
-            <div className={`${cellCls} p-6 sm:p-8`}>
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">bolt</span>
-                        <div>
-                            <h2 className="text-lg font-semibold font-google text-slate-900 dark:text-slate-200">Action Center</h2>
-                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-0.5">Your most valuable next actions, ranked</p>
-                        </div>
-                    </div>
-                    {counts.total > 0 && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                            {counts.high > 0 && summaryChip('Act now', counts.high, URGENCY.high.badge)}
-                            {counts.medium > 0 && summaryChip('Soon', counts.medium, URGENCY.medium.badge)}
-                            {counts.low > 0 && summaryChip('Later', counts.low, URGENCY.low.badge)}
-                        </div>
-                    )}
+            {/* Slim header row */}
+            <div className="flex items-center justify-between gap-3 flex-wrap px-1">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">bolt</span>
+                    <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Action Center</h2>
+                    <span className="hidden sm:inline text-xs font-google text-slate-400 dark:text-slate-500">· your next actions, ranked</span>
                 </div>
+                {counts.total > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {counts.high > 0 && summaryChip('Act now', counts.high, URGENCY.high.badge)}
+                        {counts.medium > 0 && summaryChip('Soon', counts.medium, URGENCY.medium.badge)}
+                        {counts.low > 0 && summaryChip('Later', counts.low, URGENCY.low.badge)}
+                    </div>
+                )}
             </div>
 
             {queue.length === 0 ? (
@@ -138,86 +137,59 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized }: ActionCen
                     </p>
                 </div>
             ) : (
-                <div className="flex flex-col gap-3">
-                    {queue.map(lead => {
-                        const u = URGENCY[lead.urgency] || URGENCY.low;
-                        const mailto = `mailto:${lead.email}?subject=${encodeURIComponent('Following up on your enquiry')}`;
-                        const pending = outcomeMutation.isPending;
-                        return (
-                            <div key={lead.id} className={`${cellCls} border-l-4 ${u.accent} p-4 sm:p-5`}>
-                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                                    {/* Lead info */}
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                            <span className={`text-[10px] font-bold font-google uppercase tracking-widest px-2 py-0.5 rounded-md ${u.badge}`}>
-                                                {u.label}
-                                            </span>
-                                            {lead.band && (
-                                                <span className={`text-[10px] font-bold font-google uppercase tracking-widest px-2 py-0.5 rounded-md ${BAND_CHIP[lead.band] || BAND_CHIP.COLD}`}>
-                                                    {lead.band}
-                                                </span>
-                                            )}
-                                            <span className="text-[11px] font-google text-slate-400 dark:text-slate-500">{lead.reason}</span>
+                <>
+                    {/* Dense divided list — one row per lead */}
+                    <div className={`${cellCls} overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/50`}>
+                        {queue.map(lead => {
+                            const u = URGENCY[lead.urgency] || URGENCY.low;
+                            const mailto = `mailto:${lead.email}?subject=${encodeURIComponent('Following up on your enquiry')}`;
+                            const pending = outcomeMutation.isPending;
+                            return (
+                                <div key={lead.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                                    {/* Identity + context — left */}
+                                    <div className="min-w-0 w-full sm:w-[32%] sm:shrink-0">
+                                        <div className="flex items-baseline gap-2 min-w-0">
+                                            <span className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200 truncate max-w-[55%] shrink-0">{lead.name || lead.email}</span>
+                                            {lead.name && <span className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{lead.email}</span>}
                                         </div>
-                                        <p className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200 truncate">
-                                            {lead.name || lead.email}
-                                        </p>
-                                        {lead.name && (
-                                            <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{lead.email}</p>
-                                        )}
-                                        {lead.context && (
-                                            <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">
-                                                “{lead.context}”
-                                            </p>
-                                        )}
+                                        {lead.context && <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate mt-0.5">“{lead.context}”</p>}
                                     </div>
 
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                                        <a
-                                            href={mailto}
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-semibold font-google hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                                            aria-label={`Email ${lead.email}`}
-                                        >
-                                            <span className="material-symbols-outlined text-[15px]">mail</span> Email
+                                    {/* Three columns — reason · urgency · band, no partitions */}
+                                    <div className="w-full sm:flex-1 grid grid-cols-3 items-center gap-3">
+                                        <span className="text-[11px] font-google text-slate-500 dark:text-slate-400 truncate text-center">{lead.reason}</span>
+                                        <div className="flex justify-center">
+                                            <span className={`text-[10px] font-bold font-google uppercase tracking-widest px-2 py-0.5 rounded-md ${u.badge}`}>{u.label}</span>
+                                        </div>
+                                        <div className="flex justify-center">
+                                            {lead.band && <span className={`text-[10px] font-bold font-google uppercase tracking-widest px-2 py-0.5 rounded-md ${BAND_CHIP[lead.band] || BAND_CHIP.COLD}`}>{lead.band}</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Actions — right */}
+                                    <div className="shrink-0 flex items-center gap-1.5 self-end sm:self-auto">
+                                        <a href={mailto} aria-label={`Email ${lead.email}`} className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+                                            <span className="material-symbols-outlined text-[15px]">mail</span>
                                         </a>
-                                        {lead.status === 'new' && (
-                                            <button
-                                                type="button"
-                                                disabled={pending}
-                                                onClick={() => outcomeMutation.mutate({ leadId: lead.id, status: 'contacted' })}
-                                                className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/[0.06] text-slate-700 dark:text-slate-300 text-xs font-semibold font-google hover:bg-slate-200 dark:hover:bg-white/[0.1] transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                                            >
-                                                Mark contacted
-                                            </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            disabled={pending}
-                                            onClick={() => outcomeMutation.mutate({ leadId: lead.id, status: 'won' })}
-                                            className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold font-google hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-                                            aria-label="Mark won"
-                                        >
+                                        <button type="button" disabled={pending} aria-label="Mark won"
+                                            onClick={() => { setActed(a => ({ ...a, [lead.id]: 'won' })); outcomeMutation.mutate({ leadId: lead.id, status: 'won' }); }}
+                                            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${acted[lead.id] === 'won' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400'}`}>
                                             Won
                                         </button>
-                                        <button
-                                            type="button"
-                                            disabled={pending}
-                                            onClick={() => outcomeMutation.mutate({ leadId: lead.id, status: 'lost' })}
-                                            className="px-2.5 py-2 rounded-xl text-slate-400 dark:text-slate-500 text-xs font-semibold font-google hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-                                            aria-label="Dismiss as lost"
-                                        >
+                                        <button type="button" disabled={pending} aria-label="Dismiss as lost"
+                                            onClick={() => { setActed(a => ({ ...a, [lead.id]: 'lost' })); outcomeMutation.mutate({ leadId: lead.id, status: 'lost' }); }}
+                                            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${acted[lead.id] === 'lost' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400'}`}>
                                             Lost
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 text-center mt-1">
+                            );
+                        })}
+                    </div>
+                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 text-center">
                         Won deals add to realized revenue · set the exact deal value in the Leads CRM tab.
                     </p>
-                </div>
+                </>
             )}
         </div>
     );

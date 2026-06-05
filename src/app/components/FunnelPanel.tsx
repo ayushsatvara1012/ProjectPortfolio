@@ -170,8 +170,9 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                 </div>
             ) : (
                 <>
-                    {/* ── Funnel stages ── */}
-                    <div className={`${cellCls} p-5 sm:p-8`}>
+                    {/* ── Funnel stages (60%) + outcome summary (40%) ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                    <div className={`${cellCls} p-5 sm:p-8 lg:col-span-3`}>
                         <div className="flex flex-col gap-1">
                             {stages.map((s, i) => {
                                 const accent = STAGE_ACCENT[s.key] || STAGE_ACCENT.conversations;
@@ -227,9 +228,9 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                         </div>
                     </div>
 
-                    {/* ── Outcome summary ── */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center`}>
+                    {/* ── Outcome summary (40%, stacked beside the funnel) ── */}
+                    <div className="lg:col-span-2 flex flex-col sm:flex-row lg:flex-col gap-4">
+                        <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center flex-1`}>
                             <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">
                                 Overall conversion
                             </span>
@@ -240,7 +241,7 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                                 of conversations end in a won deal
                             </p>
                         </div>
-                        <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center border border-emerald-200 dark:border-emerald-900/40`}>
+                        <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center flex-1 border border-emerald-200 dark:border-emerald-900/40`}>
                             <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wide mb-2">
                                 Revenue won
                             </span>
@@ -251,6 +252,7 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                                 closed-won in this window
                             </p>
                         </div>
+                    </div>
                     </div>
 
                     {/* ── Lead quality breakdown (orthogonal to the funnel) ── */}

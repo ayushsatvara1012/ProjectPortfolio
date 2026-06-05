@@ -266,19 +266,17 @@ export default function AppInsights() {
 
     // ── Rendering Helpers ────────────────────────────────────────────────────
     const renderHeader = () => (
-        <div className="px-6 py-7 sm:px-8 sm:py-8 shrink-0 transition-colors duration-500 min-w-0 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+        <div className="px-6 py-3 sm:px-8 sm:py-4 shrink-0 transition-colors duration-500 min-w-0 w-full">
+            {(activeTab === 'analytics' && (lastGeneratedAt || canAnalytics)) && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                 <div className="min-w-0">
-                    <p className="text-sm md:text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
-                        AI-synthesized business intelligence from your chat logs. Reports refresh every 24 hours.
-                    </p>
-                    {lastGeneratedAt && activeTab === 'analytics' && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 font-google mt-2 transition-colors">
+                    {lastGeneratedAt && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-google transition-colors">
                             Last generated: {lastGeneratedAt}
                         </p>
                     )}
                 </div>
-                {canAnalytics && activeTab === 'analytics' && (
+                {canAnalytics && (
                     <button
                         onClick={() => handleGenerate(false)}
                         disabled={isGenerating || !selectedBotId}
@@ -298,10 +296,11 @@ export default function AppInsights() {
                     </button>
                 )}
             </div>
+            )}
 
             {/* Persistent Bot Selector */}
             {canAnalytics && bots.length > 1 && (
-                <div className="mt-5 pt-5 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
+                <div className="mt-3 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
                         Reporting for
                     </span>
@@ -318,7 +317,7 @@ export default function AppInsights() {
             )}
 
             {/* Tabs */}
-            <div className="mt-7 overflow-x-auto scrollbar-hide">
+            <div className="mt-3 overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
                     {[
                         { id: 'action', label: 'Action Center' },
@@ -381,7 +380,7 @@ export default function AppInsights() {
             {renderHeader()}
 
             {/* Content Area */}
-            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-6">
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-4 pt-1">
 
                 {activeTab === 'action' && (
                     <ActionCenterPanel
