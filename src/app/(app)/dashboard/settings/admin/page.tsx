@@ -10,13 +10,13 @@ import SkeletonLoader from '@/src/app/components/SkeletonLoader';
 import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
 
 // ── Tier config ───────────────────────────────────────────────────────────────
-const TIERS = ['FREE', 'BASIC', 'STARTER', 'PRO', 'ENTERPRISE', 'CUSTOM'];
+const TIERS = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'];
 
 const TIER_STYLE: Record<string, string> = {
   FREE: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-  BASIC: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
   STARTER: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   PRO: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  BUSINESS: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
   ENTERPRISE: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
   CUSTOM: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   SUPER_ADMIN: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',

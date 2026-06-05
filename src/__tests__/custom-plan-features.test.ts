@@ -173,7 +173,7 @@ describe('Custom Plan Features - Entitlements Resolution', () => {
     });
 
     it('should allow selective feature grants to lower tiers', () => {
-      // BASIC user with custom plan adding webhooks+lead_capture
+      // Custom-plan user selectively adding webhooks+lead_capture
       const customPlanFeatures = {
         advanced_bot: false,
         human_handoff: false,

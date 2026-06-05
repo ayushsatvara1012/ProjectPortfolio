@@ -113,14 +113,14 @@ describe('useAuthenticatedFetch', () => {
       ok: false,
       status: 402,
       headers: { get: () => 'application/json' },
-      json: async () => ({ detail: { code: 'MSG_LIMIT', message: 'Message limit reached', tier: 'BASIC', current: 500, limit: 500 } }),
+      json: async () => ({ detail: { code: 'MSG_LIMIT', message: 'Message limit reached', tier: 'STARTER', current: 500, limit: 500 } }),
     }));
 
     const { result } = renderHook(() => useAuthenticatedFetch());
     const err = await result.current('/api/test').catch(e => e);
     expect(err).toBeInstanceOf(UpgradeError);
     expect(err.code).toBe('MSG_LIMIT');
-    expect(err.tier).toBe('BASIC');
+    expect(err.tier).toBe('STARTER');
     vi.unstubAllGlobals();
   });
 

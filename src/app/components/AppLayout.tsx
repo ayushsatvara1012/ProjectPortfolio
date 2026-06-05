@@ -76,9 +76,11 @@ const PATH_LABELS: Record<string, string> = {
 
 const TIER_LABEL: Record<string, string> = {
   FREE: 'Free',
-  BASIC: 'Basic',
   STARTER: 'Starter',
-  PRO: 'Pro',
+  PRO: 'Growth',
+  BUSINESS: 'Scale',
+  ENTERPRISE: 'Enterprise',
+  CUSTOM: 'Custom',
 };
 
 // ── Sidebar nav item ──────────────────────────────────────────────────────────

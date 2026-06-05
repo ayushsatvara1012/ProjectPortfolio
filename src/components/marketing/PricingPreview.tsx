@@ -31,12 +31,12 @@ const PricingPreview = () => {
           </p>
         </div>
 
-        {/* Tiers — compact preview (Basic / Starter / Pro only) */}
+        {/* Tiers — compact preview (Starter / Growth / Scale) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {PLANS.filter((plan) => PREVIEW_PLAN_IDS.includes(plan.id)).map((plan) => {
             const price = PRICE_MATRIX[plan.id as keyof typeof PRICE_MATRIX].USD;
             const featured = plan.badge === 'Most Popular';
-            const cta = plan.id === 'BASIC' ? 'Start Free' : `Get ${plan.name}`;
+            const cta = `Get ${plan.name}`;
 
             return (
               <div

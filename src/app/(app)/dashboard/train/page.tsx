@@ -326,7 +326,7 @@ export default function TrainPage() {
     }, []);
 
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier) && userRole !== 'SUPER_ADMIN';
-    const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'BASIC' || userTier === 'STARTER') && messagesUsed >= messageLimit && userRole !== 'SUPER_ADMIN';
+    const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'STARTER') && messagesUsed >= messageLimit && userRole !== 'SUPER_ADMIN';
 
     const showAlert = (type: 'success' | 'error' | 'warning' | 'development', msg: string) => {
         setAlert({ open: true, type, msg });

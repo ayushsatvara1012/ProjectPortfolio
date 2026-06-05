@@ -5,7 +5,6 @@ import { UpgradeError } from '@/src/lib/errors';
 // Mirrors PLAN_LIMITS from main.py — single frontend source of truth for UI gating
 const PLAN_LIMITS: Record<Tier, { max_bots: number; messages: number; chunks: number }> = {
   FREE:       { max_bots: 0,   messages: 0,      chunks: 0     },
-  BASIC:      { max_bots: 1,   messages: 500,    chunks: 100   },
   STARTER:    { max_bots: 3,   messages: 2000,   chunks: 500   },
   PRO:        { max_bots: 5,   messages: 5000,   chunks: 2000  },
   ENTERPRISE: { max_bots: 999, messages: 999999, chunks: 999999 },
@@ -27,28 +26,28 @@ describe('Tier hierarchy', () => {
     expect(PLAN_LIMITS.FREE.messages).toBe(0);
   });
 
-  it('PRO has more messages than BASIC', () => {
-    expect(PLAN_LIMITS.PRO.messages).toBeGreaterThan(PLAN_LIMITS.BASIC.messages);
+  it('PRO has more messages than STARTER', () => {
+    expect(PLAN_LIMITS.PRO.messages).toBeGreaterThan(PLAN_LIMITS.STARTER.messages);
   });
 
   it('ENTERPRISE has more bots than PRO', () => {
     expect(PLAN_LIMITS.ENTERPRISE.max_bots).toBeGreaterThan(PLAN_LIMITS.PRO.max_bots);
   });
 
-  it('STARTER is between BASIC and PRO for messages', () => {
-    expect(PLAN_LIMITS.STARTER.messages).toBeGreaterThan(PLAN_LIMITS.BASIC.messages);
+  it('STARTER is between FREE and PRO for messages', () => {
+    expect(PLAN_LIMITS.STARTER.messages).toBeGreaterThan(PLAN_LIMITS.FREE.messages);
     expect(PLAN_LIMITS.STARTER.messages).toBeLessThan(PLAN_LIMITS.PRO.messages);
   });
 });
 
 describe('canAddBot', () => {
   it('returns false when can_add_more is false', () => {
-    const plan: BotPlan = { tier: 'BASIC', can_add_more: false, speed_tier: 'standard', current_bots: 0, max_bots: 1, message_limit: 500, chunk_limit: 100 };
+    const plan: BotPlan = { tier: 'STARTER', can_add_more: false, speed_tier: 'standard', current_bots: 0, max_bots: 1, message_limit: 1500, chunk_limit: 300 };
     expect(canAddBot(plan)).toBe(false);
   });
 
   it('returns false when at max_bots', () => {
-    const plan: BotPlan = { tier: 'BASIC', can_add_more: true, speed_tier: 'standard', current_bots: 1, max_bots: 1, message_limit: 500, chunk_limit: 100 };
+    const plan: BotPlan = { tier: 'STARTER', can_add_more: true, speed_tier: 'standard', current_bots: 1, max_bots: 1, message_limit: 1500, chunk_limit: 300 };
     expect(canAddBot(plan)).toBe(false);
   });
 
@@ -60,7 +59,7 @@ describe('canAddBot', () => {
 
 describe('isOverMessageLimit', () => {
   it('returns true when messages_used >= message_limit', () => {
-    const me: MeResponse = { role: 'USER', tier: 'BASIC', messages_used: 500, message_limit: 500 };
+    const me: MeResponse = { role: 'USER', tier: 'STARTER', messages_used: 1500, message_limit: 1500 };
     expect(isOverMessageLimit(me)).toBe(true);
   });
 
@@ -77,10 +76,10 @@ describe('isOverMessageLimit', () => {
 
 describe('UpgradeError tier enforcement', () => {
   it('carries tier and limit from 402 response shape', () => {
-    const err = new UpgradeError({ code: 'MSG_LIMIT', message: 'Limit hit', tier: 'BASIC', current: 500, limit: 500 });
-    expect(err.tier).toBe('BASIC');
-    expect(err.current).toBe(500);
-    expect(err.limit).toBe(500);
+    const err = new UpgradeError({ code: 'MSG_LIMIT', message: 'Limit hit', tier: 'STARTER', current: 1500, limit: 1500 });
+    expect(err.tier).toBe('STARTER');
+    expect(err.current).toBe(1500);
+    expect(err.limit).toBe(1500);
   });
 
   it('is catchable as UpgradeError for UI branching', () => {

@@ -23,7 +23,6 @@ function parseCustomPlanFeatures(raw: unknown): FeatureMap | null {
 const TIER_DEFAULTS: Record<string, Partial<Entitlements>> = {
   FREE: {},
   // Starter: RAG bot + UI customization only. No conversion engine.
-  BASIC: { canUseAdvancedBot: true }, // legacy alias of Starter
   STARTER: { canUseAdvancedBot: true },
   // Growth: + lead capture / scoring / alerts / booking / Action Center / digest.
   PRO: {

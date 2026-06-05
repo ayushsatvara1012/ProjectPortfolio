@@ -13,13 +13,14 @@ import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
 // ── Tier metadata ──
 const TIER_META: Record<string, any> = {
   FREE: { label: 'Free', color: 'text-slate-500', badge: 'bg-slate-100 dark:bg-slate-800 text-slate-500', icon: Shield },
-  BASIC: { label: 'Basic', color: 'text-blue-600', badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600', icon: Zap },
-  STARTER: { label: 'Professional', color: 'text-emerald-600', badge: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600', icon: Rocket },
-  PRO: { label: 'Enterprise', color: 'text-cyan-600', badge: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600', icon: Shield },
+  STARTER: { label: 'Starter', color: 'text-blue-600', badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600', icon: Rocket },
+  PRO: { label: 'Growth', color: 'text-emerald-600', badge: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600', icon: Zap },
+  BUSINESS: { label: 'Scale', color: 'text-cyan-600', badge: 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600', icon: Rocket },
+  ENTERPRISE: { label: 'Enterprise', color: 'text-violet-600', badge: 'bg-violet-50 dark:bg-violet-900/30 text-violet-600', icon: Shield },
+  CUSTOM: { label: 'Custom', color: 'text-amber-600', badge: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600', icon: Shield },
 };
 
 const POLAR_URLS: Record<string, string | undefined> = {
-  BASIC: process.env.NEXT_PUBLIC_POLAR_BASIC_URL,
   STARTER: process.env.NEXT_PUBLIC_POLAR_STARTER_URL,
   PRO: process.env.NEXT_PUBLIC_POLAR_PRO_URL,
   BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_URL,
@@ -214,22 +215,13 @@ const BillingTab = () => {
           </button>
         )}
         {tier === 'FREE' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              onClick={handleUpgrade('BASIC')}
-              disabled={!!processing}
-              className="py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 active:scale-[0.98]"
-            >
-              Upgrade to Basic — $9
-            </button>
-            <button
-              onClick={handleUpgrade('STARTER')}
-              disabled={!!processing}
-              className="py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 active:scale-[0.98]"
-            >
-              Upgrade to Starter — $19
-            </button>
-          </div>
+          <button
+            onClick={handleUpgrade('STARTER')}
+            disabled={!!processing}
+            className="w-full sm:w-fit py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 active:scale-[0.98]"
+          >
+            Upgrade to Starter — $19
+          </button>
         )}
         {isPaid && !isCanceled && (
           <button
