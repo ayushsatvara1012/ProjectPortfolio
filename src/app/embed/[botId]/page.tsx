@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import ChatWidget from '@/src/app/components/ChatWidget';
 import EmbedBootstrapper from '@/src/app/components/EmbedBootstrapper';
 
-export const runtime = 'edge';
-
 async function getBotConfig(botId: string) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.sapybase.com';

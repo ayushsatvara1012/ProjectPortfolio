@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
 
-export const runtime = 'edge';
-
 export const metadata: Metadata = {
   // noindex prevents the standalone /embed/[botId] URL from being indexed;
   // indexifembedded permits Google to attribute this iframe's content to the

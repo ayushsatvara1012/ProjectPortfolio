@@ -16,8 +16,8 @@ const ASSET_BASE = IS_DEV ? '' : 'https://www.sapybase.com';
 const BrandLogo = `${ASSET_BASE}/vaayu_logo.svg`;
 
 // Send a message to the host page only when we have a validated origin.
-// `__SapybaseParentOrigin` is set by `src/app/embed/[botId]/page.tsx` after
-// it parses & validates `parentOrigin` from the URL hash via `new URL().origin`.
+// `__SapybaseParentOrigin` is set by `EmbedBootstrapper` after it parses &
+// validates `parentOrigin` from the URL hash via `new URL().origin`.
 // If we don't have a trusted origin, we skip the post entirely — never use '*'.
 function postToParent(message: unknown) {
   if (typeof window === 'undefined' || window.parent === window) return;
