@@ -250,7 +250,7 @@ export default function DemoCustomizePage() {
                             <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 transition-colors">
                                 <div className="min-w-0">
                                     <p className="text-sm font-medium font-google text-slate-800 dark:text-slate-200 transition-colors">
-                                        Remove "Powered by Sapybase" branding
+                                        Remove "Vaayu Intelligence" branding
                                     </p>
                                     <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
                                         Hide the Sapybase footer from your widget.

@@ -175,10 +175,7 @@ const AppPricing = () => {
                 <div className="px-6 md:px-8 pt-8 pb-6 shrink-0">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">
-                                Plans &amp; pricing
-                            </h1>
-                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-1">
+                            <p className="text-sm font-google text-slate-500 dark:text-slate-400">
                                 Choose the plan that fits your stage. Upgrade or downgrade anytime.
                             </p>
 

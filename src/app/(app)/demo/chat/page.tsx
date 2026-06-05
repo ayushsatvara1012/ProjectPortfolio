@@ -256,7 +256,7 @@ export default function DemoChatPage() {
                             <span className="material-symbols-outlined text-[20px]">send</span>
                         </button>
                     </form>
-                    <p className="text-[10px] text-center text-slate-400 mt-3 font-semibold uppercase tracking-[0.25em]">Powered by Sapybase AI</p>
+                    <p className="text-[10px] text-center text-slate-400 mt-3 font-semibold uppercase tracking-[0.25em]">Vaayu Intelligence</p>
                 </div>
             </div>
         </div>

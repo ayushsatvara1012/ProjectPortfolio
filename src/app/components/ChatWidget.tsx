@@ -13,7 +13,7 @@ import { FAB_SHAPES, SHAPE_CLASS_MAP, AVATAR_GRADIENTS } from './avatar/AvatarSh
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE = IS_DEV ? '' : 'https://www.sapybase.com';
-const BrandLogo = `${ASSET_BASE}/logo2-straight.svg`;
+const BrandLogo = `${ASSET_BASE}/vaayu_logo.svg`;
 
 // Send a message to the host page only when we have a validated origin.
 // `__SapybaseParentOrigin` is set by `src/app/embed/[botId]/page.tsx` after
@@ -1332,8 +1332,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div className="shrink-0 pt-2 flex justify-center items-center">
                   <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-[9px] font-sans font-normal tracking-wide text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
-                    <Image src={BrandLogo} alt="Sapybase" width={15} height={15} className="opacity-50 group-hover:opacity-100 transition-opacity" />
-                    Powered by Sapybase
+                    <Image src={BrandLogo} alt="Vaayu" width={20} height={13} className="opacity-50 group-hover:opacity-100 transition-opacity" />
+                    Vaayu Intelligence
                   </a>
                 </div>
               )}

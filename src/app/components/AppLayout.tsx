@@ -41,9 +41,8 @@ class DashboardErrorBoundary extends Component<
 import { usePathname } from 'next/navigation';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
-import Logo from './Logo';
+import VaayuLogo from './VaayuLogo';
 import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
-import FloatingBotWidget from './FloatingBotWidget';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import NavigationProgress from './NavigationProgress';
 
@@ -226,6 +225,15 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
         </div>
       </nav>
 
+      {/* Back to Sapybase home — same look as the nav items above */}
+      <SidebarItem
+        label="Back to Sapybase"
+        icon="home"
+        path="/"
+        onClick={onClose}
+        expanded={expanded}
+      />
+
       {/* User footer */}
       <div className="px-5 py-4 flex items-center gap-3 min-h-[64px] bg-[#f8f9fa] dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
         {mounted && <UserButton appearance={{ elements: { avatarBox: 'w-7 h-7' } }} />}
@@ -272,9 +280,8 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
         >
           <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">menu</span>
         </button>
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-          <Logo className="h-6 w-auto" />
-          <span className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100 transition-colors">Sapybase</span>
+        <Link href="/dashboard" aria-label="Vaayu dashboard" className="flex items-center hover:opacity-80 transition-opacity">
+          <VaayuLogo iconOnly size={30} />
         </Link>
       </div>
 
@@ -396,7 +403,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </footer>}
       </main>
-      <FloatingBotWidget />
     </div>
   );
 }

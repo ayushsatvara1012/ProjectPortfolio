@@ -8,7 +8,7 @@ import { BotAvatar } from './LogoCustomizer';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
-const BrandLogo = `${ASSET_BASE_URL}/SB_loading.svg`;
+const BrandLogo = `${ASSET_BASE_URL}/vaayu_logo.svg`;
 
 type BotPreviewProps = {
   theme?: 'light' | 'dark';
@@ -128,8 +128,8 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         {!hideBranding && (
           <div className={`shrink-0 py-1.5 flex justify-center items-center border-t border-slate-100/10 ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
             <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <Image src={BrandLogo} alt="Sapybase" width={20} height={20} className="grayscale opacity-50" />
-              Powered by Sapybase
+              <Image src={BrandLogo} alt="Vaayu" width={20} height={13} className="opacity-60" />
+              Vaayu Intelligence
             </span>
           </div>
         )}

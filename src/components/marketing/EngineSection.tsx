@@ -43,7 +43,7 @@ const EngineSection = () => {
         <div className="w-full lg:w-auto flex justify-center items-center">
           <img
             src="/vector_SBengine.svg"
-            alt="Sapybase Engine Vector"
+            alt="Vaayu Engine Vector"
             loading="lazy"
             decoding="async"
             className="w-full max-w-lg lg:max-w-[700px] h-auto object-contain transition-all duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"
@@ -54,7 +54,7 @@ const EngineSection = () => {
         <div className="w-full lg:w-auto flex justify-center items-center">
           <img
             src="/vector_chat.svg"
-            alt="Sapybase Chat Vector"
+            alt="Vaayu Chat Vector"
             loading="lazy"
             decoding="async"
             className="w-full max-w-[320px] sm:max-w-md lg:max-w-[450px] h-auto object-contain transition-all duration-500 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"

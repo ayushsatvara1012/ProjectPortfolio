@@ -207,7 +207,7 @@ const BillingTab = () => {
           <button
             onClick={handleBillingPortal}
             disabled={!!processing}
-            className="w-full py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+            className="w-full sm:w-fit py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
           >
             <span className="material-symbols-outlined text-[16px]">open_in_new</span>
             Manage billing
@@ -235,7 +235,7 @@ const BillingTab = () => {
           <button
             onClick={handleCancel}
             disabled={!!processing}
-            className="w-full py-3 px-5 text-sm font-semibold font-google rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 active:scale-[0.98]"
+            className="w-full sm:w-fit py-3 px-5 text-sm font-semibold font-google rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 active:scale-[0.98]"
           >
             Cancel subscription
           </button>
@@ -412,7 +412,7 @@ const ApiKeysTab = () => {
       <button
         onClick={handleRotate}
         disabled={isRotating || !selectedBotId}
-        className="w-full py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+        className="w-full sm:w-fit py-3 px-5 text-sm font-semibold font-google rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
       >
         {isRotating
           ? <><div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" /> Rotating…</>
@@ -433,11 +433,8 @@ export default function AccountPage() {
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
 
       {/* Header */}
-      <div className="px-6 md:px-8 pt-8 pb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">
-          Account
-        </h1>
-        <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-1">
+      <div className="px-6 md:px-8 pt-6 pb-5">
+        <p className="text-sm font-google text-slate-500 dark:text-slate-400">
           Manage your profile, billing, and API keys.
         </p>
 

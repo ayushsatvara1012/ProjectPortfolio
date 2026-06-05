@@ -137,11 +137,7 @@ export default function CustomizePage() {
       <div className="flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden border-r border-slate-100 dark:border-slate-800 transition-colors duration-500">
 
         {/* Header */}
-        <div className="px-6 md:px-8 pt-6 pb-4 shrink-0">
-          <div className="flex items-center gap-2.5 mb-1">
-            <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">palette</span>
-            <h1 className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">Customize bot</h1>
-          </div>
+        <div className="px-6 md:px-8 pt-5 pb-4 shrink-0">
           <p className="text-sm font-google text-slate-500 dark:text-slate-400 transition-colors">Changes reflect instantly in the preview.</p>
         </div>
 
@@ -248,7 +244,7 @@ export default function CustomizePage() {
               <div className={`flex items-start justify-between gap-4 p-4 rounded-xl transition-colors ${canHideBranding ? 'bg-slate-50 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-800 opacity-50'}`}>
                 <div className="min-w-0">
                   <p className="text-sm font-medium font-google text-slate-800 dark:text-slate-200 transition-colors">
-                    Remove "Powered by Sapybase" branding
+                    Remove "Vaayu Intelligence" branding
                   </p>
                   <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
                     {canHideBranding ? 'Hide the Sapybase footer from your widget.' : 'Available on Starter plan and above.'}

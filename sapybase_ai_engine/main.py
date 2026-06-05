@@ -548,7 +548,7 @@ def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> di
     return plan
 
 # 3. Initialize FastAPI App
-app = FastAPI(title="Sapybase AI Engine (SaaS Edition)", version="2.0")
+app = FastAPI(title="Vaayu AI Engine (SaaS Edition)", version="2.0")
 
 # Setup SlowAPI Rate Limiter
 # ── SECURITY: Conditional Redis Backend for Distributed Rate Enforcement ──────

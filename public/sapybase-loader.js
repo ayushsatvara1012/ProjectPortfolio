@@ -262,7 +262,7 @@
       appScript.textContent = JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebApplication',
-        name: 'Sapybase AI Assistant',
+        name: 'Vaayu AI Assistant',
         url: IFRAME_ORIGIN + '/embed/' + botId,
         applicationCategory: 'CustomerSupportApplication',
         operatingSystem: 'Web',

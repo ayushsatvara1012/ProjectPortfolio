@@ -2,6 +2,7 @@
 // Importing from '@/src/lib' gives access to every shared utility in one place
 // and ensures the knowledge graph registers all cross-module dependencies.
 
+export { BRAND, COMPANY, PRODUCT, VAAYU_ACCENT } from './brand';
 export { UpgradeError } from './errors';
 export type { Tier, Role, MeResponse, BotSummary, CompanyDetails } from './types/api';
 export { useAuthenticatedFetch, useIsAuthReady } from './hooks/useAuthenticatedFetch';

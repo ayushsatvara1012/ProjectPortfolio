@@ -134,12 +134,8 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
 
       <div className="relative flex flex-col h-full z-10">
         <DemoMigrationBanner />
-        <div className="px-6 py-6 sm:px-8 sm:py-8 flex items-center justify-between transition-colors">
+        <div className="px-6 py-5 sm:px-8 sm:py-6 flex items-center justify-between transition-colors">
           <div>
-            <div className="flex items-center gap-2.5 mb-1.5">
-              <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">smart_toy</span>
-              <h1 className="text-2xl md:text-3xl font-display font-semibold text-slate-900 dark:text-slate-200">My Bots</h1>
-            </div>
             <p className="text-sm md:text-base font-display text-slate-500 dark:text-slate-400">Manage all your AI assistants across your plan.</p>
           </div>
           {plan && (

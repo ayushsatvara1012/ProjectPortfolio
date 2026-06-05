@@ -163,11 +163,7 @@ const AppRegistration = () => {
         <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
 
             {/* Header */}
-            <div className="px-6 md:px-8 pt-8 pb-6 shrink-0">
-                <div className="flex items-center gap-2.5 mb-1.5">
-                    <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">domain</span>
-                    <h1 className="text-2xl md:text-3xl font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">Create Bot</h1>
-                </div>
+            <div className="px-6 md:px-8 pt-6 pb-5 shrink-0">
                 <p className="text-sm font-google text-slate-500 dark:text-slate-400">
                     Configure your AI bot identity and receive integration credentials.
                 </p>
@@ -293,7 +289,7 @@ const AppRegistration = () => {
                                         </div>
 
                                         <button type="submit" disabled={isLoading}
-                                            className="w-full py-3.5 min-h-[48px] bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold font-google rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50">
+                                            className="w-full sm:w-fit sm:px-10 py-3.5 min-h-[48px] bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold font-google rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50">
                                             {isLoading
                                                 ? <><div className="w-3.5 h-3.5 border-2 border-white/30 dark:border-slate-800/50 border-t-white dark:border-t-slate-800 rounded-full animate-spin" /> Provisioning…</>
                                                 : <>Create bot <span className="material-symbols-outlined text-[16px]">arrow_forward</span></>

@@ -6,7 +6,8 @@ const baseUrl = 'https://www.sapybase.com'
 // Real content-update dates. Bump a route's date only when its CONTENT
 // meaningfully changes — this is the signal Google uses for crawl priority.
 const routes: { path: string; lastModified: string; priority: number }[] = [
-  { path: '',                      lastModified: '2026-06-02', priority: 1.0 },
+  { path: '',                      lastModified: '2026-06-04', priority: 1.0 },
+  { path: '/vaayu',                lastModified: '2026-06-04', priority: 0.9 },
   { path: '/pricing',              lastModified: '2026-06-02', priority: 0.8 },
   { path: '/about',                lastModified: '2026-06-02', priority: 0.8 },
   { path: '/contact',              lastModified: '2026-05-30', priority: 0.8 },

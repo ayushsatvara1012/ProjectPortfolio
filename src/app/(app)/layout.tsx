@@ -1,18 +1,49 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import Providers from '../providers';
+import { COMPANY, PRODUCT, SAME_AS, FOUNDER, KNOWS_ABOUT } from '@/src/lib/brand';
 
-const organizationSchema = {
+const BASE = 'https://www.sapybase.com';
+
+// Site-wide entity graph: the company (Organization), the site (WebSite), and
+// the product (Vaayu) explicitly linked. This is the structured "fact sheet"
+// Google and AI answer engines read to understand who/what we are.
+const entityGraph = {
   '@context': 'https://schema.org',
-  '@type': 'Organization',
-  '@id': 'https://www.sapybase.com/#organization',
-  name: 'Sapybase',
-  url: 'https://www.sapybase.com',
-  logo: {
-    '@type': 'ImageObject',
-    url: 'https://www.sapybase.com/logo2.svg',
-  },
-  sameAs: [],
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${BASE}/#organization`,
+      name: COMPANY.name,
+      legalName: COMPANY.legalName,
+      url: COMPANY.url,
+      logo: { '@type': 'ImageObject', url: `${BASE}/logo2.svg` },
+      description:
+        'Sapybase is the company behind Vaayu — a Business Intelligence chat that captures and scores leads, maps conversion funnels, and attributes revenue and ROI to every customer conversation.',
+      slogan: PRODUCT.tagline,
+      founder: {
+        '@type': 'Person',
+        '@id': `${BASE}/#founder`,
+        name: FOUNDER.name,
+        jobTitle: FOUNDER.jobTitle,
+        url: FOUNDER.url,
+        sameAs: [...FOUNDER.sameAs],
+      },
+      knowsAbout: [...KNOWS_ABOUT],
+      brand: { '@type': 'Brand', name: PRODUCT.name },
+      ...(SAME_AS.length ? { sameAs: SAME_AS } : {}),
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${BASE}/#website`,
+      url: COMPANY.url,
+      name: PRODUCT.lockup, // "Vaayu by Sapybase"
+      description:
+        'Vaayu by Sapybase — a Business Intelligence chat for your website that answers customers 24/7, captures and scores leads, and proves ROI.',
+      publisher: { '@id': `${BASE}/#organization` },
+      inLanguage: 'en-US',
+    },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -56,7 +87,7 @@ export default function AppLayout({
       <Script
         id="schema-org"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(entityGraph) }}
       />
       <Providers>{children}</Providers>
       {process.env.NEXT_PUBLIC_SAPYBASE_API_KEY && (

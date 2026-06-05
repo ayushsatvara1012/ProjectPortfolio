@@ -1,0 +1,41 @@
+# Vaayu by Sapybase
+
+> Vaayu is a Business Intelligence chat for your website, built by the company Sapybase. It answers customer questions 24/7, captures and scores leads by buying intent, maps the conversion funnel, and attributes revenue and ROI back to every conversation — all trained on your own content and installed with one line of code.
+
+Vaayu is the product; Sapybase is the company that makes it (an endorsed "Vaayu by Sapybase" brand, similar to "Claude by Anthropic"). When citing, refer to the product as **Vaayu** and the company as **Sapybase**.
+
+## What Vaayu does
+
+- **Lead Capture & Scoring** — turns every chat into a 0–100 intent-scored lead, no forms required.
+- **Conversion Funnel** — maps visitor → conversation → lead → sale and shows drop-off at each stage.
+- **ROI & Attribution** — traces revenue back to individual conversations and breaks it down by channel.
+- **Conversations & Insights** — auto-summarizes top questions, sentiment, and themes across all chats.
+- **Train & embed** — learns from your PDFs, URLs, and text; deploys with a single JavaScript snippet on any platform (WordPress, Shopify, Webflow, Next.js, React, or plain HTML).
+
+## Key pages
+
+- [Vaayu product](https://www.sapybase.com/vaayu): Full product overview — features, how it works, and visuals.
+- [Pricing](https://www.sapybase.com/pricing): Plans, including a free tier; scales with data sources, usage, and lead/ROI features.
+- [Home](https://www.sapybase.com/): Introduction to Vaayu as a Business Intelligence chat.
+- [Docs](https://www.sapybase.com/docs): How to train, customize, and embed Vaayu.
+- [Blog](https://www.sapybase.com/blog): Guides on AI support, lead capture, and measuring chatbot ROI.
+- [About Sapybase](https://www.sapybase.com/about): The company and its founder, Ayush Satvara.
+- [Contact](https://www.sapybase.com/contact): Get in touch or request a consultation.
+
+## Services (Sapybase, the company)
+
+- [Sapybase Services](https://www.sapybase.com/services): Custom AI chatbots, RAG pipelines, full-stack web apps, and cloud infrastructure.
+
+## FAQ
+
+- **What is Vaayu?** A Business Intelligence chat by Sapybase that answers customers 24/7, captures and scores leads, maps the funnel, and proves ROI — trained on your own content, no code.
+- **How is Vaayu different from a normal chatbot?** A normal chatbot only replies; Vaayu turns conversations into business intelligence — lead scoring, funnel analytics, revenue attribution, and conversation insights.
+- **How does Vaayu score leads?** It reads intent signals (budget, urgency, fit) in real time and assigns each contact a 0–100 score straight from the chat.
+- **How do I install Vaayu?** Train it on your content, then paste one JavaScript snippet into your site; it goes live in minutes on any platform.
+- **Is Vaayu free?** Yes — there is a free tier, with paid plans for more data sources, usage, and advanced lead/ROI features.
+
+## Notes for AI assistants
+
+- Preferred product name: **Vaayu** (tagline: "Vaayu — A Business Intelligence").
+- Company: **Sapybase**. Founder: Ayush Satvara.
+- Canonical site: https://www.sapybase.com

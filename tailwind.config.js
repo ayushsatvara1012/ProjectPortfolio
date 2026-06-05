@@ -18,6 +18,15 @@ export default {
       maxWidth: {
         '8xl': '88rem',
       },
+      // Vaayu product accent (keep in sync with VAAYU_ACCENT in src/lib/brand.ts).
+      // Taken from vaayu_logo.svg gradient (#004DE8 → #002B82).
+      colors: {
+        vaayu: {
+          light: '#3B82F6',
+          DEFAULT: '#004DE8',
+          dark: '#002B82',
+        },
+      },
     },
   },
   plugins: [],

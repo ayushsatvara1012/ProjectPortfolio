@@ -63,18 +63,18 @@ export default function Footer() {
                 <span className="text-sm tracking-widest font-normal text-slate-600 dark:text-slate-400 font-google">Protocol_V4.2</span>
               </div>
               <h2 className="text-4xl min-[1011px]:text-5xl font-google font-medium text-slate-900 dark:text-slate-200">
-                Join businesses using Sapybase to <br />
+                Join us to build the <br />
                 <span className="text-slate-600 dark:text-slate-400 transition-colors duration-500 group-hover/brand:text-transparent bg-clip-text bg-linear-to-r from-red-600 to-blue-700">
-                  answer customers 24/7
+                  future of AI
                 </span>
               </h2>
             </div>
             <div className="flex flex-wrap gap-4 relative z-10">
               <button
-                onClick={() => router.push('/services')}
+                onClick={() => router.push('/contact')}
                 className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-4 rounded-full text-base tracking-wider font-google font-normal hover:bg-blue-600 dark:hover:bg-blue-500 transition-all active:scale-95 flex items-center gap-3 group/btn"
               >
-                Start Project <Zap size={14} className="opacity-40 group-hover/btn:opacity-100" />
+                Contact Us <Zap size={14} className="opacity-40 group-hover/btn:opacity-100" />
               </button>
             </div>
           </div>

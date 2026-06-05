@@ -64,7 +64,7 @@ const FEATURE_FLAGS = [
   { key: 'advanced_bot', label: 'Advanced behavior', icon: 'psychology', desc: 'System prompt, tone, quick questions' },
   { key: 'human_handoff', label: 'Human handoff', icon: 'support_agent', desc: 'Talk-to-human button + transcript email' },
   { key: 'lead_capture', label: 'Lead capture', icon: 'contact_mail', desc: 'Collect visitor email / name in widget' },
-  { key: 'white_label', label: 'White label', icon: 'branding_watermark', desc: 'Remove "Powered by Sapybase"' },
+  { key: 'white_label', label: 'White label', icon: 'branding_watermark', desc: 'Remove "Vaayu Intelligence" badge' },
   { key: 'webhook', label: 'Webhooks', icon: 'webhook', desc: 'Zapier / Make integration' },
   { key: 'custom_logo', label: 'Custom logo', icon: 'image', desc: 'Upload own logo URL' },
   { key: 'analytics', label: 'Analytics', icon: 'bar_chart', desc: 'Insights & ROI reports' },

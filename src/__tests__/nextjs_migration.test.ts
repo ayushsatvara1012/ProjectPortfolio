@@ -240,11 +240,11 @@ describe('NEXT_PUBLIC_ environment variables', () => {
     expect(typeof process.env.NEXT_PUBLIC_API_URL).toBe('string');
   });
 
-  it('NEXT_PUBLIC_Sapybase_API_KEY is defined when set in env', () => {
+  it('NEXT_PUBLIC_SAPYBASE_API_KEY is defined when set in env', () => {
     // Vitest does not auto-load .env.local — the key is injected via vitest.config.ts
     // or must be present in process.env at test time. We assert the pattern: if set,
     // it must be a non-empty string starting with "sb_".
-    const key = process.env.NEXT_PUBLIC_Sapybase_API_KEY;
+    const key = process.env.NEXT_PUBLIC_SAPYBASE_API_KEY;
     if (key !== undefined) {
       expect(key.length).toBeGreaterThan(0);
       expect(key.startsWith('sb_')).toBe(true);
@@ -298,14 +298,6 @@ describe('EmbedPage ResizeObserver postMessage bridge', () => {
 // ── 6. SSR safety: no window/document at module import time ──────────────────
 
 describe('SSR safety: module-level browser access', () => {
-  it('FloatingBotWidget reads env at runtime, not module scope', () => {
-    // NEXT_PUBLIC_Sapybase_API_KEY must be accessed via process.env at render time
-    // not stored in a module-level const that would run on the server
-    const key = process.env.NEXT_PUBLIC_Sapybase_API_KEY ?? '';
-    // If it were server-inaccessible, this would throw. It must not.
-    expect(typeof key).toBe('string');
-  });
-
   it('window is not accessed during pure logic evaluation', () => {
     // Validate the preValidateUrl function (extracted from LogoCustomizer)
     // works without window access — it only uses URL constructor and string ops

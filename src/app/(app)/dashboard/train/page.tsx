@@ -249,7 +249,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                         <button
                             onClick={handleDeleteSelected}
                             disabled={selectedChunks.size === 0 || isDeleting}
-                            className="w-full py-3 min-h-[44px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-base font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                            className="w-full sm:w-fit sm:px-6 py-3 min-h-[44px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-base font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                         >
                             {isDeleting ? (
                                 <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
@@ -512,13 +512,7 @@ export default function TrainPage() {
 
     return (
         <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500">
-            <div className="px-6 py-7 md:px-8 md:py-8 shrink-0 transition-colors duration-500">
-                <div className="flex items-center gap-2.5 mb-2">
-                    <span className="material-symbols-outlined text-[22px] text-slate-500 dark:text-slate-400 transition-colors">
-                        psychology
-                    </span>
-                    <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">Train AI</h1>
-                </div>
+            <div className="px-6 py-5 md:px-8 md:py-6 shrink-0 transition-colors duration-500">
                 <p className="text-base md:text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Ingest knowledge sources into your AI's vector brain.</p>
             </div>
 
@@ -772,7 +766,7 @@ export default function TrainPage() {
                             />
                         )}
                         <button type="submit" disabled={isTraining || isLockedOut}
-                            className="w-full py-3.5 min-h-[48px] rounded-xl bg-linear-to-r from-blue-600 to-green-600 text-white text-base font-medium hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
+                            className="w-full sm:w-fit sm:px-10 py-3.5 min-h-[48px] rounded-xl bg-linear-to-r from-blue-600 to-green-600 text-white text-base font-medium hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
                             {trainingJobId ? (
                                 <>
                                     <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -813,7 +807,7 @@ export default function TrainPage() {
                     <button
                         onClick={handlePurge}
                         disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
-                        className="w-full py-3.5 min-h-[48px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-base font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
+                        className="w-full sm:w-fit sm:px-8 py-3.5 min-h-[48px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-base font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                         {isPurging ? (
                             <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Deleting…</>

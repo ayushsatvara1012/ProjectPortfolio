@@ -10,7 +10,7 @@ const PIPELINE_STEPS = [
     label: "INGEST",
     title: "Connect Your Data",
     subtitle: "Zero manual entry. Pure extraction.",
-    description: "Sapybase securely crawls your website or accepts PDF uploads and extracts every meaningful sentence — product details, FAQs, pricing tables, policies — without you copying a single line. The moment you connect, your content becomes the brain of your chatbot.",
+    description: "Vaayu securely crawls your website or accepts PDF uploads and extracts every meaningful sentence — product details, FAQs, pricing tables, policies — without you copying a single line. The moment you connect, your content becomes the brain of your chatbot.",
     bullets: [
       "Auto-sync on website content changes",
       "Upload PDFs, CSVs, or enter raw text",
@@ -23,7 +23,7 @@ const PIPELINE_STEPS = [
     label: "UNDERSTAND",
     title: "AI Reads Intent, Not Keywords",
     subtitle: "Semantic intent-matching.",
-    description: "Traditional search breaks when a customer types 'what does it cost?' instead of 'pricing'. Sapybase converts every sentence into an AI fingerprint that understands meaning, not just keywords. When a user asks a question, we match the closest meaning, not just words, preventing chatbot failures.",
+    description: "Traditional search breaks when a customer types 'what does it cost?' instead of 'pricing'. Vaayu converts every sentence into an AI fingerprint that understands meaning, not just keywords. When a user asks a question, we match the closest meaning, not just words, preventing chatbot failures.",
     bullets: [
       "Semantic matching (meaning-aware search)",
       "Protects against chatbot hallucination",
@@ -102,13 +102,13 @@ function EngineLogoNode({
         {reducedMotion ? (
           <img
             src="/logo2.svg"
-            alt="Sapybase Engine"
+            alt="Vaayu Engine"
             className="w-[58%] h-[58%] object-contain"
           />
         ) : (
           <motion.img
             src="/logo2.svg"
-            alt="Sapybase Engine"
+            alt="Vaayu Engine"
             className="w-[58%] h-[58%] object-contain"
             style={{ willChange: "transform" }}
             animate={isThinking ? { scale: [1, 1.12, 1] } : { scale: [1, 1.05, 1] }}
@@ -276,7 +276,7 @@ function StepTwoVisual({
         <div className="absolute left-[20%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[22%] aspect-square z-10 pointer-events-none">
           <EngineLogoNode phase={phase} />
           <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
-            Sapybase Engine
+            Vaayu Engine
           </span>
         </div>
       )}
@@ -840,7 +840,7 @@ export default function HowItWorks() {
               <div className="absolute w-[22%] aspect-square left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
                 <EngineLogoNode />
                 <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
-                  Sapybase Engine
+                  Vaayu Engine
                 </span>
               </div>
             )}

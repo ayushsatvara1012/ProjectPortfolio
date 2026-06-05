@@ -99,7 +99,7 @@ const WhatWeSolve = () => {
                 </span>
               </h2>
               <p className="text-base md:text-lg font-google text-slate-800 dark:text-slate-200 leading-relaxed max-w-xl">
-                Most AI chatbots make things up. Sapybase only answers from your actual content — so customers get accurate answers, and you never have to apologize for wrong information again.
+                Most AI chatbots make things up. Vaayu only answers from your actual content — so customers get accurate answers, and you never have to apologize for wrong information again.
               </p>
             </div>
 

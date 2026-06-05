@@ -269,14 +269,6 @@ export default function AppInsights() {
         <div className="px-6 py-7 sm:px-8 sm:py-8 shrink-0 transition-colors duration-500 min-w-0 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                 <div className="min-w-0">
-                    <div className="flex items-center gap-2.5 mb-2">
-                        <span className="material-symbols-outlined text-[22px] text-slate-500 dark:text-slate-400 transition-colors shrink-0">
-                            insights
-                        </span>
-                        <h1 className="text-2xl md:text-3xl font-google font-semibold tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors truncate">
-                            Sapybase Insights
-                        </h1>
-                    </div>
                     <p className="text-sm md:text-base font-google text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
                         AI-synthesized business intelligence from your chat logs. Reports refresh every 24 hours.
                     </p>

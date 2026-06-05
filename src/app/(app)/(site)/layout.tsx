@@ -1,7 +1,6 @@
 import Navbar from '@/src/app/components/Navbar';
 import Footer from '@/src/app/components/Footer';
 import ClientEffects from '@/src/app/client-effects';
-import FloatingBotWidget from '@/src/app/components/FloatingBotWidget';
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,7 +15,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <main id="main-content">{children}</main>
       <Footer />
       <ClientEffects />
-      <FloatingBotWidget />
     </div>
   );
 }

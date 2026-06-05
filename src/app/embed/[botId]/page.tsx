@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ botId: st
 
   return {
     title: `${botName} | ${companyName}`,
-    description: `Chat with ${botName}, the official AI assistant for ${companyName}. Powered by Sapybase.`,
+    description: `Chat with ${botName}, the official AI assistant for ${companyName}. Powered by Vaayu Intelligence.`,
     openGraph: {
       title: `${botName} | ${companyName}`,
       description: `Need help? Chat with ${botName} now.`,

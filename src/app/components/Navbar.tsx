@@ -13,14 +13,15 @@ import {
 import Logo from './Logo';
 import AntigravityBackground from '../../components/marketing/AntigravityBackground';
 
-type ServiceItem = { title: string; desc: string; price: string };
+type ServiceItem = { title: string; desc: string; price: string; href?: string };
 type ServiceGroup = { label: string; items: ServiceItem[] };
-type NavLink = { name: string; href: string; id: string; dropdown?: boolean };
+type DropdownKey = 'product' | 'services';
+type NavLink = { name: string; href: string; id: string; dropdown?: boolean; dropdownType?: DropdownKey };
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isServicesOpenDesktop, setIsServicesOpenDesktop] = useState(false);
-  const [isServicesOpenMobile, setIsServicesOpenMobile] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<DropdownKey | null>(null);
+  const [activeMobileDropdown, setActiveMobileDropdown] = useState<DropdownKey | null>(null);
   const [renderCanvas, setRenderCanvas] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -29,7 +30,7 @@ export default function Navbar() {
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    if (isServicesOpenDesktop) {
+    if (activeDropdown === 'product') {
       setRenderCanvas(true);
     } else {
       timeoutId = setTimeout(() => {
@@ -37,7 +38,7 @@ export default function Navbar() {
       }, 300);
     }
     return () => clearTimeout(timeoutId);
-  }, [isServicesOpenDesktop]);
+  }, [activeDropdown]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -84,13 +85,29 @@ export default function Navbar() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsServicesOpenDesktop(false);
+        setActiveDropdown(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Vaayu product — the Business Intelligence console and its capability modules.
+  // (These mirror the dashboard panels: Leads, Funnel, ROI, Conversations.)
+  const productGroups: ServiceGroup[] = [
+    {
+      label: 'Vaayu',
+      items: [
+        { title: 'Vaayu — A Business Intelligence', desc: 'AI chat that captures leads & proves ROI', price: 'Live', href: '/vaayu' },
+        { title: 'Lead Capture & Scoring', desc: 'Turn conversations into qualified leads', price: 'Included', href: '/vaayu#leads' },
+        { title: 'Conversion Funnel', desc: 'See where visitors drop off & convert', price: 'Included', href: '/vaayu#funnel' },
+        { title: 'ROI & Attribution', desc: 'Revenue traced back to every chat', price: 'Included', href: '/vaayu#roi' },
+        { title: 'Conversations & Insights', desc: 'What customers ask, auto-summarized', price: 'Included', href: '/vaayu#conversations' },
+      ],
+    },
+  ];
+
+  // Sapybase agency services — the company layer (parent of Vaayu).
   const serviceGroups: ServiceGroup[] = [
     {
       label: 'Build',
@@ -110,21 +127,50 @@ export default function Navbar() {
     },
   ];
 
+  // Shared config for both nav dropdowns. Product = Vaayu (animated, hero);
+  // Services = Sapybase agency (static, calm). Same UI, driven by this map.
+  const dropdownConfig: Record<DropdownKey, {
+    heading: string;
+    pitch?: string;
+    items: ServiceItem[];
+    icon: string;
+    itemHref: string;
+    animated: boolean;
+    cta: { label: string; href: string };
+  }> = {
+    product: {
+      heading: 'Vaayu — A Business Intelligence',
+      items: productGroups.flatMap((g) => g.items),
+      icon: '/vaayu_logo.svg',
+      itemHref: '/vaayu', // dedicated Vaayu product page (per-item anchors below)
+      animated: true,
+      cta: { label: 'See pricing', href: '/pricing' },
+    },
+    services: {
+      heading: 'Engineering digital excellence',
+      pitch: 'From code to cloud — custom AI, web apps & infrastructure, built by Sapybase.',
+      items: serviceGroups.flatMap((g) => g.items),
+      icon: '/logo2-straight.svg',
+      itemHref: '/services',
+      animated: false,
+      cta: { label: 'See all services', href: '/services' },
+    },
+  };
+
   const navLinks: NavLink[] = [
     { name: 'Home', href: '/#home', id: 'home' },
-    { name: 'Projects', href: '/about#projects', id: 'projects' },
-    { name: 'Services', href: '/services', id: 'services', dropdown: true },
-    { name: 'Pricing', href: '/pricing', id: 'pricing' },
+    { name: 'Product', href: '/vaayu', id: 'product', dropdown: true, dropdownType: 'product' },
+    { name: 'Services', href: '/services', id: 'services', dropdown: true, dropdownType: 'services' },
     { name: 'Docs', href: '/docs', id: 'docs' },
-    { name: 'Contact', href: '/contact', id: 'contact' },
+    { name: 'Blog', href: '/blog', id: 'blog' },
     { name: 'About', href: '/about', id: 'about' },
   ];
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     setIsOpen(false);
-    setIsServicesOpenDesktop(false);
-    setIsServicesOpenMobile(false);
+    setActiveDropdown(null);
+    setActiveMobileDropdown(null);
 
     const [basePath, hash] = href.split('#');
     const targetPath = basePath || '/';
@@ -160,76 +206,86 @@ export default function Navbar() {
           </div>
 
           {/* Cell 2: Desktop Navigation Links (md+) */}
-          <div className="hidden lg:flex flex-1 items-center gap-4 lg:gap-8 xl:gap-10 px-6 lg:px-10 h-full">
+          <div ref={dropdownRef} className="hidden lg:flex flex-1 items-center gap-4 lg:gap-8 xl:gap-10 px-6 lg:px-10 h-full">
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
                 className="relative text-base font-google font-normal antialiased tracking-wider text-slate-800 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
-                ref={link.dropdown ? dropdownRef : null}
               >
-                {link.dropdown ? (
+                {link.dropdown && link.dropdownType ? (() => {
+                  const cfg = dropdownConfig[link.dropdownType];
+                  const isActive = activeDropdown === link.dropdownType;
+                  return (
                   <button
-                    onClick={() => setIsServicesOpenDesktop(!isServicesOpenDesktop)}
+                    onClick={() => setActiveDropdown(isActive ? null : link.dropdownType!)}
                     className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
                   >
                     {link.name}
                     <span
-                      className={`material-symbols-outlined text-black dark:text-white text-[12px] opacity-40 transition-transform duration-200 ${isServicesOpenDesktop ? 'rotate-180' : ''}`}
+                      className={`material-symbols-outlined text-black dark:text-white text-[12px] opacity-40 transition-transform duration-200 ${isActive ? 'rotate-180' : ''}`}
                     >
                       keyboard_arrow_down
                     </span>
 
                     {/* Desktop Dropdown */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 backdrop-blur-md shadow-none rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isServicesOpenDesktop ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
-                      onMouseLeave={() => setIsServicesOpenDesktop(false)}
+                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 backdrop-blur-md shadow-none rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isActive ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      onMouseLeave={() => setActiveDropdown(null)}
                     >
                       <div className="flex p-8">
                         {/* Left Content */}
                         <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
                           <div>
                             <h3 className="text-2xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-6 tracking-tight">
-                              Built for the agent-first era
+                              {cfg.heading}
                             </h3>
-                            
-                            {/* Desktop-only Shape Visualization */}
+
+                            {/* Left visual: animated canvas (Product) or static gradient (Services) */}
                             <div className="relative w-full h-48 overflow-hidden rounded-2xl">
-                              {renderCanvas && (
-                                <AntigravityBackground
-                                  effectStyle="water_drop"
-                                  particleCount={100}
-                                  particleType="dot"
-                                  particleSize={0.07}
-                                  colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
-                                  particleSeparation={0.6}
-                                  speed={1}
-                                  cameraPosition={[0, 0, 26]}
-                                  parallaxBaseY={0}
-                                  parallaxX={0}
-                                  parallaxY={0}
-                                  fog={null}
-                                  containerClassName="absolute inset-0 pointer-events-none"
-                                />
+                              {cfg.animated ? (
+                                renderCanvas && isActive && (
+                                  <AntigravityBackground
+                                    effectStyle="water_drop"
+                                    particleCount={100}
+                                    particleType="dot"
+                                    particleSize={0.07}
+                                    colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
+                                    particleSeparation={0.6}
+                                    speed={1}
+                                    cameraPosition={[0, 0, 26]}
+                                    parallaxBaseY={0}
+                                    parallaxX={0}
+                                    parallaxY={0}
+                                    fog={null}
+                                    containerClassName="absolute inset-0 pointer-events-none"
+                                  />
+                                )
+                              ) : (
+                                <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 dark:from-slate-900 dark:via-slate-950 dark:to-slate-800 flex items-end p-5">
+                                  <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
+                                    {cfg.pitch}
+                                  </p>
+                                </div>
                               )}
                             </div>
                           </div>
-                          <Link href="/services" onClick={() => setIsServicesOpenDesktop(false)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
-                            See overview
+                          <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
+                            {cfg.cta.label}
                           </Link>
                         </div>
-                        
-                        {/* Right Content - Services List */}
+
+                        {/* Right Content - Item List */}
                         <div className="w-1/2 flex flex-col gap-0.5">
-                          {serviceGroups.flatMap(group => group.items).map((service, idx) => {
+                          {cfg.items.map((service, idx) => {
                             return (
                                <Link
-                                key={`service-drop-${idx}`}
-                                href="/services"
-                                onClick={() => setIsServicesOpenDesktop(false)}
+                                key={`${link.dropdownType}-drop-${idx}`}
+                                href={service.href ?? cfg.itemHref}
+                                onClick={() => setActiveDropdown(null)}
                                 className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
-                                  <img src="/logo2-straight.svg" alt="" decoding="async" className="w-5 h-5 opacity-70 group-hover/item:opacity-100 transition-opacity" />
+                                  <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-70 group-hover/item:opacity-100 transition-opacity" />
                                   <span className="text-[15px] font-google text-slate-700 dark:text-slate-300 group-hover/item:text-slate-900 dark:group-hover/item:text-slate-100 transition-colors">
                                     {service.title}
                                   </span>
@@ -244,7 +300,8 @@ export default function Navbar() {
                       </div>
                     </div>
                   </button>
-                ) : (
+                  );
+                })() : (
                   <a
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
@@ -340,46 +397,49 @@ export default function Navbar() {
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex flex-col bg-transparent">
             {navLinks.map((link) =>
-              link.dropdown ? (
+              link.dropdown && link.dropdownType ? (() => {
+                const cfg = dropdownConfig[link.dropdownType];
+                const isOpenMob = activeMobileDropdown === link.dropdownType;
+                return (
                 <div key={`nav-mob-${link.id}`} className="border-b border-gray-50 dark:border-slate-800/60">
-                  {/* Services toggle row */}
+                  {/* Dropdown toggle row */}
                   <button
-                    onClick={() => setIsServicesOpenMobile((p) => !p)}
+                    onClick={() => setActiveMobileDropdown(isOpenMob ? null : link.dropdownType!)}
                     className="w-full px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
                   >
                     <span>{link.name}</span>
                     <span
-                      className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isServicesOpenMobile ? 'rotate-180' : ''}`}
+                      className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isOpenMob ? 'rotate-180' : ''}`}
                     >
                       expand_more
                     </span>
                   </button>
 
-                  {/* Services sub-items */}
-                  <div className={`grid transition-all duration-500 ease-in-out ${isServicesOpenMobile ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  {/* Dropdown sub-items */}
+                  <div className={`grid transition-all duration-500 ease-in-out ${isOpenMob ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                   <div className="overflow-y-auto max-h-[50vh]" style={{ touchAction: 'pan-y' }}>
                     <div className="px-6 pb-8 flex flex-col gap-1">
-                      
-                      {/* Integrated Services Header (Mirroring Desktop) */}
+
+                      {/* Header (mirrors desktop) */}
                       <div className="px-2 py-4 mb-2">
                         <h4 className="text-xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-2 tracking-tight">
-                          Built for the agent-first era
+                          {cfg.heading}
                         </h4>
                       </div>
 
-                      {serviceGroups.flatMap(group => group.items).map((service, idx) => {
+                      {cfg.items.map((service, idx) => {
                         return (
                           <Link
-                            key={`mob-svc-${idx}`}
-                            href="/services"
+                            key={`mob-${link.dropdownType}-${idx}`}
+                            href={service.href ?? cfg.itemHref}
                             onClick={() => {
                               setIsOpen(false);
-                              setIsServicesOpenMobile(false);
+                              setActiveMobileDropdown(null);
                             }}
                             className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-300"
                           >
                             <div className="flex items-center gap-4">
-                              <img src="/logo2-straight.svg" alt="" decoding="async" className="w-5 h-5 opacity-40 group-hover/item:opacity-80 transition-opacity" />
+                              <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-40 group-hover/item:opacity-80 transition-opacity" />
                               <div className="flex flex-col">
                                 <span className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-200 transition-colors">
                                   {service.title}
@@ -395,20 +455,21 @@ export default function Navbar() {
                           </Link>
                         );
                       })}
-                      
+
                       <Link
-                        href="/services"
+                        href={cfg.cta.href}
                         onClick={() => setIsOpen(false)}
                         className="mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-slate-100 dark:bg-slate-800 text-sm font-google font-medium text-slate-900 dark:text-white transition-colors"
                       >
-                        View All Services
+                        {cfg.cta.label}
                         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                       </Link>
                     </div>
                   </div>
                   </div>
                 </div>
-              ) : (
+                );
+              })() : (
                 <a
                   key={`nav-mob-${link.id || link.name}`}
                   href={link.href}

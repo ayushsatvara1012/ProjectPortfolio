@@ -1,8 +1,8 @@
 export const seoConfig = {
   home: {
-    title: 'Sapybase — AI Chatbot That Knows Your Business | Deploy in 10 Minutes',
+    title: 'Vaayu by Sapybase — Business Intelligence Chat That Captures Leads & Proves ROI',
     description:
-      'Add a 24/7 AI support agent to your website in 10 minutes. Sapybase trains on your content — PDFs, URLs, or text — answers customer questions accurately, captures leads, and shows you the exact ROI. No coding required.',
+      'Vaayu by Sapybase is a Business Intelligence chat for your website. It answers customer questions 24/7, captures and scores leads, and shows you the funnel, conversions, and exact ROI it earned — trained on your own content, no coding required.',
     canonical: 'https://www.sapybase.com/',
     keywords: [
       'AI chatbot for website',
@@ -19,7 +19,27 @@ export const seoConfig = {
       'chatbot ROI tracking',
       'AI support insights',
       'conversation analytics',
+      'Vaayu',
+      'Vaayu by Sapybase',
       'Sapybase',
+    ],
+  },
+  vaayu: {
+    title: 'Vaayu — A Business Intelligence Chat That Captures Leads & Proves ROI | by Sapybase',
+    description:
+      'Vaayu is the Business Intelligence chat by Sapybase. It captures and scores leads, maps your conversion funnel, attributes revenue and ROI to every conversation, and auto-summarizes what customers ask — trained on your content, live in minutes.',
+    canonical: 'https://www.sapybase.com/vaayu',
+    keywords: [
+      'Vaayu',
+      'Vaayu by Sapybase',
+      'business intelligence chat',
+      'AI chatbot lead scoring',
+      'conversion funnel analytics',
+      'chatbot ROI attribution',
+      'conversation analytics',
+      'lead capture chatbot',
+      'AI chat revenue attribution',
+      'no-code AI chatbot',
     ],
   },
   about: {
@@ -37,18 +57,18 @@ export const seoConfig = {
     keywords: ['contact Sapybase', 'AI chatbot consultation', 'deploy AI bot', 'custom AI solution'],
   },
   services: {
-    title: 'Sapybase AI Chatbot — Features & Capabilities',
+    title: 'Sapybase Services — Custom AI, Web Apps & Cloud Engineering',
     description:
-      'From lead capture to ROI analytics, see everything your Sapybase chatbot does automatically — 24/7 support, conversation memory, custom branding, and real-time insights.',
+      'Sapybase is a software studio that designs and ships custom AI chatbots, RAG pipelines, full-stack web apps, and cloud infrastructure. Engineering digital excellence, from code to cloud.',
     canonical: 'https://www.sapybase.com/services',
-    keywords: ['AI chatbot features', 'chatbot lead capture', 'chatbot ROI analytics', 'AI customer support features', 'no-code chatbot platform', 'AI support insights', 'chatbot conversation analytics', 'support automation ROI'],
+    keywords: ['custom AI development', 'RAG pipeline development', 'full-stack web app agency', 'AI integration consulting', 'cloud infrastructure AWS', 'software development studio'],
   },
   pricing: {
-    title: 'Pricing Plans | Sapybase AI Chatbot',
+    title: 'Vaayu Pricing — Plans That Scale With You | by Sapybase',
     description:
-      'Simple, transparent pricing for every stage of your business. Start free, scale as you grow — from solo projects to enterprise AI deployments with Sapybase.',
+      'Simple, transparent pricing for Vaayu, the Business Intelligence chat by Sapybase. Start free and scale as you grow — more data sources, lead capture, and ROI insights on every plan.',
     canonical: 'https://www.sapybase.com/pricing',
-    keywords: ['Sapybase pricing', 'AI chatbot plans', 'chatbot subscription', 'enterprise AI pricing'],
+    keywords: ['Vaayu pricing', 'business intelligence chat pricing', 'AI chatbot plans', 'chatbot subscription', 'lead capture pricing'],
   },
   docs: {
     title: 'Documentation | Sapybase',
