@@ -79,15 +79,31 @@ const faqSchema = {
       "name": "Does Vaayu support lead generation?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. Vaayu chatbots can capture visitor details during conversations and surface them as leads in your dashboard, helping you convert website traffic into sales opportunities without manual follow-up."
+        "text": "Yes. On the Growth plan and above, Vaayu chatbots capture visitor contact details during conversations, automatically score each lead as HOT, WARM, or COLD, and send you instant alerts. Captured leads appear in your dashboard and a prioritized Action Center worklist so you can follow up while intent is high."
       }
     },
     {
       "@type": "Question",
-      "name": "Is Vaayu free to use?",
+      "name": "What analytics and business intelligence does Vaayu provide?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Vaayu offers a free tier so you can build and test your AI chatbot at no cost. Paid plans are available for higher usage, more data sources, and advanced features."
+        "text": "The Scale plan adds deep business intelligence: an ROI dashboard that ties conversations to closed revenue, a conversion funnel that shows where visitors drop off, and lead-source attribution so you know which channels drive your best leads. You also get a weekly results email summarizing performance."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my data secure with Vaayu?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Your content is never sold and never used to train external AI models beyond your own bot. All data is encrypted in transit with TLS, API keys are hashed and never stored in plaintext, and the embeddable widget is locked to the website domains you authorize so no one else can reuse it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Vaayu free to try?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You can explore the live interactive demo for free and start a 14-day trial of the Growth plan on your own data. Paid plans — Starter, Growth, and Scale — unlock production bots, higher message and knowledge limits, and advanced conversion and white-label features, with custom plans available for agencies and high-volume teams."
       }
     }
   ]

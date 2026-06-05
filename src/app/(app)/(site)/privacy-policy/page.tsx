@@ -7,7 +7,7 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 
 export const metadata: Metadata = buildMetadata('privacy');
 
-const LAST_UPDATED = 'April 26, 2026';
+const LAST_UPDATED = 'June 5, 2026';
 const CONTACT_EMAIL = 'ayushsatvara2002@gmail.com';
 
 const Section = ({ num, title, children }: { num: string; title: string; children: React.ReactNode }) => (
@@ -87,8 +87,9 @@ export default function PrivacyPolicyPage() {
                 information collected for rate limiting, billing enforcement, and abuse prevention.
               </li>
               <li>
-                <strong>Lead capture data</strong> — if you enable lead capture on your bot, end-user contact information
-                (name, email, phone) submitted through the widget is stored and attributed to your account.
+                <strong>Lead &amp; conversion data</strong> — if you enable lead capture on your bot, end-user contact
+                information (name, email, phone) submitted through the widget is stored, scored as HOT/WARM/COLD, and
+                attributed to your account and its traffic source so you can measure conversion performance.
               </li>
             </ul>
           </Section>
@@ -98,7 +99,7 @@ export default function PrivacyPolicyPage() {
               <li>Providing, operating, and improving the Sapybase platform and your bots.</li>
               <li>Processing subscription billing and enforcing plan limits.</li>
               <li>Generating analytics, insight reports, and SEO FAQ content for your bots.</li>
-              <li>Sending transactional emails (account creation, billing events, password reset) via Clerk.</li>
+              <li>Sending account and billing emails via Clerk, and product notification emails — hot-lead alerts, human-handoff notifications, and the weekly results digest — via Resend.</li>
               <li>Detecting and preventing abuse, fraud, and rate-limit violations.</li>
               <li>Responding to your support requests sent to {CONTACT_EMAIL}.</li>
             </ul>
@@ -129,6 +130,7 @@ export default function PrivacyPolicyPage() {
                     ['Render', 'API server hosting', 'US'],
                     ['Polar', 'Subscription billing & payments', 'US'],
                     ['Google (Gemini API)', 'AI language model inference', 'US / Google Cloud'],
+                    ['Resend', 'Transactional & notification email delivery', 'US'],
                     ['Vercel', 'Frontend hosting', 'Global CDN'],
                     ['Redis (Render)', 'Rate limiting & caching', 'US'],
                   ].map(([name, purpose, location]) => (

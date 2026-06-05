@@ -145,7 +145,7 @@ export default function PricingClient() {
               <div className="flex border border-gray-200 dark:border-slate-800 bg-white dark:bg-white/[0.02] rounded-xl p-1">
                 {(['monthly', 'annual'] as const).map(p => (
                   <button key={p} onClick={() => setBillingPeriod(p)} className={`px-4 py-2 text-[11px] font-display font-bold uppercase tracking-widest transition-all rounded-lg ${billingPeriod === p ? 'bg-slate-900 dark:bg-white text-white dark:text-black' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                    {p === 'annual' ? 'Annual −10%' : 'Monthly'}
+                    {p === 'annual' ? 'Annual · 2 mo free' : 'Monthly'}
                   </button>
                 ))}
               </div>

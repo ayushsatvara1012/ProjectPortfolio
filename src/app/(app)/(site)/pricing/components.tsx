@@ -135,12 +135,16 @@ export const COMPARISON_FEATURES = [
 ];
 
 export const FAQS = [
-  { q: 'Can I switch plans at any time?', a: 'Yes. Upgrades take effect immediately. Downgrades take effect at the end of your current billing cycle.' },
-  { q: 'Can I try it before paying?', a: 'Yes — start a 14-day trial of Growth to experience lead capture and the Action Center, then pick the plan that fits. No long-term commitment.' },
-  { q: 'What payment methods do you accept?', a: 'We accept all major credit/debit cards and UPI (India) via our Polar checkout. Invoices available on the Scale and Enterprise plans.' },
-  { q: 'What are "knowledge chunks"?', a: 'Knowledge chunks are the units of text (approximately 512 tokens each) your bot stores from your documents, URLs, or FAQs. More chunks = richer, more accurate answers.' },
-  { q: 'Do you offer annual billing?', a: 'Yes — pay annually and get 2 months free (about 17% off) on Starter, Growth, and Scale. Toggle annual billing on this page.' },
-  { q: 'What is human handoff?', a: 'Human handoff lets your bot transfer a conversation to a live agent — passing the full transcript and optionally redirecting to a support URL you configure.' },
+  { q: 'How does it work?', a: 'Add your content — website URLs, PDF or document uploads, or pasted text — and we index it into a private, vectorized knowledge base. Your AI bot then answers visitor questions grounded in that content (not guesses), and you embed it on any site with a single line of JavaScript. Works with Next.js, React, WordPress, Shopify, Webflow, and plain HTML.' },
+  { q: 'Which plan is right for me?', a: 'Starter gives you an on-brand support bot. Growth adds the conversion engine — lead capture, HOT/WARM/COLD scoring, instant hot-lead alerts, and the Action Center worklist. Scale adds deep business intelligence (ROI dashboard, conversion funnel, lead-source attribution), Slack and webhook integrations, and full white-label. Need higher limits or agency features? Custom plans are built around your volume.' },
+  { q: 'Can I try it before paying?', a: 'Yes. Explore the live interactive demo for free, or start a 14-day trial of Growth to experience lead capture and the Action Center on your own data. No long-term commitment, and you can cancel anytime.' },
+  { q: 'Can I switch or cancel anytime?', a: 'Absolutely. Upgrades apply instantly and are pro-rated; downgrades take effect at the end of your current billing cycle so you keep what you paid for. Cancel from your dashboard at any time and retain access until the period ends — no further charges.' },
+  { q: 'Do you offer annual billing?', a: 'Yes — switch to annual on Starter, Growth, or Scale and get 2 months free versus paying monthly. Use the monthly/annual toggle on this page to see the discounted price.' },
+  { q: 'What happens if I hit my monthly message limit?', a: 'Message quotas are counted per bot, per month. When a bot reaches its limit it pauses replies until the next billing cycle resets — you can upgrade anytime for a higher cap. Your knowledge base, configuration, and captured leads are never affected.' },
+  { q: 'What are "knowledge chunks"?', a: 'Knowledge chunks are the units of text (about 512 tokens each) your bot stores from your documents, URLs, and FAQs. More chunks means a richer, more accurate knowledge base — each plan includes a per-bot chunk allowance.' },
+  { q: 'Is my data private and secure?', a: 'Yes. We never sell your data or your visitors’ data, and your content is never used to train external AI models beyond your own bot. Everything is encrypted in transit (TLS), API keys are hashed and never stored in plaintext, and the embeddable widget is locked to the domains you authorize. See our Privacy Policy for full details.' },
+  { q: 'Can I remove your branding?', a: 'Scale and Custom plans include full white-label — upload your own logo, set your brand colors, and remove the platform badge entirely so the widget looks 100% yours.' },
+  { q: 'What about integrations and human handoff?', a: 'Growth and above can hand a live conversation to a human agent with the full transcript attached. Scale adds Slack alerts for hot leads and outbound webhooks, so you can push captured leads straight into your CRM or any tool via Zapier.' },
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -174,7 +178,7 @@ export const FaqItem = ({ q, a, isOpen, onToggle }: { q: string; a: string; isOp
       <span className="text-sm font-display font-bold text-white group-hover:text-blue-300 transition-colors">{q}</span>
       <ChevronDown size={14} className={`shrink-0 text-white/50 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
     </button>
-    <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-40' : 'max-h-0'}`}>
+    <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96' : 'max-h-0'}`}>
       <p className="px-6 pb-5 text-sm font-google text-white/70 leading-relaxed">{a}</p>
     </div>
   </div>

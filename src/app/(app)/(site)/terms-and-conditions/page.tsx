@@ -7,7 +7,7 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 
 export const metadata: Metadata = buildMetadata('terms');
 
-const LAST_UPDATED = 'April 26, 2026';
+const LAST_UPDATED = 'June 5, 2026';
 const CONTACT_EMAIL = 'ayushsatvara2002@gmail.com';
 
 const Section = ({ num, title, children }: { num: string; title: string; children: React.ReactNode }) => (
@@ -66,7 +66,9 @@ export default function TermsAndConditionsPage() {
           <Section num="02" title="The Service">
             <p>
               Sapybase is a SaaS platform that lets you create, train, and deploy AI-powered chatbots on your
-              website or app. Features available to you depend on your subscription plan. Current plan details
+              website or app and — on higher plans — capture and score leads, hand conversations off to human
+              agents, and access business-intelligence analytics such as ROI, conversion funnel, and lead-source
+              attribution. Features available to you depend on your subscription plan. Current plan details
               and pricing are published at{' '}
               <Link href="/pricing" className="text-indigo-600 dark:text-indigo-400 underline">
                 Sapybase.com/pricing
@@ -81,7 +83,7 @@ export default function TermsAndConditionsPage() {
 
           <Section num="03" title="Subscriptions and Billing">
             <p>
-              Paid plans (Basic, Starter, Pro, Business) are billed monthly or annually in advance via Polar,
+              Paid plans (Starter, Growth, Scale) are billed monthly or annually in advance via Polar,
               our payment processor. Prices are listed in USD and INR on our pricing page. Local taxes may
               apply and are calculated at checkout.
             </p>
@@ -104,12 +106,12 @@ export default function TermsAndConditionsPage() {
                 responses for that bot until the next billing cycle.
               </li>
               <li>
-                <strong>Annual billing</strong> is available on Starter, Pro, and Business plans at a 10%
-                discount. Contact us at{' '}
-                <a href={`mailto:${CONTACT_EMAIL}`} className="text-indigo-600 dark:text-indigo-400 underline">
-                  {CONTACT_EMAIL}
-                </a>{' '}
-                to set it up.
+                <strong>Annual billing</strong> is available on the Starter, Growth, and Scale plans and includes
+                two months free compared with paying monthly. You can switch between monthly and annual billing
+                using the toggle on the{' '}
+                <Link href="/pricing" className="text-indigo-600 dark:text-indigo-400 underline">
+                  pricing page
+                </Link>.
               </li>
             </ul>
           </Section>
