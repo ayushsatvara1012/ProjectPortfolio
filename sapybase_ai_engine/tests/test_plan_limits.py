@@ -16,9 +16,9 @@ class TestPlanLimits:
         limits, _, _ = _import()
         assert limits["FREE"]["messages"] == 0
 
-    def test_basic_allows_one_bot(self):
+    def test_starter_allows_one_bot(self):
         limits, _, _ = _import()
-        assert limits["BASIC"]["max_bots"] == 1
+        assert limits["STARTER"]["max_bots"] == 1
 
     def test_enterprise_has_effectively_unlimited_bots(self):
         limits, _, _ = _import()
@@ -27,15 +27,13 @@ class TestPlanLimits:
     def test_higher_tiers_have_more_messages(self):
         limits, _, _ = _import()
         # Commercial ladder: Starter < Growth(PRO) < Scale(BUSINESS) < Enterprise.
-        # BASIC is a legacy alias of Starter (equal), no longer sold.
-        assert limits["BASIC"]["messages"] == limits["STARTER"]["messages"]
         assert limits["STARTER"]["messages"] < limits["PRO"]["messages"]
         assert limits["PRO"]["messages"] < limits["BUSINESS"]["messages"]
         assert limits["BUSINESS"]["messages"] < limits["ENTERPRISE"]["messages"]
 
     def test_higher_tiers_have_more_chunks(self):
         limits, _, _ = _import()
-        assert limits["BASIC"]["chunks"] < limits["PRO"]["chunks"]
+        assert limits["STARTER"]["chunks"] < limits["PRO"]["chunks"]
 
     def test_free_tier_no_lead_capture(self):
         limits, _, _ = _import()
@@ -60,8 +58,13 @@ class TestPlanLimits:
 
     def test_all_expected_tiers_present(self):
         limits, _, _ = _import()
-        for tier in ("FREE", "BASIC", "STARTER", "PRO", "ENTERPRISE"):
+        for tier in ("FREE", "STARTER", "PRO", "ENTERPRISE"):
             assert tier in limits, f"Missing tier: {tier}"
+
+    def test_basic_tier_fully_removed(self):
+        limits, mapping, _ = _import()
+        assert "BASIC" not in limits
+        assert "BASIC" not in mapping
 
 
 class TestModelMapping:
@@ -69,9 +72,9 @@ class TestModelMapping:
         _, mapping, _ = _import()
         assert "lite" in mapping["FREE"].lower() or "flash" in mapping["FREE"].lower()
 
-    def test_pro_gets_higher_model_than_basic(self):
+    def test_pro_gets_higher_model_than_free(self):
         _, mapping, _ = _import()
-        # PRO should not use same model as FREE/BASIC
+        # PRO should not use the same model as FREE
         assert mapping["PRO"] != mapping["FREE"]
 
     def test_all_mapped_models_are_valid(self):

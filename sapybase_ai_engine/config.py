@@ -13,12 +13,10 @@ from datetime import timedelta
 #   Growth   → PRO      ($49/mo)  — + lead capture/scoring, alerts, booking, Action Center, digest.
 #   Scale    → BUSINESS ($99/mo)  — + deep BI (ROI/funnel/attribution), Slack, webhooks, handoff, white-label.
 #   Enterprise → ENTERPRISE/CUSTOM (contact) — everything, custom limits.
-# FREE = inactive/trial state. BASIC = LEGACY alias (no longer sold; mirrors Starter
-# so any pre-existing BASIC rows degrade gracefully — migrate them to STARTER).
+# FREE = inactive/trial state. Starter is the entry paid tier.
 # This is the single backend source of truth; src/lib/auth/entitlements.ts MUST mirror it.
 PLAN_LIMITS = {
     "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
-    "BASIC":      {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},  # legacy alias of Starter
     "STARTER":    {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
     "PRO":        {"max_bots": 3,   "messages": 5000,   "chunks": 1500,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
     "BUSINESS":   {"max_bots": 5,   "messages": 15000,  "chunks": 5000,  "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True},
@@ -29,11 +27,10 @@ PLAN_LIMITS = {
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
     "FREE":       "gemini-2.5-flash-lite",
-    "BASIC":      "gemini-2.5-flash-lite",
     "STARTER":    "gemini-2.5-flash",
     "PRO":        "gemini-2.5-pro",
     "BUSINESS":   "gemini-2.5-pro",
-    "ENTERPRISE": "gemini-3.1-pro-preview",
+    "ENTERPRISE": "gemini-2.5-pro",
 }
 
 VALID_MODELS = set(MODEL_MAPPING.values()) | {
@@ -52,7 +49,6 @@ TIER_RATE_LIMITS = {
     # quota / LLM spend can be drained (e.g. by widget-key replay), well above any
     # legitimate single-bot daily volume.
     "FREE":       {"per_minute": 0,   "per_hour": 0,      "per_day": 0},
-    "BASIC":      {"per_minute": 20,  "per_hour": 200,    "per_day": 1200},
     "STARTER":    {"per_minute": 40,  "per_hour": 800,    "per_day": 4800},
     "PRO":        {"per_minute": 80,  "per_hour": 2000,   "per_day": 12000},
     "BUSINESS":   {"per_minute": 200, "per_hour": 5000,   "per_day": 30000},   # ultra-speed tier

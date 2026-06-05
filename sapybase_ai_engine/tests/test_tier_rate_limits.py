@@ -20,7 +20,7 @@ class TestDailyCapConfig:
         for tier, caps in main.TIER_RATE_LIMITS.items():
             assert "per_day" in caps, f"{tier} missing per_day"
 
-    @pytest.mark.parametrize("tier", ["BASIC", "STARTER", "PRO", "BUSINESS", "CUSTOM"])
+    @pytest.mark.parametrize("tier", ["STARTER", "PRO", "BUSINESS", "CUSTOM"])
     def test_per_day_is_six_times_per_hour(self, tier):
         caps = main.TIER_RATE_LIMITS[tier]
         assert caps["per_day"] == caps["per_hour"] * 6
@@ -71,26 +71,26 @@ class TestEnforceDailyCap:
         # When Redis is unavailable the limiter must fall through silently.
         monkeypatch.setattr(main, "r", None, raising=False)
         # Should not raise even with a tier that has caps.
-        _run(main.enforce_tier_chat_limit("c1", "BASIC"))
+        _run(main.enforce_tier_chat_limit("c1", "STARTER"))
 
     def test_under_daily_cap_does_not_raise(self, fake_redis, monkeypatch):
         # High minute/hour so only the day cap is in play; day cap = 5.
         monkeypatch.setitem(
-            main.TIER_RATE_LIMITS, "BASIC",
+            main.TIER_RATE_LIMITS, "STARTER",
             {"per_minute": 10_000, "per_hour": 10_000, "per_day": 5},
         )
         for _ in range(5):
-            _run(main.enforce_tier_chat_limit("tenant-under", "BASIC"))  # 1..5 == cap, ok
+            _run(main.enforce_tier_chat_limit("tenant-under", "STARTER"))  # 1..5 == cap, ok
 
     def test_exceeding_daily_cap_raises_429_per_day(self, fake_redis, monkeypatch):
         monkeypatch.setitem(
-            main.TIER_RATE_LIMITS, "BASIC",
+            main.TIER_RATE_LIMITS, "STARTER",
             {"per_minute": 10_000, "per_hour": 10_000, "per_day": 3},
         )
         for _ in range(3):
-            _run(main.enforce_tier_chat_limit("tenant-over", "BASIC"))  # 1..3 ok
+            _run(main.enforce_tier_chat_limit("tenant-over", "STARTER"))  # 1..3 ok
         with pytest.raises(HTTPException) as exc:
-            _run(main.enforce_tier_chat_limit("tenant-over", "BASIC"))  # 4th trips
+            _run(main.enforce_tier_chat_limit("tenant-over", "STARTER"))  # 4th trips
         assert exc.value.status_code == 429
         assert exc.value.detail["scope"] == "per_day"
         assert "Retry-After" in exc.value.headers
@@ -107,27 +107,27 @@ class TestEnforceDailyCap:
     def test_minute_cap_trips_before_day_cap(self, fake_redis, monkeypatch):
         # Ordering guarantee: the tightest window (minute) should fire first.
         monkeypatch.setitem(
-            main.TIER_RATE_LIMITS, "BASIC",
+            main.TIER_RATE_LIMITS, "STARTER",
             {"per_minute": 2, "per_hour": 10_000, "per_day": 10_000},
         )
-        _run(main.enforce_tier_chat_limit("t", "BASIC"))
-        _run(main.enforce_tier_chat_limit("t", "BASIC"))
+        _run(main.enforce_tier_chat_limit("t", "STARTER"))
+        _run(main.enforce_tier_chat_limit("t", "STARTER"))
         with pytest.raises(HTTPException) as exc:
-            _run(main.enforce_tier_chat_limit("t", "BASIC"))
+            _run(main.enforce_tier_chat_limit("t", "STARTER"))
         assert exc.value.detail["scope"] == "per_minute"
 
     def test_separate_tenants_have_independent_buckets(self, fake_redis, monkeypatch):
         monkeypatch.setitem(
-            main.TIER_RATE_LIMITS, "BASIC",
+            main.TIER_RATE_LIMITS, "STARTER",
             {"per_minute": 10_000, "per_hour": 10_000, "per_day": 2},
         )
-        _run(main.enforce_tier_chat_limit("tenant-A", "BASIC"))
-        _run(main.enforce_tier_chat_limit("tenant-A", "BASIC"))
+        _run(main.enforce_tier_chat_limit("tenant-A", "STARTER"))
+        _run(main.enforce_tier_chat_limit("tenant-A", "STARTER"))
         # tenant-B is unaffected by tenant-A hitting its cap.
-        _run(main.enforce_tier_chat_limit("tenant-B", "BASIC"))
-        _run(main.enforce_tier_chat_limit("tenant-B", "BASIC"))
+        _run(main.enforce_tier_chat_limit("tenant-B", "STARTER"))
+        _run(main.enforce_tier_chat_limit("tenant-B", "STARTER"))
         with pytest.raises(HTTPException):
-            _run(main.enforce_tier_chat_limit("tenant-A", "BASIC"))  # A's 3rd trips
+            _run(main.enforce_tier_chat_limit("tenant-A", "STARTER"))  # A's 3rd trips
 
 
 # ── Redis-down fail-open alerting (item 8) ───────────────────────────────────
@@ -175,7 +175,7 @@ class TestRedisDownAlert:
         main._REDIS_ALERT_LAST.clear()
         calls = self._capture_errors(monkeypatch)
         monkeypatch.setattr(main, "r", _RaisingRedis(), raising=False)
-        _run(main.enforce_tier_chat_limit("tenant", "BASIC"))  # no exception
+        _run(main.enforce_tier_chat_limit("tenant", "STARTER"))  # no exception
         assert any("enforce_tier_chat_limit" in c[0][1] for c in calls)
 
     def test_check_global_llm_budget_fails_open_and_alerts_on_redis_error(self, monkeypatch):

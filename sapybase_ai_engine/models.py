@@ -99,7 +99,6 @@ class UserRole(str, Enum):
 
 class UserTier(str, Enum):
     FREE = "FREE"
-    BASIC = "BASIC"
     STARTER = "STARTER"
     PRO = "PRO"
     ENTERPRISE = "ENTERPRISE"

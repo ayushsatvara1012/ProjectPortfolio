@@ -503,7 +503,6 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
     # unintentional overruns while keeping the interface snappy.
     token_limits = {
         "FREE": 400,
-        "BASIC": 600,
         "STARTER": 800,
         "PRO": 1200,
         "BUSINESS": 1600,
@@ -599,7 +598,6 @@ POLAR_PRODUCT_TIER_MAP = {
     pid: tier
     for tier, pid in {
         # Monthly products
-        "BASIC": os.getenv("POLAR_PRODUCT_ID_BASIC"),  # legacy
         "STARTER": os.getenv("POLAR_PRODUCT_ID_STARTER"),
         "PRO": os.getenv("POLAR_PRODUCT_ID_PRO"),
         "BUSINESS": os.getenv("POLAR_PRODUCT_ID_BUSINESS"),
@@ -709,7 +707,7 @@ async def enforce_tier_chat_limit(company_id: str, tier: str) -> None:
     """
     if not r:
         return
-    caps = TIER_RATE_LIMITS.get((tier or "FREE").upper(), TIER_RATE_LIMITS["BASIC"])
+    caps = TIER_RATE_LIMITS.get((tier or "FREE").upper(), TIER_RATE_LIMITS["STARTER"])
     minute_cap = caps["per_minute"]
     hour_cap = caps["per_hour"]
     day_cap = caps.get("per_day", 0)
@@ -1171,6 +1169,12 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
     tier = (company_data[13] or "FREE").upper()
     role = company_data[14]
 
+    # Legacy BASIC tier retired — treat as STARTER (identical limits) for this
+    # request. The owner's next dashboard load persists the migration via
+    # get_current_user; the 0012 migration handles the bulk update.
+    if tier == "BASIC":
+        tier = "STARTER"
+
     # Step 2.4 (chat path): grace-period auto-downgrade. If the user is marked
     # CANCELED via the Polar webhook and billing_period_end has passed, flip
     # them to FREE on read. Mirrors the same logic in get_current_user so the
@@ -1541,6 +1545,13 @@ async def get_current_user(request: Request):
                     print(f"SECURITY ALERT: Unauthorized SUPER_ADMIN detected ({user_email}). Downgrading to USER.")
                     cursor.execute("UPDATE users SET role = 'USER' WHERE id = %s", (user_id,))
                     role = 'USER'
+
+                # Legacy BASIC tier retired. Transparently migrate any remaining
+                # BASIC rows to STARTER (identical limits) on read — belt-and-
+                # suspenders alongside the 0012 data migration.
+                if tier == 'BASIC':
+                    cursor.execute("UPDATE users SET tier = 'STARTER' WHERE id = %s", (user_id,))
+                    tier = 'STARTER'
                 
             conn.commit()
             
@@ -1636,7 +1647,7 @@ async def get_admin_user(user: dict = Depends(get_current_user)):
 async def require_premium_tier(user: dict = Depends(get_current_user)):
     """
     Route Guard: Blocks FREE-tier users from accessing AI Command Center routes.
-    BASIC, STARTER, and PRO users are permitted.
+    Starter and all higher paid tiers are permitted.
     """
     tier = user.get("tier")
     role = user.get("role")
@@ -1645,7 +1656,7 @@ async def require_premium_tier(user: dict = Depends(get_current_user)):
     if (tier == "FREE" or tier is None) and role != "SUPER_ADMIN":
         raise HTTPException(
             status_code=403,
-            detail="Access denied: This feature requires an active Basic or paid subscription."
+            detail="Access denied: This feature requires an active paid subscription."
         )
     return user
 
@@ -1933,18 +1944,6 @@ async def update_company_details(
     tier = user.get("tier", "FREE")
     role = user.get("role")
 
-    # ── Tier gate: fields restricted to BASIC users ──
-    if tier == "BASIC" and role != "SUPER_ADMIN":
-        restricted_fields = ["system_prompt", "company_tone", "quick_questions", "ai_model",
-                             "logo_shape", "custom_logo_url", "avatar_bg_style"]
-        provided_fields = update.model_dump(exclude_unset=True).keys()
-        forbidden = [f for f in provided_fields if f in restricted_fields]
-        if forbidden:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Advanced customization ({', '.join(forbidden)}) requires a Starter or Pro plan."
-            )
-
     # ── PRO-only gate: webhook_url ──
     custom_plan_cfg = user.get("custom_plan_config") or {}
     if update.webhook_url is not None and update.webhook_url.strip():
@@ -1967,14 +1966,6 @@ async def update_company_details(
         require_entitlement(user, "custom_logo", "Custom logo URL")
         # Run the hardened async validator (HEAD check + size probe)
         await validate_logo_url(update.custom_logo_url.strip())
-
-    # ── logo_shape available to STARTER+ ──
-    if update.logo_shape is not None:
-        if tier == "BASIC" and role != "SUPER_ADMIN":
-            raise HTTPException(
-                status_code=402,
-                detail="Bot shape selection requires a Starter or Pro plan."
-            )
 
     # ── hide_branding available to STARTER+ (white-label plans) ──
     if update.hide_branding is True:
@@ -2195,7 +2186,7 @@ async def chat_endpoint(
     background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
-    """Core AI Chat Endpoint with Exact-Match Cache, Basic/Paid Enforcement and Connection Pooling."""
+    """Core AI Chat Endpoint with Exact-Match Cache, tier enforcement and Connection Pooling."""
     # ── SECURITY: Global LLM Budget Enforcement (Redis-Backed) ──
     # Prevents rapid credit depletion even if someone manages to bypass per-key rate limits.
     await check_global_llm_budget(company["id"])
@@ -2258,7 +2249,7 @@ async def chat_endpoint(
         # Tier-aware per-minute / per-hour technical cap (Step 1.3). Runs
         # AFTER tier is known, BEFORE billing/quota checks — so abusers can't
         # burn through the monthly quota in 30 seconds via a runaway loop.
-        await enforce_tier_chat_limit(company["id"], tier or "BASIC")
+        await enforce_tier_chat_limit(company["id"], tier or "STARTER")
 
         # Billing check: allow ACTIVE, plus CANCELED (in grace period — the
         # 2.4 lazy-downgrade has already flipped expired ones to EXPIRED) and
@@ -7018,34 +7009,6 @@ async def polar_webhook(request: Request):
     finally:
         release_db_connection(conn)
 
-@app.post("/api/user/subscription-manual")
-async def select_basic_tier(current_user: dict = Depends(get_current_user)):
-    """
-    Basic Plan Activation: Provisions a user for the BASIC tier.
-    Used for manual activations or migrations.
-    """
-    current_tier = current_user.get("tier")
-    
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE users 
-            SET tier = 'BASIC', subscription_status = 'ACTIVE'
-            WHERE id = %s
-            """,
-            (current_user["id"],)
-        )
-        cursor.execute(
-            "INSERT INTO usage_tracking (user_id, period_start, period_end) VALUES (%s, now(), now() + interval '30 days') ON CONFLICT DO NOTHING",
-            (current_user["id"],)
-        )
-        conn.commit()
-        return {"status": "success", "tier": "BASIC"}
-    finally:
-        release_db_connection(conn)
-
 
 @app.post("/api/user/sync-subscription")
 @limiter.limit("5/minute;20/hour")  # Polar API quota protection — each call hits their billing API
@@ -7117,21 +7080,50 @@ async def sync_subscription_from_polar(
 
             # Step 4: Pick the best subscription (most recently started)
             sub = sorted(subscriptions, key=lambda s: s.get("started_at", ""), reverse=True)[0]
-            product_name = (sub.get("product", {}).get("name") or "").upper()
+            product = sub.get("product", {}) or {}
+            product_id = product.get("id")
+            product_name = product.get("name") or ""
             status = sub.get("status", "").upper()
             period_end = sub.get("current_period_end")
 
-            print(f"SYNC: Found subscription - Product={product_name}, Status={status}")
+            print(f"SYNC: Found subscription - Product={product_name} ({product_id}), Status={status}")
 
-            # Step 5: Map Polar product name to our internal tier
-            if "PRO" in product_name:
-                tier = "PRO"
-            elif "STARTER" in product_name:
-                tier = "STARTER"
-            elif "BASIC" in product_name:
-                tier = "BASIC"
-            else:
-                tier = "BASIC"
+            # Step 5: Resolve tier by IMMUTABLE product ID — the same source of
+            # truth the Polar webhook uses (POLAR_PRODUCT_TIER_MAP). Matching on
+            # the product *name* is fragile: renaming a plan in Polar's dashboard
+            # (e.g. Pro→Growth, Business→Scale) silently downgrades paying
+            # customers to a lower tier. Product IDs never change.
+            tier = POLAR_PRODUCT_TIER_MAP.get(product_id) if product_id else None
+
+            # Custom-plan fallback: the product may be a per-customer custom plan
+            # tracked on the user row rather than in the global env map.
+            if tier is None and product_id:
+                _lookup_conn = get_db_connection()
+                try:
+                    _lc = _lookup_conn.cursor()
+                    _lc.execute(
+                        "SELECT 1 FROM users WHERE custom_plan_polar_product_id = %s AND clerk_id = %s",
+                        (product_id, clerk_id)
+                    )
+                    if _lc.fetchone():
+                        tier = "CUSTOM"
+                    _lc.close()
+                finally:
+                    release_db_connection(_lookup_conn)
+
+            if tier is None:
+                # Unknown product — do NOT silently downgrade. Log for ops and
+                # leave the user's tier untouched; the webhook (also product-ID
+                # based) is authoritative and reconciles once the product is
+                # mapped in POLAR_PRODUCT_ID_* env vars.
+                print(
+                    f"SYNC CRITICAL: Unknown product_id={product_id} (name={product_name!r}). "
+                    f"Add to POLAR_PRODUCT_ID_* env and resync. Tier left unchanged."
+                )
+                return {
+                    "status": "unknown_product",
+                    "message": "Subscription found, but the plan isn't mapped yet. Your access will update automatically in a moment.",
+                }
 
             db_status = "ACTIVE" if status in ("ACTIVE", "TRIALING") else status
 
