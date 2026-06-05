@@ -30,7 +30,7 @@ export default function ThinkingLogo({
     <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: 12, ...style }}>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 154 41" width={width} height={height} style={{ flexShrink: 0 }}>
         {blocks.map((b, i) => (
-          <rect key={i} x={b.x} y="6" width="28.8" height="28.8" rx="4" fill={b.color}>
+          <rect key={i} x={b.x} y="6" width="28.8" height="28.8" rx="14.4" fill={b.color}>
             <animate
               attributeName="opacity"
               values="0.15;0.15;1;0.15;0.15"

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, MoreHorizontal } from 'lucide-react';
+import { X, MoreHorizontal } from 'lucide-react';
 import ThinkingLogo from './ThinkingLogo';
 import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
 import { FAB_SHAPES, SHAPE_CLASS_MAP, AVATAR_GRADIENTS } from './avatar/AvatarShared';
@@ -380,14 +380,14 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
         <div className="flex flex-col gap-1">
           <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
           {localError && <span className="text-[11px] text-red-500 font-bold px-1">{localError}</span>}
         </div>
         <button type="submit" disabled={isSubmitting}
-          className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
+          className="w-full mt-1 rounded-full py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
           style={{ backgroundColor: themeColor }}>
           {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Submit'}
         </button>
@@ -433,14 +433,14 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
         <div className="flex flex-col gap-1">
           <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1" />
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
           {error && <span className="text-[11px] text-red-500 font-bold px-1">{error}</span>}
         </div>
         <button type="submit" disabled={isSubmitting}
-          className="w-full mt-1 rounded-xl py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
+          className="w-full mt-1 rounded-full py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
           style={{ backgroundColor: themeColor }}>
           {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Notify the team'}
         </button>
@@ -465,6 +465,7 @@ type Message = {
   visitorEmail?: string;
   redirectUrl?: string;
   bookingUrl?: string;
+  ts?: number;
 };
 
 type ConfigData = {
@@ -626,6 +627,43 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
   );
 }
 
+// ── Theme-derived CSS variables ──────────────────────────────────────────────
+
+/**
+ * Derive theme-driven CSS variables from the tenant's themeColor so accents
+ * (header text, focus rings, loading glow) adapt to ANY brand color and stay
+ * readable. rgba is computed in JS rather than CSS color-mix() for universal
+ * browser support inside embedded customer pages. Malformed hex falls back to
+ * the default brand color, so a bad config can never render a broken accent.
+ */
+function themeVars(hex: string): Record<string, string> {
+  const fallback = '5730F5';
+  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((hex || '').trim());
+  let c = match ? match[1] : fallback;
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255; // perceived brightness
+  // User bubble = theme tinted at low opacity over the chat surface, so the text
+  // must follow the *blended* bubble lightness (not the raw theme). Luminance is
+  // linear in RGB, so blended = A*themeLum + (1-A)*surfaceLum. The surface differs
+  // by mode, so we compute a foreground for the light and the dark surface.
+  const A_LIGHT = 0.15; // user-bubble tint, light mode
+  const A_DARK = 0.20;  // user-bubble tint, dark mode (a touch stronger)
+  const fgFor = (alpha: number, surfaceLum: number) => (alpha * lum + (1 - alpha) * surfaceLum > 0.6 ? '#0f172a' : '#ffffff');
+  return {
+    '--sapy-theme': `#${c}`,                         // focus rings / borders
+    '--sapy-theme-fg': lum > 0.6 ? '#0f172a' : '#ffffff', // readable header text
+    '--sapy-glow': `rgba(${r}, ${g}, ${b}, 0.45)`,   // loading glow
+    '--sapy-glow-ring': `rgba(${r}, ${g}, ${b}, 0.18)`,
+    '--sapy-user-bg': `rgba(${r}, ${g}, ${b}, ${A_LIGHT})`,      // user bubble — softened theme (light)
+    '--sapy-user-bg-dark': `rgba(${r}, ${g}, ${b}, ${A_DARK})`, // user bubble — softened theme (dark)
+    '--sapy-user-fg': fgFor(A_LIGHT, 0.96),      // bubble text over the light chat surface
+    '--sapy-user-fg-dark': fgFor(A_DARK, 0.06),  // bubble text over the dark chat surface
+  };
+}
+
 // ── ChatWidget ────────────────────────────────────────────────────────────────
 
 type ChatWidgetProps = { apiKey?: string; isEmbed?: boolean };
@@ -724,7 +762,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
           setMessages(prev => {
             if (prev.length === 1 && prev[0].role === 'bot') {
-              return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message }];
+              return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message, ts: Date.now() }];
             }
             return prev;
           });
@@ -752,6 +790,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const LOGO_URL = configData.custom_logo_url || '';
   const LOGO_SHAPE = configData.logo_shape || 'circle';
   const AVATAR_BG_STYLE = configData.avatar_bg_style || 'none';
+  const themeStyleVars = useMemo(() => themeVars(THEME_COLOR), [THEME_COLOR]);
 
   const leadCapturedRef = useRef(false);
   const leadFormShownRef = useRef(false);
@@ -768,7 +807,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [isOpen, setIsOpen] = useState(isEmbed);
   const [showMenu, setShowMenu] = useState(false);
   const [handoffSent, setHandoffSent] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([{ role: 'bot', content: DEFAULT_CONFIG.initial_message }]);
+  const [messages, setMessages] = useState<Message[]>([{ role: 'bot', content: DEFAULT_CONFIG.initial_message, ts: Date.now() }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -781,7 +820,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   }, []);
 
   useEffect(() => {
-    if (!isMobile || !isOpen) return;
+    // Embedded mode lives in a fixed-size iframe that already provides the
+    // correct height. The visualViewport/--sapy-vh hack is only for the
+    // real-mobile fullscreen case; running it inside a cross-origin iframe
+    // makes Chrome report the PARENT page's viewport height, inflating the
+    // panel past the iframe so the message list never overflows (dead wheel).
+    if (!isMobile || !isOpen || isEmbed) return;
     const vv = window.visualViewport;
     if (!vv) return;
     const fullHeight = window.innerHeight;
@@ -800,7 +844,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       document.documentElement.style.removeProperty('--sapy-vh');
       document.documentElement.style.removeProperty('--sapy-safe-bottom');
     };
-  }, [isMobile, isOpen]);
+  }, [isMobile, isOpen, isEmbed]);
 
   useEffect(() => {
     if (isEmbed && !isOpen) {
@@ -904,9 +948,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (!overrideText && !input.trim()) return;
     const userMessage = overrideText || input.trim();
     userMessageCountRef.current += 1;
+    const now = Date.now();
     setMessages(prev => appendBounded(prev,
-      { role: 'user', content: userMessage },
-      { role: 'bot', content: '', isStreaming: true },
+      { role: 'user', content: userMessage, ts: now },
+      { role: 'bot', content: '', isStreaming: true, ts: now },
     ));
     setInput('');
     setIsLoading(true);
@@ -952,9 +997,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot' && last.isStreaming) {
-                updated[updated.length - 1] = { role: 'bot', content: data.reply, isStreaming: false };
+                updated[updated.length - 1] = { ...last, content: data.reply, isStreaming: false };
               } else {
-                updated.push({ role: 'bot', content: data.reply });
+                updated.push({ role: 'bot', content: data.reply, ts: Date.now() });
               }
               return updated;
             });
@@ -1027,7 +1072,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               return updated;
             });
             setIsLoading(false);
-            forceScrollToBottom(true);
+            // Only glide to the bottom if the user is already there — never yank
+            // them down mid-read when the answer finishes generating.
+            scrollToBottom(true);
             if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current) {
               const lowerReply = fullContent.toLowerCase();
               const lowerUserMsg = userMessage.toLowerCase();
@@ -1099,7 +1146,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (handoffSent) return;
     setMessages(prev => [
       ...prev,
-      { role: 'bot', content: "I'll connect you with our team! Share your email so they can reply to you directly. 👇" },
+      { role: 'bot', content: "I'll connect you with our team! Share your email so they can reply to you directly. 👇", ts: Date.now() },
       { role: 'handoff_form', id: 'handoff-form' },
     ]);
   };
@@ -1124,7 +1171,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       ));
     } catch {
       setMessages(prev => prev.map(m =>
-        m.id === 'handoff-form' ? { role: 'bot', content: 'Something went wrong. Please try again.' } : m
+        m.id === 'handoff-form' ? { role: 'bot', content: 'Something went wrong. Please try again.', ts: Date.now() } : m
       ));
       setHandoffSent(false);
     }
@@ -1151,14 +1198,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
             className={`${isEmbed ? 'relative w-full h-full' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px]'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
-            style={isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : (isEmbed ? { height: '100%' } : {})}
+            style={{ ...themeStyleVars, ...(isEmbed ? { height: '100%' } : isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {}) } as React.CSSProperties}
           >
-            <div className="relative shrink-0">
-              <div className="absolute inset-0 animate-gradient-x" style={{ backgroundImage: `linear-gradient(90deg, ${THEME_COLOR}, #FD7F74, ${THEME_COLOR})`, backgroundSize: '200% 200%', zIndex: 0 }} />
-              <div className="absolute inset-0 opacity-30 dark:opacity-40 pointer-events-none scale-150 mix-blend-overlay dark:mix-blend-overlay" style={{ backgroundImage: `url(${ASSET_BASE}/vector_SBdesign.svg)`, backgroundSize: 'cover', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', zIndex: 1 }} />
-              <div className="bg-white/10 dark:bg-slate-900/10 text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative border-b border-gray-200/50 dark:border-slate-800/50" style={{ zIndex: 2 }}>
+            <div className="relative shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200/70 dark:border-slate-800/80">
+              <div className="text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
-                  <div className="relative flex items-center gap-3 pl-4">
+                  <div className="relative flex items-center gap-3 pl-2">
                     <div className="relative">
                       <BotAvatar
                         shapeId={LOGO_SHAPE}
@@ -1170,11 +1215,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         bgStyle={AVATAR_BG_STYLE}
                       />
                     </div>
-                    <div className="flex flex-col justify-center">
-                      <p className="text-lg font-google font-medium leading-none text-white">{BOT_NAME}</p>
-                      <div className="absolute -bottom-1.5 flex items-center gap-1 place-items-center">
-                        <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-xs text-green-500 google font-normal leading-none pb-1">online</span>
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[15px] font-google font-semibold leading-none text-slate-900 dark:text-slate-100">{BOT_NAME}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <span className="text-xs font-google text-slate-500 dark:text-slate-400 leading-none">Active now</span>
                       </div>
                     </div>
                   </div>
@@ -1182,12 +1227,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     <button onClick={() => setShowMenu(!showMenu)}
                       style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
                       className="p-2.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Chat menu">
-                      <MoreHorizontal size={22} className="text-slate-100 dark:text-slate-400" />
+                      <MoreHorizontal size={22} className="text-slate-500 dark:text-slate-400" />
                     </button>
                     <button onClick={() => { if (isEmbed) { postToParent({ type: 'Sapybase:close' }); } else { setIsOpen(false); } }}
                       style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
                       className="p-2.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors group focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close chat">
-                      <X size={22} className="text-red-500 dark:text-red-400 transition-transform group-hover:rotate-90" />
+                      <X size={22} className="text-slate-400 dark:text-slate-500 group-hover:text-red-500 dark:group-hover:text-red-400 transition-all group-hover:rotate-90" />
                     </button>
                   </div>
                   <AnimatePresence>
@@ -1202,7 +1247,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           </button>
                         )}
                         <button onClick={() => {
-                          setMessages([{ role: 'bot', content: configData.initial_message }]);
+                          setMessages([{ role: 'bot', content: configData.initial_message, ts: Date.now() }]);
                           userMessageCountRef.current = 0;
                           leadCapturedRef.current = false;
                           leadFormShownRef.current = false;
@@ -1228,21 +1273,24 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
             <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
               <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_rgba(59,130,246,0.50)] ring-1 ring-inset ring-blue-500/10 dark:ring-blue-400/20" />
+                <div className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_var(--sapy-glow)] ring-1 ring-inset ring-[var(--sapy-glow-ring)]" />
               </div>
               <div ref={scrollContainerRef} onScroll={handleScrollContainer}
-                className="flex-1 min-h-0 p-4 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative custom-scrollbar">
+                className="flex-1 min-h-0 px-3 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{ maskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)' }}>
                 <div className="flex flex-col gap-5">
                   <AnimatePresence initial={false}>
                     {messages.map((msg, idx) => {
                       const isNew = !animatedMsgIndices.current.has(idx);
                       if (isNew) animatedMsgIndices.current.add(idx);
+                      const metaTime = msg.ts ? new Date(msg.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+                      const metaLabel = msg.role === 'bot' ? (metaTime ? `Agent · ${metaTime}` : 'Agent') : metaTime;
                       return (
                         <motion.div key={`${clearCount}-${idx}`} layout={msg.isStreaming ? false : 'position'}
                           initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                          className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' || msg.role === 'lead_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-[95%]' : 'max-w-[85%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
+                          className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' || msg.role === 'lead_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-full' : 'max-w-[85%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
                           {msg.role === 'handoff_form' ? (
                             <HandoffContactForm themeColor={THEME_COLOR} onSubmit={submitHandoff}
                               onDismiss={() => setMessages(prev => prev.filter(m => m.id !== 'handoff-form'))} />
@@ -1254,7 +1302,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                               </p>
                               {msg.redirectUrl && (
                                 <a href={msg.redirectUrl} target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-sm font-google font-bold text-white transition-opacity hover:opacity-90"
+                                  className="flex items-center justify-center gap-2 w-full py-2 rounded-full text-sm font-google font-bold text-white transition-opacity hover:opacity-90"
                                   style={{ backgroundColor: THEME_COLOR }}>
                                   Connect instantly <span className="material-symbols-outlined text-[16px]">open_in_new</span>
                                 </a>
@@ -1271,7 +1319,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                               </p>
                               {msg.bookingUrl && (
                                 <a href={msg.bookingUrl} target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-sm font-google font-bold text-white transition-opacity hover:opacity-90"
+                                  className="flex items-center justify-center gap-2 w-full py-2 rounded-full text-sm font-google font-bold text-white transition-opacity hover:opacity-90"
                                   style={{ backgroundColor: THEME_COLOR }}>
                                   <span className="material-symbols-outlined text-[16px]">calendar_month</span> Book a call
                                 </a>
@@ -1286,22 +1334,22 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                 setMessages(prev => prev.map(m => m.id === 'lead-form'
                                   ? (bookingUrl
                                     ? { role: 'lead_confirmed', content: thanks, bookingUrl, id: 'lead-confirmed' }
-                                    : { role: 'bot', content: thanks })
+                                    : { role: 'bot', content: thanks, ts: Date.now() })
                                   : m));
                               }}
                               onDismiss={() => { leadCapturedRef.current = true; setMessages(prev => prev.filter(m => m.id !== 'lead-form')); }} />
                           ) : (
                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                              {msg.role === 'bot' ? <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 ml-1 leading-none">{BOT_NAME}</span> : <span className="text-sm uppercase tracking-widest font-bold text-slate-400 font-sans mb-1.5 mr-1 leading-none">YOU</span>}
-                              <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'user' ? 'w-fit max-w-[85%] self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'text-white rounded-2xl rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200/60 dark:border-slate-700/60 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`} style={msg.role === 'user' ? { backgroundColor: THEME_COLOR } : {}}>
+                              <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'bot' && msg.isStreaming && isLoading ? '!bg-transparent !p-1' : ''} ${msg.role === 'user' ? 'w-fit max-w-full self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'rounded-2xl rounded-tr-none bg-[var(--sapy-user-bg)] dark:bg-[var(--sapy-user-bg-dark)] text-[var(--sapy-user-fg)] dark:text-[var(--sapy-user-fg-dark)]' : 'bg-slate-100/50 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`}>
                                 {msg.role === 'user' ? (
-                                  <div className="min-w-0 max-w-full whitespace-pre-wrap wrap-break-word text-base font-normal font-google leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{msg.content}</div>
+                                  <div className="max-w-full whitespace-pre-wrap break-words text-base font-normal font-google leading-relaxed">{msg.content}</div>
                                 ) : (
                                   <div className="min-w-0 max-w-full text-base font-google leading-relaxed">
                                     <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} onStreamTick={() => scrollToBottom(false)} />
                                   </div>
                                 )}
                               </div>
+                              {metaLabel && !msg.isStreaming && <span className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-1 px-1 leading-none">{metaLabel}</span>}
                             </div>
                           )}
                         </motion.div>
@@ -1316,39 +1364,38 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       if (!label) return null;
                       return (
                         <button key={qidx} onClick={() => sendMessage(label)}
-                          className="px-4 py-2.5 min-h-[44px] border rounded-md text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500">
+                          className="px-4 py-2.5 min-h-[44px] rounded-full text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)]">
                           {label}
                         </button>
                       );
                     })}
                   </div>
                 )}
-                <div ref={messagesEndRef} className="h-2 shrink-0" aria-hidden="true" />
+                <div ref={messagesEndRef} className="h-5 shrink-0" aria-hidden="true" />
               </div>
             </div>
 
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-gray-200/50 dark:border-slate-800/50 shrink-0 z-10 flex flex-col">
-              {!configData.white_label_enabled && (
-                <div className="shrink-0 pt-2 flex justify-center items-center">
-                  <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[9px] font-sans font-normal tracking-wide text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
-                    <Image src={BrandLogo} alt="Vaayu" width={20} height={13} className="opacity-50 group-hover:opacity-100 transition-opacity" />
-                    Vaayu Intelligence
-                  </a>
-                </div>
-              )}
-              <div className="px-2 w-full shadow-xs" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
-                <form onSubmit={handleSend} className="relative flex items-center gap-2 pb-1">
+            <div className="bg-gray-50/50 dark:bg-slate-950/50 shrink-0 z-10 flex flex-col">
+              <div className="px-3 pt-2 w-full" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
+                <form onSubmit={handleSend} className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder="Ask anything..."
-                    className="flex-1 max-h-32 min-h-[40px] bg-transparent resize-none px-2.5 py-[9px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-base sm:text-sm font-google"
+                    placeholder="Ask anything"
+                    className="flex-1 max-h-32 min-h-[28px] bg-transparent resize-none py-[6px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-base sm:text-sm font-google [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     rows={1} disabled={isLoading} aria-label="Chat input" />
                   <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send message"
-                    className="p-2 shrink-0 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center translate-y-px"
-                    style={{ color: THEME_COLOR }}>
-                    <Send size={15} />
+                    className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 transition-colors disabled:cursor-not-allowed ${input.trim() && !isLoading ? 'text-blue-900 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <span className="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                   </button>
                 </form>
+                {!configData.white_label_enabled && (
+                  <div className="flex items-center justify-center gap-1.5 py-2.5">
+                    <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-[10px] font-sans font-normal tracking-wide text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
+                      <Image src={BrandLogo} alt="Vaayu" width={18} height={12} className="opacity-50 group-hover:opacity-100 transition-opacity" />
+                      Vaayu Intelligence
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
