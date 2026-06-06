@@ -607,7 +607,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
           <ThinkingLogo size={40} className="origin-left" themeColor={themeColor} />
         </div>
         {hasContent && (
-          <div className="leading-relaxed text-base font-normal tracking-wide font-google">
+          <div className="leading-relaxed text-[16px] font-normal tracking-wide font-google">
             <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
               {sanitizeStreamMarkdown(displayedText)}
             </ReactMarkdown>
@@ -619,7 +619,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
   }
 
   return (
-    <div className="relative leading-relaxed text-base font-normal font-google">
+    <div className="relative leading-relaxed text-[16px] font-normal font-google">
       <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
         {content}
       </ReactMarkdown>
@@ -1216,7 +1216,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <p className="text-[15px] font-google font-semibold leading-none text-slate-900 dark:text-slate-100">{BOT_NAME}</p>
+                      <p className="text-[15px] font-google font-medium leading-none text-slate-900 dark:text-slate-100">{BOT_NAME}</p>
                       <div className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                         <span className="text-xs font-google text-slate-500 dark:text-slate-400 leading-none">Active now</span>
@@ -1342,9 +1342,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                               <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'bot' && msg.isStreaming && isLoading ? '!bg-transparent !p-1' : ''} ${msg.role === 'user' ? 'w-fit max-w-full self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'rounded-2xl rounded-tr-none bg-[var(--sapy-user-bg)] dark:bg-[var(--sapy-user-bg-dark)] text-[var(--sapy-user-fg)] dark:text-[var(--sapy-user-fg-dark)]' : 'bg-slate-100/50 dark:bg-slate-900 text-gray-800 dark:text-slate-200 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`}>
                                 {msg.role === 'user' ? (
-                                  <div className="max-w-full whitespace-pre-wrap break-words text-base font-normal font-google leading-relaxed">{msg.content}</div>
+                                  <div className="max-w-full whitespace-pre-wrap break-words text-[16px] font-normal font-google leading-relaxed">{msg.content}</div>
                                 ) : (
-                                  <div className="min-w-0 max-w-full text-base font-google leading-relaxed">
+                                  <div className="min-w-0 max-w-full text-[16px] font-google leading-relaxed">
                                     <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} onStreamTick={() => scrollToBottom(false)} />
                                   </div>
                                 )}

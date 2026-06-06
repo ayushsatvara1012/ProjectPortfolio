@@ -11,7 +11,11 @@ import {
   Show,
 } from '@clerk/nextjs';
 import Logo from './Logo';
-import AntigravityBackground from '../../components/marketing/AntigravityBackground';
+import dynamic from 'next/dynamic';
+
+const AntigravityBackground = dynamic(() => import('../../components/marketing/AntigravityBackground'), {
+  ssr: false,
+});
 
 type ServiceItem = { title: string; desc: string; price: string; href?: string };
 type ServiceGroup = { label: string; items: ServiceItem[] };

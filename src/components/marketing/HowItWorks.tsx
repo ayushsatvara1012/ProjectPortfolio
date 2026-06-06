@@ -767,7 +767,14 @@ export default function HowItWorks() {
 
   const handleStepClick = (id: number) => {
     setActiveStep(id);
-    stepRefs.current[id - 1]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Desktop only: center the card so it lines up with the sticky visual panel.
+    // On mobile there is no sticky panel — centering a freshly-expanded (tall)
+    // card scrolls the heading off the top and leaves the preview centered.
+    // So we expand in place: the heading stays put and the SVG preview, which
+    // sits below the text in the DOM, simply opens on the lower side.
+    if (!isMobile) {
+      stepRefs.current[id - 1]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   // ── Per-step preview panels ────────────────────────────────────────────────
@@ -1016,10 +1023,17 @@ export default function HowItWorks() {
                     </p>
                   </div>
 
-                  {/* Expandable: bullets + mobile preview */}
+                  {/* Expandable: bullets + mobile preview.
+                      Mobile (base): always open, so the preview opens on the
+                      lower side beneath the heading and nothing changes height
+                      on scroll/tap — the heading can never be pushed off-screen.
+                      Desktop (lg+): accordion driven by isActive, paired with
+                      the sticky visual panel on the left. */}
                   <div
-                    className={`grid transition-all duration-500 ease-in-out ${
-                      isActive ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
+                    className={`grid transition-all duration-500 ease-in-out grid-rows-[1fr] opacity-100 mt-2 ${
+                      isActive
+                        ? "lg:grid-rows-[1fr] lg:opacity-100 lg:mt-2"
+                        : "lg:grid-rows-[0fr] lg:opacity-0 lg:mt-0"
                     }`}
                   >
                     <div className="overflow-hidden flex flex-col gap-6">

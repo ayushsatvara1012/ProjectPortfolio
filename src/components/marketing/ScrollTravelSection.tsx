@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import AntigravityBackground from './AntigravityBackground';
+import dynamic from 'next/dynamic';
+
+const AntigravityBackground = dynamic(() => import('./AntigravityBackground'), {
+  ssr: false,
+});
 import FeatureIllustration from './FeatureIllustration';
 import NewSection from './NewSection';
 
@@ -138,17 +142,20 @@ export default function ScrollTravelSection() {
               display: 'none',
             }}
           >
-            <AntigravityBackground
-              particleCount={100}
-              particleType="dot"
-              effectStyle="ripples"
-              colorPalette={['#0303FF']}
-              particleSeparation={0.5}
-              speed={0.4}
-              fog={{ color: '#0f172a', near: 15, far: 50 }}
-              morphProgressRef={morphProgressRef}
-              containerClassName="absolute inset-0 pointer-events-none"
-            />
+            {isVisible && (
+              <AntigravityBackground
+                particleCount={100}
+                particleType="dot"
+                effectStyle="ripples"
+                colorPalette={['#0303FF']}
+                particleSeparation={0.5}
+                speed={0.4}
+                fog={{ color: '#0f172a', near: 15, far: 50 }}
+                morphProgressRef={morphProgressRef}
+                containerClassName="absolute inset-0 pointer-events-none"
+                interactive={false}
+              />
+            )}
           </div>
         </div>
       </div>

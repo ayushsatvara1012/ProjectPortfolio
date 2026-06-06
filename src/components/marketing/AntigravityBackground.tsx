@@ -12,7 +12,7 @@ class WebGLErrorBoundary extends Component<{ children: ReactNode; fallback?: Rea
   }
 }
 
-export type WaveStyle = 'classic' | 'ripples' | 'vortex' | 'matrix' | 'dome' | 'flat' | 'globe' | 'water_drop';
+export type WaveStyle = 'classic' | 'ripples' | 'vortex' | 'matrix' | 'dome' | 'flat' | 'globe' | 'water_drop' | 'drifting_dust' | 'standing_ripple';
 export type ParticleType = 'capsule' | 'box' | 'dot';
 
 export interface AntigravityBackgroundProps {
@@ -32,6 +32,7 @@ export interface AntigravityBackgroundProps {
   className?: string; // For CSS overlays
   containerClassName?: string;
   morphProgressRef?: { current: number };
+  interactive?: boolean;
 }
 
 const defaultColors = ['#FF0000', '#0035FF', '#F7FF00', '#FF6A00'];
@@ -50,6 +51,7 @@ const WaveParticles = ({
   speed,
   morphProgressRef,
   isInViewportRef,
+  interactive = true,
 }: {
   effectStyle: WaveStyle;
   colorPalette: string[];
@@ -64,6 +66,7 @@ const WaveParticles = ({
   speed: number;
   morphProgressRef?: { current: number };
   isInViewportRef: { current: boolean };
+  interactive?: boolean;
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
@@ -102,7 +105,7 @@ const WaveParticles = ({
           for (let i = 0; i < mask.length; i++) {
             // Earth specular map is bright on water, dark on land. 
             // We want land to be bright for visibility.
-            mask[i] = pixels[i * 4] < 100 ? 255 : 0; 
+            mask[i] = pixels[i * 4] < 100 ? 255 : 0;
           }
           setLandMask(mask);
         }
@@ -136,6 +139,7 @@ const WaveParticles = ({
     let i = 0;
     for (let ix = 0; ix < particleCount; ix++) {
       for (let iy = 0; iy < particleCount; iy++) {
+        dummy.quaternion.set(0, 0, 0, 1);
         const randX = ((Math.sin(ix * 12.9898 + iy * 78.233) * 43758.5453) % 1) * 2 - 1;
         const randZ = ((Math.sin(ix * 39.346 + iy * 11.135) * 43758.5453) % 1) * 2 - 1;
 
@@ -169,31 +173,82 @@ const WaveParticles = ({
           y = dome + breathe + surfaceRipple - 8;
         } else if (effectStyle === 'flat') {
           y = -2;
+        } else if (effectStyle === 'drifting_dust') {
+          const seed = Math.sin(ix * 45.32 + iy * 89.21);
+          const speedFactor = 0.3 + Math.abs(seed) * 0.4;
+          const heightRange = 36;
+          const startY = -18;
+          y = startY + ((time * speedFactor + Math.abs(seed) * heightRange) % heightRange);
+          const randShiftX = Math.sin(ix * 12.9898 + iy * 78.233 + seed * 100);
+          const randShiftZ = Math.cos(ix * 39.346 + iy * 11.135 + seed * 100);
+          x = (ix - particleCount / 2) * (particleSeparation * 1.5) + randShiftX * 3;
+          z = (iy - particleCount / 2) * (particleSeparation * 1.5) + randShiftZ * 3;
+          x += Math.sin(time * 0.5 + seed * 10) * 2.0;
+          z += Math.cos(time * 0.4 + seed * 10) * 2.0;
+        } else if (effectStyle === 'standing_ripple') {
+          x = ix * particleSeparation - (particleCount * particleSeparation) / 2;
+          z = iy * particleSeparation - (particleCount * particleSeparation) / 2;
+
+          const d = Math.sqrt(x * x + z * z);
+          const waveFreq = 0.25;
+          const waveSpeed = 1.2;
+          const waveVal = Math.cos(d * waveFreq - time * waveSpeed);
+
+          y = waveVal * 1.5;
+
+          if (d > 0.05) {
+            const dir = new THREE.Vector3(x, y, z).normalize();
+            const up = new THREE.Vector3(0, 1, 0);
+            dummy.quaternion.setFromUnitVectors(up, dir);
+          } else {
+            dummy.quaternion.set(0, 0, 0, 1);
+          }
         }
 
-        let scale = Math.max(0.2, 1 + y * (effectStyle === 'matrix' ? 0.2 : 0.15));
+        let scale = Math.max(0.2, 1 + y * (effectStyle === 'matrix' ? 0.2 : ((effectStyle === 'drifting_dust' || effectStyle === 'standing_ripple') ? 0 : 0.15)));
+        if (effectStyle === 'drifting_dust') {
+          const seed = Math.sin(ix * 45.32 + iy * 89.21);
+          const startY = -18;
+          const heightRange = 36;
+          const distanceToEdge = Math.min(y - startY, (startY + heightRange) - y);
+          const fadeZone = 5;
+          scale = Math.max(0.0, Math.min(1.0, distanceToEdge / fadeZone)) * (0.8 + Math.abs(seed) * 0.6);
+        } else if (effectStyle === 'standing_ripple') {
+          const d = Math.sqrt(x * x + z * z);
+          const baseScale = particleCount < 35 ? 2.5 : 1.2;
+
+          const maxRadius = (particleCount * particleSeparation) * 0.5;
+          const centerRadius = 2.0;
+          const centerFadeZone = 3.5;
+          const edgeFadeZone = 6.0;
+
+          const centerFade = Math.max(0.0, Math.min(1.0, (d - centerRadius) / centerFadeZone));
+          const edgeFade = Math.max(0.0, Math.min(1.0, (maxRadius - d) / edgeFadeZone));
+
+          scale = baseScale * centerFade * edgeFade;
+        }
 
         if (effectStyle === 'globe') {
           const R = 15;
           const u = ix / (particleCount - 1);
           const v = iy / (particleCount - 1);
-          
+
           // Asymmetric distribution noise
           const noise = ((Math.sin(ix * 12.9898 + iy * 78.233) * 43758.5453) % 1);
           const rotationSpeed = time * 0.15;
           const theta = u * Math.PI * 2 + rotationSpeed + noise * 0.02;
           const phi = v * Math.PI;
-          
+
           x = R * Math.sin(phi) * Math.cos(theta);
           y = R * Math.cos(phi);
           z = R * Math.sin(phi) * Math.sin(theta);
-          
+
           // Sampling the land mask
           if (landMask) {
             const mx = Math.floor(u * (maskRes.w - 1));
             const my = Math.floor(v * (maskRes.h - 1));
             const isLand = landMask[my * maskRes.w + mx] > 0;
-            
+
             if (!isLand) {
               scale = 0; // Hide sea particles for country detail
             } else {
@@ -206,7 +261,7 @@ const WaveParticles = ({
           const idx = i;
           const n = numParticles;
 
-          const phi   = Math.acos(1 - 2 * (idx + 0.5) / n);
+          const phi = Math.acos(1 - 2 * (idx + 0.5) / n);
           const theta = Math.PI * (1 + Math.sqrt(5)) * idx + time * 0.12;
 
           const rx = Math.sin(phi) * Math.cos(theta);
@@ -217,8 +272,8 @@ const WaveParticles = ({
           const breath = 1 + Math.sin(time * 0.55) * 0.032;
 
           // Layer 2 — directional slosh: Y squashes while XZ expands (incompressible).
-          const slosh   = Math.sin(time * 0.82 + 0.4) * 0.042;
-          const scaleY  = breath * (1 + slosh);
+          const slosh = Math.sin(time * 0.82 + 0.4) * 0.042;
+          const scaleY = breath * (1 + slosh);
           const scaleXZ = breath * (1 - slosh * 0.5);
 
           // Layer 3 — travelling surface ripples (smooth on Fibonacci lattice).
@@ -232,6 +287,10 @@ const WaveParticles = ({
           x = rx * rSurf * scaleXZ;
           y = ry * rSurf * scaleY + Math.sin(time * 0.38) * 0.9;
           z = rz * rSurf * scaleXZ;
+
+          const normal = new THREE.Vector3(rx, ry, rz);
+          const up = new THREE.Vector3(0, 1, 0);
+          dummy.quaternion.setFromUnitVectors(up, normal);
 
           // Smoothstep pole-cap at 0.4 rad ≈ 23°: gentler than linear fade.
           const poleCapAngle = 0.4;
@@ -249,7 +308,8 @@ const WaveParticles = ({
           // Rim: silhouette-edge particles appear fractionally larger.
           const rim = 1 + Math.max(0, 0.3 - Math.abs(dotZ)) * 0.5;
 
-          scale = (0.30 + Math.abs(ripple) * 4.5) * poleFade * layerFade * rim;
+          const baseScale = particleCount < 35 ? 2.5 : 1.0;
+          scale = baseScale * (0.30 + Math.abs(ripple) * 4.5) * poleFade * layerFade * rim;
         }
 
         // Ripple → water_drop morph — driven by morphProgressRef (zero React re-renders).
@@ -260,9 +320,9 @@ const WaveParticles = ({
               ? 4 * mp * mp * mp
               : 1 - Math.pow(-2 * mp + 2, 3) / 2;
 
-            const R  = 9;
-            const n  = numParticles;
-            const gPhi   = Math.acos(1 - 2 * (i + 0.5) / n);
+            const R = 9;
+            const n = numParticles;
+            const gPhi = Math.acos(1 - 2 * (i + 0.5) / n);
             const gTheta = Math.PI * (1 + Math.sqrt(5)) * i + time * 0.12;
 
             const wRx = Math.sin(gPhi) * Math.cos(gTheta);
@@ -270,11 +330,11 @@ const WaveParticles = ({
             const wRz = Math.sin(gPhi) * Math.sin(gTheta);
 
             // Mirror the water_drop physics exactly.
-            const breath  = 1 + Math.sin(time * 0.55) * 0.032;
-            const slosh   = Math.sin(time * 0.82 + 0.4) * 0.042;
-            const scaleY  = breath * (1 + slosh);
+            const breath = 1 + Math.sin(time * 0.55) * 0.032;
+            const slosh = Math.sin(time * 0.82 + 0.4) * 0.042;
+            const scaleY = breath * (1 + slosh);
             const scaleXZ = breath * (1 - slosh * 0.5);
-            const ripple  =
+            const ripple =
               Math.sin(gPhi * 4.0 - time * 1.6) * 0.020 +
               Math.sin(gPhi * 7.5 + time * 1.0) * 0.009 +
               Math.cos(gTheta * 3.0 - time * 0.65) * 0.013;
@@ -313,7 +373,7 @@ const WaveParticles = ({
         // pushes north-pole particles (x≈0, z≈0) upward and creates the bump.
         const isDropStyle = effectStyle === 'water_drop' ||
           (effectStyle === 'ripples' && (morphProgressRef?.current ?? 0) > 0);
-        if (!isDropStyle) {
+        if (!isDropStyle && interactive && effectStyle !== 'drifting_dust' && effectStyle !== 'standing_ripple') {
           const dist = Math.sqrt(Math.pow(x - pointerX, 2) + Math.pow(z - pointerY, 2));
           y += Math.max(0, 4 - dist) * 0.8;
         }
@@ -325,6 +385,14 @@ const WaveParticles = ({
           normalizedY = (y + 15) / 30;
         } else if (effectStyle === 'water_drop') {
           normalizedY = (y + 12) / 24; // Blue-ish gradients for water
+        } else if (effectStyle === 'drifting_dust') {
+          normalizedY = (y + 18) / 36;
+        } else if (effectStyle === 'standing_ripple') {
+          const d = Math.sqrt(x * x + z * z);
+          const waveFreq = 0.25;
+          const waveSpeed = 1.2;
+          const waveVal = Math.cos(d * waveFreq - time * waveSpeed);
+          normalizedY = waveVal * 0.5 + 0.5;
         }
         normalizedY = Math.max(0, Math.min(1, normalizedY));
 
@@ -356,9 +424,17 @@ const WaveParticles = ({
       meshRef.current.instanceColor.needsUpdate = true;
     }
 
-    state.camera.position.x += (state.pointer.x * parallaxX - state.camera.position.x) * 0.05;
-    state.camera.position.y += (parallaxBaseY + state.pointer.y * parallaxY - state.camera.position.y) * 0.05;
-    state.camera.lookAt(0, 0, 0);
+    if (effectStyle === 'standing_ripple') {
+      state.camera.position.set(0, 20, 6);
+      state.camera.lookAt(0, 0, 0);
+    } else if (effectStyle === 'water_drop' && particleCount < 35) {
+      state.camera.position.set(0, 0, 22);
+      state.camera.lookAt(0, 0, 0);
+    } else {
+      state.camera.position.x += (state.pointer.x * parallaxX - state.camera.position.x) * 0.05;
+      state.camera.position.y += (parallaxBaseY + state.pointer.y * parallaxY - state.camera.position.y) * 0.05;
+      state.camera.lookAt(0, 0, 0);
+    }
   });
 
   return (
@@ -397,6 +473,7 @@ const AntigravityBackground: React.FC<AntigravityBackgroundProps> = ({
   className = "",
   containerClassName = "absolute inset-0 w-full h-full z-0 bg-transparent overflow-hidden pointer-events-auto",
   morphProgressRef,
+  interactive = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInViewportRef = useRef(true);
@@ -437,6 +514,7 @@ const AntigravityBackground: React.FC<AntigravityBackgroundProps> = ({
             speed={speed}
             morphProgressRef={morphProgressRef}
             isInViewportRef={isInViewportRef}
+            interactive={interactive}
           />
         </Canvas>
       </WebGLErrorBoundary>
