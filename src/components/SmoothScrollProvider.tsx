@@ -24,6 +24,18 @@ export default function SmoothScrollProvider({
   children: React.ReactNode;
 }) {
   useEffect(() => {
+    // Lenis only smooths WHEEL events here (smoothTouch is off), but its rAF
+    // loop runs every frame on every device. On touch devices that's pure
+    // overhead with no behavioural benefit — mobile already scrolls natively —
+    // so skip Lenis there to cut continuous main-thread work and improve mobile
+    // performance. Route-change scroll reset (ScrollResetter) is unaffected.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(pointer: coarse)').matches
+    ) {
+      return;
+    }
+
     const lenis = new Lenis({
       lerp: 0.1,
       duration: 1.5,

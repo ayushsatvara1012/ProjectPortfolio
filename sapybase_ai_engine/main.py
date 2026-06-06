@@ -594,6 +594,13 @@ app.state.limiter = limiter
 # Loaded from env at startup so a misconfiguration fails loudly here, not
 # silently mid-webhook. ENTERPRISE is intentionally absent — the product
 # doesn't exist yet in Polar; when it does, add POLAR_PRODUCT_ID_ENTERPRISE.
+#
+# NAMING: the dict KEYS below are INTERNAL TIER CODES, not customer-facing
+# names. They never change. The commercial labels (UI only) differ:
+#   PRO → "Growth"   ·   BUSINESS → "Scale"   ·   STARTER → "Starter"
+# We resolve subscriptions by the immutable product-id UUID (the VALUES),
+# never by Polar's product NAME — so renaming products in Polar's dashboard
+# (e.g. Pro→Growth) can never silently mis-map or downgrade a customer.
 POLAR_PRODUCT_TIER_MAP = {
     pid: tier
     for tier, pid in {

@@ -380,10 +380,10 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
+          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-[16px] font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
         <div className="flex flex-col gap-1">
           <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-[16px] font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
           {localError && <span className="text-[11px] text-red-500 font-bold px-1">{localError}</span>}
         </div>
         <button type="submit" disabled={isSubmitting}
@@ -433,10 +433,10 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
+          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-[16px] font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
         <div className="flex flex-col gap-1">
           <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-base sm:text-sm font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-[16px] font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
           {error && <span className="text-[11px] text-red-500 font-bold px-1">{error}</span>}
         </div>
         <button type="submit" disabled={isSubmitting}
@@ -1380,7 +1380,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <form onSubmit={handleSend} className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Ask anything"
-                    className="flex-1 max-h-32 min-h-[28px] bg-transparent resize-none py-[6px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-base sm:text-sm font-google [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex-1 max-h-32 min-h-[28px] bg-transparent resize-none py-[6px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-[16px] font-google [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     rows={1} disabled={isLoading} aria-label="Chat input" />
                   <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send message"
                     className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 transition-colors disabled:cursor-not-allowed ${input.trim() && !isLoading ? 'text-blue-900 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
