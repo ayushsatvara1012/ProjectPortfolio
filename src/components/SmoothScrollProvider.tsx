@@ -40,6 +40,21 @@ export default function SmoothScrollProvider({
       lerp: 0.1,
       duration: 1.5,
       smoothWheel: true,
+      // Exclude nested scroll containers (e.g. chat widget message list) from
+      // smooth scrolling. Lenis only handles document scroll; nested elements
+      // with overflow-y: auto should scroll natively without Lenis interference.
+      prevent: (node: HTMLElement) => {
+        // Check if the element or any parent up to <html> has overflow-y: auto/scroll
+        let el: HTMLElement | null = node;
+        while (el && el !== document.documentElement) {
+          const overflow = window.getComputedStyle(el).overflowY;
+          if (overflow === 'auto' || overflow === 'scroll') {
+            return true; // Prevent Lenis from handling this scroll
+          }
+          el = el.parentElement;
+        }
+        return false;
+      },
     });
 
     let rafId: number;
