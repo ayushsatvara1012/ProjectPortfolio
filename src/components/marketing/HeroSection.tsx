@@ -4,7 +4,13 @@ import React, { useState, useEffect } from 'react';
 import Button from './Button';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import AntigravityBackground from './AntigravityBackground';
+import dynamic from 'next/dynamic';
+
+import type { AntigravityBackgroundProps } from './AntigravityBackground';
+
+const AntigravityBackground = dynamic<AntigravityBackgroundProps>(() => import('./AntigravityBackground'), {
+  ssr: false,
+});
 import { PRODUCT } from '@/src/lib/brand';
 
 const HeroSection = () => {
@@ -28,9 +34,13 @@ const HeroSection = () => {
 
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
       <AntigravityBackground
-        particleCount={isMobile ? 100 : 50}
+        particleCount={isMobile ? 30 : 50}
         particleType={isMobile ? 'dot' : 'capsule'}
-        particleSeparation={isMobile ? 2 : 4}
+        particleSeparation={isMobile ? 0.8 : 4}
+        effectStyle={isMobile ? 'water_drop' : 'classic'}
+        colorPalette={isMobile ? ['#020617', '#0b1d3a', '#0044cc', '#0088ff', '#55bbff'] : undefined}
+        interactive={!isMobile}
+        isMobile={isMobile}
       />
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
 
