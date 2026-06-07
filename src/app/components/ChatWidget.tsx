@@ -1191,7 +1191,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const fabGradient = AVATAR_BG_STYLE !== 'none' ? AVATAR_GRADIENTS[AVATAR_BG_STYLE] : null;
 
   return (
-    <div className={`${isEmbed ? 'relative w-full h-full' : 'fixed bottom-0 right-0 sm:bottom-6 sm:right-6'} z-2147483647 font-sans pointer-events-none`} style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
+    <div className={`${isEmbed ? 'relative w-full h-full' : 'sapy-chat-root fixed bottom-0 right-0 sm:bottom-6 sm:right-6'} z-2147483647 font-sans pointer-events-none`} style={{ isolation: 'isolate', width: isOpen ? '100%' : 'auto', height: isOpen ? '100%' : 'auto' }}>
       <AnimatePresence>
         {isOpen && (
           <motion.div

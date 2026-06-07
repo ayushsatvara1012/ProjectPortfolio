@@ -225,7 +225,7 @@ describe('401 invalidation', () => {
 
   it('does NOT clear the token on a 402 (message-limit) response', () => {
     const ref: TokenRef = { current: { token: 'keep', exp: Date.now() + 10_000_000 } };
-    const status = 402;
+    const status: number = 402;
     if (status === 401) ref.current = null; // 402 must not match
     expect(ref.current?.token).toBe('keep');
   });

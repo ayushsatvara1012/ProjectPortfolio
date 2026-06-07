@@ -117,7 +117,7 @@ describe('useAuthenticatedFetch', () => {
     }));
 
     const { result } = renderHook(() => useAuthenticatedFetch());
-    const err = await result.current('/api/test').catch(e => e);
+    const err: any = await result.current('/api/test').catch(e => e);
     expect(err).toBeInstanceOf(UpgradeError);
     expect(err.code).toBe('MSG_LIMIT');
     expect(err.tier).toBe('STARTER');
