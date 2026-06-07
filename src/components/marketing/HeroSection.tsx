@@ -40,7 +40,6 @@ const HeroSection = () => {
         effectStyle={isMobile ? 'water_drop' : 'classic'}
         colorPalette={isMobile ? ['#020617', '#0b1d3a', '#0044cc', '#0088ff', '#55bbff'] : undefined}
         interactive={!isMobile}
-        isMobile={isMobile}
       />
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
 

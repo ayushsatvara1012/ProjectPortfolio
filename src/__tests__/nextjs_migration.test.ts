@@ -115,7 +115,7 @@ describe('useAuthenticatedFetch', () => {
 
     const { useAuthenticatedFetch, UpgradeError } = await import('@/src/lib/hooks/useAuthenticatedFetch');
     const { result } = renderHook(() => useAuthenticatedFetch());
-    const error = await result.current('/api/chat').catch((e) => e);
+    const error: any = await result.current('/api/chat').catch((e) => e);
 
     expect(error).toBeInstanceOf(UpgradeError);
     expect(error.code).toBe('MESSAGE_LIMIT_EXCEEDED');
@@ -135,7 +135,7 @@ describe('useAuthenticatedFetch', () => {
 
     const { useAuthenticatedFetch, UpgradeError } = await import('@/src/lib/hooks/useAuthenticatedFetch');
     const { result } = renderHook(() => useAuthenticatedFetch());
-    const error = await result.current('/api/chat').catch((e) => e);
+    const error: any = await result.current('/api/chat').catch((e) => e);
 
     expect(error).toBeInstanceOf(UpgradeError);
     expect(error.code).toBe('DEFAULT');

@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// useLayoutEffect warns during SSR; fall back to useEffect on the server.
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const PIPELINE_STEPS = [
   {
@@ -90,13 +93,12 @@ function EngineLogoNode({
 
       {/* Inner disc */}
       <div
-        className={`absolute inset-[10%] rounded-full border bg-white dark:bg-slate-900 flex items-center justify-center shadow-md transition-all duration-300 ${
-          isThinking
+        className={`absolute inset-[10%] rounded-full border bg-white dark:bg-slate-900 flex items-center justify-center shadow-md transition-all duration-300 ${isThinking
             ? "border-blue-500/40 dark:border-blue-400/40 shadow-blue-500/10"
             : isResolved
-            ? "border-emerald-500/40 dark:border-emerald-400/40 shadow-emerald-500/10"
-            : "border-slate-200 dark:border-slate-800"
-        }`}
+              ? "border-emerald-500/40 dark:border-emerald-400/40 shadow-emerald-500/10"
+              : "border-slate-200 dark:border-slate-800"
+          }`}
       >
         {/* Logo breathing animation — skipped on mobile */}
         {reducedMotion ? (
@@ -127,13 +129,13 @@ function Step1SVGDefs() {
     <defs>
       {/* userSpaceOnUse avoids degenerate-bbox failures on zero-height/zero-width paths */}
       <linearGradient id="s1-glow-a" gradientUnits="userSpaceOnUse" x1="100" y1="250" x2="400" y2="250">
-        <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0" />
-        <stop offset="50%"  stopColor="#3B82F6" stopOpacity="1" />
+        <stop offset="0%" stopColor="#3B82F6" stopOpacity="0" />
+        <stop offset="50%" stopColor="#3B82F6" stopOpacity="1" />
         <stop offset="100%" stopColor="#6366F1" stopOpacity="0" />
       </linearGradient>
       <linearGradient id="s1-glow-b" gradientUnits="userSpaceOnUse" x1="100" y1="250" x2="400" y2="250">
-        <stop offset="0%"   stopColor="#6366F1" stopOpacity="0" />
-        <stop offset="50%"  stopColor="#4F46E5" stopOpacity="1" />
+        <stop offset="0%" stopColor="#6366F1" stopOpacity="0" />
+        <stop offset="50%" stopColor="#4F46E5" stopOpacity="1" />
         <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
       </linearGradient>
     </defs>
@@ -167,12 +169,12 @@ function StepTwoVisual({
         <defs>
           {/* Horizontal: search bar (400) → engine (100) — right-to-left gradient */}
           <linearGradient id="s2-horiz" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#6366F1" stopOpacity="1"   />
+            <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#6366F1" stopOpacity="1" />
           </linearGradient>
           {/* Vertical: engine (250) → intent card (410) */}
           <linearGradient id="s2-vert" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="#6366F1" stopOpacity="1" />
+            <stop offset="0%" stopColor="#6366F1" stopOpacity="1" />
             <stop offset="100%" stopColor="#10B981" stopOpacity="1" />
           </linearGradient>
         </defs>
@@ -426,8 +428,8 @@ function StepThreeVisual({ isMobile = false, isActive = true }: { isMobile?: boo
       >
         <defs>
           <linearGradient id="s3-vert" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="#3B82F6" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#10B981" stopOpacity="1"   />
+            <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#10B981" stopOpacity="1" />
           </linearGradient>
         </defs>
 
@@ -459,7 +461,7 @@ function StepThreeVisual({ isMobile = false, isActive = true }: { isMobile?: boo
         {/* Data packet travelling snippet → browser */}
         {phase === "transferring" && (
           <>
-            <motion.circle cx={250} cy={142} r={5}  fill="#10B981"             animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
+            <motion.circle cx={250} cy={142} r={5} fill="#10B981" animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
             <motion.circle cx={250} cy={142} r={10} fill="#10B981" fillOpacity={0.3} animate={{ cy: 200 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
           </>
         )}
@@ -489,11 +491,10 @@ function StepThreeVisual({ isMobile = false, isActive = true }: { isMobile?: boo
           <motion.button
             animate={copied ? { scale: [1, 0.92, 1] } : {}}
             transition={{ duration: 0.15 }}
-            className={`shrink-0 flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[8px] font-mono font-medium transition-colors ${
-              copied
+            className={`shrink-0 flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[8px] font-mono font-medium transition-colors ${copied
                 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                 : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
-            }`}
+              }`}
           >
             <span className="material-symbols-outlined text-[10px]">
               {copied ? "check" : "content_copy"}
@@ -508,9 +509,9 @@ function StepThreeVisual({ isMobile = false, isActive = true }: { isMobile?: boo
               initial={{ x: 80, y: 40, opacity: 0 }}
               animate={{
                 x: [80, 76, 76, 80],
-                y: [40, 8,  8,  40],
-                scale:   [1,  1,  0.85, 1],
-                opacity: [0,  1,  1,    0],
+                y: [40, 8, 8, 40],
+                scale: [1, 1, 0.85, 1],
+                opacity: [0, 1, 1, 0],
               }}
               transition={{ duration: 1.4, times: [0, 0.5, 0.65, 1], ease: "easeInOut" }}
             >
@@ -529,13 +530,12 @@ function StepThreeVisual({ isMobile = false, isActive = true }: { isMobile?: boo
       ────────────────────────────────────────────────────────────────────── */}
       <div className="absolute left-[50%] top-[64%] -translate-x-1/2 -translate-y-1/2 w-[84%] z-10">
         <div
-          className={`relative border bg-white dark:bg-slate-900 rounded-xl overflow-hidden flex flex-col aspect-[16/9] shadow-lg transition-all duration-500 ${
-            phase === "installing"
+          className={`relative border bg-white dark:bg-slate-900 rounded-xl overflow-hidden flex flex-col aspect-[16/9] shadow-lg transition-all duration-500 ${phase === "installing"
               ? "border-emerald-500/60 shadow-emerald-500/10 scale-[1.01]"
               : phase === "active"
-              ? "border-slate-200 dark:border-slate-800/80"
-              : "border-slate-200 dark:border-slate-800/80 opacity-60"
-          }`}
+                ? "border-slate-200 dark:border-slate-800/80"
+                : "border-slate-200 dark:border-slate-800/80 opacity-60"
+            }`}
         >
           {/* Browser chrome bar */}
           <div className="bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/60 shrink-0">
@@ -683,8 +683,8 @@ function TypewriterLabel({
   isMobile: boolean;
   onPhaseChange?: (phase: TypewriterPhase) => void;
 }) {
-  const [phase, setPhase]           = useState<TypewriterPhase>("typing");
-  const [typedText, setTypedText]   = useState("");
+  const [phase, setPhase] = useState<TypewriterPhase>("typing");
+  const [typedText, setTypedText] = useState("");
   const [currentIdx, setCurrentIdx] = useState(0);
   const currentData = QUESTIONS_DATA[currentIdx];
 
@@ -740,6 +740,38 @@ export default function HowItWorks() {
   const [isMobile, setIsMobile] = useState(false);
   const handleStep2Phase = useCallback((p: TypewriterPhase) => setStep2Phase(p), []);
 
+  // Sync mirror of activeStep + a pending "anchor" for pinning a card's
+  // on-screen position across an accordion open/close on mobile.
+  const activeStepRef = useRef(1);
+  const pendingAnchorRef = useRef<{ id: number; top: number } | null>(null);
+
+  // Single entry point for changing the active step. On mobile it records the
+  // target card's current viewport top BEFORE the state change, so the layout
+  // effect below can scroll-compensate the instant height change — keeping the
+  // header/text fixed instead of being shoved up when the card above collapses.
+  const activateStep = useCallback((id: number) => {
+    if (activeStepRef.current === id) return;
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      const el = stepRefs.current[id - 1];
+      if (el) pendingAnchorRef.current = { id, top: el.getBoundingClientRect().top };
+    }
+    activeStepRef.current = id;
+    setActiveStep(id);
+  }, []);
+
+  // Pin the newly-active card: cancel any vertical shift the accordion
+  // collapse/expand introduced, so the header stays exactly where it was.
+  // Runs before paint, so the shift + correction are atomic (no visible jump).
+  useIsomorphicLayoutEffect(() => {
+    const anchor = pendingAnchorRef.current;
+    pendingAnchorRef.current = null;
+    if (!anchor || anchor.id !== activeStep) return;
+    const el = stepRefs.current[activeStep - 1];
+    if (!el) return;
+    const delta = el.getBoundingClientRect().top - anchor.top;
+    if (delta) window.scrollBy(0, delta);
+  }, [activeStep]);
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -754,7 +786,7 @@ export default function HowItWorks() {
         entries.forEach((e) => {
           if (e.isIntersecting) {
             const idx = stepRefs.current.findIndex((el) => el === e.target);
-            if (idx !== -1) setActiveStep(idx + 1);
+            if (idx !== -1) activateStep(idx + 1);
           }
         });
       },
@@ -763,15 +795,13 @@ export default function HowItWorks() {
 
     stepRefs.current.forEach((r) => r && observer.observe(r));
     return () => observer.disconnect();
-  }, []);
+  }, [activateStep]);
 
   const handleStepClick = (id: number) => {
-    setActiveStep(id);
+    activateStep(id);
     // Desktop only: center the card so it lines up with the sticky visual panel.
-    // On mobile there is no sticky panel — centering a freshly-expanded (tall)
-    // card scrolls the heading off the top and leaves the preview centered.
-    // So we expand in place: the heading stays put and the SVG preview, which
-    // sits below the text in the DOM, simply opens on the lower side.
+    // On mobile, activateStep already pins the card's position (see the layout
+    // effect), so the header stays put and the preview opens on the lower side.
     if (!isMobile) {
       stepRefs.current[id - 1]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -801,7 +831,7 @@ export default function HowItWorks() {
 
               {/* Base dashed paths: source nodes (100,y) → engine (400,250) */}
               <path d="M 100 100 C 240 100, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
-              <path d="M 100 250 L 400 250"                   stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
+              <path d="M 100 250 L 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
               <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
 
               {/* Animated glow pulses — native SVG <animate> uses user-unit coords directly,
@@ -824,7 +854,7 @@ export default function HowItWorks() {
             {/* Source nodes — LEFT column at 20%, tops 20% / 50% / 80% */}
             {(
               [
-                { icon: "language",    top: "20%" },
+                { icon: "language", top: "20%" },
                 { icon: "description", top: "50%" },
                 { icon: "table_chart", top: "80%" },
               ] as const
@@ -972,30 +1002,27 @@ export default function HowItWorks() {
                   key={s.id}
                   ref={(el) => { stepRefs.current[s.id - 1] = el; }}
                   onClick={() => handleStepClick(s.id)}
-                  className={`group relative p-5 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-500 cursor-pointer flex flex-col gap-4 ${
-                    isActive
+                  className={`group relative p-5 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-500 cursor-pointer flex flex-col gap-4 ${isActive
                       ? "bg-white dark:bg-slate-950"
                       : "bg-slate-50/40 dark:bg-slate-900/10"
-                  }`}
+                    }`}
                 >
 
                   {/* Header row */}
                   <div className="flex items-center justify-between">
                     <span
-                      className={`font-mono text-sm font-bold uppercase tracking-widest transition-colors duration-300 ${
-                        isActive
+                      className={`font-mono text-sm font-bold uppercase tracking-widest transition-colors duration-300 ${isActive
                           ? "text-blue-600 dark:text-blue-400"
                           : "text-slate-400 dark:text-slate-600"
-                      }`}
+                        }`}
                     >
                       Step {s.step} · {s.label}
                     </span>
                     <span
-                      className={`material-symbols-outlined text-[20px] transition-all duration-300 ${
-                        isActive
+                      className={`material-symbols-outlined text-[20px] transition-all duration-300 ${isActive
                           ? "text-blue-500 translate-x-0"
                           : "text-slate-300 dark:text-slate-700 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
-                      }`}
+                        }`}
                     >
                       chevron_right
                     </span>
@@ -1004,36 +1031,35 @@ export default function HowItWorks() {
                   {/* Title & description */}
                   <div className="space-y-2">
                     <h3
-                      className={`text-2xl font-google font-bold leading-tight transition-colors duration-300 ${
-                        isActive
+                      className={`text-2xl font-google font-bold leading-tight transition-colors duration-300 ${isActive
                           ? "text-slate-900 dark:text-white"
                           : "text-slate-500 dark:text-slate-500"
-                      }`}
+                        }`}
                     >
                       {s.title}
                     </h3>
                     <p
-                      className={`text-base font-google leading-relaxed transition-colors duration-300 ${
-                        isActive
+                      className={`text-base font-google leading-relaxed transition-colors duration-300 ${isActive
                           ? "text-slate-600 dark:text-slate-400"
                           : "text-slate-400 dark:text-slate-600"
-                      }`}
+                        }`}
                     >
                       {s.description}
                     </p>
                   </div>
 
-                  {/* Expandable: bullets + mobile preview.
-                      Mobile (base): always open, so the preview opens on the
-                      lower side beneath the heading and nothing changes height
-                      on scroll/tap — the heading can never be pushed off-screen.
-                      Desktop (lg+): accordion driven by isActive, paired with
-                      the sticky visual panel on the left. */}
+                  {/* Expandable: bullets + mobile preview — a real accordion
+                      (only the active step is mounted, for performance).
+                      Mobile: the OPENING card eases smoothly (ease-in-out), but
+                      the CLOSING card collapses instantly — that instant collapse
+                      is what activateStep scroll-pins, so the header never moves
+                      while the active card eases open downward beneath it.
+                      Desktop (lg+): smooth animated accordion both ways. */}
                   <div
-                    className={`grid transition-all duration-500 ease-in-out grid-rows-[1fr] opacity-100 mt-2 ${
+                    className={`grid lg:transition-all lg:duration-500 lg:ease-in-out ${
                       isActive
-                        ? "lg:grid-rows-[1fr] lg:opacity-100 lg:mt-2"
-                        : "lg:grid-rows-[0fr] lg:opacity-0 lg:mt-0"
+                        ? "transition-all duration-300 ease-in-out grid-rows-[1fr] opacity-100 mt-2"
+                        : "grid-rows-[0fr] opacity-0 mt-0"
                     }`}
                   >
                     <div className="overflow-hidden flex flex-col gap-6">

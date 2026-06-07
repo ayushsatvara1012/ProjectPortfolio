@@ -80,10 +80,16 @@ export default function Navbar() {
     if (isOpen) {
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
+      // Signal the open mobile menu so the chat widget can drop below it.
+      document.body.classList.add('mobile-menu-open');
     } else {
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
+      document.body.classList.remove('mobile-menu-open');
     }
+    return () => {
+      document.body.classList.remove('mobile-menu-open');
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -491,25 +497,27 @@ export default function Navbar() {
         {/* Mobile Bottom CTA Section */}
         <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
             <Show when="signed-out">
-              <SignUpButton mode="modal">
-                <button className="w-full bg-slate-800 dark:bg-slate-900 text-white py-6 text-base font-google font-medium hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-full mb-3">
-                  Start Free Trial
-                </button>
-              </SignUpButton>
-              <SignInButton mode="modal">
-                <button className="w-full text-slate-900 dark:text-slate-200 py-6 text-base font-google font-medium rounded-full hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border border-slate-300 dark:border-slate-700">
-                  Login to System
-                </button>
-              </SignInButton>
+              <div className="flex flex-row gap-3">
+                <SignUpButton mode="modal">
+                  <button className="flex-1 bg-slate-800 dark:bg-slate-900 text-white py-3 text-sm font-google font-medium hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-full">
+                    Start Free Trial
+                  </button>
+                </SignUpButton>
+                <SignInButton mode="modal">
+                  <button className="flex-1 text-slate-900 dark:text-slate-200 py-3 text-sm font-google font-medium rounded-full hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border border-slate-300 dark:border-slate-700">
+                    Login to System
+                  </button>
+                </SignInButton>
+              </div>
             </Show>
 
             <Show when="signed-in">
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
-                className="w-full bg-slate-900 dark:bg-blue-600 text-white py-6 text-base font-google  font-medium hover:bg-slate-800 dark:hover:bg-blue-500 transition-all rounded-full flex items-center justify-center gap-2 tracking-wider"
+                className="w-full bg-slate-900 dark:bg-blue-600 text-white py-3 text-sm font-google  font-medium hover:bg-slate-800 dark:hover:bg-blue-500 transition-all rounded-full flex items-center justify-center gap-2 tracking-wider"
               >
-               <span className='material-symbols-outlined text-base text-white'>dashboard</span> Dashboard
+               <span className='material-symbols-outlined text-sm text-white'>dashboard</span> Dashboard
               </Link>
             </Show>
 

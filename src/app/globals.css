@@ -291,3 +291,12 @@
     max-width: 96rem;
   }
 }
+
+/* When the mobile hamburger menu is open (body.mobile-menu-open, set by Navbar),
+   drop the chat widget beneath the menu (z-40) and header (z-50) so it hides
+   under the menu. Unlayered + body-scoped so it overrides the widget's inline
+   z-2147483647 utility. Only affects this site — embedded widgets on customer
+   sites never get the body class, so they keep their max z-index. */
+body.mobile-menu-open .sapy-chat-root {
+  z-index: 30 !important;
+}
