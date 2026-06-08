@@ -53,12 +53,12 @@ const nextConfig = {
               "default-src 'self'",
               // Turbopack / React dev tools require unsafe-eval in development. 
               // Some third-party SDKs (Clerk/Stripe) may also require it in production.
-              `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://clerk.sapybase.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com https://challenges.cloudflare.com https://js.stripe.com`,
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://clerk.sapybase.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com https://challenges.cloudflare.com https://js.stripe.com https://www.googletagmanager.com https://va.vercel-scripts.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
               // Backend API + Clerk API + Stripe
-              `connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://clerk.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com wss://*.clerk.accounts.dev https://api.stripe.com${isDev ? " http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 wss://localhost:3000" : ""}`,
+              `connect-src 'self' https://sapyai.onrender.com https://www.sapybase.com https://clerk.sapybase.com https://api.clerk.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com wss://*.clerk.accounts.dev https://api.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com${isDev ? " http://localhost:8000 http://127.0.0.1:8000 ws://localhost:3000 wss://localhost:3000" : ""}`,
               "frame-src 'self' https://clerk.sapybase.com https://*.clerk.accounts.dev https://challenges.cloudflare.com https://js.stripe.com",
               "object-src 'none'",
               "base-uri 'self'",
