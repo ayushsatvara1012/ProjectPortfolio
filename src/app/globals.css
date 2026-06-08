@@ -1,9 +1,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 @theme {
-  --font-sans: "Google Sans", var(--font-google), sans-serif;
-  --font-display: "Google Sans", var(--font-google), sans-serif;
-  --font-google: "Google Sans", var(--font-google), sans-serif;
+  --font-sans: "Plus Jakarta Sans", var(--font-google), sans-serif;
+  --font-display: "Plus Jakarta Sans", var(--font-google), sans-serif;
+  --font-google: "Plus Jakarta Sans", var(--font-google), sans-serif;
 }
 
 @theme {

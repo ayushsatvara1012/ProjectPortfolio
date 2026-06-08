@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Google_Sans } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
 
-const googleSans = Google_Sans({
+const googleSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-google',

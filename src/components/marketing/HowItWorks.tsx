@@ -276,7 +276,7 @@ function StepTwoVisual({
       {/* Engine node — mobile only; desktop uses the shared overlay */}
       {isMobile && (
         <div className="absolute left-[20%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[22%] aspect-square z-10 pointer-events-none">
-          <EngineLogoNode phase={phase} />
+          <EngineLogoNode phase={phase} reducedMotion={isMobile} />
           <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
             Vaayu Engine
           </span>
@@ -779,7 +779,13 @@ export default function HowItWorks() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // IntersectionObserver — auto-activates the step nearest viewport centre
+  // IntersectionObserver — auto-activates the step nearest viewport centre.
+  // Runs on BOTH desktop and mobile:
+  //   • Desktop drives the sticky sliding visual panel.
+  //   • Mobile opens the card's accordion. The scroll-pin (activateStep records
+  //     the target card's viewport top, then the layout effect scroll-compensates
+  //     the height change before paint) keeps that card's heading fixed in place,
+  //     so the panel expands DOWNWARD and the current view never jumps/pushes up.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -835,16 +841,21 @@ export default function HowItWorks() {
               <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="#E2E8F0" strokeWidth="1.5" fill="none" className="dark:stroke-slate-800" strokeDasharray="4 4" />
 
               {/* Animated glow pulses — native SVG <animate> uses user-unit coords directly,
-                  avoiding Framer Motion's CSS-px / viewBox scale mismatch on mobile */}
-              {!isMobile && (
+                  avoiding Framer Motion's CSS-px / viewBox scale mismatch on mobile.
+                  Gated on `isActive` so they only run when step 1 is the centered
+                  step — off-center previews show only the static dashed base lines,
+                  so no animation work happens for steps the user isn't viewing. */}
+              {!isMobile && isActive && (
                 <path d="M 100 100 C 240 100, 260 250, 400 250" stroke="url(#s1-glow-a)" strokeWidth="2.5" fill="none" strokeDasharray="76 304">
                   <animate attributeName="stroke-dashoffset" from="0" to="-380" dur="2.5s" repeatCount="indefinite" calcMode="linear" />
                 </path>
               )}
-              <path d="M 100 250 L 400 250" stroke="url(#s1-glow-b)" strokeWidth="2.5" fill="none" strokeDasharray="60 240">
-                <animate attributeName="stroke-dashoffset" from="0" to="-300" dur="2s" begin="0.5s" repeatCount="indefinite" calcMode="linear" />
-              </path>
-              {!isMobile && (
+              {isActive && (
+                <path d="M 100 250 L 400 250" stroke="url(#s1-glow-b)" strokeWidth="2.5" fill="none" strokeDasharray="60 240">
+                  <animate attributeName="stroke-dashoffset" from="0" to="-300" dur="2s" begin="0.5s" repeatCount="indefinite" calcMode="linear" />
+                </path>
+              )}
+              {!isMobile && isActive && (
                 <path d="M 100 400 C 240 400, 260 250, 400 250" stroke="url(#s1-glow-a)" strokeWidth="2.5" fill="none" strokeDasharray="76 304">
                   <animate attributeName="stroke-dashoffset" from="0" to="-380" dur="2.8s" begin="0.2s" repeatCount="indefinite" calcMode="linear" />
                 </path>
@@ -875,7 +886,7 @@ export default function HowItWorks() {
             {/* Engine node — RIGHT anchor, mobile only (desktop uses shared overlay) */}
             {isMobile && (
               <div className="absolute w-[22%] aspect-square left-[80%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                <EngineLogoNode />
+                <EngineLogoNode reducedMotion={isMobile} />
                 <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[8px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
                   Vaayu Engine
                 </span>
@@ -981,7 +992,7 @@ export default function HowItWorks() {
                       transition={{ duration: 0.35, ease: "easeOut" }}
                       className="relative w-full h-full flex flex-col items-center"
                     >
-                      <EngineLogoNode phase={activeStep === 2 ? step2Phase : undefined} />
+                      <EngineLogoNode phase={activeStep === 2 ? step2Phase : undefined} reducedMotion={isMobile} />
                       <span className="absolute top-[115%] left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap select-none">
                         Sapy Engine
                       </span>
@@ -1048,18 +1059,21 @@ export default function HowItWorks() {
                     </p>
                   </div>
 
-                  {/* Expandable: bullets + mobile preview — a real accordion
-                      (only the active step is mounted, for performance).
-                      Mobile: the OPENING card eases smoothly (ease-in-out), but
-                      the CLOSING card collapses instantly — that instant collapse
-                      is what activateStep scroll-pins, so the header never moves
-                      while the active card eases open downward beneath it.
-                      Desktop (lg+): smooth animated accordion both ways. */}
+                  {/* Expandable: bullets + mobile preview.
+                      MOBILE: every step stays OPEN once the section is in view —
+                      scrolling never collapses a step (base grid-rows-[1fr]). This
+                      decouples "open" from "active": an open step is visible, but
+                      its animation only runs when it's the centered/active step
+                      (see `isActive` passed into renderPreview below). Because
+                      nothing collapses on mobile, there is no layout shift and the
+                      heading never moves while scrolling.
+                      DESKTOP (lg+): classic single-open accordion — only the active
+                      step is expanded, animated smoothly both ways via lg: classes. */}
                   <div
-                    className={`grid lg:transition-all lg:duration-500 lg:ease-in-out ${
+                    className={`grid transition-all duration-300 ease-in-out lg:duration-500 grid-rows-[1fr] opacity-100 mt-2 ${
                       isActive
-                        ? "transition-all duration-300 ease-in-out grid-rows-[1fr] opacity-100 mt-2"
-                        : "grid-rows-[0fr] opacity-0 mt-0"
+                        ? "lg:grid-rows-[1fr] lg:opacity-100 lg:mt-2"
+                        : "lg:grid-rows-[0fr] lg:opacity-0 lg:mt-0"
                     }`}
                   >
                     <div className="overflow-hidden flex flex-col gap-6">
