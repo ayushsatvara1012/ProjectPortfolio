@@ -329,14 +329,14 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center h-full overflow-hidden shrink-0">
             <Show when="signed-out">
               <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
-                <SignInButton mode="modal">
+                <SignInButton mode="redirect">
                   <button className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full flex items-center transition-colors duration-500">
-                <SignUpButton mode="modal">
+                <SignUpButton mode="redirect">
                   <button className=" text-slate-600 dark:text-slate-200 text-base font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-400 to-blue-500 transition-all duration-500">
                       Get Started
@@ -498,12 +498,12 @@ export default function Navbar() {
         <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
             <Show when="signed-out">
               <div className="flex flex-row gap-3">
-                <SignUpButton mode="modal">
+                <SignUpButton mode="redirect">
                   <button className="flex-1 bg-slate-800 dark:bg-slate-900 text-white py-3 text-sm font-google font-medium hover:bg-slate-700 dark:hover:bg-slate-800 transition-all rounded-full">
                     Start Free Trial
                   </button>
                 </SignUpButton>
-                <SignInButton mode="modal">
+                <SignInButton mode="redirect">
                   <button className="flex-1 text-slate-900 dark:text-slate-200 py-3 text-sm font-google font-medium rounded-full hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors border border-slate-300 dark:border-slate-700">
                     Login to System
                   </button>

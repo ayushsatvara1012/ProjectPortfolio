@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Button from './Button';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
@@ -16,9 +16,14 @@ import { PRODUCT } from '@/src/lib/brand';
 const HeroSection = () => {
   const router = useRouter();
   const { isSignedIn } = useUser();
-  const { openSignUp } = useClerk();
 
   const [isMobile, setIsMobile] = useState(false);
+  // Defer mounting the WebGL background until the browser is idle. The Three.js
+  // chunk (~880 kB) is heavy to parse/execute; mounting it during hydration is
+  // the single biggest contributor to mobile TBT. Gating the mount to idle moves
+  // that work out of the critical path. The animation is unchanged — the scene's
+  // built-in staggered reveal fades it in once mounted.
+  const [mountBackground, setMountBackground] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -29,18 +34,33 @@ const HeroSection = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    // requestIdleCallback isn't available in Safari/iOS — fall back to a short
+    // timeout. The `timeout` option guarantees the scene still mounts promptly
+    // even if the main thread stays busy.
+    const ric = window.requestIdleCallback;
+    if (typeof ric === 'function') {
+      const id = ric(() => setMountBackground(true), { timeout: 2000 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(() => setMountBackground(true), 200);
+    return () => window.clearTimeout(id);
+  }, []);
+
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
 
       {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
-      <AntigravityBackground
-        particleCount={isMobile ? 30 : 50}
-        particleType={isMobile ? 'dot' : 'capsule'}
-        particleSeparation={isMobile ? 0.8 : 4}
-        effectStyle={isMobile ? 'water_drop' : 'classic'}
-        colorPalette={isMobile ? ['#020617', '#0b1d3a', '#0044cc', '#0088ff', '#55bbff'] : undefined}
-        interactive={!isMobile}
-      />
+      {mountBackground && (
+        <AntigravityBackground
+          particleCount={isMobile ? 30 : 50}
+          particleType={isMobile ? 'dot' : 'capsule'}
+          particleSeparation={isMobile ? 0.8 : 4}
+          effectStyle={isMobile ? 'water_drop' : 'classic'}
+          colorPalette={isMobile ? ['#020617', '#0b1d3a', '#0044cc', '#0088ff', '#55bbff'] : undefined}
+          interactive={!isMobile}
+        />
+      )}
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
 
         {/* Text and controls centered */}
@@ -75,7 +95,7 @@ const HeroSection = () => {
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">
             <button
-              onClick={() => isSignedIn ? router.push('/dashboard') : openSignUp()}
+              onClick={() => isSignedIn ? router.push('/dashboard') : router.push('/sign-up')}
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
             >
               Get {PRODUCT.name}<span className='material-symbols-outlined ml-2'>arrow_forward</span>
