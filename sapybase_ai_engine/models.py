@@ -76,6 +76,43 @@ class LeadCaptureRequest(BaseModel):
         return v or None
 
 
+class ExploreEnquiryRequest(BaseModel):
+    """Explore access request from a personal-email applicant (§3, pending approval)."""
+    email: str = Field(..., max_length=255)
+    name: Optional[str] = Field(None, max_length=100)
+    company_name: Optional[str] = Field(None, max_length=200)
+    use_case: Optional[str] = Field(None, max_length=1000)
+    # Honeypot: hidden in the UI; real users leave it empty, bots fill it.
+    website: Optional[str] = Field(None, max_length=255)
+
+    @validator('email')
+    def validate_email(cls, v):
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, v.strip()):
+            raise ValueError('Invalid email address')
+        return v.strip().lower()
+
+    @validator('name', 'company_name', 'use_case')
+    def blank_to_none(cls, v):
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None
+
+
+class EnquiryDeclineRequest(BaseModel):
+    """Super-admin decline of an Explore enquiry — reason is required (§6)."""
+    reason: str = Field(..., min_length=3, max_length=500)
+
+    @validator('reason')
+    def trim_reason(cls, v):
+        v = (v or '').strip()
+        if len(v) < 3:
+            raise ValueError('A decline reason is required.')
+        return v
+
+
 class SubscriptionRequest(BaseModel):
     tier: str  # Starter, Pro, Enterprise
 

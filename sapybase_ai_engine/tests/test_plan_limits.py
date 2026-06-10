@@ -66,6 +66,82 @@ class TestPlanLimits:
         assert "BASIC" not in limits
         assert "BASIC" not in mapping
 
+    # ── EXPLORE tier (lifetime-free top-of-funnel) ───────────────────────────
+    def test_explore_tier_present(self):
+        limits, _, _ = _import()
+        assert "EXPLORE" in limits
+
+    def test_explore_cost_caps(self):
+        limits, _, _ = _import()
+        e = limits["EXPLORE"]
+        assert e["max_bots"] == 1
+        assert e["messages"] == 200
+        assert e["chunks"] == 75
+        assert e["speed"] == "lite"
+        assert e["max_owner_emails"] == 50
+
+    def test_explore_full_product_except_white_label(self):
+        # The single hard rule: white_label OFF; everything else ON.
+        limits, _, _ = _import()
+        e = limits["EXPLORE"]
+        assert e["white_label"] is False, "white_label MUST be off on Explore (viral badge)"
+        assert e["human_handoff"] is True
+        assert e["lead_capture"] is True
+        assert e["analytics"] is True
+        assert e["webhook"] is True
+        assert e["custom_logo"] is True
+
+    def test_explore_uses_lite_model(self):
+        _, mapping, valid = _import()
+        assert "EXPLORE" in mapping
+        assert mapping["EXPLORE"] == "gemini-2.5-flash-lite"
+        assert mapping["EXPLORE"] in valid
+
+    def test_advanced_bot_is_not_a_plan_limits_key(self):
+        # advanced_bot is entitlements-only; adding it to PLAN_LIMITS would break
+        # schema-shape consistency. Guard against accidental reintroduction.
+        limits, _, _ = _import()
+        for tier, d in limits.items():
+            assert "advanced_bot" not in d, f"{tier} must not carry advanced_bot in PLAN_LIMITS"
+
+    def test_schema_shape_consistency_all_tiers_same_keys(self):
+        # Every tier dict MUST have identical keys, or dict access in main.py and
+        # the test suite can break. This is the invariant §4.1 warns about.
+        limits, _, _ = _import()
+        key_sets = {tier: frozenset(d.keys()) for tier, d in limits.items()}
+        reference = key_sets["FREE"]
+        for tier, keys in key_sets.items():
+            assert keys == reference, f"{tier} keys {keys ^ reference} differ from FREE"
+
+    def test_max_owner_emails_present_on_every_tier(self):
+        limits, _, _ = _import()
+        for tier, d in limits.items():
+            assert "max_owner_emails" in d, f"{tier} missing max_owner_emails"
+        # Explore is capped; paid tiers are effectively unlimited; FREE is zero.
+        assert limits["FREE"]["max_owner_emails"] == 0
+        assert limits["EXPLORE"]["max_owner_emails"] == 50
+        assert limits["STARTER"]["max_owner_emails"] >= 999999
+
+
+class TestExploreRateLimitsAndDomains:
+    def test_explore_has_rate_limits(self):
+        from main import TIER_RATE_LIMITS
+        assert "EXPLORE" in TIER_RATE_LIMITS
+        caps = TIER_RATE_LIMITS["EXPLORE"]
+        assert caps["per_minute"] == 20
+        assert caps["per_hour"] == 200
+        assert caps["per_day"] == 1200
+
+    def test_domain_lists_loaded_and_disjoint(self):
+        from config import FREE_EMAIL_DOMAINS, DISPOSABLE_EMAIL_DOMAINS
+        assert "gmail.com" in FREE_EMAIL_DOMAINS
+        assert "mailinator.com" in DISPOSABLE_EMAIL_DOMAINS
+        # A domain must not be classified as both free-mail and disposable.
+        assert FREE_EMAIL_DOMAINS.isdisjoint(DISPOSABLE_EMAIL_DOMAINS)
+        # Stored normalized (lowercase) so signup-time domain matching is reliable.
+        assert all(d == d.lower() for d in FREE_EMAIL_DOMAINS)
+        assert all(d == d.lower() for d in DISPOSABLE_EMAIL_DOMAINS)
+
 
 class TestModelMapping:
     def test_free_gets_lite_model(self):
