@@ -5,13 +5,19 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  UserButton,
   SignInButton,
   SignUpButton,
   Show,
 } from '@clerk/nextjs';
 import Logo from './Logo';
 import dynamic from 'next/dynamic';
+
+// UserButton (avatar menu) is the heaviest Clerk UI component and only renders
+// for signed-in users — split it so anonymous visitors never download it.
+// Its containers are fixed-size (w-10 h-10 / w-16), so deferred mount can't shift layout.
+const UserButton = dynamic(() => import('@clerk/nextjs').then((m) => m.UserButton), {
+  ssr: false,
+});
 
 const AntigravityBackground = dynamic(() => import('../../components/marketing/AntigravityBackground'), {
   ssr: false,

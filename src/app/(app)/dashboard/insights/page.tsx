@@ -5,13 +5,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
-import LeadsPanel from '@/src/app/components/LeadsPanel';
-import ConversationsPanel from '@/src/app/components/ConversationsPanel';
-import FixesNeededPanel from '@/src/app/components/FixesNeededPanel';
-import ROIPanel from '@/src/app/components/ROIPanel';
-import FunnelPanel from '@/src/app/components/FunnelPanel';
-import ActionCenterPanel from '@/src/app/components/ActionCenterPanel';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
+
+// Each panel is only visible on its own tab — code-split them so the insights
+// route doesn't ship all six at once. Panels render their own loading states.
+const LeadsPanel = dynamic(() => import('@/src/app/components/LeadsPanel'));
+const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
+const FixesNeededPanel = dynamic(() => import('@/src/app/components/FixesNeededPanel'));
+const ROIPanel = dynamic(() => import('@/src/app/components/ROIPanel'));
+const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
+const ActionCenterPanel = dynamic(() => import('@/src/app/components/ActionCenterPanel'));
 import Link from 'next/link';
 
 // ── Style primitives matching AppTrainAI ────────────────────────────────────

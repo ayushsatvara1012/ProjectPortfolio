@@ -9,13 +9,32 @@ import Image from 'next/image';
 
 const DocMedia = ({ alt, placeholderText, src }: { alt: string; placeholderText?: string; src?: string }) => {
   const isVideo = src && /\.(mp4|webm|ogg|mov)$/i.test(src);
+  // Videos only start downloading once the block nears the viewport — the docs
+  // page embeds ~15 MB of autoplay recordings that would otherwise all fetch on load.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [videoVisible, setVideoVisible] = useState(false);
+  useEffect(() => {
+    if (!isVideo || videoVisible || !containerRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setVideoVisible(true);
+      },
+      { rootMargin: '400px' }
+    );
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [isVideo, videoVisible]);
   return (
-    <div className="group relative aspect-video w-full rounded-2xl overflow-hidden my-5 bg-slate-100 dark:bg-white/[0.04] transition-colors duration-500">
+    <div ref={containerRef} className="group relative aspect-video w-full rounded-2xl overflow-hidden my-5 bg-slate-100 dark:bg-white/[0.04] transition-colors duration-500">
       {src ? (
         isVideo ? (
-          <video src={src} autoPlay loop muted playsInline preload="metadata" className="w-full h-full object-cover" />
+          videoVisible ? (
+            <video src={src} autoPlay loop muted playsInline preload="metadata" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full" aria-label={alt} />
+          )
         ) : (
-          <Image src={src} alt={alt} fill className="object-cover" />
+          <Image src={src} alt={alt} fill sizes="(max-width: 768px) 100vw, 768px" className="object-cover" />
         )
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center border-2 border-dashed border-slate-200 dark:border-white/[0.06] rounded-2xl">
@@ -336,7 +355,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://www.sap
                 <li className="flex items-start gap-2"><span className="material-symbols-outlined text-[15px] text-slate-400 mt-0.5 shrink-0">check_circle</span><span><strong className="font-semibold text-slate-700 dark:text-slate-300">Sign up</strong> using your email or Google account.</span></li>
                 <li className="flex items-start gap-2"><span className="material-symbols-outlined text-[15px] text-slate-400 mt-0.5 shrink-0">check_circle</span><span><strong className="font-semibold text-slate-700 dark:text-slate-300">Chatbot ID</strong> — we automatically provision isolated storage so your data stays secure.</span></li>
               </ul>
-              <DocMedia alt="Registration Screen" placeholderText="Screen Recording: Walking through the Registration Screen showing the Business Name input and account setup fields." src="/videos/registration_Sapybase.mp4" />
+              <DocMedia alt="Registration Screen" placeholderText="Screen Recording: Walking through the Registration Screen showing the Business Name input and account setup fields." src="/videos/registration_sapybase.mp4" />
               <ul className="space-y-2.5 text-sm lg:text-base font-normal text-slate-600 dark:text-slate-400 lg:text-slate-700 lg:dark:text-slate-300 leading-relaxed">
                 <li className="flex items-start gap-2"><span className="material-symbols-outlined text-[15px] text-slate-400 mt-0.5 shrink-0">check_circle</span><span>After registration you'll be redirected to the dashboard.</span></li>
                 <li className="flex items-start gap-2"><span className="material-symbols-outlined text-[15px] text-slate-400 mt-0.5 shrink-0">check_circle</span><span><strong className="font-semibold text-slate-700 dark:text-slate-300">Subscribe</strong> — choose the plan that suits your needs.</span></li>
@@ -512,7 +531,7 @@ const BotIntegrationDocs = ({ apiKey = 'YOUR_API_KEY', apiUrl = 'https://www.sap
               <p className="text-sm lg:text-base font-normal text-slate-600 dark:text-slate-400 lg:text-slate-700 lg:dark:text-slate-300 leading-relaxed">
                 Our Pro plan lets you create and switch between entirely separate bots from a single dashboard.
               </p>
-              <DocMedia alt="Agency Bot Manager" placeholderText="Screen Recording: Switching between multiple bots and creating a new bot instance in Agency Mode." src="/Manage_Bot.png" />
+              <DocMedia alt="Agency Bot Manager" placeholderText="Screen Recording: Switching between multiple bots and creating a new bot instance in Agency Mode." src="/Manage_Bot.webp" />
             </section>
 
             {/* ── Support ── */}

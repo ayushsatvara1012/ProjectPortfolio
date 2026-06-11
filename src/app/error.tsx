@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 import Image from 'next/image';
@@ -39,42 +38,30 @@ export default function Error({
 
       <div className="max-w-xl w-full relative z-10 text-center space-y-12">
         {/* Error Illustration / Icon */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative inline-block"
-        >
+        <div className="anim-err-fade-scale relative inline-block">
           <div className="absolute -inset-4 bg-rose-500/10 dark:bg-rose-500/20 blur-2xl rounded-full animate-pulse"></div>
           <div className="relative bg-white dark:bg-slate-900 border border-rose-100 dark:border-rose-900/50 p-8 rounded-3xl shadow-2xl">
             <span className="material-symbols-outlined text-[64px] text-rose-500">error</span>
           </div>
-        </motion.div>
+        </div>
 
         {/* Text Content */}
         <div className="space-y-4">
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200"
-          >
+          <h1 className="anim-err-fade-up text-5xl md:text-7xl font-display font-black tracking-tight leading-none text-slate-900 dark:text-slate-200">
             Sapybase <span className="text-rose-500 underline decoration-rose-500/30 underline-offset-8">Interrupted.</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-base text-slate-500 leading-relaxed dark:text-slate-400 max-w-md mx-auto"
+          </h1>
+          <p
+            style={{ animationDelay: '0.1s' }}
+            className="anim-err-fade-up text-base text-slate-500 leading-relaxed dark:text-slate-400 max-w-md mx-auto"
           >
             We encountered an unexpected architectural breach. The system has been notified and we're working to restore stability.
-          </motion.p>
+          </p>
         </div>
 
         {/* Error Details (Minimalist Code Block) */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 font-mono text-left max-w-md mx-auto shadow-sm"
+        <div
+          style={{ animationDelay: '0.2s' }}
+          className="anim-err-fade bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 font-mono text-left max-w-md mx-auto shadow-sm"
         >
           <div className="flex items-center gap-2 mb-3 border-b border-slate-200 dark:border-slate-800 pb-3">
             <Image src="/logo2.svg" className="w-4 h-4 object-contain" alt="Sapybase" width={16} height={16} />
@@ -88,14 +75,12 @@ export default function Error({
               Digest: {error.digest}
             </p>
           )}
-        </motion.div>
+        </div>
 
         {/* Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+        <div
+          style={{ animationDelay: '0.3s', '--err-rise': '20px' } as React.CSSProperties}
+          className="anim-err-fade-up flex flex-col sm:flex-row gap-4 justify-center items-center"
         >
           <button
             onClick={() => reset()}
@@ -109,7 +94,7 @@ export default function Error({
           >
             <span className="material-symbols-outlined text-[18px]">home</span> Emergency Exit
           </Link>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

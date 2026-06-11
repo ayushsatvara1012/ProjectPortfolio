@@ -2,7 +2,13 @@
 const isDev = process.env.NODE_ENV === 'development';
 
 const nextConfig = {
+  experimental: {
+    // framer-motion is deliberately NOT listed: the import-rewrite duplicates its
+    // internals across chunks and bypasses the LazyMotion entry point.
+    optimizePackageImports: ['lucide-react', 'tech-stack-icons'],
+  },
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -66,6 +72,14 @@ const nextConfig = {
               ...(isDev ? [] : ["upgrade-insecure-requests"]),
             ].join('; '),
           },
+        ],
+      },
+      // Static media in /public — content-hashed by usage, safe to cache long-term.
+      // If an image is replaced in-place, rename the file to bust the cache.
+      {
+        source: '/:all*(svg|webp|png|jpg|jpeg|avif|ico|mp4)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       // Widget assets — public CDN-style, no framing restriction
