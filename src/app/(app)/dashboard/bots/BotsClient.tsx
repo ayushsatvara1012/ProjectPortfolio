@@ -43,12 +43,20 @@ function DeleteConfirmModal({ botName, onConfirm, onCancel }: { botName: string;
   );
 }
 
+// Keys MUST cover every `speed` value in the backend PLAN_LIMITS (config.py):
+// none | lite (EXPLORE) | standard (STARTER) | priority (PRO) | ultra (BUSINESS) | dedicated (ENTERPRISE).
+// A missing key used to crash the whole page (speedInfo.cls on undefined) — the
+// `?? FALLBACK` below now guarantees an unknown tier degrades gracefully instead.
 const SPEED_BADGE: Record<string, { label: string; cls: string }> = {
+  none: { label: 'No Access', cls: 'text-red-500 bg-red-500/10' },
+  lite: { label: 'Lite', cls: 'text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800/60' },
   standard: { label: 'Standard', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800' },
   priority: { label: 'Priority', cls: 'text-slate-900 bg-slate-200 dark:text-slate-200 dark:bg-slate-700' },
+  ultra: { label: 'Ultra', cls: 'text-slate-950 bg-slate-300 dark:text-slate-100 dark:bg-slate-600' },
   dedicated: { label: 'Dedicated', cls: 'text-slate-950 bg-slate-300 dark:text-slate-100 dark:bg-slate-600' },
-  none: { label: 'No Access', cls: 'text-red-500 bg-red-500/10' },
 };
+
+const SPEED_BADGE_FALLBACK = { label: 'Standard', cls: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-800' };
 
 interface Bot {
   id: string;
@@ -126,7 +134,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
   };
 
   const canAdd = plan && plan.can_add_more;
-  const speedInfo = SPEED_BADGE[plan?.speed_tier || 'none'];
+  const speedInfo = SPEED_BADGE[plan?.speed_tier || 'none'] ?? SPEED_BADGE_FALLBACK;
 
   return (
     <>
