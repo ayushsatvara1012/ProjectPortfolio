@@ -116,12 +116,17 @@ ROUTE_CTA_BLOCKED = "blocked"    # disposable/invalid email → no path
 _ACCESS_TIERS = frozenset({"EXPLORE", "STARTER", "PRO", "BUSINESS", "ENTERPRISE", "CUSTOM"})
 
 
-def explore_cta_route(tier, email) -> str:
+def explore_cta_route(tier, email, *, has_approved_enquiry: bool = False) -> str:
     """What should happen when this signed-in user clicks 'Get Explore'?
 
     Already on an access-granting tier → ACTIVE (no-op). Otherwise classify the
-    email: business → CHECKOUT (Polar $0 sub), personal → ENQUIRY (manual approval),
-    disposable/invalid → BLOCKED.
+    email: business → CHECKOUT (Polar $0 sub, no approval needed). Personal →
+    ENQUIRY (manual super-admin approval) until that approval lands; once approved
+    (has_approved_enquiry) it also goes to CHECKOUT. Approval only unlocks the
+    Polar checkout door — it does NOT grant Explore. The EXPLORE tier is granted
+    solely by the Polar subscription.created webhook once the $0 checkout completes,
+    so the billing period (limit-reset window) always comes from Polar. Disposable/
+    invalid → BLOCKED.
     """
     if tier in _ACCESS_TIERS:
         return ROUTE_CTA_ACTIVE
@@ -129,18 +134,18 @@ def explore_cta_route(tier, email) -> str:
     if route == ROUTE_GRANT_EXPLORE:
         return ROUTE_CTA_CHECKOUT
     if route == ROUTE_ENQUIRY:
-        return ROUTE_CTA_ENQUIRY
+        return ROUTE_CTA_CHECKOUT if has_approved_enquiry else ROUTE_CTA_ENQUIRY
     return ROUTE_CTA_BLOCKED
 
 
-def signup_provisioning(email, pre_approved: bool = False) -> tuple:
+def signup_provisioning(email) -> tuple:
     """(tier, subscription_status) to provision a brand-new signup row with.
 
-    pre_approved=True means an *approved* Explore enquiry already exists for this
-    email (they were approved before they registered) → grant EXPLORE immediately
-    as ACTIVE. Otherwise FREE + the gate-holding status from initial_signup_status
-    (PENDING for real emails, BLOCKED for disposable/invalid).
+    Always FREE + the gate-holding status from initial_signup_status (PENDING for
+    real emails, BLOCKED for disposable/invalid). Access to Explore is NEVER granted
+    here — not even when an *approved* enquiry already exists for this email.
+    Approval only unlocks the Polar checkout route (see explore_cta_route); the
+    EXPLORE tier is granted solely by the Polar subscription.created webhook once the
+    $0 checkout completes, so the billing period (limit reset) comes from Polar.
     """
-    if pre_approved:
-        return (SIGNUP_TIER_EXPLORE, SUBSCRIPTION_ACTIVE)
     return (SIGNUP_TIER_DEFAULT, initial_signup_status(email))

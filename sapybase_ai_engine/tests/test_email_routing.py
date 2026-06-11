@@ -119,27 +119,29 @@ class TestInitialSignupStatus:
 
 
 class TestSignupProvisioning:
-    def test_pre_approved_grants_active_explore(self):
+    def test_never_grants_explore_even_when_pre_approved(self):
         er = _import()
-        # Even a personal email, once pre-approved, gets active EXPLORE.
-        assert er.signup_provisioning("a@gmail.com", pre_approved=True) == ("EXPLORE", "ACTIVE")
-        assert er.signup_provisioning("founder@acme.io", pre_approved=True) == ("EXPLORE", "ACTIVE")
+        # Provisioning NEVER grants EXPLORE — not even for an approved email. The
+        # EXPLORE tier is earned only by completing the Polar $0 checkout (webhook).
+        # A brand-new signup always starts FREE + gate-holding status.
+        assert er.signup_provisioning("a@gmail.com") == ("FREE", er.SIGNUP_STATUS_PENDING)
+        assert er.signup_provisioning("founder@acme.io") == ("FREE", er.SIGNUP_STATUS_PENDING)
 
-    def test_not_approved_real_email_is_free_pending(self):
+    def test_real_email_is_free_pending(self):
         er = _import()
         assert er.signup_provisioning("a@gmail.com") == ("FREE", er.SIGNUP_STATUS_PENDING)
-        assert er.signup_provisioning("founder@acme.io", pre_approved=False) == ("FREE", er.SIGNUP_STATUS_PENDING)
+        assert er.signup_provisioning("founder@acme.io") == ("FREE", er.SIGNUP_STATUS_PENDING)
 
-    def test_not_approved_disposable_is_free_blocked(self):
+    def test_disposable_is_free_blocked(self):
         er = _import()
         assert er.signup_provisioning("a@mailinator.com") == ("FREE", er.SIGNUP_STATUS_BLOCKED)
         assert er.signup_provisioning("garbage") == ("FREE", er.SIGNUP_STATUS_BLOCKED)
 
-    def test_granted_tier_is_a_valid_plan_limits_key(self):
+    def test_provisioned_tier_is_a_valid_plan_limits_key(self):
         er = _import()
         from config import PLAN_LIMITS
-        tier, _ = er.signup_provisioning("a@gmail.com", pre_approved=True)
-        assert tier in PLAN_LIMITS  # EXPLORE must be a real tier
+        tier, _ = er.signup_provisioning("a@gmail.com")
+        assert tier in PLAN_LIMITS  # FREE must be a real tier
 
 
 class TestExploreCtaRoute:
@@ -148,9 +150,31 @@ class TestExploreCtaRoute:
         assert er.explore_cta_route("FREE", "founder@acme.io") == er.ROUTE_CTA_CHECKOUT
         assert er.explore_cta_route(None, "team@startup.dev") == er.ROUTE_CTA_CHECKOUT
 
-    def test_personal_email_goes_to_enquiry(self):
+    def test_personal_email_goes_to_enquiry_until_approved(self):
         er = _import()
+        # Personal email with no approval → enquiry form.
         assert er.explore_cta_route("FREE", "a@gmail.com") == er.ROUTE_CTA_ENQUIRY
+        assert (
+            er.explore_cta_route("FREE", "a@gmail.com", has_approved_enquiry=False)
+            == er.ROUTE_CTA_ENQUIRY
+        )
+
+    def test_approved_personal_email_goes_to_checkout(self):
+        er = _import()
+        # Once the enquiry is approved, the personal user routes to Polar checkout —
+        # approval unlocks the door but does NOT grant Explore (the webhook does).
+        assert (
+            er.explore_cta_route("FREE", "a@gmail.com", has_approved_enquiry=True)
+            == er.ROUTE_CTA_CHECKOUT
+        )
+
+    def test_approval_does_not_override_block_for_disposable(self):
+        er = _import()
+        # A disposable/invalid email stays BLOCKED even if (somehow) flagged approved.
+        assert (
+            er.explore_cta_route("FREE", "x@mailinator.com", has_approved_enquiry=True)
+            == er.ROUTE_CTA_BLOCKED
+        )
 
     def test_disposable_invalid_blocked(self):
         er = _import()

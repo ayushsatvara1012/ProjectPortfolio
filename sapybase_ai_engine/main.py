@@ -1600,34 +1600,13 @@ async def get_current_user(request: Request):
                 # Final fallback: provision new row if still none exists. Only reached for
                 # genuinely-new signups (paid Polar accounts reconcile above & short-circuit).
                 #
-                # Explore §6 (C2b): if an *approved* enquiry already exists for this email
-                # (they were approved before registering), grant EXPLORE immediately;
-                # otherwise stamp FREE + the gate-holding status from email_routing
-                # (PENDING for real emails, BLOCKED for disposable/invalid).
-                #
-                # The pre-approval lookup is SAVEPOINT-guarded so that a missing
-                # `explore_enquiries` table (migration v24 not yet applied) — or any
-                # transient error — can NEVER break the hot auth path: it just falls
-                # back to the normal (non-approved) signup.
-                _pre_approved = False
-                try:
-                    cursor.execute("SAVEPOINT pre_approval_chk")
-                    cursor.execute(
-                        "SELECT 1 FROM explore_enquiries WHERE lower(email) = lower(%s) "
-                        "AND status = 'approved' LIMIT 1",
-                        (email,),
-                    )
-                    _pre_approved = cursor.fetchone() is not None
-                    cursor.execute("RELEASE SAVEPOINT pre_approval_chk")
-                except Exception as _pa_err:
-                    try:
-                        cursor.execute("ROLLBACK TO SAVEPOINT pre_approval_chk")
-                    except Exception:
-                        pass
-                    _pre_approved = False
-                    print(f"PRE-APPROVAL CHECK SKIPPED: {_pa_err}")
-
-                _new_tier, _new_status = signup_provisioning(email, pre_approved=_pre_approved)
+                # Always FREE + the gate-holding status from email_routing (PENDING for
+                # real emails, BLOCKED for disposable/invalid). An *approved* Explore
+                # enquiry no longer grants EXPLORE here — approval only unlocks the Polar
+                # $0 checkout route, and the EXPLORE tier is granted by the Polar
+                # subscription.created webhook once that checkout completes (so the
+                # billing period comes from Polar's clock, §A0).
+                _new_tier, _new_status = signup_provisioning(email)
                 cursor.execute(
                     "INSERT INTO users (clerk_id, email, tier, subscription_status) VALUES (%s, %s, %s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config",
                     (clerk_id, email, _new_tier, _new_status)
@@ -3164,10 +3143,39 @@ async def explore_route_for_user(request: Request, user: dict = Depends(get_curr
     from email_routing import classify_email_domain
     email = user.get("email") or ""
     return {
-        "route": explore_cta_route(user.get("tier"), email),
+        "route": explore_cta_route(
+            user.get("tier"), email,
+            has_approved_enquiry=_has_approved_enquiry(email),
+        ),
         "tier": user.get("tier"),
         "email_class": classify_email_domain(email),
     }
+
+
+def _has_approved_enquiry(email: str) -> bool:
+    """True if an *approved* Explore enquiry exists for this email.
+
+    Drives the post-approval CTA: a personal-email user whose enquiry was approved
+    routes to the Polar checkout (not back to the enquiry form). Guarded so a missing
+    `explore_enquiries` table (pre-migration) or any transient error returns False —
+    it must never break the pricing-page CTA.
+    """
+    if not email:
+        return False
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM explore_enquiries WHERE lower(email) = lower(%s) "
+            "AND status = 'approved' LIMIT 1",
+            (email,),
+        )
+        return cursor.fetchone() is not None
+    except Exception as e:
+        print(f"APPROVED-ENQUIRY CHECK SKIPPED: {e}")
+        return False
+    finally:
+        release_db_connection(conn)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -3204,33 +3212,15 @@ def _fetch_enquiry(cursor, enquiry_id: str):
     return _enquiry_row_to_dict(row) if row else None
 
 
-def _grant_explore_to_email(cursor, email: str) -> int:
-    """Interim grant: flip any matching user row to active EXPLORE. Returns rows updated.
-
-    0 means they haven't signed up yet — the now-`approved` enquiry grants them
-    EXPLORE on first sign-in via the JIT path (see get_current_user). The tier guard
-    prevents ever downgrading a paying user who shares the address.
-    TODO(A0): swap this direct flip for the Polar $0-sub provision call so the grant
-    flows through the subscription webhook like every other tier.
-    """
-    cursor.execute(
-        """
-        UPDATE users
-           SET tier = 'EXPLORE', subscription_status = 'ACTIVE'
-         WHERE lower(email) = lower(%s)
-           AND COALESCE(tier, 'FREE') IN ('FREE', 'EXPLORE')
-        """,
-        (email,),
-    )
-    return cursor.rowcount
-
-
 def _apply_enquiry_action(conn, cursor, enquiry: dict, action: str, *,
                           reviewed_by: str, reason: Optional[str] = None) -> dict:
     """Shared core for both the admin endpoints and the email-link endpoint.
 
-    Resolves the action against the current status, applies it atomically (guarded
-    by `status='pending'` for concurrency), grants Explore on approve, and audit-logs.
+    Resolves the action against the current status and applies it atomically (guarded
+    by `status='pending'` for concurrency), then audit-logs. Approval does NOT grant
+    the EXPLORE tier — it only marks the enquiry approved, which unlocks the Polar
+    checkout route. EXPLORE is granted by the Polar subscription.created webhook once
+    the user completes the $0 checkout (so the billing period comes from Polar).
     """
     outcome = _ea.resolve_action(enquiry["status"], action)
     if outcome == _ea.OUTCOME_INVALID:
@@ -3260,20 +3250,20 @@ def _apply_enquiry_action(conn, cursor, enquiry: dict, action: str, *,
         return {"ok": True, "outcome": noop, "already": True, "status": cur_status,
                 "email": enquiry["email"]}
 
-    granted_users = 0
-    if action == _ea.ACTION_APPROVE:
-        granted_users = _grant_explore_to_email(cursor, enquiry["email"])
+    # Approval marks the enquiry approved ONLY — it does NOT grant the EXPLORE tier.
+    # It unlocks the Polar $0 checkout route (explore_cta_route); EXPLORE is granted by
+    # the Polar subscription.created webhook once the user completes checkout, so the
+    # billing period (limit-reset window) comes from Polar's clock.
     conn.commit()
 
     log_admin_action(
         reviewed_by,
         "EXPLORE_ENQUIRY_APPROVE" if action == _ea.ACTION_APPROVE else "EXPLORE_ENQUIRY_DECLINE",
         enquiry["id"],
-        {"email": enquiry["email"], "new_status": target,
-         "granted_users": granted_users, "reason": reason},
+        {"email": enquiry["email"], "new_status": target, "reason": reason},
     )
     return {"ok": True, "outcome": "applied", "status": target,
-            "granted_users": granted_users, "email": enquiry["email"]}
+            "email": enquiry["email"]}
 
 
 @app.get("/api/admin/explore/enquiries")
@@ -3500,8 +3490,9 @@ async def explore_enquiry_action_apply(
                             f"<p style='color:#64748b'>This enquiry was already <b>{state}</b>.</p>"))
     if action == _ea.ACTION_APPROVE:
         return HTMLResponse(_enquiry_action_shell("Approved ✅",
-                            f"<p style='color:#64748b'><b>{enquiry['email']}</b> now has Explore access. "
-                            "A welcome email is on its way.</p>", accent="#16a34a"))
+                            f"<p style='color:#64748b'><b>{enquiry['email']}</b> can now subscribe to Explore. "
+                            "Next time they click “Get Explore” they’ll go straight to the Polar checkout — "
+                            "Explore activates once that $0 checkout completes.</p>", accent="#16a34a"))
     return HTMLResponse(_enquiry_action_shell("Declined",
                         f"<p style='color:#64748b'>Enquiry from <b>{enquiry['email']}</b> was declined.</p>"))
 

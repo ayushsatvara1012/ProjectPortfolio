@@ -77,7 +77,7 @@ export default function ExploreEnquiriesTab() {
   const approveMutation = useMutation({
     mutationFn: (id: string) =>
       authFetch(`/api/admin/explore/enquiries/${id}/approve`, { method: 'POST' }),
-    onSuccess: () => { invalidate(); toast('success', 'Enquiry approved — Explore access granted.'); },
+    onSuccess: () => { invalidate(); toast('success', 'Enquiry approved — they can now subscribe to Explore via Polar checkout.'); },
     onError: (e: any) => toast('error', e?.message || 'Approve failed.'),
   });
 
