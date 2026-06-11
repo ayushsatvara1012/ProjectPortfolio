@@ -485,7 +485,7 @@ class TestWebhookCustomPlanLookup:
         # All values must be non-CUSTOM tiers (custom plan lookup is separate)
         for product_id, tier in tier_map.items():
             assert tier != "CUSTOM", f"Standard product {product_id} should not map to CUSTOM"
-            assert tier in {"FREE", "STARTER", "PRO", "BUSINESS", "ENTERPRISE"}
+            assert tier in {"FREE", "EXPLORE", "STARTER", "PRO", "BUSINESS", "ENTERPRISE"}
 
     def test_check_custom_plan_gate_suspended_not_overwritten_by_active_event(self):
         """

@@ -7,7 +7,7 @@ import HeroSection from '@/src/components/marketing/HeroSection';
 import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
 
 import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection';
-import EngineSection from '@/src/components/marketing/EngineSection';
+// import EngineSection from '@/src/components/marketing/EngineSection'; // hidden for now — re-add the import together with the JSX below
 import HowItWorks from '@/src/components/marketing/HowItWorks';
 import Testimonials from '@/src/components/marketing/Testimonials';
 import PricingPreview from '@/src/components/marketing/PricingPreview';

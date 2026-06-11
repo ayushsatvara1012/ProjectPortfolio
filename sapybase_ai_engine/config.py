@@ -15,18 +15,32 @@ from datetime import timedelta
 #   Enterprise → ENTERPRISE/CUSTOM (contact) — everything, custom limits.
 # FREE = inactive/trial state. Starter is the entry paid tier.
 # This is the single backend source of truth; src/lib/auth/entitlements.ts MUST mirror it.
+# EXPLORE = lifetime-free top-of-funnel (a $0 Polar subscription). Full product ON
+# (analytics, lead capture, WhatsApp/human handoff, webhooks, custom logo, advanced
+# bot) EXCEPT white_label — the permanent "Powered by Vaayu Intelligence" badge is the
+# viral engine. Cost-bearing dimensions are capped: 1 bot, 200 messages/mo, 75 chunks,
+# `lite` model, 50 owner-emails/mo. white_label is False here and must never be enabled
+# via any self-serve path (super-admin override only, logged).
+#
+# `max_owner_emails` (NEW dimension): monthly cap on Resend lead-emails sent to bot owners
+# (the "resting"-state lead email). EXPLORE = 50 (abuse backstop). Paid tiers = 999999
+# (effectively unlimited — "upgrade for unlimited lead emails" is a selling point). FREE = 0.
+# NOTE: `advanced_bot` is intentionally NOT a PLAN_LIMITS key — it is an entitlements-only
+# flag (see entitlements.ts, gated via company config not has_entitlement). Do not add it here.
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
-    "STARTER":    {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
-    "PRO":        {"max_bots": 3,   "messages": 5000,   "chunks": 1500,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False},
-    "BUSINESS":   {"max_bots": 5,   "messages": 15000,  "chunks": 5000,  "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True},
+    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 0},
+    "EXPLORE":    {"max_bots": 1,   "messages": 200,    "chunks": 75,    "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50},
+    "STARTER":    {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
+    "PRO":        {"max_bots": 3,   "messages": 5000,   "chunks": 1500,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
+    "BUSINESS":   {"max_bots": 5,   "messages": 15000,  "chunks": 5000,  "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
 }
 
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
     "FREE":       "gemini-2.5-flash-lite",
+    "EXPLORE":    "gemini-2.5-flash-lite",  # cheapest model — upgrade path = smarter/faster
     "STARTER":    "gemini-2.5-flash",
     "PRO":        "gemini-2.5-pro",
     "BUSINESS":   "gemini-2.5-pro",
@@ -49,6 +63,9 @@ TIER_RATE_LIMITS = {
     # quota / LLM spend can be drained (e.g. by widget-key replay), well above any
     # legitimate single-bot daily volume.
     "FREE":       {"per_minute": 0,   "per_hour": 0,      "per_day": 0},
+    # EXPLORE serves real traffic (unlike FREE), so it needs genuine anti-abuse caps.
+    # Generous for one real bot; tight enough to bound a single widget-key replay burst.
+    "EXPLORE":    {"per_minute": 20,  "per_hour": 200,    "per_day": 1200},
     "STARTER":    {"per_minute": 40,  "per_hour": 800,    "per_day": 4800},
     "PRO":        {"per_minute": 80,  "per_hour": 2000,   "per_day": 12000},
     "BUSINESS":   {"per_minute": 200, "per_hour": 5000,   "per_day": 30000},   # ultra-speed tier
@@ -79,6 +96,27 @@ BLOCKED_LOGO_URL_PATTERNS = [
 ]
 
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB hard ceiling
+
+# ── Signup-routing domain lists (Explore plan §3) ────────────────────────────
+# Personal/free-mail domains → route to the ENQUIRY flow (manual approval) instead
+# of an instant $0 Explore grant. This filters intent and protects LLM cost.
+# Stored as data (frozenset, lowercase) — extend over time without touching logic.
+FREE_EMAIL_DOMAINS = frozenset({
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.co.uk", "ymail.com",
+    "rocketmail.com", "hotmail.com", "hotmail.co.uk", "outlook.com", "live.com", "msn.com",
+    "icloud.com", "me.com", "mac.com", "aol.com", "protonmail.com", "proton.me", "gmx.com",
+    "gmx.net", "mail.com", "yandex.com", "yandex.ru", "tutanota.com", "hey.com", "zoho.com",
+    "fastmail.com", "pm.me",
+})
+
+# Disposable / throwaway domains → HARD BLOCK signup (abuse). Static list covers ~95%;
+# do NOT add an external disposable-check API at launch (new dependency + latency + failure
+# mode). Revisit only if abuse data shows it's needed.
+DISPOSABLE_EMAIL_DOMAINS = frozenset({
+    "mailinator.com", "10minutemail.com", "guerrillamail.com", "temp-mail.org", "tempmail.com",
+    "trashmail.com", "getnada.com", "throwawaymail.com", "yopmail.com", "sharklasers.com",
+    "dispostable.com", "maildrop.cc",
+})
 
 # ── Custom plan feature flag keys (canonical list) ───────────────────────────
 CUSTOM_PLAN_FEATURE_KEYS = {

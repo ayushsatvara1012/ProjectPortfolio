@@ -30,7 +30,7 @@ try:
 except ImportError:
     convert_from_path = None
 from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, ConfigDict, Field, validator
@@ -478,6 +478,73 @@ def require_fresh_admin(request: Request):
 # suite resolve unchanged. These are immutable; functions below read them here.
 from config import PLAN_LIMITS, MODEL_MAPPING, VALID_MODELS, UNLIMITED_PLAN
 
+# ── Monthly usage-period reset (Explore D2) ──────────────────────────────────
+# Pure decision logic lives in usage_period.py; the DB write is below. Reset is
+# applied "self-healing on read" (no cron), the same pattern as the grace-period
+# downgrade in get_current_user.
+from usage_period import should_reset_usage, fresh_period, next_period_for_subscription
+
+# ── Dashboard access gate (Explore D3 + D5) ──────────────────────────────────
+# Pure decision logic (single source of truth, mirrored on the frontend).
+from access_gate import is_dashboard_access_allowed
+
+# ── Signup routing (Explore §3, Phase B) ─────────────────────────────────────
+# Stamps the initial subscription_status on brand-new signups (PENDING/BLOCKED).
+from email_routing import initial_signup_status, signup_provisioning, explore_cta_route
+
+# ── Enquiry approval (Explore §6, Phase C) ───────────────────────────────────
+# Signed one-click tokens + the pending→approved/rejected state machine.
+import enquiry_approval as _ea
+
+
+def _enquiry_token_secret() -> str:
+    """Secret for signing one-click approve/decline links. Dedicated env preferred,
+    falls back to existing admin/widget secrets so dev never silently breaks."""
+    return (
+        os.getenv("ENQUIRY_TOKEN_SECRET")
+        or os.getenv("ADMIN_SECRET")
+        or (WIDGET_SESSION_SECRET or "")
+    )
+
+# Whitelisted scope columns — the only values ever interpolated into the reset
+# SQL's column position. Never sourced from request input (no injection surface).
+_USAGE_RESET_SCOPES = {"company_id", "user_id"}
+
+
+def _reset_elapsed_usage_periods(cursor, *, company_id=None, user_id=None, now=None,
+                                 billing_period_end=None) -> int:
+    """Zero `messages_used` and roll the window for any usage_tracking row whose
+    monthly period has elapsed. Scope by `company_id` (the chat quota gate) or by
+    `user_id` (the dashboard bot list). Idempotent — the `period_end <= now` filter
+    means only elapsed rows are touched, so it is safe to call on every request and
+    a second call in the same request matches nothing. Caller is responsible for the
+    commit. Returns the number of rows reset.
+
+    `billing_period_end` (the user's Polar renewal date) anchors the NEW window to
+    Polar's monthly cycle when it's within ~a month (e.g. Explore's $0 monthly sub);
+    otherwise it falls back to a rolling 30-day window (annual plans, missing/lagging
+    renewal). See usage_period.next_period_for_subscription.
+
+    Chunks are NOT reset here — they are stored-knowledge counted from
+    company_knowledge, not a usage_tracking counter.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if company_id is not None:
+        scope_col, scope_val = "company_id", company_id
+    elif user_id is not None:
+        scope_col, scope_val = "user_id", user_id
+    else:
+        return 0
+    assert scope_col in _USAGE_RESET_SCOPES  # guard against future misuse
+    new_start, new_end = next_period_for_subscription(now, billing_period_end)
+    cursor.execute(
+        f"UPDATE usage_tracking SET messages_used = 0, period_start = %s, period_end = %s "
+        f"WHERE {scope_col} = %s AND period_end <= %s",
+        (new_start, new_end, scope_val, now),
+    )
+    return cursor.rowcount
+
 
 def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dict = None):
     """
@@ -604,6 +671,10 @@ app.state.limiter = limiter
 POLAR_PRODUCT_TIER_MAP = {
     pid: tier
     for tier, pid in {
+        # Explore — the $0 lifetime-free product (D1). Maps to the EXPLORE tier
+        # once POLAR_PRODUCT_ID_EXPLORE is set. Until then it's absent (filtered
+        # by `if pid`), exactly like ENTERPRISE — a safe no-op, no signups break.
+        "EXPLORE": os.getenv("POLAR_PRODUCT_ID_EXPLORE"),
         # Monthly products
         "STARTER": os.getenv("POLAR_PRODUCT_ID_STARTER"),
         "PRO": os.getenv("POLAR_PRODUCT_ID_PRO"),
@@ -996,6 +1067,7 @@ app.add_middleware(
 # `from main import ChatRequest` (etc.) and the test suite resolve unchanged.
 from models import (
     RegisterRequest, ChatMessage, ChatRequest, ChatResponse, LeadCaptureRequest,
+    ExploreEnquiryRequest, EnquiryDeclineRequest,
     SubscriptionRequest, HandoffMessage, HandoffRequest, UserRole, UserTier,
     CustomPlanConfig, AdminUpdateUserRequest, CompanyUpdate, RoiBenchmarkUpdate,
     DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
@@ -1525,10 +1597,40 @@ async def get_current_user(request: Request):
             row = cursor.fetchone()
 
             if not row and email != "unknown@email.com":
-                # Final fallback: provision new row if still none exists
+                # Final fallback: provision new row if still none exists. Only reached for
+                # genuinely-new signups (paid Polar accounts reconcile above & short-circuit).
+                #
+                # Explore §6 (C2b): if an *approved* enquiry already exists for this email
+                # (they were approved before registering), grant EXPLORE immediately;
+                # otherwise stamp FREE + the gate-holding status from email_routing
+                # (PENDING for real emails, BLOCKED for disposable/invalid).
+                #
+                # The pre-approval lookup is SAVEPOINT-guarded so that a missing
+                # `explore_enquiries` table (migration v24 not yet applied) — or any
+                # transient error — can NEVER break the hot auth path: it just falls
+                # back to the normal (non-approved) signup.
+                _pre_approved = False
+                try:
+                    cursor.execute("SAVEPOINT pre_approval_chk")
+                    cursor.execute(
+                        "SELECT 1 FROM explore_enquiries WHERE lower(email) = lower(%s) "
+                        "AND status = 'approved' LIMIT 1",
+                        (email,),
+                    )
+                    _pre_approved = cursor.fetchone() is not None
+                    cursor.execute("RELEASE SAVEPOINT pre_approval_chk")
+                except Exception as _pa_err:
+                    try:
+                        cursor.execute("ROLLBACK TO SAVEPOINT pre_approval_chk")
+                    except Exception:
+                        pass
+                    _pre_approved = False
+                    print(f"PRE-APPROVAL CHECK SKIPPED: {_pa_err}")
+
+                _new_tier, _new_status = signup_provisioning(email, pre_approved=_pre_approved)
                 cursor.execute(
-                    "INSERT INTO users (clerk_id, email) VALUES (%s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config",
-                    (clerk_id, email)
+                    "INSERT INTO users (clerk_id, email, tier, subscription_status) VALUES (%s, %s, %s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config",
+                    (clerk_id, email, _new_tier, _new_status)
                 )
                 row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
@@ -1653,17 +1755,16 @@ async def get_admin_user(user: dict = Depends(get_current_user)):
 
 async def require_premium_tier(user: dict = Depends(get_current_user)):
     """
-    Route Guard: Blocks FREE-tier users from accessing AI Command Center routes.
-    Starter and all higher paid tiers are permitted.
+    Route Guard: Blocks users without a real plan from AI Command Center routes.
+    Allowed: Explore ($0) and all paid tiers (+ SUPER_ADMIN). Blocked: FREE /
+    PENDING / no-tier. Decision logic lives in access_gate (single source of
+    truth, mirrored on the frontend). Behaviour-preserving for existing tiers;
+    additionally recognises EXPLORE as allowed and PENDING as blocked.
     """
-    tier = user.get("tier")
-    role = user.get("role")
-    
-    # Block FREE-tier users unless they are a SUPER_ADMIN
-    if (tier == "FREE" or tier is None) and role != "SUPER_ADMIN":
+    if not is_dashboard_access_allowed(user.get("role"), user.get("tier")):
         raise HTTPException(
             status_code=403,
-            detail="Access denied: This feature requires an active paid subscription."
+            detail="Access denied: This feature requires an active plan. Choose a plan to continue."
         )
     return user
 
@@ -2237,7 +2338,7 @@ async def chat_endpoint(
                        (SELECT SUM(messages_used) FROM usage_tracking WHERE company_id = %s),
                        0
                    ) AS messages_used,
-                   u.id, ut.id as usage_id, u.role
+                   u.id, ut.id as usage_id, u.role, ut.period_end, u.billing_period_end
             FROM users u
             JOIN companies c ON c.user_id = u.id
             LEFT JOIN usage_tracking ut ON ut.company_id = c.id
@@ -2249,7 +2350,22 @@ async def chat_endpoint(
         if not sub_data:
             raise HTTPException(status_code=404, detail="Subscription data not found.")
 
-        tier, trial_end, status, messages_used, user_uuid, usage_id, user_role = sub_data
+        tier, trial_end, status, messages_used, user_uuid, usage_id, user_role, ut_period_end, user_billing_end = sub_data
+
+        # D2: self-healing monthly reset. If this bot's usage window has elapsed,
+        # zero its counter and roll the window BEFORE the quota gate below — so a
+        # new month's first visitor is served (and a "resting" bot auto-revives)
+        # instead of staying blocked forever. Wrapped so a reset hiccup never
+        # blocks chat (mirrors the grace-period downgrade's defensive try/except).
+        if usage_id and should_reset_usage(datetime.now(timezone.utc), ut_period_end):
+            try:
+                _reset_elapsed_usage_periods(cursor, company_id=company["id"],
+                                             billing_period_end=user_billing_end)
+                conn.commit()
+                messages_used = 0
+            except Exception as _reset_err:
+                print(f"USAGE RESET ERROR (company={company['id']}): {_reset_err}")
+
         plan = get_plan(tier, role=user_role, custom_plan_config=company.get("custom_plan_config"))
         current_limit = plan["messages"]  # Per-bot quota
 
@@ -2891,6 +3007,504 @@ async def capture_lead(
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         release_db_connection(conn)
+
+def _super_admin_emails() -> list:
+    """Configured super-admin recipient(s), in priority order."""
+    raw = os.getenv("ADMIN_EMAILS") or os.getenv("ADMIN_EMAIL") or os.getenv("SUPER_ADMIN_EMAIL") or ""
+    return [e.strip() for e in raw.split(",") if e.strip()]
+
+
+def _send_enquiry_notification(enquiry: dict) -> None:
+    """Notify the super-admin that a NEW Explore enquiry is awaiting review (§6).
+
+    Plain notification — no action tokens; approve/decline happens in the admin
+    panel. Best-effort + fire-and-forget: no-ops when no admin email or provider
+    is configured, and never raises (runs in a BackgroundTask).
+    """
+    import html as _html
+    recipients = _super_admin_emails()
+    if not recipients:
+        return
+    app_url = os.getenv("APP_BASE_URL", "https://www.sapybase.com").rstrip("/")
+    review_url = f"{app_url}/admin"
+
+    def esc(v):
+        return _html.escape(str(v)) if v else "—"
+
+    def row(label, val):
+        return (f"<tr><td style='padding:6px 0;color:#64748b;font-size:13px'>{label}</td>"
+                f"<td style='padding:6px 0;font-size:13px;font-weight:600'>{esc(val)}</td></tr>")
+
+    subject = f"New Explore enquiry — {enquiry.get('email', '')}"
+    body = (
+        "<div style=\"font-family:Inter,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1e293b\">"
+        "<h2 style='margin:0 0 4px'>📋 New Explore enquiry</h2>"
+        "<p style='color:#64748b;margin:0 0 20px'>Someone requested Explore access and is awaiting your approval.</p>"
+        "<table style='width:100%;border-collapse:collapse;margin-bottom:24px'>"
+        + row("Email", enquiry.get("email"))
+        + row("Name", enquiry.get("name"))
+        + row("Company", enquiry.get("company_name"))
+        + row("Use case", enquiry.get("use_case"))
+        + row("Type", enquiry.get("email_class"))
+        + "</table>"
+        f"<a href='{review_url}' style='display:inline-block;padding:12px 24px;background:#2563eb;"
+        "color:#fff;text-decoration:none;border-radius:9999px;font-weight:600;font-size:14px'>"
+        "Review in dashboard →</a>"
+        "<p style='color:#94a3b8;font-size:12px;margin-top:24px'>Vaayu Intelligence · Explore enquiries</p>"
+        "</div>"
+    )
+    try:
+        send_transactional_email(recipients[0], subject, body)
+    except Exception as e:  # defensive — send_transactional_email already swallows
+        print(f"ENQUIRY NOTIFICATION FAILED: {e}")
+
+
+@app.post("/api/explore/enquiry")
+@limiter.limit("3/minute", key_func=get_remote_address)   # burst guard
+@limiter.limit("10/hour", key_func=get_remote_address)    # daily-ish abuse ceiling per IP
+async def submit_explore_enquiry(
+    request: Request,
+    payload: ExploreEnquiryRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Public: a personal-email applicant requests Explore access (pending super-admin approval).
+
+    Business emails never reach here — they self-serve the instant $0 sub. This
+    handles the gmail.com-style case: record the enquiry as 'pending' so an admin
+    can approve it (Phase C). Disposable/invalid emails are rejected, not stored.
+    """
+    from email_routing import classify_email_domain, DISPOSABLE, INVALID
+
+    # Honeypot: bots fill the hidden `website` field. Silently accept + drop so
+    # the bot believes it succeeded and doesn't retry with a different vector.
+    if payload.website:
+        return {"status": "pending", "message": "Thanks! Your request is under review."}
+
+    email_class = classify_email_domain(payload.email)
+    if email_class in (DISPOSABLE, INVALID):
+        # Abuse / throwaway address — do not persist.
+        raise HTTPException(
+            status_code=422,
+            detail="Please use a valid, non-disposable email address.",
+        )
+
+    client_ip = get_remote_address(request)
+    user_agent = (request.headers.get("user-agent") or "")[:512]
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Idempotency: surface the existing state rather than stacking duplicates.
+        cursor.execute(
+            """
+            SELECT status FROM explore_enquiries
+            WHERE lower(email) = lower(%s)
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (payload.email,),
+        )
+        existing = cursor.fetchone()
+        if existing and existing[0] == "pending":
+            return {"status": "pending",
+                    "message": "We've already received your request — it's under review."}
+        if existing and existing[0] == "approved":
+            return {"status": "approved",
+                    "message": "You're already approved — sign in to get started."}
+
+        cursor.execute(
+            """
+            INSERT INTO explore_enquiries
+                (email, name, company_name, use_case, email_class, status, source_ip, user_agent)
+            VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
+            RETURNING id
+            """,
+            (payload.email, payload.name, payload.company_name, payload.use_case,
+             email_class, client_ip, user_agent),
+        )
+        enquiry_id = cursor.fetchone()[0]
+        conn.commit()
+
+        # Notify the super-admin — only fires for a genuinely NEW enquiry (the
+        # duplicate pending/approved cases return early above, so no spam on re-submit).
+        background_tasks.add_task(_send_enquiry_notification, {
+            "email": payload.email,
+            "name": payload.name,
+            "company_name": payload.company_name,
+            "use_case": payload.use_case,
+            "email_class": email_class,
+        })
+
+        return {
+            "status": "pending",
+            "enquiry_id": str(enquiry_id),
+            "message": "Thanks! Your request is under review. We'll email you once access is granted.",
+        }
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"EXPLORE ENQUIRY ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/explore/route")
+@limiter.limit("30/minute")
+async def explore_route_for_user(request: Request, user: dict = Depends(get_current_user)):
+    """Tell the pricing 'Get Explore' CTA where to send THIS signed-in user:
+
+      active   → already has dashboard access (Explore or paid) — go to dashboard
+      checkout → business email → Polar $0 hosted checkout (no card)
+      enquiry  → personal/free email → enquiry + manual approval
+      blocked  → disposable/invalid email → no path
+
+    Keeps the business-vs-personal domain classification server-side (single
+    source of truth). The frontend builds the actual Polar checkout URL.
+    """
+    from email_routing import classify_email_domain
+    email = user.get("email") or ""
+    return {
+        "route": explore_cta_route(user.get("tier"), email),
+        "tier": user.get("tier"),
+        "email_class": classify_email_domain(email),
+    }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# EXPLORE ENQUIRY APPROVAL (§6, Phase C2) — admin queue + one-click email links
+# ════════════════════════════════════════════════════════════════════════════
+
+_ENQUIRY_COLS = ("id, email, name, company_name, use_case, email_class, status, "
+                 "created_at, reviewed_at, reviewed_by, review_note")
+
+
+def _enquiry_row_to_dict(r) -> dict:
+    return {
+        "id": str(r[0]),
+        "email": r[1],
+        "name": r[2],
+        "company_name": r[3],
+        "use_case": r[4],
+        "email_class": r[5],
+        "status": r[6],
+        "created_at": r[7].isoformat() if r[7] else None,
+        "reviewed_at": r[8].isoformat() if r[8] else None,
+        "reviewed_by": r[9],
+        "review_note": r[10],
+    }
+
+
+def _fetch_enquiry(cursor, enquiry_id: str):
+    try:
+        cursor.execute(f"SELECT {_ENQUIRY_COLS} FROM explore_enquiries WHERE id = %s", (enquiry_id,))
+    except Exception:
+        # Malformed UUID etc. — treat as not found rather than 500.
+        return None
+    row = cursor.fetchone()
+    return _enquiry_row_to_dict(row) if row else None
+
+
+def _grant_explore_to_email(cursor, email: str) -> int:
+    """Interim grant: flip any matching user row to active EXPLORE. Returns rows updated.
+
+    0 means they haven't signed up yet — the now-`approved` enquiry grants them
+    EXPLORE on first sign-in via the JIT path (see get_current_user). The tier guard
+    prevents ever downgrading a paying user who shares the address.
+    TODO(A0): swap this direct flip for the Polar $0-sub provision call so the grant
+    flows through the subscription webhook like every other tier.
+    """
+    cursor.execute(
+        """
+        UPDATE users
+           SET tier = 'EXPLORE', subscription_status = 'ACTIVE'
+         WHERE lower(email) = lower(%s)
+           AND COALESCE(tier, 'FREE') IN ('FREE', 'EXPLORE')
+        """,
+        (email,),
+    )
+    return cursor.rowcount
+
+
+def _apply_enquiry_action(conn, cursor, enquiry: dict, action: str, *,
+                          reviewed_by: str, reason: Optional[str] = None) -> dict:
+    """Shared core for both the admin endpoints and the email-link endpoint.
+
+    Resolves the action against the current status, applies it atomically (guarded
+    by `status='pending'` for concurrency), grants Explore on approve, and audit-logs.
+    """
+    outcome = _ea.resolve_action(enquiry["status"], action)
+    if outcome == _ea.OUTCOME_INVALID:
+        return {"ok": False, "outcome": outcome, "status": enquiry["status"]}
+    if outcome in (_ea.OUTCOME_NOOP_APPROVED, _ea.OUTCOME_NOOP_REJECTED):
+        # Terminal — re-click / already actioned. Friendly no-op.
+        return {"ok": True, "outcome": outcome, "already": True, "status": enquiry["status"],
+                "email": enquiry["email"]}
+
+    target = _ea.target_status_for(action)
+    # Atomic transition: only flips a still-pending row (loses a concurrent race safely).
+    cursor.execute(
+        """
+        UPDATE explore_enquiries
+           SET status = %s, reviewed_at = NOW(), reviewed_by = %s, review_note = %s
+         WHERE id = %s AND status = 'pending'
+        """,
+        (target, reviewed_by, reason, enquiry["id"]),
+    )
+    if cursor.rowcount == 0:
+        # Someone actioned it between our read and write — report the current state.
+        conn.rollback()
+        fresh = _fetch_enquiry(cursor, enquiry["id"])
+        cur_status = fresh["status"] if fresh else enquiry["status"]
+        noop = (_ea.OUTCOME_NOOP_APPROVED if cur_status == _ea.STATUS_APPROVED
+                else _ea.OUTCOME_NOOP_REJECTED)
+        return {"ok": True, "outcome": noop, "already": True, "status": cur_status,
+                "email": enquiry["email"]}
+
+    granted_users = 0
+    if action == _ea.ACTION_APPROVE:
+        granted_users = _grant_explore_to_email(cursor, enquiry["email"])
+    conn.commit()
+
+    log_admin_action(
+        reviewed_by,
+        "EXPLORE_ENQUIRY_APPROVE" if action == _ea.ACTION_APPROVE else "EXPLORE_ENQUIRY_DECLINE",
+        enquiry["id"],
+        {"email": enquiry["email"], "new_status": target,
+         "granted_users": granted_users, "reason": reason},
+    )
+    return {"ok": True, "outcome": "applied", "status": target,
+            "granted_users": granted_users, "email": enquiry["email"]}
+
+
+@app.get("/api/admin/explore/enquiries")
+@limiter.limit("30/minute")
+def list_explore_enquiries(
+    request: Request,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    """Super Admin: the Explore enquiry queue (filter by status, search email/company)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        clauses, params = [], []
+        if status in ("pending", "approved", "rejected"):
+            clauses.append("status = %s")
+            params.append(status)
+        if q and q.strip():
+            clauses.append("(lower(email) LIKE %s OR lower(COALESCE(company_name,'')) LIKE %s)")
+            like = f"%{q.strip().lower()}%"
+            params.extend([like, like])
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        # NOTE: `where` is assembled from constants only; all values are bound params.
+        cursor.execute(
+            f"SELECT {_ENQUIRY_COLS} FROM explore_enquiries {where} "
+            f"ORDER BY (status = 'pending') DESC, created_at DESC LIMIT 500",
+            params,
+        )
+        rows = cursor.fetchall()
+        pending = sum(1 for r in rows if r[6] == "pending")
+        return {"enquiries": [_enquiry_row_to_dict(r) for r in rows], "pending_count": pending}
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/explore/enquiries/{enquiry_id}/approve")
+@limiter.limit("30/minute")
+def approve_explore_enquiry(request: Request, enquiry_id: str, admin: dict = Depends(get_admin_user)):
+    """Super Admin: approve an enquiry → grant Explore + mark approved (audit-logged)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        enquiry = _fetch_enquiry(cursor, enquiry_id)
+        if not enquiry:
+            raise HTTPException(status_code=404, detail="Enquiry not found.")
+        return _apply_enquiry_action(
+            conn, cursor, enquiry, _ea.ACTION_APPROVE,
+            reviewed_by=admin.get("email") or admin.get("clerk_id") or "super_admin",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"ENQUIRY APPROVE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/explore/enquiries/{enquiry_id}/decline")
+@limiter.limit("30/minute")
+def decline_explore_enquiry(
+    request: Request,
+    enquiry_id: str,
+    payload: EnquiryDeclineRequest,
+    admin: dict = Depends(get_admin_user),
+):
+    """Super Admin: decline an enquiry with a required reason (audit-logged)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        enquiry = _fetch_enquiry(cursor, enquiry_id)
+        if not enquiry:
+            raise HTTPException(status_code=404, detail="Enquiry not found.")
+        return _apply_enquiry_action(
+            conn, cursor, enquiry, _ea.ACTION_DECLINE,
+            reviewed_by=admin.get("email") or admin.get("clerk_id") or "super_admin",
+            reason=payload.reason,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"ENQUIRY DECLINE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+# ── One-click email links (no login) ─────────────────────────────────────────
+# GET renders a read-only confirm page (prefetch-safe — email scanners/SafeLinks
+# can hit the GET without mutating anything); the actual change is a POST from
+# that page's button.
+
+def _enquiry_action_shell(title: str, body_html: str, accent: str = "#2563eb") -> str:
+    return f"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{title} — Vaayu</title></head>
+<body style="margin:0;background:#f8fafc;font-family:Inter,Segoe UI,system-ui,sans-serif;color:#1e293b">
+<div style="max-width:520px;margin:48px auto;padding:0 20px">
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;box-shadow:0 8px 30px rgba(0,0,0,.04)">
+    <div style="width:48px;height:48px;border-radius:9999px;background:{accent}1a;display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:24px">⚡</div>
+    <h1 style="font-size:22px;margin:0 0 12px">{title}</h1>
+    {body_html}
+  </div>
+  <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:20px">Vaayu Intelligence · Explore enquiries</p>
+</div></body></html>"""
+
+
+def _enquiry_summary_html(enquiry: dict) -> str:
+    def row(label, val):
+        return (f"<tr><td style='padding:6px 0;color:#64748b;font-size:13px'>{label}</td>"
+                f"<td style='padding:6px 0;font-size:13px;font-weight:600'>{(val or '—')}</td></tr>")
+    return ("<table style='width:100%;border-collapse:collapse;margin:8px 0 24px'>"
+            + row("Email", enquiry["email"])
+            + row("Name", enquiry["name"])
+            + row("Company", enquiry["company_name"])
+            + row("Type", enquiry["email_class"])
+            + "</table>")
+
+
+@app.get("/api/explore/enquiry/action", response_class=HTMLResponse)
+@limiter.limit("20/minute", key_func=get_remote_address)
+def explore_enquiry_action_page(request: Request, token: str = "", action: str = ""):
+    """Read-only confirm page reached from the email button (no mutation here)."""
+    ok, info = _ea.verify_action_token(token, _enquiry_token_secret())
+    if not ok:
+        msg = ("This link has expired — open the admin dashboard to action it instead."
+               if info == "expired" else "This link is invalid or has been tampered with.")
+        return HTMLResponse(_enquiry_action_shell("Link not valid",
+                            f"<p style='color:#64748b'>{msg}</p>", accent="#dc2626"), status_code=400)
+    if action and action != info["action"]:
+        return HTMLResponse(_enquiry_action_shell("Link not valid",
+                            "<p style='color:#64748b'>Action mismatch.</p>", accent="#dc2626"),
+                            status_code=400)
+    action = info["action"]
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        enquiry = _fetch_enquiry(cursor, info["enquiry_id"])
+    finally:
+        release_db_connection(conn)
+    if not enquiry:
+        return HTMLResponse(_enquiry_action_shell("Not found",
+                            "<p style='color:#64748b'>That enquiry no longer exists.</p>",
+                            accent="#dc2626"), status_code=404)
+
+    outcome = _ea.resolve_action(enquiry["status"], action)
+    if outcome in (_ea.OUTCOME_NOOP_APPROVED, _ea.OUTCOME_NOOP_REJECTED):
+        state = "approved" if outcome == _ea.OUTCOME_NOOP_APPROVED else "declined"
+        return HTMLResponse(_enquiry_action_shell("Already actioned",
+                            f"<p style='color:#64748b'>This enquiry was already <b>{state}</b>. "
+                            f"Nothing more to do.</p>"))
+
+    verb = "Approve & grant Explore" if action == _ea.ACTION_APPROVE else "Decline"
+    accent = "#2563eb" if action == _ea.ACTION_APPROVE else "#dc2626"
+    note_field = ("" if action == _ea.ACTION_APPROVE else
+                  "<input name='reason' required minlength='3' placeholder='Reason for declining (required)' "
+                  "style='width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #e2e8f0;"
+                  "border-radius:10px;margin-bottom:14px;font-size:14px'>")
+    body = (f"<p style='color:#64748b;margin:0 0 8px'>Please confirm this action:</p>"
+            + _enquiry_summary_html(enquiry)
+            + f"<form method='post' action='/api/explore/enquiry/action'>"
+            f"<input type='hidden' name='token' value='{token}'>"
+            f"<input type='hidden' name='action' value='{action}'>"
+            + note_field
+            + f"<button type='submit' style='width:100%;padding:12px;border:0;border-radius:9999px;"
+            f"background:{accent};color:#fff;font-size:15px;font-weight:600;cursor:pointer'>{verb}</button>"
+            "</form>")
+    return HTMLResponse(_enquiry_action_shell(verb, body, accent=accent))
+
+
+@app.post("/api/explore/enquiry/action", response_class=HTMLResponse)
+@limiter.limit("20/minute", key_func=get_remote_address)
+async def explore_enquiry_action_apply(
+    request: Request,
+    token: str = Form(""),
+    action: str = Form(""),
+    reason: str = Form(""),
+):
+    """Apply the action confirmed on the GET page (the only mutating path for email links)."""
+    ok, info = _ea.verify_action_token(token, _enquiry_token_secret())
+    if not ok:
+        return HTMLResponse(_enquiry_action_shell("Link not valid",
+                            "<p style='color:#64748b'>This link is invalid or expired.</p>",
+                            accent="#dc2626"), status_code=400)
+    action = info["action"]
+    if action == _ea.ACTION_DECLINE and len((reason or "").strip()) < 3:
+        return HTMLResponse(_enquiry_action_shell("Reason required",
+                            "<p style='color:#64748b'>A decline reason is required. Go back and add one.</p>",
+                            accent="#dc2626"), status_code=400)
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        enquiry = _fetch_enquiry(cursor, info["enquiry_id"])
+        if not enquiry:
+            return HTMLResponse(_enquiry_action_shell("Not found",
+                                "<p style='color:#64748b'>That enquiry no longer exists.</p>",
+                                accent="#dc2626"), status_code=404)
+        result = _apply_enquiry_action(
+            conn, cursor, enquiry, action,
+            reviewed_by="super_admin (email link)",
+            reason=(reason.strip() if action == _ea.ACTION_DECLINE else None),
+        )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"ENQUIRY EMAIL-ACTION ERROR: {e}")
+        return HTMLResponse(_enquiry_action_shell("Something went wrong",
+                            "<p style='color:#64748b'>Please try again from the admin dashboard.</p>",
+                            accent="#dc2626"), status_code=500)
+    finally:
+        release_db_connection(conn)
+
+    if result.get("already"):
+        state = "approved" if result["outcome"] == _ea.OUTCOME_NOOP_APPROVED else "declined"
+        return HTMLResponse(_enquiry_action_shell("Already actioned",
+                            f"<p style='color:#64748b'>This enquiry was already <b>{state}</b>.</p>"))
+    if action == _ea.ACTION_APPROVE:
+        return HTMLResponse(_enquiry_action_shell("Approved ✅",
+                            f"<p style='color:#64748b'><b>{enquiry['email']}</b> now has Explore access. "
+                            "A welcome email is on its way.</p>", accent="#16a34a"))
+    return HTMLResponse(_enquiry_action_shell("Declined",
+                        f"<p style='color:#64748b'>Enquiry from <b>{enquiry['email']}</b> was declined.</p>"))
+
 
 @app.post("/api/handoff")
 @limiter.limit("5/minute;30/hour")  # Per-API-Key — protects merchant inboxes from spam
@@ -4853,6 +5467,16 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # D2: self-healing monthly reset for the owner's view — zero any of this
+        # user's bots whose usage window has elapsed BEFORE reading, so an idle
+        # bot shows a fresh 0/limit at month rollover instead of a stale "limit
+        # reached" until its next visitor chats. Non-fatal on error.
+        try:
+            _reset_elapsed_usage_periods(cursor, user_id=user["id"],
+                                         billing_period_end=user.get("billing_period_end"))
+            conn.commit()
+        except Exception as _reset_err:
+            print(f"USAGE RESET ERROR (user={user['id']}): {_reset_err}")
         cursor.execute(
             """SELECT c.id, c.company_name, c.allowed_origin, c.bot_name, c.theme_color,
                       c.logo_url, c.initial_message, c.display_order, c.is_active,
