@@ -31,6 +31,35 @@ const PricingPreview = () => {
           </p>
         </div>
 
+        {/* Explore — lifetime-free plan, Coming Soon (slim teaser above the tiers) */}
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200/60 dark:border-slate-800/60 bg-white dark:bg-white/[0.06]">
+              <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400">explore</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-google font-semibold text-slate-900 dark:text-white">Explore</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-0.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  </span>
+                  <span className="text-[10px] font-display font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Coming Soon</span>
+                </span>
+              </div>
+              <p className="text-sm font-google text-slate-500 dark:text-slate-400">The full Vaayu Intelligence platform — free, forever.</p>
+            </div>
+          </div>
+          <Link
+            href="/pricing"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 px-6 py-3 text-sm font-google font-medium text-slate-900 dark:text-slate-200 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
+          >
+            Learn more
+            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </Link>
+        </div>
+
         {/* Tiers — compact preview (Starter / Growth / Scale) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {PLANS.filter((plan) => PREVIEW_PLAN_IDS.includes(plan.id)).map((plan) => {

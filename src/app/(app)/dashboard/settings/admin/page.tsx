@@ -8,6 +8,7 @@ import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 import SkeletonLoader from '@/src/app/components/SkeletonLoader';
 import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
+import ExploreEnquiriesTab from './ExploreEnquiriesTab';
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 const TIERS = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'];
@@ -854,7 +855,7 @@ export default function AdminPage() {
   const { userRole } = useUserRole();
   const authFetch = useAuthenticatedFetch();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics' | 'enquiries'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -890,6 +891,16 @@ export default function AdminPage() {
     queryFn: () => authFetch('/api/admin/custom-plan/metrics') as Promise<any>,
     enabled: isAdmin && activeTab === 'metrics',
   });
+
+  // Explore enquiries — fetched always (not just on the tab) so the pending
+  // badge is live on every tab. Shares its cache key with ExploreEnquiriesTab.
+  const enquiriesQuery = useQuery({
+    queryKey: ['admin', 'explore-enquiries'],
+    queryFn: () => authFetch('/api/admin/explore/enquiries') as Promise<any>,
+    enabled: isAdmin,
+    refetchInterval: 60_000,
+  });
+  const pendingEnquiries = enquiriesQuery.data?.pending_count || 0;
 
   const users = usersQuery.data || [];
   const stats = statsQuery.data || { total_users: 0, total_companies: 0, active_bots: 0, total_messages: 0, custom_plan_count: 0 };
@@ -992,6 +1003,7 @@ export default function AdminPage() {
             { key: 'users', label: 'All users', icon: 'group' },
             { key: 'plans', label: 'Custom plans', icon: 'build' },
             { key: 'metrics', label: 'Metrics', icon: 'bar_chart' },
+            { key: 'enquiries', label: 'Enquiries', icon: 'inbox' },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -1004,6 +1016,11 @@ export default function AdminPage() {
             >
               <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
               {tab.label}
+              {tab.key === 'enquiries' && pendingEnquiries > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-semibold rounded-full bg-amber-500 text-white">
+                  {pendingEnquiries}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -1323,6 +1340,13 @@ export default function AdminPage() {
               </>
             );
           })()}
+        </div>
+      )}
+
+      {/* ── Explore enquiries ── */}
+      {activeTab === 'enquiries' && (
+        <div className="px-6 md:px-8 py-6">
+          <ExploreEnquiriesTab />
         </div>
       )}
 

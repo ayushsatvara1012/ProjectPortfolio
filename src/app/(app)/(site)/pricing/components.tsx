@@ -85,7 +85,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, string> = {
   'Knowledge chunks / bot': 'Units of text (≈512 tokens each) your bot stores from documents, URLs, and FAQs. More chunks = richer knowledge base.',
   'Response speed': 'Latency and priority for generating responses. Ultra = <1s average, Dedicated = <2s, Priority = <3s, Standard = <5s.',
   'Custom branding & colors': 'Customize the chat widget color scheme, fonts, and styling to match your brand guidelines.',
-  'White-label (remove Sapybase)': 'Remove all Sapybase branding and logos from the chat widget. Display your brand exclusively.',
+  'White-label (remove Vaayu badge)': 'Remove the “Powered by Vaayu Intelligence” badge and all platform branding from the chat widget. Display your brand exclusively.',
   'Human handoff': 'Enable bot-to-agent handoff. The bot can transfer conversations to live agents with full transcript context.',
   'Lead capture / CRM': 'Capture visitor contact info from chat. Basic = name/email only. Full CRM = integrations with Zapier, webhooks, etc.',
   'Webhooks & Zapier': 'Connect your bot to 10,000+ apps via Zapier, or send custom data to your backend via webhooks.',
@@ -107,7 +107,7 @@ export const COMPARISON_FEATURES = [
   {
     category: 'Branding & Customization', rows: [
       { label: 'Custom branding & colors', starter: true, pro: true, business: true },
-      { label: 'White-label (remove Sapybase)', starter: false, pro: false, business: true },
+      { label: 'White-label (remove Vaayu badge)', starter: false, pro: false, business: true },
       { label: 'Human handoff', starter: false, pro: false, business: true },
     ]
   },
@@ -145,6 +145,8 @@ export const FAQS = [
   { q: 'Is my data private and secure?', a: 'Yes. We never sell your data or your visitors’ data, and your content is never used to train external AI models beyond your own bot. Everything is encrypted in transit (TLS), API keys are hashed and never stored in plaintext, and the embeddable widget is locked to the domains you authorize. See our Privacy Policy for full details.' },
   { q: 'Can I remove your branding?', a: 'Scale and Custom plans include full white-label — upload your own logo, set your brand colors, and remove the platform badge entirely so the widget looks 100% yours.' },
   { q: 'What about integrations and human handoff?', a: 'Growth and above can hand a live conversation to a human agent with the full transcript attached. Scale adds Slack alerts for hot leads and outbound webhooks, so you can push captured leads straight into your CRM or any tool via Zapier.' },
+  { q: 'Is Explore really free forever?', a: 'Yes — Explore is a lifetime-free plan, not a trial. You get the full Vaayu Intelligence platform (analytics, lead capture, WhatsApp/human handoff, webhooks, custom branding and the advanced bot) with no time limit and no credit card. Cost-bearing limits are capped — 1 bot, 200 messages/month, 75 knowledge chunks — and every deployed bot keeps the “Powered by Vaayu Intelligence” badge. Upgrade to a paid plan anytime for higher limits, a faster model, and full white-label.' },
+  { q: 'Why do I need a business email for Explore?', a: 'Explore is built for businesses and agencies, so we grant instant access to sign-ups from a business or custom domain. Personal-email sign-ups (gmail, yahoo, outlook, etc.) are welcome too — just tell us about your business via a short enquiry and we approve access, usually within 24 hours. This keeps the free platform sustainable and reserved for real use cases.' },
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -237,3 +239,137 @@ export const BottomCTA = () => (
     </div>
   </section>
 );
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   EXPLORE — "COMING SOON" (lifetime-free top-of-funnel banner)
+   Full-width horizontal hero shown ABOVE the Starter / Growth / Scale cards.
+   Presentational only (no hooks, no framer-motion) so it's SSR-safe to import
+   anywhere. Theme-matched: font-display / font-google, material-symbols icons,
+   dark mode, rounded corners, brand gradients. Responsive: stacks on mobile,
+   splits identity | features horizontally from lg up.
+ ───────────────────────────────────────────────────────────────────────────── */
+
+const EXPLORE_HIGHLIGHTS: { icon: string; label: string }[] = [
+  { icon: 'smart_toy', label: '1 AI Bot' },
+  { icon: 'forum', label: '200 messages / month' },
+  { icon: 'database', label: '75 knowledge chunks' },
+  { icon: 'contact_mail', label: 'Lead capture & scoring' },
+  { icon: 'analytics', label: 'Full analytics dashboard' },
+  { icon: 'support_agent', label: 'WhatsApp & human handoff' },
+  { icon: 'webhook', label: 'Webhooks & integrations' },
+  { icon: 'palette', label: 'Custom logo & appearance' },
+  { icon: 'tune', label: 'Advanced bot — prompt & tone' },
+];
+
+export const ExploreComingSoon = ({
+  onGetExplore,
+  busy = false,
+  message = null,
+}: {
+  onGetExplore?: () => void;
+  busy?: boolean;
+  message?: string | null;
+} = {}) => {
+  // "Live" mode (an action handler was passed) flips the card from a passive
+  // "Coming Soon" teaser into an actionable "Get Explore — Free" CTA.
+  const live = typeof onGetExplore === 'function';
+  return (
+  <section
+    aria-label={live ? 'Explore plan' : 'Explore plan — coming soon'}
+    className="relative mb-6 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800/60 bg-white dark:bg-white/[0.02] backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-gray-300 dark:hover:border-slate-700 hover:shadow-lg dark:hover:shadow-slate-950/20"
+  >
+    <div className="flex flex-col lg:flex-row">
+      {/* LEFT — identity + price + CTA */}
+      <div className="flex flex-col gap-5 p-7 sm:p-8 lg:w-[38%] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-slate-800/60">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-white/[0.06]">
+            <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400">explore</span>
+          </div>
+          <div className="flex flex-col items-start gap-1.5">
+            <h3 className="text-lg font-display font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">Explore</h3>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 px-3 py-1">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+              </span>
+              <span className="text-[10px] font-display font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">{live ? 'Free Forever' : 'Coming Soon'}</span>
+            </span>
+          </div>
+        </div>
+
+        <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
+          The full Vaayu Intelligence platform — analytics, lead capture, WhatsApp handoff and more —{' '}
+          <span className="font-semibold text-slate-800 dark:text-slate-200">free, forever.</span> Built for businesses and agencies.
+        </p>
+
+        <div className="flex items-end gap-2">
+          <span className="text-4xl sm:text-5xl font-display font-black text-slate-900 dark:text-slate-100">Free</span>
+          <span className="mb-1.5 text-sm font-google text-slate-500 dark:text-slate-400">forever · no card</span>
+        </div>
+
+        {live ? (
+          <button
+            type="button"
+            onClick={onGetExplore}
+            disabled={busy}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 dark:bg-white px-6 py-4 text-sm font-display font-bold uppercase tracking-widest text-white dark:text-slate-900 transition-all duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className={`material-symbols-outlined text-[16px] ${busy ? 'animate-spin' : ''}`}>
+              {busy ? 'progress_activity' : 'explore'}
+            </span>
+            {busy ? 'One moment…' : 'Get Explore — Free'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-slate-100 dark:bg-white/[0.06] border border-gray-200 dark:border-slate-800/60 px-6 py-4 text-sm font-display font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400"
+          >
+            <span className="material-symbols-outlined text-[16px]">schedule</span>
+            Coming Soon
+          </button>
+        )}
+        {message && (
+          <p className="text-xs font-google text-amber-600 dark:text-amber-400 leading-relaxed">{message}</p>
+        )}
+
+        <div className="flex items-start gap-1.5">
+          <span className="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500 shrink-0">bolt</span>
+          <span className="text-[11px] font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+            Every deployed bot keeps the “Powered by Vaayu Intelligence” badge.
+          </span>
+        </div>
+      </div>
+
+      {/* RIGHT — feature highlights */}
+      <div className="flex-1 p-7 sm:p-8">
+        <div className="mb-5 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500">auto_awesome</span>
+          <span className="text-[10px] font-display font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Everything included</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {EXPLORE_HIGHLIGHTS.map(f => (
+            <div
+              key={f.label}
+              className="flex items-center gap-3 rounded-full border border-gray-200 dark:border-slate-800/60 bg-slate-50/60 dark:bg-white/[0.02] px-4 py-2.5 transition-colors hover:border-gray-300 dark:hover:border-slate-700"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-white/[0.06]">
+                <span className="material-symbols-outlined text-[15px] text-slate-600 dark:text-slate-400">{f.icon}</span>
+              </div>
+              <span className="text-sm font-google font-medium text-slate-700 dark:text-slate-300 leading-tight">{f.label}</span>
+            </div>
+          ))}
+          {/* The single honest exclusion */}
+          <div className="flex items-center gap-3 rounded-full border border-dashed border-gray-200 dark:border-slate-800/60 px-4 py-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/50">
+              <span className="material-symbols-outlined text-[15px] text-slate-400 dark:text-slate-600">remove</span>
+            </div>
+            <span className="text-sm font-google font-medium text-slate-400 dark:text-slate-500 leading-tight">White-label — on paid plans</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  );
+};

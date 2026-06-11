@@ -42,10 +42,10 @@ export default function ContactClient() {
         <ScrollReveal>
           {/* Main Grid: Info on left, Form on right */}
           <div className="flex flex-col-reverse lg:grid lg:grid-cols-2 gap-12 lg:gap-16 items-start mb-20 sm:mb-28">
-            
+
             {/* LEFT COLUMN (50%) - Sticky on Desktop */}
             <div className="w-full lg:sticky lg:top-32 space-y-12 lg:pl-8">
-              
+
               <div>
                 {/* 1. SECTION LABEL */}
                 <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 mb-4">
@@ -70,7 +70,7 @@ export default function ContactClient() {
               {/* 4. CONTACT METHODS */}
               <div className="space-y-3">
                 {/* Email Entry */}
-                <a 
+                <a
                   href="mailto:ayushsatvara2002@gmail.com"
                   className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950"
                 >
@@ -84,7 +84,7 @@ export default function ContactClient() {
                 </a>
 
                 {/* LinkedIn Entry */}
-                <a 
+                <a
                   href="https://linkedin.com/in/ayushsatvara"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -100,7 +100,7 @@ export default function ContactClient() {
                 </a>
 
                 {/* WhatsApp Entry */}
-                <div 
+                <div
                   onClick={showDev}
                   className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950 cursor-pointer"
                 >
@@ -114,8 +114,8 @@ export default function ContactClient() {
                 </div>
 
                 {/* Project Status Tracker entry */}
-                <div 
-                  onClick={showError} 
+                <div
+                  onClick={showError}
                   className="rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-800/40 p-4 flex items-center justify-center gap-2 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-colors bg-emerald-50/10 dark:bg-emerald-950/5 text-emerald-600 dark:text-emerald-400 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">forum</span>
@@ -128,7 +128,7 @@ export default function ContactClient() {
             {/* RIGHT COLUMN (50%) */}
             <div className="w-full lg:pr-4">
               <div className="rounded-3xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950 p-5 sm:p-8 lg:p-10 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none transition-all duration-300">
-                
+
                 {/* CARD HEADER */}
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-6 mb-8">
                   <div className="flex items-center gap-2">
@@ -148,11 +148,11 @@ export default function ContactClient() {
                       <label htmlFor="name" className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
                         Name
                       </label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         id="name"
                         required
-                        placeholder="Name" 
+                        placeholder="Name"
                         className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full"
                       />
                     </div>
@@ -160,11 +160,11 @@ export default function ContactClient() {
                       <label htmlFor="email" className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
                         Email
                       </label>
-                      <input 
-                        type="email" 
+                      <input
+                        type="email"
                         id="email"
                         required
-                        placeholder="Email" 
+                        placeholder="Email"
                         className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full"
                       />
                     </div>
@@ -175,7 +175,7 @@ export default function ContactClient() {
                     <label className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
                       Service
                     </label>
-                    
+
                     {/* Visual pill selector (3 cols on sm+, wrap on mobile) */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       {[
@@ -191,11 +191,10 @@ export default function ContactClient() {
                             key={service}
                             type="button"
                             onClick={() => setSelectedService(service)}
-                            className={`px-4 py-3 text-sm font-google font-medium rounded-xl border text-center transition-all duration-200 ${
-                              isSelected
+                            className={`px-4 py-3 text-sm font-google font-medium rounded-xl border text-center transition-all duration-200 ${isSelected
                                 ? 'bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400'
                                 : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors'
-                            }`}
+                              }`}
                           >
                             {service}
                           </button>
@@ -210,19 +209,19 @@ export default function ContactClient() {
                     <label htmlFor="message" className="text-sm font-google font-medium text-slate-700 dark:text-slate-300">
                       Tell us about your project
                     </label>
-                    <textarea 
+                    <textarea
                       id="message"
                       rows={5}
                       required
-                      placeholder="What are you building? Timeline? Budget range?" 
+                      placeholder="What are you building? Timeline? Budget range?"
                       className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full resize-none"
                     />
                   </div>
 
                   {/* SUBMIT BUTTON */}
                   <div className="w-full flex flex-col items-center lg:items-stretch">
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="w-full sm:w-auto lg:w-full overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
                     >
                       {/* Wave layer 1 — lightest blue, reveals first */}
@@ -231,7 +230,7 @@ export default function ContactClient() {
                       <span className="absolute w-[75%] h-36 -top-22 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-700 duration-700 origin-left" />
                       {/* Wave layer 3 — dark blue, reveals last */}
                       <span className="absolute w-[30%] h-32 -top-14 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-1000 duration-500 origin-left" />
-                      
+
                       {/* Hover label — fades in on top of waves */}
                       <span className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute z-10 whitespace-nowrap flex items-center gap-2">
                         Send It →
@@ -268,8 +267,8 @@ export default function ContactClient() {
                 {faqs.map((faq, i) => {
                   const isOpen = activeFaq === i;
                   return (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className="rounded-xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950 overflow-hidden transition-colors duration-300"
                     >
                       <button
@@ -279,19 +278,17 @@ export default function ContactClient() {
                         <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
                           {faq.q}
                         </span>
-                        <span 
-                          className={`material-symbols-outlined transition-transform duration-300 text-[16px] text-slate-400 dark:text-slate-500 group-hover:text-blue-500 ${
-                            isOpen ? 'rotate-180 text-blue-500' : ''
-                          }`}
+                        <span
+                          className={`material-symbols-outlined transition-transform duration-300 text-[16px] text-slate-400 dark:text-slate-500 group-hover:text-blue-500 ${isOpen ? 'rotate-180 text-blue-500' : ''
+                            }`}
                         >
                           expand_more
                         </span>
                       </button>
-                      
-                      <div 
-                        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-                          isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-                        }`}
+
+                      <div
+                        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                          }`}
                         style={{ display: 'grid' }}
                       >
                         <div className="overflow-hidden">

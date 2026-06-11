@@ -5,6 +5,10 @@ import { motion, useInView } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Mail } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useUser, useClerk, useAuth } from '@clerk/nextjs';
+import { buildPolarCheckoutUrl } from '@/src/lib/billing/checkout';
+import { fetchExploreRoute, exploreDestination } from '@/src/lib/billing/explore';
 import {
   PRICE_MATRIX,
   CURRENCIES,
@@ -15,7 +19,8 @@ import {
   CheckMark,
   CellValue,
   FaqItem,
-  accentMap
+  accentMap,
+  ExploreComingSoon
 } from './components';
 
 export default function PricingClient() {
@@ -25,6 +30,60 @@ export default function PricingClient() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [selectedPlans, setSelectedPlans] = useState<Set<string>>(new Set(['STARTER', 'PRO']));
   const [highlightedPlan, setHighlightedPlan] = useState<string | null>(null);
+
+  const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const { openSignUp } = useClerk();
+  const router = useRouter();
+  const [exploreBusy, setExploreBusy] = useState(false);
+  const [exploreMessage, setExploreMessage] = useState<string | null>(null);
+
+  // Plan-card CTA: signed-in users go straight to the Polar checkout for the
+  // selected tier; signed-out users get the sign-up/login flow first and are
+  // forwarded to checkout afterwards (via the /subscribe continuation route).
+  const handleSubscribe = (tier: string) => {
+    if (isSignedIn) {
+      const url = buildPolarCheckoutUrl(tier, billingPeriod, {
+        userId: user?.id ?? null,
+        origin: window.location.origin,
+      });
+      // Fall back to the in-app pricing page if a checkout link isn't configured.
+      window.location.href = url ?? '/dashboard/pricing';
+      return;
+    }
+    openSignUp({
+      forceRedirectUrl: `/subscribe?plan=${tier}&period=${billingPeriod}`,
+    });
+  };
+
+  // "Get Explore" CTA. Signed-out → sign up, then the /subscribe?plan=EXPLORE
+  // continuation routes them. Signed-in → ask the backend which path applies
+  // (business → Polar $0 checkout, personal → enquiry, blocked, or already-active).
+  const handleGetExplore = async () => {
+    setExploreMessage(null);
+    if (!isSignedIn) {
+      openSignUp({ forceRedirectUrl: '/subscribe?plan=EXPLORE' });
+      return;
+    }
+    setExploreBusy(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('no token');
+      const route = await fetchExploreRoute(token);
+      const dest = exploreDestination(route, {
+        userId: user?.id ?? null,
+        origin: window.location.origin,
+      });
+      if (dest.kind === 'external') window.location.href = dest.url;
+      else if (dest.kind === 'navigate') router.push(dest.path);
+      else setExploreMessage(dest.text);
+    } catch {
+      // Network/auth hiccup — fall back to the enquiry form rather than dead-end.
+      router.push('/explore/enquiry');
+    } finally {
+      setExploreBusy(false);
+    }
+  };
 
   const heroRef = useRef(null);
   const cardsRef = useRef(null);
@@ -161,6 +220,9 @@ export default function PricingClient() {
             </div>
           </div>
 
+          {/* Explore — lifetime-free plan, Coming Soon (full-width, above the cards) */}
+          <ExploreComingSoon onGetExplore={handleGetExplore} busy={exploreBusy} message={exploreMessage} />
+
           {/* Plan Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {PLANS.map((plan, i) => {
@@ -220,17 +282,17 @@ export default function PricingClient() {
                     </div>
 
                     {/* CTA Button */}
-                    <Link
-                      href="/dashboard/pricing"
-                      className={`w-full py-4 text-sm font-display font-bold uppercase tracking-widest flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98] ${
-                        plan.badge
+                    <button
+                      type="button"
+                      onClick={() => handleSubscribe(plan.id)}
+                      className={`w-full py-4 text-sm font-display font-bold uppercase tracking-widest flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98] ${plan.badge
                           ? 'bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-800 dark:hover:bg-slate-100 shadow-lg'
                           : 'bg-slate-100 dark:bg-white/[0.06] text-slate-900 dark:text-slate-200 border border-gray-200 dark:border-slate-800/60 hover:bg-slate-200 dark:hover:bg-white/[0.10]'
-                      }`}
+                        }`}
                     >
                       {`Get ${plan.name}`}
                       <ArrowRight size={14} />
-                    </Link>
+                    </button>
                   </div>
                 </motion.div>
               );
@@ -267,11 +329,10 @@ export default function PricingClient() {
                   }
                   setSelectedPlans(newSelected);
                 }}
-                className={`px-4 sm:px-5 py-3 rounded-xl font-display font-bold uppercase tracking-wide text-xs sm:text-sm transition-all duration-300 border ${
-                  selectedPlans.has(plan.id)
+                className={`px-4 sm:px-5 py-3 rounded-xl font-display font-bold uppercase tracking-wide text-xs sm:text-sm transition-all duration-300 border ${selectedPlans.has(plan.id)
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-black border-slate-700 dark:border-slate-200 shadow-lg'
                     : 'bg-slate-50 dark:bg-white/[0.02] text-slate-700 dark:text-slate-300 border-gray-200 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700'
-                }`}
+                  }`}
               >
                 {plan.name}
               </button>
@@ -316,9 +377,8 @@ export default function PricingClient() {
                               return (
                                 <div
                                   key={planId}
-                                  className={`flex-1 px-6 py-5 flex items-center justify-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900/40 transition-all duration-200 ${
-                                    planIdx !== 0 ? 'border-l border-gray-100 dark:border-slate-800/50' : ''
-                                  } ${isDimmed ? 'opacity-40' : 'opacity-100'}`}
+                                  className={`flex-1 px-6 py-5 flex items-center justify-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900/40 transition-all duration-200 ${planIdx !== 0 ? 'border-l border-gray-100 dark:border-slate-800/50' : ''
+                                    } ${isDimmed ? 'opacity-40' : 'opacity-100'}`}
                                   onMouseEnter={() => setHighlightedPlan(planId)}
                                   onMouseLeave={() => setHighlightedPlan(null)}
                                 >

@@ -17,12 +17,12 @@ const navLinks = [
 ];
 
 const usecaseList = [
-'E-commerce support',
-'SaaS customer success',
-'Local business FAQs',
-'Agency client bots',
-'Real estate inquiries',
-'HR & internal knowledge bases',
+  'E-commerce support',
+  'SaaS customer success',
+  'Local business FAQs',
+  'Agency client bots',
+  'Real estate inquiries',
+  'HR & internal knowledge bases',
 ];
 
 export default function Footer() {
@@ -179,7 +179,7 @@ export default function Footer() {
               </div>
             </div>
             <div>
-                <a href="https://fazier.com/launches/www.sapybase.com" target="_blank" rel="noopener noreferrer"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=neutral" width={120} height={51} loading="lazy" decoding="async" alt="Sapybase launch on Fazier" /></a>
+              <a href="https://fazier.com/launches/www.sapybase.com" target="_blank" rel="noopener noreferrer"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=neutral" width={120} height={51} loading="lazy" decoding="async" alt="Sapybase launch on Fazier" /></a>
             </div>
             <div className="flex items-center gap-3">
               <Activity size={14} className="text-emerald-500" />
@@ -189,7 +189,7 @@ export default function Footer() {
             </div>
           </div>
 
-          
+
 
         </div>
       </div>

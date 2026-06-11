@@ -6,21 +6,9 @@ import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import Alert from '@/src/app/components/Alert';
-
-// Monthly Polar checkout links per tier.
-const POLAR_URLS: Record<string, string | undefined> = {
-    STARTER: process.env.NEXT_PUBLIC_POLAR_STARTER_URL,
-    PRO: process.env.NEXT_PUBLIC_POLAR_PRO_URL,
-    BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_URL,
-};
-
-// Annual Polar checkout links per tier (2 months free). Set these in env when
-// the annual products exist in Polar; falls back to monthly if unset.
-const POLAR_URLS_ANNUAL: Record<string, string | undefined> = {
-    STARTER: process.env.NEXT_PUBLIC_POLAR_STARTER_ANNUAL_URL,
-    PRO: process.env.NEXT_PUBLIC_POLAR_PRO_ANNUAL_URL,
-    BUSINESS: process.env.NEXT_PUBLIC_POLAR_BUSINESS_ANNUAL_URL,
-};
+// Checkout links resolved from the shared single source (also used by the
+// marketing /pricing page and the /subscribe continuation route).
+import { POLAR_URLS, POLAR_URLS_ANNUAL } from '@/src/lib/billing/checkout';
 
 const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
@@ -189,7 +177,7 @@ const AppPricing = () => {
                                         className={`px-4 py-2 text-sm font-medium font-google rounded-lg transition-all capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${billingPeriod === period
                                             ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
                                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                                        }`}
+                                            }`}
                                     >
                                         {period}
                                         {period === 'annual' && (
@@ -216,7 +204,7 @@ const AppPricing = () => {
                                             className={`px-4 py-2 text-sm font-medium font-google rounded-lg transition-all ${currency === curr
                                                 ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm'
                                                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                                            }`}
+                                                }`}
                                         >
                                             {curr}
                                         </button>
@@ -229,6 +217,32 @@ const AppPricing = () => {
 
                 {/* ── Plan Cards ── */}
                 <div className="px-6 md:px-8 pb-6">
+                    {/* Explore — lifetime-free plan, Coming Soon (in-app teaser above the tiers) */}
+                    <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
+                                <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400">explore</span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base font-google font-semibold text-slate-900 dark:text-slate-200">Explore</span>
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-0.5">
+                                        <span className="relative flex h-1.5 w-1.5">
+                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                        </span>
+                                        <span className="text-[10px] font-google font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Coming Soon</span>
+                                    </span>
+                                </div>
+                                <p className="text-xs font-google text-slate-500 dark:text-slate-400">Lifetime-free — the full Vaayu Intelligence platform. Launching soon.</p>
+                            </div>
+                        </div>
+                        <span className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-slate-100 dark:bg-slate-700 px-5 py-2.5 text-sm font-google font-medium text-slate-500 dark:text-slate-400">
+                            <span className="material-symbols-outlined text-[16px]">schedule</span>
+                            Coming Soon
+                        </span>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         {plans.map((plan, i) => {
                             const isCurrent = plan.id === userTier;
@@ -287,13 +301,12 @@ const AppPricing = () => {
                                     <button
                                         onClick={() => handleSelectPlan(plan.id)}
                                         disabled={isLoading || isCurrent}
-                                        className={`w-full py-3 min-h-[44px] text-sm font-semibold font-google rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
-                                            isCurrent
+                                        className={`w-full py-3 min-h-[44px] text-sm font-semibold font-google rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${isCurrent
                                                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                                                 : plan.highlight
                                                     ? 'bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-700 dark:hover:bg-slate-200'
                                                     : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                        }`}
+                                            }`}
                                     >
                                         {isCurrent ? (
                                             'Current plan'

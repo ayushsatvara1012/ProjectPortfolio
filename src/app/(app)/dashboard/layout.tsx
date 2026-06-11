@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import AppLayout from '@/src/app/components/AppLayout';
 import UserSeed from '@/src/app/components/UserSeed';
 import DashboardProviders from './DashboardProviders';
+import { isDashboardAccessAllowed } from '@/src/lib/auth/accessGate';
 
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   } catch {
     // fall through; client-side refreshUser will retry.
+  }
+
+  // Dashboard access gate (Explore D5). DORMANT until EXPLORE_DASHBOARD_GATE=true.
+  // ⚠️ Do NOT enable until: (1) the $0 Explore Polar product exists (A0),
+  // (2) signup routing provisions new users (Phase B), and (3) existing FREE
+  // users are migrated to Explore — otherwise this redirects every FREE/new
+  // user to /pricing and locks them out. Backend require_premium_tier already
+  // enforces the same rule on data routes (always on, additive/safe).
+  if (
+    process.env.EXPLORE_DASHBOARD_GATE === 'true' &&
+    !isDashboardAccessAllowed(role, tier)
+  ) {
+    redirect('/pricing');
   }
 
   return (

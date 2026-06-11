@@ -44,12 +44,22 @@ export default function SmoothScrollProvider({
       // smooth scrolling. Lenis only handles document scroll; nested elements
       // with overflow-y: auto should scroll natively without Lenis interference.
       prevent: (node: HTMLElement) => {
-        // Check if the element or any parent up to <html> has overflow-y: auto/scroll
+        // Prevent Lenis only for elements that are GENUINE nested scroll
+        // containers — overflow-y auto/scroll AND actually overflowing
+        // (scrollHeight > clientHeight). The extra check matters: a layout
+        // wrapper can *compute* overflow-y:auto without ever scrolling — e.g.
+        // `overflow-x-hidden` forces the visible y-axis to compute as `auto`
+        // (a CSS quirk). Such a div has scrollHeight === clientHeight; treating
+        // it as a scroll container wrongly disabled page smooth-scroll for the
+        // whole route (this was the /pricing Lenis bug).
         let el: HTMLElement | null = node;
         while (el && el !== document.documentElement) {
           const overflow = window.getComputedStyle(el).overflowY;
-          if (overflow === 'auto' || overflow === 'scroll') {
-            return true; // Prevent Lenis from handling this scroll
+          if (
+            (overflow === 'auto' || overflow === 'scroll') &&
+            el.scrollHeight > el.clientHeight
+          ) {
+            return true; // genuine nested scroller — let it scroll natively
           }
           el = el.parentElement;
         }

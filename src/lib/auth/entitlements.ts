@@ -22,6 +22,18 @@ function parseCustomPlanFeatures(raw: unknown): FeatureMap | null {
 //   Starter = STARTER ($19) · Growth = PRO ($49) · Scale = BUSINESS ($99).
 const TIER_DEFAULTS: Record<string, Partial<Entitlements>> = {
   FREE: {},
+  // Explore: lifetime-free ($0 Polar sub). Full product ON EXCEPT white-label —
+  // the permanent "Powered by Vaayu Intelligence" badge is the viral engine.
+  // canWhiteLabel is intentionally omitted (defaults false) and must never be granted
+  // via any self-serve path. MUST mirror config.py › PLAN_LIMITS["EXPLORE"].
+  EXPLORE: {
+    canUseCustomLogo: true,
+    canUseWebhooks: true,
+    canUseHumanHandoff: true,
+    canUseLeadCapture: true,
+    canUseAnalytics: true,
+    canUseAdvancedBot: true,
+  },
   // Starter: RAG bot + UI customization only. No conversion engine.
   STARTER: { canUseAdvancedBot: true },
   // Growth: + lead capture / scoring / alerts / booking / Action Center / digest.
