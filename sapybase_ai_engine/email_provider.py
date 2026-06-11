@@ -122,11 +122,20 @@ def _send_via_smtp(to: str, subject: str, html: str, reply_to=None) -> bool:
         return False
 
 
+def _smtp_configured() -> bool:
+    """True when Gmail SMTP creds are present (usable as a fallback)."""
+    return bool((os.getenv("SMTP_USER") or "").strip() and (os.getenv("SMTP_PASS") or "").strip())
+
+
 def send_transactional_email(to: str, subject: str, html: str, reply_to=None) -> bool:
     """Send one HTML email via the active provider. Returns True on success.
 
-    No-ops (returns False) when no recipient or no provider is configured, and
-    never raises — callers can fire-and-forget safely.
+    Provider order: Resend (when keyed) → Gmail SMTP fallback. If Resend is the
+    active provider but the send FAILS (e.g. unverified domain 403, network blip),
+    we automatically retry via SMTP when those creds are configured — so a Resend
+    misconfiguration can't silently drop admin notifications. No-ops (returns
+    False) when no recipient or no provider is configured, and never raises —
+    callers can fire-and-forget safely.
     """
     if not to:
         return False
@@ -135,5 +144,11 @@ def send_transactional_email(to: str, subject: str, html: str, reply_to=None) ->
         logger.info("EMAIL: no provider configured (set RESEND_API_KEY or SMTP_USER/SMTP_PASS) — skipping.")
         return False
     if provider == "resend":
-        return _send_via_resend(to, subject, html, reply_to)
+        if _send_via_resend(to, subject, html, reply_to):
+            return True
+        # Resend failed — fall back to SMTP if available rather than dropping the email.
+        if _smtp_configured():
+            logger.warning("EMAIL: Resend send failed — falling back to Gmail SMTP.")
+            return _send_via_smtp(to, subject, html, reply_to)
+        return False
     return _send_via_smtp(to, subject, html, reply_to)
