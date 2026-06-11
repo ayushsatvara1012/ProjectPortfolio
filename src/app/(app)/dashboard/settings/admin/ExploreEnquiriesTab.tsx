@@ -121,6 +121,7 @@ export default function ExploreEnquiriesTab() {
     <div className="space-y-4">
       {/* Filters + search */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
           {FILTERS.map(f => {
             const count = f.key === 'all' ? all.length : all.filter(e => e.status === f.key).length;
@@ -139,6 +140,7 @@ export default function ExploreEnquiriesTab() {
               </button>
             );
           })}
+        </div>
         </div>
         <input
           value={search}

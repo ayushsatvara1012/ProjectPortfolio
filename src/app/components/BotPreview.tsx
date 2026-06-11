@@ -40,45 +40,39 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
       {/* ── Main Chatbot Box ── */}
       <div className={`w-full max-w-[95vw] sm:max-w-[480px] h-[60vh] sm:h-[600px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
         
-        {/* ── Header ── */}
-        <div className="relative shrink-0">
-          <div
-            className="absolute inset-0 animate-gradient-x opacity-20"
-            style={{
-              backgroundImage: `linear-gradient(90deg, ${THEME_COLOR}, #f97316, ${THEME_COLOR})`,
-              backgroundSize: '200% 200%'
-            }}
-          />
-          <div className={`backdrop-blur-md p-2 flex justify-end items-center relative z-10 border-b ${isDark ? 'bg-slate-900/40 text-slate-100 border-slate-800/50' : 'bg-white/40 text-slate-900 border-gray-200/50'}`}>
+        {/* ── Header (mirrors the live ChatWidget top nav exactly) ── */}
+        <div className={`relative shrink-0 border-b ${isDark ? 'bg-slate-900 border-slate-800/80' : 'bg-white border-slate-200/70'}`}>
+          <div className={`p-2 flex justify-end items-center relative ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <div className="relative flex flex-row justify-between items-center w-full">
-              {/* Left: Avatar + Name */}
-              <div className="relative flex items-center gap-3 pl-3">
-                <div className="relative inline-flex shrink-0">
-                  <BotAvatar
-                    shapeId={logoShape || 'circle'}
-                    logoUrl={LOGO_URL}
-                    botName={BOT_NAME}
-                    themeColor={THEME_COLOR}
-                    size="md"
-                    bgStyle={avatarBgStyle || 'none'}
-                    isCustom={!!customLogoUrl}
-                  />
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 animate-pulse z-10" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold font-google leading-tight text-slate-800 dark:text-slate-100">
+              {/* Left: Avatar + Name — avatar is always a circle, no shadow */}
+              <div className="relative flex items-center gap-3 pl-2">
+                <BotAvatar
+                  shapeId="circle"
+                  logoUrl={LOGO_URL}
+                  botName={BOT_NAME}
+                  themeColor={THEME_COLOR}
+                  size="md"
+                  hasShadow={false}
+                  bgStyle={avatarBgStyle || 'none'}
+                  isCustom={!!customLogoUrl}
+                />
+                <div className="flex flex-col gap-1.5">
+                  <p className={`text-[15px] font-google font-medium leading-none ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                     {BOT_NAME}
                   </p>
-                  <p className="text-[10px] text-slate-450 dark:text-slate-500 font-google">Online</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    <span className={`text-xs font-google leading-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Active now</span>
+                  </div>
                 </div>
               </div>
               {/* Right: Action buttons */}
               <div className="flex items-center gap-1">
                 <button className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>
-                  <MoreHorizontal size={20} className="text-slate-400" />
+                  <MoreHorizontal size={22} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
                 </button>
-                <button className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-colors group">
-                  <X size={20} className="text-red-500 group-hover:rotate-90 transition-transform" />
+                <button className={`p-2 rounded-full transition-colors group ${isDark ? 'hover:bg-red-950/30' : 'hover:bg-red-50'}`}>
+                  <X size={22} className={`${isDark ? 'text-slate-500 group-hover:text-red-400' : 'text-slate-400 group-hover:text-red-500'} transition-colors`} />
                 </button>
               </div>
             </div>

@@ -150,6 +150,16 @@ const SidebarContent = ({ onClose, expanded = true, trained, handleReset }: any)
                 </div>
             </nav>
 
+            {/* Back to Sapybase home */}
+            <SidebarItem
+                label="Back to Sapybase"
+                icon="home"
+                path="/"
+                onClick={onClose}
+                expanded={expanded}
+                trained={trained}
+            />
+
             {/* User footer */}
             <div className="px-5 py-4 flex items-center gap-3 min-h-[64px] bg-[#f8f9fa] dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
                 <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">JD</div>

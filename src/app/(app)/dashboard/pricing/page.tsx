@@ -10,7 +10,7 @@ import Alert from '@/src/app/components/Alert';
 // marketing /pricing page and the /subscribe continuation route).
 import { POLAR_URLS, POLAR_URLS_ANNUAL } from '@/src/lib/billing/checkout';
 
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 transition-colors duration-500';
 
 const CURRENCIES = {
     USD: { symbol: '$', label: 'USD', locale: 'en-US' },
@@ -157,7 +157,7 @@ const AppPricing = () => {
 
     return (
         <>
-            <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-900 transition-colors duration-500 overflow-x-hidden">
+            <div className="flex flex-col min-h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-x-hidden">
 
                 {/* ── Header ── */}
                 <div className="px-6 md:px-8 pt-8 pb-6 shrink-0">

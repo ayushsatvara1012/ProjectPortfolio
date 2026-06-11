@@ -32,7 +32,7 @@ const ACCOUNT_TABS = [
   { id: 'apikeys', label: 'API keys', icon: 'vpn_key' },
 ];
 
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 transition-colors duration-500';
 
 // ── Profile Tab ───────────────────────────────────────────────────────────────
 const ProfileTab = () => {
@@ -422,7 +422,7 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState('profile');
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
 
       {/* Header */}
       <div className="px-6 md:px-8 pt-6 pb-5">

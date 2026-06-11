@@ -1205,12 +1205,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-3 pl-2">
                     <div className="relative">
+                      {/* In-chat profile avatar is ALWAYS a circle with no shadow so any
+                          custom logo sits seamlessly. The selected shape applies to the
+                          FAB floating icon only — never here. */}
                       <BotAvatar
-                        shapeId={LOGO_SHAPE}
+                        shapeId="circle"
                         logoUrl={LOGO_URL}
                         botName={BOT_NAME}
                         themeColor={THEME_COLOR}
-                        sizeClass={`w-10 h-10 ${SHAPE_CLASS_MAP[LOGO_SHAPE] || 'rounded-full'}`}
+                        sizeClass="w-10 h-10 rounded-full"
+                        hasShadow={false}
                         isCustom={!!configData.custom_logo_url}
                         bgStyle={AVATAR_BG_STYLE}
                       />
@@ -1232,7 +1236,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     <button onClick={() => { if (isEmbed) { postToParent({ type: 'Sapybase:close' }); } else { setIsOpen(false); } }}
                       style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
                       className="p-2.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors group focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close chat">
-                      <X size={22} className="text-slate-400 dark:text-slate-500 group-hover:text-red-500 dark:group-hover:text-red-400 transition-all group-hover:rotate-90" />
+                      <X size={22} className="text-slate-400 dark:text-slate-500 group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors" />
                     </button>
                   </div>
                   <AnimatePresence>
@@ -1241,7 +1245,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-[2147483647] overflow-hidden">
                         {configData.lead_capture_enabled && (
                           <button onClick={handleHandoff} disabled={handoffSent}
-                            className="w-full text-left px-4 py-2 text-sm font-medium font-google text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50">
+                            className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50">
                             {handoffSent ? 'Team notified ✓' : 'Talk to a human'}
                             <span className="material-symbols-outlined text-[18px]">support_agent</span>
                           </button>
@@ -1255,14 +1259,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                           setHandoffSent(false);
                           setShowMenu(false);
                           setClearCount(c => c + 1);
-                        }} className="w-full text-left px-4 py-2 text-sm font-medium font-google text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+                        }} className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
                           Clear chat <span className="material-symbols-outlined">refresh</span>
                         </button>
                         <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
-                          className="w-full text-left px-4 py-2 text-sm font-medium font-google hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
-                          onClick={() => setShowMenu(false)} style={{ color: THEME_COLOR }}>
+                          className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
+                          onClick={() => setShowMenu(false)}>
                           Add to your site
-                          <span className="material-symbols-outlined text-sm font-medium font-google opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+                          <span className="material-symbols-outlined text-[18px] opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
                         </a>
                       </motion.div>
                     )}

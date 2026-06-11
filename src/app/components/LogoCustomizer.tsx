@@ -104,6 +104,7 @@ type BotAvatarProps = {
   themeColor?: string;
   bgStyle?: string;
   isCustom?: boolean;
+  hasShadow?: boolean;
 };
 
 export function BotAvatar({
@@ -114,6 +115,7 @@ export function BotAvatar({
   themeColor = '#5730F5',
   bgStyle = 'none',
   isCustom = true,
+  hasShadow = true,
 }: BotAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
@@ -154,7 +156,7 @@ export function BotAvatar({
       xmlns="http://www.w3.org/2000/svg"
       width={sizePx}
       height={sizePx}
-      className="shrink-0 drop-shadow-sm"
+      className={`shrink-0 ${hasShadow ? 'drop-shadow-sm' : ''}`}
       overflow="visible"
     >
       <defs>

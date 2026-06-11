@@ -981,8 +981,8 @@ export default function AdminPage() {
           Super admin console
         </h1>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        {/* Stats — single horizontal-scroll row on mobile (hidden scrollbar), grid on md+ */}
+        <div className="flex md:grid md:grid-cols-5 gap-4 mb-6 overflow-x-auto scrollbar-hide -mx-1 px-1">
           {[
             { label: 'Total users', value: stats.total_users, icon: 'group' },
             { label: 'Total bots', value: stats.total_companies, icon: 'smart_toy' },
@@ -990,14 +990,15 @@ export default function AdminPage() {
             { label: 'Messages', value: stats.total_messages?.toLocaleString(), icon: 'forum' },
             { label: 'Custom plans', value: stats.custom_plan_count, icon: 'build' },
           ].map((s, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl p-5 transition-colors duration-500">
+            <div key={i} className="min-w-[150px] shrink-0 md:min-w-0 bg-white dark:bg-slate-900 rounded-2xl p-5 transition-colors duration-500">
               <p className="text-xs font-medium font-google text-slate-400 dark:text-slate-500 mb-1 truncate">{s.label}</p>
               <h3 className="text-xl md:text-2xl font-semibold font-google truncate text-slate-900 dark:text-slate-100">{s.value}</h3>
             </div>
           ))}
         </div>
 
-        {/* Pill tab bar */}
+        {/* Pill tab bar — scrolls horizontally on mobile instead of overflowing the page */}
+        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
           {([
             { key: 'users', label: 'All users', icon: 'group' },
@@ -1023,6 +1024,7 @@ export default function AdminPage() {
               )}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
