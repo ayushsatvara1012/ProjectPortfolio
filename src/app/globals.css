@@ -193,6 +193,24 @@
     will-change: opacity, transform;
   }
 
+  /* ── Chat Widget: streamed markdown block ease-in (one-shot, GPU-composited).
+     Each completed/active block fades up once as it appears. React preserves the
+     wrapper across re-renders, so growing the tail block never replays it. The
+     spacing rule restores the inter-paragraph gap now that blocks render in
+     separate wrappers (each block's own last <p> has its bottom margin zeroed). */
+  @keyframes sapyBlockIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .sapy-md-block-in {
+    animation: sapyBlockIn 0.25s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+    will-change: opacity, transform;
+  }
+  .sapy-md-block-in:not(:last-child) { margin-bottom: 0.5rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .sapy-md-block-in { animation: none; }
+  }
+
   /* ── Chat Widget: Streaming text fade-in (simultaneous with ThinkingLogo fade-out) */
   @keyframes streamTextIn {
     from { opacity: 0; }

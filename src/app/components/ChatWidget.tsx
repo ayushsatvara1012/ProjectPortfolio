@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useId, useMemo, memo } from 'react';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -512,6 +512,58 @@ const MD_COMPONENTS = {
   ),
 };
 
+// Split markdown into top-level blocks (paragraphs / lists / headings / code),
+// breaking on blank lines but never inside a fenced code block. This lets each
+// COMPLETED block be memoized so it parses exactly once, instead of re-parsing
+// the entire message on every streamed frame (the old O(n²) hot path).
+function splitMarkdownBlocks(md: string): string[] {
+  if (!md) return [];
+  const lines = md.split('\n');
+  const blocks: string[] = [];
+  let cur: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    if (/^\s*```/.test(line)) inFence = !inFence;
+    if (!inFence && line.trim() === '') {
+      if (cur.length) { blocks.push(cur.join('\n')); cur = []; }
+    } else {
+      cur.push(line);
+    }
+  }
+  if (cur.length) blocks.push(cur.join('\n'));
+  return blocks;
+}
+
+// Advance `idx` forward by `n` WHOLE words within `buffer`, returning the new
+// boundary index. Never reveals a partial trailing word (waits for its
+// terminating whitespace) so the typewriter steps word-by-word, never mid-word.
+function advanceWords(buffer: string, idx: number, n: number): number {
+  let i = idx;
+  for (let w = 0; w < n; w++) {
+    while (i < buffer.length && /\s/.test(buffer[i])) i++;     // skip leading whitespace
+    const wordStart = i;
+    while (i < buffer.length && !/\s/.test(buffer[i])) i++;    // consume the word
+    if (i >= buffer.length) return wordStart > idx ? wordStart : idx; // word unterminated → hold it
+    while (i < buffer.length && (buffer[i] === ' ' || buffer[i] === '\t')) i++; // include trailing spaces
+  }
+  return i;
+}
+
+// One markdown block, memoized on its source. A finalized block never re-parses;
+// only the still-growing `tail` block does. `tail` also closes any half-typed
+// markers (incomplete **bold** / fences) so inline formatting stays live as it
+// streams. The wrapper carries a one-shot fade-in (plays once per block — React
+// preserves the element across re-renders, so growing the tail never replays it).
+const MarkdownBlock = memo(function MarkdownBlock({ source, tail }: { source: string; tail?: boolean }) {
+  return (
+    <div className="sapy-md-block-in">
+      <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
+        {tail ? sanitizeStreamMarkdown(source) : source}
+      </ReactMarkdown>
+    </div>
+  );
+});
+
 // ── StreamCallbacks ───────────────────────────────────────────────────────────
 
 type StreamCallbacks = {
@@ -546,17 +598,24 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
     const drain = (timestamp: number) => {
       if (!lastTickRef.current) lastTickRef.current = timestamp;
       const delta = timestamp - lastTickRef.current;
-      if (delta >= 26) {
-        lastTickRef.current = timestamp;
+      // Reveal WHOLE words (not chars): far fewer re-renders, and each re-render
+      // only re-parses the small tail block (not the whole message). Reveal more
+      // words per step when the buffer is far ahead so we never lag the network.
+      if (delta >= 38) {
         const buffer = bufferRef.current;
         const idx = displayIdxRef.current;
         if (idx < buffer.length) {
           const ahead = buffer.length - idx;
-          const charsToAdd = ahead > 80 ? 3 : ahead > 30 ? 2 : 1;
-          const newIdx = Math.min(idx + charsToAdd, buffer.length);
-          displayIdxRef.current = newIdx;
-          setDisplayedText(buffer.slice(0, newIdx));
-          onStreamTickRef.current?.();
+          const words = ahead > 220 ? 4 : ahead > 90 ? 2 : 1;
+          const newIdx = advanceWords(buffer, idx, words);
+          if (newIdx > idx) {
+            // Only reset the clock when we actually advanced — if we're waiting
+            // for a word boundary, re-check on the next frame instead of stalling.
+            lastTickRef.current = timestamp;
+            displayIdxRef.current = newIdx;
+            setDisplayedText(buffer.slice(0, newIdx));
+            onStreamTickRef.current?.();
+          }
         }
       }
       rafRef.current = requestAnimationFrame(drain);
@@ -599,30 +658,29 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
     };
   }, []);
 
-  if (isStreaming) {
-    const hasContent = displayedText.length > 0;
-    return (
-      <div className="relative min-h-[28px]">
+  // Streaming and final share ONE structure so React preserves the block
+  // instances when isStreaming flips off — no remount, no re-parse, no flash on
+  // completion. Only the tail block re-parses while typing; completed blocks are
+  // memoized. The ThinkingLogo still cross-fades out as the first content lands.
+  const sourceText = isStreaming ? displayedText : content;
+  const blocks = splitMarkdownBlocks(sourceText);
+  const hasContent = blocks.length > 0;
+
+  return (
+    <div className="relative min-h-[28px]">
+      {isStreaming && (
         <div style={{ opacity: hasContent ? 0 : 1, position: hasContent ? 'absolute' : 'relative', transition: 'opacity 0.2s ease-out', pointerEvents: hasContent ? 'none' : 'auto' }}>
           <ThinkingLogo size={40} className="origin-left" themeColor={themeColor} />
         </div>
-        {hasContent && (
-          <div className="leading-relaxed text-[15px] font-normal tracking-wide font-google">
-            <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
-              {sanitizeStreamMarkdown(displayedText)}
-            </ReactMarkdown>
-            <span className="sapy-stream-cursor" style={{ backgroundColor: themeColor }} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative leading-relaxed text-[15px] font-normal font-google">
-      <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
-        {content}
-      </ReactMarkdown>
+      )}
+      {hasContent && (
+        <div className="leading-relaxed text-[15px] font-normal font-google">
+          {blocks.map((b, i) => (
+            <MarkdownBlock key={i} source={b} tail={isStreaming && i === blocks.length - 1} />
+          ))}
+          {isStreaming && <span className="sapy-stream-cursor" style={{ backgroundColor: themeColor }} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -870,6 +928,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const userHasScrolledUpRef = useRef(false);
   const streamingCallbackRef = useRef<StreamCallbacks | null>(null);
   const animatedMsgIndices = useRef(new Set<number>());
+  // "New message ↓" pill: shown when a finished reply extends below the fold.
+  // We never auto-scroll during/after streaming — the pill lets the user jump
+  // down on their own terms, keeping their reading position stable.
+  const [showJumpPill, setShowJumpPill] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -910,7 +972,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   }, []);
 
   const handleScrollContainer = useCallback(() => {
-    userHasScrolledUpRef.current = !isNearBottom();
+    const atBottom = isNearBottom();
+    userHasScrolledUpRef.current = !atBottom;
+    // Reaching the bottom means they've seen the latest — dismiss the pill.
+    if (atBottom) setShowJumpPill(false);
   }, [isNearBottom]);
 
 
@@ -954,6 +1019,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setInput('');
     setIsLoading(true);
     userHasScrolledUpRef.current = false;
+    setShowJumpPill(false);
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const ctrl = new AbortController();
     abortControllerRef.current = ctrl;
@@ -1070,9 +1136,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               return updated;
             });
             setIsLoading(false);
-            // Only glide to the bottom if the user is already there — never yank
-            // them down mid-read when the answer finishes generating.
-            scrollToBottom(true);
+            // Never move the viewport on completion — keep the user exactly where
+            // they are for reading continuity. If the finished answer extends below
+            // the fold, surface the "new message" pill so they can jump down when
+            // they choose. Deferred a frame so isNearBottom reads the FINAL height
+            // (the message just jumped from typed-out text to full content).
+            requestAnimationFrame(() => { if (!isNearBottom()) setShowJumpPill(true); });
             if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current) {
               const lowerReply = fullContent.toLowerCase();
               const lowerUserMsg = userMessage.toLowerCase();
@@ -1195,7 +1264,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           <motion.div
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
-            className={`${isEmbed ? 'relative w-full h-full' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px]'} bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
+            className={`${isEmbed ? 'relative w-full h-full bg-white dark:bg-slate-900' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl'} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
             style={{ ...themeStyleVars, ...(isEmbed ? { height: '100%' } : isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {}) } as React.CSSProperties}
           >
             <div className="relative shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200/70 dark:border-slate-800/80">
@@ -1274,6 +1343,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             </div>
 
             <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
+              {showJumpPill && (
+                <button
+                  type="button"
+                  onClick={() => { forceScrollToBottom(true); setShowJumpPill(false); }}
+                  aria-label="Scroll to latest message"
+                  className="sapy-msg-in absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 shadow-lg shadow-black/10 hover:bg-gray-50 dark:hover:bg-slate-700 active:scale-95 transition-colors cursor-pointer">
+                  <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
+                </button>
+              )}
               <div ref={scrollContainerRef} onScroll={handleScrollContainer}
                 className="flex-1 min-h-0 px-3 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 style={{ maskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)' }}>
@@ -1344,7 +1422,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                   <div className="max-w-full whitespace-pre-wrap break-words text-[15px] font-normal font-google leading-relaxed">{msg.content}</div>
                                 ) : (
                                   <div className="min-w-0 max-w-full text-[15px] font-google leading-relaxed">
-                                    <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} onStreamTick={() => scrollToBottom(false)} />
+                                    <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} />
                                   </div>
                                 )}
                               </div>
