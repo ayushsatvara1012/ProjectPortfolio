@@ -1994,7 +1994,7 @@ Query: {query}
 Passages:
 {numbered}
 
-Respond ONLY with a JSON array of integers in the same order as the passages. Example: [8, 3, 9, 1, 7, 2, 6, 4, 0, 5]
+Respond ONLY with a JSON array of exactly {len(candidates)} integers, where each integer corresponds to the relevance score of the passage at the same index. Example: [8, 3, 9, 1, 7, 2, 6, 4, 0, 5]
 Output nothing else."""
 
         response = await rerank_model.ainvoke([HumanMessage(content=rerank_prompt)])

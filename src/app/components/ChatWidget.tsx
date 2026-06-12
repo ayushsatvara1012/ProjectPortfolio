@@ -1036,7 +1036,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       setIsLoading(false);
       return;
     }
-    const recentHistory = messages.slice(-4).map(m => ({ role: m.role, content: m.content }));
+    const recentHistory = messages
+      .filter(m => (m.role === 'user' || m.role === 'bot') && typeof m.content === 'string')
+      .slice(-4)
+      .map(m => ({ role: m.role, content: m.content! }));
     let firstChunkReceived = false;
     let sseRetryCount = 0;
     const SSE_MAX_RETRIES = 1;
