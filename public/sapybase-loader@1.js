@@ -230,7 +230,7 @@
     }
 
     _applyConfig(cfg) {
-      const themeColor = cfg.theme_color || '#5730F5';
+      const themeColor = cfg.theme_color || '#004DE8';
       const shapeId = cfg.logo_shape || 'circle';
       const shape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
       let logoUrl = cfg.custom_logo_url || '/logo2.svg';
@@ -311,7 +311,7 @@
       const themeColor =
         (cfg && cfg.theme_color) ||
         (window.SapybaseConfig && window.SapybaseConfig.themeColor) ||
-        '#5730F5';
+        '#004DE8';
 
       const style = document.createElement('style');
       style.textContent = [

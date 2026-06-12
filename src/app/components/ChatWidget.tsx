@@ -607,7 +607,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
           <ThinkingLogo size={40} className="origin-left" themeColor={themeColor} />
         </div>
         {hasContent && (
-          <div className="leading-relaxed text-[16px] font-normal tracking-wide font-google">
+          <div className="leading-relaxed text-[15px] font-normal tracking-wide font-google">
             <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
               {sanitizeStreamMarkdown(displayedText)}
             </ReactMarkdown>
@@ -619,7 +619,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
   }
 
   return (
-    <div className="relative leading-relaxed text-[16px] font-normal font-google">
+    <div className="relative leading-relaxed text-[15px] font-normal font-google">
       <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
         {content}
       </ReactMarkdown>
@@ -655,8 +655,6 @@ function themeVars(hex: string): Record<string, string> {
   return {
     '--sapy-theme': `#${c}`,                         // focus rings / borders
     '--sapy-theme-fg': lum > 0.6 ? '#0f172a' : '#ffffff', // readable header text
-    '--sapy-glow': `rgba(${r}, ${g}, ${b}, 0.45)`,   // loading glow
-    '--sapy-glow-ring': `rgba(${r}, ${g}, ${b}, 0.18)`,
     '--sapy-user-bg': `rgba(${r}, ${g}, ${b}, ${A_LIGHT})`,      // user bubble — softened theme (light)
     '--sapy-user-bg-dark': `rgba(${r}, ${g}, ${b}, ${A_DARK})`, // user bubble — softened theme (dark)
     '--sapy-user-fg': fgFor(A_LIGHT, 0.96),      // bubble text over the light chat surface
@@ -1276,9 +1274,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             </div>
 
             <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
-              <div className={`absolute inset-0 pointer-events-none z-20 transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="absolute inset-0 animate-pulse shadow-[inset_0px_0px_25px_var(--sapy-glow)] ring-1 ring-inset ring-[var(--sapy-glow-ring)]" />
-              </div>
               <div ref={scrollContainerRef} onScroll={handleScrollContainer}
                 className="flex-1 min-h-0 px-3 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 style={{ maskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)' }}>
@@ -1346,9 +1341,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                               <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'bot' && msg.isStreaming && isLoading ? '!bg-transparent !p-1' : ''} ${msg.role === 'user' ? 'w-fit max-w-full self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'rounded-2xl rounded-tr-none bg-[var(--sapy-user-bg)] dark:bg-[var(--sapy-user-bg-dark)] text-[var(--sapy-user-fg)] dark:text-[var(--sapy-user-fg-dark)]' : 'bg-slate-100/50 dark:bg-slate-900 text-gray-800 dark:text-slate-200 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`}>
                                 {msg.role === 'user' ? (
-                                  <div className="max-w-full whitespace-pre-wrap break-words text-[16px] font-normal font-google leading-relaxed">{msg.content}</div>
+                                  <div className="max-w-full whitespace-pre-wrap break-words text-[15px] font-normal font-google leading-relaxed">{msg.content}</div>
                                 ) : (
-                                  <div className="min-w-0 max-w-full text-[16px] font-google leading-relaxed">
+                                  <div className="min-w-0 max-w-full text-[15px] font-google leading-relaxed">
                                     <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} onStreamTick={() => scrollToBottom(false)} />
                                   </div>
                                 )}
@@ -1384,7 +1379,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <form onSubmit={handleSend} className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Ask anything"
-                    className="flex-1 max-h-32 min-h-[28px] bg-transparent resize-none py-[6px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-[16px] font-google [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex-1 max-h-32 min-h-[28px] bg-transparent resize-none py-[6px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-[15px] font-google [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     rows={1} disabled={isLoading} aria-label="Chat input" />
                   <button type="submit" disabled={isLoading || !input.trim()} aria-label="Send message"
                     className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 transition-colors disabled:cursor-not-allowed ${input.trim() && !isLoading ? 'text-blue-900 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
