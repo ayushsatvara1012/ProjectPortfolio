@@ -163,7 +163,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
             {[
               { label: 'Plan', value: plan.tier || '—' },
               { label: 'Messages / bot / mo', value: plan.message_limit >= 999999 ? 'Unlimited' : plan.message_limit.toLocaleString() },
-              { label: 'Knowledge chunks', value: plan.chunk_limit >= 999999 ? 'Unlimited' : plan.chunk_limit.toLocaleString() },
+              { label: 'Knowledge words', value: plan.chunk_limit >= 999999 ? 'Unlimited' : (plan.chunk_limit * 60).toLocaleString() },
             ].map((s, i) => (
               <div key={i} className="bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl transition-colors">
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-google mb-1">{s.label}</p>

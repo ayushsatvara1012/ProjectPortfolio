@@ -101,7 +101,7 @@ export default function TermsAndConditionsPage() {
                 until the end of the paid billing period. No further charges are made after cancellation.
               </li>
               <li>
-                <strong>Plan limits</strong> (bots, messages per month, knowledge chunks) are enforced
+                <strong>Plan limits</strong> (bots, messages per month, words of knowledge) are enforced
                 per-bot as described on the pricing page. Exceeding your message quota suspends chat
                 responses for that bot until the next billing cycle.
               </li>

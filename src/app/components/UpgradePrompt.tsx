@@ -36,13 +36,13 @@ const LIMIT_CONFIG: Record<string, LimitEntry> = {
     title: 'Knowledge Base Full',
     accent: 'rose',
     tip: (tier, limit) =>
-      `Your ${tier} plan allows ${limit?.toLocaleString()} knowledge chunks. Upgrade to train on more data.`,
+      `Your ${tier} plan's knowledge storage is full. Upgrade to train on more content.`,
   },
   CHUNK_QUOTA_OVERFLOW: {
     icon: Database,
     title: 'File Too Large for Plan',
     accent: 'rose',
-    tip: () => 'This file exceeds your remaining chunk quota. Please use smaller files or upgrade to get more storage.',
+    tip: () => 'This file exceeds your remaining knowledge storage. Please use smaller files or upgrade to get more.',
   },
   DEFAULT: {
     icon: Zap,

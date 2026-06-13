@@ -117,7 +117,6 @@ const BillingTab = () => {
 
   const showAlert = useCallback((type: any, title: string, msg: string) => {
     setAlert({ open: true, type, title, msg });
-    setTimeout(() => setAlert(prev => ({ ...prev, open: false })), 8000);
   }, []);
 
   const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));

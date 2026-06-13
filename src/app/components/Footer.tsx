@@ -149,10 +149,10 @@ export default function Footer() {
                   <div className="space-y-2">
                     <p className="text-[10px] tracking-[0.2em] font-bold text-slate-400 dark:text-slate-600">Connect_Direct</p>
                     <a
-                      href="mailto:ayushsatvara2002@gmail.com"
+                      href="mailto:ayush@sapybase.com"
                       className="text-sm font-google font-medium text-slate-900 dark:text-slate-200 hover:text-blue-400 dark:hover:text-blue-400 break-all transition-colors block"
                     >
-                      ayushsatvara2002@gmail.com
+                      ayush@sapybase.com
                     </a>
                   </div>
                   <div className="space-y-2">

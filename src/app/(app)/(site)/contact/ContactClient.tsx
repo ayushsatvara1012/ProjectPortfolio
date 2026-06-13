@@ -7,22 +7,51 @@ import ScrollReveal from '@/src/components/marketing/ScrollReveal';
 export default function ContactClient() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [selectedService, setSelectedService] = useState('Custom AI Chatbot');
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formMessage, setFormMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{ open: boolean; type: 'success' | 'error' | 'warning' | 'development'; msg: string }>({
     open: false,
     type: 'success',
     msg: ''
   });
 
-  const showError = (event: React.MouseEvent) => {
-    event.preventDefault();
-    setAlertConfig({ open: true, type: 'error', msg: 'No Status at the moment' });
-    setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 3000);
+  const showAlert = (type: typeof alertConfig.type, msg: string) => {
+    setAlertConfig({ open: true, type, msg });
   };
 
-  const showDev = (event: React.FormEvent | React.MouseEvent) => {
-    event.preventDefault();
-    setAlertConfig({ open: true, type: 'development', msg: 'Try using our whatsapp' });
-    setTimeout(() => setAlertConfig(prev => ({ ...prev, open: false })), 3000);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formName,
+          email: formEmail,
+          service: selectedService,
+          message: formMessage,
+        }),
+      });
+
+      if (res.ok) {
+        showAlert('success', 'Message sent! We\'ll get back to you within 24 hours.');
+        setFormName('');
+        setFormEmail('');
+        setFormMessage('');
+        setSelectedService('Custom AI Chatbot');
+      } else {
+        showAlert('error', 'Something went wrong. Please try emailing us directly.');
+      }
+    } catch {
+      showAlert('error', 'Network error. Please try again or email us directly.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const faqs = [
@@ -71,7 +100,7 @@ export default function ContactClient() {
               <div className="space-y-3">
                 {/* Email Entry */}
                 <a
-                  href="mailto:ayushsatvara2002@gmail.com"
+                  href="mailto:ayush@sapybase.com"
                   className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950"
                 >
                   <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
@@ -79,7 +108,7 @@ export default function ContactClient() {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-google text-slate-500 dark:text-slate-400">Direct line</span>
-                    <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200">ayushsatvara2002@gmail.com</span>
+                    <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200">ayush@sapybase.com</span>
                   </div>
                 </a>
 
@@ -100,9 +129,11 @@ export default function ContactClient() {
                 </a>
 
                 {/* WhatsApp Entry */}
-                <div
-                  onClick={showDev}
-                  className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950 cursor-pointer"
+                <a
+                  href="https://wa.me/15626681855"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800/60 p-4 flex items-center gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors bg-white dark:bg-slate-950"
                 >
                   <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-blue-500 text-[20px]">chat</span>
@@ -111,16 +142,7 @@ export default function ContactClient() {
                     <span className="text-sm font-google text-slate-500 dark:text-slate-400">Fastest response</span>
                     <span className="text-base font-google font-medium text-slate-800 dark:text-slate-200">Message us directly</span>
                   </div>
-                </div>
-
-                {/* Project Status Tracker entry */}
-                <div
-                  onClick={showError}
-                  className="rounded-2xl border border-dashed border-emerald-200 dark:border-emerald-800/40 p-4 flex items-center justify-center gap-2 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 transition-colors bg-emerald-50/10 dark:bg-emerald-950/5 text-emerald-600 dark:text-emerald-400 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">forum</span>
-                  <span className="text-sm uppercase tracking-widest font-bold font-google">Track Your Project Status</span>
-                </div>
+                </a>
               </div>
 
             </div>
@@ -141,7 +163,7 @@ export default function ContactClient() {
                 </div>
 
                 {/* FORM */}
-                <form onSubmit={showDev} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Row 1: Name and Email */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
@@ -152,6 +174,8 @@ export default function ContactClient() {
                         type="text"
                         id="name"
                         required
+                        value={formName}
+                        onChange={e => setFormName(e.target.value)}
                         placeholder="Name"
                         className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full"
                       />
@@ -164,6 +188,8 @@ export default function ContactClient() {
                         type="email"
                         id="email"
                         required
+                        value={formEmail}
+                        onChange={e => setFormEmail(e.target.value)}
                         placeholder="Email"
                         className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full"
                       />
@@ -201,7 +227,6 @@ export default function ContactClient() {
                         );
                       })}
                     </div>
-                    <input type="hidden" name="service" value={selectedService} />
                   </div>
 
                   {/* Row 3: Textarea */}
@@ -213,6 +238,8 @@ export default function ContactClient() {
                       id="message"
                       rows={5}
                       required
+                      value={formMessage}
+                      onChange={e => setFormMessage(e.target.value)}
                       placeholder="What are you building? Timeline? Budget range?"
                       className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-base font-google text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-mono focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 dark:focus:border-blue-500 outline-none transition-all duration-200 w-full resize-none"
                     />
@@ -222,7 +249,8 @@ export default function ContactClient() {
                   <div className="w-full flex flex-col items-center lg:items-stretch">
                     <button
                       type="submit"
-                      className="w-full sm:w-auto lg:w-full overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
+                      disabled={isSubmitting}
+                      className="w-full sm:w-auto lg:w-full overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {/* Wave layer 1 — lightest blue, reveals first */}
                       <span className="absolute w-[150%] h-50 -top-26 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-100 transition-transform group-hover:duration-500 duration-1000 origin-left" />
@@ -237,8 +265,8 @@ export default function ContactClient() {
                       </span>
                       {/* Default label */}
                       <span className="relative z-10 flex items-center gap-2 group-hover:opacity-0 transition-opacity duration-300">
-                        Send Message
-                        <span className="material-symbols-outlined text-[18px]">send</span>
+                        {isSubmitting ? 'Sending…' : 'Send Message'}
+                        {!isSubmitting && <span className="material-symbols-outlined text-[18px]">send</span>}
                       </span>
                     </button>
 
@@ -310,7 +338,7 @@ export default function ContactClient() {
         isOpen={alertConfig.open}
         type={alertConfig.type}
         message={alertConfig.msg}
-        onClose={() => setAlertConfig({ ...alertConfig, open: false })}
+        onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
       />
     </section>
   );

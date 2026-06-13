@@ -50,7 +50,6 @@ export default function DemoTrainAIPage() {
 
     const showAlert = (type: 'success' | 'error' | 'warning', msg: string) => {
         setAlert({ open: true, type, msg });
-        setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
     };
 
     const handleTrain = async (e: React.FormEvent) => {
@@ -85,7 +84,7 @@ export default function DemoTrainAIPage() {
 
     const handlePurge = () => {
         if (!window.confirm(
-            `⚠️ DESTRUCTIVE ACTION\n\nThis will permanently delete ALL ${chunksUsed} knowledge chunks for "${botConfig?.name}".\n\nThis cannot be undone. Continue?`
+            `⚠️ DESTRUCTIVE ACTION\n\nThis will permanently delete ALL knowledge content for "${botConfig?.name}".\n\nThis cannot be undone. Continue?`
         )) return;
         setIsPurging(true);
         clearKnowledge();
@@ -220,9 +219,9 @@ export default function DemoTrainAIPage() {
                         <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Data storage</h4>
                     </div>
                     <div className="flex items-end gap-1 mb-3">
-                        <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{chunksUsed}</span>
-                        <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {chunkLimit}</span>
-                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">chunks</span>
+                        <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{(chunksUsed * 60).toLocaleString()}</span>
+                        <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {(chunkLimit * 60).toLocaleString()}</span>
+                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">words</span>
                     </div>
                     {chunkPct !== null && (
                         <>
@@ -429,7 +428,7 @@ export default function DemoTrainAIPage() {
                                     <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 flex items-start gap-2">
                                         <span className="material-symbols-outlined text-[15px] text-blue-500 mt-0.5 shrink-0">info</span>
                                         <p className="text-xs text-blue-700 dark:text-blue-300 font-google leading-relaxed">
-                                            Each row becomes one knowledge chunk. Make sure your file has a <span className="font-bold">header row</span>. Re-uploading replaces the previous version.
+                                            Each row is stored as a piece of knowledge your bot can answer from. Make sure your file has a <span className="font-bold">header row</span>. Re-uploading replaces the previous version.
                                         </p>
                                     </div>
                                 )}

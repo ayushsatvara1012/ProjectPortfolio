@@ -18,7 +18,7 @@ from datetime import timedelta
 # EXPLORE = lifetime-free top-of-funnel (a $0 Polar subscription). Full product ON
 # (analytics, lead capture, WhatsApp/human handoff, webhooks, custom logo, advanced
 # bot) EXCEPT white_label — the permanent "Powered by Vaayu Intelligence" badge is the
-# viral engine. Cost-bearing dimensions are capped: 1 bot, 200 messages/mo, 75 chunks,
+# viral engine. Cost-bearing dimensions are capped: 1 bot, 1000 messages/mo, 200 chunks,
 # `lite` model, 50 owner-emails/mo. white_label is False here and must never be enabled
 # via any self-serve path (super-admin override only, logged).
 #
@@ -29,10 +29,10 @@ from datetime import timedelta
 # flag (see entitlements.ts, gated via company config not has_entitlement). Do not add it here.
 PLAN_LIMITS = {
     "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 0},
-    "EXPLORE":    {"max_bots": 1,   "messages": 200,    "chunks": 75,    "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50},
-    "STARTER":    {"max_bots": 1,   "messages": 1500,   "chunks": 300,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
-    "PRO":        {"max_bots": 3,   "messages": 5000,   "chunks": 1500,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
-    "BUSINESS":   {"max_bots": 5,   "messages": 15000,  "chunks": 5000,  "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
+    "EXPLORE":    {"max_bots": 1,   "messages": 1000,   "chunks": 200,   "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50},
+    "STARTER":    {"max_bots": 1,   "messages": 5000,   "chunks": 1000,  "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
+    "PRO":        {"max_bots": 3,   "messages": 15000,  "chunks": 4000,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
+    "BUSINESS":   {"max_bots": 5,   "messages": 50000,  "chunks": 15000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
     "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
 }
 

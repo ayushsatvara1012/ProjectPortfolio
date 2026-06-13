@@ -78,7 +78,6 @@ const AppRegistration = () => {
 
     const showAlert = (type: 'success' | 'error' | 'development', msg: string) => {
         setAlert({ open: true, type, msg });
-        setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
     };
 
     const handleCopy = (text: string, key: string) => {

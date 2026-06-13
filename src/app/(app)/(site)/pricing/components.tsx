@@ -29,8 +29,8 @@ export const PLANS = [
     accent: 'slate',
     features: [
       '1 AI Bot',
-      '1,500 messages / month',
-      '300 knowledge chunks',
+      '5,000 messages / month',
+      '60,000 words of knowledge',
       'Custom branding & colors',
       'Custom prompt & tone',
       'Email support',
@@ -46,8 +46,8 @@ export const PLANS = [
     accent: 'blue',
     features: [
       '3 AI Bots',
-      '5,000 messages / month',
-      '1,500 knowledge chunks',
+      '15,000 messages / month',
+      '240,000 words of knowledge',
       'Everything in Starter, plus:',
       'Lead capture & scoring (HOT/WARM/COLD)',
       'Instant hot-lead alerts + booking CTA',
@@ -66,8 +66,8 @@ export const PLANS = [
     accent: 'emerald',
     features: [
       '5 AI Bots',
-      '15,000 messages / month',
-      '5,000 knowledge chunks',
+      '50,000 messages / month',
+      '900,000 words of knowledge',
       'Everything in Growth, plus:',
       'ROI dashboard + Conversion funnel',
       'Lead source attribution',
@@ -82,7 +82,7 @@ export const PLANS = [
 export const FEATURE_DESCRIPTIONS: Record<string, string> = {
   'AI Bots': 'Number of independent AI chatbot instances you can create and deploy across different websites or use cases.',
   'Messages / bot / month': 'Monthly message quota per chatbot. Each customer message to your bot counts as one message. Resets monthly.',
-  'Knowledge chunks / bot': 'Units of text (≈512 tokens each) your bot stores from documents, URLs, and FAQs. More chunks = richer knowledge base.',
+  'Knowledge words / bot': 'Total words of content your bot can store from documents, URLs, and FAQs. More words = richer, more accurate knowledge base.',
   'Response speed': 'Latency and priority for generating responses. Ultra = <1s average, Dedicated = <2s, Priority = <3s, Standard = <5s.',
   'Custom branding & colors': 'Customize the chat widget color scheme, fonts, and styling to match your brand guidelines.',
   'White-label (remove Vaayu badge)': 'Remove the “Powered by Vaayu Intelligence” badge and all platform branding from the chat widget. Display your brand exclusively.',
@@ -99,8 +99,8 @@ export const COMPARISON_FEATURES = [
   {
     category: 'Bots & Capacity', rows: [
       { label: 'AI Bots', starter: '1', pro: '3', business: '5' },
-      { label: 'Messages / bot / month', starter: '1,500', pro: '5,000', business: '15,000' },
-      { label: 'Knowledge chunks / bot', starter: '300', pro: '1,500', business: '5,000' },
+      { label: 'Messages / bot / month', starter: '5,000', pro: '15,000', business: '50,000' },
+      { label: 'Knowledge words / bot', starter: '60,000', pro: '240,000', business: '900,000' },
       { label: 'Response speed', starter: 'Standard', pro: 'Priority', business: 'Ultra' },
     ]
   },
@@ -141,11 +141,11 @@ export const FAQS = [
   { q: 'Can I switch or cancel anytime?', a: 'Absolutely. Upgrades apply instantly and are pro-rated; downgrades take effect at the end of your current billing cycle so you keep what you paid for. Cancel from your dashboard at any time and retain access until the period ends — no further charges.' },
   { q: 'Do you offer annual billing?', a: 'Yes — switch to annual on Starter, Growth, or Scale and get 2 months free versus paying monthly. Use the monthly/annual toggle on this page to see the discounted price.' },
   { q: 'What happens if I hit my monthly message limit?', a: 'Message quotas are counted per bot, per month. When a bot reaches its limit it pauses replies until the next billing cycle resets — you can upgrade anytime for a higher cap. Your knowledge base, configuration, and captured leads are never affected.' },
-  { q: 'What are "knowledge chunks"?', a: 'Knowledge chunks are the units of text (about 512 tokens each) your bot stores from your documents, URLs, and FAQs. More chunks means a richer, more accurate knowledge base — each plan includes a per-bot chunk allowance.' },
+  { q: 'What does "words of knowledge" mean?', a: 'It\'s the total amount of content your bot can learn from — documents, URLs, and FAQs you upload. Think of it like a word count: 60,000 words covers a full product FAQ site; 240,000 words handles medium product docs; 900,000 words fits a large enterprise knowledge base. More words means a richer, more accurate bot.' },
   { q: 'Is my data private and secure?', a: 'Yes. We never sell your data or your visitors’ data, and your content is never used to train external AI models beyond your own bot. Everything is encrypted in transit (TLS), API keys are hashed and never stored in plaintext, and the embeddable widget is locked to the domains you authorize. See our Privacy Policy for full details.' },
   { q: 'Can I remove your branding?', a: 'Scale and Custom plans include full white-label — upload your own logo, set your brand colors, and remove the platform badge entirely so the widget looks 100% yours.' },
   { q: 'What about integrations and human handoff?', a: 'Growth and above can hand a live conversation to a human agent with the full transcript attached. Scale adds Slack alerts for hot leads and outbound webhooks, so you can push captured leads straight into your CRM or any tool via Zapier.' },
-  { q: 'Is Explore really free forever?', a: 'Yes — Explore is a lifetime-free plan, not a trial. You get the full Vaayu Intelligence platform (analytics, lead capture, WhatsApp/human handoff, webhooks, custom branding and the advanced bot) with no time limit and no credit card. Cost-bearing limits are capped — 1 bot, 200 messages/month, 75 knowledge chunks — and every deployed bot keeps the “Powered by Vaayu Intelligence” badge. Upgrade to a paid plan anytime for higher limits, a faster model, and full white-label.' },
+  { q: 'Is Explore really free forever?', a: 'Yes — Explore is a lifetime-free plan, not a trial. You get the full Vaayu Intelligence platform (analytics, lead capture, WhatsApp/human handoff, webhooks, custom branding and the advanced bot) with no time limit and no credit card. Cost-bearing limits are capped — 1 bot, 1,000 messages/month, 12,000 words of knowledge — and every deployed bot keeps the “Powered by Vaayu Intelligence” badge. Upgrade to a paid plan anytime for higher limits, a faster model, and full white-label.' },
   { q: 'Why do I need a business email for Explore?', a: 'Explore is built for businesses and agencies, so we grant instant access to sign-ups from a business or custom domain. Personal-email sign-ups (gmail, yahoo, outlook, etc.) are welcome too — just tell us about your business via a short enquiry and we approve access, usually within 24 hours. This keeps the free platform sustainable and reserved for real use cases.' },
 ];
 
@@ -251,8 +251,8 @@ export const BottomCTA = () => (
 
 const EXPLORE_HIGHLIGHTS: { icon: string; label: string }[] = [
   { icon: 'smart_toy', label: '1 AI Bot' },
-  { icon: 'forum', label: '200 messages / month' },
-  { icon: 'database', label: '75 knowledge chunks' },
+  { icon: 'forum', label: '1,000 messages / month' },
+  { icon: 'database', label: '12,000 words of knowledge' },
   { icon: 'contact_mail', label: 'Lead capture & scoring' },
   { icon: 'analytics', label: 'Full analytics dashboard' },
   { icon: 'support_agent', label: 'WhatsApp & human handoff' },

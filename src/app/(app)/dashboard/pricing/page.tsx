@@ -37,7 +37,6 @@ const AppPricing = () => {
 
     const showAlert = (type: 'success' | 'error' | 'development', msg: string) => {
         setAlert({ open: true, type, msg });
-        setTimeout(() => setAlert(p => ({ ...p, open: false })), 8000);
     };
 
     // Annual = 2 months free → per-month equivalent is monthly × 10 / 12.
@@ -104,7 +103,7 @@ const AppPricing = () => {
             description: 'A smart AI chatbot on your site, fully on-brand.',
             icon: 'rocket_launch',
             highlight: false,
-            features: ['1 AI bot', '1,500 messages / mo', 'Custom branding & prompt'],
+            features: ['1 AI bot', '5,000 messages / mo', 'Custom branding & prompt'],
         },
         {
             name: 'Growth', id: 'PRO',
@@ -113,7 +112,7 @@ const AppPricing = () => {
             icon: 'trending_up',
             highlight: true,
             badge: 'Most popular',
-            features: ['3 AI bots', '5,000 messages / mo', 'Lead capture + alerts + Action Center'],
+            features: ['3 AI bots', '15,000 messages / mo', 'Lead capture + alerts + Action Center'],
         },
         {
             name: 'Scale', id: 'BUSINESS',
@@ -122,7 +121,7 @@ const AppPricing = () => {
             icon: 'insights',
             highlight: false,
             badge: 'Full platform',
-            features: ['5 AI bots', '15,000 messages / mo', 'ROI, funnel, attribution + white-label'],
+            features: ['5 AI bots', '50,000 messages / mo', 'ROI, funnel, attribution + white-label'],
         },
     ];
 
