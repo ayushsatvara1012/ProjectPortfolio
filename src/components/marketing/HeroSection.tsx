@@ -52,38 +52,7 @@ const HeroSection = () => {
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
 
-      {/* ── HERO BACKGROUND ──────────────────────────────
-          Mobile (<768px): a static SVG mesh-gradient. Zero JS, SSR'd, paints
-          instantly, and never loads the ~880kB three.js chunk or runs a render
-          loop — the biggest mobile INP/LCP/TBT saving. Soft blue/indigo glows sit
-          toward the edges over the section's bg so the centered headline stays
-          readable in both light and dark mode. No animated filters (would jank). */}
-      <div className="absolute inset-0 md:hidden pointer-events-none overflow-hidden" aria-hidden="true">
-        <svg
-          className="w-full h-full"
-          viewBox="0 0 400 800"
-          preserveAspectRatio="xMidYMid slice"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <radialGradient id="hero-mob-1" cx="80" cy="130" r="280" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="hero-mob-2" cx="360" cy="70" r="300" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#0066FF" stopOpacity="0.20" />
-              <stop offset="100%" stopColor="#0066FF" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="hero-mob-3" cx="210" cy="760" r="340" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#0088FF" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#0088FF" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <rect width="400" height="800" fill="url(#hero-mob-1)" />
-          <rect width="400" height="800" fill="url(#hero-mob-2)" />
-          <rect width="400" height="800" fill="url(#hero-mob-3)" />
-        </svg>
-      </div>
+
 
       {/* Desktop (≥768px): the WebGL particle scene, mounted at idle. The
           !isMobile guard means it never mounts on phones. */}

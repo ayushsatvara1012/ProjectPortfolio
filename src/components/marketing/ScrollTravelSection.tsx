@@ -15,12 +15,23 @@ export default function ScrollTravelSection() {
   const bgRef      = useRef<HTMLDivElement>(null);  // 200vw canvas container
   const maskRef    = useRef<HTMLDivElement>(null);  // viewport-sized clip + mask
   const [isVisible, setIsVisible] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const rafIdRef = useRef<number | null>(null);
 
   // Written every rAF frame, read inside Three.js useFrame — zero React re-renders.
   const morphProgressRef = useRef(0);
 
   useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    setIsDesktop(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+
     const spring = { p: 0, vp: 0 };
     let rafId: number;
 
@@ -109,7 +120,7 @@ export default function ScrollTravelSection() {
         cancelAnimationFrame(rafIdRef.current);
       }
     };
-  }, []);
+  }, [isDesktop]);
 
   return (
     <div ref={wrapperRef} className="relative bg-white dark:bg-slate-950 transition-colors duration-500">
@@ -142,7 +153,7 @@ export default function ScrollTravelSection() {
               display: 'none',
             }}
           >
-            {isVisible && (
+            {isDesktop && isVisible && (
               <AntigravityBackground
                 particleCount={100}
                 particleType="dot"
