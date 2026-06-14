@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
+import Link from 'next/link';
 import Button from './Button';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
@@ -51,15 +52,48 @@ const HeroSection = () => {
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
 
-      {/* ── UNIFIED SINGLE HERO CONTAINER ──────────────── */}
-      {mountBackground && (
+      {/* ── HERO BACKGROUND ──────────────────────────────
+          Mobile (<768px): a static SVG mesh-gradient. Zero JS, SSR'd, paints
+          instantly, and never loads the ~880kB three.js chunk or runs a render
+          loop — the biggest mobile INP/LCP/TBT saving. Soft blue/indigo glows sit
+          toward the edges over the section's bg so the centered headline stays
+          readable in both light and dark mode. No animated filters (would jank). */}
+      <div className="absolute inset-0 md:hidden pointer-events-none overflow-hidden" aria-hidden="true">
+        <svg
+          className="w-full h-full"
+          viewBox="0 0 400 800"
+          preserveAspectRatio="xMidYMid slice"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <radialGradient id="hero-mob-1" cx="80" cy="130" r="280" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="hero-mob-2" cx="360" cy="70" r="300" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#0066FF" stopOpacity="0.20" />
+              <stop offset="100%" stopColor="#0066FF" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="hero-mob-3" cx="210" cy="760" r="340" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#0088FF" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#0088FF" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="400" height="800" fill="url(#hero-mob-1)" />
+          <rect width="400" height="800" fill="url(#hero-mob-2)" />
+          <rect width="400" height="800" fill="url(#hero-mob-3)" />
+        </svg>
+      </div>
+
+      {/* Desktop (≥768px): the WebGL particle scene, mounted at idle. The
+          !isMobile guard means it never mounts on phones. */}
+      {!isMobile && mountBackground && (
         <AntigravityBackground
-          particleCount={isMobile ? 30 : 50}
-          particleType={isMobile ? 'dot' : 'capsule'}
-          particleSeparation={isMobile ? 0.8 : 4}
-          effectStyle={isMobile ? 'water_drop' : 'classic'}
-          colorPalette={isMobile ? ['#020617', '#0b1d3a', '#0044cc', '#0088ff', '#55bbff'] : undefined}
-          interactive={!isMobile}
+          particleCount={50}
+          particleType="capsule"
+          particleSeparation={4}
+          effectStyle="classic"
+          interactive
         />
       )}
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
@@ -98,8 +132,12 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">
-            <button
-              onClick={() => startTransition(() => router.push(isSignedIn ? '/dashboard' : '/sign-up'))}
+            {/* Primary CTA is a prefetched <Link>, not a Clerk-gated onClick. The
+                tap navigates natively (no JS on the main thread) so it stays
+                instant even before Clerk hydrates. href upgrades to /dashboard
+                once useUser() resolves a signed-in session. */}
+            <Link
+              href={isSignedIn ? '/dashboard' : '/sign-up'}
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
             >
               Get {PRODUCT.name}<span className='material-symbols-outlined ml-2'>arrow_forward</span>
@@ -115,7 +153,7 @@ const HeroSection = () => {
               <span
                 className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap"
               >Explore Now!</span>
-            </button>
+            </Link>
 
 
             <Button onClick={() => startTransition(() => router.push('/demo/train'))} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
