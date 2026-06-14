@@ -16,7 +16,11 @@ const googleSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: 'Sapybase',
   icons: {
-    icon: [{ url: '/logo2.svg', type: 'image/svg+xml' }],
+    icon: [
+      { url: '/logo2.svg', type: 'image/svg+xml' },
+      { url: '/logo3.png', type: 'image/png', sizes: '48x48' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
     apple: [{ url: '/logo2.svg' }],
   },
 };
