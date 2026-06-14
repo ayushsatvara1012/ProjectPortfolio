@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   SignInButton,
   SignUpButton,
@@ -36,7 +36,6 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
-  const router = useRouter();
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -183,7 +182,6 @@ export default function Navbar() {
   ];
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
-    e.preventDefault();
     setIsOpen(false);
     setActiveDropdown(null);
     setActiveMobileDropdown(null);
@@ -191,18 +189,20 @@ export default function Navbar() {
     const [basePath, hash] = href.split('#');
     const targetPath = basePath || '/';
 
-    if (hash) {
-      if (pathname === targetPath) {
-        const targetElement = document.querySelector(`#${hash}`);
-        if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth' });
-        }
-      } else {
-        router.push(href);
+    // Same-page hash (e.g. "/#home" while already on "/"): intercept and
+    // smooth-scroll instead of triggering a full navigation. For every other
+    // case we let <Link> navigate natively — that path is prefetched and runs
+    // inside React's transition, which is the whole point of this change
+    // (raw <a> + router.push defeated prefetch and blocked the main thread).
+    if (hash && pathname === targetPath) {
+      e.preventDefault();
+      const targetElement = document.querySelector(`#${hash}`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth' });
       }
-    } else {
-      router.push(href);
     }
+    // Cross-page hash links navigate via <Link>; the pathname effect above
+    // scrolls to the hash once the destination route mounts.
   };
 
   return (
@@ -216,9 +216,9 @@ export default function Navbar() {
 
           {/* Cell 1: Logo */}
           <div className="px-6 h-full flex items-center shrink-0 min-w-fit">
-            <a href="/#home" onClick={(e) => handleLinkClick(e, '/#home')} className="flex items-center">
+            <Link href="/#home" onClick={(e) => handleLinkClick(e, '/#home')} className="flex items-center">
               <Logo className="h-10 w-auto" />
-            </a>
+            </Link>
           </div>
 
           {/* Cell 2: Desktop Navigation Links (md+) */}
@@ -318,14 +318,14 @@ export default function Navbar() {
                   </button>
                   );
                 })() : (
-                  <a
+                  <Link
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
                     className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
                   >
                     {link.name}
                     <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
-                  </a>
+                  </Link>
                 )}
               </div>
             ))}
@@ -486,7 +486,7 @@ export default function Navbar() {
                 </div>
                 );
               })() : (
-                <a
+                <Link
                   key={`nav-mob-${link.id || link.name}`}
                   href={link.href}
                   onClick={(e) => handleLinkClick(e, link.href)}
@@ -494,7 +494,7 @@ export default function Navbar() {
                 >
                   <span>{link.name}</span>
                   <span className="material-symbols-outlined text-[18px] opacity-40">chevron_right</span>
-                </a>
+                </Link>
               )
             )}
           </div>

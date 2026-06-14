@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import Button from './Button';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import { PRODUCT } from '@/src/lib/brand';
 const HeroSection = () => {
   const router = useRouter();
   const { isSignedIn } = useUser();
+  const [, startTransition] = useTransition();
 
   const [isMobile, setIsMobile] = useState(false);
   // Defer mounting the WebGL background until the browser is idle. The Three.js
@@ -76,7 +77,10 @@ const HeroSection = () => {
                 <img
                   src={PRODUCT.logo}
                   alt=""
+                  width={36}
+                  height={23}
                   decoding="async"
+                  fetchPriority="high"
                   className="h-14 sm:h-16 md:h-20 w-auto"
                 />
                 <span className="text-6xl sm:text-7xl md:text-8xl text-transparent bg-clip-text bg-linear-to-r from-blue-700 to-blue-500">
@@ -95,7 +99,7 @@ const HeroSection = () => {
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">
             <button
-              onClick={() => isSignedIn ? router.push('/dashboard') : router.push('/sign-up')}
+              onClick={() => startTransition(() => router.push(isSignedIn ? '/dashboard' : '/sign-up'))}
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
             >
               Get {PRODUCT.name}<span className='material-symbols-outlined ml-2'>arrow_forward</span>
@@ -114,7 +118,7 @@ const HeroSection = () => {
             </button>
 
 
-            <Button onClick={() => router.push('/demo/train')} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
+            <Button onClick={() => startTransition(() => router.push('/demo/train'))} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
               <span className="material-symbols-outlined text-lg">
                 experiment
               </span>

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
+import { PRODUCT } from '@/src/lib/brand';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
 // import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
@@ -112,6 +113,10 @@ const faqSchema = {
 export default function HomePage() {
   return (
     <>
+      {/* Prioritize the hero logo (LCP candidate): a high-priority preload so the
+          browser fetches it before hydration work. React 19 hoists this <link>
+          into <head>. Pairs with fetchPriority="high" on the <img> itself. */}
+      <link rel="preload" as="image" href={PRODUCT.logo} fetchPriority="high" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
