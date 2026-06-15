@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import type { Components } from 'react-markdown';
 import { buildPostMetadata } from '@/src/seo/buildMetadata';
@@ -67,6 +68,18 @@ const MD: Components = {
     </pre>
   ),
   strong: ({ children }) => <strong className="font-bold text-slate-900 dark:text-slate-100">{children}</strong>,
+  table: ({ children }) => (
+    <div className="w-full overflow-x-auto my-8 border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+      <table className="w-full text-sm text-left border-collapse min-w-[600px]">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase tracking-wider">{children}</thead>
+  ),
+  tbody: ({ children }) => <tbody className="divide-y divide-slate-200 dark:divide-slate-800">{children}</tbody>,
+  tr: ({ children }) => <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors">{children}</tr>,
+  th: ({ children }) => <th className="px-6 py-4 font-google font-bold text-slate-900 dark:text-slate-100">{children}</th>,
+  td: ({ children }) => <td className="px-6 py-4 font-google text-slate-700 dark:text-slate-300 leading-relaxed">{children}</td>,
 };
 
 export default async function BlogArticlePage({
@@ -112,7 +125,11 @@ export default async function BlogArticlePage({
         </header>
 
         <div>
-          <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD}>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]} 
+            rehypePlugins={[rehypeSanitize]} 
+            components={MD}
+          >
             {post.body}
           </ReactMarkdown>
         </div>

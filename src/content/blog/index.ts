@@ -2,9 +2,10 @@ import type { BlogPost } from './types';
 import { post as addChatbot10Min } from './posts/add-ai-chatbot-website-10-minutes';
 import { post as measureRoi } from './posts/measure-chatbot-roi';
 import { post as preventHallucinations } from './posts/prevent-chatbot-hallucinations';
+import { post as otherBotsVsVaayu } from './posts/other-bots-vs-vaayu';
 
 // Source registry. Add new posts here.
-const registry: BlogPost[] = [addChatbot10Min, measureRoi, preventHallucinations];
+const registry: BlogPost[] = [addChatbot10Min, measureRoi, preventHallucinations, otherBotsVsVaayu];
 
 /** All posts, newest first by publication date. */
 export const allPosts: BlogPost[] = [...registry].sort((a, b) =>
