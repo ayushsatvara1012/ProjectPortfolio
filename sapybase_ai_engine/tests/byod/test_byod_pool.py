@@ -13,12 +13,14 @@ import threading
 
 import pytest
 
+from byod_breaker import BreakerConfig, BreakerOpen, BreakerState
 from byod_pool import (
     CeilingExceeded,
     PoolConfig,
     RoutingIntegrityError,
     TenantBusy,
     TenantPoolRegistry,
+    statement_timeout_on_acquire,
 )
 
 
@@ -73,6 +75,10 @@ def make_registry(config=None, **kwargs):
         **kwargs,
     )
     return reg, pools
+
+
+class TenantDbError(Exception):
+    """Stand-in for a driver DB/timeout error (e.g. psycopg2 OperationalError)."""
 
 
 # ── Pool reuse ────────────────────────────────────────────────────────────────
@@ -251,3 +257,169 @@ def test_dsn_provider_called_once_per_pool():
         with reg.get_tenant_db("A"):
             pass
     assert calls == ["A"]  # DSN resolved once; pool reused thereafter
+
+
+# ── Circuit breaker integration (Phase 1.6, rule 15, §7.3) ───────────────────
+def make_breaker_registry(breaker_config, clock=None, **kwargs):
+    pools: dict[str, FakePool] = {}
+
+    def factory(dsn, minconn, maxconn):
+        p = FakePool(dsn, minconn, maxconn)
+        pools[dsn] = p
+        return p
+
+    extra = {"clock": clock} if clock is not None else {}
+    reg = TenantPoolRegistry(
+        PoolConfig(),
+        pool_factory=factory,
+        dsn_provider=lambda cid: f"dsn://{cid}",
+        breaker_config=breaker_config,
+        db_failure_types=(TenantDbError,),
+        **extra,
+        **kwargs,
+    )
+    return reg, pools
+
+
+def _fail_once(reg, cid):
+    with pytest.raises(TenantDbError):
+        with reg.get_tenant_db(cid):
+            raise TenantDbError("db down")
+
+
+def test_breaker_disabled_by_default():
+    reg, _ = make_registry()
+    assert reg.breaker_state("A") is None  # no breaker unless configured
+
+
+def test_repeated_db_failures_open_breaker_and_fast_fail():
+    reg, pools = make_breaker_registry(BreakerConfig(failure_threshold=3))
+    for _ in range(3):
+        _fail_once(reg, "A")
+    assert reg.breaker_state("A") is BreakerState.OPEN
+    # Now fast-fail WITHOUT acquiring a connection.
+    before = pools["dsn://A"].checked_out
+    with pytest.raises(BreakerOpen):
+        with reg.get_tenant_db("A"):
+            pass
+    assert pools["dsn://A"].checked_out == before  # no checkout happened
+
+
+def test_other_tenants_unaffected_when_one_breaker_open():
+    reg, _ = make_breaker_registry(BreakerConfig(failure_threshold=2))
+    for _ in range(2):
+        _fail_once(reg, "A")
+    assert reg.breaker_state("A") is BreakerState.OPEN
+    # Tenant B still serves normally.
+    with reg.get_tenant_db("B") as conn:
+        assert conn is not None
+    assert reg.breaker_state("B") is BreakerState.CLOSED
+
+
+def test_clean_success_keeps_breaker_closed():
+    reg, _ = make_breaker_registry(BreakerConfig(failure_threshold=2))
+    _fail_once(reg, "A")
+    with reg.get_tenant_db("A"):  # success resets the streak
+        pass
+    _fail_once(reg, "A")
+    assert reg.breaker_state("A") is BreakerState.CLOSED
+
+
+def test_backpressure_does_not_trip_breaker():
+    # CeilingExceeded / TenantBusy are not DB-health failures, so a bulkhead hit
+    # (per_tenant_max=1, nested acquire) must NOT open the breaker.
+    pools: dict[str, FakePool] = {}
+
+    def factory(dsn, minconn, maxconn):
+        p = FakePool(dsn, minconn, maxconn)
+        pools[dsn] = p
+        return p
+
+    reg = TenantPoolRegistry(
+        PoolConfig(per_tenant_max=1, global_ceiling=10),
+        pool_factory=factory,
+        dsn_provider=lambda cid: f"dsn://{cid}",
+        breaker_config=BreakerConfig(failure_threshold=1),
+        db_failure_types=(TenantDbError,),
+    )
+    with reg.get_tenant_db("A"):
+        with pytest.raises(TenantBusy):
+            with reg.get_tenant_db("A"):
+                pass
+    assert reg.breaker_state("A") is BreakerState.CLOSED  # not tripped
+
+
+def test_half_open_recovery_restores_service():
+    t = {"now": 1000.0}
+    reg, _ = make_breaker_registry(
+        BreakerConfig(failure_threshold=2, reset_timeout_seconds=30.0),
+        clock=lambda: t["now"],
+    )
+    for _ in range(2):
+        _fail_once(reg, "A")
+    assert reg.breaker_state("A") is BreakerState.OPEN
+    t["now"] += 31  # cooldown elapses → half-open
+    assert reg.breaker_state("A") is BreakerState.HALF_OPEN
+    with reg.get_tenant_db("A") as conn:  # probe succeeds
+        assert conn is not None
+    assert reg.breaker_state("A") is BreakerState.CLOSED
+
+
+# ── Statement-timeout on_acquire helper (§7.3) ───────────────────────────────
+class _RecordingCursor:
+    def __init__(self, sink): self.sink = sink
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def execute(self, sql, params=None): self.sink.append((sql, params))
+
+
+class _RecordingConn:
+    def __init__(self): self.executed = []
+    def cursor(self): return _RecordingCursor(self.executed)
+
+
+def test_statement_timeout_hook_sets_timeout():
+    hook = statement_timeout_on_acquire(15000)
+    conn = _RecordingConn()
+    hook(conn)
+    assert conn.executed == [("SET statement_timeout = %s", (15000,))]
+
+
+def test_statement_timeout_hook_noop_when_disabled():
+    hook = statement_timeout_on_acquire(0)
+    conn = _RecordingConn()
+    hook(conn)
+    assert conn.executed == []
+
+
+def test_statement_timeout_applied_via_registry_on_acquire():
+    conns = []
+
+    def factory(dsn, minconn, maxconn):
+        return FakePoolWithCursor(dsn, minconn, maxconn, conns)
+
+    reg = TenantPoolRegistry(
+        PoolConfig(),
+        pool_factory=factory,
+        dsn_provider=lambda cid: f"dsn://{cid}",
+        on_acquire=statement_timeout_on_acquire(5000),
+    )
+    with reg.get_tenant_db("A"):
+        pass
+    assert conns and conns[0].executed == [("SET statement_timeout = %s", (5000,))]
+
+
+class FakePoolWithCursor(FakePool):
+    def __init__(self, dsn, minconn, maxconn, sink):
+        super().__init__(dsn, minconn, maxconn)
+        self.sink = sink
+
+    def getconn(self):
+        c = _RecordingConn()
+        c.closed = False
+        self.checked_out += 1
+        self.sink.append(c)
+        return c
+
+    def putconn(self, conn, close=False):
+        self.checked_out -= 1

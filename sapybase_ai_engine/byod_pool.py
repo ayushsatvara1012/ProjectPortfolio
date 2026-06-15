@@ -42,8 +42,10 @@ import time
 from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Iterator, Optional, Protocol
+from typing import Callable, Iterator, Optional, Protocol, Tuple, Type
 from weakref import WeakKeyDictionary
+
+from byod_breaker import BreakerConfig, BreakerOpen, BreakerRegistry, BreakerState
 
 
 # ── Errors ────────────────────────────────────────────────────────────────────
@@ -93,6 +95,7 @@ class PoolConfig:
     global_ceiling: int = 100        # max concurrent in-flight conns across ALL tenants (E7)
     idle_ttl_seconds: float = 300.0  # evict a pool idle longer than this
     acquire_timeout_seconds: float = 5.0  # bounded wait at the ceiling before shedding
+    statement_timeout_ms: int = 30000  # per-query statement timeout (§7.3); 0 = unset
 
     @classmethod
     def from_env(cls) -> "PoolConfig":
@@ -112,6 +115,9 @@ class PoolConfig:
             idle_ttl_seconds=_float("BYOD_POOL_IDLE_TTL_SECONDS", cls.idle_ttl_seconds),
             acquire_timeout_seconds=_float(
                 "BYOD_POOL_ACQUIRE_TIMEOUT_SECONDS", cls.acquire_timeout_seconds
+            ),
+            statement_timeout_ms=_int(
+                "BYOD_POOL_STATEMENT_TIMEOUT_MS", cls.statement_timeout_ms
             ),
         )
 
@@ -138,12 +144,25 @@ class TenantPoolRegistry:
         dsn_provider: DsnProvider,
         on_acquire: Optional[OnAcquire] = None,
         clock: Callable[[], float] = time.monotonic,
+        breaker_config: Optional[BreakerConfig] = None,
+        db_failure_types: Tuple[Type[BaseException], ...] = (),
     ) -> None:
         self._config = config or PoolConfig()
         self._pool_factory = pool_factory
         self._dsn_provider = dsn_provider
         self._on_acquire = on_acquire
         self._clock = clock
+        # Per-tenant circuit breaker (rule 15, §7.3). Disabled if no config given,
+        # so the bare registry keeps its Phase-1.5 behaviour. The wiring passes
+        # the driver's connection/timeout error classes as db_failure_types so a
+        # slow/dead DB trips the breaker, while backpressure (CeilingExceeded /
+        # TenantBusy) and routing aborts (RoutingIntegrityError) never do.
+        self._breakers: Optional[BreakerRegistry] = (
+            BreakerRegistry(breaker_config, clock=clock)
+            if breaker_config is not None
+            else None
+        )
+        self._db_failure_types = db_failure_types
         # LRU order: front = least-recently-used, back = most-recent.
         self._pools: "OrderedDict[str, _PoolEntry]" = OrderedDict()
         self._global_in_flight = 0
@@ -162,9 +181,15 @@ class TenantPoolRegistry:
         :class:`TenantBusy` on backpressure, :class:`RoutingIntegrityError` on a
         tag mismatch.
         """
-        entry = self._reserve(company_id)
+        breaker = self._breakers.get(company_id) if self._breakers else None
+        if breaker is not None:
+            breaker.before_request()  # fast-fail if open; never consumes a slot
+
+        outcome = "ignore"
+        entry = None
         conn = None
         try:
+            entry = self._reserve(company_id)
             try:
                 conn = entry.pool.getconn()
             except Exception as exc:  # per-tenant pool exhausted / connect failed
@@ -178,13 +203,35 @@ class TenantPoolRegistry:
             # tenant's before any SQL runs.
             self.assert_tenant(conn, company_id)
             yield conn
+            outcome = "success"
+        except BaseException as exc:
+            if self._is_db_failure(exc):
+                outcome = "failure"
+            raise
         finally:
             if conn is not None:
                 try:
                     entry.pool.putconn(conn, close=bool(getattr(conn, "closed", False)))
                 finally:
                     self._tags.pop(conn, None)
-            self._release(company_id)
+            if entry is not None:
+                self._release(company_id)
+            if breaker is not None:
+                if outcome == "success":
+                    breaker.on_success()
+                elif outcome == "failure":
+                    breaker.on_failure()
+                else:
+                    breaker.on_ignore()
+
+    def _is_db_failure(self, exc: BaseException) -> bool:
+        """A DB-health failure (counts against the breaker) — NOT backpressure or
+        a routing abort, which are PoolRegistryErrors and never classified here."""
+        return bool(self._db_failure_types) and isinstance(exc, self._db_failure_types)
+
+    def breaker_state(self, company_id: str) -> Optional[BreakerState]:
+        """Current circuit-breaker state for a tenant (None if breakers disabled)."""
+        return self._breakers.state_of(company_id) if self._breakers else None
 
     def assert_tenant(self, conn: object, company_id: str) -> None:
         """Assert a connection is tagged for ``company_id``; else abort (E5).
@@ -310,3 +357,18 @@ def psycopg2_pool_factory(dsn: str, minconn: int, maxconn: int) -> ConnectionPoo
     from psycopg2 import pool as _pg_pool  # lazy
 
     return _pg_pool.ThreadedConnectionPool(minconn=minconn, maxconn=maxconn, dsn=dsn)
+
+
+def statement_timeout_on_acquire(timeout_ms: int) -> OnAcquire:
+    """Build an ``on_acquire`` hook that bounds every query on a checked-out
+    connection with a Postgres ``statement_timeout`` (§7.3, rule 4) — so one slow
+    tenant query is cancelled fast instead of hanging a worker. A non-positive
+    timeout disables it (no-op)."""
+
+    def _apply(conn: object) -> None:
+        if timeout_ms <= 0:
+            return
+        with conn.cursor() as cur:  # type: ignore[attr-defined]
+            cur.execute("SET statement_timeout = %s", (timeout_ms,))
+
+    return _apply
