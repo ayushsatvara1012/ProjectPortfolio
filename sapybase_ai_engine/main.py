@@ -1076,18 +1076,21 @@ from models import (
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
 )
 
-# ── BYOD super-admin config logic (RFC Phase 2.1–2.2, §3.1) — dark until enabled ──
+# ── BYOD super-admin config logic (RFC Phase 2.1–2.3, §3.1) — dark until enabled ──
 import byod_admin
 import byod_probe
+import byod_dataplane
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
 
-def _byod_probe_http_error(exc: "byod_probe.ProbeError") -> HTTPException:
-    """Map a sanitized tenant-DB probe failure to an HTTP error (rule 7 / E6:
-    the message is already safe — no DSN/host/driver text). Unreachable → 502
-    (bad upstream); reachable-but-incompatible → 422."""
+def _byod_provision_http_error(exc: Exception) -> HTTPException:
+    """Map a sanitized tenant-DB provisioning failure to an HTTP error (rule 7 /
+    E6: the message is already safe — no DSN/host/driver text). Unreachable / DDL
+    failure → 502 (bad upstream); reachable-but-incompatible → 422."""
     if isinstance(exc, byod_probe.TenantConnectionError):
+        return HTTPException(status_code=502, detail=str(exc))
+    if isinstance(exc, byod_dataplane.DataPlaneProvisionError):
         return HTTPException(status_code=502, detail=str(exc))
     return HTTPException(status_code=422, detail=str(exc))
 
@@ -6429,7 +6432,7 @@ def test_byod_connection(
         # The message is safe (never contains the password — rule 7).
         raise HTTPException(status_code=400, detail=str(e))
     except byod_probe.ProbeError as e:
-        raise _byod_probe_http_error(e)
+        raise _byod_provision_http_error(e)
 
 
 @app.post("/api/admin/users/{clerk_id}/byod/provision")
@@ -6441,10 +6444,12 @@ def provision_byod(
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin),
 ):
-    """Provision the stored tenant DSN (Phase 2.2): decrypt in memory, re-validate,
-    real-connect with the migration role, assert pgvector + vector(768) + min
-    version (§16.7), then move PENDING -> PROVISIONING. Idempotent + advisory-
-    locked (§16.6): a double-click serializes and a re-submit is a safe no-op."""
+    """Provision the stored tenant DSN end-to-end (Phase 2.2+2.3): decrypt in
+    memory, re-validate, probe (pgvector + vector(768) + min version §16.7), apply
+    the data-plane schema, create the DML-only vaayu_runtime role (§5.4), store the
+    runtime DSN, record the schema version, and flip to LIVE. Idempotent +
+    advisory-locked (§16.6): a double-click serializes and a re-submit once LIVE is
+    a safe no-op."""
     try:
         kms = kms_from_env()
     except KmsUnavailable:
@@ -6457,6 +6462,7 @@ def provision_byod(
         log_admin_action(
             admin["clerk_id"], "BYOD_PROVISION", clerk_id,
             {"status": result["status"], "idempotent": result.get("idempotent"),
+             "schema_version": result.get("schema_version"),
              "pgvector_version": result.get("pgvector_version"), "reason": req.reason},
         )
         return {"status": "success", **result}
@@ -6469,9 +6475,9 @@ def provision_byod(
     except DsnValidationError as e:
         conn.commit()  # status was moved to ERROR; persist that + release the lock
         raise HTTPException(status_code=400, detail=str(e))
-    except byod_probe.ProbeError as e:
+    except (byod_probe.ProbeError, byod_dataplane.DataPlaneProvisionError) as e:
         conn.commit()  # status was moved to ERROR; persist that + release the lock
-        raise _byod_probe_http_error(e)
+        raise _byod_provision_http_error(e)
     finally:
         release_db_connection(conn)
 

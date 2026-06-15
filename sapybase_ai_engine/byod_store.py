@@ -67,6 +67,10 @@ _COLUMNS = (
     "dsn_data_key",
     "dsn_nonce",
     "dsn_key_id",
+    "runtime_dsn_ciphertext",
+    "runtime_dsn_data_key",
+    "runtime_dsn_nonce",
+    "runtime_dsn_key_id",
     "schema_version",
     "status",
     "created_at",
@@ -100,6 +104,16 @@ CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     dsn_nonce       BYTEA,
     dsn_key_id      TEXT  NOT NULL,
 
+    -- Runtime (DML-only vaayu_runtime) DSN, envelope-encrypted the same way as
+    -- the migrate DSN above (RFC sec 5.4 / Phase 2.3). NULL until provisioning
+    -- creates the runtime role; this is the credential the engine request path
+    -- uses (Phase 3), while the dsn_* columns above are the privileged migrate
+    -- credential used only at provisioning/migration time.
+    runtime_dsn_ciphertext  BYTEA,
+    runtime_dsn_data_key    BYTEA,
+    runtime_dsn_nonce       BYTEA,
+    runtime_dsn_key_id      TEXT,
+
     -- Schema-version registry (sec 8.1): the tenant DB's current data-plane
     -- alembic version, mirrored here. NULL until provisioned.
     schema_version  TEXT,
@@ -115,6 +129,24 @@ CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
 -- Operational lookups: list tenants by lifecycle state (e.g. all NEEDS_RECONNECT).
 CREATE INDEX IF NOT EXISTS idx_byod_tenant_databases_status
     ON {TABLE_NAME} (status);
+""".strip()
+
+# Additive migration for existing (pre-runtime-DSN) installs: the CREATE TABLE
+# above is IF NOT EXISTS, so it won't add columns to an already-created table.
+# Migration 0015 runs these idempotent ALTERs; ASCII-only, kept here as the
+# single source of truth (imported by the Alembic migration).
+RUNTIME_DSN_ADD_COLUMNS_SQL = f"""
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS runtime_dsn_ciphertext BYTEA;
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS runtime_dsn_data_key   BYTEA;
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS runtime_dsn_nonce      BYTEA;
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS runtime_dsn_key_id     TEXT;
+""".strip()
+
+RUNTIME_DSN_DROP_COLUMNS_SQL = f"""
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS runtime_dsn_key_id;
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS runtime_dsn_nonce;
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS runtime_dsn_data_key;
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS runtime_dsn_ciphertext;
 """.strip()
 
 # Mirror of the migration's downgrade, kept here so tests can reset cleanly.
@@ -133,6 +165,10 @@ class TenantDbRecord:
     dsn_data_key: Optional[bytes]
     dsn_nonce: Optional[bytes]
     dsn_key_id: str
+    runtime_dsn_ciphertext: Optional[bytes]
+    runtime_dsn_data_key: Optional[bytes]
+    runtime_dsn_nonce: Optional[bytes]
+    runtime_dsn_key_id: Optional[str]
     schema_version: Optional[str]
     status: str
     created_at: object  # datetime — kept loose to avoid a hard import here
@@ -155,10 +191,14 @@ def _row_to_record(row: tuple) -> TenantDbRecord:
         dsn_data_key=_to_bytes(row[2]),
         dsn_nonce=_to_bytes(row[3]),
         dsn_key_id=row[4],
-        schema_version=row[5],
-        status=row[6],
-        created_at=row[7],
-        updated_at=row[8],
+        runtime_dsn_ciphertext=_to_bytes(row[5]),
+        runtime_dsn_data_key=_to_bytes(row[6]),
+        runtime_dsn_nonce=_to_bytes(row[7]),
+        runtime_dsn_key_id=row[8],
+        schema_version=row[9],
+        status=row[10],
+        created_at=row[11],
+        updated_at=row[12],
     )
 
 
@@ -234,6 +274,40 @@ def update_tenant_db_status(cur: "_Cursor", company_id: str, status: str) -> boo
     cur.execute(
         f"UPDATE {TABLE_NAME} SET status = %s, updated_at = NOW() WHERE company_id = %s",
         (status, company_id),
+    )
+    return cur.rowcount > 0
+
+
+def set_runtime_dsn(
+    cur: "_Cursor",
+    company_id: str,
+    *,
+    runtime_dsn_ciphertext: bytes,
+    runtime_dsn_key_id: str,
+    runtime_dsn_data_key: Optional[bytes] = None,
+    runtime_dsn_nonce: Optional[bytes] = None,
+) -> bool:
+    """Store the envelope-encrypted runtime (vaayu_runtime) DSN for ``company_id``
+    (RFC §5.4 / Phase 2.3). Updates only the runtime credential columns, leaving
+    the migrate DSN / status / schema_version untouched. Returns True if a row was
+    updated. Caller owns the transaction."""
+    cur.execute(
+        f"""
+        UPDATE {TABLE_NAME} SET
+            runtime_dsn_ciphertext = %s,
+            runtime_dsn_data_key   = %s,
+            runtime_dsn_nonce      = %s,
+            runtime_dsn_key_id     = %s,
+            updated_at             = NOW()
+        WHERE company_id = %s
+        """,
+        (
+            psycopg2_bytea(runtime_dsn_ciphertext),
+            psycopg2_bytea(runtime_dsn_data_key),
+            psycopg2_bytea(runtime_dsn_nonce),
+            runtime_dsn_key_id,
+            company_id,
+        ),
     )
     return cur.rowcount > 0
 

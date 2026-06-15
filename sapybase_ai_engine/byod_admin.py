@@ -22,15 +22,20 @@ and map the typed errors to status codes (404 / 400 / 503), never logging a DSN.
 from __future__ import annotations
 
 import json
+import secrets
 from typing import Callable, Optional, Sequence
 
 import byod_crypto
+import byod_dataplane
 import byod_probe
 import byod_store
 from byod_dsn import validate_db_url
 from byod_store import TenantDbStatus
 from config import BYOD_PLAN_DEFAULTS
 from models import CustomPlanConfig
+
+# Bytes of entropy for the generated vaayu_runtime password (token_urlsafe).
+_RUNTIME_PASSWORD_BYTES = 32
 
 # §5.1: the only DSN form ever shown in the UI. Produced WITHOUT decrypting the
 # stored ciphertext — there is nothing to reveal, so KMS is not touched here.
@@ -155,8 +160,10 @@ def set_connection(
     return {"company_id": company_id, "masked_url": MASKED_URL, "status": record.status}
 
 
-# Statuses that mean "already provisioned (or in flight)" — a re-submit is a no-op.
-_PROVISIONED_STATUSES = frozenset({TenantDbStatus.PROVISIONING, TenantDbStatus.LIVE})
+# Only LIVE is terminal: a re-submit there is a no-op. PROVISIONING means a prior
+# attempt is in flight or crashed mid-pipeline — since every step is idempotent
+# (advisory-locked + IF-NOT-EXISTS DDL), re-running safely drives it to LIVE.
+_PROVISIONED_STATUSES = frozenset({TenantDbStatus.LIVE})
 
 
 def _acquire_provision_lock(cur, company_id: str) -> None:
@@ -179,23 +186,26 @@ def provision(
     resolver: Optional[Resolver] = None,
     connect: Optional[Connector] = None,
 ) -> dict:
-    """Provision a stored tenant database (Phase 2.2): decrypt the DSN in memory,
-    re-validate it, open a real connection with the migration role, assert
-    pgvector + ``vector(768)`` + the minimum pgvector version (§16.7), and move
-    the record ``PENDING -> PROVISIONING``. (Running the data-plane migrations and
-    creating the DML-only runtime role is Phase 2.3; the health-probe -> ``LIVE``
-    transition is Phase 2.4.)
+    """Provision a stored tenant database end-to-end (RFC §4.1 / A.5, Phases
+    2.2+2.3): decrypt the migrate DSN in memory, re-validate it, **probe** it
+    (pgvector + ``vector(768)`` + min version §16.7), **apply the data-plane
+    schema** and **create the DML-only ``vaayu_runtime`` role** (§5.4), store the
+    derived runtime DSN, **record the schema version** (§8.1), and flip the record
+    to ``LIVE``.
 
     **Idempotent & advisory-locked (§16.6):** a transaction-scoped advisory lock
     serializes concurrent calls for the same tenant, so a double-click can't run
-    the probe twice or leave a half-written state. If the tenant is already
-    ``PROVISIONING``/``LIVE`` the call is a safe no-op. On a probe failure the
-    record is moved to ``ERROR`` (isolated, §10) and the error re-raised.
+    the pipeline twice or leave a half-written state. Already ``LIVE`` → safe
+    no-op. A prior crash leaves ``PROVISIONING``/``ERROR``; because every step is
+    idempotent (IF-NOT-EXISTS DDL, role-if-exists), re-running safely completes it.
+    On any failure the record is moved to ``ERROR`` (isolated + alertable, §10)
+    and the error re-raised.
 
-    Caller owns the transaction (commit on success / rollback on error — either
-    releases the advisory lock). Raises :class:`CompanyNotFound`,
-    :class:`ConnectionNotConfigured`, ``DsnValidationError``, ``KmsUnavailable``,
-    or a :class:`byod_probe.ProbeError`. Never logs or returns the plaintext DSN."""
+    Caller owns the transaction (commit on success / on the persisted ``ERROR`` /
+    rollback — any of which releases the advisory lock). Raises
+    :class:`CompanyNotFound`, :class:`ConnectionNotConfigured`,
+    ``DsnValidationError``, ``KmsUnavailable``, :class:`byod_probe.ProbeError`, or
+    :class:`byod_dataplane.DataPlaneProvisionError`. Never logs/returns a DSN."""
     company_id = resolve_company_id(cur, clerk_id)
     if company_id is None:
         raise CompanyNotFound(clerk_id)
@@ -207,7 +217,7 @@ def provision(
     if record is None:
         raise ConnectionNotConfigured(clerk_id)
 
-    # Idempotency: a re-submit while already provisioning/live does nothing.
+    # Idempotency: a re-submit once LIVE does nothing (no re-probe, no re-apply).
     if record.status in _PROVISIONED_STATUSES:
         return {
             "company_id": company_id,
@@ -217,26 +227,44 @@ def provision(
             "idempotent": True,
         }
 
-    # Decrypt in memory only (rule 7) — never logged, never returned.
+    # Decrypt the privileged (migrate) DSN in memory only (rule 7) — never logged.
     dsn = byod_crypto.load_decrypted_dsn(cur, company_id, kms)
     if dsn is None:
         raise ConnectionNotConfigured(clerk_id)
 
     try:
-        result = byod_probe.probe_tenant_database(dsn, resolver=resolver, connect=connect)
+        byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.PROVISIONING)
+
+        # 1. Probe: prove pgvector + vector(768) + min version, no mutation.
+        probe = byod_probe.probe_tenant_database(dsn, resolver=resolver, connect=connect)
+
+        # 2. Apply schema + create the DML-only runtime role (migrate connection).
+        runtime_password = secrets.token_urlsafe(_RUNTIME_PASSWORD_BYTES)
+        schema_version = byod_dataplane.provision_tenant_database(
+            dsn,
+            dbname=probe.dbname,
+            runtime_password=runtime_password,
+            connect=connect,
+        )
+
+        # 3. Store the derived runtime DSN (envelope-encrypted), record version, LIVE.
+        runtime_dsn = byod_dataplane.build_runtime_dsn(dsn, runtime_password)
+        byod_crypto.store_encrypted_runtime_dsn(cur, company_id, runtime_dsn, kms)
+        byod_store.update_tenant_db_schema_version(cur, company_id, schema_version)
+        byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.LIVE)
     except Exception:
         # Fail-soft on availability: isolate this tenant in ERROR and alert (§10).
         byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.ERROR)
         raise
 
-    byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.PROVISIONING)
     return {
         "company_id": company_id,
         "masked_url": MASKED_URL,
-        "status": TenantDbStatus.PROVISIONING,
-        "pgvector_version": result.pgvector_version,
-        "server_version": result.server_version,
-        "embedding_dimensions": result.embedding_dimensions,
+        "status": TenantDbStatus.LIVE,
+        "schema_version": schema_version,
+        "pgvector_version": probe.pgvector_version,
+        "server_version": probe.server_version,
+        "embedding_dimensions": probe.embedding_dimensions,
         "idempotent": False,
     }
 

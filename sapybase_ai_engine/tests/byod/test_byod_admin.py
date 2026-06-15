@@ -31,7 +31,7 @@ from byod_admin import (
 from byod_admin import test_dsn as run_test_dsn  # aliased: bare `test_dsn` would be collected as a test
 import os
 
-from byod_crypto import LocalKmsProvider, load_decrypted_dsn
+from byod_crypto import LocalKmsProvider, load_decrypted_dsn, load_decrypted_runtime_dsn
 from byod_dsn import DsnValidationError
 from byod_store import CONTROL_PLANE_SCHEMA_SQL, TenantDbStatus, get_tenant_db_record
 from config import CUSTOM_PLAN_FEATURE_KEYS
@@ -259,37 +259,47 @@ def _enroll_and_connect(admin_conn, make_user, kms):
     return clerk_id, company_id
 
 
-def test_provision_probes_and_moves_to_provisioning(admin_conn, make_user, kms):
+def test_provision_runs_full_pipeline_to_live(admin_conn, make_user, kms):
     clerk_id, company_id = _enroll_and_connect(admin_conn, make_user, kms)
     connector = _healthy_connector()
 
     result = provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
     admin_conn.commit()
 
-    assert result["status"] == TenantDbStatus.PROVISIONING
+    assert result["status"] == TenantDbStatus.LIVE
     assert result["idempotent"] is False
     assert result["pgvector_version"] == "0.7.0"
+    assert result["schema_version"] == "0001"  # data-plane version recorded
     assert "s3cr3t" not in json.dumps(result)  # rule 7 — no DSN echoed
-    assert len(connector.created) == 1  # connected to the tenant DB exactly once
 
     record = get_tenant_db_record(admin_conn.cursor(), company_id)
-    assert record.status == TenantDbStatus.PROVISIONING
+    assert record.status == TenantDbStatus.LIVE
+    assert record.schema_version == "0001"
+    assert record.runtime_dsn_ciphertext is not None  # runtime DSN stored
+
+    # The runtime DSN decrypts to a vaayu_runtime credential — NOT the migrate one.
+    runtime_dsn = load_decrypted_runtime_dsn(admin_conn.cursor(), company_id, kms)
+    assert runtime_dsn.startswith("postgresql://vaayu_runtime:")
+    assert "sslmode=require" in runtime_dsn
+    assert "s3cr3t" not in runtime_dsn  # not the migrate password
 
 
 def test_provision_is_idempotent_on_double_submit(admin_conn, make_user, kms):
-    """§16.6: a double-click must not re-probe or corrupt state."""
+    """§16.6: a double-click must not re-run the pipeline or corrupt state."""
     clerk_id, _ = _enroll_and_connect(admin_conn, make_user, kms)
     connector = _healthy_connector()
 
     first = provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
     admin_conn.commit()
+    connections_after_first = len(connector.created)  # probe + apply
     second = provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
     admin_conn.commit()
 
     assert first["idempotent"] is False
     assert second["idempotent"] is True
-    assert second["status"] == TenantDbStatus.PROVISIONING
-    assert len(connector.created) == 1  # NOT probed a second time
+    assert second["status"] == TenantDbStatus.LIVE
+    # The LIVE short-circuit opened NO new tenant connections (no re-probe/re-apply).
+    assert len(connector.created) == connections_after_first
 
 
 def test_provision_rejects_old_pgvector_and_marks_error(admin_conn, make_user, kms):

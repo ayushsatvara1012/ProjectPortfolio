@@ -45,8 +45,6 @@ from embedding_config import EMBEDDING_DIMENSIONS  # noqa: E402
 # recent pgvector with HNSW support.
 PGVECTOR_IMAGE = os.getenv("BYOD_TEST_PGVECTOR_IMAGE", "pgvector/pgvector:pg16")
 
-_SCHEMA_SQL_PATH = Path(__file__).resolve().parent / "data_plane_schema.sql"
-
 
 class TenantDBUnavailable(RuntimeError):
     """Raised when no ephemeral tenant Postgres backend can be provisioned."""
@@ -94,9 +92,13 @@ def vector_literal(vec: list[float]) -> str:
 # ── Provisioning ────────────────────────────────────────────────────────────
 
 def _load_schema_sql() -> str:
-    raw = _SCHEMA_SQL_PATH.read_text()
-    # Keep the vector dimension locked to embedding_config — never hard-coded.
-    return raw.replace("{EMBEDDING_DIMENSIONS}", str(EMBEDDING_DIMENSIONS))
+    # Single source of truth (RFC Phase 2.3): the harness provisions the SAME
+    # authoritative data-plane DDL the engine applies in production, so the tested
+    # schema and the provisioned schema can never drift. The vector dimension is
+    # locked to embedding_config inside byod_dataplane.
+    import byod_dataplane
+
+    return byod_dataplane.DATA_PLANE_SCHEMA_SQL
 
 
 def provision(dsn: str) -> None:

@@ -279,6 +279,48 @@ def load_decrypted_dsn(cur, company_id: str, kms: KmsProvider) -> Optional[str]:
     return decrypt_dsn(_encrypted_from_record(rec), company_id, kms)
 
 
+def _encrypted_from_runtime_record(rec: TenantDbRecord) -> EncryptedDsn:
+    if (
+        rec.runtime_dsn_ciphertext is None
+        or rec.runtime_dsn_data_key is None
+        or rec.runtime_dsn_nonce is None
+        or rec.runtime_dsn_key_id is None
+    ):
+        raise CryptoError("record has no envelope-encrypted runtime DSN")
+    return EncryptedDsn(
+        ciphertext=rec.runtime_dsn_ciphertext,
+        data_key=rec.runtime_dsn_data_key,
+        nonce=rec.runtime_dsn_nonce,
+        key_id=rec.runtime_dsn_key_id,
+    )
+
+
+def store_encrypted_runtime_dsn(
+    cur, company_id: str, plaintext_runtime_dsn: str, kms: KmsProvider
+) -> bool:
+    """Encrypt + persist the DML-only runtime (vaayu_runtime) DSN (RFC §5.4 /
+    Phase 2.3). Returns True if the tenant row was updated. The runtime DSN is
+    bound to the same ``company_id`` AAD as the migrate DSN; never logged."""
+    enc = encrypt_dsn(plaintext_runtime_dsn, company_id, kms)
+    return byod_store.set_runtime_dsn(
+        cur,
+        company_id,
+        runtime_dsn_ciphertext=enc.ciphertext,
+        runtime_dsn_key_id=enc.key_id,
+        runtime_dsn_data_key=enc.data_key,
+        runtime_dsn_nonce=enc.nonce,
+    )
+
+
+def load_decrypted_runtime_dsn(cur, company_id: str, kms: KmsProvider) -> Optional[str]:
+    """Resolve + decrypt the runtime DSN the engine request path uses (Phase 3),
+    or None if no record / no runtime DSN stored yet. In-memory only."""
+    rec = byod_store.get_tenant_db_record(cur, company_id)
+    if rec is None or rec.runtime_dsn_ciphertext is None:
+        return None
+    return decrypt_dsn(_encrypted_from_runtime_record(rec), company_id, kms)
+
+
 def rotate_stored_dsn(cur, company_id: str, kms: KmsProvider) -> Optional[TenantDbRecord]:
     """Re-encrypt the stored DSN under the KMS active key (key-rotation runbook, §16.5).
 

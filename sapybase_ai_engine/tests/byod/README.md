@@ -49,10 +49,12 @@ to it.
 - `tenant_conn` (per-test) — a psycopg2 connection with pgvector registered.
 
 Seed data and the deterministic embedding helper live in
-[`tenant_harness.py`](tenant_harness.py); the fixture schema is
-[`data_plane_schema.sql`](data_plane_schema.sql). The vector column dimension is
-locked to `EMBEDDING_DIMENSIONS` from `embedding_config.py` (substituted at load
-time) so the two can never silently drift.
+[`tenant_harness.py`](tenant_harness.py); the schema it provisions is the
+authoritative data-plane DDL in [`byod_dataplane.py`](../../byod_dataplane.py)
+(`DATA_PLANE_SCHEMA_SQL`, RFC Phase 2.3) — the same DDL the engine applies when
+provisioning a real tenant DB, so the tested and provisioned schemas can never
+drift. The vector column dimension is locked to `EMBEDDING_DIMENSIONS` from
+`embedding_config.py` so the two can never silently differ.
 
-> The fixture schema is a minimal, representative slice — **not** the
-> authoritative data-plane migration set, which arrives in Phase 3.1.
+> Phase 3.1 wraps `byod_dataplane.DATA_PLANE_SCHEMA_SQL` into a formal Alembic
+> `data_plane` lineage; until then this module is the single source of truth.
