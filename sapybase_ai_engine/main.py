@@ -1073,8 +1073,13 @@ from models import (
     CustomPlanConfig, AdminUpdateUserRequest, CompanyUpdate, RoiBenchmarkUpdate,
     DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
-    LeadOutcomeUpdate,
+    LeadOutcomeUpdate, ByodConnectionRequest,
 )
+
+# ── BYOD super-admin config logic (RFC Phase 2.1, §3.1) — dark until enabled ──
+import byod_admin
+from byod_dsn import DsnValidationError
+from byod_crypto import KmsUnavailable, kms_from_env
 
 # ── Lead outcome / pipeline analytics — extracted to lead_outcomes.py ──
 # Re-exported so `from main import summarize_pipeline` / `main.X` and the test
@@ -6345,6 +6350,109 @@ def update_user_limits(
 ):
     """Alias endpoint used by the Admin Dashboard plan builder UI."""
     return update_user_admin(request, clerk_id, req, admin, _fresh)
+
+
+# ── BYOD super-admin config (RFC Phase 2.1, §3.1) ───────────────────────────
+# Thin endpoints over byod_admin: create-from-template, view (masked URL), Test,
+# and set/rotate the connection. Plan-field overrides flow through the existing
+# /custom-plan/override + /limits endpoints (BYOD is Custom-Plan machinery). A
+# decrypted DSN is NEVER logged or echoed (rule 7).
+
+@app.get("/api/admin/users/{clerk_id}/byod")
+@limiter.limit("30/minute")
+def get_byod_config(
+    request: Request,
+    clerk_id: str,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Admin BYOD panel surface: plan overrides + masked connection block."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        return byod_admin.get_admin_view(cursor, clerk_id)
+    except byod_admin.UserNotFound:
+        raise HTTPException(status_code=404, detail="User not found.")
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/enroll")
+@limiter.limit("20/minute")
+def enroll_byod(
+    request: Request,
+    clerk_id: str,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Create-from-template: seed a per-client CUSTOM config from the BYOD template
+    (§3.1). Every field stays super-admin-editable via the custom-plan endpoints."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cfg = byod_admin.enroll_in_byod(cursor, clerk_id)
+        conn.commit()
+        log_admin_action(admin["clerk_id"], "BYOD_ENROLL", clerk_id, {"plan_name": cfg.get("plan_name")})
+        return {"status": "success", "config": cfg}
+    except byod_admin.UserNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="User not found.")
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/test")
+@limiter.limit("20/minute")
+def test_byod_connection(
+    request: Request,
+    clerk_id: str,
+    req: ByodConnectionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """The **Test** button: validate the DSN (SSRF + allowlist + TLS) without
+    storing it. Connecting + asserting pgvector is Phase 2.2."""
+    try:
+        return byod_admin.test_dsn(req.db_url)
+    except DsnValidationError as e:
+        # The message is safe (never contains the password — rule 7).
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/api/admin/users/{clerk_id}/byod/connection")
+@limiter.limit("10/minute")
+def set_byod_connection(
+    request: Request,
+    clerk_id: str,
+    req: ByodConnectionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Validate, envelope-encrypt, and store the tenant DSN as PENDING (onboarding
+    / rotate-URL). The plaintext DSN is never logged or returned."""
+    try:
+        kms = kms_from_env()
+    except KmsUnavailable:
+        raise HTTPException(status_code=503, detail="Encryption service unavailable.")
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_admin.set_connection(cursor, clerk_id, req.db_url, kms)
+        conn.commit()
+        # Audit the change WITHOUT the DSN (rule 7) — only the masked form + reason.
+        log_admin_action(
+            admin["clerk_id"], "BYOD_SET_CONNECTION", clerk_id,
+            {"masked_url": result["masked_url"], "status": result["status"], "reason": req.reason},
+        )
+        return {"status": "success", **result}
+    except byod_admin.CompanyNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="User has no company to attach a database to.")
+    except DsnValidationError as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        release_db_connection(conn)
 
 
 # (TrialExtensionRequest moved to models.py — re-exported above)

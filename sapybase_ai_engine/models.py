@@ -339,6 +339,15 @@ class CustomPlanOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ByodConnectionRequest(BaseModel):
+    """A BYOD tenant database connection string (RFC §3.1 / §4.1). Validated,
+    encrypted, and stored ciphertext-only; never echoed back in full."""
+    db_url: str = Field(..., min_length=1, max_length=4096, description="Tenant Postgres DSN")
+    reason: Optional[str] = Field(None, max_length=500, description="Internal reason (audit log)")
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class EvalQuestion(BaseModel):
     question: str = Field(..., max_length=1000)
     expected_answer: str = Field(..., max_length=3000)
