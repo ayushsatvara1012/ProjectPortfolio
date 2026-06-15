@@ -348,6 +348,14 @@ class ByodConnectionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ByodProvisionRequest(BaseModel):
+    """Trigger provisioning of the already-stored tenant DSN (RFC §4.1 / §16.6).
+    No DSN here — it is read from the stored ciphertext. ``reason`` is audit-only."""
+    reason: Optional[str] = Field(None, max_length=500, description="Internal reason (audit log)")
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class EvalQuestion(BaseModel):
     question: str = Field(..., max_length=1000)
     expected_answer: str = Field(..., max_length=3000)

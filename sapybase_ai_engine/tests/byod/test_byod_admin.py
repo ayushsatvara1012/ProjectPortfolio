@@ -16,12 +16,15 @@ import psycopg2
 import pytest
 
 import byod_admin
+import byod_probe
 from byod_admin import (
     CompanyNotFound,
+    ConnectionNotConfigured,
     MASKED_URL,
     UserNotFound,
     enroll_in_byod,
     get_admin_view,
+    provision,
     seed_byod_config,
     set_connection,
 )
@@ -33,11 +36,18 @@ from byod_dsn import DsnValidationError
 from byod_store import CONTROL_PLANE_SCHEMA_SQL, TenantDbStatus, get_tenant_db_record
 from config import CUSTOM_PLAN_FEATURE_KEYS
 
+from .test_byod_probe import make_fake_connector
+
 GOOD_DSN = "postgresql://app:s3cr3t@db.tenant.example.com:5432/tenantdb?sslmode=require"
 
 
 def _resolver(host):  # public IP for any host → SSRF check passes
     return ["8.8.8.8"]
+
+
+def _healthy_connector():
+    """A fake tenant connection reporting a supported pgvector (for the probe)."""
+    return make_fake_connector(available_row=("0.7.0", "0.7.0"), extversion="0.7.0")
 
 
 # ── Pure: template seed (create-from-template) ────────────────────────────────
@@ -53,11 +63,21 @@ def test_seed_is_all_features_on_byod_template():
 
 # ── Pure: Test button + masking ───────────────────────────────────────────────
 def test_test_dsn_accepts_valid():
-    result = run_test_dsn(GOOD_DSN, resolver=_resolver)
+    # Phase 2.2: Test now opens a real connection and asserts pgvector. The fake
+    # connector stands in for a healthy tenant DB.
+    result = run_test_dsn(GOOD_DSN, resolver=_resolver, connect=_healthy_connector())
     assert result["ok"] is True
     assert result["host"] == "db.tenant.example.com"
     assert result["sslmode"] == "require"
     assert result["masked_url"] == MASKED_URL
+    assert result["pgvector_version"] == "0.7.0"
+    assert result["embedding_dimensions"] == 768
+
+
+def test_test_dsn_rejects_db_without_pgvector():
+    connector = make_fake_connector(available_row=None)
+    with pytest.raises(byod_probe.PgvectorUnavailable):
+        run_test_dsn(GOOD_DSN, resolver=_resolver, connect=connector)
 
 
 @pytest.mark.parametrize(
@@ -226,3 +246,111 @@ def test_override_persists_and_resolves(admin_conn, make_user):
     plan = get_plan("CUSTOM", custom_plan_config=view["overrides"])
     assert plan["messages"] == 12345
     assert plan["byo_database"] is True
+
+
+# ── Provisioning: real-connect probe + idempotent advisory lock (Phase 2.2) ───
+def _enroll_and_connect(admin_conn, make_user, kms):
+    """Helper: a user enrolled in BYOD with a stored PENDING DSN."""
+    clerk_id, company_id = make_user()
+    enroll_in_byod(admin_conn.cursor(), clerk_id)
+    admin_conn.commit()
+    set_connection(admin_conn.cursor(), clerk_id, GOOD_DSN, kms, resolver=_resolver)
+    admin_conn.commit()
+    return clerk_id, company_id
+
+
+def test_provision_probes_and_moves_to_provisioning(admin_conn, make_user, kms):
+    clerk_id, company_id = _enroll_and_connect(admin_conn, make_user, kms)
+    connector = _healthy_connector()
+
+    result = provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
+    admin_conn.commit()
+
+    assert result["status"] == TenantDbStatus.PROVISIONING
+    assert result["idempotent"] is False
+    assert result["pgvector_version"] == "0.7.0"
+    assert "s3cr3t" not in json.dumps(result)  # rule 7 — no DSN echoed
+    assert len(connector.created) == 1  # connected to the tenant DB exactly once
+
+    record = get_tenant_db_record(admin_conn.cursor(), company_id)
+    assert record.status == TenantDbStatus.PROVISIONING
+
+
+def test_provision_is_idempotent_on_double_submit(admin_conn, make_user, kms):
+    """§16.6: a double-click must not re-probe or corrupt state."""
+    clerk_id, _ = _enroll_and_connect(admin_conn, make_user, kms)
+    connector = _healthy_connector()
+
+    first = provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
+    admin_conn.commit()
+    second = provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
+    admin_conn.commit()
+
+    assert first["idempotent"] is False
+    assert second["idempotent"] is True
+    assert second["status"] == TenantDbStatus.PROVISIONING
+    assert len(connector.created) == 1  # NOT probed a second time
+
+
+def test_provision_rejects_old_pgvector_and_marks_error(admin_conn, make_user, kms):
+    clerk_id, company_id = _enroll_and_connect(admin_conn, make_user, kms)
+    connector = make_fake_connector(available_row=("0.4.0", "0.4.0"), extversion="0.4.0")
+
+    with pytest.raises(byod_probe.PgvectorVersionTooOld):
+        provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
+    admin_conn.commit()  # the endpoint persists the ERROR transition
+
+    record = get_tenant_db_record(admin_conn.cursor(), company_id)
+    assert record.status == TenantDbStatus.ERROR
+
+
+def test_provision_without_connection_raises(admin_conn, make_user, kms):
+    clerk_id, _ = make_user()
+    enroll_in_byod(admin_conn.cursor(), clerk_id)
+    admin_conn.commit()
+    with pytest.raises(ConnectionNotConfigured):
+        provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=_healthy_connector())
+
+
+def test_provision_no_company_raises(admin_conn, make_user, kms):
+    clerk_id, _ = make_user(with_company=False)
+    with pytest.raises(CompanyNotFound):
+        provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver)
+
+
+def test_provision_advisory_lock_serializes_per_tenant(admin_conn, control_plane_db_dsn, make_user):
+    """The provisioning advisory lock blocks a concurrent provision of the SAME
+    tenant, while a different tenant's lock stays free (§16.6 serialization)."""
+    _, company_id = make_user()
+    _, other_company_id = make_user()
+
+    c1 = psycopg2.connect(control_plane_db_dsn)
+    c2 = psycopg2.connect(control_plane_db_dsn)
+    try:
+        # c1 holds the lock for company_id (transaction left open → lock held).
+        with c1.cursor() as cur1:
+            byod_admin._acquire_provision_lock(cur1, company_id)
+
+            # c2 cannot take the same tenant's lock within the timeout.
+            with c2.cursor() as cur2:
+                cur2.execute("SET lock_timeout = '300ms'")
+                with pytest.raises(psycopg2.errors.LockNotAvailable):
+                    byod_admin._acquire_provision_lock(cur2, company_id)
+            c2.rollback()
+
+            # …but a DIFFERENT tenant's lock is free (no false serialization).
+            with c2.cursor() as cur2:
+                cur2.execute("SET lock_timeout = '300ms'")
+                byod_admin._acquire_provision_lock(cur2, other_company_id)
+            c2.rollback()
+
+        c1.commit()  # releases company_id's lock
+
+        # Now c2 can acquire company_id's lock.
+        with c2.cursor() as cur2:
+            cur2.execute("SET lock_timeout = '300ms'")
+            byod_admin._acquire_provision_lock(cur2, company_id)
+        c2.commit()
+    finally:
+        c1.close()
+        c2.close()

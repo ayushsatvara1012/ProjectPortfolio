@@ -25,8 +25,10 @@ import json
 from typing import Callable, Optional, Sequence
 
 import byod_crypto
+import byod_probe
 import byod_store
 from byod_dsn import validate_db_url
+from byod_store import TenantDbStatus
 from config import BYOD_PLAN_DEFAULTS
 from models import CustomPlanConfig
 
@@ -34,7 +36,13 @@ from models import CustomPlanConfig
 # stored ciphertext — there is nothing to reveal, so KMS is not touched here.
 MASKED_URL = "postgresql://••••@••••"
 
+# §16.6: a fixed namespace for the per-tenant provisioning advisory lock, so the
+# (namespace, hashtext(company_id)) key can't collide with any other advisory
+# lock domain. 0x42594F44 == b"BYOD"; fits a signed int4.
+_PROVISION_LOCK_NAMESPACE = 0x42594F44
+
 Resolver = Callable[[str], Sequence[str]]
+Connector = Callable[[str], object]
 
 
 class ByodAdminError(Exception):
@@ -47,6 +55,10 @@ class UserNotFound(ByodAdminError):
 
 class CompanyNotFound(ByodAdminError):
     """The user has no company to attach a tenant database to."""
+
+
+class ConnectionNotConfigured(ByodAdminError):
+    """No tenant DSN has been stored yet — call set_connection before provisioning."""
 
 
 def seed_byod_config() -> dict:
@@ -88,19 +100,31 @@ def enroll_in_byod(cur, clerk_id: str) -> dict:
     return cfg
 
 
-def test_dsn(dsn: str, *, resolver: Optional[Resolver] = None) -> dict:
-    """The **Test** button: validate a DSN (SSRF + DNS re-check + param allowlist +
-    TLS, Phase 1.4) without storing anything. Raises ``DsnValidationError`` on a
-    bad DSN; on success returns the safe (password-free) parsed view + masked URL.
-    (Actually connecting + asserting pgvector is Phase 2.2.)"""
-    validated = validate_db_url(dsn) if resolver is None else validate_db_url(dsn, resolver=resolver)
+def test_dsn(
+    dsn: str,
+    *,
+    resolver: Optional[Resolver] = None,
+    connect: Optional[Connector] = None,
+) -> dict:
+    """The **Test** button (Phase 2.2): validate the DSN (SSRF + DNS re-check +
+    param allowlist + TLS, Phase 1.4) **and** open a real connection to prove the
+    database can back the engine — pgvector installed at a supported version and
+    a ``vector(768)`` column creatable (§16.7). Stores nothing.
+
+    Raises ``DsnValidationError`` on an unsafe DSN (before connecting) or a
+    :class:`byod_probe.ProbeError` if the DB is unreachable / incompatible. On
+    success returns the safe (password-free) parsed view + proven capabilities."""
+    result = byod_probe.probe_tenant_database(dsn, resolver=resolver, connect=connect)
     return {
         "ok": True,
         "masked_url": MASKED_URL,
-        "host": validated.host,
-        "port": validated.port,
-        "dbname": validated.dbname,
-        "sslmode": validated.sslmode,
+        "host": result.host,
+        "port": result.port,
+        "dbname": result.dbname,
+        "sslmode": result.sslmode,
+        "pgvector_version": result.pgvector_version,
+        "server_version": result.server_version,
+        "embedding_dimensions": result.embedding_dimensions,
     }
 
 
@@ -129,6 +153,92 @@ def set_connection(
         cur, company_id, dsn, kms, status=byod_store.TenantDbStatus.PENDING
     )
     return {"company_id": company_id, "masked_url": MASKED_URL, "status": record.status}
+
+
+# Statuses that mean "already provisioned (or in flight)" — a re-submit is a no-op.
+_PROVISIONED_STATUSES = frozenset({TenantDbStatus.PROVISIONING, TenantDbStatus.LIVE})
+
+
+def _acquire_provision_lock(cur, company_id: str) -> None:
+    """Take a transaction-scoped advisory lock on the control plane for this
+    tenant (§16.6). Two concurrent provisions of the same company serialize here:
+    the second blocks until the first commits/rolls back (auto-releasing the
+    lock), then observes the updated status and short-circuits. Keyed by
+    (namespace, hashtext(company_id)) so it can't collide with other lock uses."""
+    cur.execute(
+        "SELECT pg_advisory_xact_lock(%s, hashtext(%s))",
+        (_PROVISION_LOCK_NAMESPACE, company_id),
+    )
+
+
+def provision(
+    cur,
+    clerk_id: str,
+    kms: byod_crypto.KmsProvider,
+    *,
+    resolver: Optional[Resolver] = None,
+    connect: Optional[Connector] = None,
+) -> dict:
+    """Provision a stored tenant database (Phase 2.2): decrypt the DSN in memory,
+    re-validate it, open a real connection with the migration role, assert
+    pgvector + ``vector(768)`` + the minimum pgvector version (§16.7), and move
+    the record ``PENDING -> PROVISIONING``. (Running the data-plane migrations and
+    creating the DML-only runtime role is Phase 2.3; the health-probe -> ``LIVE``
+    transition is Phase 2.4.)
+
+    **Idempotent & advisory-locked (§16.6):** a transaction-scoped advisory lock
+    serializes concurrent calls for the same tenant, so a double-click can't run
+    the probe twice or leave a half-written state. If the tenant is already
+    ``PROVISIONING``/``LIVE`` the call is a safe no-op. On a probe failure the
+    record is moved to ``ERROR`` (isolated, §10) and the error re-raised.
+
+    Caller owns the transaction (commit on success / rollback on error — either
+    releases the advisory lock). Raises :class:`CompanyNotFound`,
+    :class:`ConnectionNotConfigured`, ``DsnValidationError``, ``KmsUnavailable``,
+    or a :class:`byod_probe.ProbeError`. Never logs or returns the plaintext DSN."""
+    company_id = resolve_company_id(cur, clerk_id)
+    if company_id is None:
+        raise CompanyNotFound(clerk_id)
+
+    # Serialize concurrent provisions for this tenant before reading status.
+    _acquire_provision_lock(cur, company_id)
+
+    record = byod_store.get_tenant_db_record(cur, company_id)
+    if record is None:
+        raise ConnectionNotConfigured(clerk_id)
+
+    # Idempotency: a re-submit while already provisioning/live does nothing.
+    if record.status in _PROVISIONED_STATUSES:
+        return {
+            "company_id": company_id,
+            "masked_url": MASKED_URL,
+            "status": record.status,
+            "schema_version": record.schema_version,
+            "idempotent": True,
+        }
+
+    # Decrypt in memory only (rule 7) — never logged, never returned.
+    dsn = byod_crypto.load_decrypted_dsn(cur, company_id, kms)
+    if dsn is None:
+        raise ConnectionNotConfigured(clerk_id)
+
+    try:
+        result = byod_probe.probe_tenant_database(dsn, resolver=resolver, connect=connect)
+    except Exception:
+        # Fail-soft on availability: isolate this tenant in ERROR and alert (§10).
+        byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.ERROR)
+        raise
+
+    byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.PROVISIONING)
+    return {
+        "company_id": company_id,
+        "masked_url": MASKED_URL,
+        "status": TenantDbStatus.PROVISIONING,
+        "pgvector_version": result.pgvector_version,
+        "server_version": result.server_version,
+        "embedding_dimensions": result.embedding_dimensions,
+        "idempotent": False,
+    }
 
 
 def get_admin_view(cur, clerk_id: str) -> dict:

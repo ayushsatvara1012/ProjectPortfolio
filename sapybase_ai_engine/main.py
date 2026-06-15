@@ -1073,13 +1073,23 @@ from models import (
     CustomPlanConfig, AdminUpdateUserRequest, CompanyUpdate, RoiBenchmarkUpdate,
     DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
-    LeadOutcomeUpdate, ByodConnectionRequest,
+    LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
 )
 
-# ── BYOD super-admin config logic (RFC Phase 2.1, §3.1) — dark until enabled ──
+# ── BYOD super-admin config logic (RFC Phase 2.1–2.2, §3.1) — dark until enabled ──
 import byod_admin
+import byod_probe
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
+
+
+def _byod_probe_http_error(exc: "byod_probe.ProbeError") -> HTTPException:
+    """Map a sanitized tenant-DB probe failure to an HTTP error (rule 7 / E6:
+    the message is already safe — no DSN/host/driver text). Unreachable → 502
+    (bad upstream); reachable-but-incompatible → 422."""
+    if isinstance(exc, byod_probe.TenantConnectionError):
+        return HTTPException(status_code=502, detail=str(exc))
+    return HTTPException(status_code=422, detail=str(exc))
 
 # ── Lead outcome / pipeline analytics — extracted to lead_outcomes.py ──
 # Re-exported so `from main import summarize_pipeline` / `main.X` and the test
@@ -6410,13 +6420,60 @@ def test_byod_connection(
     admin: dict = Depends(get_admin_user),
     _fresh: dict = Depends(require_fresh_admin),
 ):
-    """The **Test** button: validate the DSN (SSRF + allowlist + TLS) without
-    storing it. Connecting + asserting pgvector is Phase 2.2."""
+    """The **Test** button (Phase 2.2): validate the DSN (SSRF + allowlist + TLS)
+    AND open a real connection to prove pgvector is present at a supported version
+    and a vector(768) column is creatable (§16.7). Stores nothing."""
     try:
         return byod_admin.test_dsn(req.db_url)
     except DsnValidationError as e:
         # The message is safe (never contains the password — rule 7).
         raise HTTPException(status_code=400, detail=str(e))
+    except byod_probe.ProbeError as e:
+        raise _byod_probe_http_error(e)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/provision")
+@limiter.limit("10/minute")
+def provision_byod(
+    request: Request,
+    clerk_id: str,
+    req: ByodProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Provision the stored tenant DSN (Phase 2.2): decrypt in memory, re-validate,
+    real-connect with the migration role, assert pgvector + vector(768) + min
+    version (§16.7), then move PENDING -> PROVISIONING. Idempotent + advisory-
+    locked (§16.6): a double-click serializes and a re-submit is a safe no-op."""
+    try:
+        kms = kms_from_env()
+    except KmsUnavailable:
+        raise HTTPException(status_code=503, detail="Encryption service unavailable.")
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_admin.provision(cursor, clerk_id, kms)
+        conn.commit()  # commit also releases the transaction-scoped advisory lock
+        log_admin_action(
+            admin["clerk_id"], "BYOD_PROVISION", clerk_id,
+            {"status": result["status"], "idempotent": result.get("idempotent"),
+             "pgvector_version": result.get("pgvector_version"), "reason": req.reason},
+        )
+        return {"status": "success", **result}
+    except byod_admin.CompanyNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="User has no company to attach a database to.")
+    except byod_admin.ConnectionNotConfigured:
+        conn.rollback()
+        raise HTTPException(status_code=409, detail="No tenant database connection has been set yet.")
+    except DsnValidationError as e:
+        conn.commit()  # status was moved to ERROR; persist that + release the lock
+        raise HTTPException(status_code=400, detail=str(e))
+    except byod_probe.ProbeError as e:
+        conn.commit()  # status was moved to ERROR; persist that + release the lock
+        raise _byod_probe_http_error(e)
+    finally:
+        release_db_connection(conn)
 
 
 @app.put("/api/admin/users/{clerk_id}/byod/connection")
