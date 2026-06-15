@@ -215,6 +215,18 @@ def ephemeral_database(server_dsn: str) -> Iterator[str]:
 
 
 @contextmanager
+def bare_ephemeral_database(server_dsn: str) -> Iterator[str]:
+    """A fresh isolated database with NO schema provisioned; dropped on exit.
+
+    For control-plane tests (RFC Phase 1.2+) that need a clean Postgres to apply
+    their own DDL — unlike :func:`ephemeral_database`, this does not lay down the
+    data-plane (tenant) fixture schema.
+    """
+    with _ephemeral_db_on_server(server_dsn) as dsn:
+        yield dsn
+
+
+@contextmanager
 def ephemeral_tenant_db() -> Iterator[str]:
     """Yield a DSN to a provisioned, throwaway tenant Postgres+pgvector DB.
 

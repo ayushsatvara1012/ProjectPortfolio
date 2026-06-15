@@ -8,6 +8,7 @@ import pytest
 
 from .tenant_harness import (
     TenantDBUnavailable,
+    bare_ephemeral_database,
     ephemeral_database,
     open_tenant_server,
 )
@@ -46,3 +47,14 @@ def tenant_conn(tenant_db_dsn: str) -> Iterator[psycopg2.extensions.connection]:
         yield conn
     finally:
         conn.close()
+
+
+@pytest.fixture
+def control_plane_db_dsn(tenant_db_server: str) -> Iterator[str]:
+    """A fresh, bare (un-provisioned) database per test for control-plane tests.
+
+    The BYOD control-plane tables live on Sapybase's own Postgres, not on a
+    tenant DB; this gives those tests a clean server to apply their own DDL to.
+    """
+    with bare_ephemeral_database(tenant_db_server) as dsn:
+        yield dsn
