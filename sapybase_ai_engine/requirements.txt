@@ -12,6 +12,10 @@ langchain-community
 langchain-text-splitters
 svix
 python-jose[cryptography]
+# Direct dependency: BYOD DSN envelope encryption (byod_crypto.py, AES-256-GCM).
+# Already pulled transitively by python-jose[cryptography]; declared explicitly
+# since we now use it directly.
+cryptography
 requests
 slowapi
 clerk-backend-api

@@ -94,29 +94,7 @@ class TestSchemaConstant:
 
 
 # ── Functional round-trip (needs Postgres) ───────────────────────────────────
-
-@pytest.fixture
-def cp_conn(control_plane_db_dsn: str):
-    """A control-plane DB with a stub `companies` table + the migration DDL applied."""
-    conn = psycopg2.connect(control_plane_db_dsn)
-    try:
-        with conn.cursor() as cur:
-            # Minimal stand-in for the real companies table (FK target).
-            cur.execute("CREATE TABLE IF NOT EXISTS companies (id UUID PRIMARY KEY)")
-            cur.execute(CONTROL_PLANE_SCHEMA_SQL)  # "migration applies"
-        conn.commit()
-        yield conn
-    finally:
-        conn.close()
-
-
-def _make_company(conn) -> str:
-    company_id = str(uuid.uuid4())
-    with conn.cursor() as cur:
-        cur.execute("INSERT INTO companies (id) VALUES (%s)", (company_id,))
-    conn.commit()
-    return company_id
-
+# The `cp_conn` and `make_company` fixtures are shared via tests/byod/conftest.py.
 
 def test_schema_applies_and_table_exists(cp_conn):
     with cp_conn.cursor() as cur:
@@ -124,8 +102,8 @@ def test_schema_applies_and_table_exists(cp_conn):
         assert cur.fetchone()[0] == TABLE_NAME
 
 
-def test_store_read_roundtrip(cp_conn):
-    company_id = _make_company(cp_conn)
+def test_store_read_roundtrip(cp_conn, make_company):
+    company_id = make_company()
     ciphertext = b"\x00\x01\x02enc-dsn\xff"
     data_key = b"wrapped-data-key"
     nonce = b"nonce-123"
@@ -166,8 +144,8 @@ def test_get_missing_returns_none(cp_conn):
         assert get_tenant_db_record(cur, str(uuid.uuid4())) is None
 
 
-def test_store_is_upsert_and_never_persists_plaintext(cp_conn):
-    company_id = _make_company(cp_conn)
+def test_store_is_upsert_and_never_persists_plaintext(cp_conn, make_company):
+    company_id = make_company()
     with cp_conn.cursor() as cur:
         store_tenant_db_record(cur, company_id, dsn_ciphertext=b"v1", dsn_key_id="k1")
         store_tenant_db_record(cur, company_id, dsn_ciphertext=b"v2", dsn_key_id="k2",
@@ -191,8 +169,8 @@ def test_store_is_upsert_and_never_persists_plaintext(cp_conn):
     assert not any("plain" in c or c in {"dsn", "dsn_url", "connection_string"} for c in cols)
 
 
-def test_update_status_and_schema_version(cp_conn):
-    company_id = _make_company(cp_conn)
+def test_update_status_and_schema_version(cp_conn, make_company):
+    company_id = make_company()
     with cp_conn.cursor() as cur:
         store_tenant_db_record(cur, company_id, dsn_ciphertext=b"x", dsn_key_id="k")
         assert update_tenant_db_status(cur, company_id, TenantDbStatus.LIVE) is True
@@ -207,8 +185,8 @@ def test_update_missing_company_returns_false(cp_conn):
         assert update_tenant_db_status(cur, str(uuid.uuid4()), TenantDbStatus.LIVE) is False
 
 
-def test_invalid_status_rejected_in_python_and_db(cp_conn):
-    company_id = _make_company(cp_conn)
+def test_invalid_status_rejected_in_python_and_db(cp_conn, make_company):
+    company_id = make_company()
     # Python guard.
     with cp_conn.cursor() as cur:
         with pytest.raises(ValueError):
@@ -226,8 +204,8 @@ def test_invalid_status_rejected_in_python_and_db(cp_conn):
     cp_conn.rollback()
 
 
-def test_offboard_deletes_routing_only(cp_conn):
-    company_id = _make_company(cp_conn)
+def test_offboard_deletes_routing_only(cp_conn, make_company):
+    company_id = make_company()
     with cp_conn.cursor() as cur:
         store_tenant_db_record(cur, company_id, dsn_ciphertext=b"x", dsn_key_id="k")
         assert delete_tenant_db_record(cur, company_id) is True
@@ -238,8 +216,8 @@ def test_offboard_deletes_routing_only(cp_conn):
     cp_conn.commit()
 
 
-def test_company_delete_cascades_routing_row(cp_conn):
-    company_id = _make_company(cp_conn)
+def test_company_delete_cascades_routing_row(cp_conn, make_company):
+    company_id = make_company()
     with cp_conn.cursor() as cur:
         store_tenant_db_record(cur, company_id, dsn_ciphertext=b"x", dsn_key_id="k")
         cur.execute("DELETE FROM companies WHERE id = %s", (company_id,))
