@@ -1,0 +1,94 @@
+{
+  "captured_at": "2026-06-15T00:57:24.821175+00:00",
+  "git_commit": "12c9e898d33dcafb48e05d68b04351401a9b7941",
+  "measurements": {
+    "shared": {
+      "error_rate": 0.005,
+      "latency_p95_ms": 1500.0,
+      "latency_p99_ms": 3000.0
+    },
+    "tenant": {
+      "error_rate": 0.02,
+      "latency_p95_ms": 2500.0,
+      "latency_p99_ms": 5000.0
+    }
+  },
+  "measurements_source": "slo_ceilings",
+  "phase": "0.3",
+  "slo": {
+    "metric_catalog": {
+      "byod_tenant_circuit_breaker_state": {
+        "description": "Per-tenant breaker: 0=closed, 1=open, 2=half-open (RFC \u00a77.3).",
+        "labels": [
+          "company_id"
+        ],
+        "type": "gauge"
+      },
+      "byod_tenant_db_errors_total": {
+        "description": "Per-tenant DB errors (timeout, connect, query) \u2014 per-tenant error-rate.",
+        "labels": [
+          "company_id",
+          "kind"
+        ],
+        "type": "counter"
+      },
+      "byod_tenant_pool_connections_in_use": {
+        "description": "Per-tenant connection-pool connections currently checked out.",
+        "labels": [
+          "company_id"
+        ],
+        "type": "gauge"
+      },
+      "byod_tenant_pool_size": {
+        "description": "Per-tenant connection-pool size (for saturation = in_use / size).",
+        "labels": [
+          "company_id"
+        ],
+        "type": "gauge"
+      },
+      "byod_tenant_query_duration_seconds": {
+        "description": "Per-tenant remote DB query latency.",
+        "labels": [
+          "company_id"
+        ],
+        "type": "histogram"
+      },
+      "sapybase_http_request_duration_seconds": {
+        "description": "End-to-end request latency; source for p50/p95/p99.",
+        "labels": [
+          "route",
+          "plane",
+          "company_id"
+        ],
+        "type": "histogram"
+      },
+      "sapybase_http_requests_total": {
+        "description": "HTTP requests, partitioned by 2xx/4xx/5xx status_class \u2014 error-rate numerator/denominator.",
+        "labels": [
+          "route",
+          "status_class",
+          "plane",
+          "company_id"
+        ],
+        "type": "counter"
+      }
+    },
+    "slo_version": "2026-06-14.1",
+    "slos": {
+      "shared": {
+        "availability_target": 0.999,
+        "error_rate_max": 0.005,
+        "latency_p95_ms_max": 1500.0,
+        "latency_p99_ms_max": 3000.0
+      },
+      "tenant": {
+        "breaker_open_ratio_max": 0.05,
+        "error_rate_max": 0.02,
+        "latency_p95_ms_max": 2500.0,
+        "latency_p99_ms_max": 5000.0,
+        "pool_saturation_max": 0.9
+      }
+    }
+  },
+  "slo_version": "2026-06-14.1"
+}

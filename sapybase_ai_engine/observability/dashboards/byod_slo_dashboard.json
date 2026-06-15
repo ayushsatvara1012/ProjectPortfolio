@@ -1,0 +1,118 @@
+{
+  "__comment": "BYOD SLO dashboard (RFC Phase 0.3) — dashboards-as-code. Metric names MUST exist in observability/slo.py METRIC_CATALOG. Shared-plane row is the regression gate; tenant row is per-company (template var $company_id).",
+  "title": "BYOD — Error-rate & Latency SLOs",
+  "uid": "byod-slo",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["byod", "slo", "rfc-byod"],
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "company_id",
+        "label": "Tenant (company_id)",
+        "type": "query",
+        "query": "label_values(byod_tenant_circuit_breaker_state, company_id)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Shared plane (regression gate)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Shared error-rate (5xx) — SLO <= 0.5%",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.005 } ] } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(sapybase_http_requests_total{plane=\"shared\",status_class=\"5xx\"}[5m])) / sum(rate(sapybase_http_requests_total{plane=\"shared\"}[5m]))",
+          "legendFormat": "shared 5xx rate"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Shared latency p95 — SLO <= 1500ms",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1.5 } ] } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(sapybase_http_request_duration_seconds_bucket{plane=\"shared\"}[5m])) by (le))",
+          "legendFormat": "shared p95"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Per-tenant plane ($company_id)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Tenant DB error-rate — SLO <= 2%",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (company_id) (rate(byod_tenant_db_errors_total{company_id=~\"$company_id\"}[5m])) / sum by (company_id) (rate(sapybase_http_requests_total{plane=\"tenant\",company_id=~\"$company_id\"}[5m]))",
+          "legendFormat": "{{company_id}} error rate"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Tenant query latency p95 — SLO <= 2500ms",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, company_id) (rate(byod_tenant_query_duration_seconds_bucket{company_id=~\"$company_id\"}[5m])))",
+          "legendFormat": "{{company_id}} p95"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "state-timeline",
+      "title": "Tenant circuit-breaker state (0=closed,1=open,2=half-open)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "byod_tenant_circuit_breaker_state{company_id=~\"$company_id\"}",
+          "legendFormat": "{{company_id}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Tenant pool saturation (in_use / size) — SLO <= 90%",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.9 } ] } } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "byod_tenant_pool_connections_in_use{company_id=~\"$company_id\"} / byod_tenant_pool_size{company_id=~\"$company_id\"}",
+          "legendFormat": "{{company_id}} saturation"
+        }
+      ]
+    }
+  ]
+}

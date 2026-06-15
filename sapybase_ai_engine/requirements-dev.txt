@@ -1,0 +1,13 @@
+# Dev / test-only dependencies for the Sapybase AI engine.
+# Production deps live in requirements.txt; these are NOT installed in the
+# runtime image. Install locally with:  pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest
+pytest-asyncio
+
+# BYOD test harness (Phase 0.1): spins an ephemeral Postgres+pgvector
+# "tenant" database for tests when no BYOD_TEST_TENANT_DSN is provided.
+# Requires Docker to be running locally. In CI we use a service container
+# instead (see .github/workflows/ci.yml) and this is unused.
+testcontainers[postgres]>=4.0

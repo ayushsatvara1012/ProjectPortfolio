@@ -1,5 +1,8 @@
 import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 # ── Embedding Model Configuration ────────────────────────────────────────────
 # To upgrade the embedding model in the future:
@@ -12,11 +15,17 @@ EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768  # gemini-embedding-001 native output dimension
 
 
-def get_embedding_model(task_type: str) -> GoogleGenerativeAIEmbeddings:
+def get_embedding_model(task_type: str) -> "GoogleGenerativeAIEmbeddings":
     """Return a configured embedding model for the given task type.
 
     task_type: 'retrieval_document' when ingesting, 'retrieval_query' when querying.
+
+    The langchain import is deferred to call time so that simply importing this
+    module for its constants (e.g. EMBEDDING_DIMENSIONS, used by the BYOD test
+    harness) doesn't drag in the heavy langchain_google_genai dependency.
     """
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
     return GoogleGenerativeAIEmbeddings(
         model=EMBEDDING_MODEL,
         google_api_key=os.getenv("GEMINI_API_KEY"),

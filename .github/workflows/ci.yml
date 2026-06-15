@@ -9,24 +9,94 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
-        
+
     - name: Install Dependencies
       run: npm ci
-      
+
     - name: Lint
       run: npm run lint
-      
+
     - name: Build Next.js
       run: npm run build
       env:
         # Mock environment variables needed for build
         NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  # BYOD Phase 0.1 gate: spin an ephemeral tenant Postgres+pgvector, run a
+  # real vector query against it, tear it down. See docs/rfc-byod.md §13.
+  byod-tenant-harness:
+    runs-on: ubuntu-latest
+
+    services:
+      tenant-postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install harness dependencies
+      # Minimal set — the harness reads EMBEDDING_DIMENSIONS from embedding_config
+      # (langchain import is deferred), so no heavy engine deps are needed here.
+      run: python -m pip install psycopg2-binary "pgvector>=0.4" pytest pytest-asyncio
+
+    - name: Run BYOD tenant DB harness gate
+      working-directory: sapybase_ai_engine
+      env:
+        # Use the ephemeral service container; the harness creates a fresh
+        # database per test on it and drops it on teardown.
+        BYOD_TEST_TENANT_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+      run: python -m pytest tests/byod -v
+
+  # BYOD Phase 0.2 gate: with byo_database DARK (no BYOD_* env set), the full
+  # existing engine regression suite must stay green — zero behavior change.
+  # See docs/rfc-byod.md §13.
+  engine-regression:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install engine dependencies
+      working-directory: sapybase_ai_engine
+      run: |
+        python -m pip install -r requirements.txt
+        python -m pip install pytest pytest-asyncio
+
+    - name: Run engine regression suite (byo_database dark)
+      working-directory: sapybase_ai_engine
+      env:
+        ENV: test
+        # No BYOD_ENABLED / BYOD_CANARY_COMPANY_IDS → flag is OFF by default.
+      # The tenant-DB harness tests skip cleanly here (no Postgres/Docker in
+      # this job); they are covered by the byod-tenant-harness job above.
+      run: python -m pytest -v
