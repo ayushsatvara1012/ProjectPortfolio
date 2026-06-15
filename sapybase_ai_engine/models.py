@@ -158,6 +158,7 @@ class CustomPlanConfig(BaseModel):
     webhook: Optional[bool] = False
     custom_logo: Optional[bool] = False
     analytics: Optional[bool] = False
+    byo_database: Optional[bool] = False  # RFC §3.1 BYOD capability flag (super-admin set)
     notes: Optional[str] = ""
     # Payment metadata set by /provision — read-only from admin form
     polar_checkout_url: Optional[str] = None

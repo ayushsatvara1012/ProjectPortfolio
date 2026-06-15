@@ -6,6 +6,7 @@ export type Entitlements = {
   canUseLeadCapture: boolean;
   canUseAnalytics: boolean;
   canUseAdvancedBot: boolean; // system prompt, tone, quick questions — STARTER+
+  canUseByoDatabase: boolean; // Build-Your-Own-Database — BYOD only (RFC §3)
 };
 
 type FeatureMap = Record<string, boolean>;
@@ -60,6 +61,20 @@ const TIER_DEFAULTS: Record<string, Partial<Entitlements>> = {
     canUseAnalytics: true,
     canUseAdvancedBot: true,
   },
+  // BYOD: the client supplies only a Postgres DSN; every feature is ON, plus the
+  // byo_database capability. Mirrors config.py › PLAN_LIMITS["BYOD"] (Rule R18).
+  // Not a tier users are assigned to — BYOD clients are tier CUSTOM with a config
+  // seeded from this template; kept here so resolution is correct if ever queried.
+  BYOD: {
+    canUseCustomLogo: true,
+    canWhiteLabel: true,
+    canUseWebhooks: true,
+    canUseHumanHandoff: true,
+    canUseLeadCapture: true,
+    canUseAnalytics: true,
+    canUseAdvancedBot: true,
+    canUseByoDatabase: true,
+  },
 };
 
 const ALL_GRANTED: Entitlements = {
@@ -70,6 +85,7 @@ const ALL_GRANTED: Entitlements = {
   canUseLeadCapture: true,
   canUseAnalytics: true,
   canUseAdvancedBot: true,
+  canUseByoDatabase: true,
 };
 
 const ALL_DENIED: Entitlements = {
@@ -80,6 +96,7 @@ const ALL_DENIED: Entitlements = {
   canUseLeadCapture: false,
   canUseAnalytics: false,
   canUseAdvancedBot: false,
+  canUseByoDatabase: false,
 };
 
 // Resolution order: SUPER_ADMIN → customPlanFeatures key → tier-default matrix.
@@ -113,6 +130,7 @@ export function resolveEntitlements(
     canUseLeadCapture: resolve('canUseLeadCapture', 'lead_capture'),
     canUseAnalytics: resolve('canUseAnalytics', 'analytics'),
     canUseAdvancedBot: resolve('canUseAdvancedBot', 'advanced_bot'),
+    canUseByoDatabase: resolve('canUseByoDatabase', 'byo_database'),
   };
 }
 

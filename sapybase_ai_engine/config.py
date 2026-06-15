@@ -27,13 +27,25 @@ from datetime import timedelta
 # (effectively unlimited — "upgrade for unlimited lead emails" is a selling point). FREE = 0.
 # NOTE: `advanced_bot` is intentionally NOT a PLAN_LIMITS key — it is an entitlements-only
 # flag (see entitlements.ts, gated via company config not has_entitlement). Do not add it here.
+#
+# `byo_database` (BYOD — RFC docs/rfc-byod.md §3): a plan capability flag, present on EVERY
+# row (False everywhere except the BYOD template) so the schema shape stays uniform and
+# has_entitlement(user, "byo_database") resolves for any tier — exactly like white_label.
+# BYOD = "Build-Your-Own-Database": the client supplies only a Postgres DSN; every feature
+# is ON (incl. white_label). PLAN_LIMITS["BYOD"] is NOT a tier users are assigned to — it is
+# the DEFAULT TEMPLATE that seeds a per-client `custom_plan_config` (tier stays CUSTOM, §3.1).
+# Caps below are fair-use / anti-abuse on a flat $149/mo LLM-included plan (§3.2/§3.3), all
+# super-admin editable. MUST stay mirrored with src/lib/auth/entitlements.ts (Rule R18).
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 0},
-    "EXPLORE":    {"max_bots": 1,   "messages": 1000,   "chunks": 200,   "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50},
-    "STARTER":    {"max_bots": 1,   "messages": 5000,   "chunks": 1000,  "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
-    "PRO":        {"max_bots": 3,   "messages": 15000,  "chunks": 4000,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999},
-    "BUSINESS":   {"max_bots": 5,   "messages": 50000,  "chunks": 15000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999},
+    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 0,      "byo_database": False},
+    "EXPLORE":    {"max_bots": 1,   "messages": 1000,   "chunks": 200,   "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50,     "byo_database": False},
+    "STARTER":    {"max_bots": 1,   "messages": 5000,   "chunks": 1000,  "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999, "byo_database": False},
+    "PRO":        {"max_bots": 3,   "messages": 15000,  "chunks": 4000,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999, "byo_database": False},
+    "BUSINESS":   {"max_bots": 5,   "messages": 50000,  "chunks": 15000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": False},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": False},
+    # BYOD template (RFC §3.2): flat $149/mo, LLM included; all features ON incl white_label.
+    # 50k messages, 1 bot, 50k chunks (storage is the client's — only one-time embedding is ours).
+    "BYOD":       {"max_bots": 1,   "messages": 50000,  "chunks": 50000, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": True},
 }
 
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
@@ -45,6 +57,7 @@ MODEL_MAPPING = {
     "PRO":        "gemini-2.5-pro",
     "BUSINESS":   "gemini-2.5-pro",
     "ENTERPRISE": "gemini-2.5-pro",
+    "BYOD":       "gemini-2.5-pro",  # BYOD default model (RFC §3.2; super-admin editable)
 }
 
 VALID_MODELS = set(MODEL_MAPPING.values()) | {
@@ -71,6 +84,9 @@ TIER_RATE_LIMITS = {
     "BUSINESS":   {"per_minute": 200, "per_hour": 5000,   "per_day": 30000},   # ultra-speed tier
     "ENTERPRISE": {"per_minute": 500, "per_hour": 999999, "per_day": 999999},
     "CUSTOM":     {"per_minute": 100, "per_hour": 3000,   "per_day": 18000},   # safe default; override via custom_plan_config
+    # BYOD (RFC §3.2): 100/min · 2,000/hr · 6,000/day. The daily ceiling (~3.6× a 50k/mo
+    # bot's avg daily volume) absorbs spikes while bounding Gemini spend on the flat plan (§3.3).
+    "BYOD":       {"per_minute": 100, "per_hour": 2000,   "per_day": 6000},
 }
 
 # ── Logo validation limits / allowlists (SSRF + abuse prevention) ────────────
@@ -119,8 +135,11 @@ DISPOSABLE_EMAIL_DOMAINS = frozenset({
 })
 
 # ── Custom plan feature flag keys (canonical list) ───────────────────────────
+# `byo_database` (RFC §3.1) joins the set so it can be granted per-client via
+# custom_plan_config and resolved by has_entitlement, exactly like the others.
+# Mirror this set with the resolve(...) feature keys in entitlements.ts (Rule R18).
 CUSTOM_PLAN_FEATURE_KEYS = {
-    "advanced_bot", "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics"
+    "advanced_bot", "human_handoff", "lead_capture", "white_label", "webhook", "custom_logo", "analytics", "byo_database"
 }
 
 CUSTOM_PLAN_DEFAULTS = {
@@ -139,10 +158,30 @@ CUSTOM_PLAN_DEFAULTS = {
     "webhook": False,
     "custom_logo": False,
     "analytics": False,
+    "byo_database": False,
     "notes": "",
     # Payment metadata — populated by /provision endpoint, not by admin form
     "polar_checkout_url": None,
     "polar_created_at": None,
+}
+
+# ── BYOD seed template (RFC §3.1/§3.2) ───────────────────────────────────────
+# Putting a client on BYOD creates a per-client `custom_plan_config` PRE-FILLED
+# from this template (tier stays CUSTOM); the super-admin panel may then override
+# every field. Derived from the canonical PLAN_LIMITS["BYOD"] / MODEL_MAPPING so
+# limits and model can never drift from the tier template. Price ($149) is the one
+# literal — it lives nowhere else. Consumed by provisioning in Phase 2.1.
+BYOD_PLAN_DEFAULTS = {
+    **CUSTOM_PLAN_DEFAULTS,
+    "plan_name": "BYOD",
+    "monthly_price_usd": 149,
+    "max_bots": PLAN_LIMITS["BYOD"]["max_bots"],
+    "max_messages": PLAN_LIMITS["BYOD"]["messages"],
+    "max_chunks": PLAN_LIMITS["BYOD"]["chunks"],
+    "gemini_model": MODEL_MAPPING["BYOD"],
+    # Every capability ON. advanced_bot isn't a PLAN_LIMITS key (entitlements-only),
+    # so it defaults True here; the rest mirror the all-on PLAN_LIMITS["BYOD"] row.
+    **{k: PLAN_LIMITS["BYOD"].get(k, True) for k in CUSTOM_PLAN_FEATURE_KEYS},
 }
 
 # ── Custom plan access gate constants ────────────────────────────────────────

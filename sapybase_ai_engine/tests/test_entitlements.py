@@ -58,6 +58,36 @@ class TestFreeAndOverrides:
         assert has_entitlement(_user("MYSTERY"), "lead_capture") is False
 
 
+class TestByoDatabaseEntitlement:
+    """RFC docs/rfc-byod.md Phase 1.1 — byo_database resolves like any feature flag.
+
+    BYOD clients are tier CUSTOM with a config seeded from the BYOD template (§3.1),
+    so the authoritative path is custom_plan_config; the all-on BYOD template grants
+    every flag including byo_database.
+    """
+
+    def test_byo_database_off_for_standard_tiers(self):
+        for tier in ("FREE", "STARTER", "PRO", "BUSINESS", "ENTERPRISE"):
+            assert has_entitlement(_user(tier), "byo_database") is False, tier
+
+    def test_byo_database_via_custom_plan_config(self):
+        u = _user("CUSTOM", custom={"byo_database": True})
+        assert has_entitlement(u, "byo_database") is True
+        # Absent/false in config → denied (trust the control-plane config, not a default).
+        assert has_entitlement(_user("CUSTOM", custom={}), "byo_database") is False
+
+    def test_super_admin_has_byo_database(self):
+        assert has_entitlement(_user("FREE", role="SUPER_ADMIN"), "byo_database") is True
+
+    def test_byod_template_grants_all_features_plus_byo_database(self):
+        # The seed template is the "all features enabled + BYOD" config a client gets.
+        from main import BYOD_PLAN_DEFAULTS
+        u = _user("CUSTOM", custom=dict(BYOD_PLAN_DEFAULTS))
+        for flag in ("lead_capture", "analytics", "webhook", "white_label",
+                     "human_handoff", "custom_logo", "advanced_bot", "byo_database"):
+            assert has_entitlement(u, flag) is True, flag
+
+
 class TestRequireEntitlement:
     def test_raises_402_when_denied(self):
         with pytest.raises(HTTPException) as exc:

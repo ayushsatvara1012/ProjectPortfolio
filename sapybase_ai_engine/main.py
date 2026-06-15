@@ -605,6 +605,7 @@ def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> di
             "webhook": bool(cfg.get("webhook")),
             "custom_logo": bool(cfg.get("custom_logo")),
             "analytics": bool(cfg.get("analytics")),
+            "byo_database": bool(cfg.get("byo_database")),
             "gemini_model": cfg.get("gemini_model"),
             "max_output_tokens": cfg.get("max_output_tokens"),
             "plan_name": cfg.get("plan_name", "Custom Plan"),
@@ -1095,7 +1096,7 @@ from config import VALID_LOGO_SHAPES, BLOCKED_LOGO_URL_PATTERNS, MAX_LOGO_BYTES
 # (ChatMessage … UserTier moved to models.py — re-exported above)
 
 # ── Custom plan feature keys / defaults — extracted to config.py (re-exported) ──
-from config import CUSTOM_PLAN_FEATURE_KEYS, CUSTOM_PLAN_DEFAULTS
+from config import CUSTOM_PLAN_FEATURE_KEYS, CUSTOM_PLAN_DEFAULTS, BYOD_PLAN_DEFAULTS
 
 # (CustomPlanConfig moved to models.py — re-exported above)
 

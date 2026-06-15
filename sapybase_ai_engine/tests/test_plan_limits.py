@@ -125,6 +125,77 @@ class TestPlanLimits:
         assert limits["STARTER"]["max_owner_emails"] >= 999999
 
 
+class TestBYODPlanTemplate:
+    """RFC docs/rfc-byod.md Phase 1.1 — PLAN_LIMITS["BYOD"] default template (§3.2).
+
+    BYOD is the top-tier "Build-Your-Own-Database" offer: the client supplies only a
+    Postgres DSN; every feature is ON. This row is a SEED TEMPLATE (not a tier users
+    are assigned to — they stay CUSTOM, §3.1), so it must keep the uniform schema shape
+    and mirror entitlements.ts (Rule R18; see test_byod_config_ts_mirror.py).
+    """
+
+    def test_byod_present(self):
+        limits, _, _ = _import()
+        assert "BYOD" in limits
+
+    def test_byod_caps_match_commercial_offer(self):
+        # RFC §3.2: $149/mo flat · 50,000 messages · 1 bot · 50,000 chunks.
+        limits, _, _ = _import()
+        b = limits["BYOD"]
+        assert b["max_bots"] == 1
+        assert b["messages"] == 50000
+        assert b["chunks"] == 50000
+        assert b["max_owner_emails"] >= 999999
+
+    def test_byod_has_every_feature_including_white_label(self):
+        # "All features enabled" — incl. white_label (unlike EXPLORE). RFC §3.2.
+        limits, _, _ = _import()
+        b = limits["BYOD"]
+        for feat in ("human_handoff", "lead_capture", "white_label", "webhook", "analytics", "custom_logo"):
+            assert b[feat] is True, f"BYOD must enable {feat}"
+
+    def test_byo_database_flag_is_uniform_and_byod_only(self):
+        # byo_database is a plan capability on EVERY row (schema-shape uniformity),
+        # True only for the BYOD template, False elsewhere.
+        limits, _, _ = _import()
+        for tier, d in limits.items():
+            assert "byo_database" in d, f"{tier} missing byo_database key"
+        assert limits["BYOD"]["byo_database"] is True
+        for tier, d in limits.items():
+            if tier != "BYOD":
+                assert d["byo_database"] is False, f"{tier} must not have byo_database on"
+
+    def test_byod_uses_pro_model(self):
+        # RFC §3.2: gemini-2.5-pro by default.
+        _, mapping, valid = _import()
+        assert mapping["BYOD"] == "gemini-2.5-pro"
+        assert mapping["BYOD"] in valid
+
+    def test_byod_rate_limits(self):
+        # RFC §3.2: 100/min · 2,000/hr · 6,000/day.
+        from main import TIER_RATE_LIMITS
+        caps = TIER_RATE_LIMITS["BYOD"]
+        assert caps["per_minute"] == 100
+        assert caps["per_hour"] == 2000
+        assert caps["per_day"] == 6000
+
+    def test_byod_seed_template_prefills_custom_plan_config(self):
+        # RFC §3.1: putting a client on BYOD seeds a per-client custom_plan_config
+        # from this template. Derived values must not drift from the canonical sources.
+        from main import BYOD_PLAN_DEFAULTS, CUSTOM_PLAN_FEATURE_KEYS
+        limits, mapping, _ = _import()
+        b = limits["BYOD"]
+        assert BYOD_PLAN_DEFAULTS["plan_name"] == "BYOD"
+        assert BYOD_PLAN_DEFAULTS["monthly_price_usd"] == 149
+        assert BYOD_PLAN_DEFAULTS["max_messages"] == b["messages"]
+        assert BYOD_PLAN_DEFAULTS["max_chunks"] == b["chunks"]
+        assert BYOD_PLAN_DEFAULTS["max_bots"] == b["max_bots"]
+        assert BYOD_PLAN_DEFAULTS["gemini_model"] == mapping["BYOD"]
+        # Every capability — including byo_database and advanced_bot — is ON.
+        for feat in CUSTOM_PLAN_FEATURE_KEYS:
+            assert BYOD_PLAN_DEFAULTS[feat] is True, f"BYOD seed must enable {feat}"
+
+
 class TestExploreRateLimitsAndDomains:
     def test_explore_has_rate_limits(self):
         from main import TIER_RATE_LIMITS
