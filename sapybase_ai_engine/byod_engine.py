@@ -37,6 +37,8 @@ from contextlib import contextmanager
 from typing import Callable, Iterator, List, Optional, Sequence, Tuple
 
 import byod_flags
+import byod_schema
+import byod_store
 from byod_breaker import BreakerConfig, BreakerOpen
 from byod_crypto import load_decrypted_runtime_dsn
 from byod_dsn import DsnValidationError, validate_db_url
@@ -196,6 +198,59 @@ def _resolve_runtime_dsn(company_id: str) -> str:
     # Re-validate on (pool-build) connect — defeats DNS-rebinding/TOCTOU (rule 8).
     validate_db_url(dsn)
     return dsn
+
+
+# ── Schema version-gate (Phase 6.1; §8.1/§8.2, rule 12, §16.9) ───────────────────
+def tenant_schema_version(company_id: str) -> Optional[str]:
+    """Read the tenant DB's recorded data-plane schema version from the control-
+    plane registry (§8.1), or ``None`` if unknown.
+
+    Reads the control plane, NEVER the tenant DB — the version is authoritative on
+    Sapybase's side (it is recorded there on a verified migration, Phase 6.2).
+    **Fail-soft:** any control-plane error → ``None`` (logged sanitized, E6), which
+    the gate reads as "below every requirement" → the engine falls back to the OLD
+    shape and never throws (§16.9)."""
+    if _Deps.control_conn_factory is None:
+        return None
+    try:
+        conn = _Deps.control_conn_factory()
+    except Exception as exc:  # control plane unreachable — degrade to old shape
+        logger.warning(
+            "BYOD schema-version read degraded: company=%s reason=%s",
+            company_id, sanitize_db_error(exc),
+        )
+        return None
+    try:
+        cur = conn.cursor()
+        try:
+            record = byod_store.get_tenant_db_record(cur, company_id)
+        finally:
+            cur.close()
+        return record.schema_version if record is not None else None
+    except Exception as exc:
+        logger.warning(
+            "BYOD schema-version read degraded: company=%s reason=%s",
+            company_id, sanitize_db_error(exc),
+        )
+        return None
+    finally:
+        if _Deps.control_conn_release is not None:
+            _Deps.control_conn_release(conn)
+
+
+def tenant_supports_version(
+    company_id: str, required: str, *, schema_version: Optional[str] = None
+) -> bool:
+    """Whether the tenant DB is at schema version ``>= required`` (the rule-12
+    gate). Gate a read of a column/table introduced at ``required`` on this
+    returning True; otherwise read the old shape.
+
+    Fail-soft by construction: an unknown/unreadable/older version → ``False`` so a
+    tenant N versions behind reads the old shape and never throws (§16.9). Pass
+    ``schema_version`` to reuse a version already resolved this request and skip a
+    second control-plane read."""
+    version = schema_version if schema_version is not None else tenant_schema_version(company_id)
+    return byod_schema.version_meets(version, required)
 
 
 # ── Pool registry (lazy process singleton) ──────────────────────────────────────
