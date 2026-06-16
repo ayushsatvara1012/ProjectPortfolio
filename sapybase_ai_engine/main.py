@@ -1083,6 +1083,7 @@ import byod_dataplane
 import byod_health
 import byod_engine
 import byod_metering
+import byod_ingest
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
@@ -4853,6 +4854,98 @@ async def get_job_status(job_id: str) -> Optional[dict]:
         print(f"REDIS FETCH ERROR: {e}")
         return _training_jobs.get(job_id)
 
+
+def _byod_remaining_chunk_quota(company_id: str, source_name: str, limit: int) -> int:
+    """Plan max_chunks remaining for a BYOD tenant, counted on the TENANT DB (the
+    quota gate must read the data plane for a BYOD tenant). Re-training a source
+    excludes that source's current children. Fail-soft: an unreachable tenant DB
+    yields 0 (ingest nothing) rather than crashing the job."""
+    try:
+        with byod_engine.tenant_connection(company_id) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+                (company_id,),
+            )
+            total = cur.fetchone()[0]
+            cur.execute(
+                "SELECT COUNT(*) FROM company_knowledge "
+                "WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+                (company_id, source_name),
+            )
+            this_source = cur.fetchone()[0]
+            cur.close()
+        return max(0, limit - (total - this_source))
+    except byod_engine.TenantDataError as exc:
+        logger.warning("BYOD quota probe degraded: company=%s reason=%s", company_id, exc.reason)
+        return 0
+
+
+def _byod_invalidate_company_cache(company_id: str):
+    """Clear the company's exact_query_cache on the CONTROL plane (the response
+    cache is Sapybase-side, §9). Best-effort; sanitized on failure."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.warning(
+            "BYOD cache invalidation failed: company=%s reason=%s",
+            company_id, byod_engine.sanitize_db_error(e),
+        )
+    finally:
+        release_db_connection(conn)
+
+
+async def _byod_run_training_job(
+    job_id: str,
+    company_id: str,
+    source_name: str,
+    chunks: list,
+    limit: int,
+    is_upsert: bool,
+):
+    """BYOD ingest path (Phase 3.4): write company_knowledge to the tenant's own DB
+    via the checkpointed/idempotent + cost-guarded ingest (E11, §16.7). Additive +
+    dedup — re-training an unchanged source is a no-op; only new chunks are
+    embedded. Cache invalidation stays on the control plane. Errors are sanitized
+    (E6) into the job status (never raw DSN/host/driver text)."""
+    await set_job_status(job_id, {"status": "processing", "progress": 0, "total": len(chunks)})
+    try:
+        # Plan max_chunks quota, counted on the tenant DB.
+        remaining = await asyncio.to_thread(
+            _byod_remaining_chunk_quota, company_id, source_name, limit
+        )
+        capped = chunks[:remaining]
+        was_capped = len(capped) < len(chunks)
+
+        result = await byod_ingest.run_tenant_ingest(
+            company_id=company_id,
+            source_name=source_name,
+            chunks=capped,
+            embed_documents=embeddings_model_doc.aembed_documents,
+        )
+
+        await asyncio.to_thread(_byod_invalidate_company_cache, company_id)
+
+        await set_job_status(job_id, {
+            "status": "done",
+            "chunks_added": result.added,
+            "deduped": result.skipped,
+            "capped_by_cost": result.capped_by_cost,
+            "was_capped": was_capped,
+            "is_upsert": is_upsert,
+        })
+    except Exception as e:
+        await set_job_status(job_id, {
+            "status": "error",
+            "message": byod_engine.sanitize_db_error(e),
+        })
+
+
 async def run_training_job(
     job_id: str,
     resolved_company_id: str,
@@ -4925,6 +5018,21 @@ async def run_training_job(
                 if child_texts:
                     parent_child_pairs.append((parent_doc.page_content, child_texts))
             child_only_chunks = []  # not used when parent_child_pairs is populated
+
+        # ── BYOD: route ingestion to the tenant's OWN database (Phase 3.4) ────────
+        # Dark by default. For a BYOD-routed tenant, write company_knowledge to the
+        # tenant DB via the checkpointed/idempotent + cost-guarded ingest (E11,
+        # §16.7) instead of the shared-DB temp-swap path below. conn is still None
+        # here, so the function's finally only releases the Redis lock.
+        if byod_engine.routing_active(resolved_company_id):
+            if skip_splitting:
+                byod_chunks = [(None, d.page_content) for d in child_only_chunks]
+            else:
+                byod_chunks = [(p, c) for (p, cs) in parent_child_pairs for c in cs]
+            await _byod_run_training_job(
+                job_id, resolved_company_id, source_name, byod_chunks, limit, is_upsert
+            )
+            return
 
         # ── Quota: count only child rows ─────────────────────────────────────────
         conn = get_db_connection()
@@ -5755,17 +5863,25 @@ def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user
 
         # chunk_count shows only child rows — parents are internal and not counted toward quota.
         # Filter out temp rows (prefixed __temp_) that belong to in-progress jobs.
-        cursor.execute(
+        sources_sql = (
             """SELECT url, COUNT(*) as chunk_count
                FROM company_knowledge
                WHERE company_id = %s
                  AND chunk_type = 'child'
                  AND url NOT LIKE '__temp_%%'
                GROUP BY url
-               ORDER BY url""",
-            (company_id,)
+               ORDER BY url"""
         )
-        rows = cursor.fetchall()
+        # BYOD: knowledge rows live on the tenant DB (Phase 3.4, dark by default).
+        if byod_engine.routing_active(company_id):
+            with byod_engine.tenant_connection(company_id) as tconn:
+                kcur = tconn.cursor()
+                kcur.execute(sources_sql, (company_id,))
+                rows = kcur.fetchall()
+                kcur.close()
+        else:
+            cursor.execute(sources_sql, (company_id,))
+            rows = cursor.fetchall()
         sources = [{"source": row[0], "chunk_count": row[1]} for row in rows]
         return {"sources": sources}
     except HTTPException:
@@ -5801,18 +5917,29 @@ def get_knowledge_chunks(
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
         # Show only child rows in the UI preview — parents are large blobs not useful for display.
-        cursor.execute(
-            "SELECT id, content, created_at FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child' ORDER BY created_at DESC LIMIT %s",
-            (company_id, source, limit)
+        chunks_sql = (
+            "SELECT id, content, created_at FROM company_knowledge "
+            "WHERE company_id = %s AND url = %s AND chunk_type = 'child' "
+            "ORDER BY created_at DESC LIMIT %s"
         )
-        rows = cursor.fetchall()
-
-        # Total child chunk count for this source
-        cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
-            (company_id, source)
+        count_sql = (
+            "SELECT COUNT(*) FROM company_knowledge "
+            "WHERE company_id = %s AND url = %s AND chunk_type = 'child'"
         )
-        total = cursor.fetchone()[0]
+        # BYOD: knowledge rows live on the tenant DB (Phase 3.4, dark by default).
+        if byod_engine.routing_active(company_id):
+            with byod_engine.tenant_connection(company_id) as tconn:
+                kcur = tconn.cursor()
+                kcur.execute(chunks_sql, (company_id, source, limit))
+                rows = kcur.fetchall()
+                kcur.execute(count_sql, (company_id, source))
+                total = kcur.fetchone()[0]
+                kcur.close()
+        else:
+            cursor.execute(chunks_sql, (company_id, source, limit))
+            rows = cursor.fetchall()
+            cursor.execute(count_sql, (company_id, source))
+            total = cursor.fetchone()[0]
 
         chunks = [{
             "id": str(row[0]),
@@ -5851,17 +5978,24 @@ def delete_knowledge_source(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        # Batch delete
-        cursor.execute(
-            "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s",
-            (company_id, body.source_name)
-        )
-        count = cursor.rowcount
-        
-        # Cache invalidation
+        # Batch delete the knowledge rows. BYOD: on the tenant DB (Phase 3.4); the
+        # response cache invalidation below stays on the control plane (§9).
+        delete_sql = "DELETE FROM company_knowledge WHERE company_id = %s AND url = %s"
+        if byod_engine.routing_active(company_id):
+            with byod_engine.tenant_connection(company_id) as tconn:
+                kcur = tconn.cursor()
+                kcur.execute(delete_sql, (company_id, body.source_name))
+                count = kcur.rowcount
+                tconn.commit()
+                kcur.close()
+        else:
+            cursor.execute(delete_sql, (company_id, body.source_name))
+            count = cursor.rowcount
+
+        # Cache invalidation (control plane)
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
         invalidate_cache(conn, company_id)
-        
+
         conn.commit()
         return {"status": "success", "message": f"Source '{body.source_name}' removed. {count} chunks deleted."}
     except Exception as e:
@@ -5892,13 +6026,22 @@ def delete_knowledge_chunks(
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        # Double-safety: only delete chunks that belong to THIS company_id
-        cursor.execute(
-            "DELETE FROM company_knowledge WHERE id = ANY(%s::uuid[]) AND company_id = %s RETURNING id",
-            (body.chunk_ids, company_id)
+        # Double-safety: only delete chunks that belong to THIS company_id.
+        # BYOD: on the tenant DB (Phase 3.4); cache invalidation stays control-plane.
+        delete_chunks_sql = (
+            "DELETE FROM company_knowledge WHERE id = ANY(%s::uuid[]) AND company_id = %s RETURNING id"
         )
-        deleted_ids = [str(row[0]) for row in cursor.fetchall()]
-        # Invalidate cache: deleted chunks may affect cached answers
+        if byod_engine.routing_active(company_id):
+            with byod_engine.tenant_connection(company_id) as tconn:
+                kcur = tconn.cursor()
+                kcur.execute(delete_chunks_sql, (body.chunk_ids, company_id))
+                deleted_ids = [str(row[0]) for row in kcur.fetchall()]
+                tconn.commit()
+                kcur.close()
+        else:
+            cursor.execute(delete_chunks_sql, (body.chunk_ids, company_id))
+            deleted_ids = [str(row[0]) for row in cursor.fetchall()]
+        # Invalidate cache: deleted chunks may affect cached answers (control plane)
         invalidate_cache(conn, company_id)
 
         conn.commit()

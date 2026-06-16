@@ -84,7 +84,11 @@ CREATE TABLE IF NOT EXISTS company_knowledge (
     created_at  TIMESTAMPTZ DEFAULT now(),
     chunk_type  TEXT NOT NULL DEFAULT 'child',
     parent_id   UUID,
-    content_tsv tsvector
+    -- Auto-maintained by Postgres (mirrors the shared DB's v20 hybrid-search
+    -- column) so BM25 retrieval works on the tenant DB without an ingest-time
+    -- write. GENERATED columns cannot be inserted into, which matches every
+    -- company_knowledge INSERT (none sets content_tsv).
+    content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
 );
 CREATE INDEX IF NOT EXISTS company_knowledge_embedding_hnsw
     ON company_knowledge USING hnsw (embedding vector_cosine_ops);
