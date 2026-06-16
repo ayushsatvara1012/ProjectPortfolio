@@ -294,11 +294,18 @@ def tenant_connection(
 
 
 # chat_logs columns mirror the global-pool INSERT in main.log_chat_to_db and the
-# authoritative data-plane schema (byod_dataplane.DATA_PLANE_SCHEMA_SQL).
+# authoritative data-plane schema (byod_dataplane.DATA_PLANE_SCHEMA_SQL). When a
+# message_id is supplied it is the row id == the metering idempotency key (Phase
+# 3.3), so the reconciler can match a confirmed store to a metered key (§16.1).
 _CHAT_LOG_INSERT = (
     "INSERT INTO chat_logs "
     "(company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+)
+_CHAT_LOG_INSERT_WITH_ID = (
+    "INSERT INTO chat_logs "
+    "(id, company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
 )
 
 
@@ -311,10 +318,13 @@ def tenant_log_chat(
     session_id: Optional[str] = None,
     confidence: Optional[float] = None,
     *,
+    message_id: Optional[str] = None,
     registry: Optional[TenantPoolRegistry] = None,
 ) -> bool:
     """Write the conversation log to the tenant DB. Returns True on success.
 
+    When ``message_id`` is given it becomes the ``chat_logs.id`` — the per-message
+    idempotency key the control-plane meter and reconciler key on (Phase 3.3).
     Degrades soft (§16.9): on ANY tenant-DB failure it logs a SANITIZED warning
     and returns False — a tenant analytics-write hiccup never breaks chat or leaks
     DB internals. The caller (a background task) ignores the result."""
@@ -322,18 +332,33 @@ def tenant_log_chat(
         with tenant_connection(company_id, registry=registry) as conn:
             cur = conn.cursor()
             try:
-                cur.execute(
-                    _CHAT_LOG_INSERT,
-                    (
-                        company_id,
-                        user_query,
-                        bot_response,
-                        was_cache_hit,
-                        is_unanswered,
-                        session_id,
-                        confidence,
-                    ),
-                )
+                if message_id is not None:
+                    cur.execute(
+                        _CHAT_LOG_INSERT_WITH_ID,
+                        (
+                            message_id,
+                            company_id,
+                            user_query,
+                            bot_response,
+                            was_cache_hit,
+                            is_unanswered,
+                            session_id,
+                            confidence,
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        _CHAT_LOG_INSERT,
+                        (
+                            company_id,
+                            user_query,
+                            bot_response,
+                            was_cache_hit,
+                            is_unanswered,
+                            session_id,
+                            confidence,
+                        ),
+                    )
                 conn.commit()
             finally:
                 cur.close()

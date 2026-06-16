@@ -1082,6 +1082,7 @@ import byod_probe
 import byod_dataplane
 import byod_health
 import byod_engine
+import byod_metering
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
@@ -2303,6 +2304,52 @@ def async_increment_usage(usage_id: Optional[str], user_id: str, company_id: str
     finally:
         release_db_connection(conn)
 
+
+def _byod_store_and_meter(
+    company_id: str,
+    message_id: str,
+    user_query: str,
+    bot_response: str,
+    was_cache_hit: bool,
+    is_unanswered: bool,
+    session_id: Optional[str],
+    confidence: Optional[float],
+    user_uuid: str,
+):
+    """BYOD store-then-meter background task (Phase 3.3, §16.1 / E1, E2).
+
+    Order matters: (1) write the chat_log to the TENANT DB, keyed by message_id;
+    (2) ONLY on a confirmed store, atomically + idempotently increment the
+    CONTROL-PLANE usage counter, keyed by that same message_id. Never meters
+    before the store is confirmed, so a store failure simply isn't counted (and
+    leaves no chat_log → no drift). If the meter fails AFTER a confirmed store,
+    the chat_log carries the key and the reconciler repairs the lagging counter
+    later — so a meter hiccup degrades soft and never double-counts on retry."""
+    stored = byod_engine.tenant_log_chat(
+        company_id, user_query, bot_response, was_cache_hit, is_unanswered,
+        session_id, confidence, message_id=message_id,
+    )
+    if not stored:
+        return  # store unconfirmed → do NOT meter (§16.1)
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        byod_metering.record_message_and_meter(
+            cursor, company_id=company_id, idempotency_key=message_id, user_id=user_uuid
+        )
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.warning(
+            "BYOD meter degraded: company=%s reason=%s",
+            company_id, byod_engine.sanitize_db_error(e),
+        )
+    finally:
+        release_db_connection(conn)
+
+
 @app.post("/api/widget/session")
 @limiter.limit("10/minute", key_func=get_remote_address)   # per-IP: throttle automated minting
 @limiter.limit("60/minute")                                 # per-API-key ceiling
@@ -2455,26 +2502,37 @@ async def chat_endpoint(
                 print(f"[CACHE HIT] company={company['id']} hash={query_hash[:12]}... history_len={len(chat_history)}")
                 cached_response = cached[0]
 
-                # Still increment usage — cache hits count toward billing
-                if usage_id:
-                    cursor.execute(
-                        "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
-                        (usage_id,)
+                if byod_engine.routing_active(company["id"]):
+                    # BYOD: cache hits still count toward billing. Store the chat_log
+                    # on the tenant DB, THEN meter idempotently on the control plane
+                    # (store-then-meter, §16.1) — a single background task so the
+                    # counter only moves after a confirmed store.
+                    background_tasks.add_task(
+                        _byod_store_and_meter, company["id"], str(uuid.uuid4()),
+                        chat_req.message, cached_response, True, False,
+                        chat_req.session_id, None, user_uuid,
                     )
                 else:
-                    cursor.execute(
-                        """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
-                           VALUES (%s, %s, 1, now(), now() + interval '30 days')
-                           ON CONFLICT DO NOTHING""",
-                        (user_uuid, company["id"])
-                    )
-                conn.commit()
+                    # Still increment usage — cache hits count toward billing
+                    if usage_id:
+                        cursor.execute(
+                            "UPDATE usage_tracking SET messages_used = messages_used + 1 WHERE id = %s",
+                            (usage_id,)
+                        )
+                    else:
+                        cursor.execute(
+                            """INSERT INTO usage_tracking (user_id, company_id, messages_used, period_start, period_end)
+                               VALUES (%s, %s, 1, now(), now() + interval '30 days')
+                               ON CONFLICT DO NOTHING""",
+                            (user_uuid, company["id"])
+                        )
+                    conn.commit()
 
-                # ── ASYNC ANALYTICS LOG (cache hit) ──────────────────────────
-                background_tasks.add_task(
-                    log_chat_to_db, company["id"], chat_req.message,
-                    cached_response, True, False, chat_req.session_id
-                )
+                    # ── ASYNC ANALYTICS LOG (cache hit) ──────────────────────────
+                    background_tasks.add_task(
+                        log_chat_to_db, company["id"], chat_req.message,
+                        cached_response, True, False, chat_req.session_id
+                    )
 
                 return ChatResponse(
                     reply=cached_response,
@@ -2740,16 +2798,26 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     # Groundedness/confidence (0.0–1.0, or None when unknown).
                     confidence = _compute_confidence(is_un_final, len(retrieved_docs), rerank_top_score)
 
-                    background_tasks.add_task(
-                        log_chat_to_db, company["id"], chat_req.message,
-                        full_reply, False, is_un_final, chat_req.session_id, confidence
-                    )
+                    if byod_engine.routing_active(company["id"]):
+                        # BYOD: store chat_log on the tenant DB, THEN meter
+                        # idempotently on the control plane (store-then-meter,
+                        # §16.1 / E1, E2) — one ordered task instead of two.
+                        background_tasks.add_task(
+                            _byod_store_and_meter, company["id"], str(uuid.uuid4()),
+                            chat_req.message, full_reply, False, is_un_final,
+                            chat_req.session_id, confidence, user_uuid,
+                        )
+                    else:
+                        background_tasks.add_task(
+                            log_chat_to_db, company["id"], chat_req.message,
+                            full_reply, False, is_un_final, chat_req.session_id, confidence
+                        )
 
-                    # 3. Usage Tracking (Background Task)
-                    background_tasks.add_task(
-                        async_increment_usage,
-                        usage_id, user_uuid, company["id"]
-                    )
+                        # 3. Usage Tracking (Background Task)
+                        background_tasks.add_task(
+                            async_increment_usage,
+                            usage_id, user_uuid, company["id"]
+                        )
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
