@@ -27,6 +27,7 @@ from typing import Callable, Optional, Sequence
 
 import byod_crypto
 import byod_dataplane
+import byod_health
 import byod_probe
 import byod_store
 from byod_dsn import validate_db_url
@@ -246,9 +247,14 @@ def provision(
             runtime_password=runtime_password,
             connect=connect,
         )
-
-        # 3. Store the derived runtime DSN (envelope-encrypted), record version, LIVE.
         runtime_dsn = byod_dataplane.build_runtime_dsn(dsn, runtime_password)
+
+        # 3. Health gate (§4.1 step 4): prove the *runtime* credential works
+        #    end-to-end BEFORE persisting it or flipping LIVE — so a failure here
+        #    leaves no partial state on the control plane (status -> ERROR only).
+        byod_health.run_health_check(runtime_dsn, resolver=resolver, connect=connect)
+
+        # 4. Healthy: store the runtime DSN (encrypted), record version, go LIVE.
         byod_crypto.store_encrypted_runtime_dsn(cur, company_id, runtime_dsn, kms)
         byod_store.update_tenant_db_schema_version(cur, company_id, schema_version)
         byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.LIVE)
@@ -266,6 +272,51 @@ def provision(
         "server_version": probe.server_version,
         "embedding_dimensions": probe.embedding_dimensions,
         "idempotent": False,
+    }
+
+
+def check_health(
+    cur,
+    clerk_id: str,
+    kms: byod_crypto.KmsProvider,
+    *,
+    resolver: Optional[Resolver] = None,
+    connect: Optional[Connector] = None,
+) -> dict:
+    """On-demand health probe of a provisioned tenant (RFC §4.4 / §10 status
+    surfacing). Connects with the **runtime** DSN, verifies liveness + data-plane
+    reachability, and reflects the outcome in the lifecycle status:
+
+      * healthy           -> ``LIVE`` (confirms / recovers from a prior error),
+      * auth failure       -> ``NEEDS_RECONNECT`` (client rotated the DB password),
+      * unreachable / bad  -> ``ERROR``.
+
+    Caller commits (persisting the status) on both success and the health-error
+    paths. Raises :class:`CompanyNotFound`, :class:`ConnectionNotConfigured` (not
+    provisioned yet), ``KmsUnavailable``, or a :class:`byod_health.HealthError`.
+    Never logs or returns the plaintext DSN."""
+    company_id = resolve_company_id(cur, clerk_id)
+    if company_id is None:
+        raise CompanyNotFound(clerk_id)
+
+    runtime_dsn = byod_crypto.load_decrypted_runtime_dsn(cur, company_id, kms)
+    if runtime_dsn is None:
+        raise ConnectionNotConfigured(clerk_id)
+
+    try:
+        result = byod_health.run_health_check(runtime_dsn, resolver=resolver, connect=connect)
+    except byod_health.TenantAuthFailed:
+        byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.NEEDS_RECONNECT)
+        raise
+    except Exception:
+        byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.ERROR)
+        raise
+
+    byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.LIVE)
+    return {
+        "company_id": company_id,
+        "status": TenantDbStatus.LIVE,
+        "healthy": result.healthy,
     }
 
 
@@ -291,6 +342,8 @@ def get_admin_view(cur, clerk_id: str) -> dict:
             connection = {
                 "masked_url": MASKED_URL,  # §5.1 — never the real DSN
                 "status": record.status,
+                "is_live": record.status == TenantDbStatus.LIVE,  # health surface
+                "provisioned": record.runtime_dsn_ciphertext is not None,
                 "schema_version": record.schema_version,
                 "key_id": record.dsn_key_id,
                 "created_at": _iso(record.created_at),

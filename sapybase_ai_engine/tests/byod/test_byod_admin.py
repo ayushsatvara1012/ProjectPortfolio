@@ -36,7 +36,7 @@ from byod_dsn import DsnValidationError
 from byod_store import CONTROL_PLANE_SCHEMA_SQL, TenantDbStatus, get_tenant_db_record
 from config import CUSTOM_PLAN_FEATURE_KEYS
 
-from .test_byod_probe import make_fake_connector
+from .test_byod_probe import FakeDbError, make_fake_connector
 
 GOOD_DSN = "postgresql://app:s3cr3t@db.tenant.example.com:5432/tenantdb?sslmode=require"
 
@@ -300,6 +300,67 @@ def test_provision_is_idempotent_on_double_submit(admin_conn, make_user, kms):
     assert second["status"] == TenantDbStatus.LIVE
     # The LIVE short-circuit opened NO new tenant connections (no re-probe/re-apply).
     assert len(connector.created) == connections_after_first
+
+
+def test_provision_health_failure_leaves_clean_error_state(admin_conn, make_user, kms):
+    """§10 / Phase 2.4 gate: a failed health probe → ERROR with NO partial state —
+    not LIVE, no runtime DSN persisted, no schema version recorded."""
+    import byod_health
+
+    clerk_id, company_id = _enroll_and_connect(admin_conn, make_user, kms)
+    # Probe + schema/role apply succeed; only the health (data-plane) query fails.
+    connector = make_fake_connector(health_query_error=FakeDbError("no table", pgcode="42P01"))
+
+    with pytest.raises(byod_health.DataPlaneUnavailable):
+        provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=connector)
+    admin_conn.commit()  # the endpoint persists the ERROR transition
+
+    record = get_tenant_db_record(admin_conn.cursor(), company_id)
+    assert record.status == TenantDbStatus.ERROR
+    assert record.runtime_dsn_ciphertext is None  # not stored — no partial state
+    assert record.schema_version is None           # version not recorded
+
+
+def test_check_health_recovers_and_reports_live(admin_conn, make_user, kms):
+    clerk_id, company_id = _enroll_and_connect(admin_conn, make_user, kms)
+    provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=_healthy_connector())
+    admin_conn.commit()
+
+    result = byod_admin.check_health(
+        admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=_healthy_connector()
+    )
+    admin_conn.commit()
+    assert result["healthy"] is True
+    assert result["status"] == TenantDbStatus.LIVE
+
+
+def test_check_health_auth_failure_marks_needs_reconnect(admin_conn, make_user, kms):
+    import byod_health
+
+    clerk_id, company_id = _enroll_and_connect(admin_conn, make_user, kms)
+    provision(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=_healthy_connector())
+    admin_conn.commit()
+
+    # Client rotated their DB password → runtime connect now auth-fails (§16.5).
+    def auth_fail(dsn):
+        raise FakeDbError("auth", pgcode="28P01")
+
+    with pytest.raises(byod_health.TenantAuthFailed):
+        byod_admin.check_health(admin_conn.cursor(), clerk_id, kms, resolver=_resolver, connect=auth_fail)
+    admin_conn.commit()
+
+    record = get_tenant_db_record(admin_conn.cursor(), company_id)
+    assert record.status == TenantDbStatus.NEEDS_RECONNECT
+
+
+def test_check_health_unprovisioned_raises(admin_conn, make_user, kms):
+    clerk_id, _ = make_user()
+    enroll_in_byod(admin_conn.cursor(), clerk_id)
+    admin_conn.commit()
+    # No runtime DSN stored yet (never provisioned).
+    with pytest.raises(ConnectionNotConfigured):
+        byod_admin.check_health(admin_conn.cursor(), clerk_id, kms, resolver=_resolver,
+                                connect=_healthy_connector())
 
 
 def test_provision_rejects_old_pgvector_and_marks_error(admin_conn, make_user, kms):

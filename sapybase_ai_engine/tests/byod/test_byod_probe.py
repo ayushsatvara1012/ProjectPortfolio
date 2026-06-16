@@ -34,9 +34,18 @@ def _resolver(host):  # any host → public IP, so the SSRF re-check passes
     return ["8.8.8.8"]
 
 
-# ── Fake connection (shared with test_byod_admin via make_fake_connector) ─────
+class FakeDbError(Exception):
+    """A stand-in driver error carrying a SQLSTATE ``pgcode`` (for classifying
+    auth / data-plane failures in health + probe tests)."""
+
+    def __init__(self, message: str = "db error", pgcode: str | None = None):
+        super().__init__(message)
+        self.pgcode = pgcode
+
+
+# ── Fake connection (shared with test_byod_admin/health via make_fake_connector) ─
 class _FakeCursor:
-    """A minimal DB-API cursor that answers the probe's fixed query set."""
+    """A minimal DB-API cursor that answers the probe + health + role query set."""
 
     def __init__(self, conn: "FakeConn"):
         self._conn = conn
@@ -58,7 +67,13 @@ class _FakeCursor:
             self._conn._result = None
         elif "show server_version" in s:
             self._conn._result = (self._conn.server_version,)
-        else:  # SET statement_timeout, etc.
+        elif "from company_knowledge" in s:  # health: data-plane reachability
+            if self._conn.health_query_error is not None:
+                raise self._conn.health_query_error
+            self._conn._result = (1,)
+        elif s == "select 1":  # health: liveness
+            self._conn._result = (1,)
+        else:  # SET statement_timeout, DDL, GRANT/role SQL, etc.
             self._conn._result = None
 
     def fetchone(self):
@@ -76,12 +91,14 @@ class FakeConn:
         server_version="16.2",
         create_extension_error=None,
         temp_table_error=None,
+        health_query_error=None,
     ):
         self.available_row = available_row
         self.extversion = extversion
         self.server_version = server_version
         self.create_extension_error = create_extension_error
         self.temp_table_error = temp_table_error
+        self.health_query_error = health_query_error
         self.calls: list[str] = []
         self.rolled_back = False
         self.committed = False

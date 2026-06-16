@@ -1080,17 +1080,21 @@ from models import (
 import byod_admin
 import byod_probe
 import byod_dataplane
+import byod_health
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
 
 def _byod_provision_http_error(exc: Exception) -> HTTPException:
-    """Map a sanitized tenant-DB provisioning failure to an HTTP error (rule 7 /
-    E6: the message is already safe — no DSN/host/driver text). Unreachable / DDL
-    failure → 502 (bad upstream); reachable-but-incompatible → 422."""
+    """Map a sanitized tenant-DB provisioning / health failure to an HTTP error
+    (rule 7 / E6: the message is already safe — no DSN/host/driver text).
+    Unreachable / DDL / health failure → 502 (bad upstream); reachable-but-
+    incompatible (old pgvector etc.) → 422."""
     if isinstance(exc, byod_probe.TenantConnectionError):
         return HTTPException(status_code=502, detail=str(exc))
     if isinstance(exc, byod_dataplane.DataPlaneProvisionError):
+        return HTTPException(status_code=502, detail=str(exc))
+    if isinstance(exc, byod_health.HealthError):
         return HTTPException(status_code=502, detail=str(exc))
     return HTTPException(status_code=422, detail=str(exc))
 
@@ -6475,8 +6479,47 @@ def provision_byod(
     except DsnValidationError as e:
         conn.commit()  # status was moved to ERROR; persist that + release the lock
         raise HTTPException(status_code=400, detail=str(e))
-    except (byod_probe.ProbeError, byod_dataplane.DataPlaneProvisionError) as e:
+    except (byod_probe.ProbeError, byod_dataplane.DataPlaneProvisionError, byod_health.HealthError) as e:
         conn.commit()  # status was moved to ERROR; persist that + release the lock
+        raise _byod_provision_http_error(e)
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/health")
+@limiter.limit("30/minute")
+def check_byod_health(
+    request: Request,
+    clerk_id: str,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """On-demand health probe of a provisioned tenant (Phase 2.4 / §4.4): connect
+    with the DML-only runtime credential, verify liveness + data-plane access, and
+    reflect it in the status (healthy→LIVE, auth-failure→NEEDS_RECONNECT,
+    unreachable→ERROR). Surfaces a tenant's health without touching the engine."""
+    try:
+        kms = kms_from_env()
+    except KmsUnavailable:
+        raise HTTPException(status_code=503, detail="Encryption service unavailable.")
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_admin.check_health(cursor, clerk_id, kms)
+        conn.commit()
+        log_admin_action(
+            admin["clerk_id"], "BYOD_HEALTH_CHECK", clerk_id,
+            {"status": result["status"], "healthy": result.get("healthy")},
+        )
+        return {"status": "success", **result}
+    except byod_admin.CompanyNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="User has no company to attach a database to.")
+    except byod_admin.ConnectionNotConfigured:
+        conn.rollback()
+        raise HTTPException(status_code=409, detail="Tenant database is not provisioned yet.")
+    except byod_health.HealthError as e:
+        conn.commit()  # persist NEEDS_RECONNECT / ERROR + release the connection
         raise _byod_provision_http_error(e)
     finally:
         release_db_connection(conn)
