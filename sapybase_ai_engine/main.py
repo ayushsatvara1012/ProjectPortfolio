@@ -1082,6 +1082,7 @@ import byod_probe
 import byod_dataplane
 import byod_health
 import byod_engine
+import byod_jobs
 import byod_metering
 import byod_ingest
 import byod_store
@@ -6564,7 +6565,13 @@ def run_weekly_digest(request: Request, x_cron_secret: str = Header(None)):
         f"Week of {(now - timedelta(days=7)).strftime('%b %d')} – "
         f"{now.strftime('%b %d, %Y')}"
     )
-    processed = sent = skipped = 0
+    processed = sent = skipped = failed = 0
+    # Engine/control-plane window cutoff for BYOD-routed tenants (E12 / §16.8):
+    # the 7-day lead window for a tenant DB is anchored to OUR clock, passed as a
+    # bound param, so a skewed tenant clock can't widen/narrow the digest window.
+    # Shared tenants keep server-side NOW() below (byte-for-byte unchanged).
+    engine_cutoff_7d = now - timedelta(days=7)
+    routed: dict = {}  # company_id -> (company, recipient) for BYOD tenants
 
     conn = get_db_connection()
     try:
@@ -6580,6 +6587,49 @@ def run_weekly_digest(request: Request, x_cron_secret: str = Header(None)):
         companies = cursor.fetchall()
         cursor.close()
 
+        # One BYOD tenant's digest: read this week's leads from the tenant's OWN
+        # DB (get_tenant_db / vaayu_runtime, breaker-guarded), then mark the week on
+        # the control plane. Runs on a batch pool thread (§16.4), so it acquires its
+        # own control connection; the tenant read goes through the bounded pool. Any
+        # tenant-DB failure raises a sanitized TenantDataError that the batch runner
+        # isolates — one broken client DB never aborts the run.
+        def _digest_routed_worker(cid):
+            company, recipient = routed[cid]
+            with byod_engine.tenant_connection(cid) as tconn:
+                tcur = tconn.cursor()
+                try:
+                    tcur.execute(
+                        """
+                        SELECT email, name, context, score, score_band
+                        FROM lead_capture
+                        WHERE company_id = %s AND created_at >= %s
+                        """,
+                        (cid, engine_cutoff_7d),
+                    )
+                    leads = [
+                        {"email": r[0], "name": r[1], "context": r[2], "score": r[3], "band": r[4]}
+                        for r in tcur.fetchall()
+                    ]
+                finally:
+                    tcur.close()
+            stats = summarize_leads(leads)
+            if not should_send_digest(stats):
+                return "skipped"
+            if not _send_digest_email(recipient, company["bot_name"] or "Your bot", stats, period_label):
+                return "skipped"
+            wconn = get_db_connection()
+            try:
+                wcur = wconn.cursor()
+                wcur.execute(
+                    "UPDATE companies SET last_weekly_digest_week = %s WHERE id = %s",
+                    (week_key, cid),
+                )
+                wconn.commit()
+                wcur.close()
+            finally:
+                release_db_connection(wconn)
+            return "sent"
+
         for row in companies:
             processed += 1
             company = {
@@ -6593,6 +6643,12 @@ def run_weekly_digest(request: Request, x_cron_secret: str = Header(None)):
             recipient = resolve_digest_recipient(company)
             if not recipient:
                 skipped += 1
+                continue
+
+            # BYOD-routed tenant: defer to the bounded-concurrency batch below so a
+            # slow/broken remote DB can't block the shared-tenant digests (§16.4).
+            if byod_engine.routing_active(company["id"]):
+                routed[company["id"]] = (company, recipient)
                 continue
 
             try:
@@ -6637,8 +6693,28 @@ def run_weekly_digest(request: Request, x_cron_secret: str = Header(None)):
             else:
                 skipped += 1
 
-        return {"status": "ok", "week": week_key,
-                "processed": processed, "sent": sent, "skipped": skipped}
+        # Fan out the BYOD-routed tenants under bounded concurrency, skipping any
+        # whose breaker is OPEN (retry next run) and isolating per-tenant failures
+        # (E9 / §16.4). Shared-only deployments have an empty `routed`, so this is a
+        # no-op and the response is unchanged.
+        if routed:
+            report = byod_jobs.run_tenant_batch(
+                list(routed.keys()),
+                _digest_routed_worker,
+                max_concurrency=byod_jobs.max_concurrency_from_env(),
+                skip=byod_engine.tenant_breaker_open,
+                sanitize=byod_engine.sanitize_db_error,
+            )
+            for outcome in report.outcomes:
+                if outcome.ok and outcome.value == "sent":
+                    sent += 1
+                elif outcome.ok or outcome.skipped:
+                    skipped += 1
+                else:
+                    failed += 1
+
+        return {"status": "ok", "week": week_key, "processed": processed,
+                "sent": sent, "skipped": skipped, "failed": failed}
     except HTTPException:
         raise
     except Exception as e:

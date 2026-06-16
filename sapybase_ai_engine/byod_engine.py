@@ -272,6 +272,27 @@ def reset_registry() -> None:
             _registry = None
 
 
+def tenant_breaker_open(
+    company_id: str, *, registry: Optional[TenantPoolRegistry] = None
+) -> bool:
+    """Whether the tenant's circuit breaker is OPEN — used by batch jobs to skip a
+    known-bad tenant for free (E9 / §16.4: "skip open-breaker tenants, retry
+    later"), without paying a connection attempt.
+
+    OPEN → True (skip). HALF_OPEN/CLOSED → False (allow; HALF_OPEN lets one probe
+    through to recover the tenant automatically). Fail-soft: any error resolving
+    the breaker state returns False — on doubt we DON'T skip, because the
+    connection attempt itself is breaker-guarded and will fast-fail if truly open.
+    """
+    from byod_breaker import BreakerState  # lazy; keeps import graph light
+
+    try:
+        reg = registry or get_registry()
+        return reg.breaker_state(company_id) is BreakerState.OPEN
+    except Exception:
+        return False
+
+
 # ── Tenant data-plane access ────────────────────────────────────────────────────
 @contextmanager
 def tenant_connection(
