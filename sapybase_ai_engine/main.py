@@ -1133,6 +1133,26 @@ def _byod_dataplane_cursor(company_id, control_conn):
         yield control_conn.cursor(), control_conn
 
 
+def _byod_window_clause(company_id, days):
+    """Build a ``created_at`` lower-bound window clause + params for an analytics
+    query, honoring E12 / §16.8 (Phase 4.1): for a BYOD-routed tenant the cutoff
+    is derived from **engine / control-plane time** (NOT the tenant DB clock,
+    which may be skewed) and passed as a bound parameter; the shared path keeps
+    server-side ``NOW()`` so its behavior is byte-for-byte unchanged. ``days`` <= 0
+    means no window → ``("", [])``.
+
+    The returned fragment always begins with `` AND created_at >= …`` so it can be
+    concatenated after a `WHERE company_id = %s` predicate; its params follow the
+    company_id param in execution order.
+    """
+    if not days or days <= 0:
+        return "", []
+    if byod_engine.routing_active(company_id):
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        return " AND created_at >= %s", [cutoff]
+    return " AND created_at >= NOW() - (INTERVAL '1 day' * %s)", [days]
+
+
 def _byod_provision_http_error(exc: Exception) -> HTTPException:
     """Map a sanitized tenant-DB provisioning / health failure to an HTTP error
     (rule 7 / E6: the message is already safe — no DSN/host/driver text).
@@ -4214,27 +4234,30 @@ def list_fixes_needed(
                 "upgrade_url": "/app/pricing"
             })
 
-        cursor.execute(
-            """
-            SELECT
-                (array_agg(user_query ORDER BY created_at DESC))[1] AS representative_query,
-                COUNT(*) AS ask_count,
-                MAX(created_at) AS last_asked,
-                AVG(confidence) AS group_confidence,
-                BOOL_OR(is_unanswered) AS has_unanswered
-            FROM chat_logs
-            WHERE company_id = %s
-              AND created_at >= NOW() - make_interval(days => %s)
-              AND btrim(COALESCE(user_query, '')) <> ''
-            GROUP BY lower(btrim(user_query))
-            """,
-            (company_id, window_days)
-        )
-        raw = [
-            (r[0], r[1], r[2].isoformat() if r[2] else None,
-             float(r[3]) if r[3] is not None else None, bool(r[4]))
-            for r in cursor.fetchall()
-        ]
+        win_sql, win_params = _byod_window_clause(company_id, window_days)
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                """
+                SELECT
+                    (array_agg(user_query ORDER BY created_at DESC))[1] AS representative_query,
+                    COUNT(*) AS ask_count,
+                    MAX(created_at) AS last_asked,
+                    AVG(confidence) AS group_confidence,
+                    BOOL_OR(is_unanswered) AS has_unanswered
+                FROM chat_logs
+                WHERE company_id = %s"""
+                + win_sql
+                + """
+                  AND btrim(COALESCE(user_query, '')) <> ''
+                GROUP BY lower(btrim(user_query))
+                """,
+                tuple([company_id] + win_params),
+            )
+            raw = [
+                (r[0], r[1], r[2].isoformat() if r[2] else None,
+                 float(r[3]) if r[3] is not None else None, bool(r[4]))
+                for r in dcur.fetchall()
+            ]
     finally:
         release_db_connection(conn)
 
@@ -4287,32 +4310,37 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
         avg_cost = float(bm_row[0]) if bm_row and bm_row[0] is not None else 5.00
         avg_lead = float(bm_row[1]) if bm_row and bm_row[1] is not None else 50.00
 
-        # Live 30-day stats
-        cursor.execute(
-            "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND is_unanswered = false AND created_at >= NOW() - INTERVAL '30 days'",
-            (company_id,)
-        )
-        answered_30d = cursor.fetchone()[0] or 0
+        # Live 30-day stats + realized revenue read from the DATA plane (the
+        # tenant's own chat_logs / lead_capture for a BYOD-routed tenant). The
+        # 30-day window is anchored to engine/control-plane time (E12).
+        win_sql, win_params = _byod_window_clause(company_id, 30)
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND is_unanswered = false"
+                + win_sql,
+                tuple([company_id] + win_params)
+            )
+            answered_30d = dcur.fetchone()[0] or 0
 
-        cursor.execute(
-            "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'",
-            (company_id,)
-        )
-        total_30d = cursor.fetchone()[0] or 0
+            dcur.execute(
+                "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s" + win_sql,
+                tuple([company_id] + win_params)
+            )
+            total_30d = dcur.fetchone()[0] or 0
 
-        cursor.execute(
-            "SELECT COUNT(*) FROM lead_capture WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'",
-            (company_id,)
-        )
-        leads_30d = cursor.fetchone()[0] or 0
+            dcur.execute(
+                "SELECT COUNT(*) FROM lead_capture WHERE company_id = %s" + win_sql,
+                tuple([company_id] + win_params)
+            )
+            leads_30d = dcur.fetchone()[0] or 0
 
-        # Realized revenue: actual closed-won deal value (the closed-loop figure).
-        cursor.execute(
-            "SELECT COALESCE(SUM(value_usd), 0), COUNT(*) FROM lead_capture "
-            "WHERE company_id = %s AND status = 'won'",
-            (company_id,)
-        )
-        won_row = cursor.fetchone()
+            # Realized revenue: actual closed-won deal value (the closed-loop figure).
+            dcur.execute(
+                "SELECT COALESCE(SUM(value_usd), 0), COUNT(*) FROM lead_capture "
+                "WHERE company_id = %s AND status = 'won'",
+                (company_id,)
+            )
+            won_row = dcur.fetchone()
         realized_revenue = round(float(won_row[0] or 0), 2)
         won_deals = won_row[1] or 0
 
@@ -4414,7 +4442,6 @@ def get_conversion_funnel(
     so drop-off is always valid; the pure math lives in funnel.py.
     """
     wd = window_days if window_days in _FUNNEL_WINDOWS else 30
-    win_sql = "" if wd == 0 else " AND created_at >= NOW() - (INTERVAL '1 day' * %s)"
 
     conn = get_db_connection()
     try:
@@ -4437,39 +4464,43 @@ def get_conversion_funnel(
                 "upgrade_url": "/app/pricing"
             })
 
-        win_params = [] if wd == 0 else [wd]
+        # Window anchored to engine/control-plane time for a BYOD tenant (E12).
+        win_sql, win_params = _byod_window_clause(company_id, wd)
 
-        # Stage 1: distinct conversations (engaged sessions). Legacy rows with a
-        # NULL session_id are excluded — funnel.py clamps any resulting inversion.
-        cursor.execute(
-            "SELECT COUNT(DISTINCT session_id) FROM chat_logs "
-            "WHERE company_id = %s AND session_id IS NOT NULL" + win_sql,
-            tuple([company_id] + win_params)
-        )
-        conversations = cursor.fetchone()[0] or 0
+        # All funnel inputs read from the DATA plane (tenant's chat_logs /
+        # lead_capture for a BYOD-routed tenant).
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            # Stage 1: distinct conversations (engaged sessions). Legacy rows with a
+            # NULL session_id are excluded — funnel.py clamps any resulting inversion.
+            dcur.execute(
+                "SELECT COUNT(DISTINCT session_id) FROM chat_logs "
+                "WHERE company_id = %s AND session_id IS NOT NULL" + win_sql,
+                tuple([company_id] + win_params)
+            )
+            conversations = dcur.fetchone()[0] or 0
 
-        # Stages 2-4 + realized won value in one pass over lead_capture.
-        cursor.execute(
-            "SELECT COUNT(*), "
-            "COUNT(*) FILTER (WHERE status <> 'new'), "
-            "COUNT(*) FILTER (WHERE status = 'won'), "
-            "COALESCE(SUM(value_usd) FILTER (WHERE status = 'won'), 0) "
-            "FROM lead_capture WHERE company_id = %s" + win_sql,
-            tuple([company_id] + win_params)
-        )
-        lead_row = cursor.fetchone()
-        leads_total = lead_row[0] or 0
-        contacted = lead_row[1] or 0
-        won = lead_row[2] or 0
-        won_value = round(float(lead_row[3] or 0), 2)
+            # Stages 2-4 + realized won value in one pass over lead_capture.
+            dcur.execute(
+                "SELECT COUNT(*), "
+                "COUNT(*) FILTER (WHERE status <> 'new'), "
+                "COUNT(*) FILTER (WHERE status = 'won'), "
+                "COALESCE(SUM(value_usd) FILTER (WHERE status = 'won'), 0) "
+                "FROM lead_capture WHERE company_id = %s" + win_sql,
+                tuple([company_id] + win_params)
+            )
+            lead_row = dcur.fetchone()
+            leads_total = lead_row[0] or 0
+            contacted = lead_row[1] or 0
+            won = lead_row[2] or 0
+            won_value = round(float(lead_row[3] or 0), 2)
 
-        # Lead-quality breakdown (orthogonal to the funnel).
-        cursor.execute(
-            "SELECT score_band, COUNT(*) FROM lead_capture "
-            "WHERE company_id = %s" + win_sql + " GROUP BY score_band",
-            tuple([company_id] + win_params)
-        )
-        quality_counts = {row[0]: row[1] for row in cursor.fetchall()}
+            # Lead-quality breakdown (orthogonal to the funnel).
+            dcur.execute(
+                "SELECT score_band, COUNT(*) FROM lead_capture "
+                "WHERE company_id = %s" + win_sql + " GROUP BY score_band",
+                tuple([company_id] + win_params)
+            )
+            quality_counts = {row[0]: row[1] for row in dcur.fetchall()}
 
         funnel = build_funnel({
             "conversations": conversations,
@@ -4498,7 +4529,6 @@ def get_lead_attribution(
     the most leads and the most won revenue, over a selectable window. Same
     analytics tier gate as the funnel; aggregation is pure (attribution.py)."""
     wd = window_days if window_days in _FUNNEL_WINDOWS else 30
-    win_sql = "" if wd == 0 else " AND created_at >= NOW() - (INTERVAL '1 day' * %s)"
     safe_limit = max(1, min(int(limit) if limit else 8, 50))
 
     conn = get_db_connection()
@@ -4521,16 +4551,18 @@ def get_lead_attribution(
                 "upgrade_url": "/app/pricing"
             })
 
-        win_params = [] if wd == 0 else [wd]
-        cursor.execute(
-            "SELECT referrer, utm_source, status, value_usd FROM lead_capture "
-            "WHERE company_id = %s" + win_sql,
-            tuple([company_id] + win_params)
-        )
-        leads = [
-            {"referrer": r[0], "utm_source": r[1], "status": r[2], "value_usd": r[3]}
-            for r in cursor.fetchall()
-        ]
+        # Window anchored to engine/control-plane time for a BYOD tenant (E12).
+        win_sql, win_params = _byod_window_clause(company_id, wd)
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                "SELECT referrer, utm_source, status, value_usd FROM lead_capture "
+                "WHERE company_id = %s" + win_sql,
+                tuple([company_id] + win_params)
+            )
+            leads = [
+                {"referrer": r[0], "utm_source": r[1], "status": r[2], "value_usd": r[3]}
+                for r in dcur.fetchall()
+            ]
         result = summarize_attribution(leads, limit=safe_limit)
         result["window_days"] = wd
         return result
@@ -4576,82 +4608,89 @@ def generate_insight_report(
                 "upgrade_url": "/app/pricing"
             })
 
-        # ── FETCH RECENT CONVERSATIONS (ALWAYS FRESH) ────────────────────────
-        cursor.execute(
-            """SELECT user_query, is_unanswered, created_at FROM chat_logs
-               WHERE company_id = %s ORDER BY created_at DESC LIMIT 15""",
-            (company_id,)
-        )
-        recent_rows = cursor.fetchall()
-        recent_activity = [
-            {
-                "query": r[0],
-                "unanswered": r[1],
-                "timestamp": r[2].isoformat() if r[2] else None
-            } for r in recent_rows
-        ]
-
-        # ── FETCH PEAK ACTIVITY BLOCKS (ALWAYS FRESH) ────────────────────────
-        cursor.execute("""
-            WITH DailyStats AS (
-                SELECT
-                    DATE(created_at) AS log_date,
-                    COUNT(DISTINCT session_id) as interacted_users,
-                    COUNT(id) as total_questions,
-                    SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
-                    SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(created_at)
-            ),
-            DailyTopQueries AS (
-                SELECT
-                    DATE(created_at) AS log_date,
-                    user_query,
-                    COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days'
-                GROUP BY DATE(created_at), user_query
-            ),
-            DailyTopUnanswered AS (
-                SELECT
-                    DATE(created_at) AS log_date,
-                    user_query,
-                    COUNT(*) as query_count,
-                    ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
-                FROM chat_logs
-                WHERE company_id = %s AND created_at >= NOW() - INTERVAL '30 days' AND is_unanswered = true
-                GROUP BY DATE(created_at), user_query
+        # The always-fresh conversation reads come from the DATA plane (the
+        # tenant's own chat_logs for a BYOD-routed tenant); the 30-day peak-block
+        # window is anchored to engine/control-plane time (E12). This block does
+        # not span the LLM call below — the tenant connection is released before
+        # any slow inference (Phase 3.4 pool-starvation rule).
+        win30, win30p = _byod_window_clause(company_id, 30)
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            # ── FETCH RECENT CONVERSATIONS (ALWAYS FRESH) ────────────────────
+            dcur.execute(
+                """SELECT user_query, is_unanswered, created_at FROM chat_logs
+                   WHERE company_id = %s ORDER BY created_at DESC LIMIT 15""",
+                (company_id,)
             )
-            SELECT
-                s.log_date,
-                s.interacted_users,
-                s.total_questions,
-                s.answered_questions,
-                s.unanswered_questions,
-                q1.user_query as top_q1,
-                q2.user_query as top_q2,
-                u1.user_query as top_unanswered1,
-                u2.user_query as top_unanswered2
-            FROM DailyStats s
-            LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
-            LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
-            LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
-            LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
-            ORDER BY s.log_date DESC;
-        """, (company_id, company_id, company_id))
-        fresh_peak_blocks = []
-        for r in cursor.fetchall():
-            fresh_peak_blocks.append({
-                "date": r[0].isoformat() if r[0] else None,
-                "interacted_users": int(r[1]) if r[1] else 0,
-                "total_questions": int(r[2]) if r[2] else 0,
-                "answered_questions": int(r[3]) if r[3] else 0,
-                "unanswered_questions": int(r[4]) if r[4] else 0,
-                "top_questions": [q for q in [r[5], r[6]] if q],
-                "top_unanswered": [q for q in [r[7], r[8]] if q]
-            })
+            recent_rows = dcur.fetchall()
+            recent_activity = [
+                {
+                    "query": r[0],
+                    "unanswered": r[1],
+                    "timestamp": r[2].isoformat() if r[2] else None
+                } for r in recent_rows
+            ]
+
+            # ── FETCH PEAK ACTIVITY BLOCKS (ALWAYS FRESH) ────────────────────
+            dcur.execute("""
+                WITH DailyStats AS (
+                    SELECT
+                        DATE(created_at) AS log_date,
+                        COUNT(DISTINCT session_id) as interacted_users,
+                        COUNT(id) as total_questions,
+                        SUM(CASE WHEN is_unanswered = false THEN 1 ELSE 0 END) as answered_questions,
+                        SUM(CASE WHEN is_unanswered = true THEN 1 ELSE 0 END) as unanswered_questions
+                    FROM chat_logs
+                    WHERE company_id = %s""" + win30 + """
+                    GROUP BY DATE(created_at)
+                ),
+                DailyTopQueries AS (
+                    SELECT
+                        DATE(created_at) AS log_date,
+                        user_query,
+                        COUNT(*) as query_count,
+                        ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                    FROM chat_logs
+                    WHERE company_id = %s""" + win30 + """
+                    GROUP BY DATE(created_at), user_query
+                ),
+                DailyTopUnanswered AS (
+                    SELECT
+                        DATE(created_at) AS log_date,
+                        user_query,
+                        COUNT(*) as query_count,
+                        ROW_NUMBER() OVER(PARTITION BY DATE(created_at) ORDER BY COUNT(*) DESC) as rn
+                    FROM chat_logs
+                    WHERE company_id = %s""" + win30 + """ AND is_unanswered = true
+                    GROUP BY DATE(created_at), user_query
+                )
+                SELECT
+                    s.log_date,
+                    s.interacted_users,
+                    s.total_questions,
+                    s.answered_questions,
+                    s.unanswered_questions,
+                    q1.user_query as top_q1,
+                    q2.user_query as top_q2,
+                    u1.user_query as top_unanswered1,
+                    u2.user_query as top_unanswered2
+                FROM DailyStats s
+                LEFT JOIN DailyTopQueries q1 ON s.log_date = q1.log_date AND q1.rn = 1
+                LEFT JOIN DailyTopQueries q2 ON s.log_date = q2.log_date AND q2.rn = 2
+                LEFT JOIN DailyTopUnanswered u1 ON s.log_date = u1.log_date AND u1.rn = 1
+                LEFT JOIN DailyTopUnanswered u2 ON s.log_date = u2.log_date AND u2.rn = 2
+                ORDER BY s.log_date DESC;
+            """, tuple([company_id] + win30p + [company_id] + win30p + [company_id] + win30p))
+            fresh_peak_blocks = []
+            for r in dcur.fetchall():
+                fresh_peak_blocks.append({
+                    "date": r[0].isoformat() if r[0] else None,
+                    "interacted_users": int(r[1]) if r[1] else 0,
+                    "total_questions": int(r[2]) if r[2] else 0,
+                    "answered_questions": int(r[3]) if r[3] else 0,
+                    "unanswered_questions": int(r[4]) if r[4] else 0,
+                    "top_questions": [q for q in [r[5], r[6]] if q],
+                    "top_unanswered": [q for q in [r[7], r[8]] if q]
+                })
 
         # ── STEP A: 24-HOUR COOLDOWN CHECK ───────────────────────────────────
         cursor.execute(
@@ -4692,33 +4731,39 @@ def generate_insight_report(
             period_start = datetime.now(timezone.utc) - timedelta(days=30)
             period_end = datetime.now(timezone.utc)
 
-        # Total Answered (billing cycle)
-        cursor.execute(
-            "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND is_unanswered = false AND created_at >= %s AND created_at <= %s",
-            (company_id, period_start, period_end)
-        )
-        total_answered = cursor.fetchone()[0] or 0
+        # Billing-cycle counts + the spam-filtered trend logs read from the DATA
+        # plane. The window bounds (period_start/period_end) come from the
+        # control plane's usage_tracking, so they are already engine-authoritative
+        # timestamps (E12) — passed as params, never the tenant clock. Released
+        # before the LLM call below.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            # Total Answered (billing cycle)
+            dcur.execute(
+                "SELECT COUNT(*) FROM chat_logs WHERE company_id = %s AND is_unanswered = false AND created_at >= %s AND created_at <= %s",
+                (company_id, period_start, period_end)
+            )
+            total_answered = dcur.fetchone()[0] or 0
 
-        # Total Leads (billing cycle)
-        cursor.execute(
-            "SELECT COUNT(*) FROM lead_capture WHERE company_id = %s AND created_at >= %s AND created_at <= %s",
-            (company_id, period_start, period_end)
-        )
-        total_leads = cursor.fetchone()[0] or 0
+            # Total Leads (billing cycle)
+            dcur.execute(
+                "SELECT COUNT(*) FROM lead_capture WHERE company_id = %s AND created_at >= %s AND created_at <= %s",
+                (company_id, period_start, period_end)
+            )
+            total_leads = dcur.fetchone()[0] or 0
+
+            # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────
+            dcur.execute(
+                """SELECT user_query, is_unanswered, created_at FROM chat_logs
+                   WHERE company_id = %s
+                     AND LENGTH(TRIM(user_query)) >= 3
+                     AND LOWER(TRIM(user_query)) NOT IN %s
+                   ORDER BY created_at DESC LIMIT 200""",
+                (company_id, tuple(SPAM_WORDS))
+            )
+            logs = dcur.fetchall()
 
         support_savings = total_answered * avg_cost
         potential_revenue = total_leads * avg_lead
-
-        # ── STEP B: DATA FETCH & SPAM FILTER ─────────────────────────────────
-        cursor.execute(
-            """SELECT user_query, is_unanswered, created_at FROM chat_logs
-               WHERE company_id = %s
-                 AND LENGTH(TRIM(user_query)) >= 3
-                 AND LOWER(TRIM(user_query)) NOT IN %s
-               ORDER BY created_at DESC LIMIT 200""",
-            (company_id, tuple(SPAM_WORDS))
-        )
-        logs = cursor.fetchall()
 
         # Empty state guard
         if len(logs) < 5:
