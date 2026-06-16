@@ -1081,8 +1081,19 @@ import byod_admin
 import byod_probe
 import byod_dataplane
 import byod_health
+import byod_engine
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
+
+# Wire the BYOD engine's control-plane accessors (Phase 3.2). Stores callables
+# only — nothing connects or builds a tenant pool here, so this is a no-op at
+# startup when BYOD is dark (the rollout flag is off and nothing routes to a
+# tenant DB). The tenant pool is built lazily on the first routed request.
+byod_engine.configure(
+    control_conn_factory=get_db_connection,
+    control_conn_release=release_db_connection,
+    kms_factory=kms_from_env,
+)
 
 
 def _byod_provision_http_error(exc: Exception) -> HTTPException:
@@ -1982,6 +1993,22 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
     return results
 
 
+def _byod_retrieve_knowledge(company_id, query_vector, query_text: str = ""):
+    """BYOD RAG read: run the SAME hybrid retrieval against the tenant's own DB
+    (Phase 3.2, rule 1 — via get_tenant_db / vaayu_runtime), then validate the
+    rows (E3). Fails SOFT (rule 10): on any tenant-DB error the read degrades to
+    an empty knowledge set — the bot answers from its fallback protocol — and the
+    error is logged SANITIZED (E6), never leaking DSN/host/driver text. Reuses
+    retrieve_knowledge() so the query is identical to the shared-DB path."""
+    try:
+        with byod_engine.tenant_connection(company_id) as conn:
+            rows = retrieve_knowledge(conn, company_id, query_vector, query_text=query_text)
+    except byod_engine.TenantDataError as exc:
+        logger.warning("BYOD RAG read degraded: company=%s reason=%s", company_id, exc.reason)
+        return []
+    return byod_engine.validate_knowledge_rows(rows)
+
+
 async def rerank_chunks(query: str, candidates: list, top_k: int = 5) -> tuple[list, float | None]:
     """
     LLM-based reranker using Gemini Flash Lite (fast + cheap).
@@ -2231,6 +2258,14 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed.
     `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit)."""
+    # BYOD tenants store chat_logs on their OWN database (Phase 3.2, dark by
+    # default — data-plane write via get_tenant_db / vaayu_runtime). Degrades
+    # soft on failure (§16.9): a tenant analytics-write hiccup never breaks chat.
+    if byod_engine.routing_active(company_id):
+        byod_engine.tenant_log_chat(
+            company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence
+        )
+        return
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -2456,8 +2491,15 @@ async def chat_endpoint(
             query_vector = query_vector[:768]
         _t_embed = time.perf_counter()
 
-        # Hybrid retrieval (BM25 uses original query; vector uses HyDE-expanded embedding)
-        candidate_docs = await asyncio.to_thread(retrieve_knowledge, conn, company["id"], query_vector, query_text=chat_req.message)
+        # Hybrid retrieval (BM25 uses original query; vector uses HyDE-expanded embedding).
+        # BYOD tenants read from their OWN database (Phase 3.2, dark by default);
+        # everyone else uses the shared global pool exactly as before.
+        if byod_engine.routing_active(company["id"]):
+            candidate_docs = await asyncio.to_thread(
+                _byod_retrieve_knowledge, company["id"], query_vector, chat_req.message
+            )
+        else:
+            candidate_docs = await asyncio.to_thread(retrieve_knowledge, conn, company["id"], query_vector, query_text=chat_req.message)
         _t_retrieve = time.perf_counter()
         retrieved_docs, rerank_top_score = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
         _t_rerank = time.perf_counter()
