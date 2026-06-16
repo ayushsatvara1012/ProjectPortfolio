@@ -1083,6 +1083,7 @@ import byod_dataplane
 import byod_health
 import byod_engine
 import byod_jobs
+import byod_config
 import byod_metering
 import byod_ingest
 import byod_store
@@ -5078,6 +5079,36 @@ def _byod_invalidate_insights(company_id: str):
         pass
 
 
+def _byod_propagate_config_change(clerk_id: str) -> None:
+    """Live config propagation (Phase 5.2, §3.1 / §8.4): after a super-admin edits
+    a user's plan (limits/features/model via /limits, or plan state via
+    /custom-plan/override), clear the derived answer cache for every company the
+    user owns so the change takes effect on the very next request — the config
+    itself is read fresh per request, this just prevents a stale CACHED answer from
+    the old plan being replayed. Opens its own short control-plane connection (the
+    admin write has already committed); best-effort + sanitized so an invalidation
+    hiccup never fails the admin edit."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        prop = byod_config.propagate_config_change(cursor, clerk_id)
+        conn.commit()
+        if prop.companies_invalidated:
+            logger.info(
+                "Config change propagated: clerk_id=%s companies=%d",
+                clerk_id, prop.companies_invalidated,
+            )
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.warning(
+            "Config-change cache invalidation failed: clerk_id=%s reason=%s",
+            clerk_id, byod_engine.sanitize_db_error(e),
+        )
+    finally:
+        release_db_connection(conn)
+
+
 async def _byod_run_training_job(
     job_id: str,
     company_id: str,
@@ -6882,6 +6913,11 @@ def update_user_admin(
 
         log_admin_action(admin["clerk_id"], "UPDATE_USER_PROFILE", clerk_id, changes)
 
+        # Live config propagation (Phase 5.2, §3.1 / §8.4): the new limits/features
+        # are read fresh on the next request; clear the derived answer cache so no
+        # reply computed under the old plan is replayed. Best-effort.
+        _byod_propagate_config_change(clerk_id)
+
         return {"status": "success"}
     except HTTPException:
         raise
@@ -7768,6 +7804,13 @@ async def custom_plan_override(
             clerk_id,
             changes
         )
+
+        # Live config propagation (Phase 5.2, §3.1 / §8.4): a plan-state change is a
+        # control-plane change, so clear the derived answer cache for the user's
+        # companies — the next request resolves the new state live, with no stale
+        # cached reply and no redeploy. Best-effort. ('cancel' only issues a Polar
+        # request here; the webhook applies CANCELED + invalidates on its own path.)
+        _byod_propagate_config_change(clerk_id)
 
         print(f"OVERRIDE: admin={admin['clerk_id']} action={req.action} target={clerk_id} reason={req.reason!r}")
         return {"status": "success", "action": req.action, "changes": changes}
