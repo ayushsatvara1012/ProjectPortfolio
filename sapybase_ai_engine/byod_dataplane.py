@@ -140,6 +140,15 @@ DATA_PLANE_SCHEMA_SQL = _build_schema_sql()
 # privileges below cover present + future tables regardless.
 DATA_PLANE_TABLES: tuple[str, ...] = ("company_knowledge", "chat_logs", "lead_capture")
 
+# Reverse of DATA_PLANE_SCHEMA_SQL — the analogue of byod_store's
+# CONTROL_PLANE_SCHEMA_DROP_SQL. Used by the data_plane Alembic lineage's
+# downgrade (Phase 3.1) so the schema and its teardown share one source of truth.
+# Drops only the data-plane tables (indexes go with them); the `vector` extension
+# is left in place since it is a database-wide resource we did not exclusively own.
+DATA_PLANE_SCHEMA_DROP_SQL = "\n".join(
+    f"DROP TABLE IF EXISTS {t};" for t in reversed(DATA_PLANE_TABLES)
+)
+
 
 def apply_data_plane_schema(cur) -> None:
     """Apply the authoritative data-plane DDL (idempotent/additive). Run with the

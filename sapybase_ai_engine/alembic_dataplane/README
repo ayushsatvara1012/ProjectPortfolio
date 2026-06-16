@@ -1,0 +1,21 @@
+BYOD data_plane Alembic lineage (RFC docs/rfc-byod.md A.7, Phase 3.1).
+
+This is the SECOND, independent Alembic lineage. It runs on each client's BYO
+Postgres (the data plane). The default `alembic_migrations/` lineage is the
+control_plane lineage and runs on Sapybase's own DB. The two never share a
+revision tree or an `alembic_version` table — they target different databases.
+
+  control_plane  -> Sapybase control DB  (../alembic.ini, ../alembic_migrations/)
+  data_plane     -> each client BYO DB   (../alembic_dataplane.ini, here)
+
+Apply to one tenant (orchestrator / CLI):
+
+  alembic -c alembic_dataplane.ini -x dsn=<tenant_dsn> upgrade head
+
+or set BYOD_DATAPLANE_DATABASE_URL. DATABASE_URL is the control plane and is NOT
+used here.
+
+The baseline (0001) wraps byod_dataplane.DATA_PLANE_SCHEMA_SQL — the single
+source of truth the engine's provisioning path also applies. New data-plane
+migrations MUST be additive/backward-compatible (expand->migrate->contract,
+rule 11) and chain from the current head.
