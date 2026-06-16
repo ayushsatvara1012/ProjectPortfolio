@@ -1084,6 +1084,7 @@ import byod_health
 import byod_engine
 import byod_metering
 import byod_ingest
+import byod_store
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
@@ -1096,6 +1097,22 @@ byod_engine.configure(
     control_conn_release=release_db_connection,
     kms_factory=kms_from_env,
 )
+
+
+def _byod_offboard(cursor, company_id: str) -> bool:
+    """Offboard a BYOD tenant — rule E10 / RFC §16.6 (Phase 3.6).
+
+    A BYOD tenant's operational rows (knowledge vectors, chat_logs, leads) live
+    in the CLIENT's own database. Cancellation / deletion / offboarding here MUST
+    remove ONLY the control-plane routing pointer + encrypted credentials — i.e.
+    Sapybase stops connecting — and MUST NOT drop or delete anything in the
+    client's DB. Deleting client data is a separate, explicitly-confirmed action.
+
+    Returns True if a BYOD routing record existed (i.e. this was an enrolled BYOD
+    tenant), so the caller can audit the offboard. ``cursor`` is a control-plane
+    cursor; the caller owns the transaction. This never opens a tenant connection.
+    """
+    return byod_store.delete_tenant_db_record(cursor, company_id)
 
 from contextlib import contextmanager as _contextmanager
 
@@ -5822,12 +5839,25 @@ def delete_company(company_id: str, user: dict = Depends(get_current_user)):
         )
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
-        # Explicitly purge knowledge and cache (tables may lack ON DELETE CASCADE)
-        cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (company_id,))
+        # BYOD offboard (E10/§16.6): remove the control-plane routing + encrypted
+        # credentials so Sapybase stops connecting. Returns True for an enrolled
+        # BYOD tenant; harmless (no-op) otherwise.
+        was_byod = _byod_offboard(cursor, company_id)
+        # E10/§16.6: never delete a BYOD tenant's data. When this bot's data plane
+        # is the client's own DB, skip the knowledge purge entirely — their rows
+        # stay intact (offboarding removed routing + credentials above). Shared-DB
+        # bots still have their knowledge purged from the shared DB as before.
+        if not byod_engine.routing_active(company_id):
+            cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (company_id,))
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
         # Hard delete — cascades to usage_tracking, chat_logs, analytics, leads, etc.
         cursor.execute("DELETE FROM companies WHERE id = %s AND user_id = %s", (company_id, user["id"]))
         conn.commit()
+        if was_byod:
+            log_admin_action(
+                user["clerk_id"], "BYOD_OFFBOARD", company_id,
+                {"routing_and_credentials_removed": True, "tenant_data_preserved": True},
+            )
         return {"status": "success"}
     except HTTPException:
         raise
@@ -5853,17 +5883,32 @@ def purge_knowledge(company_id: str, user: dict = Depends(get_current_user)):
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
-        # 2. Count existing chunks before deletion (for audit + response)
-        cursor.execute("SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s", (company_id,))
-        deleted_count = cursor.fetchone()[0]
+        # 2. + 3. Count then delete the chunks. BYOD (Phase 3.6): purging knowledge
+        # is an EXPLICIT, user-confirmed destructive action (§16.6) — distinct from
+        # offboarding — so the bulk delete is routed to the tenant DB via the
+        # DML-only vaayu_runtime role (which cannot DROP/TRUNCATE the table). The
+        # response-cache invalidation below stays on the control plane (§9).
+        count_sql = "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s"
+        purge_sql = "DELETE FROM company_knowledge WHERE company_id = %s"
+        if byod_engine.routing_active(company_id):
+            with byod_engine.tenant_connection(company_id) as tconn:
+                kcur = tconn.cursor()
+                kcur.execute(count_sql, (company_id,))
+                deleted_count = kcur.fetchone()[0]
+                if deleted_count:
+                    kcur.execute(purge_sql, (company_id,))
+                    tconn.commit()
+                kcur.close()
+        else:
+            cursor.execute(count_sql, (company_id,))
+            deleted_count = cursor.fetchone()[0]
+            if deleted_count:
+                cursor.execute(purge_sql, (company_id,))
 
         if deleted_count == 0:
             return {"status": "success", "message": "No knowledge chunks to delete.", "deleted": 0}
 
-        # 3. Delete all knowledge chunks for this bot
-        cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (company_id,))
-
-        # Invalidate cache: purged knowledge = stale cached answers
+        # Invalidate cache: purged knowledge = stale cached answers (control plane)
         invalidate_cache(conn, company_id)
 
         conn.commit()
@@ -6948,12 +6993,21 @@ def delete_company_admin(
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # BYOD offboard (E10/§16.6): super-admin deletion removes the control-plane
+        # routing + encrypted credentials only; the client's own database and its
+        # data are never touched (the companies-row delete cascades on the control
+        # plane alone, never into the tenant DB). Deleting client data is a
+        # separate, explicitly-confirmed action.
+        was_byod = _byod_offboard(cursor, company_id)
         cursor.execute("DELETE FROM companies WHERE id = %s", (company_id,))
         conn.commit()
-        
+
         # Issue #17: Log the destructive action
-        log_admin_action(admin["clerk_id"], "DELETE_COMPANY", company_id, {"deleted": True})
-        
+        log_admin_action(
+            admin["clerk_id"], "DELETE_COMPANY", company_id,
+            {"deleted": True, "byod_offboard": was_byod, "tenant_data_preserved": was_byod},
+        )
+
         return {"status": "success"}
     finally:
         release_db_connection(conn)
