@@ -1085,6 +1085,7 @@ import byod_engine
 import byod_metering
 import byod_ingest
 import byod_store
+import byod_insight_cache
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
@@ -3104,6 +3105,9 @@ async def capture_lead(
             lead_id = cursor.fetchone()[0]
             dconn.commit()
 
+        # New lead → stale funnel / ROI / attribution insights (§16.8).
+        _byod_invalidate_insights(company["id"])
+
         # Fire webhook in background if configured
         webhook_url = company.get("webhook_url")
         if webhook_url:
@@ -3841,6 +3845,8 @@ def delete_lead(
 
         log_admin_action(cursor, user["id"], "DELETE_LEAD", f"Lead ID: {lead_id}")
         conn.commit()
+        # Lead removed → stale funnel / ROI / attribution insights (§16.8).
+        _byod_invalidate_insights(company_id)
         return {"status": "success"}
     except Exception as e:
         if conn: conn.rollback()
@@ -3928,6 +3934,8 @@ def update_lead_outcome(
             f"Lead {lead_id} → {payload.status}" + (f" (${value})" if value else "")
         )
         conn.commit()
+        # Outcome change (e.g. won + deal value) → stale ROI / funnel (§16.8).
+        _byod_invalidate_insights(company_id)
         return {
             "status": "success",
             "lead": {
@@ -4234,6 +4242,16 @@ def list_fixes_needed(
                 "upgrade_url": "/app/pricing"
             })
 
+        # BYOD insight cache (§9): for a routed tenant, serve a cached result
+        # (after the live ownership + tier gate) so the remote DB isn't hit.
+        routed = byod_engine.routing_active(company_id)
+        insight_cache = byod_insight_cache.get_insight_cache()
+        if routed:
+            cached = insight_cache.get(company_id, "fixes", window_days=window_days,
+                                       limit=limit, min_confidence=min_confidence)
+            if cached is not None:
+                return cached
+
         win_sql, win_params = _byod_window_clause(company_id, window_days)
         with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
             dcur.execute(
@@ -4262,7 +4280,7 @@ def list_fixes_needed(
         release_db_connection(conn)
 
     fixes = _build_fixes_list(raw, min_confidence=min_confidence, limit=limit)
-    return {
+    result = {
         "fixes": fixes,
         "total": len(fixes),
         "unanswered_count": sum(1 for f in fixes if f["category"] == "unanswered"),
@@ -4270,6 +4288,10 @@ def list_fixes_needed(
         "window_days": window_days,
         "min_confidence": min_confidence,
     }
+    if routed:
+        insight_cache.set(company_id, "fixes", result, window_days=window_days,
+                          limit=limit, min_confidence=min_confidence)
+    return result
 
 
 # ── ROI BENCHMARKS ENDPOINTS ──────────────────────────────────────────────────
@@ -4300,6 +4322,14 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
                 "message": "ROI Dashboard requires the Pro plan or a custom plan with analytics enabled.",
                 "upgrade_url": "/app/pricing"
             })
+
+        # BYOD insight cache (§9): serve a cached result after the live gate.
+        routed = byod_engine.routing_active(company_id)
+        insight_cache = byod_insight_cache.get_insight_cache()
+        if routed:
+            cached = insight_cache.get(company_id, "roi")
+            if cached is not None:
+                return cached
 
         # Benchmarks (defaults if not yet set)
         cursor.execute(
@@ -4350,7 +4380,7 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
         # Realized total prefers proven revenue over the assumed estimate.
         realized_total = round(support_savings + realized_revenue, 2)
 
-        return {
+        result = {
             "benchmarks": {
                 "avg_human_cost_per_ticket": avg_cost,
                 "avg_lead_value": avg_lead,
@@ -4369,6 +4399,9 @@ def get_roi_benchmarks(company_id: str, user: dict = Depends(get_current_user)):
                 "realized_total": realized_total,
             }
         }
+        if routed:
+            insight_cache.set(company_id, "roi", result)
+        return result
     finally:
         release_db_connection(conn)
 
@@ -4413,6 +4446,8 @@ def update_roi_benchmarks(
             (company_id, payload.avg_human_cost_per_ticket, payload.avg_lead_value)
         )
         conn.commit()
+        # Benchmark change alters the cached ROI numbers → invalidate (§16.8).
+        _byod_invalidate_insights(company_id)
         return {"status": "success"}
     except HTTPException:
         raise
@@ -4464,6 +4499,14 @@ def get_conversion_funnel(
                 "upgrade_url": "/app/pricing"
             })
 
+        # BYOD insight cache (§9): serve a cached result after the live gate.
+        routed = byod_engine.routing_active(company_id)
+        insight_cache = byod_insight_cache.get_insight_cache()
+        if routed:
+            cached = insight_cache.get(company_id, "funnel", window_days=wd)
+            if cached is not None:
+                return cached
+
         # Window anchored to engine/control-plane time for a BYOD tenant (E12).
         win_sql, win_params = _byod_window_clause(company_id, wd)
 
@@ -4508,12 +4551,15 @@ def get_conversion_funnel(
             "contacted": contacted,
             "won": won,
         })
-        return {
+        result = {
             "window_days": wd,
             "funnel": funnel,
             "won_value": won_value,
             "quality": build_quality_breakdown(quality_counts),
         }
+        if routed:
+            insight_cache.set(company_id, "funnel", result, window_days=wd)
+        return result
     finally:
         release_db_connection(conn)
 
@@ -4551,6 +4597,15 @@ def get_lead_attribution(
                 "upgrade_url": "/app/pricing"
             })
 
+        # BYOD insight cache (§9): serve a cached result after the live gate.
+        routed = byod_engine.routing_active(company_id)
+        insight_cache = byod_insight_cache.get_insight_cache()
+        if routed:
+            cached = insight_cache.get(company_id, "attribution", window_days=wd,
+                                       limit=safe_limit)
+            if cached is not None:
+                return cached
+
         # Window anchored to engine/control-plane time for a BYOD tenant (E12).
         win_sql, win_params = _byod_window_clause(company_id, wd)
         with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
@@ -4565,6 +4620,9 @@ def get_lead_attribution(
             ]
         result = summarize_attribution(leads, limit=safe_limit)
         result["window_days"] = wd
+        if routed:
+            insight_cache.set(company_id, "attribution", result, window_days=wd,
+                              limit=safe_limit)
         return result
     finally:
         release_db_connection(conn)
@@ -5005,6 +5063,20 @@ def _byod_invalidate_company_cache(company_id: str):
         release_db_connection(conn)
 
 
+def _byod_invalidate_insights(company_id: str):
+    """Clear the BYOD tenant's computed-insight cache (Redis) on new data or GDPR
+    erasure (Phase 4.2, §16.8). Gated on routing so the shared path is untouched;
+    fail-soft (the cache module never raises). High-frequency chat-log writes are
+    intentionally NOT invalidated here — they rely on the short TTL (§7.4) so the
+    cache isn't thrashed; only low-frequency, high-impact changes invalidate."""
+    try:
+        if byod_engine.routing_active(company_id):
+            byod_insight_cache.get_insight_cache().invalidate_company(company_id)
+    except Exception:
+        # invalidate_company is already fail-soft; this guards routing_active too.
+        pass
+
+
 async def _byod_run_training_job(
     job_id: str,
     company_id: str,
@@ -5035,6 +5107,7 @@ async def _byod_run_training_job(
         )
 
         await asyncio.to_thread(_byod_invalidate_company_cache, company_id)
+        await asyncio.to_thread(_byod_invalidate_insights, company_id)
 
         await set_job_status(job_id, {
             "status": "done",
@@ -8548,6 +8621,11 @@ async def gdpr_delete_user(current_user: dict = Depends(get_current_user)):
 
         conn.commit()
         cursor.close()
+
+        # GDPR erasure must reach derived caches (§16.8): clear each purged
+        # company's computed-insight cache. Fail-soft; gated on BYOD routing.
+        for cid in company_ids:
+            await asyncio.to_thread(_byod_invalidate_insights, cid)
 
         log_admin_action(clerk_id, "GDPR_DELETE", None, {"company_ids_purged": company_ids})
     except Exception as e:
