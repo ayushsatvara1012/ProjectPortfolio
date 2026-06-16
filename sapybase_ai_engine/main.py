@@ -1097,6 +1097,24 @@ byod_engine.configure(
     kms_factory=kms_from_env,
 )
 
+from contextlib import contextmanager as _contextmanager
+
+
+@_contextmanager
+def _byod_dataplane_cursor(company_id, control_conn):
+    """Yield ``(cursor, conn)`` for a company's DATA-plane tables (``lead_capture``,
+    ``chat_logs``, ``company_knowledge``): the tenant's own DB for a BYOD-routed
+    tenant (Phase 3.5, via get_tenant_db / vaayu_runtime), else the shared control
+    connection. A handler runs its data-plane SQL on the yielded cursor while
+    ownership checks and audit logs stay on the control plane. Dark by default —
+    when routing is inactive this is just a cursor on the control connection, so
+    behavior is byte-for-byte unchanged."""
+    if byod_engine.routing_active(company_id):
+        with byod_engine.tenant_connection(company_id) as tconn:
+            yield tconn.cursor(), tconn
+    else:
+        yield control_conn.cursor(), control_conn
+
 
 def _byod_provision_http_error(exc: Exception) -> HTTPException:
     """Map a sanitized tenant-DB provisioning / health failure to an HTTP error
@@ -3014,19 +3032,6 @@ async def capture_lead(
     
     conn = get_db_connection()
     try:
-        cursor = conn.cursor()
-        
-        # Deduplication check (24 hours)
-        cursor.execute(
-            """
-            SELECT id FROM lead_capture 
-            WHERE company_id = %s AND email = %s AND created_at > NOW() - INTERVAL '24 hours'
-            """,
-            (company["id"], payload.email)
-        )
-        if cursor.fetchone():
-            return {"status": "duplicate", "message": "Lead already captured recently"}
-
         scored = _score_lead(payload.context, payload.email, payload.name)
         # Attribution: trust explicit UTM params from the widget, else backfill
         # by parsing them out of the captured page_url.
@@ -3034,19 +3039,33 @@ async def capture_lead(
         utm_source = payload.utm_source or _utm["utm_source"]
         utm_medium = payload.utm_medium or _utm["utm_medium"]
         utm_campaign = payload.utm_campaign or _utm["utm_campaign"]
-        cursor.execute(
-            """
-            INSERT INTO lead_capture
-                (company_id, email, name, context, score, score_band, score_reasons,
-                 page_url, referrer, utm_source, utm_medium, utm_campaign)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """,
-            (company["id"], payload.email, payload.name, payload.context,
-             scored["score"], scored["band"], "; ".join(scored["reasons"]),
-             payload.page_url, payload.referrer, utm_source, utm_medium, utm_campaign)
-        )
-        lead_id = cursor.fetchone()[0]
-        conn.commit()
+
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant.
+        with _byod_dataplane_cursor(company["id"], conn) as (cursor, dconn):
+            # Deduplication check (24 hours)
+            cursor.execute(
+                """
+                SELECT id FROM lead_capture
+                WHERE company_id = %s AND email = %s AND created_at > NOW() - INTERVAL '24 hours'
+                """,
+                (company["id"], payload.email)
+            )
+            if cursor.fetchone():
+                return {"status": "duplicate", "message": "Lead already captured recently"}
+
+            cursor.execute(
+                """
+                INSERT INTO lead_capture
+                    (company_id, email, name, context, score, score_band, score_reasons,
+                     page_url, referrer, utm_source, utm_medium, utm_campaign)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """,
+                (company["id"], payload.email, payload.name, payload.context,
+                 scored["score"], scored["band"], "; ".join(scored["reasons"]),
+                 payload.page_url, payload.referrer, utm_source, utm_medium, utm_campaign)
+            )
+            lead_id = cursor.fetchone()[0]
+            dconn.commit()
 
         # Fire webhook in background if configured
         webhook_url = company.get("webhook_url")
@@ -3704,25 +3723,27 @@ def list_leads(
         order_clause = ("ORDER BY score DESC NULLS LAST, created_at DESC"
                         if sort == "score" else "ORDER BY created_at DESC")
 
-        cursor.execute(
-            f"SELECT COUNT(*) FROM lead_capture WHERE company_id = %s {filter_clause}",
-            tuple([company_id] + filter_params)
-        )
-        total = cursor.fetchone()[0]
-
         select_params = [company_id] + filter_params + [limit, offset]
-        cursor.execute(
-            f"""
-            SELECT id, email, name, context, created_at, score, score_band, score_reasons,
-                   status, value_usd, status_updated_at
-            FROM lead_capture
-            WHERE company_id = %s {filter_clause}
-            {order_clause}
-            LIMIT %s OFFSET %s
-            """,
-            tuple(select_params)
-        )
-        rows = cursor.fetchall()
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                f"SELECT COUNT(*) FROM lead_capture WHERE company_id = %s {filter_clause}",
+                tuple([company_id] + filter_params)
+            )
+            total = dcur.fetchone()[0]
+
+            dcur.execute(
+                f"""
+                SELECT id, email, name, context, created_at, score, score_band, score_reasons,
+                       status, value_usd, status_updated_at
+                FROM lead_capture
+                WHERE company_id = %s {filter_clause}
+                {order_clause}
+                LIMIT %s OFFSET %s
+                """,
+                tuple(select_params)
+            )
+            rows = dcur.fetchall()
 
         leads = []
         for r in rows:
@@ -3758,19 +3779,29 @@ def delete_lead(
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # Ownership check on the control plane (companies lives there, never on a
+        # tenant DB) — so the lead delete below can target the data plane safely.
         cursor.execute(
-            """
-            DELETE FROM lead_capture 
-            WHERE id = %s AND company_id = %s 
-            AND company_id IN (SELECT id FROM companies WHERE user_id = %s)
-            RETURNING id
-            """,
-            (lead_id, company_id, user["id"])
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s",
+            (company_id, user["id"])
         )
-        deleted = cursor.fetchone()
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Lead not found or unauthorized.")
+
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant. (Raise
+        # the 404 OUTSIDE the data-plane context: an HTTPException raised inside the
+        # tenant connection would be sanitized into a TenantDataError.)
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, dconn):
+            dcur.execute(
+                "DELETE FROM lead_capture WHERE id = %s AND company_id = %s RETURNING id",
+                (lead_id, company_id)
+            )
+            deleted = dcur.fetchone()
+            if deleted:
+                dconn.commit()
         if not deleted:
             raise HTTPException(status_code=404, detail="Lead not found or unauthorized.")
-            
+
         log_admin_action(cursor, user["id"], "DELETE_LEAD", f"Lead ID: {lead_id}")
         conn.commit()
         return {"status": "success"}
@@ -3837,16 +3868,21 @@ def update_lead_outcome(
         # A deal value only persists for a 'won' lead; cleared for any other status.
         value = resolve_outcome_value(payload.status, payload.value_usd)
 
-        cursor.execute(
-            """
-            UPDATE lead_capture
-            SET status = %s, value_usd = %s, status_updated_at = NOW()
-            WHERE id = %s AND company_id = %s
-            RETURNING id, status, value_usd, status_updated_at
-            """,
-            (payload.status, value, lead_id, company_id)
-        )
-        row = cursor.fetchone()
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant. (Raise
+        # the 404 OUTSIDE the data-plane context — see delete_lead.)
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, dconn):
+            dcur.execute(
+                """
+                UPDATE lead_capture
+                SET status = %s, value_usd = %s, status_updated_at = NOW()
+                WHERE id = %s AND company_id = %s
+                RETURNING id, status, value_usd, status_updated_at
+                """,
+                (payload.status, value, lead_id, company_id)
+            )
+            row = dcur.fetchone()
+            if row:
+                dconn.commit()
         if not row:
             raise HTTPException(status_code=404, detail="Lead not found or unauthorized.")
 
@@ -3889,11 +3925,13 @@ def get_lead_pipeline(company_id: str, user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
         _require_lead_management(user)
 
-        cursor.execute(
-            "SELECT status, value_usd FROM lead_capture WHERE company_id = %s",
-            (company_id,)
-        )
-        leads = [{"status": r[0], "value_usd": r[1]} for r in cursor.fetchall()]
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                "SELECT status, value_usd FROM lead_capture WHERE company_id = %s",
+                (company_id,)
+            )
+            leads = [{"status": r[0], "value_usd": r[1]} for r in dcur.fetchall()]
         return summarize_pipeline(leads)
     finally:
         release_db_connection(conn)
@@ -3917,20 +3955,22 @@ def get_action_center(company_id: str, limit: int = 25, user: dict = Depends(get
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
         _require_lead_management(user)
 
-        cursor.execute(
-            "SELECT id, email, name, context, score, score_band, status, "
-            "created_at, status_updated_at "
-            "FROM lead_capture WHERE company_id = %s AND status IN ('new', 'contacted')",
-            (company_id,)
-        )
-        leads = [
-            {
-                "id": str(r[0]), "email": r[1], "name": r[2], "context": r[3],
-                "score": r[4], "score_band": r[5], "status": r[6],
-                "created_at": r[7], "status_updated_at": r[8],
-            }
-            for r in cursor.fetchall()
-        ]
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                "SELECT id, email, name, context, score, score_band, status, "
+                "created_at, status_updated_at "
+                "FROM lead_capture WHERE company_id = %s AND status IN ('new', 'contacted')",
+                (company_id,)
+            )
+            leads = [
+                {
+                    "id": str(r[0]), "email": r[1], "name": r[2], "context": r[3],
+                    "score": r[4], "score_band": r[5], "status": r[6],
+                    "created_at": r[7], "status_updated_at": r[8],
+                }
+                for r in dcur.fetchall()
+            ]
         return build_action_queue(leads, now=datetime.now(timezone.utc), limit=safe_limit)
     finally:
         release_db_connection(conn)
@@ -3959,17 +3999,19 @@ def export_leads(
         if not has_entitlement(user, "lead_capture"):
             raise HTTPException(status_code=402, detail="Export requires the Pro plan or a custom plan with lead capture enabled.")
 
-        cursor.execute(
-            """
-            SELECT email, name, context, created_at 
-            FROM lead_capture 
-            WHERE company_id = %s 
-            ORDER BY created_at DESC
-            """,
-            (company_id,)
-        )
-        leads = cursor.fetchall()
-        
+        # lead_capture is a data-plane table → tenant DB for a BYOD tenant.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                """
+                SELECT email, name, context, created_at
+                FROM lead_capture
+                WHERE company_id = %s
+                ORDER BY created_at DESC
+                """,
+                (company_id,)
+            )
+            leads = dcur.fetchall()
+
         import csv, io
         output = io.StringIO()
         writer = csv.writer(output)
@@ -4035,71 +4077,72 @@ def list_conversations(
             })
 
         unanswered_clause = "AND cl.is_unanswered = true" if filter == "unanswered" else ""
+        offset = (page - 1) * limit
 
-        # Count total distinct sessions (NULL session_ids count individually)
-        cursor.execute(
-            f"""
-            SELECT COUNT(*) FROM (
-                SELECT COALESCE(session_id::text, id::text) AS grp
+        # chat_logs is a data-plane table → tenant DB for a BYOD tenant.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            # Count total distinct sessions (NULL session_ids count individually)
+            dcur.execute(
+                f"""
+                SELECT COUNT(*) FROM (
+                    SELECT COALESCE(session_id::text, id::text) AS grp
+                    FROM chat_logs cl
+                    WHERE company_id = %s {unanswered_clause}
+                    GROUP BY grp
+                ) sub
+                """,
+                (company_id,)
+            )
+            total = dcur.fetchone()[0]
+
+            # Fetch session groups ordered by most recent activity
+            dcur.execute(
+                f"""
+                SELECT
+                    COALESCE(session_id::text, id::text) AS grp,
+                    MAX(created_at) AS last_active,
+                    COUNT(*) AS message_count,
+                    BOOL_OR(is_unanswered) AS has_unanswered
                 FROM chat_logs cl
                 WHERE company_id = %s {unanswered_clause}
                 GROUP BY grp
-            ) sub
-            """,
-            (company_id,)
-        )
-        total = cursor.fetchone()[0]
-
-        offset = (page - 1) * limit
-
-        # Fetch session groups ordered by most recent activity
-        cursor.execute(
-            f"""
-            SELECT
-                COALESCE(session_id::text, id::text) AS grp,
-                MAX(created_at) AS last_active,
-                COUNT(*) AS message_count,
-                BOOL_OR(is_unanswered) AS has_unanswered
-            FROM chat_logs cl
-            WHERE company_id = %s {unanswered_clause}
-            GROUP BY grp
-            ORDER BY last_active DESC
-            LIMIT %s OFFSET %s
-            """,
-            (company_id, limit, offset)
-        )
-        session_rows = cursor.fetchall()
-
-        sessions = []
-        for grp, last_active, msg_count, has_unanswered in session_rows:
-            # Fetch the actual messages for this session
-            cursor.execute(
-                """
-                SELECT user_query, bot_response, is_unanswered, created_at
-                FROM chat_logs
-                WHERE company_id = %s
-                  AND COALESCE(session_id::text, id::text) = %s
-                ORDER BY created_at ASC
-                LIMIT 50
+                ORDER BY last_active DESC
+                LIMIT %s OFFSET %s
                 """,
-                (company_id, grp)
+                (company_id, limit, offset)
             )
-            messages = [
-                {
-                    "user_query": r[0],
-                    "bot_response": r[1],
-                    "is_unanswered": r[2],
-                    "timestamp": r[3].isoformat() if r[3] else None,
-                }
-                for r in cursor.fetchall()
-            ]
-            sessions.append({
-                "session_id": grp,
-                "last_active": last_active.isoformat() if last_active else None,
-                "message_count": msg_count,
-                "has_unanswered": has_unanswered,
-                "messages": messages,
-            })
+            session_rows = dcur.fetchall()
+
+            sessions = []
+            for grp, last_active, msg_count, has_unanswered in session_rows:
+                # Fetch the actual messages for this session
+                dcur.execute(
+                    """
+                    SELECT user_query, bot_response, is_unanswered, created_at
+                    FROM chat_logs
+                    WHERE company_id = %s
+                      AND COALESCE(session_id::text, id::text) = %s
+                    ORDER BY created_at ASC
+                    LIMIT 50
+                    """,
+                    (company_id, grp)
+                )
+                messages = [
+                    {
+                        "user_query": r[0],
+                        "bot_response": r[1],
+                        "is_unanswered": r[2],
+                        "timestamp": r[3].isoformat() if r[3] else None,
+                    }
+                    for r in dcur.fetchall()
+                ]
+                sessions.append({
+                    "session_id": grp,
+                    "last_active": last_active.isoformat() if last_active else None,
+                    "message_count": msg_count,
+                    "has_unanswered": has_unanswered,
+                    "messages": messages,
+                })
 
         return {
             "sessions": sessions,
