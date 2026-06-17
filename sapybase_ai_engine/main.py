@@ -1089,8 +1089,9 @@ import byod_ingest
 import byod_store
 import byod_insight_cache
 import byod_orchestrator
+import byod_switchin
 import byod_crypto
-from byod_dsn import DsnValidationError
+from byod_dsn import DsnValidationError, validate_db_url
 from byod_crypto import KmsUnavailable, kms_from_env
 
 # Wire the BYOD engine's control-plane accessors (Phase 3.2). Stores callables
@@ -6839,6 +6840,31 @@ def run_data_plane_migrations(request: Request, x_cron_secret: str = Header(None
     }
 
 
+@app.post("/api/internal/run-switchin-purge")
+def run_switchin_purge(request: Request, x_cron_secret: str = Header(None)):
+    """Purge the SHARED-DB copy of switched-in tenants whose 7-day rollback window
+    has elapsed (RFC §4.2, Phase 7.1). Trigger from a scheduler with the
+    `x-cron-secret` header. Touches only Sapybase's shared DB — the client's own
+    database is never modified. Idempotent: already-purged tenants are skipped."""
+    if not CRON_SECRET or x_cron_secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    conn = get_db_connection()
+    purged = 0
+    try:
+        cursor = conn.cursor()
+        try:
+            company_ids = byod_switchin.list_purgeable(cursor)
+        finally:
+            cursor.close()
+        for company_id in company_ids:
+            # source + control are both the shared control-plane DB here.
+            if byod_switchin.purge_shared_copy(conn, conn, company_id):
+                purged += 1
+        return {"status": "ok", "candidates": len(company_ids), "purged": purged}
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/admin/companies")
 @limiter.limit("30/minute")
 def get_all_companies(request: Request, admin: dict = Depends(get_admin_user)):
@@ -7176,6 +7202,83 @@ def check_byod_health(
         conn.commit()  # persist NEEDS_RECONNECT / ERROR + release the connection
         raise _byod_provision_http_error(e)
     finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/switch-in")
+@limiter.limit("5/minute")
+def switch_in_byod(
+    request: Request,
+    clerk_id: str,
+    req: ByodProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Relocate a tenant's existing rows from the shared DB into its own BYO
+    database (Phase 7.1 / §4.2, rule 17). Resumable + idempotent + checksum-verified;
+    the tenant DB is declared authoritative only AFTER every table verifies, and the
+    shared copy is retained for a 7-day rollback window. Re-invoke to resume an
+    interrupted run; a re-invoke after cutover is a safe no-op."""
+    try:
+        kms = kms_from_env()
+    except KmsUnavailable:
+        raise HTTPException(status_code=503, detail="Encryption service unavailable.")
+    conn = get_db_connection()
+    dest_conn = None
+    try:
+        cursor = conn.cursor()
+        try:
+            company_id = byod_admin.resolve_company_id(cursor, clerk_id)
+            migrate_dsn = (
+                byod_crypto.load_decrypted_dsn(cursor, company_id, kms)
+                if company_id else None
+            )
+        finally:
+            cursor.close()
+        if not company_id:
+            raise HTTPException(status_code=404, detail="User has no company to switch in.")
+        if not migrate_dsn:
+            raise HTTPException(status_code=409, detail="No tenant database connection has been set yet.")
+        validate_db_url(migrate_dsn)  # rule 8: re-validate the DSN on every connect
+        dest_conn = psycopg2.connect(migrate_dsn)
+        # Source + control are the shared control-plane DB (one connection); dest is
+        # the tenant DB. run_switchin checkpoints + commits as it goes (resumable).
+        result = byod_switchin.run_switchin(
+            company_id=company_id,
+            source_conn=conn,
+            dest_conn=dest_conn,
+            control_conn=conn,
+        )
+        log_admin_action(
+            admin["clerk_id"], "BYOD_SWITCH_IN", clerk_id,
+            {"switchin_status": result.status, "cutover_at": str(result.cutover_at),
+             "reason": req.reason},
+        )
+        return {
+            "status": "success",
+            "switchin_status": result.status,
+            "cutover_at": result.cutover_at,
+            "retain_until": result.retain_until,
+            "tables": [
+                {"table": t.table, "rows_copied": t.rows_copied,
+                 "source_count": t.source_count, "dest_count": t.dest_count,
+                 "verified": t.verified}
+                for t in result.tables
+            ],
+        }
+    except HTTPException:
+        raise
+    except DsnValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except byod_switchin.SwitchInError as e:
+        # Checkpoints persist; the move is resumable on the next invocation.
+        raise HTTPException(status_code=502, detail=str(e))
+    finally:
+        if dest_conn is not None:
+            try:
+                dest_conn.close()
+            except Exception:
+                pass
         release_db_connection(conn)
 
 
