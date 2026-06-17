@@ -267,6 +267,23 @@ def get_tenant_db_record(cur: "_Cursor", company_id: str) -> Optional[TenantDbRe
     return _row_to_record(row) if row else None
 
 
+def list_live_tenants(cur: "_Cursor") -> "list[tuple[str, Optional[str]]]":
+    """Return ``(company_id, schema_version)`` for every LIVE tenant DB.
+
+    The fleet the migration orchestrator (Phase 6.2 / §8.3 / A.8) rolls over: only
+    LIVE tenants are provisioned + reachable enough to migrate. Other states
+    (PENDING/PROVISIONING/ERROR/NEEDS_RECONNECT/DISABLED) are intentionally
+    excluded — they have no usable migrate credential or are known-unreachable.
+    Ordered by company_id for a deterministic, resumable rollout order.
+    """
+    cur.execute(
+        f"SELECT company_id::text, schema_version FROM {TABLE_NAME} "
+        f"WHERE status = %s ORDER BY company_id",
+        (TenantDbStatus.LIVE,),
+    )
+    return [(row[0], row[1]) for row in cur.fetchall()]
+
+
 def update_tenant_db_status(cur: "_Cursor", company_id: str, status: str) -> bool:
     """Transition the lifecycle status; returns True if a row was updated."""
     if status not in TENANT_DB_STATUSES:

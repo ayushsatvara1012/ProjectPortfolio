@@ -64,8 +64,14 @@ def _resolve_dataplane_url() -> str:
 # percent makes configparser emit a literal %.
 config.set_main_option("sqlalchemy.url", _resolve_dataplane_url().replace("%", "%%"))
 
-# Interpret the config file for Python logging.
-if config.config_file_name is not None:
+# Interpret the config file for Python logging — but ONLY when invoked via the
+# CLI. fileConfig() mutates Python's GLOBAL logging config and is NOT thread-safe;
+# the Phase-6 migration orchestrator runs `command.upgrade` concurrently across
+# many tenant DBs, so it sets the standard Alembic `configure_logger=False`
+# attribute to skip this and avoid a cross-thread deadlock on the logging lock.
+if config.config_file_name is not None and config.attributes.get(
+    "configure_logger", True
+):
     fileConfig(config.config_file_name)
 
 # Hand-written migrations against op.execute() — no ORM models, so autogenerate

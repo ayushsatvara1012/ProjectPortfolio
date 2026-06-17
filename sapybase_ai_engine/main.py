@@ -1088,6 +1088,8 @@ import byod_metering
 import byod_ingest
 import byod_store
 import byod_insight_cache
+import byod_orchestrator
+import byod_crypto
 from byod_dsn import DsnValidationError
 from byod_crypto import KmsUnavailable, kms_from_env
 
@@ -6755,6 +6757,87 @@ def run_weekly_digest(request: Request, x_cron_secret: str = Header(None)):
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         release_db_connection(conn)
+
+
+@app.post("/api/internal/run-data-plane-migrations")
+def run_data_plane_migrations(request: Request, x_cron_secret: str = Header(None)):
+    """Roll the BYOD data-plane schema across the fleet (RFC §8.3 / A.8, Phase 6.2).
+
+    Trigger from an external scheduler (or an operator runbook) with the
+    `x-cron-secret` header. For each LIVE tenant DB below the engine's data-plane
+    Alembic head, this applies the pending additive migrations under a per-tenant
+    Postgres advisory lock (so concurrent runners can't collide), and records the
+    new schema_version on the control plane ONLY after the upgrade is verified at
+    target (rule 13). Unreachable tenants are isolated and retried on a later run;
+    one bad client DB never aborts the batch. Idempotent: re-running when the fleet
+    is already current is a no-op.
+    """
+    if not CRON_SECRET or x_cron_secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Each closure runs on a batch pool thread (§16.4), so it acquires + releases
+    # its OWN control connection (the control pool is thread-safe); the tenant
+    # migrate connection + advisory lock live inside byod_orchestrator.migrate_tenant.
+    def _list_tenants():
+        c = get_db_connection()
+        try:
+            cur = c.cursor()
+            try:
+                return byod_store.list_live_tenants(cur)
+            finally:
+                cur.close()
+        finally:
+            release_db_connection(c)
+
+    def _resolve_migrate_dsn(company_id):
+        kms = kms_from_env()
+        c = get_db_connection()
+        try:
+            cur = c.cursor()
+            try:
+                return byod_crypto.load_decrypted_dsn(cur, company_id, kms)
+            finally:
+                cur.close()
+        finally:
+            release_db_connection(c)
+
+    def _record_version(company_id, version):
+        c = get_db_connection()
+        try:
+            cur = c.cursor()
+            try:
+                byod_store.update_tenant_db_schema_version(cur, company_id, version)
+                c.commit()
+            finally:
+                cur.close()
+        finally:
+            release_db_connection(c)
+
+    try:
+        # max_concurrency defaults to 1: the Alembic apply runs through process-global
+        # proxies and is not concurrency-safe in-process (see byod_orchestrator).
+        report = byod_orchestrator.run_migration_rollout(
+            list_tenants=_list_tenants,
+            resolve_migrate_dsn=_resolve_migrate_dsn,
+            record_version=_record_version,
+            skip=byod_engine.tenant_breaker_open,
+            sanitize=byod_engine.sanitize_db_error,
+        )
+    except byod_orchestrator.OrchestratorError as e:
+        logger.error(f"Data-plane migration rollout failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    return {
+        "status": "ok",
+        "target": report.target,
+        "total": report.total,
+        "migrated": report.migrated,
+        "current": report.current,
+        "contended": report.contended,
+        "skipped": report.skipped,
+        "failed": report.failed,
+    }
+
 
 @app.get("/api/admin/companies")
 @limiter.limit("30/minute")
