@@ -1090,6 +1090,7 @@ import byod_store
 import byod_insight_cache
 import byod_orchestrator
 import byod_switchin
+import byod_switchout
 import byod_crypto
 from byod_dsn import DsnValidationError, validate_db_url
 from byod_crypto import KmsUnavailable, kms_from_env
@@ -7279,6 +7280,112 @@ def switch_in_byod(
                 dest_conn.close()
             except Exception:
                 pass
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/switch-out")
+@limiter.limit("5/minute")
+def switch_out_byod(
+    request: Request,
+    clerk_id: str,
+    req: ByodProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Reverse-migrate a tenant's rows from its BYO database back into the shared DB
+    when it leaves BYOD (Phase 7.2 / §16.6). Resumable + checksum-verified; the
+    engine is re-pointed at the shared DB (offboard) only AFTER every table verifies.
+    The client's own database is read-only throughout and is never modified."""
+    try:
+        kms = kms_from_env()
+    except KmsUnavailable:
+        raise HTTPException(status_code=503, detail="Encryption service unavailable.")
+    conn = get_db_connection()
+    tenant_conn = None
+    try:
+        cursor = conn.cursor()
+        try:
+            company_id = byod_admin.resolve_company_id(cursor, clerk_id)
+            migrate_dsn = (
+                byod_crypto.load_decrypted_dsn(cursor, company_id, kms)
+                if company_id else None
+            )
+        finally:
+            cursor.close()
+        if not company_id:
+            raise HTTPException(status_code=404, detail="User has no company to switch out.")
+        if not migrate_dsn:
+            raise HTTPException(status_code=409, detail="No tenant database connection is configured.")
+        validate_db_url(migrate_dsn)  # rule 8: re-validate the DSN on every connect
+        tenant_conn = psycopg2.connect(migrate_dsn)  # read-only source
+        result = byod_switchout.run_switchout(
+            company_id=company_id,
+            tenant_conn=tenant_conn,
+            shared_conn=conn,
+            control_conn=conn,
+        )
+        log_admin_action(
+            admin["clerk_id"], "BYOD_SWITCH_OUT", clerk_id,
+            {"switchout_status": result.status, "cutover_at": str(result.cutover_at),
+             "reason": req.reason},
+        )
+        return {
+            "status": "success",
+            "switchout_status": result.status,
+            "cutover_at": result.cutover_at,
+            "tables": [
+                {"table": t.table, "rows_copied": t.rows_copied,
+                 "source_count": t.source_count, "dest_count": t.dest_count,
+                 "verified": t.verified}
+                for t in result.tables
+            ],
+        }
+    except HTTPException:
+        raise
+    except DsnValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except byod_switchout.SwitchOutError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    finally:
+        if tenant_conn is not None:
+            try:
+                tenant_conn.close()
+            except Exception:
+                pass
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/offboard")
+@limiter.limit("5/minute")
+def offboard_byod(
+    request: Request,
+    clerk_id: str,
+    req: ByodProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Leave BYOD WITHOUT a reverse migration (§16.6): the customer declined, so
+    history beyond the shared DB is forfeited (stated in contract). Removes routing +
+    credentials only; the client's own database is never opened or touched."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        try:
+            company_id = byod_admin.resolve_company_id(cursor, clerk_id)
+        finally:
+            cursor.close()
+        if not company_id:
+            raise HTTPException(status_code=404, detail="User has no company to offboard.")
+        result = byod_switchout.offboard_documented_loss(
+            company_id=company_id, control_conn=conn
+        )
+        log_admin_action(
+            admin["clerk_id"], "BYOD_OFFBOARD", clerk_id,
+            {"switchout_status": result.status, "tenant_data_preserved": True,
+             "reason": req.reason},
+        )
+        return {"status": "success", "switchout_status": result.status}
+    finally:
         release_db_connection(conn)
 
 
