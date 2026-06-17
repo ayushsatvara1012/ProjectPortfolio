@@ -7144,6 +7144,9 @@ def provision_byod(
         cursor = conn.cursor()
         result = byod_admin.provision(cursor, clerk_id, kms)
         conn.commit()  # commit also releases the transaction-scoped advisory lock
+        # A new runtime DSN is now authoritative — drop any cached decrypted DSN so
+        # it takes effect immediately rather than after the cache TTL (§16.5).
+        byod_engine.invalidate_runtime_dsn_cache(result["company_id"])
         log_admin_action(
             admin["clerk_id"], "BYOD_PROVISION", clerk_id,
             {"status": result["status"], "idempotent": result.get("idempotent"),

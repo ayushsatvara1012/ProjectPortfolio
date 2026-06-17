@@ -36,6 +36,7 @@ import threading
 from contextlib import contextmanager
 from typing import Callable, Iterator, List, Optional, Sequence, Tuple
 
+import byod_dsn_cache
 import byod_flags
 import byod_schema
 import byod_store
@@ -172,32 +173,72 @@ def configure(
     _Deps.kms_factory = kms_factory
 
 
-def _resolve_runtime_dsn(company_id: str) -> str:
-    """dsn_provider for the pool: read + decrypt the runtime (vaayu_runtime) DSN
-    from the control plane, then re-validate it (rule 8 SSRF/DNS re-check at
-    connect/pool-build time). Raises a sanitized error; never echoes the DSN."""
-    if _Deps.control_conn_factory is None or _Deps.kms_factory is None:
-        raise TenantDataError("BYOD engine is not configured")
+def _decrypt_runtime_dsn(company_id: str) -> Optional[str]:
+    """Open a short control-plane connection, decrypt the runtime DSN via KMS, and
+    release the connection. Returns None if the tenant has no stored runtime DSN.
+    Raises on a KMS / control-plane failure (the caller decides cache fallback)."""
     conn = _Deps.control_conn_factory()
     try:
         cur = conn.cursor()
         try:
             kms = _Deps.kms_factory()
-            dsn = load_decrypted_runtime_dsn(cur, company_id, kms)
+            return load_decrypted_runtime_dsn(cur, company_id, kms)
         finally:
             cur.close()
-    except TenantDataError:
-        raise
-    except Exception as exc:  # KMS / control-plane read failure — sanitize (E6)
-        raise TenantDataError(f"could not resolve tenant credentials ({type(exc).__name__})") from exc
     finally:
         if _Deps.control_conn_release is not None:
             _Deps.control_conn_release(conn)
+
+
+def _resolve_runtime_dsn(company_id: str) -> str:
+    """dsn_provider for the pool: resolve the runtime (vaayu_runtime) DSN, then
+    re-validate it (rule 8 SSRF/DNS re-check at connect/pool-build time). Raises a
+    sanitized error; never echoes the DSN.
+
+    KMS-outage resilient (§16.5): a fresh cached DSN (within TTL) is reused without
+    touching KMS; on a KMS/control failure the engine falls back to a recent cached
+    DSN (degraded + alert) and only a never-seen (cold) tenant fails — isolated."""
+    if _Deps.control_conn_factory is None or _Deps.kms_factory is None:
+        raise TenantDataError("BYOD engine is not configured")
+
+    cache = byod_dsn_cache.get_dsn_cache()
+    fresh = cache.get_fresh(company_id)
+    if fresh is not None:
+        validate_db_url(fresh)  # rule 8: still re-validate every connect
+        return fresh
+
+    try:
+        dsn = _decrypt_runtime_dsn(company_id)
+    except TenantDataError:
+        raise
+    except Exception as exc:  # KMS / control-plane read failure
+        stale = cache.get_stale(company_id)
+        if stale is not None:
+            # §16.5: absorb the blip — serve the last-known DSN, degrade + alert.
+            logger.warning(
+                "BYOD credential resolution degraded (KMS/control unavailable: %s); "
+                "serving company=%s from decrypted-DSN cache",
+                type(exc).__name__, company_id,
+            )
+            validate_db_url(stale)
+            return stale
+        # Cold (never decrypted) → fail THIS tenant only, sanitized (E6).
+        raise TenantDataError(
+            f"could not resolve tenant credentials ({type(exc).__name__})"
+        ) from exc
+
     if not dsn:
         raise TenantNotProvisioned()
+    cache.put(company_id, dsn)
     # Re-validate on (pool-build) connect — defeats DNS-rebinding/TOCTOU (rule 8).
     validate_db_url(dsn)
     return dsn
+
+
+def invalidate_runtime_dsn_cache(company_id: str) -> None:
+    """Drop a tenant's cached decrypted DSN (call after a DSN rotation / re-provision
+    so the new credential takes effect immediately, not after the TTL)."""
+    byod_dsn_cache.get_dsn_cache().invalidate(company_id)
 
 
 # ── Schema version-gate (Phase 6.1; §8.1/§8.2, rule 12, §16.9) ───────────────────
