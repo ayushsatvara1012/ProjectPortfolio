@@ -20,7 +20,7 @@ from typing import Any
 
 # Bump when SLO targets or the metric catalog change; the committed baseline.json
 # records the version it was captured against so drift is detectable.
-SLO_VERSION = "2026-06-14.1"
+SLO_VERSION = "2026-06-16.1"
 
 # ── Metric catalog ───────────────────────────────────────────────────────────
 # The contract for what the engine emits. `plane` distinguishes shared vs tenant
@@ -63,6 +63,55 @@ METRIC_CATALOG: dict[str, dict[str, Any]] = {
         "labels": ["company_id"],
         "description": "Per-tenant remote DB query latency.",
     },
+    # ── §16.9 exceptional-state detection signals (Phase 8.4) ─────────────────
+    # One detection metric per row of the §16.9 matrix that the breaker /
+    # error-rate / pool signals above do not already cover. Every EXCEPTIONAL_STATES
+    # row must point at a metric that exists here (asserted by the Phase-8.4 gate).
+    "byod_tenant_vector_dimension_mismatch_total": {
+        "type": "counter",
+        "labels": ["company_id"],
+        "description": "Wrong-dimension embedding rows skipped on read (§16.9 'wrong-dimension vectors'); tenant marked unhealthy.",
+    },
+    "byod_tenant_schema_version": {
+        "type": "gauge",
+        "labels": ["company_id"],
+        "description": "Tenant data-plane schema version (numeric) recorded in the control-plane registry (§8.1); drift vs engine target is the §16.9 'schema ahead/behind' signal.",
+    },
+    "byod_tenant_schema_gate_total": {
+        "type": "counter",
+        "labels": ["company_id", "decision"],
+        "description": "Version-gated feature reads, decision=met|blocked (§16.9 'schema ahead/behind' → version-gate, never throw, RFC §8.2).",
+    },
+    "byod_kms_decrypt_errors_total": {
+        "type": "counter",
+        "labels": ["company_id", "outcome"],
+        "description": "KMS/decrypt failures, outcome=served_cached|cold_fail (§16.9 'KMS unavailable' → serve from decrypted-DSN cache; cold tenant fails alone, RFC §16.5).",
+    },
+    "byod_dsn_cache_serves_total": {
+        "type": "counter",
+        "labels": ["mode"],
+        "description": "Decrypted-DSN cache serves, mode=fresh|stale; stale serves indicate degraded KMS operation (RFC §16.5).",
+    },
+    "byod_global_connections_in_flight": {
+        "type": "gauge",
+        "labels": [],
+        "description": "Global tenant-connection in-flight count vs the fleet ceiling (§11 'global tenant-connection ceiling approached').",
+    },
+    "byod_global_connection_ceiling_rejections_total": {
+        "type": "counter",
+        "labels": [],
+        "description": "Tenant-connection acquisitions shed at the global ceiling → 503 retry-after (§16.9 'global ceiling reached', E7).",
+    },
+    "byod_metering_idempotent_replays_total": {
+        "type": "counter",
+        "labels": ["company_id"],
+        "description": "Metering writes deduped by idempotency key — no double-count (§16.9 'idempotency-key replay', E1).",
+    },
+    "byod_routing_integrity_violations_total": {
+        "type": "counter",
+        "labels": ["company_id"],
+        "description": "Connection company_id-tag assertion failures → query aborted, never served cross-tenant (§16.9 'routing/company mismatch', E5). Any non-zero value pages.",
+    },
 }
 
 # ── SLO objectives ───────────────────────────────────────────────────────────
@@ -85,6 +134,168 @@ TENANT_SLO: dict[str, float] = {
 }
 
 SLOS: dict[str, dict[str, float]] = {"shared": SHARED_SLO, "tenant": TENANT_SLO}
+
+# ── §16.9 exceptional-state matrix → detection / alert / runbook (Phase 8.4) ──
+# The GA gate (RFC §13 Phase 8.4): "All §16.9 states alert + have a runbook."
+# This is the single machine-checked source of that mapping. Each row mirrors one
+# row of the RFC §16.9 table and binds it to:
+#   * metrics  — detection signal(s); every name MUST exist in METRIC_CATALOG
+#   * alert    — an alert name that MUST exist in ALERTS
+#   * runbook  — the anchor (id="...") of its section in docs/runbooks/byod_runbook.md
+# `title` is verbatim from the RFC table so a dropped/renamed state is caught.
+EXCEPTIONAL_STATES: tuple[dict[str, Any], ...] = (
+    {
+        "key": "tenant_db_read_only",
+        "title": "Tenant DB read-only / in recovery",
+        "detection": "write fails",
+        "engine_behavior": "Serve the answer; skip/queue the chat_log write (degraded); alert.",
+        "metrics": ["byod_tenant_db_errors_total"],
+        "alert": "BYODTenantWriteDegraded",
+        "runbook": "tenant-db-read-only",
+    },
+    {
+        "key": "wrong_dimension_vectors",
+        "title": "Wrong-dimension vectors",
+        "detection": "dimension check",
+        "engine_behavior": "Skip rows; mark tenant unhealthy; alert.",
+        "metrics": ["byod_tenant_vector_dimension_mismatch_total"],
+        "alert": "BYODTenantVectorDimensionMismatch",
+        "runbook": "wrong-dimension-vectors",
+    },
+    {
+        "key": "breaker_open",
+        "title": "Breaker open (repeated failures)",
+        "detection": "breaker state",
+        "engine_behavior": "Fast-fail that tenant ('temporarily unavailable'); isolated.",
+        "metrics": ["byod_tenant_circuit_breaker_state"],
+        "alert": "BYODTenantBreakerOpen",
+        "runbook": "breaker-open",
+    },
+    {
+        "key": "schema_drift",
+        "title": "Schema ahead/behind engine",
+        "detection": "schema_version compare",
+        "engine_behavior": "Version-gate features; never throw.",
+        "metrics": ["byod_tenant_schema_gate_total", "byod_tenant_schema_version"],
+        "alert": "BYODTenantSchemaGateBlocked",
+        "runbook": "schema-drift",
+    },
+    {
+        "key": "kms_unavailable",
+        "title": "KMS unavailable",
+        "detection": "decrypt error",
+        "engine_behavior": "Serve from decrypted-DSN cache; if cold, fail that tenant only.",
+        "metrics": ["byod_kms_decrypt_errors_total", "byod_dsn_cache_serves_total"],
+        "alert": "BYODKmsDecryptErrors",
+        "runbook": "kms-unavailable",
+    },
+    {
+        "key": "global_ceiling",
+        "title": "Global ceiling reached",
+        "detection": "pool acquire",
+        "engine_behavior": "Bounded wait -> 503 retry-after; fair scheduling.",
+        "metrics": [
+            "byod_global_connection_ceiling_rejections_total",
+            "byod_global_connections_in_flight",
+        ],
+        "alert": "BYODGlobalCeilingReached",
+        "runbook": "global-ceiling",
+    },
+    {
+        "key": "idempotency_replay",
+        "title": "Idempotency-key replay",
+        "detection": "key seen",
+        "engine_behavior": "No double meter, no duplicate row.",
+        "metrics": ["byod_metering_idempotent_replays_total"],
+        "alert": "BYODMeteringReplaySpike",
+        "runbook": "idempotency-replay",
+    },
+    {
+        "key": "routing_mismatch",
+        "title": "Routing / company mismatch",
+        "detection": "conn-tag assert",
+        "engine_behavior": "Abort the query + alert (never serve cross-tenant).",
+        "metrics": ["byod_routing_integrity_violations_total"],
+        "alert": "BYODRoutingIntegrityViolation",
+        "runbook": "routing-mismatch",
+    },
+)
+
+# Operational runbooks required by RFC §11 (beyond the §16.9 per-state ones).
+# Each value is the anchor id of its section in docs/runbooks/byod_runbook.md.
+OPERATIONAL_RUNBOOKS: dict[str, str] = {
+    "Onboarding failure": "onboarding-failure",
+    "Stuck migration": "stuck-migration",
+    "Tenant DB outage": "tenant-db-outage",
+    "Credential rotation": "credential-rotation",
+    "Emergency disconnect": "emergency-disconnect",
+}
+
+# ── Alerts as code (Phase 8.4) ───────────────────────────────────────────────
+# Single source of truth for the BYOD alerts (RFC §11). Each expr references only
+# METRIC_CATALOG metrics; `runbook` is the anchor in docs/runbooks/byod_runbook.md.
+# `render_prometheus_rules()` projects these into a Prometheus rule group, and the
+# committed observability/alerts/byod_alerts.yml is checked against it (drift guard,
+# same discipline as baseline.json / the dashboard).
+#   severity: page  -> wake someone now;  ticket -> next business hours;  info -> FYI.
+ALERTS: dict[str, dict[str, Any]] = {
+    "BYODTenantWriteDegraded": {
+        "expr": 'sum by (company_id) (rate(byod_tenant_db_errors_total{kind="readonly"}[5m])) > 0',
+        "severity": "ticket",
+        "for": "5m",
+        "summary": "Tenant DB rejecting writes (read-only / in recovery); chat_log writes degraded.",
+        "runbook": "tenant-db-read-only",
+    },
+    "BYODTenantVectorDimensionMismatch": {
+        "expr": "sum by (company_id) (increase(byod_tenant_vector_dimension_mismatch_total[15m])) > 0",
+        "severity": "ticket",
+        "for": "0m",
+        "summary": "Tenant has wrong-dimension embedding rows; rows skipped, tenant marked unhealthy.",
+        "runbook": "wrong-dimension-vectors",
+    },
+    "BYODTenantBreakerOpen": {
+        "expr": "max by (company_id) (byod_tenant_circuit_breaker_state) == 1",
+        "severity": "ticket",
+        "for": "5m",
+        "summary": "Tenant circuit breaker open >5m; that tenant is fast-failing (isolated).",
+        "runbook": "breaker-open",
+    },
+    "BYODTenantSchemaGateBlocked": {
+        "expr": 'sum by (company_id) (rate(byod_tenant_schema_gate_total{decision="blocked"}[15m])) > 0',
+        "severity": "ticket",
+        "for": "15m",
+        "summary": "Tenant schema behind engine target; features version-gated off (no error, but a migration is owed).",
+        "runbook": "schema-drift",
+    },
+    "BYODKmsDecryptErrors": {
+        "expr": "sum(rate(byod_kms_decrypt_errors_total[5m])) > 0",
+        "severity": "page",
+        "for": "5m",
+        "summary": "KMS/decrypt failures; serving from decrypted-DSN cache. Cold tenants (outcome=cold_fail) are down.",
+        "runbook": "kms-unavailable",
+    },
+    "BYODGlobalCeilingReached": {
+        "expr": "sum(rate(byod_global_connection_ceiling_rejections_total[5m])) > 0",
+        "severity": "page",
+        "for": "5m",
+        "summary": "Global tenant-connection ceiling hit; requests shed with 503 retry-after.",
+        "runbook": "global-ceiling",
+    },
+    "BYODMeteringReplaySpike": {
+        "expr": "sum by (company_id) (rate(byod_metering_idempotent_replays_total[5m])) > 0.5",
+        "severity": "info",
+        "for": "15m",
+        "summary": "Elevated idempotent metering replays; dedup is holding (no double-count) but investigate the retry source.",
+        "runbook": "idempotency-replay",
+    },
+    "BYODRoutingIntegrityViolation": {
+        "expr": "increase(byod_routing_integrity_violations_total[5m]) > 0",
+        "severity": "page",
+        "for": "0m",
+        "summary": "Connection company_id-tag assertion failed — possible cross-tenant routing. Query aborted; investigate immediately.",
+        "runbook": "routing-mismatch",
+    },
+}
 
 # Keys that are "lower is better" error/latency signals subject to the
 # no-regression check (others, like availability_target, are floors).
@@ -149,3 +360,71 @@ def evaluate_regression(
                 }
             )
     return {"ok": not violations, "plane": plane, "violations": violations}
+
+
+# ── Phase 8.4: §16.9 coverage + alerts-as-code projection ────────────────────
+
+# Anchor of the on-call sign-off section in the runbook doc — the GA-gate
+# "on-call sign-off" lives there and is asserted present by the gate test.
+RUNBOOK_DOC = "docs/runbooks/byod_runbook.md"
+
+
+def _metrics_for(expr: str) -> list[str]:
+    """Catalog metric names referenced by a PromQL expr (``_bucket`` suffix tolerated)."""
+    return [m for m in METRIC_CATALOG if m in expr]
+
+
+def exceptional_state_coverage() -> dict[str, Any]:
+    """Coverage report for the §16.9 matrix — the machine-checked GA gate.
+
+    For every exceptional state, verify each detection metric exists in
+    METRIC_CATALOG and the alert exists in ALERTS (and its expr references a
+    real catalog metric). Returns ``{"ok": bool, "states": [...]}``; ``ok`` is
+    True only when every state is fully covered (metric + alert + runbook).
+    """
+    states = []
+    ok = True
+    for st in EXCEPTIONAL_STATES:
+        missing_metrics = [m for m in st["metrics"] if m not in METRIC_CATALOG]
+        alert = ALERTS.get(st["alert"])
+        alert_ok = alert is not None and bool(_metrics_for(alert["expr"]))
+        has_runbook = bool(st.get("runbook"))
+        covered = not missing_metrics and alert_ok and has_runbook
+        ok = ok and covered
+        states.append(
+            {
+                "key": st["key"],
+                "title": st["title"],
+                "covered": covered,
+                "missing_metrics": missing_metrics,
+                "alert": st["alert"],
+                "alert_defined": alert is not None,
+                "alert_references_metric": alert_ok,
+                "runbook": st.get("runbook"),
+            }
+        )
+    return {"ok": ok, "states": states}
+
+
+def render_prometheus_rules() -> dict[str, Any]:
+    """Project ALERTS into a Prometheus alerting-rule group (alerts-as-code).
+
+    The committed ``observability/alerts/byod_alerts.yml`` is generated from /
+    checked against this (drift guard). YAML is a JSON superset, so the file is
+    written with ``json`` and stays dependency-free.
+    """
+    rules = []
+    for name, a in ALERTS.items():
+        rules.append(
+            {
+                "alert": name,
+                "expr": a["expr"],
+                "for": a["for"],
+                "labels": {"severity": a["severity"], "feature": "byod"},
+                "annotations": {
+                    "summary": a["summary"],
+                    "runbook_url": f"{RUNBOOK_DOC}#{a['runbook']}",
+                },
+            }
+        )
+    return {"groups": [{"name": "byod", "rules": rules}]}

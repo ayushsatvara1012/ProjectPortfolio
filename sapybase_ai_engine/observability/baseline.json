@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-06-15T00:57:24.821175+00:00",
-  "git_commit": "12c9e898d33dcafb48e05d68b04351401a9b7941",
+  "captured_at": "2026-06-17T13:25:04.635211+00:00",
+  "git_commit": "33cef2f2b3a6e98c237eb63a2da4e3eede629add",
   "measurements": {
     "shared": {
       "error_rate": 0.005,
@@ -17,6 +17,45 @@
   "phase": "0.3",
   "slo": {
     "metric_catalog": {
+      "byod_dsn_cache_serves_total": {
+        "description": "Decrypted-DSN cache serves, mode=fresh|stale; stale serves indicate degraded KMS operation (RFC \u00a716.5).",
+        "labels": [
+          "mode"
+        ],
+        "type": "counter"
+      },
+      "byod_global_connection_ceiling_rejections_total": {
+        "description": "Tenant-connection acquisitions shed at the global ceiling \u2192 503 retry-after (\u00a716.9 'global ceiling reached', E7).",
+        "labels": [],
+        "type": "counter"
+      },
+      "byod_global_connections_in_flight": {
+        "description": "Global tenant-connection in-flight count vs the fleet ceiling (\u00a711 'global tenant-connection ceiling approached').",
+        "labels": [],
+        "type": "gauge"
+      },
+      "byod_kms_decrypt_errors_total": {
+        "description": "KMS/decrypt failures, outcome=served_cached|cold_fail (\u00a716.9 'KMS unavailable' \u2192 serve from decrypted-DSN cache; cold tenant fails alone, RFC \u00a716.5).",
+        "labels": [
+          "company_id",
+          "outcome"
+        ],
+        "type": "counter"
+      },
+      "byod_metering_idempotent_replays_total": {
+        "description": "Metering writes deduped by idempotency key \u2014 no double-count (\u00a716.9 'idempotency-key replay', E1).",
+        "labels": [
+          "company_id"
+        ],
+        "type": "counter"
+      },
+      "byod_routing_integrity_violations_total": {
+        "description": "Connection company_id-tag assertion failures \u2192 query aborted, never served cross-tenant (\u00a716.9 'routing/company mismatch', E5). Any non-zero value pages.",
+        "labels": [
+          "company_id"
+        ],
+        "type": "counter"
+      },
       "byod_tenant_circuit_breaker_state": {
         "description": "Per-tenant breaker: 0=closed, 1=open, 2=half-open (RFC \u00a77.3).",
         "labels": [
@@ -53,6 +92,28 @@
         ],
         "type": "histogram"
       },
+      "byod_tenant_schema_gate_total": {
+        "description": "Version-gated feature reads, decision=met|blocked (\u00a716.9 'schema ahead/behind' \u2192 version-gate, never throw, RFC \u00a78.2).",
+        "labels": [
+          "company_id",
+          "decision"
+        ],
+        "type": "counter"
+      },
+      "byod_tenant_schema_version": {
+        "description": "Tenant data-plane schema version (numeric) recorded in the control-plane registry (\u00a78.1); drift vs engine target is the \u00a716.9 'schema ahead/behind' signal.",
+        "labels": [
+          "company_id"
+        ],
+        "type": "gauge"
+      },
+      "byod_tenant_vector_dimension_mismatch_total": {
+        "description": "Wrong-dimension embedding rows skipped on read (\u00a716.9 'wrong-dimension vectors'); tenant marked unhealthy.",
+        "labels": [
+          "company_id"
+        ],
+        "type": "counter"
+      },
       "sapybase_http_request_duration_seconds": {
         "description": "End-to-end request latency; source for p50/p95/p99.",
         "labels": [
@@ -73,7 +134,7 @@
         "type": "counter"
       }
     },
-    "slo_version": "2026-06-14.1",
+    "slo_version": "2026-06-16.1",
     "slos": {
       "shared": {
         "availability_target": 0.999,
@@ -90,5 +151,5 @@
       }
     }
   },
-  "slo_version": "2026-06-14.1"
+  "slo_version": "2026-06-16.1"
 }
