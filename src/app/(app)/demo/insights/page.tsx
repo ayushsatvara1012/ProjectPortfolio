@@ -243,10 +243,10 @@ const STAGE_ACCENT: Record<string, { bar: string; dot: string; text: string }> =
     contacted: { bar: 'bg-amber-400 dark:bg-amber-500', dot: 'bg-amber-400', text: 'text-amber-600 dark:text-amber-400' },
     won: { bar: 'bg-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
 };
-const QUALITY_ACCENT: Record<string, { bar: string; chip: string }> = {
-    hot: { bar: 'bg-rose-500', chip: 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400' },
-    warm: { bar: 'bg-amber-400', chip: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' },
-    cold: { bar: 'bg-sky-400', chip: 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400' },
+const QUALITY_ACCENT: Record<string, { bar: string; chip: string; dot: string }> = {
+    hot: { bar: 'bg-rose-500', chip: 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400', dot: 'bg-rose-500' },
+    warm: { bar: 'bg-amber-400', chip: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400', dot: 'bg-amber-400' },
+    cold: { bar: 'bg-sky-400', chip: 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400', dot: 'bg-sky-400' },
 };
 
 const DEMO_STAGE_DESCRIPTIONS: Record<string, string> = {
