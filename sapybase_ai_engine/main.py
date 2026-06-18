@@ -71,6 +71,10 @@ POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 # Shared secret for internal scheduled jobs (e.g. the weekly digest cron trigger).
 CRON_SECRET = os.getenv("CRON_SECRET", "")
+# Scrape-token for /metrics (readiness 2.2). On a public Render service we can't make
+# a single path network-private, so the scraper must present this token. Unset = open
+# (set it in prod so /metrics is not publicly readable).
+METRICS_SCRAPE_TOKEN = os.getenv("METRICS_SCRAPE_TOKEN", "")
 
 # 1a. Structured Logging
 logger = logging.getLogger(__name__)
@@ -9841,10 +9845,21 @@ def read_root(): return {"status": "Sapybase AI Engine Running"}
 
 
 @app.get("/metrics")
-def prometheus_metrics():
+def prometheus_metrics(request: Request):
     """Prometheus exposition endpoint for the BYOD §16.9 detection metrics + SLO
     signals (observability/slo.py METRIC_CATALOG). Returns empty if prometheus_client
     is unavailable. Scrape target for the alerts in observability/alerts/byod_alerts.yml.
-    NOTE: protect this at the ingress/network layer (it is not auth-gated here)."""
+
+    Protection (readiness 2.2): when METRICS_SCRAPE_TOKEN is set, the scrape must
+    present it as `Authorization: Bearer <token>` (or `x-metrics-token`), else 403 —
+    so /metrics is not publicly readable on the public Render service. Unset keeps it
+    open (pre-prod only)."""
+    if METRICS_SCRAPE_TOKEN:
+        provided = request.headers.get("authorization", "")
+        provided = provided[7:] if provided[:7].lower() == "bearer " else ""
+        if not provided:
+            provided = request.headers.get("x-metrics-token", "")
+        if not hmac.compare_digest(provided, METRICS_SCRAPE_TOKEN):
+            raise HTTPException(status_code=403, detail="forbidden")
     from observability import metrics as _metrics
     return Response(content=_metrics.render(), media_type=_metrics.content_type())
