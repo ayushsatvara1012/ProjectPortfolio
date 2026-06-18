@@ -9,13 +9,10 @@ import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 
 // Each panel is only visible on its own tab — code-split them so the insights
-// route doesn't ship all six at once. Panels render their own loading states.
-const LeadsPanel = dynamic(() => import('@/src/app/components/LeadsPanel'));
+// route doesn't ship all three at once. Panels render their own loading states.
+const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
 const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
-const FixesNeededPanel = dynamic(() => import('@/src/app/components/FixesNeededPanel'));
-const ROIPanel = dynamic(() => import('@/src/app/components/ROIPanel'));
 const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
-const ActionCenterPanel = dynamic(() => import('@/src/app/components/ActionCenterPanel'));
 import Link from 'next/link';
 
 // ── Style primitives matching AppTrainAI ────────────────────────────────────
@@ -229,7 +226,7 @@ export default function AppInsights() {
     const [error, setError] = useState('');
     const [isGhostTown, setIsGhostTown] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState('action'); // Action Center first — drive the next sale
+    const [activeTab, setActiveTab] = useState('sales'); // Sales & Leads Center first — drive the next sale
 
     // Silently try to load a cached report on mount
     useEffect(() => {
@@ -271,7 +268,7 @@ export default function AppInsights() {
     // ── Rendering Helpers ────────────────────────────────────────────────────
     const renderHeader = () => (
         <div className="px-6 py-3 sm:px-8 sm:py-4 shrink-0 transition-colors duration-500 min-w-0 w-full">
-            {(activeTab === 'analytics' && (lastGeneratedAt || canAnalytics)) && (
+            {(activeTab === 'funnel' && (lastGeneratedAt || canAnalytics)) && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                 <div className="min-w-0">
                     {lastGeneratedAt && (
@@ -324,13 +321,9 @@ export default function AppInsights() {
             <div className="mt-3 overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
                     {[
-                        { id: 'action', label: 'Action Center' },
-                        { id: 'analytics', label: 'Analytics' },
-                        { id: 'leads', label: 'Leads CRM' },
-                        { id: 'funnel', label: 'Funnel' },
-                        { id: 'conversations', label: 'Conversations' },
-                        { id: 'fixes', label: 'Fixes Needed' },
-                        { id: 'roi', label: 'ROI' },
+                        { id: 'sales', label: 'Sales & Leads' },
+                        { id: 'conversations', label: 'Conversations & Training' },
+                        { id: 'funnel', label: 'Funnel & Traffic' },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -385,28 +378,12 @@ export default function AppInsights() {
 
             {/* Content Area */}
             <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-4 pt-1">
-
-                {activeTab === 'action' && (
-                    <ActionCenterPanel
+                {activeTab === 'sales' && (
+                    <SalesAndLeadsPanel
                         selectedBotId={selectedBotId}
                         authFetch={authFetch}
-                        isAuthorized={canLeadCapture}
-                    />
-                )}
-
-                {activeTab === 'leads' && (
-                    <LeadsPanel
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        isAuthorized={canLeadCapture}
-                    />
-                )}
-
-                {activeTab === 'funnel' && (
-                    <FunnelPanel
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        isAuthorized={canAnalytics}
+                        entitlements={{ canUseAnalytics: canAnalytics, canUseLeadCapture: canLeadCapture }}
+                        selectedBot={bots.find((b: any) => b.id === selectedBotId)}
                     />
                 )}
 
@@ -418,71 +395,27 @@ export default function AppInsights() {
                     />
                 )}
 
-                {activeTab === 'fixes' && (
-                    <FixesNeededPanel
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        isAuthorized={canAnalytics}
-                    />
-                )}
+                {activeTab === 'funnel' && (
+                    <div className="flex flex-col gap-6 w-full min-w-0">
+                        <FunnelPanel
+                            selectedBotId={selectedBotId}
+                            authFetch={authFetch}
+                            isAuthorized={canAnalytics}
+                        />
 
-                {activeTab === 'roi' && (
-                    <ROIPanel
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        isAuthorized={canAnalytics}
-                    />
-                )}
-
-                {activeTab === 'analytics' && (
-                    <>
-                        {/* ── Tier Gate ── */}
+                        {/* ── Tier Gate for Analytics Report ── */}
                         {!canAnalytics && (
-                            <div className="p-8">
+                            <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800/80">
                                 <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
                             </div>
                         )}
 
                         {canAnalytics && reportData && !isGenerating && !error && (
-                            <div className="flex flex-col gap-4 flex-1 w-full overflow-hidden">
-
-                                {/* ── ROI Scorecards (Top Row) ── */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full min-w-0">
-                                    {/* Support Hours Saved */}
-                                    <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span>
-                                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Support hours saved</h3>
-                                        </div>
-                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{Math.floor((Number((reportData?.roi_metrics?.support_savings || '$0').replace(/[^0-9.-]+/g, "")) || 0) / 25)}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
-                                        <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
-                                    </div>
-
-                                    {/* Estimated Savings */}
-                                    <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">savings</span>
-                                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Estimated savings</h3>
-                                        </div>
-                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.support_savings || '$0.00'}</span></div>
-                                        <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
-                                    </div>
-
-                                    {/* Leads Captured / Potential Revenue */}
-                                    <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">leaderboard</span>
-                                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Potential revenue</h3>
-                                        </div>
-                                        <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{reportData?.roi_metrics?.potential_revenue || '$0.00'}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
-                                        <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden transition-colors duration-500 flex-1 w-full min-w-0">
-                                    {/* Left Column: Top Trends & Temporal */}
-                                    <div className={`lg:col-span-7 flex flex-col gap-4 transition-colors duration-500`}>
-                                        <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
+                            <div className="flex flex-col gap-6 w-full">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden transition-colors duration-500 w-full min-w-0">
+                                    {/* Left Column: Top Trends */}
+                                    <div className="lg:col-span-7 flex flex-col gap-4 transition-colors duration-500">
+                                        <div className={`${cellCls} p-4 sm:p-8 flex-1 border border-slate-100 dark:border-slate-800/40`}>
                                             <div className="flex items-center gap-2 mb-6">
                                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
                                                 <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">
@@ -494,7 +427,7 @@ export default function AppInsights() {
                                             </p>
                                             <div className="space-y-2">
                                                 {reportData?.top_trends?.map((trend: string, idx: number) => (
-                                                    <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
+                                                    <div key={idx} className={`${cellCls} flex items-start gap-4 p-5 border border-slate-100 dark:border-slate-800/40`}>
                                                         <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
                                                             {String(idx + 1).padStart(2, '0')}
                                                         </div>
@@ -507,30 +440,9 @@ export default function AppInsights() {
                                         </div>
                                     </div>
 
-                                    {/* Right Column: Knowledge Gaps + Advice */}
+                                    {/* Right Column: Actionable Advice */}
                                     <div className="lg:col-span-5 flex flex-col gap-4 transition-colors duration-500">
-                                        <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">warning</span>
-                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">
-                                                    High value gaps
-                                                </h2>
-                                            </div>
-                                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
-                                                Questions your bot failed to answer. Train these topics to secure leads.
-                                            </p>
-                                            <div className="space-y-2 mb-4 overflow-y-auto max-h-[240px] custom-scrollbar pr-1">
-                                                {reportData?.high_value_gaps?.length > 0 ? reportData.high_value_gaps.map((gap: string, idx: number) => (
-                                                    <div key={idx} className="flex items-start gap-3 p-4 bg-slate-100 dark:bg-slate-800">
-                                                        <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">help_center</span>
-                                                        <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed flex-1">"{gap}"</p>
-                                                        <Link href={`/dashboard/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
-                                                    </div>
-                                                )) : (
-                                                    <p className="text-sm font-google text-slate-500 dark:text-slate-400 italic">No critical knowledge gaps detected.</p>
-                                                )}
-                                            </div>
-
+                                        <div className={`${cellCls} p-4 sm:p-8 flex-1 border border-slate-100 dark:border-slate-800/40`}>
                                             <div className="flex items-center gap-2 mb-4">
                                                 <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
                                                 <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Actionable advice</h2>
@@ -543,8 +455,8 @@ export default function AppInsights() {
                                 </div>
 
                                 {/* ── Peak Activity Full Row ── */}
-                                <div className="flex flex-col gap-4 mb-4">
-                                    <div className={`${cellCls} p-4 sm:p-8`}>
+                                <div className="flex flex-col gap-4">
+                                    <div className={`${cellCls} p-4 sm:p-8 border border-slate-100 dark:border-slate-800/40`}>
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">calendar_month</span>
                                             <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">30-day peak activity</h2>
@@ -556,8 +468,8 @@ export default function AppInsights() {
                                 </div>
 
                                 {/* ── Recent Conversations Log ── */}
-                                <div className="flex flex-col gap-4 mb-4 w-full overflow-hidden">
-                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto overflow-y-hidden scrollbar-hide`}>
+                                <div className="flex flex-col gap-4 w-full overflow-hidden">
+                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto overflow-y-hidden scrollbar-hide border border-slate-100 dark:border-slate-800/40`}>
                                         <div className="flex items-center gap-2 mb-6">
                                             <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5 shrink-0">history</span>
                                             <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Recent activity log</h2>
@@ -606,7 +518,7 @@ export default function AppInsights() {
 
                         {/* ── Error Banner ── */}
                         {canAnalytics && error && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 shrink-0">
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-250 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 rounded-2xl">
                                 <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
                                 <p className="text-sm font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
                                 <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
@@ -615,7 +527,7 @@ export default function AppInsights() {
 
                         {/* ── Ghost Town ── */}
                         {canAnalytics && isGhostTown && !isGenerating && (
-                            <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
+                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
                                 <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                                     <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
                                 </div>
@@ -629,7 +541,7 @@ export default function AppInsights() {
 
                         {/* ── Empty State ── */}
                         {canAnalytics && !reportData && !isGenerating && !error && !isGhostTown && (
-                            <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
+                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
                                 <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
                                     <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
                                 </div>
@@ -640,13 +552,13 @@ export default function AppInsights() {
 
                         {/* ── Loading Spinner ── */}
                         {canAnalytics && isGenerating && (
-                            <div className={`${cellCls} flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center`}>
+                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
                                 <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
                                 <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
                                 <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
                             </div>
                         )}
-                    </>
+                    </div>
                 )}
             </div>
         </motion.div>

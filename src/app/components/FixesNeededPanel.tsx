@@ -11,6 +11,9 @@ interface FixesNeededPanelProps {
     selectedBotId: string;
     authFetch: any;
     isAuthorized: boolean;
+    mode?: 'full' | 'sidebar';
+    onSelectQuery?: (query: string) => void;
+    activeQuery?: string | null;
 }
 
 interface FixItem {
@@ -21,7 +24,14 @@ interface FixItem {
     category: 'unanswered' | 'low_confidence';
 }
 
-const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized }: FixesNeededPanelProps) => {
+const FixesNeededPanel = ({
+    selectedBotId,
+    authFetch,
+    isAuthorized,
+    mode = 'full',
+    onSelectQuery,
+    activeQuery
+}: FixesNeededPanelProps) => {
     const { data, isLoading } = useQuery({
         queryKey: ['fixes-needed', selectedBotId],
         queryFn: () => authFetch(`/api/fixes-needed/${selectedBotId}?window_days=30&limit=50`),
@@ -39,10 +49,10 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized }: FixesNeede
 
     if (isLoading) {
         return (
-            <div className={`${cellCls} p-8 animate-pulse flex-1 flex flex-col gap-4`}>
-                <div className="h-6 bg-slate-100 dark:bg-slate-800 w-48 mb-4" />
-                {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800 w-full rounded-sm" />
+            <div className={`${cellCls} p-4 sm:p-6 animate-pulse flex flex-col gap-3`}>
+                <div className="h-5 bg-slate-100 dark:bg-slate-800 w-32 mb-2" />
+                {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="h-12 bg-slate-100 dark:bg-slate-800 w-full rounded-sm" />
                 ))}
             </div>
         );
@@ -56,9 +66,62 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized }: FixesNeede
     const formatTime = (iso: string | null) => {
         if (!iso) return '';
         const d = new Date(iso);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
-            ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     };
+
+    if (mode === 'sidebar') {
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-500 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl">
+                {/* Compact Sidebar Header */}
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/10 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[16px] text-amber-500">build</span>
+                        <span className="text-xs font-bold font-google text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                            Gaps to Teach ({total})
+                        </span>
+                    </div>
+                </div>
+
+                {/* Empty Gaps list */}
+                {fixes.length === 0 ? (
+                    <div className="p-6 text-center flex-1 flex flex-col items-center justify-center">
+                        <span className="material-symbols-outlined text-[20px] text-emerald-400 mb-1">task_alt</span>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">All Good</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">No unanswered questions detected.</p>
+                    </div>
+                ) : (
+                    /* Dense gaps scroll list */
+                    <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/40">
+                        {fixes.map((fix, idx) => {
+                            const isUnanswered = fix.category === 'unanswered';
+                            const isActive = activeQuery === fix.query;
+                            return (
+                                <div
+                                    key={idx}
+                                    onClick={() => onSelectQuery && onSelectQuery(fix.query)}
+                                    className={`px-3 py-2.5 flex items-start gap-2 hover:bg-slate-50 dark:hover:bg-slate-900/40 cursor-pointer transition-colors ${isActive ? 'bg-amber-50/50 dark:bg-amber-950/10 border-l-2 border-l-amber-500' : ''}`}
+                                >
+                                    <span
+                                        className={`w-1.5 h-1.5 rounded-full block mt-1.5 shrink-0 ${isUnanswered ? 'bg-amber-400' : 'bg-orange-400'}`}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-700 dark:text-slate-350 break-words leading-tight">
+                                            {fix.query}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-1 text-[9px] text-slate-400 dark:text-slate-500">
+                                            <span>Asked {fix.ask_count}×</span>
+                                            <span>&middot;</span>
+                                            <span>{formatTime(fix.last_asked)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 transition-colors duration-500 overflow-hidden rounded-2xl">
@@ -137,7 +200,7 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized }: FixesNeede
                                             </span>
                                         )}
                                         <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
-                                            {formatTime(fix.last_asked)}
+                                            {fix.last_asked ? new Date(fix.last_asked).toLocaleString() : ''}
                                         </span>
                                     </div>
                                 </div>

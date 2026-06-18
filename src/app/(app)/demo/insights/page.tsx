@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getBotConfig } from '@/src/lib/demo/demoStorage';
+import { FunnelVisual, QualityDonut } from '@/src/app/components/FunnelPanel';
 
 const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
@@ -248,9 +249,32 @@ const QUALITY_ACCENT: Record<string, { bar: string; chip: string }> = {
     cold: { bar: 'bg-sky-400', chip: 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400' },
 };
 
+const DEMO_STAGE_DESCRIPTIONS: Record<string, string> = {
+    conversations: 'Total volume of visitors who interacted with the chatbot.',
+    leads: 'Potential customers who provided their email or details.',
+    contacted: 'Leads followed up with by email or suggestions.',
+    won: 'Leads successfully closed and converted to deals.',
+};
+
+const DEMO_QUALITY_DESCRIPTIONS: Record<string, string> = {
+    hot: 'Ready to buy! High purchase intent detected. Follow up immediately.',
+    warm: 'Interested. Asked questions about features, pricing, or integrations.',
+    cold: 'General browsing, FAQs, or low conversion signals.',
+};
+
+const DEMO_SOURCE_ICONS: Record<string, string> = {
+    'chat widget': 'forum',
+    'pricing page': 'credit_card',
+    'docs': 'menu_book',
+};
+
 const DemoFunnelPanel = () => {
     const [windowDays, setWindowDays] = React.useState(30);
+    const [hoveredStage, setHoveredStage] = React.useState<string | null>(null);
+    const [activeBand, setActiveBand] = React.useState<string | null>(null);
+
     const f = DEMO_FUNNEL;
+    const stages = f.stages || [];
     const maxLeads = f.sources.items.reduce((m, s) => Math.max(m, s.leads), 0) || 1;
 
     return (
@@ -272,113 +296,222 @@ const DemoFunnelPanel = () => {
                 </div>
             </div>
 
-            {/* Stages (60%) + outcome summary (40%) */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className={`${cellCls} p-5 sm:p-8 lg:col-span-3`}>
-                <div className="flex flex-col gap-1">
-                    {f.stages.map((s, i) => {
-                        const accent = STAGE_ACCENT[s.key] || STAGE_ACCENT.conversations;
-                        const width = s.count > 0 ? Math.max(s.pct_of_top, 2) : 0;
-                        const prev = i > 0 ? f.stages[i - 1] : null;
-                        return (
-                            <React.Fragment key={s.key}>
-                                {prev && (
-                                    <div className="flex items-center gap-2 pl-1 py-1 select-none">
-                                        <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600">south</span>
-                                        <span className="text-[11px] font-google text-slate-400 dark:text-slate-500">
-                                            {s.pct_of_prev}% continued
-                                            {s.dropoff_pct > 0 && <span className="text-rose-500/80 dark:text-rose-400/80"> · {s.dropoff_pct}% drop-off</span>}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="flex flex-col gap-1.5">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className={`w-2 h-2 rounded-full ${accent.dot} shrink-0`} />
-                                            <span className="text-sm font-medium font-google text-slate-700 dark:text-slate-300 truncate">{s.label}</span>
-                                        </div>
-                                        <div className="flex items-baseline gap-2 shrink-0">
-                                            <span className="text-base sm:text-lg font-google font-bold text-slate-900 dark:text-slate-200">{fmtNum(s.count)}</span>
-                                            <span className={`text-xs font-google font-medium ${accent.text}`}>{s.pct_of_top}%</span>
-                                        </div>
-                                    </div>
-                                    <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-white/[0.04] overflow-hidden">
-                                        <div className={`h-full rounded-full ${accent.bar} transition-all duration-700`} style={{ width: `${width}%` }} />
-                                    </div>
-                                </div>
-                            </React.Fragment>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Outcome summary (40%, stacked beside the funnel) */}
-            <div className="lg:col-span-2 flex flex-col sm:flex-row lg:flex-col gap-4">
-                <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center flex-1`}>
-                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Overall conversion</span>
-                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{f.overall}%</span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">of conversations end in a won deal</p>
-                </div>
-                <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center flex-1 border border-emerald-200 dark:border-emerald-900/40`}>
-                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wide mb-2">Revenue won</span>
-                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{fmtMoney(f.wonValue)}</span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">closed-won in this window</p>
-                </div>
-            </div>
-
-            </div>
-
-            {/* Lead quality */}
+            {/* Visual Funnel Chart & Interactive Details */}
             <div className={`${cellCls} p-5 sm:p-8`}>
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400">local_fire_department</span>
-                    <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Lead quality</h3>
-                </div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-5">How the {fmtNum(f.quality.total_scored)} scored leads in this window break down by intent.</p>
-                <div className="flex flex-col gap-4">
-                    {f.quality.bands.map(b => {
-                        const accent = QUALITY_ACCENT[b.band] || QUALITY_ACCENT.cold;
-                        return (
-                            <div key={b.band} className="flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className={`text-[11px] font-semibold font-google uppercase tracking-wide px-2 py-0.5 rounded-md ${accent.chip}`}>{b.band}</span>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-sm font-google font-bold text-slate-900 dark:text-slate-200">{fmtNum(b.count)}</span>
-                                        <span className="text-xs font-google text-slate-400 dark:text-slate-500">{b.pct}%</span>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    {/* Graphic Visual Funnel Chart */}
+                    <div className="lg:col-span-5 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/40 pb-6 lg:pb-0 lg:pr-6">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4 font-google">
+                            Interactive Funnel Graph
+                        </span>
+                        <FunnelVisual
+                            stages={stages}
+                            hoveredStage={hoveredStage}
+                            setHoveredStage={setHoveredStage}
+                        />
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-google text-center mt-2">
+                            Hover slices to examine conversion parameters
+                        </span>
+                    </div>
+
+                    {/* Informative Stage Description Details */}
+                    <div className="lg:col-span-7 flex flex-col gap-3">
+                        {stages.map((s, i) => {
+                            const accent = STAGE_ACCENT[s.key] || STAGE_ACCENT.conversations;
+                            const isHovered = hoveredStage === s.key;
+                            const prev = i > 0 ? stages[i - 1] : null;
+
+                            return (
+                                <React.Fragment key={s.key}>
+                                    {/* lost visitors indicator details */}
+                                    {prev && (
+                                        <div className="flex items-center gap-2 pl-4 py-0.5 select-none opacity-80">
+                                            <span className="material-symbols-outlined text-[13px] text-slate-400 dark:text-slate-600">south</span>
+                                            <span className="text-[11px] font-google text-slate-400 dark:text-slate-500">
+                                                {s.pct_of_prev}% continued
+                                                {s.dropoff_pct > 0 && (
+                                                    <span className="text-rose-500 font-medium"> · {s.dropoff_pct}% lost visitors</span>
+                                                )}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div
+                                        onMouseEnter={() => setHoveredStage(s.key)}
+                                        onMouseLeave={() => setHoveredStage(null)}
+                                        className={`p-4 rounded-xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer ${isHovered
+                                                ? 'border-indigo-400 dark:border-indigo-500 bg-slate-50 dark:bg-white/[0.04] translate-x-1'
+                                                : 'border-slate-100/50 dark:border-slate-800/20 bg-slate-50/20 dark:bg-white/[0.005]'
+                                            }`}
+                                    >
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <span className={`w-2 h-2 rounded-full ${accent.dot} mt-1.5 shrink-0`} />
+                                            <div className="min-w-0">
+                                                <span className="text-sm font-semibold font-google text-slate-800 dark:text-slate-200">
+                                                    {s.label}
+                                                </span>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-google leading-relaxed">
+                                                    {DEMO_STAGE_DESCRIPTIONS[s.key] || ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-baseline sm:flex-col sm:items-end justify-between sm:justify-center shrink-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-2 sm:pt-0">
+                                            <span className="text-base font-bold font-google text-slate-900 dark:text-slate-100">
+                                                {fmtNum(s.count)}
+                                            </span>
+                                            <span className={`text-xs font-google font-semibold ${accent.text} sm:mt-0.5`}>
+                                                {s.pct_of_top}%
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-white/[0.04] overflow-hidden">
-                                    <div className={`h-full rounded-full ${accent.bar} transition-all duration-700`} style={{ width: `${Math.max(b.pct, 2)}%` }} />
-                                </div>
-                            </div>
-                        );
-                    })}
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 
-            {/* Source attribution */}
-            <div className={`${cellCls} p-5 sm:p-8`}>
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400">travel_explore</span>
-                    <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Where your leads come from</h3>
+            {/* Conversion Outcomes Card */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center`}>
+                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-google uppercase tracking-wider mb-2">
+                        Overall conversion rate
+                    </span>
+                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">
+                        {f.overall}%
+                    </span>
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
+                        percentage of bot conversations that end in a won customer deal
+                    </p>
                 </div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-5">Top sources by lead volume — and the revenue each has actually closed.</p>
-                <div className="flex flex-col gap-4">
-                    {f.sources.items.map(s => (
-                        <div key={s.source} className="flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="text-sm font-medium font-google text-slate-700 dark:text-slate-300 truncate">{s.source}</span>
-                                <div className="flex items-baseline gap-3 shrink-0">
-                                    <span className="text-sm font-google font-bold text-slate-900 dark:text-slate-200">{fmtNum(s.leads)}</span>
-                                    <span className="text-xs font-google text-slate-400 dark:text-slate-500">leads</span>
-                                    {s.won > 0 && <span className="text-xs font-google font-semibold text-emerald-600 dark:text-emerald-400">{fmtMoney(s.won_value)} won</span>}
-                                </div>
-                            </div>
-                            <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-white/[0.04] overflow-hidden">
-                                <div className="h-full rounded-full bg-slate-400 dark:bg-slate-500 transition-all duration-700" style={{ width: `${Math.max((s.leads / maxLeads) * 100, 3)}%` }} />
-                            </div>
+                <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center border border-emerald-200/60 dark:border-emerald-900/30 bg-emerald-50/[0.02] dark:bg-emerald-900/[0.01]`}>
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wider mb-2">
+                        Revenue won
+                    </span>
+                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                        {fmtMoney(f.wonValue)}
+                    </span>
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
+                        value of closed-won deals generated in this time window
+                    </p>
+                </div>
+            </div>
+
+            {/* Lead Quality & Attribution Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Lead Quality donut chart */}
+                <div className={`${cellCls} p-5 sm:p-8 flex flex-col`}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">local_fire_department</span>
+                        <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Lead quality breakdown</h3>
+                    </div>
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-6">
+                        Lead volume in this window categorized by intent signals.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                        {/* Donut graphic */}
+                        <div className="sm:col-span-5 flex justify-center pb-4 sm:pb-0">
+                            <QualityDonut
+                                quality={f.quality}
+                                activeBand={activeBand}
+                                setActiveBand={setActiveBand}
+                            />
                         </div>
-                    ))}
+
+                        {/* Legends details list */}
+                        <div className="sm:col-span-7 flex flex-col gap-2.5">
+                            {f.quality.bands.map(b => {
+                                const key = b.band.toLowerCase();
+                                const accent = QUALITY_ACCENT[key] || QUALITY_ACCENT.cold;
+                                const isHovered = activeBand === key;
+
+                                return (
+                                    <div
+                                        key={b.band}
+                                        onMouseEnter={() => setActiveBand(key)}
+                                        onMouseLeave={() => setActiveBand(null)}
+                                        className={`p-3 rounded-xl border transition-all duration-300 cursor-pointer ${isHovered
+                                                ? 'border-indigo-400 dark:border-indigo-500 bg-slate-50 dark:bg-white/[0.04]'
+                                                : 'border-transparent bg-slate-50/20 dark:bg-white/[0.005]'
+                                            }`}
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${accent.dot}`} />
+                                                <span className="text-[11px] font-bold uppercase tracking-wider font-google text-slate-700 dark:text-slate-300">
+                                                    {b.band}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-baseline gap-1.5 shrink-0">
+                                                <span className="text-sm font-bold font-google text-slate-900 dark:text-slate-100">
+                                                    {fmtNum(b.count)}
+                                                </span>
+                                                <span className="text-xs font-google text-slate-400 dark:text-slate-500">
+                                                    ({b.pct}%)
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-google mt-1 leading-relaxed">
+                                            {DEMO_QUALITY_DESCRIPTIONS[key] || ''}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Source Attribution visual bar chart */}
+                <div className={`${cellCls} p-5 sm:p-8 flex flex-col`}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">travel_explore</span>
+                        <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Where customers found you</h3>
+                    </div>
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-6">
+                        Top traffic channels by lead volume and realized revenue won.
+                    </p>
+
+                    <div className="flex flex-col gap-4 flex-1 justify-center">
+                        {f.sources.items.map(s => {
+                            const icon = DEMO_SOURCE_ICONS[s.source.toLowerCase()] || 'language';
+                            const barPct = (s.leads / maxLeads) * 100;
+
+                            return (
+                                <div key={s.source} className="flex flex-col gap-2 p-3 bg-slate-50/20 dark:bg-white/[0.005] rounded-xl border border-transparent hover:border-slate-100 dark:hover:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-all duration-300">
+                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="material-symbols-outlined text-[16px] text-slate-400 shrink-0">{icon}</span>
+                                            <span className="text-xs font-semibold font-google text-slate-700 dark:text-slate-300 truncate">
+                                                {s.source}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-xs font-bold font-google text-slate-900 dark:text-slate-100">
+                                                {fmtNum(s.leads)}
+                                            </span>
+                                            <span className="text-[10px] font-google text-slate-400 dark:text-slate-500 font-medium">leads</span>
+                                            {s.won > 0 && (
+                                                <span className="text-[10px] font-google font-bold text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-2 py-0.5 rounded-md">
+                                                    {fmtMoney(s.won_value)} won
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div
+                                        className="w-full h-2 rounded-full bg-slate-100 dark:bg-white/[0.04] overflow-hidden"
+                                        role="img"
+                                        aria-label={`${s.source}: ${fmtNum(s.leads)} leads, ${fmtMoney(s.won_value)} won`}
+                                    >
+                                        <div
+                                            className="h-full rounded-full bg-indigo-500/80 dark:bg-indigo-600/80 transition-all duration-700"
+                                            style={{ width: `${Math.max(barPct, 3)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>

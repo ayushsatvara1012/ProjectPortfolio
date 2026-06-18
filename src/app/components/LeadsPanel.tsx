@@ -139,6 +139,19 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                             value={valueDraft[lead.id] ?? (lead.value_usd ?? '')}
                             onChange={(e) => setValueDraft(prev => ({ ...prev, [lead.id]: e.target.value }))}
                             onBlur={() => { if (valueDraft[lead.id] !== undefined) handleSaveValue(lead); }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSaveValue(lead);
+                                    (e.target as HTMLInputElement).blur();
+                                } else if (e.key === 'Escape') {
+                                    setValueDraft(prev => {
+                                        const next = { ...prev };
+                                        delete next[lead.id];
+                                        return next;
+                                    });
+                                    (e.target as HTMLInputElement).blur();
+                                }
+                            }}
                             placeholder="0"
                             aria-label="Deal value in USD"
                             className="w-20 px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-xs font-mono text-slate-900 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
@@ -360,12 +373,12 @@ const LeadsPanel = ({ selectedBotId, authFetch, isAuthorized }: LeadsPanelProps)
                         <table className="w-full text-left border-collapse min-w-[940px]">
                             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900/90 shadow-sm transition-colors border-b border-gray-100 dark:border-slate-800 backdrop-blur-sm">
                                 <tr>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[24%]">Contact Info</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[11%]">Score</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[16%]">Status / Value</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[26%]">Context / Query</th>
-                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[13%]">Captured At</th>
-                                    <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-[10%]">Action</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[24%]">Contact Details</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[11%]">Lead Quality</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[16%]">Deal Stage & Value</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[26%]">What they were looking for</th>
+                                    <th className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50 w-[13%]">Captured Date</th>
+                                    <th className="px-4 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google text-center w-[10%]">Remove</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
