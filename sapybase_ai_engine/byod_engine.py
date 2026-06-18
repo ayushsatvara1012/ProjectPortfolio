@@ -40,6 +40,7 @@ import byod_dsn_cache
 import byod_flags
 import byod_schema
 import byod_store
+from observability import metrics
 from byod_breaker import BreakerConfig, BreakerOpen
 from byod_crypto import load_decrypted_runtime_dsn
 from byod_dsn import DsnValidationError, validate_db_url
@@ -204,6 +205,7 @@ def _resolve_runtime_dsn(company_id: str) -> str:
     cache = byod_dsn_cache.get_dsn_cache()
     fresh = cache.get_fresh(company_id)
     if fresh is not None:
+        metrics.dsn_cache_serve("fresh")
         validate_db_url(fresh)  # rule 8: still re-validate every connect
         return fresh
 
@@ -215,6 +217,8 @@ def _resolve_runtime_dsn(company_id: str) -> str:
         stale = cache.get_stale(company_id)
         if stale is not None:
             # §16.5: absorb the blip — serve the last-known DSN, degrade + alert.
+            metrics.kms_decrypt_error(company_id, "served_cached")
+            metrics.dsn_cache_serve("stale")
             logger.warning(
                 "BYOD credential resolution degraded (KMS/control unavailable: %s); "
                 "serving company=%s from decrypted-DSN cache",
@@ -223,6 +227,7 @@ def _resolve_runtime_dsn(company_id: str) -> str:
             validate_db_url(stale)
             return stale
         # Cold (never decrypted) → fail THIS tenant only, sanitized (E6).
+        metrics.kms_decrypt_error(company_id, "cold_fail")
         raise TenantDataError(
             f"could not resolve tenant credentials ({type(exc).__name__})"
         ) from exc
@@ -291,7 +296,14 @@ def tenant_supports_version(
     ``schema_version`` to reuse a version already resolved this request and skip a
     second control-plane read."""
     version = schema_version if schema_version is not None else tenant_schema_version(company_id)
-    return byod_schema.version_meets(version, required)
+    supported = byod_schema.version_meets(version, required)
+    # §16.9 schema ahead/behind: a 'blocked' decision means a migration is owed
+    # (feature version-gated off, never thrown). Also surface the numeric version.
+    metrics.schema_gate(company_id, "met" if supported else "blocked")
+    parsed = byod_schema.parse_version(version)
+    if parsed is not None:
+        metrics.schema_version(company_id, parsed)
+    return supported
 
 
 # ── Pool registry (lazy process singleton) ──────────────────────────────────────
@@ -425,6 +437,15 @@ _CHAT_LOG_INSERT_WITH_ID = (
     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
 )
 
+# SQLSTATE 25006 = read_only_sql_transaction (also raised on a standby/in-recovery
+# primary) — the §16.9 "tenant DB read-only / in recovery" detection code.
+_READ_ONLY_SQLSTATE = "25006"
+
+
+def _write_failure_kind(raw: object) -> str:
+    """Classify a degraded tenant write for the db-errors metric label."""
+    return "readonly" if getattr(raw, "pgcode", None) == _READ_ONLY_SQLSTATE else "write"
+
 
 def tenant_log_chat(
     company_id: str,
@@ -481,9 +502,13 @@ def tenant_log_chat(
                 cur.close()
         return True
     except TenantDataError as exc:
+        # §16.9: a degraded write on a read-only / in-recovery DB (SQLSTATE 25006)
+        # is the detection signal for that state; other write failures are "write".
+        metrics.db_error(company_id, _write_failure_kind(exc.__cause__))
         logger.warning("BYOD chat_log write degraded: company=%s reason=%s", company_id, exc.reason)
         return False
     except Exception as exc:  # belt-and-suspenders: never let a background task raise
+        metrics.db_error(company_id, _write_failure_kind(exc))
         logger.warning(
             "BYOD chat_log write degraded: company=%s reason=%s", company_id, sanitize_db_error(exc)
         )

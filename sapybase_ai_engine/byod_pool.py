@@ -47,6 +47,15 @@ from weakref import WeakKeyDictionary
 
 from byod_breaker import BreakerConfig, BreakerOpen, BreakerRegistry, BreakerState
 
+from observability import metrics
+
+# Breaker state -> the catalog gauge encoding (0=closed, 1=open, 2=half-open).
+_BREAKER_STATE_CODE = {
+    BreakerState.CLOSED: 0,
+    BreakerState.OPEN: 1,
+    BreakerState.HALF_OPEN: 2,
+}
+
 
 # ── Errors ────────────────────────────────────────────────────────────────────
 class PoolRegistryError(Exception):
@@ -188,6 +197,7 @@ class TenantPoolRegistry:
         outcome = "ignore"
         entry = None
         conn = None
+        started = time.monotonic()
         try:
             entry = self._reserve(company_id)
             try:
@@ -207,8 +217,11 @@ class TenantPoolRegistry:
         except BaseException as exc:
             if self._is_db_failure(exc):
                 outcome = "failure"
+                metrics.db_error(company_id, "query")
             raise
         finally:
+            # Observe how long the connection was held (≈ tenant query time).
+            metrics.observe_query_duration(company_id, time.monotonic() - started)
             if conn is not None:
                 try:
                     entry.pool.putconn(conn, close=bool(getattr(conn, "closed", False)))
@@ -223,6 +236,11 @@ class TenantPoolRegistry:
                     breaker.on_failure()
                 else:
                     breaker.on_ignore()
+                # Emit the breaker gauge AFTER recording this request's outcome so
+                # a failure that just tripped the breaker shows as OPEN now (§16.9).
+                state = self._breakers.state_of(company_id)
+                if state in _BREAKER_STATE_CODE:
+                    metrics.breaker_state(company_id, _BREAKER_STATE_CODE[state])
 
     def _is_db_failure(self, exc: BaseException) -> bool:
         """A DB-health failure (counts against the breaker) — NOT backpressure or
@@ -240,6 +258,8 @@ class TenantPoolRegistry:
         bug would otherwise read/write the wrong client's database."""
         tag = self._tags.get(conn)
         if tag != company_id:
+            # E5 / §16.9 routing-mismatch — pages on any occurrence.
+            metrics.routing_violation(company_id)
             raise RoutingIntegrityError(
                 "Connection routing tag does not match the requested tenant."
             )
@@ -290,7 +310,8 @@ class TenantPoolRegistry:
                 remaining = deadline - self._clock()
                 if remaining <= 0 or not self._cond.wait(timeout=remaining):
                     if self._global_in_flight >= self._config.global_ceiling:
-                        # Bounded wait elapsed, still no room → shed (E7).
+                        # Bounded wait elapsed, still no room → shed (E7 / §16.9).
+                        metrics.ceiling_rejection()
                         raise CeilingExceeded(
                             "Global tenant-connection ceiling reached; retry shortly."
                         )
@@ -299,6 +320,7 @@ class TenantPoolRegistry:
             self._global_in_flight += 1
             entry.last_used = self._clock()
             self._pools.move_to_end(company_id)  # mark most-recently-used
+            metrics.global_in_flight(self._global_in_flight)
             return entry
 
     def _release(self, company_id: str) -> None:
@@ -307,6 +329,7 @@ class TenantPoolRegistry:
             if entry is not None and entry.in_flight > 0:
                 entry.in_flight -= 1
                 entry.last_used = self._clock()
+            metrics.global_in_flight(self._global_in_flight)
             if self._global_in_flight > 0:
                 self._global_in_flight -= 1
             # A ceiling slot freed up — wake one bounded waiter.

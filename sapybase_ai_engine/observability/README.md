@@ -9,6 +9,7 @@ fleet (RFC §13).
 | File | Purpose |
 |---|---|
 | [`slo.py`](slo.py) | Single source of truth: SLO targets (shared + per-tenant), the metric catalog, the §16.9 `EXCEPTIONAL_STATES` matrix, `ALERTS` (alerts-as-code), and `OPERATIONAL_RUNBOOKS`. Pure data + `evaluate_regression()` / `exceptional_state_coverage()` / `render_prometheus_rules()`. |
+| [`metrics.py`](metrics.py) | Live emission façade — builds one Prometheus collector per `METRIC_CATALOG` entry and emits at the engine chokepoints (`byod_pool`/`byod_engine`/`byod_metering`). Exposed via `GET /metrics`. Fail-soft + no-op if `prometheus_client` is absent. |
 | [`dashboards/byod_slo_dashboard.json`](dashboards/byod_slo_dashboard.json) | Grafana dashboard. Shared-plane row (the regression gate) + per-tenant row (templated by `$company_id`). Every panel references a metric from the catalog. |
 | [`alerts/byod_alerts.yml`](alerts/byod_alerts.yml) | Prometheus alerting rules, **generated** from `slo.ALERTS` via `render_prometheus_rules()`. One alert per §16.9 state; every `runbook_url` links into the runbook doc. Drift-checked by `tests/byod/test_byod_runbooks.py`. |
 | [`baseline.json`](baseline.json) | Captured baseline artifact: SLO snapshot + shared/tenant measurements + git commit + timestamp. |

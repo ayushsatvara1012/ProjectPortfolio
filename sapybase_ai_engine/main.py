@@ -29,7 +29,7 @@ try:
     from pdf2image import convert_from_path
 except ImportError:
     convert_from_path = None
-from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks, Response
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
@@ -9006,43 +9006,73 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
 async def gdpr_delete_user(current_user: dict = Depends(get_current_user)):
     """GDPR Right to Erasure — permanently deletes all data for the authenticated user.
 
-    Purges (in order): bots + knowledge chunks, leads, usage_tracking, and the
-    user row itself. The caller must re-authenticate after this call; the Clerk
-    account is NOT deleted here (user must do that from the Clerk portal, which
-    will fire the user.deleted webhook as a belt-and-suspenders cleanup).
+    Control-plane erasure (Sapybase's own DB): every bot the user owns plus all of
+    its company-scoped rows — chat logs, leads, usage, analytics, the BYOD
+    registry/ledger and the response cache are ``ON DELETE CASCADE`` from
+    ``companies`` — the user's usage rows, and the user record itself.
+
+    BYOD (E10 / §16.6): a bot whose data plane is the client's OWN database is
+    *offboarded* — the control-plane routing pointer + encrypted credentials are
+    removed so the engine stops connecting — but we never reach into the client's
+    database to delete their rows. That database belongs to the client; erasing
+    its contents is their responsibility. Only Sapybase's shared-DB footprint (any
+    residual/retention copies of ``company_knowledge``) is deleted here, and that
+    delete only ever runs on the control/shared connection — never a tenant one.
+
+    The caller must re-authenticate after this call; the Clerk account is NOT
+    deleted here (user must do that from the Clerk portal, which will fire the
+    user.deleted webhook as a belt-and-suspenders cleanup).
     """
     user_id = current_user["id"]
     clerk_id = current_user["clerk_id"]
 
     conn = get_db_connection()
+    byod_offboarded: list = []
     try:
         cursor = conn.cursor()
 
-        # 1. Collect company IDs owned by this user so we can cascade-delete.
-        cursor.execute("SELECT id FROM companies WHERE owner_id = %s", (user_id,))
+        # 1. Collect every bot this user owns. companies.user_id is the real owner
+        #    column, and companies.id cascades to all company-scoped control rows.
+        cursor.execute("SELECT id FROM companies WHERE user_id = %s", (user_id,))
         company_ids = [row[0] for row in cursor.fetchall()]
 
+        # Clear derived insight caches BEFORE dropping BYOD routing — the
+        # invalidation is gated on routing_active(cid), which goes false once the
+        # bot is offboarded below. Fail-soft (§16.8).
         for cid in company_ids:
-            cursor.execute("DELETE FROM chunks WHERE company_id = %s", (cid,))
-            cursor.execute("DELETE FROM knowledge_sources WHERE company_id = %s", (cid,))
-            cursor.execute("DELETE FROM leads WHERE company_id = %s", (cid,))
-            cursor.execute("DELETE FROM companies WHERE id = %s", (cid,))
+            await asyncio.to_thread(_byod_invalidate_insights, cid)
 
-        # 2. Delete usage tracking.
+        for cid in company_ids:
+            # BYOD offboard (E10/§16.6): drop the control-plane routing pointer +
+            # encrypted credentials so Sapybase stops connecting. The client's own
+            # database is never touched. Returns True for an enrolled BYOD tenant.
+            if _byod_offboard(cursor, cid):
+                byod_offboarded.append(cid)
+            # Erase Sapybase's shared-DB copy of this bot's knowledge. This runs on
+            # the control/shared connection only (no tenant connection is opened),
+            # so a BYOD client's own database is never modified — it just clears any
+            # residual/retention rows on our side. exact_query_cache also cascades
+            # from companies, but we clear it explicitly for parity with delete_company.
+            cursor.execute("DELETE FROM company_knowledge WHERE company_id = %s", (cid,))
+            cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (cid,))
+
+        # 2. Delete the bots — cascades usage_tracking(company), chat_logs,
+        #    lead_capture, analytics, byod_* registry/ledger, etc. (all ON DELETE CASCADE).
+        cursor.execute("DELETE FROM companies WHERE user_id = %s", (user_id,))
+
+        # 3. Belt-and-suspenders for any user-level usage rows not tied to a company.
         cursor.execute("DELETE FROM usage_tracking WHERE user_id = %s", (user_id,))
 
-        # 3. Delete the user row.
+        # 4. Delete the user row.
         cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
         conn.commit()
         cursor.close()
 
-        # GDPR erasure must reach derived caches (§16.8): clear each purged
-        # company's computed-insight cache. Fail-soft; gated on BYOD routing.
-        for cid in company_ids:
-            await asyncio.to_thread(_byod_invalidate_insights, cid)
-
-        log_admin_action(clerk_id, "GDPR_DELETE", None, {"company_ids_purged": company_ids})
+        log_admin_action(
+            clerk_id, "GDPR_DELETE", None,
+            {"company_ids_purged": company_ids, "byod_offboarded": byod_offboarded},
+        )
     except Exception as e:
         if conn:
             conn.rollback()
@@ -9786,3 +9816,13 @@ async def custom_plan_dashboard(
 
 @app.get("/")
 def read_root(): return {"status": "Sapybase AI Engine Running"}
+
+
+@app.get("/metrics")
+def prometheus_metrics():
+    """Prometheus exposition endpoint for the BYOD §16.9 detection metrics + SLO
+    signals (observability/slo.py METRIC_CATALOG). Returns empty if prometheus_client
+    is unavailable. Scrape target for the alerts in observability/alerts/byod_alerts.yml.
+    NOTE: protect this at the ingress/network layer (it is not auth-gated here)."""
+    from observability import metrics as _metrics
+    return Response(content=_metrics.render(), media_type=_metrics.content_type())

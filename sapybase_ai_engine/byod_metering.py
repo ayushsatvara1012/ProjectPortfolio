@@ -37,6 +37,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional
 
+from observability import metrics
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from psycopg2.extensions import cursor as _Cursor
 
@@ -140,6 +142,9 @@ def record_message_and_meter(
         (company_id, idempotency_key, row_id, row_id),
     )
     inserted, messages_used = cur.fetchone()
+    if not inserted:
+        # §16.9 idempotency-key replay: the key was already seen → no double-meter.
+        metrics.idempotent_replay(company_id)
     return MeterResult(
         counted=bool(inserted),
         messages_used=messages_used,

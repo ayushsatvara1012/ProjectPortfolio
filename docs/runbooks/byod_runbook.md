@@ -8,11 +8,15 @@
 `tests/byod/test_byod_runbooks.py` fails if any §16.9 state loses its detection
 metric, alert, or the runbook section below.
 
-> **Status (Phase 8.4):** the detection metrics ship **dark** — the names, labels,
-> alerts and runbooks are the contract; wiring emitters into the request path is an
-> operational follow-up (same posture as the Phase-0 observability scaffold). The
-> "where it's detected in code" line in each section tells you the code path that
-> *already* enforces the behavior today, so on-call can act before emitters land.
+> **Status:** the §16.9 detection metrics are **emitted live** at the engine
+> chokepoints (`byod_pool`, `byod_engine`, `byod_metering`) and exposed on the
+> **`GET /metrics`** Prometheus endpoint, so the alerts in `byod_alerts.yml` fire
+> for real. Two carve-outs: (1) **wrong-dimension vectors** has no runtime emitter —
+> it is prevented structurally by the provisioning-time `vector(N)` column type and
+> the retrieval path never reads the embedding, so its metric is defensive-only;
+> (2) the generic `sapybase_http_requests_total` shared-plane SLO metric (dashboard
+> error-rate panels) is not yet wired — it is not a §16.9 alert input. Protect
+> `/metrics` at the ingress/network layer (it is not auth-gated in-app).
 
 ---
 

@@ -33,3 +33,5 @@ polar-sdk
 pandas
 openpyxl
 alembic
+# Observability — BYOD metrics emission (RFC §11 / Phase 8.4)
+prometheus-client==0.21.1
