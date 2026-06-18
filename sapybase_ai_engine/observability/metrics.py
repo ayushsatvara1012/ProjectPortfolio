@@ -17,6 +17,7 @@ Custom-gated → a small tenant count). Revisit before opening BYOD to a large f
 """
 from __future__ import annotations
 
+import os
 from typing import Dict, Optional
 
 from . import slo
@@ -36,11 +37,33 @@ except Exception:  # pragma: no cover - exercised only when the dep is absent
     CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
+# Multiprocess mode (gunicorn -w N): each worker has its own in-process registry,
+# so a /metrics scrape would hit one random worker. Setting PROMETHEUS_MULTIPROC_DIR
+# makes every worker write to shared mmap files that MultiProcessCollector aggregates
+# at scrape time (readiness 2.1). The dir must exist before any metric is built.
+_MULTIPROC_DIR = os.environ.get("PROMETHEUS_MULTIPROC_DIR") or None
+if _ENABLED and _MULTIPROC_DIR:
+    try:
+        os.makedirs(_MULTIPROC_DIR, exist_ok=True)
+    except OSError:  # pragma: no cover - defensive; render() still degrades safely
+        pass
+
+# How each gauge aggregates across worker processes (ignored in single-process mode).
+# Additive resource counts sum across live workers; per-tenant state takes the max so
+# any worker observing an open breaker / higher schema version is reflected.
+_GAUGE_MULTIPROC_MODE = {
+    "byod_global_connections_in_flight": "livesum",
+    "byod_tenant_pool_connections_in_use": "livesum",
+    "byod_tenant_pool_size": "livesum",
+    "byod_tenant_circuit_breaker_state": "max",
+    "byod_tenant_schema_version": "max",
+}
+
+
 def _build() -> Dict[str, object]:
     """Instantiate one Prometheus collector per METRIC_CATALOG entry."""
     if not _ENABLED:
         return {}
-    ctor = {"counter": Counter, "gauge": Gauge, "histogram": Histogram}
     built: Dict[str, object] = {}
     for name, spec in slo.METRIC_CATALOG.items():
         mtype = spec["type"]
@@ -48,7 +71,16 @@ def _build() -> Dict[str, object]:
         # Counter names in the catalog already carry the _total suffix; prometheus
         # appends its own, so strip it to avoid byod_..._total_total.
         prom_name = name[:-6] if (mtype == "counter" and name.endswith("_total")) else name
-        built[name] = ctor[mtype](prom_name, spec["description"], labels)
+        if mtype == "gauge":
+            # multiprocess_mode is accepted in both modes; only used under multiproc.
+            built[name] = Gauge(
+                prom_name, spec["description"], labels,
+                multiprocess_mode=_GAUGE_MULTIPROC_MODE.get(name, "max"),
+            )
+        elif mtype == "histogram":
+            built[name] = Histogram(prom_name, spec["description"], labels)
+        else:
+            built[name] = Counter(prom_name, spec["description"], labels)
     return built
 
 
@@ -184,9 +216,19 @@ def enabled() -> bool:
 
 
 def render() -> bytes:
-    """Prometheus exposition text for the default registry (empty if disabled)."""
+    """Prometheus exposition text (empty if disabled).
+
+    Under multiprocess mode (PROMETHEUS_MULTIPROC_DIR set) the scrape must aggregate
+    every worker's mmap files via a fresh MultiProcessCollector registry — the default
+    registry would only report the worker that happened to serve the scrape."""
     if not _ENABLED:
         return b""
+    if _MULTIPROC_DIR:
+        from prometheus_client import CollectorRegistry, multiprocess
+
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry, path=_MULTIPROC_DIR)
+        return generate_latest(registry)
     return generate_latest()
 
 

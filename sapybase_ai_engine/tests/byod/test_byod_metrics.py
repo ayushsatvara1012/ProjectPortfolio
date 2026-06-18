@@ -162,6 +162,27 @@ def test_render_contains_emitted_metric():
     assert "byod_routing_integrity_violations_total" in out
 
 
+def test_render_multiproc_branch_aggregates(tmp_path, monkeypatch):
+    # When PROMETHEUS_MULTIPROC_DIR is active, render() must use a MultiProcessCollector
+    # registry (aggregating all workers) instead of the per-process default — and must
+    # not raise even with an empty dir (no worker has written yet).
+    monkeypatch.setattr(metrics, "_MULTIPROC_DIR", str(tmp_path))
+    out = metrics.render()
+    assert isinstance(out, bytes)
+
+
+def test_gauges_have_multiprocess_mode():
+    # Every gauge collector carries a multiprocess aggregation mode so it behaves
+    # correctly under gunicorn -w N (no per-pid series explosion / random-worker reads).
+    from prometheus_client import Gauge
+
+    for name, spec in slo.METRIC_CATALOG.items():
+        if spec["type"] == "gauge":
+            collector = metrics._M[name]
+            assert isinstance(collector, Gauge)
+            assert getattr(collector, "_multiprocess_mode", None) in {"livesum", "max"}
+
+
 def test_pool_routing_mismatch_increments_metric():
     # Integration: the pool's assert_tenant abort path (E5) really emits the metric.
     from byod_pool import RoutingIntegrityError
