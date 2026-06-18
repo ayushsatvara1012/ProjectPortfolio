@@ -29,6 +29,7 @@ from byod_ingest import (
     content_fingerprint,
     normalize_source_url,
     plan_ingest,
+    plan_prune,
     retry_with_backoff,
 )
 from embedding_config import EMBEDDING_DIMENSIONS
@@ -69,6 +70,18 @@ def test_plan_ingest_skips_existing_and_intra_batch_dups():
     # 'b' already stored, second 'a' is a dup → both skipped; 'a','c' embedded.
     assert [c for _p, c in plan.to_embed] == ["a", "c"]
     assert plan.skipped == 2
+
+
+# ── Pure: prune planner ──────────────────────────────────────────────────────────
+def test_plan_prune_marks_only_superseded():
+    stored = [("id-a", "a"), ("id-b", "b"), ("id-c", "c")]
+    # Current re-train keeps 'a' and 'c'; 'b' is gone → only 'b' is pruned.
+    current = {content_fingerprint("a"), content_fingerprint("c")}
+    assert plan_prune(stored, current) == ["id-b"]
+    # Nothing superseded → nothing to delete.
+    assert plan_prune(stored, {content_fingerprint(x) for x in ("a", "b", "c")}) == []
+    # None content is skipped defensively (never matches, never deleted blindly).
+    assert plan_prune([("id-x", None)], current) == []
 
 
 # ── Pure: capped retry/backoff ───────────────────────────────────────────────────
@@ -254,3 +267,119 @@ def test_embedding_cost_cap_stops_job(tenant_db_dsn):
     assert result.embedded == 5          # never embedded beyond the budget
     assert result.added == 5
     assert _count_children(tenant_db_dsn, company_id, source) == 5
+
+
+# ── Functional: re-train prune keeps a source bounded (§16.7) ─────────────────────
+def _count_parents(dsn: str, company_id: str, source: str) -> int:
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM company_knowledge "
+                "WHERE company_id = %s AND url = %s AND chunk_type = 'parent'",
+                (company_id, source),
+            )
+            return cur.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_retrain_prunes_superseded_and_stays_bounded(tenant_db_dsn):
+    """Re-training a *changed* source replaces its chunks instead of appending: the
+    count stays bounded to live content over many re-trains, and chunks that survive
+    unchanged are retained (not re-embedded)."""
+    company_id = str(uuid.uuid4())
+    source = "https://acme.test/docs"
+    reg = _registry(tenant_db_dsn)
+    cfg = IngestConfig(max_embeddings_per_job=1000, batch_size=5, max_retries=2, retry_base_delay_seconds=0)
+    embedder = _fake_embedder()
+    try:
+        # v1: 10 chunks.
+        v1 = _flat_chunks(10, salt="v1-")
+        r1 = asyncio.run(byod_ingest.run_tenant_ingest(
+            company_id=company_id, source_name=source, chunks=v1,
+            embed_documents=embedder, config=cfg, registry=reg,
+        ))
+        assert r1.added == 10 and r1.pruned == 0
+        assert _count_children(tenant_db_dsn, company_id, source) == 10
+
+        # v2: 3 chunks carried over from v1 + 7 brand-new → 7 old chunks superseded.
+        v2 = v1[:3] + _flat_chunks(7, salt="v2-")
+        r2 = asyncio.run(byod_ingest.run_tenant_ingest(
+            company_id=company_id, source_name=source, chunks=v2,
+            embed_documents=embedder, config=cfg, registry=reg,
+        ))
+        assert r2.added == 7        # only the new chunks embedded+written
+        assert r2.skipped == 3      # carried-over chunks deduped (no re-embed)
+        assert r2.pruned == 7       # the 7 dropped v1 chunks deleted
+        assert _count_children(tenant_db_dsn, company_id, source) == 10  # bounded, not 17
+
+        # Re-train the same content several more times → count never creeps.
+        for _ in range(3):
+            asyncio.run(byod_ingest.run_tenant_ingest(
+                company_id=company_id, source_name=source, chunks=v2,
+                embed_documents=embedder, config=cfg, registry=reg,
+            ))
+            assert _count_children(tenant_db_dsn, company_id, source) == 10
+    finally:
+        reg.close_all()
+
+
+def test_retrain_prunes_orphaned_parents(tenant_db_dsn):
+    """When a re-train deletes the last child under a parent, that parent is removed
+    too (no orphaned parent rows accumulate)."""
+    company_id = str(uuid.uuid4())
+    source = "https://acme.test/docs"
+    reg = _registry(tenant_db_dsn)
+    cfg = IngestConfig(max_embeddings_per_job=1000, batch_size=10, max_retries=2, retry_base_delay_seconds=0)
+    embedder = _fake_embedder()
+    try:
+        # v1: two parents, each with one child.
+        v1 = [("parent one", "p1 child"), ("parent two", "p2 child")]
+        asyncio.run(byod_ingest.run_tenant_ingest(
+            company_id=company_id, source_name=source, chunks=v1,
+            embed_documents=embedder, config=cfg, registry=reg,
+        ))
+        assert _count_parents(tenant_db_dsn, company_id, source) == 2
+
+        # v2: keep parent one's child, replace parent two's child → parent two orphaned.
+        v2 = [("parent one", "p1 child"), ("parent three", "p3 child")]
+        r2 = asyncio.run(byod_ingest.run_tenant_ingest(
+            company_id=company_id, source_name=source, chunks=v2,
+            embed_documents=embedder, config=cfg, registry=reg,
+        ))
+        assert r2.pruned == 1
+        assert _count_children(tenant_db_dsn, company_id, source) == 2
+        # parent two gone, parent one + parent three remain.
+        assert _count_parents(tenant_db_dsn, company_id, source) == 2
+    finally:
+        reg.close_all()
+
+
+def test_capped_run_does_not_prune_tail(tenant_db_dsn):
+    """A quota-capped re-train (prune disabled) must NOT delete the previously-stored
+    tail — pruning to a truncated prefix would destroy live content."""
+    company_id = str(uuid.uuid4())
+    source = "https://acme.test/docs"
+    reg = _registry(tenant_db_dsn)
+    cfg = IngestConfig(max_embeddings_per_job=1000, batch_size=5, max_retries=2, retry_base_delay_seconds=0)
+    embedder = _fake_embedder()
+    try:
+        # Store 10 chunks fully.
+        full = _flat_chunks(10)
+        asyncio.run(byod_ingest.run_tenant_ingest(
+            company_id=company_id, source_name=source, chunks=full,
+            embed_documents=embedder, config=cfg, registry=reg,
+        ))
+        assert _count_children(tenant_db_dsn, company_id, source) == 10
+
+        # Re-run with only a 4-chunk prefix but prune disabled (simulates quota cap).
+        r = asyncio.run(byod_ingest.run_tenant_ingest(
+            company_id=company_id, source_name=source, chunks=full[:4],
+            embed_documents=embedder, config=cfg, registry=reg,
+            prune_superseded=False,
+        ))
+        assert r.pruned == 0
+        assert _count_children(tenant_db_dsn, company_id, source) == 10  # tail retained
+    finally:
+        reg.close_all()

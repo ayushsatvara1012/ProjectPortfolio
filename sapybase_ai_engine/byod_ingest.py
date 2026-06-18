@@ -63,6 +63,7 @@ class IngestConfig:
     batch_size: int = 10                  # embed + write in batches (checkpoint unit)
     max_retries: int = 3                  # capped retries per batch (E11)
     retry_base_delay_seconds: float = 0.5  # exponential backoff base
+    prune_superseded: bool = True         # re-train deletes stale chunks (§16.7; keeps count bounded)
 
     @classmethod
     def from_env(cls) -> "IngestConfig":
@@ -74,11 +75,18 @@ class IngestConfig:
             raw = os.getenv(name)
             return float(raw) if raw and raw.strip() else default
 
+        def _bool(name: str, default: bool) -> bool:
+            raw = os.getenv(name)
+            if raw is None or not raw.strip():
+                return default
+            return raw.strip().lower() in ("1", "true", "yes", "on")
+
         return cls(
             max_embeddings_per_job=_int("BYOD_INGEST_MAX_EMBEDDINGS_PER_JOB", cls.max_embeddings_per_job),
             batch_size=_int("BYOD_INGEST_BATCH_SIZE", cls.batch_size),
             max_retries=_int("BYOD_INGEST_MAX_RETRIES", cls.max_retries),
             retry_base_delay_seconds=_float("BYOD_INGEST_RETRY_BASE_DELAY_SECONDS", cls.retry_base_delay_seconds),
+            prune_superseded=_bool("BYOD_INGEST_PRUNE_SUPERSEDED", cls.prune_superseded),
         )
 
 
@@ -156,6 +164,28 @@ def plan_ingest(
     return IngestPlan(to_embed=to_embed, skipped=skipped)
 
 
+def plan_prune(
+    stored_children: Sequence[Tuple[str, str]],
+    current_fingerprints: Set[str],
+) -> List[str]:
+    """Ids of stored child chunks that the current re-train no longer contains
+    (content fingerprint absent from ``current_fingerprints``) → superseded, safe to
+    delete. Without this, re-training changed content only *appends*, so stale chunks
+    linger forever → answer-quality drift + ``max_chunks`` quota creep (§16.7).
+
+    ``current_fingerprints`` must be the fingerprints of the *full* intended child
+    set for the source — so chunks that survive a re-train unchanged are retained.
+    Caller must only act on this for a complete run (not cost/quota-capped), else a
+    truncated input set would mark legitimate not-yet-stored chunks for deletion."""
+    to_delete: List[str] = []
+    for row_id, content in stored_children:
+        if content is None:
+            continue
+        if content_fingerprint(content) not in current_fingerprints:
+            to_delete.append(row_id)
+    return to_delete
+
+
 def retry_with_backoff(
     fn: Callable[[], object],
     *,
@@ -211,6 +241,17 @@ def existing_child_fingerprints(cur, company_id: str, source_name: str) -> Set[s
     return {content_fingerprint(r[0]) for r in cur.fetchall() if r[0]}
 
 
+def stored_children_for_source(cur, company_id: str, source_name: str) -> List[Tuple[str, str]]:
+    """(id, content) of every child chunk currently stored for a source on the tenant
+    DB — input to :func:`plan_prune` so a re-train can delete superseded chunks."""
+    cur.execute(
+        "SELECT id, content FROM company_knowledge "
+        "WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+        (company_id, source_name),
+    )
+    return [(str(r[0]), r[1]) for r in cur.fetchall()]
+
+
 def existing_parents(cur, company_id: str, source_name: str) -> dict:
     """Map of parent content -> parent row id already stored for a source. Preloaded
     so a resumed job reuses existing parents instead of duplicating them."""
@@ -230,6 +271,7 @@ class IngestResult:
     embedded: int          # embeddings actually consumed this run
     total_candidates: int  # input child chunks
     capped_by_cost: bool   # True if the per-job embedding budget stopped the run
+    pruned: int = 0        # superseded child chunks deleted this run (re-train, §16.7)
 
 
 # ── Tenant ingest writer (the data-plane cutover) ────────────────────────────────
@@ -245,6 +287,7 @@ async def run_tenant_ingest(
     embed_documents: EmbedFn,
     on_progress: Optional[ProgressFn] = None,
     config: Optional[IngestConfig] = None,
+    prune_superseded: Optional[bool] = None,
     registry=None,
 ) -> IngestResult:
     """Idempotent, checkpointed, cost-guarded ingest of ``chunks`` into the tenant's
@@ -257,13 +300,22 @@ async def run_tenant_ingest(
     per-job :class:`EmbeddingCostGuard` stops the run cleanly at its budget. Each
     batch is committed (checkpoint) so an interrupted job resumes without
     re-embedding or duplicating. Imported lazily to keep ``byod_engine`` decoupled.
+
+    Re-train pruning (§16.7): on a *complete* run (not stopped by the cost guard),
+    child chunks stored for the source whose content is no longer in ``chunks`` are
+    deleted, and parents thereby orphaned are removed — so re-training changed
+    content stays bounded to the live source instead of accumulating stale chunks.
+    ``prune_superseded`` overrides the config flag; the caller MUST pass ``False``
+    when ``chunks`` is a truncated/quota-capped prefix of the source (else surviving
+    tail chunks would be wrongly deleted).
     """
     import byod_engine  # lazy — byod_engine has no dependency on this module
 
     cfg = config or IngestConfig.from_env()
     guard = EmbeddingCostGuard(cfg.max_embeddings_per_job)
+    do_prune = cfg.prune_superseded if prune_superseded is None else prune_superseded
 
-    added = embedded = 0
+    added = embedded = pruned = 0
     capped_by_cost = False
 
     # 1. Read existing state for dedup/resume in a SHORT tenant checkout (we do not
@@ -330,10 +382,42 @@ async def run_tenant_ingest(
         if on_progress is not None:
             on_progress(added, total)
 
+    # 4. Prune superseded chunks — only on a COMPLETE run. If the cost guard stopped
+    #    us, ``chunks`` was fully intended but not fully stored; deleting now would be
+    #    fine for content drift, but we hold off so a partial run never mutates the
+    #    stored set beyond what it added. ``current_fps`` is the full intended child
+    #    set (incl. dedup-skipped chunks that survive unchanged), so anything not in
+    #    it is genuinely gone from the source.
+    if do_prune and not capped_by_cost:
+        current_fps = {content_fingerprint(c) for (_p, c) in chunks}
+        with byod_engine.tenant_connection(company_id, registry=registry) as conn:
+            cur = conn.cursor()
+            stored = stored_children_for_source(cur, company_id, source_name)
+            stale_ids = plan_prune(stored, current_fps)
+            if stale_ids:
+                cur.execute(
+                    "DELETE FROM company_knowledge WHERE company_id = %s AND id = ANY(%s::uuid[])",
+                    (company_id, stale_ids),
+                )
+                pruned = cur.rowcount if cur.rowcount and cur.rowcount > 0 else len(stale_ids)
+                # Remove parents for this source orphaned by the child deletes above.
+                cur.execute(
+                    "DELETE FROM company_knowledge "
+                    "WHERE company_id = %s AND url = %s AND chunk_type = 'parent' "
+                    "AND id NOT IN ("
+                    "  SELECT parent_id FROM company_knowledge "
+                    "  WHERE company_id = %s AND url = %s AND chunk_type = 'child' "
+                    "    AND parent_id IS NOT NULL"
+                    ")",
+                    (company_id, source_name, company_id, source_name),
+                )
+                conn.commit()
+
     return IngestResult(
         added=added,
         skipped=skipped,
         embedded=embedded,
         total_candidates=len(chunks),
         capped_by_cost=capped_by_cost,
+        pruned=pruned,
     )

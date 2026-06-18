@@ -1064,6 +1064,15 @@ app.add_middleware(
     max_age=86400,
 )
 
+
+# Shared/tenant request rate + latency metrics for EVERY request (Phase 1.2,
+# §16.9). A PURE ASGI middleware (not @app.middleware/BaseHTTPMiddleware) so the
+# tenant-plane tag a handler sets on request.state is visible here — BaseHTTPMiddleware
+# runs the endpoint in a child task and would not see it. See request_metrics.py.
+from observability.request_metrics import RequestMetricsMiddleware
+app.add_middleware(RequestMetricsMiddleware)
+
+
 # 4. Define Request/Response Models — extracted to models.py and re-exported so
 # `from main import ChatRequest` (etc.) and the test suite resolve unchanged.
 from models import (
@@ -2442,6 +2451,13 @@ async def chat_endpoint(
     company: dict = Depends(verify_api_key_and_origin)
 ):
     """Core AI Chat Endpoint with Exact-Match Cache, tier enforcement and Connection Pooling."""
+    # Tag this request for the shared/tenant request metrics (Phase 1.2, §16.9): a
+    # BYOD-routed company moves to the "tenant" plane + carries its company_id, so it
+    # feeds the per-tenant error-rate panel; everything else stays on "shared".
+    request.state.metrics_company_id = company["id"]
+    if byod_engine.routing_active(company["id"]):
+        request.state.metrics_plane = "tenant"
+
     # ── SECURITY: Global LLM Budget Enforcement (Redis-Backed) ──
     # Prevents rapid credit depletion even if someone manages to bypass per-key rate limits.
     await check_global_llm_budget(company["id"])
@@ -5122,10 +5138,12 @@ async def _byod_run_training_job(
     is_upsert: bool,
 ):
     """BYOD ingest path (Phase 3.4): write company_knowledge to the tenant's own DB
-    via the checkpointed/idempotent + cost-guarded ingest (E11, §16.7). Additive +
-    dedup — re-training an unchanged source is a no-op; only new chunks are
-    embedded. Cache invalidation stays on the control plane. Errors are sanitized
-    (E6) into the job status (never raw DSN/host/driver text)."""
+    via the checkpointed/idempotent + cost-guarded ingest (E11, §16.7). Dedup means
+    re-training an unchanged source is a no-op; on a full re-train, superseded chunks
+    for the source are pruned so the count stays bounded to live content (§16.7). A
+    quota-capped run sends only a prefix of the source, so pruning is disabled then
+    (it would wrongly delete the surviving tail). Cache invalidation stays on the
+    control plane. Errors are sanitized (E6) into the job status."""
     await set_job_status(job_id, {"status": "processing", "progress": 0, "total": len(chunks)})
     try:
         # Plan max_chunks quota, counted on the tenant DB.
@@ -5140,6 +5158,9 @@ async def _byod_run_training_job(
             source_name=source_name,
             chunks=capped,
             embed_documents=embeddings_model_doc.aembed_documents,
+            # A quota-capped input is a prefix of the source; pruning to it would
+            # delete the legitimate tail, so prune only on a full re-train.
+            prune_superseded=not was_capped,
         )
 
         await asyncio.to_thread(_byod_invalidate_company_cache, company_id)
@@ -5149,6 +5170,7 @@ async def _byod_run_training_job(
             "status": "done",
             "chunks_added": result.added,
             "deduped": result.skipped,
+            "pruned": result.pruned,
             "capped_by_cost": result.capped_by_cost,
             "was_capped": was_capped,
             "is_upsert": is_upsert,

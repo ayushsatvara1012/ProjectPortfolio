@@ -9,8 +9,11 @@ metric. All pure (no DB) — runs in engine-regression (prometheus_client is a d
 from __future__ import annotations
 
 import pytest
+from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
 
 from observability import metrics, slo
+from observability.request_metrics import RequestMetricsMiddleware
 
 
 def _val(name: str, labels: dict | None = None) -> float:
@@ -66,6 +69,84 @@ def test_each_facade_writes_its_collector():
 
     metrics.db_error("cD", "readonly")
     assert _val("byod_tenant_db_errors_total", {"company_id": "cD", "kind": "readonly"}) == 1.0
+
+
+def test_http_request_facade_writes_collector():
+    # Counter: status_class/plane/company_id land on sapybase_http_requests_total.
+    metrics.http_request("/api/chat", "5xx", "shared", "cHTTP")
+    assert _val(
+        "sapybase_http_requests_total",
+        {"route": "/api/chat", "status_class": "5xx", "plane": "shared", "company_id": "cHTTP"},
+    ) == 1.0
+    # Histogram: duration observed on the _count series for the same labels.
+    metrics.observe_http_duration("/api/chat", "tenant", "cHTTP", 0.01)
+    assert _val(
+        "sapybase_http_request_duration_seconds_count",
+        {"route": "/api/chat", "plane": "tenant", "company_id": "cHTTP"},
+    ) == 1.0
+
+
+def test_request_metrics_middleware_emits_per_request():
+    """The real middleware, mounted on a minimal app, emits the request counter with
+    the matched route template, the right status_class, and request.state-driven
+    plane/company_id — and stays fail-soft (a handler raising is recorded as 5xx).
+
+    NB: FastAPI/TestClient/Request are imported at MODULE TOP on purpose — with
+    ``from __future__ import annotations`` the ``request: Request`` annotation is a
+    string FastAPI resolves via the module globals, so a function-local import would
+    make it 422 the request instead of injecting the Request."""
+    app = FastAPI()
+    app.add_middleware(RequestMetricsMiddleware)
+
+    @app.get("/ok")
+    def ok():
+        return {"ok": True}
+
+    @app.get("/tenant/{cid}")
+    def tenant(cid: str, request: Request):
+        # Exactly how the chat handler upgrades the plane: set request.state inside
+        # the endpoint. It must be visible to the middleware (shared via scope) even
+        # across Starlette's middleware/endpoint task boundary.
+        request.state.metrics_plane = "tenant"
+        request.state.metrics_company_id = "cMW"
+        return {"cid": cid}
+
+    @app.get("/boom")
+    def boom():
+        raise RuntimeError("kaboom")
+
+    client = TestClient(app, raise_server_exceptions=False)
+
+    before = _val(
+        "sapybase_http_requests_total",
+        {"route": "/ok", "status_class": "2xx", "plane": "shared", "company_id": ""},
+    )
+    client.get("/ok")
+    assert _val(
+        "sapybase_http_requests_total",
+        {"route": "/ok", "status_class": "2xx", "plane": "shared", "company_id": ""},
+    ) - before == 1.0
+
+    # Tenant plane + company_id from request.state, route template (not raw path).
+    client.get("/tenant/abc")
+    assert _val(
+        "sapybase_http_requests_total",
+        {"route": "/tenant/{cid}", "status_class": "2xx", "plane": "tenant", "company_id": "cMW"},
+    ) == 1.0
+
+    # A handler exception is recorded as 5xx (fail-soft) before surfacing.
+    client.get("/boom")
+    assert _val(
+        "sapybase_http_requests_total",
+        {"route": "/boom", "status_class": "5xx", "plane": "shared", "company_id": ""},
+    ) == 1.0
+
+    # Unmatched route collapses to "unmatched" (bounded cardinality).
+    client.get("/no-such-path")
+    assert _val(
+        "sapybase_http_requests_total",
+        {"route": "unmatched", "status_class": "4xx", "plane": "shared", "company_id": ""},
+    ) == 1.0
 
 
 def test_emission_is_fail_soft():

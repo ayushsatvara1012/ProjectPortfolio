@@ -1,6 +1,6 @@
 # BYOD — Production Readiness & Go-Live Plan
 
-**Owner:** _(assign)_   **Status as of 2026-06-17:** GA gate passed; both launch blockers fixed (uncommitted). **Not yet enabled for any paying client.**
+**Owner:** _(assign)_   **Status as of 2026-06-18:** GA gate passed; both launch blockers fixed, committed + pushed (`74955beb`). Code items §1.1 (re-train prune) + §1.2 (http request metrics) done + tested locally (uncommitted). **Not yet enabled for any paying client.**
 **Source of truth:** [RFC](rfc-byod.md) · [Runbook](runbooks/byod_runbook.md) · [Alerts](../sapybase_ai_engine/observability/alerts/byod_alerts.yml) · SLOs (`sapybase_ai_engine/observability/slo.py`)
 
 This plan covers everything between "code complete" and "enable `byo_database` for the first paying client." Treat each unchecked box as a gate.
@@ -12,7 +12,7 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 - [x] Phases 0–8 complete; GA gate test suite green (engine-regression **908 passed / 94 skipped**; full BYOD suite on PG **414 passed**).
 - [x] **Blocker 1 — GDPR erasure** fixed (control-plane names corrected; BYOD = offboard-only; client DB untouched). Tests: `tests/byod/test_byod_gdpr.py`.
 - [x] **Blocker 2 — observability live** (`observability/metrics.py` + `GET /metrics`; §16.9 metrics emitted at chokepoints). Tests: `tests/byod/test_byod_metrics.py`.
-- [ ] These fixes **committed** (currently uncommitted on `byo-feature`).
+- [x] These fixes **committed + pushed** on `byo-feature` (`74955beb`).
 
 > Safe-by-default: BYOD stays off until `BYOD_ENABLED=true` **and** the tenant is in `BYOD_CANARY_COMPANY_IDS`. Nothing below is live until both are set.
 
@@ -22,8 +22,8 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 
 | # | Item | Severity | Acceptance |
 |---|---|---|---|
-| 1.1 | **Re-train prune (additive-only today).** Re-training a changed source appends + dedups but never deletes superseded chunks on the tenant DB → answer quality drift + `max_chunks` quota creep. | Medium (pre-scale, not pre-pilot) | Re-train replaces/prunes stale chunks for a source on the tenant DB; test proves count stays bounded after N re-trains of changed content. |
-| 1.2 | **Generic `sapybase_http_requests_total` shared-plane metric** not emitted (dashboard error-rate panels are blank). Not a §16.9 alert input. | Low | Request middleware emits the counter+duration with `plane`/`status_class`/`company_id`; dashboard error-rate panels populate. |
+| 1.1 | ✅ **DONE (uncommitted).** Re-train now prunes superseded chunks for a source on the tenant DB on a *complete* run (disabled on quota/cost-capped runs to protect the un-ingested tail); orphaned parents removed too. `byod_ingest.plan_prune` + `IngestResult.pruned`. Tests prove the count stays bounded after N re-trains of changed content (`test_byod_ingest.py`, verified on real PG). | Medium (pre-scale, not pre-pilot) | ✅ Met. |
+| 1.2 | ✅ **DONE (uncommitted).** Pure-ASGI `RequestMetricsMiddleware` emits `sapybase_http_requests_total` + `_request_duration_seconds` for every request with `route`/`status_class`/`plane`/`company_id`; chat hot path tags tenant traffic via `request.state`. (Pure ASGI on purpose — `BaseHTTPMiddleware` runs the endpoint in a child task and would not see the tag.) Tests in `test_byod_metrics.py`. | Low | ✅ Met. |
 | 1.3 | **`byod_tenant_vector_dimension_mismatch_total`** has no runtime emitter (structurally prevented by `vector(N)` column type; read path never loads embeddings). | Accepted / defensive-only | Decision recorded: keep as defensive contract metric, OR add an explicit dimension check if a real detection need appears. |
 
 ---
@@ -82,4 +82,4 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 ## Quick triage: what's actually blocking a first paying client
 
 **Must-do (blockers):** 2.1 metrics multiproc · 2.2 protect /metrics · 2.3 egress IP · 2.4 KMS env · 2.5 purge cron · 3.1 alerts in Prometheus · 3.2 paging · 4.1–4.3 canary + regression · §5 sign-off.
-**Can follow (not blocking a careful pilot):** 1.1 re-train prune · 1.2 http SLO metric · 3.3/3.4 dashboard+baseline polish · 4.5/4.6 perf+exhaustive review.
+**Can follow (not blocking a careful pilot):** ~~1.1 re-train prune~~ ✅ · ~~1.2 http SLO metric~~ ✅ · 3.3/3.4 dashboard+baseline polish · 4.5/4.6 perf+exhaustive review.

@@ -69,6 +69,26 @@ def _safe(fn):
     return wrapper
 
 
+# ── Shared/tenant HTTP request rate + latency (error-rate source, §16.9) ─────
+# Emitted by the request middleware for EVERY request. ``plane`` is "shared" for
+# normal control-plane traffic and "tenant" when the request hit a BYOD tenant DB;
+# ``status_class`` is 2xx/4xx/5xx — these are the numerator/denominator of the
+# shared-plane error-rate regression gate and the dashboard latency panels.
+
+@_safe
+def http_request(route: str, status_class: str, plane: str, company_id: str) -> None:
+    _M["sapybase_http_requests_total"].labels(
+        route=route, status_class=status_class, plane=plane, company_id=str(company_id)
+    ).inc()
+
+
+@_safe
+def observe_http_duration(route: str, plane: str, company_id: str, seconds: float) -> None:
+    _M["sapybase_http_request_duration_seconds"].labels(
+        route=route, plane=plane, company_id=str(company_id)
+    ).observe(seconds)
+
+
 # ── Per-tenant DB health / isolation ─────────────────────────────────────────
 
 @_safe
