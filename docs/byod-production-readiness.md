@@ -38,7 +38,7 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 | 2.4 | **KMS env configured in prod** (`BYOD_KMS_MASTER_KEYS`, `BYOD_KMS_ACTIVE_KEY_ID`). Engine fails closed without it. | Blocker | Keys present in prod secrets; a provision/decrypt smoke test succeeds. |
 | 2.5 | **Switch-in 7-day purge cron scheduled** (`POST /api/internal/run-switchin-purge`, `CRON_SECRET`). If unscheduled, migrated clients' data lingers on the shared DB past the promised window. | Blocker (privacy promise) | Cron exists in the deploy scheduler; a dry-run shows it purges only past-window copies. |
 | 2.6 | **Data-plane migration cron** (`POST /api/internal/run-data-plane-migrations`) scheduled (for future schema rollouts; no-op today). | Low | Scheduled; first run reports all tenants current. |
-| 2.7 | **Pool / breaker / cache tunables** reviewed for prod (`BYOD_POOL_*`, `BYOD_DSN_CACHE_*`, batch concurrency). | Medium | Values set deliberately for the expected fleet size (not defaults by accident). |
+| 2.7 | **Pool / breaker / cache tunables** reviewed for prod (`BYOD_POOL_*`, `BYOD_DSN_CACHE_*`, batch concurrency). | Medium | ✅ **Reviewed (early-pilot, ≤10 tenants, gunicorn -w 4).** Defaults kept deliberately; `BYOD_POOL_PER_TENANT_MAX=3` and `BYOD_POOL_GLOBAL_CEILING=100` set explicitly on Render to pin fleet sizing. **Key fact:** pools are per-worker, so effective per-tenant max = 3×4 = **12 conns/tenant** and global = 100×4 = 400; revisit before raising worker count or fleet size. DSN cache: TTL 300s / max-stale 3600s (KMS-blip ride-through) / 1024 entries. Breaker: 5 fails→open, 30s cooldown (code default, not env-tunable). |
 
 ---
 

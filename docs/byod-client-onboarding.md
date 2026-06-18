@@ -39,6 +39,10 @@ in the DSN (no `options=`, `passfile=`, etc.).
 - A **`vector(768)`** column must be creatable (Sapybase embeds with a 768-dim model).
 - A **fresh / empty database** (no conflicting schema). Sapybase provisions its own
   data-plane schema during onboarding.
+- **`max_connections` headroom:** Sapybase opens up to **12 concurrent connections**
+  to your database (3 per app worker × 4 workers). Ensure your Postgres
+  `max_connections` comfortably exceeds that plus your own usage — **≥ 50** is a safe
+  floor for a small instance.
 
 ## 4. Privileges on the connection string you provide
 

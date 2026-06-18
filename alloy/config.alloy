@@ -1,0 +1,26 @@
+// Grafana Alloy — scrape the Sapybase backend /metrics and ship to Grafana Cloud.
+// Runs as a small Render Background Worker (BYOD readiness Step 6). All secrets come
+// from env vars set on the Render service — nothing sensitive is baked into the image.
+
+prometheus.scrape "byod_backend" {
+	// The public backend. Port 443 + https because /metrics is token-gated on the
+	// public Render service (readiness 2.2); Alloy presents the token as a bearer.
+	targets = [
+		{ "__address__" = "sapyai.onrender.com:443" },
+	]
+	scheme          = "https"
+	metrics_path    = "/metrics"
+	scrape_interval = "30s"
+	bearer_token    = sys.env("METRICS_SCRAPE_TOKEN")
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_PROM_URL")
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_USER")
+			password = sys.env("GRAFANA_CLOUD_API_KEY")
+		}
+	}
+}
