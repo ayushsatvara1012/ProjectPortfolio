@@ -1,0 +1,61 @@
+# BYOD Alertmanager config for the Grafana Cloud / Mimir Alertmanager (NOT Grafana-managed alerting).
+# Pairs with observability/alerts/byod_alerts.yml (the rule group already loaded into the Mimir ruler).
+#
+# Routes the three `severity: page` alerts (BYODKmsDecryptErrors, BYODGlobalCeilingReached,
+# BYODRoutingIntegrityViolation) to the on-call pager; everything else (ticket/info) to the queue.
+#
+# SECRETS-FREE TEMPLATE: all sensitive values are ${ENV_VARS}. Render with envsubst into a
+# gitignored temp file before loading, e.g.:
+#
+#   set -a; source .env.alertmanager; set +a
+#   envsubst < sapybase_ai_engine/observability/alerts/byod_alertmanager.yaml > /tmp/byod_am.yaml
+#   ./mimirtool alertmanager load /tmp/byod_am.yaml \
+#       --address=<GRAFANA_CLOUD_AM_URL> --id=<GRAFANA_CLOUD_USER> --key=<GRAFANA_CLOUD_AM_TOKEN>
+#   (NB: pass real values from env at the shell, e.g. --address="${GRAFANA_CLOUD_AM_URL}";
+#    written as <PLACEHOLDERS> here so envsubst never expands a secret into rendered output.)
+#
+# Required env vars:
+#   ALERT_SMTP_FROM   verified Resend sender, e.g. alerts@yourdomain.com
+#   ALERT_PAGER_TO    on-call pager email
+#   ALERT_QUEUE_TO    ticket/info queue email (may equal the pager for the pilot)
+#   RESEND_API_KEY    Resend API key — used as the SMTP password (SMTP user is literally "resend")
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.resend.com:587'
+  smtp_from: '${ALERT_SMTP_FROM}'
+  smtp_auth_username: 'resend'
+  smtp_auth_password: '${RESEND_API_KEY}'
+  smtp_require_tls: true
+
+route:
+  receiver: byod-queue
+  group_by: ['alertname', 'company_id']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Page-severity → on-call pager, fast and frequent.
+    - matchers:
+        - 'severity="page"'
+        - 'feature="byod"'
+      receiver: byod-pager
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 1h
+      continue: false
+
+receivers:
+  - name: byod-queue
+    email_configs:
+      - to: '${ALERT_QUEUE_TO}'
+        send_resolved: true
+        headers:
+          Subject: '[BYOD {{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}'
+
+  - name: byod-pager
+    email_configs:
+      - to: '${ALERT_PAGER_TO}'
+        send_resolved: true
+        headers:
+          Subject: '[PAGE] BYOD {{ .CommonLabels.alertname }} ({{ .Alerts.Firing | len }} firing)'

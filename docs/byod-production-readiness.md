@@ -47,7 +47,7 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 | # | Item | Severity | Acceptance |
 |---|---|---|---|
 | 3.1 | **Load `byod_alerts.yml` into the real Prometheus** and confirm every rule parses + evaluates (exprs are unit-checked against the catalog, not yet run in Prometheus). | Blocker | Rules load with no errors; a synthetic signal fires the expected alert. |
-| 3.2 | **Alertmanager paging routes** for the three `page`-severity alerts (KMS / global-ceiling / routing-mismatch). | Blocker | A test fire of each `page` alert reaches the on-call pager. `ticket`/`info` route to the queue. |
+| 3.2 | **Alertmanager paging routes** for the three `page`-severity alerts (KMS / global-ceiling / routing-mismatch). **Config written + locally validated** (`alerts/byod_alertmanager.yaml`, secrets-free template; parses clean under `mimirtool` 3.1.1; route-matcher contract cross-checked against the rules' `feature`/`severity` labels). Load + test-fire runbook in [`alerts/README.md`](../sapybase_ai_engine/observability/alerts/README.md). **Pending:** load to Grafana Cloud + real test fire (needs the canary). | Blocker | A test fire of each `page` alert reaches the on-call pager. `ticket`/`info` route to the queue. |
 | 3.3 | **Import the Grafana dashboard** (`observability/dashboards/byod_slo_dashboard.json`) and confirm panels bind to live metrics. | Medium | Dashboard renders with real data for a canary tenant. |
 | 3.4 | **Capture a real SLO baseline** (`scripts/capture_slo_baseline.py --from <metrics_export>`) once live metrics exist, replacing the ceiling placeholders. | Medium | `baseline.json` reflects measured shared-plane numbers; `--check` wired into CI/release. |
 

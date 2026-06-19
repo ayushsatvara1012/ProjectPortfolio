@@ -69,3 +69,8 @@ coverage/
 *.db
 **/*.db
 SDE_Resume_Ayush.pdf
+
+# Observability CLI binary — downloaded locally to load/validate Grafana Cloud
+# rules + alertmanager config; ~80MB, must never be committed (see
+# sapybase_ai_engine/observability/alerts/README.md).
+/mimirtool
