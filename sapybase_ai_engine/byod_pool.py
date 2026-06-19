@@ -329,9 +329,12 @@ class TenantPoolRegistry:
             if entry is not None and entry.in_flight > 0:
                 entry.in_flight -= 1
                 entry.last_used = self._clock()
-            metrics.global_in_flight(self._global_in_flight)
             if self._global_in_flight > 0:
                 self._global_in_flight -= 1
+            # Emit AFTER the decrement so the gauge reflects the true in-flight
+            # count (mirrors _reserve, which emits after its increment); emitting
+            # first left the gauge stuck one-too-high at rest.
+            metrics.global_in_flight(self._global_in_flight)
             # A ceiling slot freed up — wake one bounded waiter.
             self._cond.notify()
 
