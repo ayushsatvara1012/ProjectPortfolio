@@ -1399,6 +1399,11 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
             # Don't block the chat request on a downgrade failure — log and
             # continue with the stale tier; next request will retry.
             print(f"GRACE-PERIOD DOWNGRADE ERROR (chat path) for user {_user_id_for_downgrade}: {e}")
+    # Resolved custom plan config — carried into the returned company dict below so
+    # the chat handler's get_plan() sees a CUSTOM tier's real limits/features. Default
+    # None so non-CUSTOM tiers fall back to PLAN_LIMITS (CUSTOM without it falls back
+    # to the FREE 0-message plan and 402s every CUSTOM/BYOD widget chat).
+    _custom_cfg = None
     if tier == "CUSTOM":
         # custom_plan_config is fetched below; we do a targeted lookup here
         _conn2 = get_db_connection()
@@ -1476,6 +1481,10 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "alert_email": company_data[23],
         "slack_webhook_url": company_data[24],
         "booking_url": company_data[25],
+        # Carry the resolved custom plan config so the chat handler's get_plan()
+        # applies the CUSTOM tier's real message/chunk limits + features. Without it,
+        # get_plan() falls back to the FREE plan (0 messages) and blocks the chat.
+        "custom_plan_config": _custom_cfg,
     }
 
     # 3. The Ironclad Origin Check (Issue 2 Fix)
