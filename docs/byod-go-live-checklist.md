@@ -5,7 +5,9 @@
 
 **Status going in (2026-06-18):** all code complete + deployed to production (`MainV2`), running dark. All config + observability blockers closed (KMS, egress IPs, `/metrics` gate, crons, alerts in Mimir, **§3.2 paging verified with a real page email**). BYOD is OFF: `BYOD_ENABLED` and `BYOD_CANARY_COMPANY_IDS` are unset.
 
-**What's left = 3 things:** (A) rotate leaked secrets, (B) Step 7 canary validation against a real tenant DB, (C) Step 8 sign-off + enable. A–C below.
+**What's left = 3 things:** (A) rotate leaked secrets, (B) Step 7 canary validation against a real tenant DB, (C) Step 8 sign-off + enable.
+
+**⚠️ Execution order (decided 2026-06-19): run B → C → A, NOT A first.** The security cleanup (A) must come **after** B3's real KMS page, because the live Alertmanager config in Grafana Cloud uses the *current* Resend API key as its SMTP password — revoking that key before B3 would silently break the very page we are trying to verify. Sections stay in A/B/C order below for reference; follow the execution order, not the section order.
 
 Detail docs this references:
 - Canary runbook: [`runbooks/byod_canary_dryrun.md`](runbooks/byod_canary_dryrun.md)
@@ -15,13 +17,13 @@ Detail docs this references:
 
 ---
 
-## A. Security cleanup — DO THIS FIRST (~15 min) 🔒
+## A. Security cleanup — DO THIS LAST, after B3's real page (~15 min) 🔒
 
-Two tokens were printed into chat in earlier sessions; treat them as compromised. The AM config now lives in Grafana Cloud, so the local secret files are no longer needed.
+Two tokens were printed into chat in earlier sessions; treat them as compromised. **Do not start this section until B3's real KMS page has been verified delivered** — A1 revokes the key that page depends on. A2 (Alloy token) has no such dependency and may be done anytime.
 
-- [ ] **A1. Rotate the Resend API key.** Resend dashboard → API Keys → revoke the old key (`re_j5WgBxWz…`, used as the SMTP password) → create a new one. You only need it again if you re-load the AM config; if so, put the new value in a fresh `.env.alertmanager` at that time.
+- [ ] **A1. Rotate the Resend API key — ONLY after B3's real page passed.** The live Alertmanager config embeds this key as its SMTP password, so revoking it without re-loading the config silently kills *all* paging. Order: Resend dashboard → API Keys → **create the new key first** → put it in a fresh `.env.alertmanager` → re-render + `mimirtool alertmanager load` the config with the new key (**AM tenant id `1656651`**) → fire a synthetic page to confirm delivery → **only then revoke** the old key (`re_j5WgBxWz…`).
 - [ ] **A2. Rotate the Alloy data-write token.** Grafana Cloud → Access Policies → the `stack-1696599-alloy-byod-alloy-render` `glc_…` token → rotate → update the Alloy Render Background Worker's `GRAFANA_CLOUD_API_KEY` env → redeploy that worker → confirm `up=1` still in Grafana Explore.
-- [ ] **A3. Delete local secret files.** `rm -f ".env.alertmanager" ~/.byod_rules_token` (repo root). Confirm `.env.alertmanager` is gone — it was never committed (`.gitignore` covers `**/.env*`), so this is local-only.
+- [ ] **A3. Delete local secret files** (after A1's re-load is verified). `rm -f ".env.alertmanager" ~/.byod_rules_token` (repo root). Confirm `.env.alertmanager` is gone — it was never committed (`.gitignore` covers `**/.env*`), so this is local-only.
 
 **Done when:** old Resend key + old Alloy token are revoked, Alloy still scrapes (`up=1`), and the two local files are deleted.
 
@@ -88,7 +90,7 @@ Run each row from [`runbooks/byod_canary_dryrun.md`](runbooks/byod_canary_dryrun
 ## Optional polish (NOT blocking a careful pilot — do anytime)
 - [ ] §3.3 import the Grafana dashboard (`observability/dashboards/byod_slo_dashboard.json`).
 - [ ] §3.4 wire `baseline.json --check` into CI/release.
-- [ ] §4.6 one focused `/code-review` pass over the BYOD modules.
+- [x] §4.6 focused `/code-review` over the BYOD **core** modules (pool/breaker, engine + DSN-resolution, SSRF/DSN validator, crypto/KMS) — done 2026-06-19, clean. Fixed one observability bug: `byod_pool` `global_in_flight` gauge was emitted *before* the decrement on release, leaving it stuck one-too-high at rest. Remaining modules (switchin/out, orchestrator, metering, store, ingest) not yet re-reviewed.
 
 ---
 
