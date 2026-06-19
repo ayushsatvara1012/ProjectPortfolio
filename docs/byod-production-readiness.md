@@ -55,6 +55,8 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 
 ## 4. Testing & validation (beyond the unit/integration suites)
 
+> **Executable runbook for §4.1–§4.3:** [`runbooks/byod_canary_dryrun.md`](runbooks/byod_canary_dryrun.md) — onboarding curls (enroll → connection → provision → switch-in → health), the flag flip, the lifecycle checklist, the four-row failure-injection matrix, and the shared-fleet regression gate. Needs a throwaway tenant Postgres (pgvector ≥ 0.5.0) reachable from the Render egress IPs.
+
 | # | Item | Severity | Acceptance |
 |---|---|---|---|
 | 4.1 | **Canary dry-run with one internal / non-paying tenant** — real DSN, real KMS, real Prometheus scrape. Exercise: onboard → provision → chat (RAG) → analytics → background digest → switch-out. | **Blocker** | Full lifecycle works end-to-end against a real remote DB; metrics + alerts observed; no error-rate regression vs baseline. |
