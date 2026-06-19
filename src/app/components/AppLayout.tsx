@@ -102,12 +102,12 @@ const SidebarItem = ({ label, icon: iconName, path, onClick, expanded }: Sidebar
       href={path}
       onClick={onClick ?? undefined}
       title={!expanded ? label : undefined}
-      className={`flex items-center gap-3.5 px-5 py-3.5 text-base tracking-wider font-display transition-all min-h-[48px] w-full overflow-hidden ${isActive
-        ? 'text-slate-900 dark:text-slate-100 font-semibold'
-        : 'text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 font-normal'
+      className={`flex items-center gap-3 px-3 py-2 text-sm tracking-normal font-display font-medium transition-all min-h-[38px] w-full overflow-hidden rounded-lg ${isActive
+        ? 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
+        : 'text-slate-800 dark:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-900/30'
         }`}
     >
-      <span className={`material-symbols-outlined text-[20px] shrink-0 ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
+      <span className={`material-symbols-outlined text-sm shrink-0 ${isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
         {iconName}
       </span>
       <span className={`flex-1 truncate transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
@@ -155,7 +155,7 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
       )}
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-2 px-2 flex flex-col gap-0.5">
         {TOP_NAV.map(item => (
           <SidebarItem key={item.path} {...item} onClick={onClose} expanded={expanded} />
         ))}
@@ -165,18 +165,18 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
           <button
             onClick={(e) => { e.stopPropagation(); expanded && setSettingsOpen(p => !p); }}
             title={!expanded ? 'Settings' : undefined}
-            className={`flex items-center gap-3.5 px-5 py-3.5 text-base font-display transition-all min-h-[48px] w-full overflow-hidden ${onSettings
-              ? 'text-slate-900 dark:text-slate-100 font-semibold'
-              : 'text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 font-normal'
+            className={`flex items-center gap-3 px-3 py-2 text-sm font-display font-medium transition-all min-h-[38px] w-full overflow-hidden rounded-lg ${onSettings
+              ? 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
+              : 'text-slate-800 dark:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-900/30'
               }`}
           >
-            <span className={`material-symbols-outlined text-[20px] shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
+            <span className={`material-symbols-outlined text-sm shrink-0 ${onSettings ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
               settings
             </span>
             <span className={`flex-1 text-left transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
               Settings
             </span>
-            <span className={`material-symbols-outlined text-[18px] text-slate-400 dark:text-slate-500 transition-all duration-200 ${settingsOpen ? 'rotate-180' : ''} ${expanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
+            <span className={`material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 transition-all duration-200 ${settingsOpen ? 'rotate-180' : ''} ${expanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
               expand_more
             </span>
           </button>
@@ -189,6 +189,7 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
                 style={{ overflow: 'hidden' }}
+                className="ml-[21px] pl-3 py-1 flex flex-col gap-0.5 my-0.5 border-l border-slate-200 dark:border-slate-800"
               >
                 {SETTINGS_SUB.map(item => {
                   const isActive = pathname === item.path;
@@ -197,12 +198,12 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                       key={item.path}
                       href={item.path}
                       onClick={(e) => { e.stopPropagation(); onClose?.(); }}
-                      className={`flex items-center gap-2 pl-12 pr-5 py-2.5 text-base tracking-wider font-display transition-colors min-h-[40px] w-full ${isActive
-                        ? 'text-slate-900 dark:text-slate-100 font-semibold'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-normal'
+                      className={`flex items-center gap-2 px-3 py-1.5 text-sm font-display font-medium transition-colors min-h-[32px] w-full rounded-md ${isActive
+                        ? 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
+                        : 'text-slate-800 dark:text-slate-200 hover:bg-slate-100/30 dark:hover:bg-slate-900/10'
                         }`}
                     >
-                      <span className="material-symbols-outlined text-[18px] shrink-0">{item.icon}</span>
+                      <span className="material-symbols-outlined text-sm shrink-0">{item.icon}</span>
                       {item.label}
                     </Link>
                   );
@@ -212,12 +213,12 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
                   <Link
                     href="/dashboard/settings/admin"
                     onClick={(e) => { e.stopPropagation(); onClose?.(); }}
-                    className={`flex items-center gap-2 pl-12 pr-5 py-2.5 text-base font-display transition-colors min-h-[40px] w-full ${pathname === '/dashboard/settings/admin'
-                      ? 'text-slate-900 dark:text-slate-100 font-semibold'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-normal'
+                    className={`flex items-center gap-2 px-3 py-1.5 text-sm font-display font-medium transition-colors min-h-[32px] w-full rounded-md ${pathname === '/dashboard/settings/admin'
+                      ? 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
+                      : 'text-slate-800 dark:text-slate-200 hover:bg-slate-100/30 dark:hover:bg-slate-900/10'
                       }`}
                   >
-                    <span className="material-symbols-outlined text-[18px] shrink-0">verified_user</span>
+                    <span className="material-symbols-outlined text-sm shrink-0">verified_user</span>
                     Super Admin
                   </Link>
                 )}
@@ -228,16 +229,18 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
       </nav>
 
       {/* Back to Sapybase home — same look as the nav items above */}
-      <SidebarItem
-        label="Back to Sapybase"
-        icon="home"
-        path="/"
-        onClick={onClose}
-        expanded={expanded}
-      />
+      <div className="px-2 py-1 border-t border-slate-200/50 dark:border-slate-800/50">
+        <SidebarItem
+          label="Back to Sapybase"
+          icon="home"
+          path="/"
+          onClick={onClose}
+          expanded={expanded}
+        />
+      </div>
 
       {/* User footer */}
-      <div className="px-5 py-4 flex items-center gap-3 min-h-[64px] bg-[#f8f9fa] dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
+      <div className="px-5 py-4 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center gap-3 min-h-[64px] bg-[#f8f9fa] dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
         {mounted && <UserButton appearance={{ elements: { avatarBox: 'w-7 h-7' } }} />}
         <div className={`flex-1 min-w-0 transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate transition-colors">
