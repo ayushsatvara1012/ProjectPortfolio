@@ -47,7 +47,7 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 | # | Item | Severity | Acceptance |
 |---|---|---|---|
 | 3.1 | **Load `byod_alerts.yml` into the real Prometheus** and confirm every rule parses + evaluates (exprs are unit-checked against the catalog, not yet run in Prometheus). | Blocker | Rules load with no errors; a synthetic signal fires the expected alert. |
-| 3.2 | **Alertmanager paging routes** for the three `page`-severity alerts (KMS / global-ceiling / routing-mismatch). **Config written + locally validated** (`alerts/byod_alertmanager.yaml`, secrets-free template; parses clean under `mimirtool` 3.1.1; route-matcher contract cross-checked against the rules' `feature`/`severity` labels). Load + test-fire runbook in [`alerts/README.md`](../sapybase_ai_engine/observability/alerts/README.md). **Pending:** load to Grafana Cloud + real test fire (needs the canary). | Blocker | A test fire of each `page` alert reaches the on-call pager. `ticket`/`info` route to the queue. |
+| 3.2 | ✅ **DONE.** **Alertmanager paging routes** loaded LIVE to the Grafana Cloud Mimir Alertmanager (`mimirtool alertmanager load`, AM tenant `--id=1656651` — the Alertmanager datasource's basic-auth User, *not* the metrics id `3317422`; that mismatch was the earlier 401). Config read back + confirmed. **Route + end-to-end delivery verified by synthetic test fire:** a `severity=page,feature=byod` alert POSTed to `/alertmanager/api/v2/alerts` registered `active`, routed to receiver `byod-pager` (verified via `/alerts/groups`, not the queue), and the `[PAGE] BYOD BYODKmsDecryptErrors` email **landed in the pager inbox** (SMTP→Resend→inbox confirmed). All three page alerts match on the same two labels (not alertname), so one fire validates all three. Runbook: [`alerts/README.md`](../sapybase_ai_engine/observability/alerts/README.md). | Blocker | A test fire of each `page` alert reaches the on-call pager. `ticket`/`info` route to the queue. |
 | 3.3 | **Import the Grafana dashboard** (`observability/dashboards/byod_slo_dashboard.json`) and confirm panels bind to live metrics. | Medium | Dashboard renders with real data for a canary tenant. |
 | 3.4 | **Capture a real SLO baseline** (`scripts/capture_slo_baseline.py --from <metrics_export>`) once live metrics exist, replacing the ceiling placeholders. | Medium | `baseline.json` reflects measured shared-plane numbers; `--check` wired into CI/release. |
 
@@ -70,7 +70,7 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 
 - [ ] All §1 (code) blockers/medium-as-decided closed.
 - [ ] All §2 (config) blockers closed.
-- [ ] §3 alerting wired; §3.1 + §3.2 verified by test fire.
+- [x] §3 alerting wired; §3.1 + §3.2 verified by test fire. _(3.1 rules in Mimir ruler; 3.2 AM paging route + page email delivered. 3.3/3.4 dashboard+baseline are non-blocking polish.)_
 - [ ] §4.1–§4.4 canary validation passed.
 - [ ] **On-call sign-off** recorded in [byod_runbook.md](runbooks/byod_runbook.md) (paging routes confirmed).
 - [ ] Commercial: contract/DPA covers BYOD data handling; client given egress IP + min Postgres/pgvector requirements (≥ 0.5.0).
@@ -81,5 +81,5 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 
 ## Quick triage: what's actually blocking a first paying client
 
-**Must-do (blockers):** 2.1 metrics multiproc · 2.2 protect /metrics · 2.3 egress IP · 2.4 KMS env · 2.5 purge cron · 3.1 alerts in Prometheus · 3.2 paging · 4.1–4.3 canary + regression · §5 sign-off.
+**Must-do (blockers):** ~~2.1 metrics multiproc~~ ✅ · ~~2.2 protect /metrics~~ ✅ · ~~2.3 egress IP~~ ✅ · ~~2.4 KMS env~~ ✅ · ~~2.5 purge cron~~ ✅ · ~~3.1 alerts in Prometheus~~ ✅ · ~~3.2 paging~~ ✅ · 4.1–4.3 canary + regression · §5 sign-off.
 **Can follow (not blocking a careful pilot):** ~~1.1 re-train prune~~ ✅ · ~~1.2 http SLO metric~~ ✅ · 3.3/3.4 dashboard+baseline polish · 4.5/4.6 perf+exhaustive review.
