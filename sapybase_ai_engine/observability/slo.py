@@ -267,11 +267,26 @@ ALERTS: dict[str, dict[str, Any]] = {
         "summary": "Tenant schema behind engine target; features version-gated off (no error, but a migration is owed).",
         "runbook": "schema-drift",
     },
+    "BYODKmsColdTenantDown": {
+        # A cold_fail means KMS is unavailable AND there is no cached DSN for that
+        # tenant — it is hard-down *now*. Page fast: increase()[10m] latches on even
+        # a single failure and stays > 0 for the whole window, so a brief burst
+        # reliably clears for:1m (the rate[5m] aggregate below needs the failures to
+        # *sustain* and silently misses short bursts — readiness 2d finding).
+        "expr": 'sum(increase(byod_kms_decrypt_errors_total{outcome="cold_fail"}[10m])) > 0',
+        "severity": "page",
+        "for": "1m",
+        "summary": "KMS/decrypt failure on a cold tenant (no cached DSN) — that tenant is DOWN now. Fast page; does not wait for a sustained rate.",
+        "runbook": "kms-unavailable",
+    },
     "BYODKmsDecryptErrors": {
-        "expr": "sum(rate(byod_kms_decrypt_errors_total[5m])) > 0",
+        # served_cached: KMS is unavailable but we are still serving from the
+        # decrypted-DSN cache (tenants up, but the cache is time-bounded — fix KMS
+        # before it expires). Sustained-rate page; cold_fail is handled faster above.
+        "expr": 'sum(rate(byod_kms_decrypt_errors_total{outcome="served_cached"}[5m])) > 0',
         "severity": "page",
         "for": "5m",
-        "summary": "KMS/decrypt failures; serving from decrypted-DSN cache. Cold tenants (outcome=cold_fail) are down.",
+        "summary": "KMS/decrypt failures while serving from the decrypted-DSN cache (tenants still up, but the cache is time-bounded — fix KMS before it expires).",
         "runbook": "kms-unavailable",
     },
     "BYODGlobalCeilingReached": {

@@ -8,106 +8,119 @@
       "rules": [
         {
           "alert": "BYODTenantWriteDegraded",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#tenant-db-read-only",
-            "summary": "Tenant DB rejecting writes (read-only / in recovery); chat_log writes degraded."
-          },
           "expr": "sum by (company_id) (rate(byod_tenant_db_errors_total{kind=\"readonly\"}[5m])) > 0",
           "for": "5m",
           "labels": {
-            "feature": "byod",
-            "severity": "ticket"
+            "severity": "ticket",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Tenant DB rejecting writes (read-only / in recovery); chat_log writes degraded.",
+            "runbook_url": "docs/runbooks/byod_runbook.md#tenant-db-read-only"
           }
         },
         {
           "alert": "BYODTenantVectorDimensionMismatch",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#wrong-dimension-vectors",
-            "summary": "Tenant has wrong-dimension embedding rows; rows skipped, tenant marked unhealthy."
-          },
           "expr": "sum by (company_id) (increase(byod_tenant_vector_dimension_mismatch_total[15m])) > 0",
           "for": "0m",
           "labels": {
-            "feature": "byod",
-            "severity": "ticket"
+            "severity": "ticket",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Tenant has wrong-dimension embedding rows; rows skipped, tenant marked unhealthy.",
+            "runbook_url": "docs/runbooks/byod_runbook.md#wrong-dimension-vectors"
           }
         },
         {
           "alert": "BYODTenantBreakerOpen",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#breaker-open",
-            "summary": "Tenant circuit breaker open >5m; that tenant is fast-failing (isolated)."
-          },
           "expr": "max by (company_id) (byod_tenant_circuit_breaker_state) == 1",
           "for": "5m",
           "labels": {
-            "feature": "byod",
-            "severity": "ticket"
+            "severity": "ticket",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Tenant circuit breaker open >5m; that tenant is fast-failing (isolated).",
+            "runbook_url": "docs/runbooks/byod_runbook.md#breaker-open"
           }
         },
         {
           "alert": "BYODTenantSchemaGateBlocked",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#schema-drift",
-            "summary": "Tenant schema behind engine target; features version-gated off (no error, but a migration is owed)."
-          },
           "expr": "sum by (company_id) (rate(byod_tenant_schema_gate_total{decision=\"blocked\"}[15m])) > 0",
           "for": "15m",
           "labels": {
-            "feature": "byod",
-            "severity": "ticket"
+            "severity": "ticket",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Tenant schema behind engine target; features version-gated off (no error, but a migration is owed).",
+            "runbook_url": "docs/runbooks/byod_runbook.md#schema-drift"
+          }
+        },
+        {
+          "alert": "BYODKmsColdTenantDown",
+          "expr": "sum(increase(byod_kms_decrypt_errors_total{outcome=\"cold_fail\"}[10m])) > 0",
+          "for": "1m",
+          "labels": {
+            "severity": "page",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "KMS/decrypt failure on a cold tenant (no cached DSN) \u2014 that tenant is DOWN now. Fast page; does not wait for a sustained rate.",
+            "runbook_url": "docs/runbooks/byod_runbook.md#kms-unavailable"
           }
         },
         {
           "alert": "BYODKmsDecryptErrors",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#kms-unavailable",
-            "summary": "KMS/decrypt failures; serving from decrypted-DSN cache. Cold tenants (outcome=cold_fail) are down."
-          },
-          "expr": "sum(rate(byod_kms_decrypt_errors_total[5m])) > 0",
+          "expr": "sum(rate(byod_kms_decrypt_errors_total{outcome=\"served_cached\"}[5m])) > 0",
           "for": "5m",
           "labels": {
-            "feature": "byod",
-            "severity": "page"
+            "severity": "page",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "KMS/decrypt failures while serving from the decrypted-DSN cache (tenants still up, but the cache is time-bounded \u2014 fix KMS before it expires).",
+            "runbook_url": "docs/runbooks/byod_runbook.md#kms-unavailable"
           }
         },
         {
           "alert": "BYODGlobalCeilingReached",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#global-ceiling",
-            "summary": "Global tenant-connection ceiling hit; requests shed with 503 retry-after."
-          },
           "expr": "sum(rate(byod_global_connection_ceiling_rejections_total[5m])) > 0",
           "for": "5m",
           "labels": {
-            "feature": "byod",
-            "severity": "page"
+            "severity": "page",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Global tenant-connection ceiling hit; requests shed with 503 retry-after.",
+            "runbook_url": "docs/runbooks/byod_runbook.md#global-ceiling"
           }
         },
         {
           "alert": "BYODMeteringReplaySpike",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#idempotency-replay",
-            "summary": "Elevated idempotent metering replays; dedup is holding (no double-count) but investigate the retry source."
-          },
           "expr": "sum by (company_id) (rate(byod_metering_idempotent_replays_total[5m])) > 0.5",
           "for": "15m",
           "labels": {
-            "feature": "byod",
-            "severity": "info"
+            "severity": "info",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Elevated idempotent metering replays; dedup is holding (no double-count) but investigate the retry source.",
+            "runbook_url": "docs/runbooks/byod_runbook.md#idempotency-replay"
           }
         },
         {
           "alert": "BYODRoutingIntegrityViolation",
-          "annotations": {
-            "runbook_url": "docs/runbooks/byod_runbook.md#routing-mismatch",
-            "summary": "Connection company_id-tag assertion failed \u2014 possible cross-tenant routing. Query aborted; investigate immediately."
-          },
           "expr": "increase(byod_routing_integrity_violations_total[5m]) > 0",
           "for": "0m",
           "labels": {
-            "feature": "byod",
-            "severity": "page"
+            "severity": "page",
+            "feature": "byod"
+          },
+          "annotations": {
+            "summary": "Connection company_id-tag assertion failed \u2014 possible cross-tenant routing. Query aborted; investigate immediately.",
+            "runbook_url": "docs/runbooks/byod_runbook.md#routing-mismatch"
           }
         }
       ]

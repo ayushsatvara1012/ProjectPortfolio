@@ -5,8 +5,8 @@ remote-written by the [Alloy scraper](../../../alloy/README.md) are evaluated:
 
 | File | What it is | Loads into |
 |------|-----------|------------|
-| `byod_alerts.yml` | The `byod` rule group (8 alerts). **Generated** from `slo.py` — do not hand-edit. | Mimir **ruler** |
-| `byod_alertmanager.yaml` | Routes the three `severity: page` alerts to the on-call pager, everything else to the ticket/info queue. Secrets-free template (`${ENV_VARS}`). | Mimir **Alertmanager** |
+| `byod_alerts.yml` | The `byod` rule group (9 alerts). **Generated** from `slo.py` — do not hand-edit. | Mimir **ruler** |
+| `byod_alertmanager.yaml` | Routes the four `severity: page` alerts to the on-call pager, everything else to the ticket/info queue. Secrets-free template (`${ENV_VARS}`). | Mimir **Alertmanager** |
 
 Both are loaded with [`mimirtool`](https://grafana.com/docs/mimir/latest/manage/tools/mimirtool/)
 (downloaded locally, gitignored). Pin the version; tested with **3.1.1**.
@@ -14,9 +14,10 @@ Both are loaded with [`mimirtool`](https://grafana.com/docs/mimir/latest/manage/
 ## Page routing contract
 
 The pager route matches `severity="page"` **and** `feature="byod"`. Every rule in
-`byod_alerts.yml` carries `feature: byod`; exactly three carry `severity: page`:
+`byod_alerts.yml` carries `feature: byod`; exactly four carry `severity: page`:
 
-- `BYODKmsDecryptErrors` — KMS/decrypt failing, cold tenants down
+- `BYODKmsColdTenantDown` — KMS down with no cached DSN; that cold tenant is down *now* (fast page, `for: 1m`)
+- `BYODKmsDecryptErrors` — KMS down but still serving from the decrypted-DSN cache (sustained, `for: 5m`)
 - `BYODGlobalCeilingReached` — global connection ceiling hit, shedding 503s
 - `BYODRoutingIntegrityViolation` — cross-tenant routing assertion tripped
 
@@ -71,6 +72,7 @@ Required env (`.env.alertmanager`, gitignored):
 ## Test fire (closes §3.2)
 
 After loading, fire each `page` alert against a canary so it reaches the pager
-(not just the queue) — e.g. trigger a KMS-decrypt failure on the canary tenant
-and confirm the `[PAGE] BYOD BYODKmsDecryptErrors` email lands. Record the
+(not just the queue) — e.g. trigger a KMS-decrypt failure on a *cold* canary tenant
+(no cached DSN) and confirm the `[PAGE] BYOD BYODKmsColdTenantDown` email lands
+within ~1 min. Record the
 on-call sign-off in [byod_runbook.md](../../../docs/runbooks/byod_runbook.md).

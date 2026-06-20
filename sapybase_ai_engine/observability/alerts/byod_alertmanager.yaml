@@ -1,8 +1,9 @@
 # BYOD Alertmanager config for the Grafana Cloud / Mimir Alertmanager (NOT Grafana-managed alerting).
 # Pairs with observability/alerts/byod_alerts.yml (the rule group already loaded into the Mimir ruler).
 #
-# Routes the three `severity: page` alerts (BYODKmsDecryptErrors, BYODGlobalCeilingReached,
-# BYODRoutingIntegrityViolation) to the on-call pager; everything else (ticket/info) to the queue.
+# Routes the four `severity: page` alerts (BYODKmsColdTenantDown, BYODKmsDecryptErrors,
+# BYODGlobalCeilingReached, BYODRoutingIntegrityViolation) to the on-call pager; everything
+# else (ticket/info) to the queue.
 #
 # SECRETS-FREE TEMPLATE: all sensitive values are ${ENV_VARS}. Render with envsubst into a
 # gitignored temp file before loading, e.g.:
