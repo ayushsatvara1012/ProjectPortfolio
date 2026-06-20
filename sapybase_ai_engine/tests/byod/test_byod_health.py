@@ -66,6 +66,18 @@ def test_health_check_classifies_auth_failure():
         run_health_check(RUNTIME_DSN, resolver=_resolver, connect=connector)
 
 
+def test_health_check_classifies_connect_time_auth_by_message():
+    """Regression (§16.5): a connect-time wrong-password failure is a plain
+    OperationalError with NO pgcode (psycopg2 doesn't populate SQLSTATE during the
+    handshake). It must still classify as auth (→ NEEDS_RECONNECT) via the message,
+    not fall through to unreachable (→ ERROR)."""
+    connector = make_failing_connector(
+        FakeDbError('connection failed: FATAL:  password authentication failed for user "vaayu_runtime"')
+    )
+    with pytest.raises(TenantAuthFailed):
+        run_health_check(RUNTIME_DSN, resolver=_resolver, connect=connector)
+
+
 def test_health_check_classifies_unreachable():
     connector = make_failing_connector(OSError("connection refused at db.tenant.example.com:5432"))
     with pytest.raises(TenantUnreachable) as ei:

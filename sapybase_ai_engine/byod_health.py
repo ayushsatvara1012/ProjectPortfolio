@@ -40,6 +40,17 @@ _REACHABILITY_TABLE = "company_knowledge"
 
 # SQLSTATEs that mean "bad credentials" (client rotated their DB password, §16.5).
 _AUTH_SQLSTATES = frozenset({"28P01", "28000", "28"})
+# Connect-time auth failures: psycopg2 raises a plain OperationalError during the
+# connection handshake whose ``pgcode`` is NOT populated (and whose class is
+# OperationalError, not InvalidPassword) — so the SQLSTATE/class checks miss the
+# real "client rotated their DB password" case. Fall back to matching the driver's
+# message (same approach as main.py's connect path). Lower-cased substring match.
+_AUTH_MESSAGE_MARKERS = (
+    "password authentication failed",
+    "authentication failed",
+    "no password supplied",
+    "invalid username-password",
+)
 # SQLSTATEs that mean "the data plane isn't usable by this role" (missing table /
 # revoked grant) rather than a connectivity problem.
 _DATAPLANE_SQLSTATES = frozenset({"42P01", "42501", "3F000", "3D000"})
@@ -104,6 +115,18 @@ def _pgcode(exc: Exception) -> Optional[str]:
     return getattr(exc, "pgcode", None)
 
 
+def _is_auth_failure(exc: Exception) -> bool:
+    """True if ``exc`` is a credential/auth rejection (→ NEEDS_RECONNECT, §16.5).
+
+    Checks the SQLSTATE and class first (query-time auth errors carry these), then
+    falls back to the driver message — required because a connect-time wrong-password
+    failure is a plain OperationalError with no ``pgcode``."""
+    if _pgcode(exc) in _AUTH_SQLSTATES or exc.__class__.__name__ == "InvalidPassword":
+        return True
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _AUTH_MESSAGE_MARKERS)
+
+
 def run_health_check(
     dsn: str,
     *,
@@ -130,7 +153,7 @@ def run_health_check(
     except HealthError:
         raise
     except Exception as exc:  # classify auth vs unreachable; sanitize (E6)
-        if _pgcode(exc) in _AUTH_SQLSTATES or exc.__class__.__name__ == "InvalidPassword":
+        if _is_auth_failure(exc):
             raise TenantAuthFailed(
                 "The tenant database rejected the stored credentials. The database "
                 "password may have changed; reconnect the database."
@@ -165,7 +188,7 @@ def _run_health_queries(conn: object, config: HealthConfig) -> None:
         cur.execute(f"SELECT 1 FROM {_REACHABILITY_TABLE} LIMIT 1")
         cur.fetchone()
     except Exception as exc:  # sanitize (E6)
-        if _pgcode(exc) in _AUTH_SQLSTATES:
+        if _is_auth_failure(exc):
             raise TenantAuthFailed(
                 "The tenant database rejected the stored credentials."
             ) from exc
