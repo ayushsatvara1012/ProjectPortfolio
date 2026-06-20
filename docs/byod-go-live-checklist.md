@@ -67,11 +67,12 @@ Run each row from [`runbooks/byod_canary_dryrun.md`](runbooks/byod_canary_dryrun
 
 **Done when:** all four behave per the runbook and the KMS page actually paged.
 
-### B4. Shared-fleet regression (GA criterion)
-- [ ] After metrics accumulate: `python sapybase_ai_engine/scripts/capture_slo_baseline.py --from <metrics_export>` to refresh `baseline.json` off real numbers.
-- [ ] `evaluate_regression(plane="shared")` passes — shared error/latency at or below the Phase-0 baseline with the canary live.
+### B4. Shared-fleet regression (GA criterion) — ✅ DONE 2026-06-20
+- [x] Measured shared-plane SLOs from Grafana Cloud (Mimir) over [6h] with the canary live: **error_rate 0** (0×5xx, 0×4xx), **p95 12.3 ms**, **p99 24.5 ms** (~729 shared requests). Queries: `histogram_quantile(0.95|0.99, sum by (le)(rate(sapybase_http_request_duration_seconds_bucket{plane="shared"}[6h])))*1000` and `sum(rate(...status_class="5xx"))/sum(rate(...))`.
+- [x] `scripts/capture_slo_baseline.py --check` of those numbers vs the committed Phase-0 baseline → **`[shared] OK`, exit 0**. Shared fleet far under budget (≤0.55% err, ≤1650 ms p95, ≤3300 ms p99) with the canary live → **no regression**.
+- [ ] (Deliberately skipped) NOT refreshing `baseline.json` to these numbers — at pre-launch volume a 12 ms p95 baseline is an unrealistically tight budget that would false-positive once real load arrives. Keep the SLO ceilings as the stable regression budget; revisit with representative production traffic. Tenant plane excluded from the check (just fault-injected in B3 → artificially degraded).
 
-**Done when:** the shared plane shows no regression.
+**Done when:** the shared plane shows no regression. ✅
 
 ---
 
