@@ -268,7 +268,13 @@ Phase 8.4 GA gate (RFC §13): *"All §16.9 states alert + have a runbook; on-cal
 - [x] Every RFC §11 operational runbook (onboarding failure, stuck migration, tenant DB outage, credential rotation, emergency disconnect) is present above.
 - [x] Alerts route by severity: `page` (KMS, global ceiling, routing mismatch) wake on-call; `ticket`/`info` go to the queue.
 
-**On-call sign-off:** _________________________  **Date:** ____________
+**On-call sign-off:** Ayush Satvara (founder / on-call)  **Date:** 2026-06-20
+
+> Verified before sign-off: all four `page`-severity alerts route to the pager via the
+> live Grafana Cloud / Mimir Alertmanager (tenant `1656651`) — confirmed end-to-end by
+> (1) the §3.2 synthetic fire, (2) the B3 real KMS page `BYODKmsColdTenantDown`, and
+> (3) a post-rotation synthetic page on the new Resend key. `ticket`/`info` route to the
+> queue. C1 rollback rehearsal passed (BYOD off → shared/dark path, tenant DB untouched).
 
 > Reviewer: confirm each `page`-severity alert has a paging route configured in the
 > alertmanager before enabling `byo_database` for the first paying client.

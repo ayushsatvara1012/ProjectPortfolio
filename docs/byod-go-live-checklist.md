@@ -78,8 +78,8 @@ Run each row from [`runbooks/byod_canary_dryrun.md`](runbooks/byod_canary_dryrun
 
 ## C. Step 8 — Sign-off & enable the first paying client
 
-- [ ] **C1. Rollback rehearsal.** Remove the canary from `BYOD_CANARY_COMPANY_IDS` (or `BYOD_ENABLED=false`) → next request serves the shared/dark path, tenant DB untouched. (Optionally `POST /byod/switch-out` for the full reverse — tenant DB only ever read.)
-- [ ] **C2. On-call sign-off.** Fill the blank sign-off line in [`runbooks/byod_runbook.md`](runbooks/byod_runbook.md#on-call-sign-off) confirming paging routes work (§3.2 synthetic + B3 real KMS page).
+- [x] **C1. Rollback rehearsal — DONE 2026-06-20.** Flipped `BYOD_ENABLED=false` (fleet-wide off) → the canary bot kept answering via the shared/dark path (graceful fallback, no outage) and Neon `chat_logs` count was **unchanged** (tenant DB not written while off). Rolled forward (`BYOD_ENABLED=true`, id still in `BYOD_CANARY_COMPANY_IDS`) → Neon `chat_logs` count **grew again** (on-switch confirmed). Reversible both directions, zero tenant-data change. (Optionally `POST /byod/switch-out` for the full reverse — tenant DB only ever read.)
+- [x] **C2. On-call sign-off — DONE 2026-06-20** (Ayush Satvara). Recorded in [`runbooks/byod_runbook.md`](runbooks/byod_runbook.md#on-call-sign-off): all four page alerts route to the pager (§3.2 synthetic + B3 real KMS page + post-rotation synthetic), C1 rollback passed.
 - [ ] **C3. Commercial.** Contract/DPA covers BYOD data handling; send the client the egress IPs (`74.220.48.0/24` + `74.220.56.0/24`) + min Postgres/pgvector (≥ 0.5.0) — see [`byod-client-onboarding.md`](byod-client-onboarding.md).
 - [ ] **C4. Enable for the real client.** Onboard them (B1 steps with their DSN) → add their `company_id` to `BYOD_CANARY_COMPANY_IDS` → redeploy. Keep `BYOD_ENABLED=true`.
 - [ ] **C5. Watch the first billing cycle.** Grafana dashboard + alerts; metering correct; no shared-fleet regression.

@@ -74,10 +74,10 @@ This plan covers everything between "code complete" and "enable `byo_database` f
 - [ ] All §2 (config) blockers closed.
 - [x] §3 alerting wired; §3.1 + §3.2 verified by test fire. _(3.1 rules in Mimir ruler; 3.2 AM paging route + page email delivered. 3.3/3.4 dashboard+baseline are non-blocking polish.)_
 - [ ] §4.1–§4.4 canary validation passed.
-- [ ] **On-call sign-off** recorded in [byod_runbook.md](runbooks/byod_runbook.md) (paging routes confirmed).
+- [x] **On-call sign-off** recorded 2026-06-20 (Ayush Satvara) in [byod_runbook.md](runbooks/byod_runbook.md) — paging routes confirmed (synthetic + real KMS page + post-rotation synthetic).
 - [ ] Commercial: contract/DPA covers BYOD data handling; client given egress IP + min Postgres/pgvector requirements (≥ 0.5.0).
 - [ ] **Enable:** set `BYOD_ENABLED=true` + add the client's `company_id` to `BYOD_CANARY_COMPANY_IDS`. Monitor closely for the first billing cycle.
-- [ ] **Rollback rehearsed:** removing the tenant from the canary allowlist (or `BYOD_ENABLED=false`) reverts to the dark/shared path with no data change.
+- [x] **Rollback rehearsed (2026-06-20):** `BYOD_ENABLED=false` reverted the canary to the dark/shared path (bot kept answering, Neon `chat_logs` count unchanged); rolling forward grew the count again. No tenant-data change either direction.
 
 ---
 
