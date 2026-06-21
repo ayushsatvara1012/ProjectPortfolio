@@ -5,8 +5,11 @@ enable/disable, monitor, and offboard a client **without ever touching Render en
 vars or running curl/console scripts** — with a self-serve client onboarding step
 and high security throughout.
 
-**Status:** PLAN ONLY (2026-06-20). Nothing here is built yet. BYOD itself is
-GA + production-ready (Sections A/B + C1/C2 done); this is the operability layer.
+**Status:** Phases 1–5 BUILT (admin fleet view + lifecycle actions + DB-driven
+routing switch + client self-serve onboarding + client status/reconnect +
+change-request signal). Phase 6 (metering/usage + final polish) is the remaining
+work. BYOD itself is GA + production-ready (Sections A/B + C1/C2 done); this is the
+operability layer.
 
 ---
 
@@ -200,7 +203,7 @@ reachable from egress IPs → actionable "allowlist these IPs" message; client s
 while already `LIVE` → blocked (frozen, §0 reconciliation); pgvector missing/too old
 → the existing probe error surfaced verbatim-safe.
 
-### Phase 5 — Client status + request-changes + reconnect flow
+### Phase 5 — Client status + request-changes + reconnect flow ✅ BUILT 2026-06-21
 **Frontend (client):** a status card (LIVE / NEEDS_RECONNECT / DISABLED / ERROR with
 plain-English copy + last health), a **"Request reconnect"** / **"Request to leave"**
 button (→ `request-change`), and — only under `NEEDS_RECONNECT` — re-open the DSN
@@ -211,6 +214,28 @@ task/notify mechanism exists; if none, an audit row + a flag on the fleet list).
 the admin gets a clear signal to re-provision.
 **Edge cases:** spam of requests → rate-limited + dedup; "leave" never deletes client
 data (maps to switch-out/offboard, admin-run).
+
+> **As built (2026-06-21):** No general admin-notification system exists, so the
+> plan's fallback was taken — **a persisted flag on the fleet list**. Migration
+> `0020` adds `pending_change_kind` / `pending_change_note` / `pending_change_at`
+> (the client→admin signal) + `last_health_at` to `byod_tenant_databases` (additive,
+> dark, NULL by default; single-source-of-truth DDL in `byod_store`).
+> `byod_client.request_change` now **parks the latest request** on the tenant row
+> (latest-wins ⇒ dedup; with the existing `10/minute` route limit that satisfies
+> "rate-limited + dedup") — still **no lifecycle mutation** ("leave" never deletes
+> data). The signal surfaces in `GET /api/admin/byod/tenants`, the admin detail view,
+> and the client's own `GET /api/byod/me` (so the client sees a persistent "pending
+> review" banner across reloads). It is **cleared** on: admin **provision → LIVE**
+> (reconnect resolved), the client **re-submitting a DSN** (self-heal), or an explicit
+> new admin endpoint `POST …/byod/clear-request` ("Dismiss request" in the drawer).
+> `last_health_at` is stamped by `check_health` + `provision` and shown in both the
+> client status card and the admin drawer. The admin tab gains a **Requests** filter +
+> a "Reconnect/Leave requested" pill on every row. A no-row caller (status "not
+> started") requesting a change gets a `409` (nothing to reconnect/leave). Tests:
+> store helpers + dedup + migration-0020 wiring + client round-trips (request parks &
+> surfaces, dedup, re-onboard clears, 409) + fleet-list flag + client-page component
+> tests (persistent banner, button collapse, last-health, correct kind). Backend
+> `pytest tests/byod` green (366 passed); frontend `vitest` green (282); `tsc` clean.
 
 ### Phase 6 — Metering/usage panel + polish *(doubles as C5 "watch the cycle")*
 **Frontend:** a per-tenant usage/metering view (message counts, billing-relevant

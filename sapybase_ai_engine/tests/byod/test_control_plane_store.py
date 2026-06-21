@@ -26,9 +26,12 @@ from byod_store import (
     TENANT_DB_STATUSES,
     TenantDbRecord,
     TenantDbStatus,
+    clear_pending_change_request,
     delete_tenant_db_record,
     get_routing_fields,
     get_tenant_db_record,
+    set_last_health_at,
+    set_pending_change_request,
     set_routing_enabled,
     store_tenant_db_record,
     update_tenant_db_schema_version,
@@ -39,6 +42,7 @@ _ENGINE_ROOT = Path(__file__).resolve().parents[2]
 _VERSIONS = _ENGINE_ROOT / "alembic_migrations" / "versions"
 _MIGRATION_PATH = _VERSIONS / "0014_byod_control_plane.py"
 _MIGRATION_0019_PATH = _VERSIONS / "0019_byod_routing_enabled.py"
+_MIGRATION_0020_PATH = _VERSIONS / "0020_byod_phase5_signals.py"
 
 
 def _load_module(name: str, path: Path):
@@ -89,6 +93,28 @@ class TestRoutingEnabledMigration:
         assert m.ROUTING_ENABLED_ADD_COLUMN_SQL is ROUTING_ENABLED_ADD_COLUMN_SQL
         assert "IF NOT EXISTS" in ROUTING_ENABLED_ADD_COLUMN_SQL
         assert "DEFAULT FALSE" in ROUTING_ENABLED_ADD_COLUMN_SQL
+
+
+class TestPhase5SignalsMigration:
+    """Phase 5 change-signal + last-health migration (0020)."""
+
+    def test_revision_chain(self):
+        m = _load_module("byod_migration_0020", _MIGRATION_0020_PATH)
+        assert m.revision == "0020"
+        assert m.down_revision == "0019"
+        assert callable(m.upgrade) and callable(m.downgrade)
+
+    def test_uses_canonical_additive_ddl(self):
+        # Imports the store's single-source-of-truth ALTERs (idempotent + additive).
+        from byod_store import PHASE5_SIGNALS_ADD_COLUMNS_SQL, PHASE5_SIGNALS_DROP_COLUMNS_SQL
+        m = _load_module("byod_migration_0020b", _MIGRATION_0020_PATH)
+        assert m.PHASE5_SIGNALS_ADD_COLUMNS_SQL is PHASE5_SIGNALS_ADD_COLUMNS_SQL
+        assert m.PHASE5_SIGNALS_DROP_COLUMNS_SQL is PHASE5_SIGNALS_DROP_COLUMNS_SQL
+        for col in ("pending_change_kind", "pending_change_note", "pending_change_at", "last_health_at"):
+            assert col in PHASE5_SIGNALS_ADD_COLUMNS_SQL, col
+            assert col in PHASE5_SIGNALS_DROP_COLUMNS_SQL, col
+        assert "IF NOT EXISTS" in PHASE5_SIGNALS_ADD_COLUMNS_SQL
+        assert "DROP COLUMN IF EXISTS" in PHASE5_SIGNALS_DROP_COLUMNS_SQL
 
 
 class TestSchemaConstant:
@@ -233,6 +259,51 @@ def test_get_routing_fields_missing_returns_none(cp_conn):
 def test_set_routing_enabled_missing_company_returns_false(cp_conn):
     with cp_conn.cursor() as cur:
         assert set_routing_enabled(cur, str(uuid.uuid4()), True) is False
+
+
+def test_pending_change_request_round_trips_and_dedups(cp_conn, make_company):
+    company_id = make_company()
+    with cp_conn.cursor() as cur:
+        rec = store_tenant_db_record(cur, company_id, dsn_ciphertext=b"x", dsn_key_id="k")
+        # Dark by default: a freshly stored row has no open request.
+        assert rec.pending_change_kind is None
+        assert rec.pending_change_at is None
+
+        assert set_pending_change_request(cur, company_id, "reconnect", "pw rotated") is True
+        rec = get_tenant_db_record(cur, company_id)
+        assert rec.pending_change_kind == "reconnect"
+        assert rec.pending_change_note == "pw rotated"
+        assert rec.pending_change_at is not None
+
+        # Latest-wins dedup: a second request overwrites the first.
+        assert set_pending_change_request(cur, company_id, "leave", None) is True
+        rec = get_tenant_db_record(cur, company_id)
+        assert rec.pending_change_kind == "leave"
+        assert rec.pending_change_note is None
+
+        # Clearing resets all three signal columns.
+        assert clear_pending_change_request(cur, company_id) is True
+        rec = get_tenant_db_record(cur, company_id)
+        assert rec.pending_change_kind is None
+        assert rec.pending_change_at is None
+    cp_conn.commit()
+
+
+def test_pending_change_request_missing_company_returns_false(cp_conn):
+    with cp_conn.cursor() as cur:
+        assert set_pending_change_request(cur, str(uuid.uuid4()), "reconnect") is False
+        assert clear_pending_change_request(cur, str(uuid.uuid4())) is False
+
+
+def test_set_last_health_at_stamps_time(cp_conn, make_company):
+    company_id = make_company()
+    with cp_conn.cursor() as cur:
+        store_tenant_db_record(cur, company_id, dsn_ciphertext=b"x", dsn_key_id="k")
+        assert get_tenant_db_record(cur, company_id).last_health_at is None
+        assert set_last_health_at(cur, company_id) is True
+        assert get_tenant_db_record(cur, company_id).last_health_at is not None
+        assert set_last_health_at(cur, str(uuid.uuid4())) is False
+    cp_conn.commit()
 
 
 def test_invalid_status_rejected_in_python_and_db(cp_conn, make_company):

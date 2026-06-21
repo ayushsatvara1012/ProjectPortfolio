@@ -20,6 +20,7 @@ from byod_store import (
     TenantDbStatus,
     TenantSummary,
     list_all_tenants,
+    set_pending_change_request,
     set_routing_enabled,
     store_tenant_db_record,
     update_tenant_db_status,
@@ -115,6 +116,21 @@ def test_routing_enabled_surfaces_in_summary(make_tenant, fleet_schema):
     with fleet_schema.cursor() as cur:
         [row] = list_all_tenants(cur)
     assert row.routing_enabled is True
+
+
+def test_pending_change_request_surfaces_in_summary(make_tenant, fleet_schema):
+    # Phase 5: a client's open change request is the "flag on the fleet list".
+    company_id, _, _ = make_tenant(status=TenantDbStatus.LIVE)
+    with fleet_schema.cursor() as cur:
+        set_pending_change_request(cur, company_id, "reconnect", "rotated")
+    fleet_schema.commit()
+
+    with fleet_schema.cursor() as cur:
+        [row] = list_all_tenants(cur)
+    assert row.pending_change_kind == "reconnect"
+    assert row.pending_change_at is not None
+    # A tenant with no request reports a clean flag.
+    assert row.last_health_at is None
 
 
 def test_provisioned_flag_reflects_runtime_dsn(make_tenant, fleet_schema):

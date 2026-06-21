@@ -262,6 +262,11 @@ def provision(
         byod_crypto.store_encrypted_runtime_dsn(cur, company_id, runtime_dsn, kms)
         byod_store.update_tenant_db_schema_version(cur, company_id, schema_version)
         byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.LIVE)
+        # Phase 5: provisioning ran a health probe and the tenant is now LIVE, so any
+        # open client change request (e.g. a reconnect after a password rotation) is
+        # resolved — record the probe time and clear the fleet-list flag.
+        byod_store.set_last_health_at(cur, company_id)
+        byod_store.clear_pending_change_request(cur, company_id)
     except Exception:
         # Fail-soft on availability: isolate this tenant in ERROR and alert (§10).
         byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.ERROR)
@@ -317,6 +322,7 @@ def check_health(
         raise
 
     byod_store.update_tenant_db_status(cur, company_id, TenantDbStatus.LIVE)
+    byod_store.set_last_health_at(cur, company_id)  # Phase 5: record the probe time
     return {
         "company_id": company_id,
         "status": TenantDbStatus.LIVE,
@@ -379,6 +385,7 @@ def get_admin_view(cur, clerk_id: str) -> dict:
                 "key_id": record.dsn_key_id,
                 "created_at": _iso(record.created_at),
                 "updated_at": _iso(record.updated_at),
+                "last_health_at": _iso(record.last_health_at),  # Phase 5
             }
 
     return {
@@ -388,7 +395,33 @@ def get_admin_view(cur, clerk_id: str) -> dict:
         "byo_database": bool(cfg.get("byo_database")),
         "overrides": cfg,
         "connection": connection,
+        # Phase 5: the client's open change request (the fleet-list flag), so the
+        # admin drawer can show + dismiss it. None when there is no open request.
+        "pending_change": _pending_change(record) if connection is not None else None,
     }
+
+
+def _pending_change(record) -> Optional[dict]:
+    """Project a tenant record's open change request (UI plan Phase 5) into the safe
+    admin/client shape, or None when there is no open request."""
+    if record is None or not record.pending_change_kind:
+        return None
+    return {
+        "kind": record.pending_change_kind,
+        "note": record.pending_change_note,
+        "requested_at": _iso(record.pending_change_at),
+    }
+
+
+def clear_change_request(cur, clerk_id: str) -> dict:
+    """Dismiss a client's open change request (UI plan Phase 5): the admin has acted
+    on (or is acknowledging) the reconnect/leave signal, so clear the fleet-list flag.
+    Performs no lifecycle mutation. Caller commits. Raises :class:`CompanyNotFound`."""
+    company_id = resolve_company_id(cur, clerk_id)
+    if company_id is None:
+        raise CompanyNotFound(clerk_id)
+    cleared = byod_store.clear_pending_change_request(cur, company_id)
+    return {"company_id": company_id, "cleared": cleared}
 
 
 def _as_dict(raw: object) -> dict:

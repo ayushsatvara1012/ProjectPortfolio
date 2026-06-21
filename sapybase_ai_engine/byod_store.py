@@ -76,6 +76,10 @@ _COLUMNS = (
     "created_at",
     "updated_at",
     "routing_enabled",
+    "pending_change_kind",
+    "pending_change_note",
+    "pending_change_at",
+    "last_health_at",
 )
 _COLS_SQL = ", ".join(_COLUMNS)
 
@@ -132,7 +136,25 @@ CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     -- until then. The engine routes a tenant to its own DB only when BYOD_ENABLED
     -- (env kill switch) AND status = 'LIVE' AND routing_enabled = TRUE (with a
     -- one-release env-canary OR fallback during rollout).
-    routing_enabled BOOLEAN NOT NULL DEFAULT FALSE
+    routing_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Phase 5 client->admin change signal (UI plan sec 4 / Phase 5). When a client
+    -- self-serve requests an admin-run change, the latest request is parked here so
+    -- it surfaces on the admin fleet list (the "flag on the fleet list" the plan
+    -- calls for) without a separate notifications system. Latest-wins (a repeat
+    -- request overwrites) so spam can't pile up -- the dedup half of the plan's
+    -- "rate-limited + dedup". 'reconnect' = my DB credential/host changed, please
+    -- re-provision; 'leave' = take me off BYOD. NULL = no open request. Validated
+    -- in app code (byod_client.REQUEST_KINDS); no DB CHECK so the additive ALTER on
+    -- existing installs stays drift-free with this CREATE.
+    pending_change_kind TEXT,
+    pending_change_note TEXT,
+    pending_change_at   TIMESTAMPTZ,
+
+    -- Last successful health probe (UI plan Phase 1 fleet list / Phase 5 status
+    -- card "last health"). Set by check_health / provision on the healthy path;
+    -- distinct from updated_at (which any mutation bumps). NULL until first probed.
+    last_health_at      TIMESTAMPTZ
 );
 
 -- Operational lookups: list tenants by lifecycle state (e.g. all NEEDS_RECONNECT).
@@ -171,6 +193,25 @@ ROUTING_ENABLED_DROP_COLUMN_SQL = (
     f"ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS routing_enabled;"
 )
 
+# Additive migration (0020) for the Phase 5 client->admin change signal + last
+# health probe (UI plan §4 / Phase 5). Idempotent (ADD COLUMN IF NOT EXISTS) and
+# dark by default (all NULLABLE, default NULL) so existing rows are untouched and
+# behaviour is unchanged until a client actually raises a request. Single source
+# of truth (imported by the Alembic migration so app code + migration never drift).
+PHASE5_SIGNALS_ADD_COLUMNS_SQL = f"""
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS pending_change_kind TEXT;
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS pending_change_note TEXT;
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS pending_change_at   TIMESTAMPTZ;
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS last_health_at      TIMESTAMPTZ;
+""".strip()
+
+PHASE5_SIGNALS_DROP_COLUMNS_SQL = f"""
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS last_health_at;
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS pending_change_at;
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS pending_change_note;
+ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS pending_change_kind;
+""".strip()
+
 # Mirror of the migration's downgrade, kept here so tests can reset cleanly.
 CONTROL_PLANE_SCHEMA_DROP_SQL = (
     f"DROP INDEX IF EXISTS idx_byod_tenant_databases_status;\n"
@@ -196,6 +237,11 @@ class TenantDbRecord:
     created_at: object  # datetime — kept loose to avoid a hard import here
     updated_at: object
     routing_enabled: bool = False  # Phase 3 routing switch; defaulted for back-compat
+    # Phase 5 client->admin change signal + last health probe; defaulted for back-compat.
+    pending_change_kind: Optional[str] = None
+    pending_change_note: Optional[str] = None
+    pending_change_at: object = None
+    last_health_at: object = None
 
 
 def _to_bytes(value: object) -> Optional[bytes]:
@@ -223,6 +269,10 @@ def _row_to_record(row: tuple) -> TenantDbRecord:
         created_at=row[11],
         updated_at=row[12],
         routing_enabled=bool(row[13]),
+        pending_change_kind=row[14],
+        pending_change_note=row[15],
+        pending_change_at=row[16],
+        last_health_at=row[17],
     )
 
 
@@ -328,6 +378,11 @@ class TenantSummary:
     routing_enabled: bool
     created_at: object
     updated_at: object
+    # Phase 5: the client's open change request (the "flag on the fleet list") +
+    # last successful health probe, both defaulted for back-compat.
+    pending_change_kind: Optional[str] = None
+    pending_change_at: object = None
+    last_health_at: object = None
 
 
 def list_all_tenants(cur: "_Cursor") -> "list[TenantSummary]":
@@ -350,7 +405,10 @@ def list_all_tenants(cur: "_Cursor") -> "list[TenantSummary]":
                (t.runtime_dsn_ciphertext IS NOT NULL) AS provisioned,
                t.routing_enabled,
                t.created_at,
-               t.updated_at
+               t.updated_at,
+               t.pending_change_kind,
+               t.pending_change_at,
+               t.last_health_at
           FROM {TABLE_NAME} t
           JOIN companies c ON c.id = t.company_id
           LEFT JOIN users u ON u.id = c.user_id
@@ -368,6 +426,9 @@ def list_all_tenants(cur: "_Cursor") -> "list[TenantSummary]":
             routing_enabled=bool(row[6]),
             created_at=row[7],
             updated_at=row[8],
+            pending_change_kind=row[9],
+            pending_change_at=row[10],
+            last_health_at=row[11],
         )
         for row in cur.fetchall()
     ]
@@ -412,6 +473,61 @@ def get_routing_fields(cur: "_Cursor", company_id: str) -> "Optional[tuple[str, 
     )
     row = cur.fetchone()
     return (row[0], bool(row[1])) if row else None
+
+
+def set_pending_change_request(
+    cur: "_Cursor", company_id: str, kind: str, note: Optional[str] = None
+) -> bool:
+    """Park a client's open change request on the tenant row (UI plan Phase 5); True
+    if a row was updated.
+
+    This is the "flag on the fleet list": ``kind`` ∈ {reconnect, leave} (validated by
+    the caller, :data:`byod_client.REQUEST_KINDS`) plus an optional ``note`` and the
+    request time. **Latest-wins** — a repeat request overwrites the prior one rather
+    than stacking, which is the dedup half of the plan's "rate-limited + dedup" (the
+    rate limit lives on the endpoint). Performs no lifecycle mutation; the request is
+    only a signal an operator acts on. Caller owns the transaction."""
+    cur.execute(
+        f"""UPDATE {TABLE_NAME}
+               SET pending_change_kind = %s,
+                   pending_change_note = %s,
+                   pending_change_at   = NOW(),
+                   updated_at          = NOW()
+             WHERE company_id = %s""",
+        (kind, note, company_id),
+    )
+    return cur.rowcount > 0
+
+
+def clear_pending_change_request(cur: "_Cursor", company_id: str) -> bool:
+    """Clear any open change request on the tenant row (UI plan Phase 5); True if a
+    row was updated.
+
+    Called when the request is resolved: an admin dismisses it, the tenant is
+    (re-)provisioned to LIVE, or the client themselves re-submits a DSN (acting on
+    their own reconnect). Idempotent — clearing an already-clear row is a harmless
+    no-op. Caller owns the transaction."""
+    cur.execute(
+        f"""UPDATE {TABLE_NAME}
+               SET pending_change_kind = NULL,
+                   pending_change_note = NULL,
+                   pending_change_at   = NULL,
+                   updated_at          = NOW()
+             WHERE company_id = %s""",
+        (company_id,),
+    )
+    return cur.rowcount > 0
+
+
+def set_last_health_at(cur: "_Cursor", company_id: str) -> bool:
+    """Stamp the last successful health probe (UI plan Phase 1 fleet / Phase 5 status
+    card); True if a row was updated. Set on the healthy path of ``check_health`` and
+    ``provision``. Caller owns the transaction."""
+    cur.execute(
+        f"UPDATE {TABLE_NAME} SET last_health_at = NOW() WHERE company_id = %s",
+        (company_id,),
+    )
+    return cur.rowcount > 0
 
 
 def set_runtime_dsn(

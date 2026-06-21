@@ -31,6 +31,7 @@ from byod_client import (
     REQUEST_KINDS,
     ConnectionFrozen,
     InvalidRequestKind,
+    NoConnectionToChange,
     get_client_view,
     request_change,
     set_own_connection,
@@ -105,8 +106,14 @@ def test_set_own_connection_allowed_when_no_row_yet(monkeypatch):
         byod_admin, "set_connection",
         lambda cur, cid, dsn, kms, resolver=None: called.update(dsn=dsn) or {"ok": True},
     )
+    # Re-onboarding clears any open reconnect request the client had raised (Phase 5).
+    monkeypatch.setattr(
+        byod_store, "clear_pending_change_request",
+        lambda cur, cid: called.update(cleared=cid) or True,
+    )
     set_own_connection(object(), "clerk_x", GOOD_DSN, object())
     assert called["dsn"] == GOOD_DSN  # delegates to the shared admin path
+    assert called["cleared"] == "co-1"  # and clears the fleet-list flag
 
 
 def test_set_own_connection_no_company_raises(monkeypatch):
@@ -132,8 +139,23 @@ def test_request_change_no_company_raises(monkeypatch):
 
 def test_request_change_acknowledges_valid_kind(monkeypatch):
     monkeypatch.setattr(byod_admin, "resolve_company_id", lambda cur, cid: "co-1")
+    parked = {}
+    monkeypatch.setattr(
+        byod_store, "set_pending_change_request",
+        lambda cur, cid, kind, note=None: parked.update(cid=cid, kind=kind, note=note) or True,
+    )
     result = request_change(object(), "clerk_x", "leave", note="going self-hosted")
     assert result == {"company_id": "co-1", "kind": "leave", "acknowledged": True}
+    # The request is parked on the tenant row (the fleet-list flag) — no mutation else.
+    assert parked == {"cid": "co-1", "kind": "leave", "note": "going self-hosted"}
+
+
+def test_request_change_without_row_raises_no_connection(monkeypatch):
+    # An entitled user who never onboarded (no tenant row) has nothing to change.
+    monkeypatch.setattr(byod_admin, "resolve_company_id", lambda cur, cid: "co-1")
+    monkeypatch.setattr(byod_store, "set_pending_change_request", lambda cur, cid, kind, note=None: False)
+    with pytest.raises(NoConnectionToChange):
+        request_change(object(), "clerk_x", "reconnect")
 
 
 # ── Control-plane round-trip fixtures (skip cleanly without a backend) ─────────
@@ -270,3 +292,74 @@ def test_set_allowed_again_under_needs_reconnect(client_conn, make_user, kms):
     )
     client_conn.commit()
     assert result["status"] == TenantDbStatus.PENDING
+
+
+# ── Phase 5: change-request signal (the fleet-list flag) round-trips ───────────
+def test_request_change_parks_signal_and_surfaces_in_view(client_conn, make_user, kms):
+    clerk_id, company_id = make_user()
+    set_own_connection(client_conn.cursor(), clerk_id, GOOD_DSN, kms, resolver=_resolver)
+    byod_store.update_tenant_db_status(client_conn.cursor(), company_id, TenantDbStatus.LIVE)
+    client_conn.commit()
+
+    out = request_change(client_conn.cursor(), clerk_id, "reconnect", note="rotated my password")
+    client_conn.commit()
+    assert out == {"company_id": company_id, "kind": "reconnect", "acknowledged": True}
+
+    # The signal is parked on the row and surfaces in the client's own view.
+    view = get_client_view(client_conn.cursor(), clerk_id)
+    assert view["pending_change"] == {
+        "kind": "reconnect",
+        "note": "rotated my password",
+        "requested_at": view["pending_change"]["requested_at"],
+    }
+    assert view["pending_change"]["requested_at"] is not None
+    # No lifecycle mutation — "leave"/"reconnect" never changes status by itself.
+    assert view["status"] == TenantDbStatus.LIVE
+
+    # The fleet list (admin) carries the same flag.
+    record = get_tenant_db_record(client_conn.cursor(), company_id)
+    assert record.pending_change_kind == "reconnect"
+
+
+def test_request_change_dedups_latest_wins(client_conn, make_user, kms):
+    clerk_id, company_id = make_user()
+    set_own_connection(client_conn.cursor(), clerk_id, GOOD_DSN, kms, resolver=_resolver)
+    byod_store.update_tenant_db_status(client_conn.cursor(), company_id, TenantDbStatus.LIVE)
+    client_conn.commit()
+
+    request_change(client_conn.cursor(), clerk_id, "reconnect", note="first")
+    request_change(client_conn.cursor(), clerk_id, "leave", note="second")
+    client_conn.commit()
+
+    # Latest-wins: the second request overwrites the first (no stacking).
+    record = get_tenant_db_record(client_conn.cursor(), company_id)
+    assert record.pending_change_kind == "leave"
+    assert record.pending_change_note == "second"
+
+
+def test_request_change_without_row_409_round_trip(client_conn, make_user):
+    # Entitled, has a company, but never onboarded — nothing to change.
+    clerk_id, _ = make_user()
+    with pytest.raises(NoConnectionToChange):
+        request_change(client_conn.cursor(), clerk_id, "reconnect")
+    client_conn.rollback()
+
+
+def test_reonboard_clears_open_request(client_conn, make_user, kms):
+    clerk_id, company_id = make_user()
+    set_own_connection(client_conn.cursor(), clerk_id, GOOD_DSN, kms, resolver=_resolver)
+    byod_store.update_tenant_db_status(
+        client_conn.cursor(), company_id, TenantDbStatus.NEEDS_RECONNECT
+    )
+    request_change(client_conn.cursor(), clerk_id, "reconnect", note="help")
+    client_conn.commit()
+    assert get_tenant_db_record(client_conn.cursor(), company_id).pending_change_kind == "reconnect"
+
+    # Client self-heals by re-entering the DSN → the open request is cleared.
+    set_own_connection(
+        client_conn.cursor(), clerk_id,
+        "postgresql://app:rotated@db.tenant.example.com:5432/tenantdb?sslmode=require",
+        kms, resolver=_resolver,
+    )
+    client_conn.commit()
+    assert get_tenant_db_record(client_conn.cursor(), company_id).pending_change_kind is None

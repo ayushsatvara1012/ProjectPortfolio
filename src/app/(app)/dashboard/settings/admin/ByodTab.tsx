@@ -16,8 +16,18 @@ export type ByodTenant = {
   provisioned: boolean;
   routing_enabled: boolean;
   routing_active: boolean;
+  // Phase 5: the client's open change request (the fleet-list flag) + last health.
+  pending_change_kind: 'reconnect' | 'leave' | null;
+  pending_change_at: string | null;
+  last_health_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+type PendingChange = {
+  kind: 'reconnect' | 'leave';
+  note: string | null;
+  requested_at: string | null;
 };
 
 // The connection block returned by GET /api/admin/users/{clerk_id}/byod (read-only).
@@ -26,6 +36,7 @@ type ByodAdminView = {
   company_id: string | null;
   tier: string;
   byo_database: boolean;
+  pending_change: PendingChange | null; // Phase 5: the client's open change request
   connection: {
     masked_url: string;
     status: string;
@@ -36,6 +47,7 @@ type ByodAdminView = {
     key_id: string;
     created_at: string | null;
     updated_at: string | null;
+    last_health_at: string | null;
   } | null;
 };
 
@@ -97,6 +109,7 @@ const STATUS_DOT: Record<string, string> = {
 
 const FILTERS = [
   { key: 'all', label: 'All' },
+  { key: 'requests', label: 'Requests' }, // Phase 5: open client change requests
   { key: 'LIVE', label: 'Live' },
   { key: 'PENDING', label: 'Pending' },
   { key: 'NEEDS_RECONNECT', label: 'Reconnect' },
@@ -140,6 +153,14 @@ const RoutingPill = ({ active }: { active: boolean }) => (
     : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
     <span className="material-symbols-outlined text-[13px]">{active ? 'cloud_done' : 'cloud_off'}</span>
     {active ? 'Routing' : 'Off'}
+  </span>
+);
+
+// Phase 5: a client's open change request — the at-a-glance flag on the fleet list.
+const ChangeRequestPill = ({ kind }: { kind: 'reconnect' | 'leave' }) => (
+  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium font-google rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+    <span className="material-symbols-outlined text-[13px]">{kind === 'leave' ? 'logout' : 'sync'}</span>
+    {kind === 'leave' ? 'Leave requested' : 'Reconnect requested'}
   </span>
 );
 
@@ -232,8 +253,9 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
   const switchInM = useAction('/byod/switch-in', 'POST', reasonBody, 'Switch-in complete — data migrated to tenant DB.');
   const switchOutM = useAction('/byod/switch-out', 'POST', reasonBody, 'Switch-out complete — data returned to shared DB.');
   const offboardM = useAction('/byod/offboard', 'POST', reasonBody, 'Offboarded — routing + credentials removed.');
+  const clearRequestM = useAction('/byod/clear-request', 'POST', () => undefined, 'Change request dismissed.');
 
-  const mutations = [enrollM, saveConnM, testM, provisionM, healthM, enableM, disableM, switchInM, switchOutM, offboardM];
+  const mutations = [enrollM, saveConnM, testM, provisionM, healthM, enableM, disableM, switchInM, switchOutM, offboardM, clearRequestM];
   const busy = mutations.some(m => m.isPending);
 
   return (
@@ -255,6 +277,7 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <StatusPill status={tenant.status} />
               <RoutingPill active={tenant.routing_active} />
+              {tenant.pending_change_kind && <ChangeRequestPill kind={tenant.pending_change_kind} />}
             </div>
             <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 truncate" title={tenant.company_name || undefined}>
               {tenant.company_name || 'Unnamed company'}
@@ -281,6 +304,32 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
             </div>
           ) : (
             <>
+              {/* Change request (Phase 5) — the client's open reconnect/leave signal */}
+              {view?.pending_change && (
+                <section className="rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/60 dark:bg-blue-900/10 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <ChangeRequestPill kind={view.pending_change.kind} />
+                    {view.pending_change.requested_at && (
+                      <span className="text-xs font-google text-slate-400">{fmtRelative(view.pending_change.requested_at)}</span>
+                    )}
+                  </div>
+                  <p className="text-sm font-google text-slate-700 dark:text-slate-300">
+                    {view.pending_change.kind === 'leave'
+                      ? 'Client requested to leave BYOD. Run switch-out (reverse-migrate) or offboard below — the client DB is never deleted.'
+                      : 'Client requested a reconnect (e.g. their DB password rotated). Re-provision below; the request clears automatically when the tenant is LIVE again.'}
+                  </p>
+                  {view.pending_change.note && (
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 rounded-lg bg-white/70 dark:bg-slate-900/50 p-2.5 break-words">
+                      “{view.pending_change.note}”
+                    </p>
+                  )}
+                  <button onClick={() => clearRequestM.mutate()} disabled={busy} className={btnNeutral}>
+                    {clearRequestM.isPending ? <Spinner /> : <span className="material-symbols-outlined text-[15px]">check</span>}
+                    Dismiss request
+                  </button>
+                </section>
+              )}
+
               {/* Plan / entitlement */}
               <section>
                 <p className="text-xs font-medium font-google text-slate-400 mb-1">Plan</p>
@@ -305,6 +354,7 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
                     <DetailRow label="Provisioned" value={conn.provisioned ? 'Yes' : 'No'} />
                     <DetailRow label="Schema version" value={conn.schema_version || '—'} />
                     <DetailRow label="KMS key" value={conn.key_id} mono />
+                    <DetailRow label="Last health" value={conn.last_health_at ? `${fmtDate(conn.last_health_at)} (${fmtRelative(conn.last_health_at)})` : '—'} />
                     <DetailRow label="Updated" value={`${fmtDate(conn.updated_at)} (${fmtRelative(conn.updated_at)})`} />
                   </>
                 ) : (
@@ -495,7 +545,9 @@ export default function ByodTab() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return all.filter(t => {
-      const matchesStatus = filter === 'all' || t.status === filter;
+      const matchesStatus =
+        filter === 'all' ||
+        (filter === 'requests' ? !!t.pending_change_kind : t.status === filter);
       const matchesTerm =
         !term ||
         (t.company_name || '').toLowerCase().includes(term) ||
@@ -527,7 +579,12 @@ export default function ByodTab() {
         <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
             {FILTERS.map(f => {
-              const count = f.key === 'all' ? all.length : all.filter(t => t.status === f.key).length;
+              const count =
+                f.key === 'all'
+                  ? all.length
+                  : f.key === 'requests'
+                    ? all.filter(t => !!t.pending_change_kind).length
+                    : all.filter(t => t.status === f.key).length;
               return (
                 <button
                   key={f.key}
@@ -583,7 +640,12 @@ export default function ByodTab() {
                       <p className="text-base font-google text-slate-900 dark:text-slate-100 truncate max-w-[220px]">{t.company_name || 'Unnamed'}</p>
                       <p className="text-xs font-mono text-slate-400 dark:text-slate-500 truncate max-w-[220px] mt-0.5">{t.clerk_id || 'no owner'}</p>
                     </td>
-                    <td className="py-4 px-5"><StatusPill status={t.status} /></td>
+                    <td className="py-4 px-5">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <StatusPill status={t.status} />
+                        {t.pending_change_kind && <ChangeRequestPill kind={t.pending_change_kind} />}
+                      </div>
+                    </td>
                     <td className="py-4 px-5"><RoutingPill active={t.routing_active} /></td>
                     <td className="py-4 px-5 text-xs font-google text-slate-500 dark:text-slate-400 whitespace-nowrap">{t.schema_version || '—'}</td>
                     <td className="py-4 px-5 text-xs font-google text-slate-500 dark:text-slate-400 whitespace-nowrap">{fmtRelative(t.updated_at)}</td>
@@ -616,6 +678,7 @@ export default function ByodTab() {
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill status={t.status} />
                   <RoutingPill active={t.routing_active} />
+                  {t.pending_change_kind && <ChangeRequestPill kind={t.pending_change_kind} />}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs font-google">
                   <div>

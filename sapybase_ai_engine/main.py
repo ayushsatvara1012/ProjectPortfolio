@@ -7120,6 +7120,11 @@ def list_byod_tenants(
                     "provisioned": t.provisioned,
                     "routing_enabled": t.routing_enabled,
                     "routing_active": byod_engine.routing_active(t.company_id),
+                    # Phase 5: the client's open change request (the fleet-list flag) +
+                    # last successful health probe.
+                    "pending_change_kind": t.pending_change_kind,
+                    "pending_change_at": t.pending_change_at.isoformat() if hasattr(t.pending_change_at, "isoformat") else None,
+                    "last_health_at": t.last_health_at.isoformat() if hasattr(t.last_health_at, "isoformat") else None,
                     "created_at": t.created_at.isoformat() if hasattr(t.created_at, "isoformat") else None,
                     "updated_at": t.updated_at.isoformat() if hasattr(t.updated_at, "isoformat") else None,
                 }
@@ -7573,6 +7578,35 @@ def disable_byod_routing(
     return _set_byod_routing(clerk_id, False, req, admin)
 
 
+@app.post("/api/admin/users/{clerk_id}/byod/clear-request")
+@limiter.limit("30/minute")
+def clear_byod_change_request(
+    request: Request,
+    clerk_id: str,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Dismiss a client's open change request (UI plan Phase 5): clear the fleet-list
+    flag once the operator has acted on (or acknowledged) the reconnect/leave signal.
+    Performs no lifecycle mutation — provision/switch-out/offboard remain the real
+    actions; this only clears the signal."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_admin.clear_change_request(cursor, clerk_id)
+        conn.commit()
+        log_admin_action(
+            admin["clerk_id"], "BYOD_CLEAR_CHANGE_REQUEST", clerk_id,
+            {"cleared": result["cleared"]},
+        )
+        return {"status": "success", **result}
+    except byod_admin.CompanyNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="User has no company.")
+    finally:
+        release_db_connection(conn)
+
+
 # ── BYOD client self-serve surface (UI plan Phase 4) ─────────────────────────
 # These are the ONLY non-admin BYOD routes. The company is resolved exclusively
 # from the caller's own session (NO clerk_id / company_id path param) so a client
@@ -7679,21 +7713,33 @@ def request_my_byod_change(
     user: dict = Depends(get_current_user),
 ):
     """Client self-serve request for an admin-run change (``reconnect`` / ``leave``).
-    Performs **no** mutation — it records an admin-visible audit row so the operator
-    can act (re-provision or switch-out/offboard). Own-company only."""
+    Performs **no** lifecycle mutation — it parks the latest request on the tenant
+    row (the admin fleet-list flag, Phase 5) and records an admin-visible audit row so
+    the operator can act (re-provision or switch-out/offboard). Latest-wins, so a
+    repeat request dedups; combined with the route rate limit this is the plan's
+    "rate-limited + dedup". Own-company only."""
     _require_byod_client(user)
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         result = byod_client.request_change(cursor, user["clerk_id"], req.kind, req.note)
+        conn.commit()  # persist the parked change request (the fleet-list flag)
         log_admin_action(
             user["clerk_id"], "BYOD_CLIENT_REQUEST_CHANGE", result["company_id"],
             {"kind": req.kind, "note": req.note},
         )
         return {"status": "success", **result}
     except byod_client.InvalidRequestKind:
+        conn.rollback()
         raise HTTPException(status_code=400, detail="Unknown request kind.")
+    except byod_client.NoConnectionToChange:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="You don't have a database connection yet — set one up before requesting a change.",
+        )
     except byod_admin.CompanyNotFound:
+        conn.rollback()
         raise HTTPException(status_code=404, detail="No company is associated with your account.")
     finally:
         release_db_connection(conn)

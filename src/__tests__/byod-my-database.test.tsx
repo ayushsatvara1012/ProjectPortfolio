@@ -91,7 +91,8 @@ describe('My Database (BYOD client onboarding)', () => {
       company_id: 'co-1',
       status: 'LIVE',
       can_edit_connection: false,
-      connection: { masked_url: 'postgresql://••••@••••', status: 'LIVE', is_live: true, provisioned: true, schema_version: '0001', created_at: null, updated_at: null },
+      connection: { masked_url: 'postgresql://••••@••••', status: 'LIVE', is_live: true, provisioned: true, schema_version: '0001', created_at: null, updated_at: null, last_health_at: null },
+      pending_change: null,
       requirements: REQUIREMENTS,
     };
     render(<MyDatabasePage />);
@@ -100,5 +101,41 @@ describe('My Database (BYOD client onboarding)', () => {
     expect(screen.getByRole('button', { name: /Request to leave/i })).toBeInTheDocument();
     // No DSN entry while frozen.
     expect(screen.queryByText('Test connection')).not.toBeInTheDocument();
+  });
+
+  // ── Phase 5 ──────────────────────────────────────────────────────────────────
+  it('Request reconnect posts the reconnect kind', () => {
+    mockView = {
+      company_id: 'co-1',
+      status: 'LIVE',
+      can_edit_connection: false,
+      connection: { masked_url: 'postgresql://••••@••••', status: 'LIVE', is_live: true, provisioned: true, schema_version: '0001', created_at: null, updated_at: null, last_health_at: '2026-06-21T00:00:00Z' },
+      pending_change: null,
+      requirements: REQUIREMENTS,
+    };
+    render(<MyDatabasePage />);
+
+    // "Last health check" surfaces from last_health_at (Phase 5 status card).
+    expect(screen.getByText('Last health check')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Request reconnect/i }));
+    expect(mutate).toHaveBeenCalledWith('reconnect');
+  });
+
+  it('shows a persistent pending-request banner and collapses the action buttons', () => {
+    mockView = {
+      company_id: 'co-1',
+      status: 'LIVE',
+      can_edit_connection: false,
+      connection: { masked_url: 'postgresql://••••@••••', status: 'LIVE', is_live: true, provisioned: true, schema_version: '0001', created_at: null, updated_at: null, last_health_at: null },
+      pending_change: { kind: 'reconnect', note: 'pw rotated', requested_at: '2026-06-21T00:00:00Z' },
+      requirements: REQUIREMENTS,
+    };
+    render(<MyDatabasePage />);
+
+    // The open request is shown persistently (server truth, survives reload)...
+    expect(screen.getByText(/You’ve requested a reconnect/i)).toBeInTheDocument();
+    // ...and the request buttons are collapsed so the client can't double-submit.
+    expect(screen.queryByRole('button', { name: /Request reconnect/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Request to leave/i })).not.toBeInTheDocument();
   });
 });

@@ -39,6 +39,13 @@ type Connection = {
   schema_version: string | null;
   created_at: string | null;
   updated_at: string | null;
+  last_health_at: string | null;
+};
+
+type PendingChange = {
+  kind: 'reconnect' | 'leave';
+  note: string | null;
+  requested_at: string | null;
 };
 
 type MeView = {
@@ -46,6 +53,7 @@ type MeView = {
   status: string | null; // null = not started
   can_edit_connection: boolean;
   connection: Connection | null;
+  pending_change: PendingChange | null;
   requirements: Requirements;
 };
 
@@ -166,8 +174,13 @@ export default function MyDatabasePage() {
 }
 
 // ── Status card ───────────────────────────────────────────────────────────────
+const REQUEST_COPY: Record<PendingChange['kind'], string> = {
+  reconnect: 'You’ve requested a reconnect. Our team will re-provision your database and update the status here.',
+  leave: 'You’ve requested to leave BYOD. Our team will safely move your data back and follow up — your database is never deleted.',
+};
+
 function StatusCard({ view }: { view: MeView }) {
-  const { status, connection } = view;
+  const { status, connection, pending_change } = view;
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between gap-3">
@@ -197,10 +210,25 @@ function StatusCard({ view }: { view: MeView }) {
             <dd className="text-slate-700 dark:text-slate-300">{connection.schema_version ?? '—'}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-400">Last updated</dt>
-            <dd className="text-slate-700 dark:text-slate-300">{fmtDate(connection.updated_at)}</dd>
+            <dt className="text-xs text-slate-400">Last health check</dt>
+            <dd className="text-slate-700 dark:text-slate-300">{fmtDate(connection.last_health_at)}</dd>
           </div>
         </dl>
+      )}
+
+      {/* Persistent open-request banner (server truth — survives reloads). */}
+      {pending_change && (
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300">
+          <span className="material-symbols-outlined mt-0.5 text-[18px]">hourglass_top</span>
+          <div>
+            <p>{REQUEST_COPY[pending_change.kind]}</p>
+            {pending_change.requested_at && (
+              <p className="mt-0.5 text-xs text-blue-700/70 dark:text-blue-400/70">
+                Requested {fmtDate(pending_change.requested_at)}
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </section>
   );
@@ -409,7 +437,6 @@ function OnboardingWizard({ view, onSubmitted }: { view: MeView; onSubmitted: ()
 function LivePanel({ view }: { view: MeView }) {
   const authedFetch = useAuthenticatedFetch();
   const queryClient = useQueryClient();
-  const [requested, setRequested] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   const requestMutation = useMutation({
@@ -419,12 +446,26 @@ function LivePanel({ view }: { view: MeView }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind }),
       }),
-    onSuccess: (_res, kind) => {
-      setRequested(kind);
+    onSuccess: () => {
       setConfirmLeave(false);
+      // The open request now lives on the server — refetch so the persistent banner
+      // (StatusCard) reflects it. No purely-local "requested" state to drift.
       queryClient.invalidateQueries({ queryKey: ['byod', 'me'] });
     },
   });
+
+  // An already-open request (server truth) is surfaced by StatusCard's banner; here
+  // we just collapse the action buttons into a muted line so there's no double UI.
+  if (view.pending_change) {
+    return (
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="text-sm font-display font-semibold text-slate-900 dark:text-slate-100">Manage your connection</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Your request is pending review (see above). Our team will follow up — there’s nothing more you need to do right now.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -433,12 +474,7 @@ function LivePanel({ view }: { view: MeView }) {
         Your connection is managed by our team for safety. Request a change and we’ll handle it without downtime.
       </p>
 
-      {requested ? (
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300">
-          Request received ({requested}). Our team will follow up shortly.
-        </div>
-      ) : (
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             disabled={requestMutation.isPending}
@@ -477,8 +513,7 @@ function LivePanel({ view }: { view: MeView }) {
               Request to leave
             </button>
           )}
-        </div>
-      )}
+      </div>
 
       {requestMutation.isError && (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">

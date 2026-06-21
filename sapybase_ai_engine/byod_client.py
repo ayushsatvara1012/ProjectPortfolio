@@ -78,6 +78,12 @@ class InvalidRequestKind(ByodClientError):
     """An unrecognised request-change ``kind`` (not in :data:`REQUEST_KINDS`)."""
 
 
+class NoConnectionToChange(ByodClientError):
+    """A change was requested but the caller has no tenant database to change yet
+    (status "not started" — no row). There is nothing to reconnect or leave, so the
+    endpoint surfaces a 409 rather than parking a request on a non-existent row."""
+
+
 # Re-export so endpoints can reference one cohesive client surface.
 test_dsn = byod_admin.test_dsn
 
@@ -104,6 +110,7 @@ def get_client_view(cur, clerk_id: str) -> dict:
             "schema_version": record.schema_version,
             "created_at": _iso(record.created_at),
             "updated_at": _iso(record.updated_at),
+            "last_health_at": _iso(record.last_health_at),  # Phase 5: "last health"
         }
 
     can_edit = record is None or record.status in CLIENT_EDITABLE_STATUSES
@@ -112,6 +119,9 @@ def get_client_view(cur, clerk_id: str) -> dict:
         "status": record.status if record is not None else None,  # None = not started
         "can_edit_connection": can_edit,
         "connection": connection,
+        # Phase 5: the caller's own open change request, so the page can persistently
+        # show "request received — pending review" across reloads (not just locally).
+        "pending_change": byod_admin._pending_change(record),
         "requirements": CLIENT_REQUIREMENTS,
     }
 
@@ -140,19 +150,30 @@ def set_own_connection(
         raise ConnectionFrozen(record.status)
 
     # Reuse the exact admin path (validate + envelope-encrypt + store as PENDING).
-    return byod_admin.set_connection(cur, clerk_id, dsn, kms, resolver=resolver)
+    result = byod_admin.set_connection(cur, clerk_id, dsn, kms, resolver=resolver)
+    # The client just re-entered their DSN — that resolves any open reconnect request
+    # they had raised, so clear the fleet-list flag (Phase 5).
+    byod_store.clear_pending_change_request(cur, company_id)
+    return result
 
 
 def request_change(cur, clerk_id: str, kind: str, note: Optional[str] = None) -> dict:
-    """Record a client's self-serve change request (``reconnect`` / ``leave``).
-    Performs **no** mutation — it only resolves + validates so the endpoint can
-    raise an admin-visible signal (audit row). Raises :class:`InvalidRequestKind`
-    or :class:`byod_admin.CompanyNotFound`."""
+    """Record a client's self-serve change request (``reconnect`` / ``leave``) as an
+    admin-visible signal (UI plan Phase 5). Parks the *latest* request on the tenant
+    row so it surfaces on the admin fleet list — latest-wins, so repeated requests
+    dedup rather than pile up (with the endpoint rate limit, this is the plan's
+    "rate-limited + dedup"). Performs **no** lifecycle mutation: "leave" never
+    deletes data; the admin runs switch-out / offboard. Caller commits. Raises
+    :class:`InvalidRequestKind`, :class:`byod_admin.CompanyNotFound`, or
+    :class:`NoConnectionToChange` (no tenant row yet — nothing to change)."""
     if kind not in REQUEST_KINDS:
         raise InvalidRequestKind(kind)
     company_id = byod_admin.resolve_company_id(cur, clerk_id)
     if company_id is None:
         raise CompanyNotFound(clerk_id)
+    if not byod_store.set_pending_change_request(cur, company_id, kind, note):
+        # No tenant row → "not started"; there is no connection to reconnect or leave.
+        raise NoConnectionToChange(company_id)
     return {"company_id": company_id, "kind": kind, "acknowledged": True}
 
 
