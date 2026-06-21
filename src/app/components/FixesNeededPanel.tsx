@@ -80,8 +80,8 @@ const FixesNeededPanel = ({
             <div className="flex flex-col h-full bg-white dark:bg-slate-900 transition-colors duration-500 overflow-hidden border border-slate-200 dark:border-slate-800 rounded-md">
                 {/* Header */}
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                    <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400">Gaps to Teach</span>
-                    <span className="text-[10px] font-mono text-slate-400">{total}</span>
+                    <span className="text-xs tracking-normal font-semibold font-sans text-slate-700 dark:text-slate-300">Gaps to Teach</span>
+                    <span className="text-[10px] font-sans text-slate-400">{total}</span>
                 </div>
 
                 {fixes.length === 0 ? (
@@ -102,7 +102,7 @@ const FixesNeededPanel = ({
                                     <span className={`w-1.5 h-1.5 rounded-full block mt-1.5 shrink-0 ${isUnanswered ? 'bg-amber-400' : 'bg-orange-400'}`} />
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 break-words leading-snug">{fix.query}</p>
-                                        <div className="flex items-center gap-2 mt-0.5 text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                                        <div className="flex items-center gap-2 mt-0.5 text-[9px] font-sans text-slate-400 dark:text-slate-500">
                                             <span>Asked {fix.ask_count}×</span>
                                             <span>·</span>
                                             <span>{formatTime(fix.last_asked)}</span>
@@ -123,9 +123,9 @@ const FixesNeededPanel = ({
             {/* Header */}
             <div className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-3">
-                    <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400">{total} Fix{total !== 1 ? 'es' : ''} Needed</span>
+                    <span className="text-xs tracking-normal font-semibold font-sans text-slate-700 dark:text-slate-300">{total} Fix{total !== 1 ? 'es' : ''} Needed</span>
                     {total > 0 && (
-                        <div className="flex items-center gap-3 text-[10px] font-mono">
+                        <div className="flex items-center gap-3 text-[10px] font-sans">
                             <span className="flex items-center gap-1 text-amber-500">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{unansweredCount} Unanswered
                             </span>
@@ -155,19 +155,19 @@ const FixesNeededPanel = ({
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-slate-700 dark:text-slate-300 font-medium break-words leading-snug">{fix.query}</p>
                                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                                        <span className={`text-[9px] uppercase tracking-widest font-mono ${isUnanswered ? 'text-amber-500' : 'text-orange-500'}`}>
+                                        <span className={`text-[9px] uppercase tracking-widest font-sans ${isUnanswered ? 'text-amber-500' : 'text-orange-500'}`}>
                                             {isUnanswered ? 'Unanswered' : 'Low confidence'}
                                         </span>
-                                        <span className="text-[10px] font-mono text-slate-400">Asked {fix.ask_count}×</span>
+                                        <span className="text-[10px] font-sans text-slate-400">Asked {fix.ask_count}×</span>
                                         {!isUnanswered && fix.confidence !== null && (
-                                            <span className="text-[10px] font-mono text-orange-500">{Math.round(fix.confidence * 100)}% grounded</span>
+                                            <span className="text-[10px] font-sans text-orange-500">{Math.round(fix.confidence * 100)}% grounded</span>
                                         )}
-                                        <span className="text-[10px] font-mono text-slate-400">{fix.last_asked ? new Date(fix.last_asked).toLocaleDateString() : ''}</span>
+                                        <span className="text-[10px] font-sans text-slate-400">{fix.last_asked ? new Date(fix.last_asked).toLocaleDateString() : ''}</span>
                                     </div>
                                 </div>
                                 <Link
                                     href={`/dashboard/train?query=${encodeURIComponent(fix.query)}&bot=${encodeURIComponent(selectedBotId)}`}
-                                    className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-indigo-600 dark:text-indigo-400 hover:underline min-h-[28px] flex items-center"
+                                    className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-indigo-600 dark:text-indigo-400 hover:underline min-h-[28px] flex items-center"
                                 >
                                     Train
                                 </Link>

@@ -115,7 +115,7 @@ const BAND_STYLES: Record<string, string> = {
 const STATUS_STYLES: Record<string, string> = {
     new: 'text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-300 dark:bg-slate-800/40 dark:border-slate-700',
     contacted: 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-900/40',
-    won: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-900/40',
+    won: 'text-emerald-500 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-900/40',
     lost: 'text-slate-400 bg-slate-50 border-slate-200 dark:text-slate-500 dark:bg-slate-800/40 dark:border-slate-700',
 };
 
@@ -199,7 +199,7 @@ const DemoActionCenterPanel = () => {
                                     <div className="min-w-0 w-full sm:w-[32%] sm:shrink-0">
                                         <div className="flex items-baseline gap-2 min-w-0">
                                             <span className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200 truncate max-w-[55%] shrink-0">{lead.name || lead.email}</span>
-                                            <span className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{lead.email}</span>
+                                            <span className="text-xs font-sans text-slate-500 dark:text-slate-400 truncate">{lead.email}</span>
                                         </div>
                                         {lead.context && <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate mt-0.5">“{lead.context}”</p>}
                                     </div>
@@ -219,7 +219,7 @@ const DemoActionCenterPanel = () => {
                                         <span aria-hidden="true" className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400">
                                             <span className="material-symbols-outlined text-[15px]">mail</span>
                                         </span>
-                                        <button onClick={() => act(lead.id, 'won')} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors ${acted[lead.id] === 'won' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400'}`}>Won</button>
+                                        <button onClick={() => act(lead.id, 'won')} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors ${acted[lead.id] === 'won' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-400'}`}>Won</button>
                                         <button onClick={() => act(lead.id, 'lost')} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors ${acted[lead.id] === 'lost' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400'}`}>Lost</button>
                                     </div>
                                 </div>
@@ -257,14 +257,14 @@ const FunnelVisual = ({ stages, hoveredStage, setHoveredStage }: {
                         onMouseLeave={() => setHoveredStage(null)}
                         className={`flex items-center gap-3 px-2 py-1.5 rounded-sm cursor-pointer transition-colors ${isHov ? 'bg-slate-50 dark:bg-slate-900/40' : ''}`}
                     >
-                        <span className="w-20 text-[10px] font-mono uppercase tracking-wide text-slate-500 shrink-0">{s.key}</span>
+                        <span className="w-20 text-[10px] font-sans uppercase tracking-wide text-slate-500 shrink-0">{s.key}</span>
                         <div className="flex-1 h-[6px] bg-slate-100 dark:bg-slate-800 rounded-none overflow-hidden">
                             <div className="h-full transition-all duration-500" style={{ width: `${Math.max(barPct, s.count > 0 ? 2 : 0)}%`, backgroundColor: color }} />
                         </div>
-                        <span className="w-12 text-right font-mono tabular-nums text-sm text-slate-800 dark:text-slate-200 shrink-0">{s.count.toLocaleString()}</span>
-                        <span className="w-10 text-right font-mono text-[11px] text-slate-400 shrink-0">{s.pct_of_top}%</span>
+                        <span className="w-12 text-right font-sans tabular-nums text-sm text-slate-800 dark:text-slate-200 shrink-0">{s.count.toLocaleString()}</span>
+                        <span className="w-10 text-right font-sans text-[11px] text-slate-400 shrink-0">{s.pct_of_top}%</span>
                         {i > 0 && s.dropoff_pct > 0 && (
-                            <span className="text-[10px] font-mono text-rose-500 shrink-0">↓{s.dropoff_pct}%</span>
+                            <span className="text-[10px] font-sans text-rose-400 shrink-0">↓{s.dropoff_pct}%</span>
                         )}
                     </div>
                 );
@@ -309,8 +309,8 @@ const QualityDonut = ({ quality, activeBand, setActiveBand }: {
                 })}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 leading-none">{total}</span>
-                <span className="text-[9px] uppercase tracking-widest font-mono text-slate-400 mt-0.5">Scored</span>
+                <span className="text-xl font-sans tabular-nums font-semibold text-slate-900 dark:text-slate-100 leading-none">{total}</span>
+                <span className="text-[9px] uppercase tracking-widest font-sans text-slate-400 mt-0.5">Scored</span>
             </div>
         </div>
     );
@@ -321,7 +321,7 @@ const STAGE_ACCENT: Record<string, { bar: string; dot: string; text: string }> =
     conversations: { bar: 'bg-slate-400 dark:bg-slate-500', dot: 'bg-slate-400', text: 'text-slate-600 dark:text-slate-300' },
     leads: { bar: 'bg-indigo-400 dark:bg-indigo-500', dot: 'bg-indigo-400', text: 'text-indigo-600 dark:text-indigo-400' },
     contacted: { bar: 'bg-amber-400 dark:bg-amber-500', dot: 'bg-amber-400', text: 'text-amber-600 dark:text-amber-400' },
-    won: { bar: 'bg-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+    won: { bar: 'bg-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-500 dark:text-emerald-400' },
 };
 const QUALITY_ACCENT: Record<string, { bar: string; chip: string; dot: string }> = {
     hot: { bar: 'bg-rose-500', chip: 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400', dot: 'bg-rose-500' },
@@ -410,7 +410,7 @@ const DemoFunnelPanel = () => {
                                             <span className="text-[11px] font-google text-slate-400 dark:text-slate-500">
                                                 {s.pct_of_prev}% continued
                                                 {s.dropoff_pct > 0 && (
-                                                    <span className="text-rose-500 font-medium"> · {s.dropoff_pct}% lost visitors</span>
+                                                    <span className="text-rose-400 font-medium"> · {s.dropoff_pct}% lost visitors</span>
                                                 )}
                                             </span>
                                         </div>
@@ -468,7 +468,7 @@ const DemoFunnelPanel = () => {
                     <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wider mb-2">
                         Revenue won
                     </span>
-                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-emerald-500 dark:text-emerald-400">
                         {fmtMoney(f.wonValue)}
                     </span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
@@ -572,7 +572,7 @@ const DemoFunnelPanel = () => {
                                             </span>
                                             <span className="text-[10px] font-google text-slate-400 dark:text-slate-500 font-medium">leads</span>
                                             {s.won > 0 && (
-                                                <span className="text-[10px] font-google font-bold text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-2 py-0.5 rounded-md">
+                                                <span className="text-[10px] font-google font-bold text-emerald-500 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-2 py-0.5 rounded-md">
                                                     {fmtMoney(s.won_value)} won
                                                 </span>
                                             )}
@@ -637,7 +637,7 @@ const DemoFixesNeededPanel = () => {
                                     {!isUnanswered && fix.confidence !== null && (
                                         <span className="text-[10px] uppercase tracking-widest font-bold text-orange-500 font-google">{Math.round(fix.confidence * 100)}% grounded</span>
                                     )}
-                                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">{formatTime(fix.last_asked)}</span>
+                                    <span className="text-[11px] font-sans text-slate-400 dark:text-slate-500">{formatTime(fix.last_asked)}</span>
                                 </div>
                             </div>
                             <Link href={`/demo/train?query=${encodeURIComponent(fix.query)}`} className="shrink-0 inline-flex items-center gap-1 mt-0.5 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold font-google rounded-sm bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors">
@@ -687,21 +687,21 @@ const DemoLeadsPanel = () => {
                                 <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50">
                                     <div className="flex flex-col gap-0.5">
                                         <span className="font-bold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
-                                        <span className="text-md text-slate-500 dark:text-slate-400 font-mono tracking-wide">{lead.name}</span>
+                                        <span className="text-md text-slate-500 dark:text-slate-400 font-sans tracking-wide">{lead.name}</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50"><ScoreBadge score={lead.score} band={lead.band} /></td>
                                 <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50">
                                     <span className={`inline-flex items-center px-2.5 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold font-google ${STATUS_STYLES[lead.status]}`}>{lead.status}</span>
                                     {lead.status === 'won' && lead.value_usd != null && (
-                                        <div className="mt-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400">{fmtMoney(lead.value_usd)}</div>
+                                        <div className="mt-1.5 text-xs font-sans text-emerald-500 dark:text-emerald-400">{fmtMoney(lead.value_usd)}</div>
                                     )}
                                 </td>
                                 <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50">
                                     <p className="text-md font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed max-w-xs">{lead.context}</p>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className="text-sm font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                    <span className="text-sm font-sans text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                         {new Date(lead.created_at).toLocaleDateString()}<br />
                                         {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
@@ -768,7 +768,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                                 className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-xl cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
                                 style={{ backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent', borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)' }}
                             >
-                                <span className={`text-[12px] sm:text-[14px] leading-none font-mono font-semibold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>{new Date(dateStr).getDate()}</span>
+                                <span className={`text-[12px] sm:text-[14px] leading-none font-sans font-semibold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>{new Date(dateStr).getDate()}</span>
                                 <span className={`text-[8px] sm:text-[9px] font-google font-medium leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>{new Date(dateStr).toLocaleDateString(undefined, { month: 'short' })}</span>
                             </div>
                         );
@@ -870,7 +870,7 @@ const DemoConversationsPanel = () => {
                                 <div className="flex-1 min-w-0">
                                     <p className="text-md font-google text-slate-700 dark:text-slate-300 truncate font-medium">{preview || 'No messages'}</p>
                                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
-                                        <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">{formatTime(session.last_active)}</span>
+                                        <span className="text-[11px] font-sans text-slate-400 dark:text-slate-500">{formatTime(session.last_active)}</span>
                                         <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">{session.message_count} msg{session.message_count !== 1 ? 's' : ''}</span>
                                         {session.has_unanswered && <span className="text-[10px] uppercase tracking-widest font-bold text-amber-500 font-google">Has gaps</span>}
                                     </div>
@@ -888,7 +888,7 @@ const DemoConversationsPanel = () => {
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User</span>
                                                     <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed mt-0.5">{msg.user_query}</p>
                                                 </div>
-                                                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                             <div className={`flex items-start gap-3 ml-4 pl-4 border-l-2 ${msg.is_unanswered ? 'border-amber-300 dark:border-amber-700' : 'border-blue-200 dark:border-blue-900'}`}>
                                                 <div className="flex-1">
@@ -970,7 +970,7 @@ const DemoROIPanel = ({ botName }: { botName: string }) => {
             <div className={`${cellCls} p-6 sm:p-8 border border-emerald-200 dark:border-emerald-900/40`}>
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0"><span className="material-symbols-outlined text-[18px] text-emerald-600 dark:text-emerald-400">paid</span></div>
+                        <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0"><span className="material-symbols-outlined text-[18px] text-emerald-500 dark:text-emerald-400">paid</span></div>
                         <div>
                             <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wide">Proven revenue · closed-won</span>
                             <p className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 mt-0.5">{fmt2(realizedRevenue)}</p>
@@ -1011,12 +1011,12 @@ const DemoROIPanel = ({ botName }: { botName: string }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                     <div>
                         <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 font-google mb-2">Cost per support ticket ($)</label>
-                        <input type="number" min="0" step="0.5" value={costPerTicket} onChange={e => { setCostPerTicket(e.target.value); setSaved(false); }} className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-base font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors" placeholder="5.00" />
+                        <input type="number" min="0" step="0.5" value={costPerTicket} onChange={e => { setCostPerTicket(e.target.value); setSaved(false); }} className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-base font-sans text-slate-900 dark:text-slate-200 rounded-xl transition-colors" placeholder="5.00" />
                         <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-1.5">Industry avg: $5–$25 per ticket</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 font-google mb-2">Average lead value ($)</label>
-                        <input type="number" min="0" step="5" value={leadValue} onChange={e => { setLeadValue(e.target.value); setSaved(false); }} className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-base font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors" placeholder="50.00" />
+                        <input type="number" min="0" step="5" value={leadValue} onChange={e => { setLeadValue(e.target.value); setSaved(false); }} className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-base font-sans text-slate-900 dark:text-slate-200 rounded-xl transition-colors" placeholder="50.00" />
                         <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-1.5">What is one captured lead worth to you?</p>
                     </div>
                 </div>
@@ -1061,7 +1061,7 @@ const DemoAnalyticsPanel = ({ report }: { report: ReturnType<typeof buildDemoRep
                     <div className="space-y-2">
                         {report.top_trends.map((trend, idx) => (
                             <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">{String(idx + 1).padStart(2, '0')}</div>
+                                <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-sans text-slate-500 dark:text-slate-400">{String(idx + 1).padStart(2, '0')}</div>
                                 <p className="text-sm font-google text-slate-700 dark:text-slate-300 pt-1.5">{trend}</p>
                             </div>
                         ))}
@@ -1112,7 +1112,7 @@ const DemoAnalyticsPanel = ({ report }: { report: ReturnType<typeof buildDemoRep
                                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200 animate-pulse" /> Handled</span>
                             )}
                         </div>
-                        <div className="col-span-2 flex items-center md:justify-end"><span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                        <div className="col-span-2 flex items-center md:justify-end"><span className="text-[11px] font-sans text-slate-500 dark:text-slate-400">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                     </div>
                 ))}
             </div>

@@ -288,9 +288,9 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
   const tierLabel = userTier ? (TIER_LABEL[userTier] ?? userTier) : null;
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-[#f8f9fa] dark:bg-slate-950 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
+    <header className="fixed top-0 left-0 right-0 h-14 bg-[#f8f9fa] dark:bg-slate-950 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
       {/* Left: hamburger (mobile) + brand */}
-      <div className="flex items-center gap-2 lg:w-[calc(256px-1rem)]">
+      <div className="flex items-center gap-2 lg:w-12">
         <button
           onClick={onMenuClick}
           className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-slate-900 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
@@ -299,14 +299,14 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
           <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">menu</span>
         </button>
         <Link href="/dashboard" aria-label="Vaayu dashboard" className="flex items-center hover:opacity-80 transition-opacity">
-          <VaayuLogo iconOnly size={30} />
+          <VaayuLogo iconOnly size={26} />
         </Link>
       </div>
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors ml-4 pl-4">
+      <div className="flex items-center gap-1.5 text-[13px] text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors">
         <div className="hidden sm:flex items-center gap-1.5 min-w-0">
-          <span className="truncate max-w-[140px] text-slate-600 dark:text-slate-400 font-google text-sm transition-colors">
+          <span className="truncate max-w-[140px] text-slate-600 dark:text-slate-400 font-google text-[13px] transition-colors">
             {mounted ? (user?.fullName || user?.firstName || 'My Workspace') : ''}
           </span>
           {tierLabel && (
@@ -316,7 +316,7 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
           )}
           <span className="material-symbols-outlined text-[16px] shrink-0 text-slate-400 dark:text-slate-600">chevron_right</span>
         </div>
-        <span className="truncate text-slate-800 dark:text-slate-200 font-google text-sm font-medium transition-colors">{pageLabel}</span>
+        <span className="truncate text-slate-800 dark:text-slate-200 font-google text-[13px] font-medium transition-colors">{pageLabel}</span>
       </div>
     </header>
   );
@@ -330,7 +330,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const pathname = usePathname();
   const desktopAsideRef = useRef<HTMLElement>(null);
-  const isFullHeightPane = pathname === '/dashboard/settings/customize';
+  const isFullHeightPane = pathname === '/dashboard/settings/customize' || pathname === '/dashboard/insights';
 
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
   useEffect(() => {
@@ -391,12 +391,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           if (e.target === e.currentTarget && window.matchMedia('(hover: none)').matches)
             setSidebarExpanded(p => !p);
         }}
-        className={`hidden lg:flex lg:flex-col fixed top-16 left-0 bottom-0 z-30 bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
+        className={`hidden lg:flex lg:flex-col fixed top-14 left-0 bottom-0 z-30 bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
       >
         <SidebarContent user={user} onClose={null} expanded={sidebarExpanded} />
       </aside>
       {/* Main content */}
-      <main className={`flex-1 relative mt-16 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-4rem)]'}`}>
+      <main className={`flex-1 relative mt-14 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-3.5rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-3.5rem)]'}`}>
         <div className={`flex-1 flex flex-col pt-0 ${isFullHeightPane ? 'lg:min-h-0 lg:overflow-hidden' : ''}`}>
           <DashboardErrorBoundary>
             <Suspense fallback={null}>
@@ -404,22 +404,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Suspense>
           </DashboardErrorBoundary>
         </div>
-        {/* Dashboard Footer */}
-        {!isFullHeightPane && <footer className="bg-[#f8f9fa] dark:bg-slate-950 px-6 py-5 md:px-8 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500">
-          <div className="flex flex-col md:flex-row items-center gap-6 text-sm text-slate-500 dark:text-slate-400 font-sans">
-            <p className="text-center">© 2026 Sapybase LLC — Engineered with precision.</p>
-            <div className="flex gap-5">
-              <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Privacy</Link>
-              <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Terms</Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[14px] text-emerald-500">browse_activity</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-              Status: <span className="text-emerald-600 font-medium">Operational</span>
-            </span>
-          </div>
-        </footer>}
+        {/* Bottom spacer — footer text removed; empty container kept for breathing room */}
+        {!isFullHeightPane && <footer aria-hidden="true" className="bg-[#f8f9fa] dark:bg-slate-950 py-4 mt-auto transition-colors duration-500" />}
       </main>
     </div>
   );

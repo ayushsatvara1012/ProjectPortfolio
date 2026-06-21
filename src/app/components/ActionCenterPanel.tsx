@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@clerk/nextjs';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 
 // Urgency → dot color only (no pill background)
 const URGENCY = {
-    high:   { label: 'Act now', dot: 'bg-rose-500',   text: 'text-rose-500' },
+    high:   { label: 'Act now', dot: 'bg-rose-500',   text: 'text-rose-400' },
     medium: { label: 'Soon',    dot: 'bg-amber-500',  text: 'text-amber-500' },
     low:    { label: 'Later',   dot: 'bg-slate-400',  text: 'text-slate-400' },
 } as const;
@@ -18,7 +19,7 @@ const BAND_DOT: Record<string, string> = {
     COLD: 'bg-slate-400',
 };
 const BAND_TEXT: Record<string, string> = {
-    HOT:  'text-rose-500',
+    HOT:  'text-rose-400',
     WARM: 'text-amber-500',
     COLD: 'text-slate-400',
 };
@@ -47,11 +48,29 @@ interface ActionCenterPanelProps {
 
 const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot }: ActionCenterPanelProps) => {
     const queryClient = useQueryClient();
+    const { user } = useUser();
+    const userEmail = user?.primaryEmailAddress?.emailAddress || 'your-email@example.com';
+    
     const [acted, setActed] = useState<Record<string, 'won' | 'lost'>>({});
     const [enteringValueLeadId, setEnteringValueLeadId] = useState<string | null>(null);
     const [dealValueInput, setDealValueInput] = useState('');
     const [emailDraftLead, setEmailDraftLead] = useState<ActionLead | null>(null);
+    const [draftSubject, setDraftSubject] = useState('');
+    const [draftBody, setDraftBody] = useState('');
+    const [draftCc, setDraftCc] = useState('');
     const [copied, setCopied] = useState(false);
+    const [showEmailProviders, setShowEmailProviders] = useState(false);
+
+    useEffect(() => {
+        if (emailDraftLead) {
+            const draft = getEmailDraft(emailDraftLead);
+            setDraftSubject(draft.subject);
+            setDraftBody(draft.body);
+            setDraftCc('');
+            setCopied(false);
+            setShowEmailProviders(false);
+        }
+    }, [emailDraftLead]);
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['action-center', selectedBotId],
@@ -128,69 +147,69 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
     };
 
     return (
-        <div className="flex flex-col gap-3 transition-colors duration-500">
+        <div className="flex flex-col gap-3 transition-colors duration-500 w-full">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Action Queue</span>
-                <span className="text-[11px] font-mono text-slate-400">{counts.total}</span>
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 px-5 py-3 border border-slate-200 dark:border-slate-800 rounded-t-xl shadow-sm border-b-0">
+                <span className="text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans">Action Queue</span>
+                <span className="text-xs font-sans text-slate-400">{counts.total}</span>
                 {counts.high > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] font-mono text-rose-500">
+                    <span className="flex items-center gap-1 text-xs font-sans font-medium text-rose-500 dark:text-rose-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />{counts.high} urgent
                     </span>
                 )}
                 {counts.medium > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] font-mono text-amber-500">
+                    <span className="flex items-center gap-1 text-xs font-sans font-medium text-amber-500">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />{counts.medium} soon
                     </span>
                 )}
             </div>
 
             {queue.length === 0 ? (
-                <div className="py-8 text-center border border-slate-100 dark:border-slate-800 rounded-md bg-white dark:bg-slate-900">
+                <div className="py-8 text-center border border-slate-200 dark:border-slate-800 rounded-b-xl bg-white dark:bg-slate-900 shadow-sm">
                     <p className="text-sm text-slate-500 dark:text-slate-400">You&apos;re all caught up.</p>
-                    <p className="text-[11px] font-mono text-slate-400 mt-1">New hot leads will appear here the moment they come in.</p>
+                    <p className="text-xs font-sans text-slate-400 mt-1">New hot leads will appear here the moment they come in.</p>
                 </div>
             ) : (
                 <>
                     {/* Dense divided list */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md divide-y divide-slate-100 dark:divide-slate-800 transition-colors duration-500">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-b-xl shadow-sm divide-y divide-slate-100 dark:divide-slate-800/50 transition-colors duration-500 overflow-hidden">
                         {queue.map(lead => {
                             const u = URGENCY[lead.urgency] || URGENCY.low;
                             const pending = outcomeMutation.isPending;
                             const isEnteringValue = enteringValueLeadId === lead.id;
 
                             return (
-                                <div key={lead.id} className="px-4 py-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
+                                <div key={lead.id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
                                     {/* Identity */}
                                     <div className="min-w-0 w-full sm:w-[32%] sm:shrink-0">
                                         <div className="flex items-baseline gap-2 min-w-0">
                                             <span className="text-sm font-semibold text-slate-900 dark:text-slate-200 truncate max-w-[55%] shrink-0">{lead.name || lead.email}</span>
-                                            {lead.name && <span className="text-[11px] font-mono text-slate-400 truncate">{lead.email}</span>}
+                                            {lead.name && <span className="text-xs font-sans text-slate-500 truncate">{lead.email}</span>}
                                         </div>
-                                        {lead.context && <p className="text-[11px] font-mono text-slate-400 truncate mt-0.5">"{lead.context}"</p>}
+                                        {lead.context && <p className="text-xs font-sans text-slate-500 truncate mt-0.5">"{lead.context}"</p>}
                                     </div>
 
                                     {/* Reason · Urgency dot · Band dot */}
-                                    <div className="w-full sm:flex-1 flex flex-wrap sm:grid sm:grid-cols-3 items-center gap-x-3 gap-y-0.5">
-                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{lead.reason}</span>
-                                        <div className="flex items-center gap-1">
+                                    <div className="w-full sm:flex-1 flex flex-wrap sm:grid sm:grid-cols-3 items-center gap-x-3 gap-y-1">
+                                        <span className="text-xs text-slate-600 dark:text-slate-400 truncate">{lead.reason}</span>
+                                        <div className="flex items-center gap-1.5">
                                             <span className={`w-1.5 h-1.5 rounded-full ${u.dot}`} />
-                                            <span className={`text-[10px] font-mono uppercase tracking-wider ${u.text}`}>{u.label}</span>
+                                            <span className={`text-xs font-sans uppercase tracking-wider font-semibold ${u.text}`}>{u.label}</span>
                                         </div>
                                         {lead.band && (
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1.5">
                                                 <span className={`w-1.5 h-1.5 rounded-full ${BAND_DOT[lead.band] || 'bg-slate-400'}`} />
-                                                <span className={`text-[10px] font-mono uppercase tracking-wider ${BAND_TEXT[lead.band] || 'text-slate-400'}`}>{lead.band}</span>
+                                                <span className={`text-xs font-sans uppercase tracking-wider font-semibold ${BAND_TEXT[lead.band] || 'text-slate-400'}`}>{lead.band}</span>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Actions */}
-                                    <div className="shrink-0 flex items-center gap-1.5 self-end sm:self-auto min-h-[36px]">
+                                    <div className="shrink-0 flex items-center gap-2 self-end sm:self-auto min-h-[36px]">
                                         {isEnteringValue ? (
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-2 py-1">
-                                                    <span className="text-[11px] font-mono text-slate-400">$</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm px-2 py-1">
+                                                    <span className="text-xs font-sans text-slate-400">$</span>
                                                     <input
                                                         type="number" placeholder="Value"
                                                         value={dealValueInput}
@@ -204,7 +223,7 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
                                                             } else if (e.key === 'Escape') { setEnteringValueLeadId(null); }
                                                         }}
                                                         disabled={pending}
-                                                        className="w-16 bg-transparent text-[11px] font-mono focus:outline-none text-slate-900 dark:text-slate-100"
+                                                        className="w-16 bg-transparent text-xs font-sans focus:outline-none text-slate-900 dark:text-slate-100 tabular-nums"
                                                         autoFocus
                                                     />
                                                 </div>
@@ -216,7 +235,7 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
                                                         setEnteringValueLeadId(null);
                                                     }}
                                                     disabled={pending}
-                                                    className="px-2.5 py-1 rounded-sm bg-emerald-600 text-white text-[11px] font-mono transition-colors disabled:opacity-50 min-h-[28px]"
+                                                    className="px-3 py-1 rounded-md shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-sans font-semibold transition-colors disabled:opacity-50 min-h-[32px]"
                                                 >Save</button>
                                                 <button
                                                     onClick={() => {
@@ -225,7 +244,7 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
                                                         setEnteringValueLeadId(null);
                                                     }}
                                                     disabled={pending}
-                                                    className="px-2.5 py-1 rounded-sm border border-slate-200 dark:border-slate-700 text-slate-500 text-[11px] font-mono hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 min-h-[28px]"
+                                                    className="px-3 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs font-sans font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 min-h-[32px]"
                                                 >Skip</button>
                                             </div>
                                         ) : (
@@ -233,20 +252,20 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
                                                 <button
                                                     type="button"
                                                     onClick={() => setEmailDraftLead(lead)}
-                                                    className="w-7 h-7 flex items-center justify-center rounded-sm border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                                    className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
                                                     title="Draft suggested email"
                                                 >
-                                                    <span className="material-symbols-outlined text-[14px]">mail</span>
+                                                    <span className="material-symbols-outlined text-[16px]">mail</span>
                                                 </button>
                                                 <button
                                                     type="button" disabled={pending}
                                                     onClick={() => { setEnteringValueLeadId(lead.id); setDealValueInput(''); }}
-                                                    className={`px-2.5 py-1 rounded-sm border text-[11px] font-mono transition-colors disabled:opacity-50 min-h-[28px] ${acted[lead.id] === 'won' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400'}`}
+                                                    className={`px-3 py-1 rounded-md shadow-sm border text-xs font-semibold font-sans transition-colors disabled:opacity-50 min-h-[32px] ${acted[lead.id] === 'won' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-400 bg-white dark:bg-slate-900'}`}
                                                 >Won</button>
                                                 <button
                                                     type="button" disabled={pending}
                                                     onClick={() => { setActed(a => ({ ...a, [lead.id]: 'lost' })); outcomeMutation.mutate({ leadId: lead.id, status: 'lost', valueUsd: null }); }}
-                                                    className={`px-2.5 py-1 rounded-sm border text-[11px] font-mono transition-colors disabled:opacity-50 min-h-[28px] ${acted[lead.id] === 'lost' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-rose-400 hover:text-rose-500'}`}
+                                                    className={`px-3 py-1 rounded-md shadow-sm border text-xs font-semibold font-sans transition-colors disabled:opacity-50 min-h-[32px] ${acted[lead.id] === 'lost' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-rose-400 hover:text-rose-500 bg-white dark:bg-slate-900'}`}
                                                 >Lost</button>
                                             </>
                                         )}
@@ -255,7 +274,7 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
                             );
                         })}
                     </div>
-                    <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 text-center">
+                    <p className="text-xs font-sans text-slate-500 dark:text-slate-500 mt-2 px-1">
                         Won deals add to realized revenue · edit values in Leads CRM
                     </p>
                 </>
@@ -263,52 +282,113 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
 
             {/* Email Draft Modal */}
             {emailDraftLead && (() => {
-                const draft = getEmailDraft(emailDraftLead);
-                const mailto = `mailto:${emailDraftLead.email}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
+                const toStr = encodeURIComponent(emailDraftLead.email);
+                const ccStr = encodeURIComponent(draftCc);
+                const subStr = encodeURIComponent(draftSubject);
+                const bodyStr = encodeURIComponent(draftBody);
+                const authUserStr = encodeURIComponent(userEmail);
+
+                const mailto = `mailto:${emailDraftLead.email}?cc=${ccStr}&subject=${subStr}&body=${bodyStr}`;
+                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${toStr}&cc=${ccStr}&su=${subStr}&body=${bodyStr}&authuser=${authUserStr}`;
+                const outlookUrl = `https://outlook.live.com/mail/0/deeplink/compose?to=${toStr}&cc=${ccStr}&subject=${subStr}&body=${bodyStr}`;
+                const yahooUrl = `https://compose.mail.yahoo.com/?to=${toStr}&cc=${ccStr}&subject=${subStr}&body=${bodyStr}`;
+
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3 sm:p-4">
-                        <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-2xl overflow-hidden flex flex-col">
-                            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                <span className="text-[11px] uppercase tracking-widest font-mono text-slate-500">Suggested Follow-up Email</span>
+                        <div className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]">
+                            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px] text-blue-500">auto_awesome</span>
+                                    <span className="text-sm tracking-normal font-semibold font-sans text-slate-800 dark:text-slate-200">New Message</span>
+                                </div>
                                 <button onClick={() => setEmailDraftLead(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                    <span className="material-symbols-outlined text-[20px]">close</span>
                                 </button>
                             </div>
-                            <div className="p-4 flex flex-col gap-3">
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-mono text-slate-400 block mb-1">Recipient</label>
-                                    <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-sm text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700">
+                            
+                            {/* Email Client Layout */}
+                            <div className="flex flex-col flex-1 overflow-hidden bg-white dark:bg-slate-900">
+                                <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3.5 transition-colors">
+                                    <span className="text-slate-400 font-sans text-[13px] w-14">From:</span>
+                                    <div className="flex-1 text-[14px] font-sans text-slate-500 dark:text-slate-400 font-medium truncate">
+                                        {userEmail}
+                                    </div>
+                                </div>
+                                <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3.5 transition-colors">
+                                    <span className="text-slate-400 font-sans text-[13px] w-14">To:</span>
+                                    <div className="flex-1 text-[14px] font-sans text-slate-800 dark:text-slate-200 font-medium truncate">
                                         {emailDraftLead.name ? `${emailDraftLead.name} <${emailDraftLead.email}>` : emailDraftLead.email}
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-mono text-slate-400 block mb-1">Subject</label>
-                                    <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-sm text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700">
-                                        {draft.subject}
-                                    </div>
+                                <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3.5 transition-colors">
+                                    <span className="text-slate-400 font-sans text-[13px] w-14">Cc:</span>
+                                    <input
+                                        value={draftCc}
+                                        onChange={e => setDraftCc(e.target.value)}
+                                        placeholder="Add Cc..."
+                                        className="flex-1 bg-transparent text-[14px] font-sans text-slate-800 dark:text-slate-200 focus:outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                                    />
                                 </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-mono text-slate-400 block mb-1">Email Draft</label>
-                                    <textarea readOnly rows={7} value={draft.body}
-                                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-sm text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700 focus:outline-none resize-none"
+                                <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3.5 transition-colors">
+                                    <span className="text-slate-400 font-sans text-[13px] w-14">Subject:</span>
+                                    <input
+                                        value={draftSubject}
+                                        onChange={e => setDraftSubject(e.target.value)}
+                                        placeholder="Email subject..."
+                                        className="flex-1 bg-transparent text-[14px] font-sans text-slate-900 dark:text-slate-100 focus:outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 font-semibold"
+                                    />
+                                </div>
+                                <div className="flex flex-col flex-1 p-6 overflow-hidden">
+                                    <textarea
+                                        value={draftBody}
+                                        onChange={e => setDraftBody(e.target.value)}
+                                        className="w-full h-full bg-transparent text-[15px] leading-relaxed font-sans text-slate-700 dark:text-slate-300 focus:outline-none resize-none custom-scrollbar"
+                                        placeholder="Write your email here..."
                                     />
                                 </div>
                             </div>
-                            <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopyDraft(`${draft.subject}\n\n${draft.body}`)}
-                                    className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-sm text-[11px] font-mono hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
-                                >
-                                    <span className="material-symbols-outlined text-[13px]">content_copy</span>
-                                    {copied ? 'Copied!' : 'Copy Draft'}
-                                </button>
-                                <a href={mailto} onClick={() => setEmailDraftLead(null)}
-                                    className="px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm text-[11px] font-mono flex items-center gap-1 transition-colors hover:bg-slate-700 dark:hover:bg-slate-200"
-                                >
-                                    <span className="material-symbols-outlined text-[13px]">mail</span>
-                                    Open Email App
-                                </a>
+
+                            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-900 transition-colors">
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopyDraft(`${draftSubject}\n\n${draftBody}`)}
+                                        className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg text-[13px] font-sans hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                                        {copied ? 'Copied!' : 'Copy Draft'}
+                                    </button>
+                                    
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEmailProviders(p => !p)}
+                                            className="px-5 py-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg text-[13px] font-sans flex items-center gap-2 transition-colors"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">send</span>
+                                            Send via...
+                                            <span className="material-symbols-outlined text-[16px]">{showEmailProviders ? 'expand_more' : 'expand_less'}</span>
+                                        </button>
+
+                                        {showEmailProviders && (
+                                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-10 flex flex-col py-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" onClick={() => setEmailDraftLead(null)} className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">mail</span> Gmail
+                                                </a>
+                                                <a href={outlookUrl} target="_blank" rel="noopener noreferrer" onClick={() => setEmailDraftLead(null)} className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span> Outlook
+                                                </a>
+                                                <a href={yahooUrl} target="_blank" rel="noopener noreferrer" onClick={() => setEmailDraftLead(null)} className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">email</span> Yahoo Mail
+                                                </a>
+                                                <div className="h-px bg-slate-100 dark:bg-slate-700 my-1"></div>
+                                                <a href={mailto} onClick={() => setEmailDraftLead(null)} className="px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">devices</span> Default Mail App
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -6,7 +6,6 @@ import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
 
 // Code-split panels — each renders its own loading state
 const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
@@ -15,7 +14,7 @@ const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
 import Link from 'next/link';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
-const cellCls = 'bg-white dark:bg-slate-900 rounded-md transition-colors duration-500';
+const cellCls = 'bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors duration-500 overflow-hidden';
 
 // ── Activity Calendar ─────────────────────────────────────────────────────────
 const ActivityCalendar = ({ data }: { data: any[] }) => {
@@ -80,23 +79,24 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 w-full">
-            {/* Calendar */}
-            <div className="w-full lg:w-1/2 flex flex-col gap-2">
-                {/* Month axis */}
-                <div className="flex gap-[3px] pl-0 mb-1">
-                    {calendarDates.map((dateStr, i) => {
-                        const found = monthLabels.find(m => m.idx === i);
-                        return (
-                            <div key={dateStr} className="w-[18px] shrink-0 text-[8px] font-mono text-slate-400 dark:text-slate-500 text-center">
-                                {found ? found.label : ''}
-                            </div>
-                        );
-                    })}
-                </div>
-                {/* Grid */}
-                <div className="flex flex-wrap gap-[3px]">
-                    {calendarDates.map((dateStr) => {
+        <div className="flex flex-col gap-6">
+            {/* Calendar Grid */}
+            <div className="w-full min-w-0 flex flex-col gap-2 overflow-x-auto custom-scrollbar pb-3">
+                <div className="min-w-max flex flex-col gap-1">
+                    {/* Month axis */}
+                    <div className="flex gap-[3px] pl-0">
+                        {calendarDates.map((dateStr, i) => {
+                            const found = monthLabels.find(m => m.idx === i);
+                            return (
+                                <div key={dateStr} className="w-[18px] shrink-0 text-[10px] font-sans uppercase tracking-widest text-slate-400 dark:text-slate-500 text-center">
+                                    {found ? found.label : ''}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {/* Grid */}
+                    <div className="flex gap-[3px]">
+                        {calendarDates.map((dateStr) => {
                         const cellData = dataMap[dateStr];
                         const count = cellData?.total_questions || 0;
                         const isSelected = selectedCell?.date === dateStr;
@@ -111,51 +111,49 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         );
                     })}
                 </div>
-                <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">Less</span>
-                    {['bg-slate-100 dark:bg-slate-800/60', 'bg-slate-300 dark:bg-slate-600', 'bg-slate-500 dark:bg-slate-500', 'bg-slate-700 dark:bg-slate-400', 'bg-slate-900 dark:bg-slate-200'].map((cls, i) => (
-                        <div key={i} className={`w-[12px] h-[12px] rounded-[2px] ${cls}`} />
-                    ))}
-                    <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">More</span>
-                </div>
             </div>
+            <div className="flex items-center gap-3 mt-2">
+                <span className="text-[10px] font-sans uppercase tracking-widest text-slate-400">Less</span>
+                {['bg-slate-100 dark:bg-slate-800/60', 'bg-slate-300 dark:bg-slate-600', 'bg-slate-500 dark:bg-slate-500', 'bg-slate-700 dark:bg-slate-400', 'bg-slate-900 dark:bg-slate-200'].map((cls, i) => (
+                    <div key={i} className={`w-[12px] h-[12px] rounded-[2px] ${cls}`} />
+                ))}
+                <span className="text-[10px] font-sans uppercase tracking-widest text-slate-400">More</span>
+            </div>
+        </div>
 
             {/* Inspector */}
-            <div className="w-full lg:w-1/2">
+            <div className="w-full">
                 {selectedCell ? (
-                    <motion.div
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        key={selectedCell.date}
-                        className="flex flex-col gap-3 border border-slate-100 dark:border-slate-800 rounded-md px-4 py-3"
+                    <div
+                        className="flex flex-col gap-3 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm px-4 py-3"
                     >
                         <div>
-                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Daily inspector</span>
+                            <span className="text-xs tracking-normal font-semibold text-slate-700 dark:text-slate-300 font-sans">Daily inspector</span>
                             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{formatDateStr(selectedCell.date)}</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
                             <div>
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400">Total activity</span>
-                                <p className="text-lg font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{selectedCell.total_questions || 0}</p>
+                                <span className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Total activity</span>
+                                <p className="text-lg font-sans tabular-nums font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{selectedCell.total_questions || 0}</p>
                             </div>
                             <div>
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400">Unique users</span>
-                                <p className="text-lg font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-200 mt-0.5">{selectedCell.interacted_users || 0}</p>
+                                <span className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Unique users</span>
+                                <p className="text-lg font-sans tabular-nums font-semibold text-slate-900 dark:text-slate-200 mt-0.5">{selectedCell.interacted_users || 0}</p>
                             </div>
                         </div>
                         <div className="space-y-0.5 border-t border-slate-100 dark:border-slate-800 pt-3">
                             <div className="flex items-center justify-between py-1.5">
                                 <span className="text-xs text-slate-500 dark:text-slate-400">Answered correctly</span>
-                                <span className="text-xs font-mono tabular-nums text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
+                                <span className="text-xs font-sans tabular-nums text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
                             </div>
                             <div className="flex items-center justify-between py-1.5">
                                 <span className="text-xs text-slate-500 dark:text-slate-400">Failed response</span>
-                                <span className="text-xs font-mono tabular-nums text-rose-500">{selectedCell.unanswered_questions || 0}</span>
+                                <span className="text-xs font-sans tabular-nums text-rose-400">{selectedCell.unanswered_questions || 0}</span>
                             </div>
                         </div>
                         {selectedCell.top_questions?.length > 0 && (
                             <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono block mb-2">Top questions</span>
+                                <span className="text-xs tracking-normal font-semibold text-slate-700 dark:text-slate-300 font-sans block mb-2">Top questions</span>
                                 <div className="space-y-1.5">
                                     {selectedCell.top_questions.map((q: string, qIdx: number) => (
                                         <p key={qIdx} className="text-xs text-slate-600 dark:text-slate-400 leading-snug italic">"{q}"</p>
@@ -165,7 +163,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                         )}
                         {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered?.length > 0 && (
                             <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono block mb-2">Unanswered queries</span>
+                                <span className="text-xs tracking-normal font-semibold text-slate-700 dark:text-slate-300 font-sans block mb-2">Unanswered queries</span>
                                 <div className="space-y-1.5">
                                     {selectedCell.top_unanswered.map((q: string, qIdx: number) => (
                                         <p key={qIdx} className="text-xs text-slate-500 dark:text-slate-400 leading-snug">"{q}"</p>
@@ -173,7 +171,7 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
                                 </div>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 ) : (
                     <div className="flex items-center justify-center py-8 text-sm italic text-slate-400 dark:text-slate-500">
                         Hover a day to inspect activity
@@ -280,14 +278,16 @@ export default function AppInsights() {
 
     // ── Header row: tabs + bot selector + generate btn ────────────────────────
     const renderHeader = () => (
-        <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
+        <div className="relative shrink-0 z-40 bg-[#f8f9fa]/90 dark:bg-slate-950/90 backdrop-blur-xl transition-colors duration-500 pt-3 pb-2 border-b border-slate-200/50 dark:border-slate-800/50">
+            {/* Fade shadow to blend scrolling content */}
+            <div className="absolute top-full left-0 w-full h-8 bg-gradient-to-b from-[#f8f9fa] dark:from-slate-950 to-transparent pointer-events-none opacity-100" />
             {/* Row 1 on mobile: bot selector + generate */}
-            <div className="flex items-center gap-2 px-4 md:px-6 py-2 sm:hidden border-b border-slate-100 dark:border-slate-800/50">
+            <div className="flex items-center gap-2 px-4 md:px-6 py-2 sm:hidden">
                 {canAnalytics && bots.length > 1 && (
                     <select
                         value={selectedBotId}
                         onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 min-w-0 px-2 py-1 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-slate-900 dark:text-slate-200 focus:outline-none"
+                        className="flex-1 min-w-0 px-2 py-1 text-xs font-sans bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-slate-900 dark:text-slate-200 focus:outline-none"
                     >
                         {bots.map((b: any) => (
                             <option key={b.id} value={b.id}>{b.bot_name}</option>
@@ -298,7 +298,7 @@ export default function AppInsights() {
                     <button
                         onClick={() => handleGenerate(false)}
                         disabled={isGenerating || !selectedBotId}
-                        className="shrink-0 px-3 py-1 text-[11px] font-mono uppercase tracking-wider bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+                        className="shrink-0 px-3 py-1 text-[11px] font-sans uppercase tracking-wider bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm disabled:opacity-40 flex items-center gap-1.5 transition-colors"
                     >
                         {isGenerating ? <><div className="w-2.5 h-2.5 border-2 border-slate-300 dark:border-slate-700 border-t-white dark:border-t-slate-900 animate-spin rounded-full" />Synth...</> : 'Generate'}
                     </button>
@@ -307,20 +307,22 @@ export default function AppInsights() {
 
             {/* Tab bar + desktop controls */}
             <div className="flex items-center gap-0 min-w-0 overflow-x-auto scrollbar-hide">
-                <div className="flex items-center px-4 md:px-6 flex-1 min-w-0">
-                    {TABS.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`py-2.5 px-1 mr-5 text-[12px] font-mono uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${activeTab === tab.id
-                                ? 'border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100 font-semibold'
-                                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                }`}
-                        >
-                            <span className="hidden sm:inline">{tab.label}</span>
-                            <span className="sm:hidden">{tab.shortLabel}</span>
-                        </button>
-                    ))}
+                <div className="flex items-center px-4 md:px-6 lg:pl-0 flex-1 min-w-0 py-0">
+                    <div className="flex items-center gap-6">
+                        {TABS.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`py-3 text-xs font-sans uppercase tracking-wider whitespace-nowrap transition-all border-b-2 ${activeTab === tab.id
+                                    ? 'border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100 font-bold'
+                                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium'
+                                    }`}
+                            >
+                                <span className="hidden sm:inline">{tab.label}</span>
+                                <span className="sm:hidden">{tab.shortLabel}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Desktop: bot selector + generate inline */}
@@ -329,7 +331,7 @@ export default function AppInsights() {
                         <select
                             value={selectedBotId}
                             onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                            className="px-2 py-1 text-[11px] font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-slate-900 dark:text-slate-200 focus:outline-none"
+                            className="px-2 py-1 text-[11px] font-sans bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-slate-900 dark:text-slate-200 focus:outline-none"
                         >
                             {bots.map((b: any) => (
                                 <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
@@ -340,7 +342,7 @@ export default function AppInsights() {
                         <button
                             onClick={() => handleGenerate(false)}
                             disabled={isGenerating || !selectedBotId}
-                            className="px-3 py-1 text-[11px] font-mono uppercase tracking-wider bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+                            className="px-3 py-1 text-[11px] font-sans uppercase tracking-wider bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm disabled:opacity-40 flex items-center gap-1.5 transition-colors"
                         >
                             {isGenerating
                                 ? <><div className="w-2.5 h-2.5 border-2 border-slate-400 border-t-white animate-spin rounded-full" />Synthesizing</>
@@ -349,7 +351,7 @@ export default function AppInsights() {
                         </button>
                     )}
                     {activeTab === 'funnel' && lastGeneratedAt && (
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap">Last: {lastGeneratedAt}</span>
+                        <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 whitespace-nowrap">Last: {lastGeneratedAt}</span>
                     )}
                 </div>
             </div>
@@ -357,16 +359,15 @@ export default function AppInsights() {
     );
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+        <div
             className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500"
         >
             {renderHeader()}
 
-            {/* Content Area */}
-            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-4 pb-6 md:px-6 gap-4 pt-4">
-
+            <div 
+                data-lenis-prevent 
+                className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col p-4 md:p-6 lg:p-8"
+            >
                 {activeTab === 'sales' && (
                     <SalesAndLeadsPanel
                         selectedBotId={selectedBotId}
@@ -406,19 +407,19 @@ export default function AppInsights() {
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full min-w-0">
                                     {/* Top Trends */}
                                     <div className="lg:col-span-7">
-                                        <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40`}>
-                                            <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800/40 flex items-center gap-2">
-                                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Top customer trends</span>
+                                        <div className={`${cellCls}`}>
+                                            <div className="bg-slate-50 dark:bg-slate-800/40 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                                                <span className="text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans">Top customer trends</span>
                                             </div>
                                             <div>
                                                 {reportData?.top_trends?.map((trend: string, idx: number) => (
-                                                    <div key={idx} className={`flex items-start gap-3 px-4 py-2 ${idx % 2 === 0 ? 'bg-slate-50/30 dark:bg-slate-900/10' : ''}`}>
-                                                        <span className="text-[10px] font-mono text-slate-400 w-5 shrink-0 pt-0.5">{String(idx + 1).padStart(2, '0')}</span>
+                                                    <div key={idx} className={`flex items-start gap-3 px-4 py-3 ${idx % 2 === 0 ? 'bg-slate-50/50 dark:bg-slate-900/50' : ''}`}>
+                                                        <span className="text-xs font-sans font-medium text-slate-500 w-5 shrink-0 pt-0.5 tabular-nums">{String(idx + 1).padStart(2, '0')}</span>
                                                         <p className="text-sm text-slate-700 dark:text-slate-300 leading-snug break-words">{trend}</p>
                                                     </div>
                                                 ))}
                                                 {(!reportData?.top_trends || reportData.top_trends.length === 0) && (
-                                                    <p className="py-6 text-center text-sm italic text-slate-400">No trends available.</p>
+                                                    <p className="py-6 text-center text-sm italic text-slate-500 dark:text-slate-400">No trends available.</p>
                                                 )}
                                             </div>
                                         </div>
@@ -426,9 +427,9 @@ export default function AppInsights() {
 
                                     {/* Actionable Advice */}
                                     <div className="lg:col-span-5">
-                                        <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40 px-4 py-4`}>
-                                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono block mb-3">Actionable advice</span>
-                                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                        <div className={`${cellCls} px-5 py-5 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-900/10 dark:to-purple-900/10`}>
+                                            <span className="text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans block mb-3">Actionable advice</span>
+                                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                                                 {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
                                             </p>
                                         </div>
@@ -436,42 +437,42 @@ export default function AppInsights() {
                                 </div>
 
                                 {/* 30-Day Activity Calendar */}
-                                <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40`}>
-                                    <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800/40">
-                                        <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">30-day peak activity</span>
+                                <div className={`${cellCls}`}>
+                                    <div className="bg-slate-50 dark:bg-slate-800/40 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                                        <span className="text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans">30-day peak activity</span>
                                     </div>
-                                    <div className="px-4 py-4">
+                                    <div className="px-5 py-5">
                                         <ActivityCalendar data={reportData?.peak_activity_blocks} />
                                     </div>
                                 </div>
 
                                 {/* Recent Activity Log */}
-                                <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40`}>
-                                    <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 border-b border-slate-100 dark:border-slate-800/40">
-                                        <div className="col-span-8 text-[10px] uppercase tracking-widest text-slate-400 font-mono">User Query</div>
-                                        <div className="col-span-2 text-[10px] uppercase tracking-widest text-slate-400 font-mono text-center">Status</div>
-                                        <div className="col-span-2 text-[10px] uppercase tracking-widest text-slate-400 font-mono text-right">Time</div>
+                                <div className={`${cellCls}`}>
+                                    <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+                                        <div className="col-span-8 text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans">User Query</div>
+                                        <div className="col-span-2 text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans text-center">Status</div>
+                                        <div className="col-span-2 text-sm tracking-normal font-semibold text-slate-800 dark:text-slate-200 font-sans text-right">Time</div>
                                     </div>
-                                    <div>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
                                         {reportData?.recent_conversations?.map((log: any, idx: number) => (
-                                            <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-1 md:gap-4 px-4 py-2 md:items-center hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors border-b last:border-b-0 border-slate-100/50 dark:border-slate-800/20">
+                                            <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-1 md:gap-4 px-4 py-3 md:items-center hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
                                                 <div className="col-span-8 text-sm text-slate-700 dark:text-slate-300 md:truncate break-words">{log.query}</div>
                                                 <div className="col-span-2 flex items-center md:justify-center gap-2">
                                                     {log.unanswered ? (
-                                                        <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Unanswered</span>
+                                                        <span className="text-xs tracking-normal font-semibold text-slate-700 dark:text-slate-300 font-sans bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Unanswered</span>
                                                     ) : (
-                                                        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-mono">Handled</span>
+                                                        <span className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 font-sans bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Handled</span>
                                                     )}
                                                 </div>
                                                 <div className="col-span-2 flex items-center md:justify-end">
-                                                    <span className="text-[10px] font-mono text-slate-400">
+                                                    <span className="text-xs font-sans text-slate-500 dark:text-slate-400 tabular-nums">
                                                         {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                                                     </span>
                                                 </div>
                                             </div>
                                         ))}
                                         {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
-                                            <p className="py-6 text-center text-sm italic text-slate-400">No recent activity found.</p>
+                                            <p className="py-6 text-center text-sm italic text-slate-500 dark:text-slate-400">No recent activity found.</p>
                                         )}
                                     </div>
                                 </div>
@@ -481,7 +482,7 @@ export default function AppInsights() {
                         {/* Error */}
                         {canAnalytics && error && (
                             <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-md">
-                                <span className="material-symbols-outlined text-[16px] text-red-500">error</span>
+                                <span className="material-symbols-outlined text-[16px] text-red-400">error</span>
                                 <p className="text-sm text-red-700 dark:text-red-300 flex-1">{error}</p>
                                 <button onClick={() => setError('')}><span className="material-symbols-outlined text-[16px] text-red-400">close</span></button>
                             </div>
@@ -491,7 +492,7 @@ export default function AppInsights() {
                         {canAnalytics && isGhostTown && !isGenerating && (
                             <div className="py-8 text-center">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">No conversations yet.</p>
-                                <Link href="/dashboard/bots" className="text-[11px] font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:underline mt-2 inline-block">View my bots</Link>
+                                <Link href="/dashboard/bots" className="text-[11px] font-sans uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:underline mt-2 inline-block">View my bots</Link>
                             </div>
                         )}
 
@@ -512,6 +513,6 @@ export default function AppInsights() {
                     </div>
                 )}
             </div>
-        </motion.div>
+        </div>
     );
 }

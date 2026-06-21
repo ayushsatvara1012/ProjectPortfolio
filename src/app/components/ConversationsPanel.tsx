@@ -75,17 +75,17 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                 {/* Header */}
                 <div className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60">
                     <div className="flex items-center gap-3">
-                        <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">{total} Conversation{total !== 1 ? 's' : ''}</span>
+                        <span className="text-xs tracking-normal font-semibold text-slate-700 dark:text-slate-300 font-sans">{total} Conversation{total !== 1 ? 's' : ''}</span>
                     </div>
                     {/* Filter Toggle */}
                     <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
                         <button
                             onClick={() => { setFilter('all'); setSelectedQueryFilter(null); setPage(1); }}
-                            className={`px-2.5 py-1 text-[10px] uppercase tracking-widest font-mono rounded-sm transition-colors min-h-[28px] whitespace-nowrap ${filter === 'all' && !selectedQueryFilter ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                            className={`px-2.5 py-1 text-[10px] uppercase tracking-widest font-sans rounded-sm transition-colors min-h-[28px] whitespace-nowrap ${filter === 'all' && !selectedQueryFilter ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                         >All</button>
                         <button
                             onClick={() => { setFilter('unanswered'); setSelectedQueryFilter(null); setPage(1); }}
-                            className={`px-2.5 py-1 text-[10px] uppercase tracking-widest font-mono rounded-sm transition-colors min-h-[28px] flex items-center gap-1 whitespace-nowrap ${filter === 'unanswered' && !selectedQueryFilter ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                            className={`px-2.5 py-1 text-[10px] uppercase tracking-widest font-sans rounded-sm transition-colors min-h-[28px] flex items-center gap-1 whitespace-nowrap ${filter === 'unanswered' && !selectedQueryFilter ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />Unanswered
                         </button>
@@ -95,7 +95,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                 {/* Filter info bar */}
                 {selectedQueryFilter && (
                     <div className="px-4 py-1.5 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between text-[10px] text-amber-700 dark:text-amber-400 shrink-0">
-                        <span className="truncate">Matching: <span className="font-mono font-semibold">"{selectedQueryFilter}"</span></span>
+                        <span className="truncate">Matching: <span className="font-sans font-semibold">"{selectedQueryFilter}"</span></span>
                         <button onClick={() => setSelectedQueryFilter(null)} className="shrink-0 flex items-center gap-0.5 hover:text-amber-800 transition-colors">
                             Clear <span className="material-symbols-outlined text-[11px]">close</span>
                         </button>
@@ -128,9 +128,9 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm text-slate-700 dark:text-slate-300 truncate font-medium">{preview || 'No messages'}</p>
                                             <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{formatTime(session.last_active)}</span>
-                                                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{session.message_count} msg{session.message_count !== 1 ? 's' : ''}</span>
-                                                {session.has_unanswered && <span className="text-[10px] font-mono uppercase tracking-wider text-amber-500">Has gaps</span>}
+                                                <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500">{formatTime(session.last_active)}</span>
+                                                <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500">{session.message_count} msg{session.message_count !== 1 ? 's' : ''}</span>
+                                                {session.has_unanswered && <span className="text-[10px] font-sans uppercase tracking-wider text-amber-500">Has gaps</span>}
                                             </div>
                                         </div>
                                         <span className={`material-symbols-outlined text-[16px] text-slate-400 shrink-0 transition-transform mt-0.5 ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
@@ -149,10 +149,10 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                                                                 <span className="material-symbols-outlined text-[10px] text-slate-500 dark:text-slate-400">person</span>
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <span className="text-[9px] uppercase tracking-widest font-mono text-slate-400">User</span>
+                                                                <span className="text-[9px] uppercase tracking-widest font-sans text-slate-400">User</span>
                                                                 <p className="text-sm text-slate-700 dark:text-slate-300 leading-snug mt-0.5 break-words whitespace-pre-wrap">{msg.user_query}</p>
                                                             </div>
-                                                            <span className="text-[10px] font-mono text-slate-400 shrink-0 mt-0.5">
+                                                            <span className="text-[10px] font-sans text-slate-400 shrink-0 mt-0.5">
                                                                 {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                                             </span>
                                                         </div>
@@ -161,14 +161,14 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                                                         <div className={`flex flex-col gap-1.5 ml-3 pl-3 border-l ${msg.is_unanswered ? 'border-l-amber-400' : 'border-l-slate-200 dark:border-l-slate-700'}`}>
                                                             <div>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-[9px] uppercase tracking-widest font-mono text-slate-400">Bot</span>
-                                                                    {msg.is_unanswered && <span className="text-[9px] font-mono uppercase tracking-wider text-amber-500">Unanswered</span>}
+                                                                    <span className="text-[9px] uppercase tracking-widest font-sans text-slate-400">Bot</span>
+                                                                    {msg.is_unanswered && <span className="text-[9px] font-sans uppercase tracking-wider text-amber-500">Unanswered</span>}
                                                                 </div>
                                                                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug mt-0.5 break-words whitespace-pre-wrap">{msg.bot_response}</p>
                                                                 {msg.is_unanswered && !isTrainingThis && (
                                                                     <button
                                                                         onClick={() => setTrainingQuery(msg.user_query)}
-                                                                        className="inline-flex items-center gap-1 mt-1 text-[10px] font-mono text-indigo-600 dark:text-indigo-400 hover:underline min-h-[28px]"
+                                                                        className="inline-flex items-center gap-1 mt-1 text-[10px] font-sans text-indigo-600 dark:text-indigo-400 hover:underline min-h-[28px]"
                                                                     >
                                                                         <span className="material-symbols-outlined text-[11px]">build</span>Teach Bot inline
                                                                     </button>
@@ -203,13 +203,13 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="text-[10px] uppercase tracking-widest font-mono text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 disabled:opacity-30 transition-colors min-h-[28px]"
+                            className="text-[10px] uppercase tracking-widest font-sans text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 disabled:opacity-30 transition-colors min-h-[28px]"
                         >← Prev</button>
-                        <span className="text-[10px] font-mono text-slate-400">Page {page} of {pages}</span>
+                        <span className="text-[10px] font-sans text-slate-400">Page {page} of {pages}</span>
                         <button
                             onClick={() => setPage(p => Math.min(pages, p + 1))}
                             disabled={page === pages}
-                            className="text-[10px] uppercase tracking-widest font-mono text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 disabled:opacity-30 transition-colors min-h-[28px]"
+                            className="text-[10px] uppercase tracking-widest font-sans text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 disabled:opacity-30 transition-colors min-h-[28px]"
                         >Next →</button>
                     </div>
                 )}

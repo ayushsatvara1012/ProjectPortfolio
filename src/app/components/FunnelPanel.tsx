@@ -62,64 +62,147 @@ interface FunnelStage {
     dropoff_pct: number;
 }
 
-// ── Horizontal Bar Chart ──────────────────────────────────────────────────────
-const FunnelBarChart = ({ stages }: { stages: FunnelStage[] }) => {
-    const [hovered, setHovered] = useState<string | null>(null);
+// ── Interactive Line Chart ────────────────────────────────────────────────────
+const InteractiveFunnelChart = ({ stages }: { stages: FunnelStage[] }) => {
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const maxCount = stages.reduce((m, s) => Math.max(m, s.count), 0) || 1;
 
+    // Fixed SVG coordinate system. It will scale responsively via width="100%"
+    const W = 800;
+    const H = 280;
+    const padX = 80;
+    const padYTop = 60;
+    const padYBot = 40;
+    
+    const chartW = W - padX * 2;
+    const chartH = H - padYTop - padYBot;
+
+    // Calculate point coordinates
+    const points = stages.map((s, i) => {
+        const x = padX + (i / Math.max(1, stages.length - 1)) * chartW;
+        const y = padYTop + chartH - (s.count / maxCount) * chartH;
+        return { x, y, stage: s };
+    });
+
+    // Create a smooth cubic bezier curve
+    const smoothLinePath = points.length > 0 ? `M ${points[0].x},${points[0].y} ` + points.slice(1).map((p, i) => {
+        const prev = points[i];
+        const cp1x = prev.x + (p.x - prev.x) / 2;
+        const cp1y = prev.y;
+        const cp2x = p.x - (p.x - prev.x) / 2;
+        const cp2y = p.y;
+        return `C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p.x},${p.y}`;
+    }).join(' ') : '';
+
+    const areaPath = smoothLinePath ? `${smoothLinePath} L ${points[points.length - 1].x},${padYTop + chartH} L ${points[0].x},${padYTop + chartH} Z` : '';
+
     return (
-        <div className="flex flex-col gap-0">
-            {stages.map((s, i) => {
-                const barPct = (s.count / maxCount) * 100;
-                const isHovered = hovered === s.key;
+        <div className="w-full relative select-none max-w-4xl mx-auto flex flex-col gap-2">
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto overflow-visible font-sans">
+                <defs>
+                    <linearGradient id="funnelArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                    </linearGradient>
+                </defs>
 
-                return (
-                    <div key={s.key}>
-                        {/* Dropoff connector between stages */}
-                        {i > 0 && (
-                            <div className="flex items-center gap-3 py-0.5 pl-28 sm:pl-32">
-                                <span className="text-[10px] font-mono text-slate-400">{s.pct_of_prev}% continued</span>
-                                {s.dropoff_pct > 0 && (
-                                    <span className="text-[10px] font-mono text-rose-500">↓ {s.dropoff_pct}% lost</span>
-                                )}
-                            </div>
-                        )}
-                        {/* Row */}
-                        <div
-                            className={`flex items-center gap-3 py-1.5 px-2 rounded-sm cursor-default transition-colors ${isHovered ? 'bg-slate-50/80 dark:bg-slate-900/40' : ''}`}
-                            onMouseEnter={() => setHovered(s.key)}
-                            onMouseLeave={() => setHovered(null)}
+                {/* Background Grid Lines */}
+                {[0, 0.5, 1].map(ratio => {
+                    const y = padYTop + chartH * ratio;
+                    return (
+                        <line key={ratio} x1={padX} y1={y} x2={W - padX} y2={y} stroke="currentColor" className="text-slate-100 dark:text-slate-800/60" strokeDasharray="4 4" strokeWidth="2" />
+                    );
+                })}
+
+                {/* Area and Line */}
+                <path d={areaPath} fill="url(#funnelArea)" />
+                <path d={smoothLinePath} fill="none" stroke="#6366f1" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+
+                {/* Points and Interaction */}
+                {points.map((p, i) => {
+                    const isHovered = hoveredIndex === i;
+                    const stage = p.stage;
+                    return (
+                        <g 
+                            key={stage.key}
+                            onMouseEnter={() => setHoveredIndex(i)}
+                            onMouseLeave={() => setHoveredIndex(null)}
+                            className="cursor-pointer"
                         >
-                            {/* Stage label */}
-                            <span className="w-24 sm:w-28 shrink-0 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                <span className="hidden sm:inline">{s.key}</span>
-                                <span className="sm:hidden">{STAGE_SHORT[s.key] || s.key}</span>
-                            </span>
+                            {/* Hit Area */}
+                            <rect 
+                                x={p.x - (chartW / (stages.length - 1)) / 2} 
+                                y={0} 
+                                width={chartW / (stages.length - 1)} 
+                                height={H} 
+                                fill="transparent" 
+                            />
+                            
+                            {/* Hover Guide Line */}
+                            <line 
+                                x1={p.x} y1={padYTop} x2={p.x} y2={padYTop + chartH} 
+                                stroke="#6366f1" strokeWidth="2" strokeDasharray="4 4" 
+                                opacity={isHovered ? 0.5 : 0}
+                                className="transition-opacity duration-300"
+                            />
 
-                            {/* Bar track */}
-                            <div className="flex-1 h-[5px] bg-slate-100 dark:bg-slate-800 rounded-none overflow-hidden">
-                                <div
-                                    className="h-full bg-slate-800 dark:bg-slate-200 transition-all duration-500"
-                                    style={{ width: `${Math.max(barPct, s.count > 0 ? 1 : 0)}%` }}
+                            {/* Data Point */}
+                            <circle 
+                                cx={p.x} cy={p.y} r={isHovered ? 7 : 5} 
+                                fill="white" stroke="#6366f1" strokeWidth="3" 
+                                className="transition-all duration-300"
+                            />
+                            
+                            {/* X-axis Label */}
+                            <text 
+                                x={p.x} y={H - 10} 
+                                textAnchor="middle" 
+                                className={`text-[12px] uppercase tracking-widest font-semibold transition-colors duration-300 ${isHovered ? 'fill-slate-800 dark:fill-slate-200' : 'fill-slate-400 dark:fill-slate-500'}`}
+                            >
+                                {STAGE_SHORT[stage.key] || stage.key}
+                            </text>
+
+                            {/* Hover Tooltip Group */}
+                            <g 
+                                className="transition-opacity duration-300 pointer-events-none drop-shadow-xl"
+                                opacity={isHovered ? 1 : 0}
+                            >
+                                <rect 
+                                    x={p.x - 60} y={p.y - 62} 
+                                    width="120" height="46" rx="8" 
+                                    className="fill-slate-800 dark:fill-slate-100" 
                                 />
-                            </div>
-
-                            {/* Count */}
-                            <span className="w-14 sm:w-16 text-right font-mono tabular-nums text-sm text-slate-800 dark:text-slate-200 shrink-0">{fmtNum(s.count)}</span>
-
-                            {/* Pct */}
-                            <span className="w-10 sm:w-12 text-right font-mono text-[11px] text-slate-400 shrink-0">{s.pct_of_top}%</span>
-                        </div>
-
-                        {/* Tooltip on hover */}
-                        {isHovered && (
-                            <div className="ml-28 sm:ml-32 pl-2 pb-1 text-[10px] font-mono text-slate-400 italic leading-snug">
-                                {STAGE_DESCRIPTIONS[s.key] || ''}
-                            </div>
+                                <polygon points={`${p.x-6},${p.y-16} ${p.x+6},${p.y-16} ${p.x},${p.y-10}`} className="fill-slate-800 dark:fill-slate-100" />
+                                <text x={p.x} y={p.y - 42} textAnchor="middle" className="fill-white dark:fill-slate-900 text-[14px] font-bold">
+                                    {fmtNum(stage.count)}
+                                </text>
+                                <text x={p.x} y={p.y - 26} textAnchor="middle" className="fill-slate-400 dark:fill-slate-500 text-[10px] uppercase tracking-wider font-medium">
+                                    {stage.pct_of_top}% CONV
+                                </text>
+                            </g>
+                        </g>
+                    );
+                })}
+            </svg>
+            
+            {/* Dropoff segments row */}
+            <div 
+                className="flex items-center w-full relative z-10 pointer-events-none pb-2"
+                style={{ paddingLeft: '10%', paddingRight: '10%' }}
+            >
+                {stages.slice(1).map((s) => (
+                    <div key={s.key} className="flex-1 flex flex-col items-center justify-center text-center">
+                        <span className="text-[10px] sm:text-[11px] font-sans font-medium text-slate-500 dark:text-slate-400">
+                            {s.pct_of_prev}% continued
+                        </span>
+                        {s.dropoff_pct > 0 && (
+                            <span className="text-[10px] sm:text-[11px] font-sans font-semibold text-rose-500 mt-0.5">
+                                ↓ {s.dropoff_pct}% lost
+                            </span>
                         )}
                     </div>
-                );
-            })}
+                ))}
+            </div>
         </div>
     );
 };
@@ -194,8 +277,8 @@ const QualityDonut = ({ quality, activeBand, setActiveBand }: {
                         })}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-xl font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 leading-none">{fmtNum(total)}</span>
-                        <span className="text-[9px] uppercase tracking-widest font-mono text-slate-400 mt-0.5">Scored</span>
+                        <span className="text-xl font-sans tabular-nums font-semibold text-slate-900 dark:text-slate-100 leading-none">{fmtNum(total)}</span>
+                        <span className="text-[9px] uppercase tracking-widest font-sans text-slate-400 mt-0.5">Scored</span>
                     </div>
                 </div>
 
@@ -215,11 +298,11 @@ const QualityDonut = ({ quality, activeBand, setActiveBand }: {
                                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${accent.dot}`} />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-baseline gap-2">
-                                        <span className={`text-[10px] font-mono uppercase tracking-wider font-semibold ${accent.text}`}>{b.band}</span>
-                                        <span className="text-sm font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200">{fmtNum(b.count)}</span>
-                                        <span className="text-[10px] font-mono text-slate-400">({b.pct}%)</span>
+                                        <span className={`text-[10px] font-sans uppercase tracking-wider font-semibold ${accent.text}`}>{b.band}</span>
+                                        <span className="text-sm font-sans tabular-nums font-semibold text-slate-800 dark:text-slate-200">{fmtNum(b.count)}</span>
+                                        <span className="text-[10px] font-sans text-slate-400">({b.pct}%)</span>
                                     </div>
-                                    <p className="text-[10px] font-mono text-slate-400 leading-snug mt-0.5">{QUALITY_DESCRIPTIONS[key] || ''}</p>
+                                    <p className="text-[10px] font-sans text-slate-400 leading-snug mt-0.5">{QUALITY_DESCRIPTIONS[key] || ''}</p>
                                 </div>
                             </div>
                         );
@@ -262,7 +345,7 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                     type="button"
                     onClick={() => setWindowDays(w.value)}
                     aria-pressed={windowDays === w.value}
-                    className={`pb-1.5 text-[11px] font-mono uppercase tracking-wider border-b-2 transition-all focus-visible:outline-none ${windowDays === w.value
+                    className={`pb-1.5 text-[11px] font-sans uppercase tracking-wider border-b-2 transition-all focus-visible:outline-none ${windowDays === w.value
                         ? 'border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100 font-semibold'
                         : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
@@ -311,10 +394,10 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
     return (
         <div className="flex flex-col gap-4 transition-colors duration-500">
             {/* Header: title + window selector */}
-            <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
+            <div className="py-1 flex items-start sm:items-center justify-between gap-3 flex-wrap">
                 <div>
-                    <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400">Conversion Funnel</span>
-                    <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">How visitors turn into revenue, stage by stage</p>
+                    <span className="text-sm tracking-normal font-semibold text-slate-700 dark:text-slate-300 font-sans">Conversion Funnel</span>
+                    <p className="text-[11px] font-sans text-slate-400 dark:text-slate-500 mt-0.5">How visitors turn into revenue, stage by stage</p>
                 </div>
                 {windowSelector}
             </div>
@@ -322,26 +405,26 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
             {isEmpty ? (
                 <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md py-8 text-center">
                     <p className="text-sm italic text-slate-400 dark:text-slate-500">No funnel data in this window yet.</p>
-                    <p className="text-[11px] font-mono text-slate-400 mt-1">Channels appear once leads convert.</p>
+                    <p className="text-[11px] font-sans text-slate-400 mt-1">Channels appear once leads convert.</p>
                 </div>
             ) : (
                 <>
-                    {/* Horizontal Bar Chart */}
+                    {/* Interactive Funnel Chart */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md p-4 sm:p-5">
-                        <FunnelBarChart stages={stages} />
+                        <InteractiveFunnelChart stages={stages} />
                     </div>
 
                     {/* Conversion Outcomes */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md px-4 py-4 sm:py-5 flex flex-col justify-center transition-colors duration-500">
-                            <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400 mb-1">Overall Conversion Rate</span>
-                            <span className="text-3xl font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-200">{overall}%</span>
-                            <p className="text-[10px] font-mono text-slate-400 mt-1">bot conversations ending in a won customer deal</p>
+                            <span className="text-xs tracking-normal font-semibold font-sans text-slate-700 dark:text-slate-300 mb-1">Overall Conversion Rate</span>
+                            <span className="text-3xl font-sans tabular-nums font-semibold text-slate-900 dark:text-slate-200">{overall}%</span>
+                            <p className="text-[10px] font-sans text-slate-400 mt-1">bot conversations ending in a won customer deal</p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md px-4 py-4 sm:py-5 flex flex-col justify-center transition-colors duration-500">
-                            <span className="text-[10px] uppercase tracking-widest font-mono text-emerald-600 dark:text-emerald-400 mb-1">Revenue Won</span>
-                            <span className="text-3xl font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{fmtMoney(wonValue)}</span>
-                            <p className="text-[10px] font-mono text-slate-400 mt-1">value of closed-won deals in this window</p>
+                            <span className="text-xs tracking-normal font-semibold font-sans text-emerald-500 dark:text-emerald-400 mb-1">Revenue Won</span>
+                            <span className="text-3xl font-sans tabular-nums font-semibold text-emerald-500 dark:text-emerald-400">{fmtMoney(wonValue)}</span>
+                            <p className="text-[10px] font-sans text-slate-400 mt-1">value of closed-won deals in this window</p>
                         </div>
                     </div>
 
@@ -349,8 +432,8 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {/* Lead Quality — thin flat donut */}
                         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md p-4 sm:p-5 transition-colors duration-500">
-                            <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400 block mb-1">Lead Quality Breakdown</span>
-                            <p className="text-[10px] font-mono text-slate-400 mb-4">Lead volume categorized by intent signals.</p>
+                            <span className="text-xs tracking-normal font-semibold font-sans text-slate-700 dark:text-slate-300 block mb-1">Lead Quality Breakdown</span>
+                            <p className="text-[10px] font-sans text-slate-400 mb-4">Lead volume categorized by intent signals.</p>
                             <QualityDonut quality={quality} activeBand={activeBand} setActiveBand={setActiveBand} />
                         </div>
 
@@ -362,8 +445,8 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
 
                             return (
                                 <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-md p-4 sm:p-5 transition-colors duration-500">
-                                    <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400 block mb-1">Where Customers Found You</span>
-                                    <p className="text-[10px] font-mono text-slate-400 mb-4">Top traffic channels by lead volume and realized revenue won.</p>
+                                    <span className="text-xs tracking-normal font-semibold font-sans text-slate-700 dark:text-slate-300 block mb-1">Where Customers Found You</span>
+                                    <p className="text-[10px] font-sans text-slate-400 mb-4">Top traffic channels by lead volume and realized revenue won.</p>
 
                                     {totalLeads === 0 ? (
                                         <p className="py-4 text-center text-sm italic text-slate-400 dark:text-slate-500">No sources in this window yet.</p>
@@ -377,16 +460,16 @@ const FunnelPanel = ({ selectedBotId, authFetch, isAuthorized }: FunnelPanelProp
                                                         {/* Source name */}
                                                         <div className="col-span-4 flex items-center gap-1.5 min-w-0">
                                                             <span className="material-symbols-outlined text-[13px] text-slate-400 shrink-0">{icon}</span>
-                                                            <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300 truncate">{s.source}</span>
+                                                            <span className="text-[11px] font-sans text-slate-600 dark:text-slate-300 truncate">{s.source}</span>
                                                         </div>
                                                         {/* Bar track */}
                                                         <div className="col-span-5 h-[4px] bg-slate-100 dark:bg-slate-800 rounded-none overflow-hidden">
                                                             <div className="h-full bg-slate-800 dark:bg-slate-200 transition-all duration-500" style={{ width: `${Math.max(barPct, 3)}%` }} />
                                                         </div>
                                                         {/* Count */}
-                                                        <span className="col-span-1 text-right font-mono tabular-nums text-[11px] text-slate-600 dark:text-slate-300 shrink-0">{fmtNum(s.leads)}</span>
+                                                        <span className="col-span-1 text-right font-sans tabular-nums text-[11px] text-slate-600 dark:text-slate-300 shrink-0">{fmtNum(s.leads)}</span>
                                                         {/* Won value */}
-                                                        <span className="col-span-2 text-right font-mono tabular-nums text-[11px] text-emerald-600 dark:text-emerald-400 shrink-0">
+                                                        <span className="col-span-2 text-right font-sans tabular-nums text-[11px] text-emerald-500 dark:text-emerald-400 shrink-0">
                                                             {s.won > 0 ? fmtMoney(s.won_value) : ''}
                                                         </span>
                                                     </div>
