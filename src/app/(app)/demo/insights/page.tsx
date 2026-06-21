@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getBotConfig } from '@/src/lib/demo/demoStorage';
-import { FunnelVisual, QualityDonut } from '@/src/app/components/FunnelPanel';
+// FunnelVisual and QualityDonut are local demo-only components defined below
 
 const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
 
@@ -235,7 +235,87 @@ const DemoActionCenterPanel = () => {
     );
 };
 
-// ── Funnel ───────────────────────────────────────────────────────────────────
+// ── Demo-local FunnelVisual (SVG horizontal bars, no import needed) ──────────
+const FunnelVisual = ({ stages, hoveredStage, setHoveredStage }: {
+    stages: any[];
+    hoveredStage: string | null;
+    setHoveredStage: (s: string | null) => void;
+}) => {
+    const maxCount = stages.reduce((m, s) => Math.max(m, s.count), 0) || 1;
+    const COLORS: Record<string, string> = {
+        conversations: '#94a3b8', leads: '#818cf8', contacted: '#fbbf24', won: '#10b981',
+    };
+    return (
+        <div className="w-full flex flex-col gap-1.5">
+            {stages.map((s, i) => {
+                const barPct = (s.count / maxCount) * 100;
+                const isHov = hoveredStage === s.key;
+                const color = COLORS[s.key] || '#94a3b8';
+                return (
+                    <div key={s.key}
+                        onMouseEnter={() => setHoveredStage(s.key)}
+                        onMouseLeave={() => setHoveredStage(null)}
+                        className={`flex items-center gap-3 px-2 py-1.5 rounded-sm cursor-pointer transition-colors ${isHov ? 'bg-slate-50 dark:bg-slate-900/40' : ''}`}
+                    >
+                        <span className="w-20 text-[10px] font-mono uppercase tracking-wide text-slate-500 shrink-0">{s.key}</span>
+                        <div className="flex-1 h-[6px] bg-slate-100 dark:bg-slate-800 rounded-none overflow-hidden">
+                            <div className="h-full transition-all duration-500" style={{ width: `${Math.max(barPct, s.count > 0 ? 2 : 0)}%`, backgroundColor: color }} />
+                        </div>
+                        <span className="w-12 text-right font-mono tabular-nums text-sm text-slate-800 dark:text-slate-200 shrink-0">{s.count.toLocaleString()}</span>
+                        <span className="w-10 text-right font-mono text-[11px] text-slate-400 shrink-0">{s.pct_of_top}%</span>
+                        {i > 0 && s.dropoff_pct > 0 && (
+                            <span className="text-[10px] font-mono text-rose-500 shrink-0">↓{s.dropoff_pct}%</span>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+// ── Demo-local QualityDonut (thin flat ring) ──────────────────────────────────
+const QualityDonut = ({ quality, activeBand, setActiveBand }: {
+    quality: { total_scored: number; bands: { band: string; count: number; pct: number }[] };
+    activeBand: string | null;
+    setActiveBand: (b: string | null) => void;
+}) => {
+    const total = quality.total_scored;
+    const bands = [...(quality.bands || [])].sort((a, b) => {
+        return ['hot', 'warm', 'cold'].indexOf(a.band.toLowerCase()) - ['hot', 'warm', 'cold'].indexOf(b.band.toLowerCase());
+    });
+    const radius = 68; const sw = 7; const circ = 2 * Math.PI * radius;
+    const COLORS: Record<string, string> = { hot: '#ef4444', warm: '#f59e0b', cold: '#38bdf8' };
+    let acc = 0;
+    if (total === 0) return <p className="text-sm italic text-slate-400 py-4 text-center">No scored leads yet.</p>;
+    return (
+        <div className="relative w-[140px] h-[140px]">
+            <svg viewBox="0 0 200 200" className="w-full h-auto -rotate-90">
+                <circle cx="100" cy="100" r={radius} fill="transparent" stroke="rgba(148,163,184,0.1)" strokeWidth={sw} />
+                {bands.map(b => {
+                    const key = b.band.toLowerCase();
+                    const seg = (b.pct / 100) * circ;
+                    const offset = -((acc / 100) * circ);
+                    acc += b.pct;
+                    const isHov = activeBand === key;
+                    return (
+                        <circle key={b.band} cx="100" cy="100" r={radius} fill="transparent"
+                            stroke={COLORS[key] || '#94a3b8'} strokeWidth={sw}
+                            strokeDasharray={`${seg} ${circ}`} strokeDashoffset={offset}
+                            strokeLinecap="butt" opacity={activeBand !== null && !isHov ? 0.3 : 1}
+                            className="transition-opacity duration-300 cursor-pointer"
+                            onMouseEnter={() => setActiveBand(key)} onMouseLeave={() => setActiveBand(null)}
+                        />
+                    );
+                })}
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xl font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 leading-none">{total}</span>
+                <span className="text-[9px] uppercase tracking-widest font-mono text-slate-400 mt-0.5">Scored</span>
+            </div>
+        </div>
+    );
+};
+
 
 const STAGE_ACCENT: Record<string, { bar: string; dot: string; text: string }> = {
     conversations: { bar: 'bg-slate-400 dark:bg-slate-500', dot: 'bg-slate-400', text: 'text-slate-600 dark:text-slate-300' },

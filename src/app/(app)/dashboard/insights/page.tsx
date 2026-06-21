@@ -8,36 +8,34 @@ import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 
-// Each panel is only visible on its own tab — code-split them so the insights
-// route doesn't ship all three at once. Panels render their own loading states.
+// Code-split panels — each renders its own loading state
 const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
 const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
 const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
 import Link from 'next/link';
 
-// ── Style primitives matching AppTrainAI ────────────────────────────────────
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+// ── Design tokens ──────────────────────────────────────────────────────────────
+const cellCls = 'bg-white dark:bg-slate-900 rounded-md transition-colors duration-500';
 
+// ── Activity Calendar ─────────────────────────────────────────────────────────
 const ActivityCalendar = ({ data }: { data: any[] }) => {
     const [selectedCell, setSelectedCell] = useState<any>(null);
 
-    // Build the grid mapping the last 30 days exactly
     const generateLast30Days = () => {
         const days = [];
         const today = new Date();
         for (let i = 29; i >= 0; i--) {
             const d = new Date(today);
             d.setDate(today.getDate() - i);
-            days.push(d.toISOString().split('T')[0]); // YYYY-MM-DD
+            days.push(d.toISOString().split('T')[0]);
         }
         return days;
     };
 
     const calendarDates = generateLast30Days();
-
-    // Map existing data to dictionary for fast lookup
     const dataMap: Record<string, any> = {};
     let maxCount = 0;
+
     if (data && data.length > 0) {
         data.forEach(d => {
             if (d.date) {
@@ -46,151 +44,139 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
             }
         });
     }
+    const safeMax = maxCount || 1;
 
-    // Default to today or most recent
     useEffect(() => {
         if (data && data.length > 0 && !selectedCell) {
             const todayStr = new Date().toISOString().split('T')[0];
-            if (dataMap[todayStr]) {
-                setSelectedCell(dataMap[todayStr]);
-            } else {
-                setSelectedCell(data[0]);
-            }
+            setSelectedCell(dataMap[todayStr] || data[0]);
         }
-    }, [data, selectedCell]);
+    }, [data, selectedCell]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // 5-step solid monochrome scale
+    const getCellColor = (count: number) => {
+        if (count === 0) return 'bg-slate-100 dark:bg-slate-800/60';
+        const ratio = count / safeMax;
+        if (ratio <= 0.25) return 'bg-slate-300 dark:bg-slate-600';
+        if (ratio <= 0.50) return 'bg-slate-500 dark:bg-slate-500';
+        if (ratio <= 0.75) return 'bg-slate-700 dark:bg-slate-400';
+        return 'bg-slate-900 dark:bg-slate-200';
+    };
+
+    // Month axis labels
+    const monthLabels: { label: string; idx: number }[] = [];
+    let lastMonth = '';
+    calendarDates.forEach((dateStr, i) => {
+        const m = new Date(dateStr).toLocaleDateString(undefined, { month: 'short' });
+        if (m !== lastMonth) {
+            monthLabels.push({ label: m, idx: i });
+            lastMonth = m;
+        }
+    });
 
     const formatDateStr = (dateStr: string) => {
         if (!dateStr) return '';
-        const d = new Date(dateStr);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-8 w-full p-1">
-            {/* Calendar Grid (50%) */}
-            <div className="w-full lg:w-1/2 flex flex-col gap-4">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium font-google text-slate-500">Activity overview</span>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                            <div className="w-2 h-2 rounded-full border border-slate-200" /> Idle
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                            <div className="w-2 h-2 rounded-full bg-blue-500/50" /> Active
-                        </div>
-                    </div>
-                </div>
-                {/* Enforce 10 columns across all devices to minimize vertical height, allowing the inspector to sit directly below on mobile */}
-                <div className="grid grid-cols-7 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden p-2.5">
+        <div className="flex flex-col lg:flex-row gap-6 w-full">
+            {/* Calendar */}
+            <div className="w-full lg:w-1/2 flex flex-col gap-2">
+                {/* Month axis */}
+                <div className="flex gap-[3px] pl-0 mb-1">
                     {calendarDates.map((dateStr, i) => {
-                        const cellData = dataMap[dateStr];
-                        const count = cellData?.total_questions || 0;
-                        const opacity = maxCount > 0 ? (count / maxCount) : 0;
-                        const isSelected = selectedCell?.date === dateStr;
-
+                        const found = monthLabels.find(m => m.idx === i);
                         return (
-                            <div
-                                key={dateStr}
-                                onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-xl cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
-                                style={{
-                                    backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
-                                    borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
-                                }}
-                            >
-                                <span className={`text-[12px] sm:text-[14px] leading-none font-mono font-semibold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
-                                    {new Date(dateStr).getDate()}
-                                </span>
-                                <span className={`text-[8px] sm:text-[9px] font-google font-medium leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>
-                                    {new Date(dateStr).toLocaleDateString(undefined, { month: 'short' })}
-                                </span>
+                            <div key={dateStr} className="w-[18px] shrink-0 text-[8px] font-mono text-slate-400 dark:text-slate-500 text-center">
+                                {found ? found.label : ''}
                             </div>
                         );
                     })}
                 </div>
+                {/* Grid */}
+                <div className="flex flex-wrap gap-[3px]">
+                    {calendarDates.map((dateStr) => {
+                        const cellData = dataMap[dateStr];
+                        const count = cellData?.total_questions || 0;
+                        const isSelected = selectedCell?.date === dateStr;
+                        return (
+                            <div
+                                key={dateStr}
+                                onClick={() => setSelectedCell(cellData || { date: dateStr, total_questions: 0 })}
+                                onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, total_questions: 0 })}
+                                className={`w-[18px] h-[18px] rounded-[2px] cursor-pointer transition-opacity duration-100 ${getCellColor(count)} ${isSelected ? 'ring-1 ring-slate-500 dark:ring-slate-400 ring-offset-1 dark:ring-offset-slate-950' : ''}`}
+                                title={`${dateStr}: ${count} queries`}
+                            />
+                        );
+                    })}
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                    <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">Less</span>
+                    {['bg-slate-100 dark:bg-slate-800/60', 'bg-slate-300 dark:bg-slate-600', 'bg-slate-500 dark:bg-slate-500', 'bg-slate-700 dark:bg-slate-400', 'bg-slate-900 dark:bg-slate-200'].map((cls, i) => (
+                        <div key={i} className={`w-[12px] h-[12px] rounded-[2px] ${cls}`} />
+                    ))}
+                    <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">More</span>
+                </div>
             </div>
 
-            {/* Inspector Panel (50%) */}
-            <div className="w-full lg:w-1/2 flex flex-col">
+            {/* Inspector */}
+            <div className="w-full lg:w-1/2">
                 {selectedCell ? (
                     <motion.div
-                        initial={{ opacity: 0, x: 20 }}
+                        initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
                         key={selectedCell.date}
-                        className="flex flex-col bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl flex-1"
+                        className="flex flex-col gap-3 border border-slate-100 dark:border-slate-800 rounded-md px-4 py-3"
                     >
-                        <div className="flex flex-col gap-1 mb-6 pb-4">
-                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google">Daily inspector</span>
-                            <span className="text-lg font-semibold text-slate-900 dark:text-slate-100 font-google">
-                                {formatDateStr(selectedCell.date)}
-                            </span>
+                        <div>
+                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Daily inspector</span>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{formatDateStr(selectedCell.date)}</p>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="flex flex-col p-4 bg-white dark:bg-slate-800 rounded-xl">
-                                <span className="text-xs text-slate-400 font-google mb-1">Total activity</span>
-                                <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-100">{selectedCell.total_questions || 0}</span>
+                        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                            <div>
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400">Total activity</span>
+                                <p className="text-lg font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{selectedCell.total_questions || 0}</p>
                             </div>
-                            <div className="flex flex-col p-4 bg-white dark:bg-slate-800 rounded-xl">
-                                <span className="text-xs text-slate-400 font-google mb-1">Unique users</span>
-                                <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200">{selectedCell.interacted_users || 0}</span>
+                            <div>
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400">Unique users</span>
+                                <p className="text-lg font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-200 mt-0.5">{selectedCell.interacted_users || 0}</p>
                             </div>
                         </div>
-
-                        <div className="space-y-1">
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800 transition-colors">
-                                <span className="text-sm font-google text-slate-500 dark:text-slate-400">Answered correctly</span>
-                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
+                        <div className="space-y-0.5 border-t border-slate-100 dark:border-slate-800 pt-3">
+                            <div className="flex items-center justify-between py-1.5">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">Answered correctly</span>
+                                <span className="text-xs font-mono tabular-nums text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
                             </div>
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800 transition-colors">
-                                <span className="text-sm font-google text-slate-500 dark:text-slate-400">Failed response</span>
-                                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                                    {selectedCell.unanswered_questions || 0}
-                                </span>
+                            <div className="flex items-center justify-between py-1.5">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">Failed response</span>
+                                <span className="text-xs font-mono tabular-nums text-rose-500">{selectedCell.unanswered_questions || 0}</span>
                             </div>
                         </div>
-
-                        <div className="mt-6 flex-1 flex flex-col gap-5">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-medium text-slate-400 font-google mb-3 flex items-center gap-2">
-                                    <span className="w-1 h-3 bg-blue-500 rounded-full" />
-                                    Top questions
-                                </span>
-                                {selectedCell.top_questions?.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {selectedCell.top_questions.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-slate-800 p-3 rounded-xl">
-                                                "{q}"
-                                            </p>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <span className="text-sm font-google text-slate-400 italic">No activity recorded</span>
-                                )}
-                            </div>
-
-                            {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered?.length > 0 && (
-                                <div className="flex flex-col pt-4">
-                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google mb-3 flex items-center gap-2">
-                                        <span className="w-1 h-3 bg-slate-400/60 rounded-full" />
-                                        Unanswered queries
-                                    </span>
-                                    <div className="space-y-2">
-                                        {selectedCell.top_unanswered.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed pl-3">
-                                                "{q}"
-                                            </p>
-                                        ))}
-                                    </div>
+                        {selectedCell.top_questions?.length > 0 && (
+                            <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono block mb-2">Top questions</span>
+                                <div className="space-y-1.5">
+                                    {selectedCell.top_questions.map((q: string, qIdx: number) => (
+                                        <p key={qIdx} className="text-xs text-slate-600 dark:text-slate-400 leading-snug italic">"{q}"</p>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
+                        {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered?.length > 0 && (
+                            <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono block mb-2">Unanswered queries</span>
+                                <div className="space-y-1.5">
+                                    {selectedCell.top_unanswered.map((q: string, qIdx: number) => (
+                                        <p key={qIdx} className="text-xs text-slate-500 dark:text-slate-400 leading-snug">"{q}"</p>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
                 ) : (
-                    <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 p-8 rounded-2xl items-center justify-center h-full">
-                        <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">radar</span>
-                        <p className="text-sm font-google text-slate-400 text-center">Select a day<br />to inspect activity</p>
+                    <div className="flex items-center justify-center py-8 text-sm italic text-slate-400 dark:text-slate-500">
+                        Hover a day to inspect activity
                     </div>
                 )}
             </div>
@@ -201,7 +187,6 @@ const ActivityCalendar = ({ data }: { data: any[] }) => {
 export default function AppInsights() {
     const { userTier: rawUserTier, userRole: rawUserRole, entitlements, isLoading: ctxLoading } = useUserRole();
     const userTier = rawUserTier ?? '';
-    const userRole = rawUserRole ?? '';
     const canAnalytics = entitlements.canUseAnalytics;
     const canLeadCapture = entitlements.canUseLeadCapture;
     const authFetch = useAuthenticatedFetch();
@@ -220,15 +205,13 @@ export default function AppInsights() {
         if (bots.length > 0 && !selectedBotId) setSelectedBotId(bots[0].id);
     }, [bots, selectedBotId]);
 
-    // ── State ────────────────────────────────────────────────────────────────
     const [reportData, setReportData] = useState<any>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [isGhostTown, setIsGhostTown] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState('sales'); // Sales & Leads Center first — drive the next sale
+    const [activeTab, setActiveTab] = useState('sales');
 
-    // Silently try to load a cached report on mount
     useEffect(() => {
         if (selectedBotId && canAnalytics) handleGenerate(true);
     }, [selectedBotId, userTier]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -254,120 +237,125 @@ export default function AppInsights() {
                 throw new Error('Invalid response from server');
             }
         } catch (err: any) {
-            console.error('Failed to generate report:', err);
             if (err?.message?.includes('404')) {
                 setIsGhostTown(true);
             } else if (!silentLoad) {
-                setError('Failed to generate report. Please try again or check your data.');
+                setError('Failed to generate report. Please try again.');
             }
         } finally {
             if (!silentLoad) setIsGenerating(false);
         }
     };
 
-    // ── Rendering Helpers ────────────────────────────────────────────────────
-    const renderHeader = () => (
-        <div className="px-6 py-3 sm:px-8 sm:py-4 shrink-0 transition-colors duration-500 min-w-0 w-full">
-            {(activeTab === 'funnel' && (lastGeneratedAt || canAnalytics)) && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                    {lastGeneratedAt && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 font-google transition-colors">
-                            Last generated: {lastGeneratedAt}
-                        </p>
-                    )}
-                </div>
-                {canAnalytics && (
-                    <button
-                        onClick={() => handleGenerate(false)}
-                        disabled={isGenerating || !selectedBotId}
-                        className="w-full sm:w-auto shrink-0 px-7 py-3 min-h-[44px] rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" />
-                                Synthesizing...
-                            </>
-                        ) : (
-                            <>
-                                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                                Generate report
-                            </>
-                        )}
-                    </button>
-                )}
-            </div>
-            )}
+    const TABS = [
+        { id: 'sales', label: 'Sales & Leads', shortLabel: 'Sales' },
+        { id: 'conversations', label: 'Conversations', shortLabel: 'Convos' },
+        { id: 'funnel', label: 'Funnel & Traffic', shortLabel: 'Funnel' },
+    ];
 
-            {/* Persistent Bot Selector */}
-            {canAnalytics && bots.length > 1 && (
-                <div className="mt-3 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
-                        Reporting for
-                    </span>
-                    <select
-                        value={selectedBotId}
-                        onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 min-w-0 max-w-xs px-3 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-sm font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors"
-                    >
-                        {bots.map((b: any) => (
-                            <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
-                        ))}
-                    </select>
-                </div>
-            )}
-
-            {/* Tabs */}
-            <div className="mt-3 overflow-x-auto scrollbar-hide">
-                <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
-                    {[
-                        { id: 'sales', label: 'Sales & Leads' },
-                        { id: 'conversations', label: 'Conversations & Training' },
-                        { id: 'funnel', label: 'Funnel & Traffic' },
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${activeTab === tab.id
-                                    ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-
-    // ── Loading state ────────────────────────────────────────────────────────
     const isLoaded = !ctxLoading && !botsLoading;
 
+    // ── Loading skeleton ──────────────────────────────────────────────────────
     if (!isLoaded) {
         return (
-            <div className="flex flex-col h-full bg-white dark:bg-slate-900 animate-pulse transition-colors duration-500">
-                <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 border-b border-gray-100 dark:border-slate-800">
-                    <div className="h-7 bg-slate-200 dark:bg-slate-800 w-48 mb-2" />
-                    <div className="h-4 bg-slate-100 dark:bg-slate-800 w-72" />
-                </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="bg-white dark:bg-slate-950 p-4 sm:p-8">
-                            <div className="h-4 bg-slate-100 dark:bg-slate-800 w-24 mb-3" />
-                            <div className="h-10 bg-slate-100 dark:bg-slate-800 w-16" />
-                        </div>
+            <div className="flex flex-col h-full animate-pulse">
+                {/* Tab bar skeleton */}
+                <div className="px-4 md:px-6 border-b border-slate-200 dark:border-slate-800 flex items-center gap-6 h-10 shrink-0">
+                    {[120, 96, 112].map(w => (
+                        <div key={w} className="h-4 bg-slate-100 dark:bg-slate-800 rounded" style={{ width: w }} />
                     ))}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 flex-1">
-                    <div className="lg:col-span-7 bg-white dark:bg-slate-950 p-4 sm:p-8" />
-                    <div className="lg:col-span-5 bg-white dark:bg-slate-950 p-4 sm:p-8" />
+                {/* Stat cards skeleton */}
+                <div className="px-4 md:px-6 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-0 border border-slate-100 dark:border-slate-800 rounded-md mx-4 md:mx-6 mt-4">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="px-4 py-3 border-r last:border-r-0 border-slate-100 dark:border-slate-800">
+                            <div className="h-3 bg-slate-100 dark:bg-slate-800 w-20 mb-2 rounded" />
+                            <div className="h-5 bg-slate-100 dark:bg-slate-800 w-16 rounded" />
+                        </div>
+                    ))}
                 </div>
             </div>
         );
     }
 
-    // ── Main Dashboard Return ────────────────────────────────────────────────
+    // ── Header row: tabs + bot selector + generate btn ────────────────────────
+    const renderHeader = () => (
+        <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 transition-colors duration-500">
+            {/* Row 1 on mobile: bot selector + generate */}
+            <div className="flex items-center gap-2 px-4 md:px-6 py-2 sm:hidden border-b border-slate-100 dark:border-slate-800/50">
+                {canAnalytics && bots.length > 1 && (
+                    <select
+                        value={selectedBotId}
+                        onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
+                        className="flex-1 min-w-0 px-2 py-1 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-slate-900 dark:text-slate-200 focus:outline-none"
+                    >
+                        {bots.map((b: any) => (
+                            <option key={b.id} value={b.id}>{b.bot_name}</option>
+                        ))}
+                    </select>
+                )}
+                {activeTab === 'funnel' && canAnalytics && (
+                    <button
+                        onClick={() => handleGenerate(false)}
+                        disabled={isGenerating || !selectedBotId}
+                        className="shrink-0 px-3 py-1 text-[11px] font-mono uppercase tracking-wider bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+                    >
+                        {isGenerating ? <><div className="w-2.5 h-2.5 border-2 border-slate-300 dark:border-slate-700 border-t-white dark:border-t-slate-900 animate-spin rounded-full" />Synth...</> : 'Generate'}
+                    </button>
+                )}
+            </div>
+
+            {/* Tab bar + desktop controls */}
+            <div className="flex items-center gap-0 min-w-0 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center px-4 md:px-6 flex-1 min-w-0">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`py-2.5 px-1 mr-5 text-[12px] font-mono uppercase tracking-wider whitespace-nowrap border-b-2 transition-all ${activeTab === tab.id
+                                ? 'border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100 font-semibold'
+                                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                }`}
+                        >
+                            <span className="hidden sm:inline">{tab.label}</span>
+                            <span className="sm:hidden">{tab.shortLabel}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Desktop: bot selector + generate inline */}
+                <div className="hidden sm:flex items-center gap-2 px-4 md:px-6 shrink-0">
+                    {canAnalytics && bots.length > 1 && (
+                        <select
+                            value={selectedBotId}
+                            onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
+                            className="px-2 py-1 text-[11px] font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm text-slate-900 dark:text-slate-200 focus:outline-none"
+                        >
+                            {bots.map((b: any) => (
+                                <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
+                            ))}
+                        </select>
+                    )}
+                    {activeTab === 'funnel' && canAnalytics && (
+                        <button
+                            onClick={() => handleGenerate(false)}
+                            disabled={isGenerating || !selectedBotId}
+                            className="px-3 py-1 text-[11px] font-mono uppercase tracking-wider bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-sm disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+                        >
+                            {isGenerating
+                                ? <><div className="w-2.5 h-2.5 border-2 border-slate-400 border-t-white animate-spin rounded-full" />Synthesizing</>
+                                : <><span className="material-symbols-outlined text-[12px]">auto_awesome</span>Generate</>
+                            }
+                        </button>
+                    )}
+                    {activeTab === 'funnel' && lastGeneratedAt && (
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap">Last: {lastGeneratedAt}</span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -377,7 +365,8 @@ export default function AppInsights() {
             {renderHeader()}
 
             {/* Content Area */}
-            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-4 pt-1">
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-4 pb-6 md:px-6 gap-4 pt-4">
+
                 {activeTab === 'sales' && (
                     <SalesAndLeadsPanel
                         selectedBotId={selectedBotId}
@@ -396,166 +385,128 @@ export default function AppInsights() {
                 )}
 
                 {activeTab === 'funnel' && (
-                    <div className="flex flex-col gap-6 w-full min-w-0">
+                    <div className="flex flex-col gap-4 w-full min-w-0">
                         <FunnelPanel
                             selectedBotId={selectedBotId}
                             authFetch={authFetch}
                             isAuthorized={canAnalytics}
                         />
 
-                        {/* ── Tier Gate for Analytics Report ── */}
+                        {/* Tier Gate */}
                         {!canAnalytics && (
-                            <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+                            <div className="p-6 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
                                 <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
                             </div>
                         )}
 
+                        {/* AI Report */}
                         {canAnalytics && reportData && !isGenerating && !error && (
-                            <div className="flex flex-col gap-6 w-full">
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden transition-colors duration-500 w-full min-w-0">
-                                    {/* Left Column: Top Trends */}
-                                    <div className="lg:col-span-7 flex flex-col gap-4 transition-colors duration-500">
-                                        <div className={`${cellCls} p-4 sm:p-8 flex-1 border border-slate-100 dark:border-slate-800/40`}>
-                                            <div className="flex items-center gap-2 mb-6">
-                                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
-                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">
-                                                    Top customer trends
-                                                </h2>
+                            <div className="flex flex-col gap-4 w-full">
+                                {/* Trends + Advice */}
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full min-w-0">
+                                    {/* Top Trends */}
+                                    <div className="lg:col-span-7">
+                                        <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40`}>
+                                            <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800/40 flex items-center gap-2">
+                                                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Top customer trends</span>
                                             </div>
-                                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                                                The most common subjects and questions your users are asking.
-                                            </p>
-                                            <div className="space-y-2">
+                                            <div>
                                                 {reportData?.top_trends?.map((trend: string, idx: number) => (
-                                                    <div key={idx} className={`${cellCls} flex items-start gap-4 p-5 border border-slate-100 dark:border-slate-800/40`}>
-                                                        <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
-                                                            {String(idx + 1).padStart(2, '0')}
-                                                        </div>
-                                                        <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
-                                                            {trend}
-                                                        </p>
+                                                    <div key={idx} className={`flex items-start gap-3 px-4 py-2 ${idx % 2 === 0 ? 'bg-slate-50/30 dark:bg-slate-900/10' : ''}`}>
+                                                        <span className="text-[10px] font-mono text-slate-400 w-5 shrink-0 pt-0.5">{String(idx + 1).padStart(2, '0')}</span>
+                                                        <p className="text-sm text-slate-700 dark:text-slate-300 leading-snug break-words">{trend}</p>
                                                     </div>
                                                 ))}
+                                                {(!reportData?.top_trends || reportData.top_trends.length === 0) && (
+                                                    <p className="py-6 text-center text-sm italic text-slate-400">No trends available.</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Right Column: Actionable Advice */}
-                                    <div className="lg:col-span-5 flex flex-col gap-4 transition-colors duration-500">
-                                        <div className={`${cellCls} p-4 sm:p-8 flex-1 border border-slate-100 dark:border-slate-800/40`}>
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
-                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Actionable advice</h2>
-                                            </div>
-                                            <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
+                                    {/* Actionable Advice */}
+                                    <div className="lg:col-span-5">
+                                        <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40 px-4 py-4`}>
+                                            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono block mb-3">Actionable advice</span>
+                                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                                                 {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* ── Peak Activity Full Row ── */}
-                                <div className="flex flex-col gap-4">
-                                    <div className={`${cellCls} p-4 sm:p-8 border border-slate-100 dark:border-slate-800/40`}>
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">calendar_month</span>
-                                            <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">30-day peak activity</h2>
-                                        </div>
-                                        <div className="w-full">
-                                            <ActivityCalendar data={reportData?.peak_activity_blocks} />
-                                        </div>
+                                {/* 30-Day Activity Calendar */}
+                                <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40`}>
+                                    <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800/40">
+                                        <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">30-day peak activity</span>
+                                    </div>
+                                    <div className="px-4 py-4">
+                                        <ActivityCalendar data={reportData?.peak_activity_blocks} />
                                     </div>
                                 </div>
 
-                                {/* ── Recent Conversations Log ── */}
-                                <div className="flex flex-col gap-4 w-full overflow-hidden">
-                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto overflow-y-hidden scrollbar-hide border border-slate-100 dark:border-slate-800/40`}>
-                                        <div className="flex items-center gap-2 mb-6">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5 shrink-0">history</span>
-                                            <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Recent activity log</h2>
-                                        </div>
-                                        <div className="w-full min-w-0">
-                                            <div className="hidden md:grid grid-cols-12 gap-4 pb-3 mb-3 px-4">
-                                                <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
-                                                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
-                                                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
+                                {/* Recent Activity Log */}
+                                <div className={`${cellCls} border border-slate-100 dark:border-slate-800/40`}>
+                                    <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 border-b border-slate-100 dark:border-slate-800/40">
+                                        <div className="col-span-8 text-[10px] uppercase tracking-widest text-slate-400 font-mono">User Query</div>
+                                        <div className="col-span-2 text-[10px] uppercase tracking-widest text-slate-400 font-mono text-center">Status</div>
+                                        <div className="col-span-2 text-[10px] uppercase tracking-widest text-slate-400 font-mono text-right">Time</div>
+                                    </div>
+                                    <div>
+                                        {reportData?.recent_conversations?.map((log: any, idx: number) => (
+                                            <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-1 md:gap-4 px-4 py-2 md:items-center hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors border-b last:border-b-0 border-slate-100/50 dark:border-slate-800/20">
+                                                <div className="col-span-8 text-sm text-slate-700 dark:text-slate-300 md:truncate break-words">{log.query}</div>
+                                                <div className="col-span-2 flex items-center md:justify-center gap-2">
+                                                    {log.unanswered ? (
+                                                        <span className="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Unanswered</span>
+                                                    ) : (
+                                                        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-mono">Handled</span>
+                                                    )}
+                                                </div>
+                                                <div className="col-span-2 flex items-center md:justify-end">
+                                                    <span className="text-[10px] font-mono text-slate-400">
+                                                        {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="space-y-3 md:space-y-1">
-                                                {reportData?.recent_conversations?.map((log: any, idx: number) => (
-                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-3 sm:px-4 bg-[#f1f3f5]/50 md:bg-transparent dark:bg-slate-900/20 md:dark:bg-transparent rounded-sm hover:bg-[#f1f3f5]/75 dark:hover:bg-slate-900/30 transition-colors md:items-center min-w-0">
-                                                        <div className="col-span-8 min-w-0 text-sm font-google font-medium text-slate-700 dark:text-slate-300 break-words md:truncate">
-                                                            {log.query}
-                                                        </div>
-                                                        <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
-                                                            <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
-                                                            {log.unanswered ? (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400/60 dark:bg-slate-500/50"></span> Unanswered
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-full">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200 animate-pulse"></span> Handled
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="col-span-2 flex items-center md:justify-end gap-3 md:gap-0 mt-1 md:mt-0">
-                                                            <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Time:</span>
-                                                            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                                                                {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                                {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
-                                                    <div className="text-center py-6 text-sm italic font-google text-slate-400">No recent activity found.</div>
-                                                )}
-                                            </div>
-                                        </div>
+                                        ))}
+                                        {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
+                                            <p className="py-6 text-center text-sm italic text-slate-400">No recent activity found.</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* ── Error Banner ── */}
+                        {/* Error */}
                         {canAnalytics && error && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-250 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 rounded-2xl">
-                                <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
-                                <p className="text-sm font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
-                                <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
+                            <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-md">
+                                <span className="material-symbols-outlined text-[16px] text-red-500">error</span>
+                                <p className="text-sm text-red-700 dark:text-red-300 flex-1">{error}</p>
+                                <button onClick={() => setError('')}><span className="material-symbols-outlined text-[16px] text-red-400">close</span></button>
                             </div>
                         )}
 
-                        {/* ── Ghost Town ── */}
+                        {/* Ghost Town */}
                         {canAnalytics && isGhostTown && !isGenerating && (
-                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
-                                <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
-                                    <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
-                                </div>
-                                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-3">No Conversations Yet</h2>
-                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
-                                    Your bot hasn't had any conversations yet. Check back once users start interacting!
-                                </p>
-                                <Link href="/dashboard/bots" className="px-7 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold rounded-xl hover:bg-slate-700 transition-all active:scale-95">View my bots</Link>
+                            <div className="py-8 text-center">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">No conversations yet.</p>
+                                <Link href="/dashboard/bots" className="text-[11px] font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:underline mt-2 inline-block">View my bots</Link>
                             </div>
                         )}
 
-                        {/* ── Empty State ── */}
+                        {/* Empty — not generated */}
                         {canAnalytics && !reportData && !isGenerating && !error && !isGhostTown && (
-                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
-                                <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
-                                    <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
-                                </div>
-                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">No Report Generated Yet</h2>
-                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">Click "Generate Report" above to synthesize your chat logs.</p>
+                            <div className="py-8 text-center">
+                                <p className="text-sm italic text-slate-400 dark:text-slate-500">Click "Generate" in the toolbar to synthesize your chat logs.</p>
                             </div>
                         )}
 
-                        {/* ── Loading Spinner ── */}
+                        {/* Loading */}
                         {canAnalytics && isGenerating && (
-                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
-                                <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
-                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
-                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
+                            <div className="py-8 flex flex-col items-center gap-3">
+                                <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-700 border-t-slate-700 dark:border-t-slate-300 animate-spin rounded-full" />
+                                <p className="text-sm text-slate-500 dark:text-slate-400">AI is analyzing logs. This takes 5–10 seconds.</p>
                             </div>
                         )}
                     </div>
