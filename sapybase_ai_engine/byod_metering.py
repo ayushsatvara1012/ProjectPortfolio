@@ -83,6 +83,85 @@ class ReconcileResult:
     repaired: int  # confirmed-but-unmetered stores the reconciler metered this pass
 
 
+@dataclass(frozen=True)
+class UsageSummary:
+    """Read-side metering rollup for one company (UI plan Phase 6 / C5).
+
+    Two complementary numbers, both from the **control plane** (never the untrusted
+    tenant DB, §6):
+
+      * ``messages_used`` / ``period_*`` — the authoritative billing counter from
+        ``usage_tracking`` (the same row the quota gate reads), plus its current
+        window. This is what a tenant is billed on.
+      * ``ledger_total`` + the rolling windows — derived from the idempotent
+        ``byod_usage_ledger`` (one row per metered message, with ``recorded_at``),
+        so an operator can watch the cadence of a live tenant's first billing cycle
+        and spot a stalled or runaway stream at a glance.
+    """
+
+    messages_used: int                 # SUM(usage_tracking.messages_used) — billing counter
+    period_start: object               # current window start (datetime | None)
+    period_end: object                 # current window end (datetime | None)
+    ledger_total: int                  # COUNT(byod_usage_ledger) — metered messages, all time
+    last_24h: int                      # metered in the trailing 24h
+    last_7d: int                       # metered in the trailing 7d
+    last_30d: int                      # metered in the trailing 30d
+    last_metered_at: object            # most recent metered message (datetime | None)
+
+
+def summarize_company_usage(cur: "_Cursor", company_id: str) -> UsageSummary:
+    """Roll up a company's metering for the admin usage panel (UI plan Phase 6).
+
+    Reads only the control plane: the authoritative ``usage_tracking`` counter +
+    window, and the idempotent ``byod_usage_ledger`` for all-time and trailing-window
+    message counts (the ledger carries ``recorded_at`` per metered message). Returns
+    zeros / ``None`` for a company that has never been metered. Read-only — the caller
+    need not commit. Never trusts the tenant DB for counts (§6 / E1)."""
+    # Billing counter + current window. SUM across rows (a company can accrue more
+    # than one usage_tracking row over time — the quota gate sums them too); the
+    # window comes from the most recent row so it reflects the live cycle.
+    cur.execute(
+        """
+        SELECT COALESCE(SUM(messages_used), 0) AS messages_used,
+               (SELECT period_start FROM usage_tracking
+                 WHERE company_id = %s ORDER BY period_end DESC NULLS LAST LIMIT 1) AS period_start,
+               (SELECT period_end FROM usage_tracking
+                 WHERE company_id = %s ORDER BY period_end DESC NULLS LAST LIMIT 1) AS period_end
+          FROM usage_tracking
+         WHERE company_id = %s
+        """,
+        (company_id, company_id, company_id),
+    )
+    messages_used, period_start, period_end = cur.fetchone()
+
+    # Per-message ledger: all-time total + trailing windows + last-metered, in one
+    # pass via FILTER aggregates. Empty ledger → all zeros, last_metered_at NULL.
+    cur.execute(
+        f"""
+        SELECT count(*) AS total,
+               count(*) FILTER (WHERE recorded_at >= now() - interval '24 hours') AS last_24h,
+               count(*) FILTER (WHERE recorded_at >= now() - interval '7 days')   AS last_7d,
+               count(*) FILTER (WHERE recorded_at >= now() - interval '30 days')  AS last_30d,
+               max(recorded_at) AS last_metered_at
+          FROM {LEDGER_TABLE}
+         WHERE company_id = %s
+        """,
+        (company_id,),
+    )
+    total, last_24h, last_7d, last_30d, last_metered_at = cur.fetchone()
+
+    return UsageSummary(
+        messages_used=int(messages_used or 0),
+        period_start=period_start,
+        period_end=period_end,
+        ledger_total=int(total or 0),
+        last_24h=int(last_24h or 0),
+        last_7d=int(last_7d or 0),
+        last_30d=int(last_30d or 0),
+        last_metered_at=last_metered_at,
+    )
+
+
 def _resolve_usage_row(cur: "_Cursor", company_id: str, user_id: Optional[str]) -> str:
     """Return the current-period ``usage_tracking`` row id for a company, creating
     one if none exists.

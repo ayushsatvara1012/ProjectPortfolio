@@ -29,6 +29,7 @@ from byod_metering import (
     LEDGER_TABLE,
     record_message_and_meter,
     reconcile_company,
+    summarize_company_usage,
 )
 
 _ENGINE_ROOT = Path(__file__).resolve().parents[2]
@@ -279,3 +280,95 @@ def test_reconciler_repairs_unmetered_confirmed_stores(metering_db, tenant_db_ds
     finally:
         cconn.close()
         tconn.close()
+
+
+# ── Phase 6: read-side usage rollup (summarize_company_usage) ─────────────────────
+def test_usage_summary_zero_for_unmetered_company(metering_db):
+    """A company that has never been metered rolls up to all-zeros / None — no row
+    in usage_tracking or the ledger means the panel shows a clean empty state, not
+    an error."""
+    company_id, _ = _make_company(metering_db)
+    conn = psycopg2.connect(metering_db)
+    try:
+        u = summarize_company_usage(conn.cursor(), company_id)
+        assert u.messages_used == 0
+        assert u.ledger_total == 0
+        assert u.last_24h == u.last_7d == u.last_30d == 0
+        assert u.period_start is None and u.period_end is None
+        assert u.last_metered_at is None
+    finally:
+        conn.close()
+
+
+def test_usage_summary_counts_metered_messages(metering_db):
+    """After N distinct messages are metered, both the billing counter and the
+    ledger-derived totals/windows reflect N, and the current window is surfaced."""
+    company_id, user_id = _make_company(metering_db)
+    conn = psycopg2.connect(metering_db)
+    try:
+        cur = conn.cursor()
+        for _ in range(5):
+            record_message_and_meter(
+                cur, company_id=company_id, idempotency_key=str(uuid.uuid4()), user_id=user_id
+            )
+        conn.commit()
+
+        u = summarize_company_usage(cur, company_id)
+        assert u.messages_used == 5          # usage_tracking billing counter
+        assert u.ledger_total == 5           # per-message ledger, all time
+        assert u.last_24h == 5 and u.last_7d == 5 and u.last_30d == 5  # all just-now
+        assert u.last_metered_at is not None
+        # _resolve_usage_row seeds a 30-day window, so both bounds are populated.
+        assert u.period_start is not None and u.period_end is not None
+    finally:
+        conn.close()
+
+
+def test_usage_summary_idempotent_replay_not_double_counted(metering_db):
+    """A replayed idempotency key (no double-meter) must not inflate the rollup —
+    the ledger PK dedups, so the summary stays at the true count."""
+    company_id, user_id = _make_company(metering_db)
+    key = str(uuid.uuid4())
+    conn = psycopg2.connect(metering_db)
+    try:
+        cur = conn.cursor()
+        record_message_and_meter(cur, company_id=company_id, idempotency_key=key, user_id=user_id)
+        record_message_and_meter(cur, company_id=company_id, idempotency_key=key, user_id=user_id)
+        conn.commit()
+
+        u = summarize_company_usage(cur, company_id)
+        assert u.messages_used == 1
+        assert u.ledger_total == 1
+    finally:
+        conn.close()
+
+
+def test_usage_summary_windows_exclude_old_messages(metering_db):
+    """A message metered outside a trailing window is excluded from that window but
+    still counts toward the all-time total — proving the FILTER bounds are real."""
+    company_id, user_id = _make_company(metering_db)
+    conn = psycopg2.connect(metering_db)
+    try:
+        cur = conn.cursor()
+        # One fresh message (now), one back-dated 10 days (outside 24h/7d, inside 30d).
+        record_message_and_meter(
+            cur, company_id=company_id, idempotency_key=str(uuid.uuid4()), user_id=user_id
+        )
+        old_key = str(uuid.uuid4())
+        record_message_and_meter(
+            cur, company_id=company_id, idempotency_key=old_key, user_id=user_id
+        )
+        cur.execute(
+            f"UPDATE {LEDGER_TABLE} SET recorded_at = now() - interval '10 days' "
+            f"WHERE company_id = %s AND idempotency_key = %s",
+            (company_id, old_key),
+        )
+        conn.commit()
+
+        u = summarize_company_usage(cur, company_id)
+        assert u.ledger_total == 2     # both messages, all time
+        assert u.last_24h == 1         # only the fresh one
+        assert u.last_7d == 1
+        assert u.last_30d == 2         # the back-dated one is still within 30d
+    finally:
+        conn.close()

@@ -7607,6 +7607,41 @@ def clear_byod_change_request(
         release_db_connection(conn)
 
 
+@app.get("/api/admin/users/{clerk_id}/byod/usage")
+@limiter.limit("30/minute")
+def get_byod_usage(
+    request: Request,
+    clerk_id: str,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Per-tenant metering/usage rollup for the admin detail panel (UI plan Phase 6 /
+    C5 "watch the cycle"): the authoritative billing counter + current window from
+    ``usage_tracking``, plus all-time and trailing-window message counts from the
+    idempotent ``byod_usage_ledger``. Read-only; reads only the control plane (never
+    the untrusted tenant DB). Carries no DSN / credential material."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        company_id = byod_admin.resolve_company_id(cursor, clerk_id)
+        if company_id is None:
+            raise HTTPException(status_code=404, detail="User has no company.")
+        u = byod_metering.summarize_company_usage(cursor, company_id)
+        return {
+            "company_id": company_id,
+            "messages_used": u.messages_used,
+            "period_start": u.period_start.isoformat() if hasattr(u.period_start, "isoformat") else None,
+            "period_end": u.period_end.isoformat() if hasattr(u.period_end, "isoformat") else None,
+            "ledger_total": u.ledger_total,
+            "last_24h": u.last_24h,
+            "last_7d": u.last_7d,
+            "last_30d": u.last_30d,
+            "last_metered_at": u.last_metered_at.isoformat() if hasattr(u.last_metered_at, "isoformat") else None,
+        }
+    finally:
+        release_db_connection(conn)
+
+
 # ── BYOD client self-serve surface (UI plan Phase 4) ─────────────────────────
 # These are the ONLY non-admin BYOD routes. The company is resolved exclusively
 # from the caller's own session (NO clerk_id / company_id path param) so a client

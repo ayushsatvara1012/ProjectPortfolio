@@ -5,11 +5,11 @@ enable/disable, monitor, and offboard a client **without ever touching Render en
 vars or running curl/console scripts** — with a self-serve client onboarding step
 and high security throughout.
 
-**Status:** Phases 1–5 BUILT (admin fleet view + lifecycle actions + DB-driven
-routing switch + client self-serve onboarding + client status/reconnect +
-change-request signal). Phase 6 (metering/usage + final polish) is the remaining
-work. BYOD itself is GA + production-ready (Sections A/B + C1/C2 done); this is the
-operability layer.
+**Status:** Phases 1–6 BUILT — the operability layer is COMPLETE (admin fleet view
++ lifecycle actions + DB-driven routing switch + client self-serve onboarding +
+client status/reconnect + change-request signal + per-tenant metering/usage panel +
+final responsive/dark/a11y pass). BYOD itself is GA + production-ready (Sections A/B
++ C1/C2 done); this UI layer makes it fully click-operable.
 
 ---
 
@@ -237,11 +237,32 @@ data (maps to switch-out/offboard, admin-run).
 > tests (persistent banner, button collapse, last-health, correct kind). Backend
 > `pytest tests/byod` green (366 passed); frontend `vitest` green (282); `tsc` clean.
 
-### Phase 6 — Metering/usage panel + polish *(doubles as C5 "watch the cycle")*
+### Phase 6 — Metering/usage panel + polish ✅ BUILT 2026-06-21 *(doubles as C5 "watch the cycle")*
 **Frontend:** a per-tenant usage/metering view (message counts, billing-relevant
 totals from the existing metering tables/`byod_metering`) + health/latency at-a-glance
 in the admin detail; final responsive + dark-mode + a11y pass.
 **Done when:** you can watch a tenant's first billing cycle (C5) from the panel.
+
+> **As built (2026-06-21):** Read-only, control-plane-only (never the untrusted
+> tenant DB, §6). **Backend:** `byod_metering.summarize_company_usage(cur, company_id)`
+> rolls up the authoritative billing counter + current window from `usage_tracking`
+> **and** all-time + trailing-window (24h/7d/30d) + last-metered from the idempotent
+> `byod_usage_ledger` (one row per metered message). New admin endpoint
+> `GET /api/admin/users/{clerk_id}/byod/usage` (super-admin + fresh-admin, 30/min,
+> DSN-free). **Frontend:** a `UsagePanel` in the admin detail drawer (`ByodTab.tsx`)
+> — "Messages billed" + "Metered (all time)" stat tiles, a 24h/7d/30d window grid, a
+> caption explaining the (normal) counter-vs-ledger gap, and a refresh control;
+> health at-a-glance is the existing status pill + "Last health" already in the
+> drawer. **a11y pass:** dialog `aria-label`, `aria-label="Close"` on the icon-only
+> close button, decorative material-symbols marked `aria-hidden`, `aria-label`ed
+> refresh control. **Verified:** the exact rollup SQL run against the prod control DB
+> for the live canary (`d8c73846…` → messages_used 53 / ledger_total 51 / last_24h 12
+> — the ~2 gap is expected, the counter predates per-message metering, which is why
+> both numbers are surfaced). Tests: backend store-level rollup (zero/empty,
+> counts-N, idempotent-replay-not-double-counted, window-exclusion) + frontend
+> component (loading/data/error/refresh). `tsc` clean; frontend `vitest` 286 green;
+> backend `pytest tests/byod` 366 green (Postgres-backed rollup tests skip without
+> Docker, as the rest of the suite does). UNCOMMITTED on MainV2.
 
 ---
 

@@ -55,6 +55,19 @@ type TestResult =
   | { ok: true; host: string; port: number; dbname: string; sslmode: string; pgvector_version: string; server_version: string; embedding_dimensions: number }
   | { ok: false; error: string };
 
+// The per-tenant metering rollup (mirror GET /api/admin/users/{clerk_id}/byod/usage).
+type ByodUsage = {
+  company_id: string;
+  messages_used: number;     // authoritative billing counter (usage_tracking)
+  period_start: string | null;
+  period_end: string | null;
+  ledger_total: number;      // metered messages, all time (byod_usage_ledger)
+  last_24h: number;
+  last_7d: number;
+  last_30d: number;
+  last_metered_at: string | null;
+};
+
 // ── Sensitive-admin fetch: force a fresh JWT (iat < 10 min) + retry once ─────────
 // The shared useAuthenticatedFetch turns every 401 into a global "auth-required"
 // redirect — wrong for a merely-stale step-up token (require_fresh_admin rejects a
@@ -137,6 +150,9 @@ const fmtRelative = (iso: string | null) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
+const fmtNum = (n: number | null | undefined) =>
+  typeof n === 'number' ? n.toLocaleString() : '—';
+
 const toast = (kind: 'success' | 'error', message: string) =>
   window.dispatchEvent(new CustomEvent('Sapybase:toast', { detail: { kind, message } }));
 
@@ -170,6 +186,77 @@ const DetailRow = ({ label, value, mono }: { label: string; value: React.ReactNo
     <span className={`text-slate-700 dark:text-slate-300 font-medium break-all ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
   </div>
 );
+
+// ── Usage / metering panel (Phase 6 — "watch the cycle", C5) ────────────────────
+// A small stat tile: a big number + caption, used for the billing counter and the
+// trailing-window message counts.
+const StatTile = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) => (
+  <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3.5">
+    <p className="text-xs font-google text-slate-400 dark:text-slate-500">{label}</p>
+    <p className="mt-1 text-xl font-semibold font-google text-slate-900 dark:text-slate-100 tabular-nums">{value}</p>
+    {hint && <p className="mt-0.5 text-[11px] font-google text-slate-400 dark:text-slate-500">{hint}</p>}
+  </div>
+);
+
+export const UsagePanel = ({ clerkId }: { clerkId: string }) => {
+  const authFetch = useAuthenticatedFetch();
+  const usageQuery = useQuery({
+    queryKey: ['admin', 'byod', 'usage', clerkId],
+    queryFn: () => authFetch(`/api/admin/users/${clerkId}/byod/usage`) as Promise<ByodUsage>,
+    enabled: !!clerkId,
+  });
+
+  const u = usageQuery.data;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium font-google text-slate-400">Usage &amp; metering</p>
+        <button
+          onClick={() => usageQuery.refetch()}
+          disabled={usageQuery.isFetching}
+          aria-label="Refresh usage"
+          className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
+        >
+          <span className={`material-symbols-outlined text-[16px] ${usageQuery.isFetching ? 'animate-spin' : ''}`} aria-hidden="true">refresh</span>
+        </button>
+      </div>
+
+      {usageQuery.isLoading ? (
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm font-google text-slate-400 text-center">Loading usage…</div>
+      ) : usageQuery.isError ? (
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-center">
+          <p className="text-sm font-google text-red-500 mb-2">Couldn’t load usage.</p>
+          <button onClick={() => usageQuery.refetch()} className={btnNeutral}>Retry</button>
+        </div>
+      ) : u ? (
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <StatTile
+              label="Messages billed"
+              value={fmtNum(u.messages_used)}
+              hint={u.period_end ? `Cycle ends ${fmtDate(u.period_end)}` : 'Current cycle'}
+            />
+            <StatTile
+              label="Metered (all time)"
+              value={fmtNum(u.ledger_total)}
+              hint={u.last_metered_at ? `Last ${fmtRelative(u.last_metered_at)}` : 'No messages yet'}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            <StatTile label="Last 24h" value={fmtNum(u.last_24h)} />
+            <StatTile label="Last 7d" value={fmtNum(u.last_7d)} />
+            <StatTile label="Last 30d" value={fmtNum(u.last_30d)} />
+          </div>
+          <p className="text-[11px] font-google text-slate-400 dark:text-slate-500 px-0.5">
+            “Messages billed” is the authoritative counter; “metered” counts confirmed BYOD stores
+            (a small gap is normal — the counter predates per-message metering).
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+};
 
 // Shared button classes.
 const btnNeutral = 'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
@@ -259,11 +346,12 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
   const busy = mutations.some(m => m.isPending);
 
   return (
-    <div className="fixed inset-0 z-[100] flex" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[100] flex" role="dialog" aria-modal="true" aria-label={`BYOD tenant: ${tenant.company_name || 'Unnamed company'}`}>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/40 dark:bg-slate-950/80 backdrop-blur-sm"
         onClick={onClose}
+        aria-hidden="true"
       />
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
@@ -284,8 +372,8 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
             </p>
             <p className="text-xs font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">{tenant.company_id}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded-lg shrink-0">
-            <span className="material-symbols-outlined text-[20px]">close</span>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded-lg shrink-0">
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -361,6 +449,9 @@ const ByodDetailDrawer = ({ tenant, onClose }: { tenant: ByodTenant; onClose: ()
                   <p className="text-sm font-google text-slate-400 py-2">No connection stored yet.</p>
                 )}
               </section>
+
+              {/* Usage / metering (Phase 6 — watch a tenant's billing cycle, C5) */}
+              <UsagePanel clerkId={clerkId} />
 
               {/* Set / update connection + Test */}
               <section className="space-y-3">
