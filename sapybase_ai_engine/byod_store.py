@@ -75,6 +75,7 @@ _COLUMNS = (
     "status",
     "created_at",
     "updated_at",
+    "routing_enabled",
 )
 _COLS_SQL = ", ".join(_COLUMNS)
 
@@ -123,7 +124,15 @@ CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     CHECK (status IN ('PENDING','PROVISIONING','LIVE','NEEDS_RECONNECT','DISABLED','ERROR')),
 
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- Phase 3 routing switch (UI plan sec 2.1): the operator's explicit per-tenant
+    -- on/off, flipped in-app without a redeploy. DARK by default (FALSE) so every
+    -- existing row stays off until explicitly enabled -- behaviour is unchanged
+    -- until then. The engine routes a tenant to its own DB only when BYOD_ENABLED
+    -- (env kill switch) AND status = 'LIVE' AND routing_enabled = TRUE (with a
+    -- one-release env-canary OR fallback during rollout).
+    routing_enabled BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Operational lookups: list tenants by lifecycle state (e.g. all NEEDS_RECONNECT).
@@ -149,6 +158,19 @@ ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS runtime_dsn_data_key;
 ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS runtime_dsn_ciphertext;
 """.strip()
 
+# Additive migration (0019) for the Phase 3 routing switch. Idempotent + dark by
+# default (NOT NULL DEFAULT FALSE), so existing rows stay off and behaviour is
+# unchanged until a row is explicitly enabled. Single source of truth (imported by
+# the Alembic migration so app code + migration never drift).
+ROUTING_ENABLED_ADD_COLUMN_SQL = (
+    f"ALTER TABLE {TABLE_NAME} "
+    "ADD COLUMN IF NOT EXISTS routing_enabled BOOLEAN NOT NULL DEFAULT FALSE;"
+)
+
+ROUTING_ENABLED_DROP_COLUMN_SQL = (
+    f"ALTER TABLE {TABLE_NAME} DROP COLUMN IF EXISTS routing_enabled;"
+)
+
 # Mirror of the migration's downgrade, kept here so tests can reset cleanly.
 CONTROL_PLANE_SCHEMA_DROP_SQL = (
     f"DROP INDEX IF EXISTS idx_byod_tenant_databases_status;\n"
@@ -173,6 +195,7 @@ class TenantDbRecord:
     status: str
     created_at: object  # datetime — kept loose to avoid a hard import here
     updated_at: object
+    routing_enabled: bool = False  # Phase 3 routing switch; defaulted for back-compat
 
 
 def _to_bytes(value: object) -> Optional[bytes]:
@@ -199,6 +222,7 @@ def _row_to_record(row: tuple) -> TenantDbRecord:
         status=row[10],
         created_at=row[11],
         updated_at=row[12],
+        routing_enabled=bool(row[13]),
     )
 
 
@@ -284,6 +308,71 @@ def list_live_tenants(cur: "_Cursor") -> "list[tuple[str, Optional[str]]]":
     return [(row[0], row[1]) for row in cur.fetchall()]
 
 
+@dataclass(frozen=True)
+class TenantSummary:
+    """A fleet-list row for the admin BYOD panel (Phase 1, UI plan §2.2).
+
+    Unlike :class:`TenantDbRecord` this carries **no** credential material — it is
+    the safe, joinable projection an operator sees in the tenant table: who owns
+    it (``clerk_id`` / ``company_name``), its lifecycle ``status``, whether it has
+    been provisioned (a runtime DSN exists), its ``schema_version`` and timestamps.
+    The DSN ciphertext is deliberately absent (never needed to render the list).
+    """
+
+    company_id: str
+    clerk_id: Optional[str]
+    company_name: Optional[str]
+    status: str
+    schema_version: Optional[str]
+    provisioned: bool
+    routing_enabled: bool
+    created_at: object
+    updated_at: object
+
+
+def list_all_tenants(cur: "_Cursor") -> "list[TenantSummary]":
+    """Return a :class:`TenantSummary` for **every** BYOD tenant, any state.
+
+    The admin fleet view (UI plan Phase 1) needs all lifecycle states, unlike
+    :func:`list_live_tenants` (LIVE-only, for the migration orchestrator). Joins
+    ``companies`` for the display name and ``users`` for the owning ``clerk_id``
+    (LEFT JOIN — a company without a user row still lists, with a null owner).
+    Ordered newest-first so freshly onboarded tenants surface at the top. Carries
+    no DSN/credential bytes — only the safe projection the table renders.
+    """
+    cur.execute(
+        f"""
+        SELECT t.company_id::text,
+               u.clerk_id,
+               c.company_name,
+               t.status,
+               t.schema_version,
+               (t.runtime_dsn_ciphertext IS NOT NULL) AS provisioned,
+               t.routing_enabled,
+               t.created_at,
+               t.updated_at
+          FROM {TABLE_NAME} t
+          JOIN companies c ON c.id = t.company_id
+          LEFT JOIN users u ON u.id = c.user_id
+         ORDER BY t.created_at DESC
+        """
+    )
+    return [
+        TenantSummary(
+            company_id=row[0],
+            clerk_id=row[1],
+            company_name=row[2],
+            status=row[3],
+            schema_version=row[4],
+            provisioned=bool(row[5]),
+            routing_enabled=bool(row[6]),
+            created_at=row[7],
+            updated_at=row[8],
+        )
+        for row in cur.fetchall()
+    ]
+
+
 def update_tenant_db_status(cur: "_Cursor", company_id: str, status: str) -> bool:
     """Transition the lifecycle status; returns True if a row was updated."""
     if status not in TENANT_DB_STATUSES:
@@ -293,6 +382,36 @@ def update_tenant_db_status(cur: "_Cursor", company_id: str, status: str) -> boo
         (status, company_id),
     )
     return cur.rowcount > 0
+
+
+def set_routing_enabled(cur: "_Cursor", company_id: str, enabled: bool) -> bool:
+    """Flip the Phase 3 routing switch (UI plan §2.1); True if a row was updated.
+
+    This is the *intent* flag the operator toggles in-app — it does NOT by itself
+    open a connection. The engine still requires ``BYOD_ENABLED`` (env kill) AND
+    ``status == LIVE`` before this matters (see byod_engine.routing_active). Callers
+    must invalidate the routing-decision cache after committing so the change takes
+    effect immediately rather than after the TTL."""
+    cur.execute(
+        f"UPDATE {TABLE_NAME} SET routing_enabled = %s, updated_at = NOW() WHERE company_id = %s",
+        (bool(enabled), company_id),
+    )
+    return cur.rowcount > 0
+
+
+def get_routing_fields(cur: "_Cursor", company_id: str) -> "Optional[tuple[str, bool]]":
+    """Lightweight routing read for the hot path: ``(status, routing_enabled)`` for
+    ``company_id``, or ``None`` if there is no row.
+
+    Deliberately selects only the two routing columns (no DSN ciphertext) because
+    byod_engine.routing_active runs this per chat request behind a short-TTL cache —
+    keeping the row small minimises the cost of a cache-miss read."""
+    cur.execute(
+        f"SELECT status, routing_enabled FROM {TABLE_NAME} WHERE company_id = %s",
+        (company_id,),
+    )
+    row = cur.fetchone()
+    return (row[0], bool(row[1])) if row else None
 
 
 def set_runtime_dsn(

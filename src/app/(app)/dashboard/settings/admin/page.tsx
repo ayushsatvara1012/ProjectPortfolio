@@ -9,6 +9,7 @@ import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 import SkeletonLoader from '@/src/app/components/SkeletonLoader';
 import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
 import ExploreEnquiriesTab from './ExploreEnquiriesTab';
+import ByodTab from './ByodTab';
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 const TIERS = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'];
@@ -855,7 +856,7 @@ export default function AdminPage() {
   const { userRole } = useUserRole();
   const authFetch = useAuthenticatedFetch();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics' | 'enquiries'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics' | 'enquiries' | 'byod'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -1005,6 +1006,7 @@ export default function AdminPage() {
             { key: 'plans', label: 'Custom plans', icon: 'build' },
             { key: 'metrics', label: 'Metrics', icon: 'bar_chart' },
             { key: 'enquiries', label: 'Enquiries', icon: 'inbox' },
+            { key: 'byod', label: 'BYOD', icon: 'database' },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -1349,6 +1351,13 @@ export default function AdminPage() {
       {activeTab === 'enquiries' && (
         <div className="px-6 md:px-8 py-6">
           <ExploreEnquiriesTab />
+        </div>
+      )}
+
+      {/* ── BYOD fleet ── */}
+      {activeTab === 'byod' && (
+        <div className="px-6 md:px-8 py-6">
+          <ByodTab />
         </div>
       )}
 

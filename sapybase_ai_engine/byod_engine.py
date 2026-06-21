@@ -38,6 +38,7 @@ from typing import Callable, Iterator, List, Optional, Sequence, Tuple
 
 import byod_dsn_cache
 import byod_flags
+import byod_routing_cache
 import byod_schema
 import byod_store
 from observability import metrics
@@ -140,15 +141,84 @@ def sanitize_db_error(exc: BaseException) -> str:
     return f"tenant database error ({type(exc).__name__})"
 
 
-# ── Routing gate ──────────────────────────────────────────────────────────────
+# ── Routing gate (Phase 3: DB-driven on/off, no redeploy) ───────────────────────
+def _read_routing_decision(company_id: str) -> "byod_routing_cache.RoutingDecision":
+    """Read ``(status, routing_enabled)`` from the control plane for the hot path.
+
+    Fail-SAFE (never fail-open): if the engine is unconfigured or the control plane
+    is unreachable, return a not-routed decision so the tenant stays on the shared
+    path — a routing read must never open a tenant DB on a guess. Caches the result
+    (including the negative "no row") via the caller."""
+    no_row = byod_routing_cache.RoutingDecision(status=None, routing_enabled=False)
+    if _Deps.control_conn_factory is None:
+        return no_row
+    try:
+        conn = _Deps.control_conn_factory()
+    except Exception as exc:  # control plane unreachable → fail closed to shared DB
+        logger.warning("BYOD routing read degraded: company=%s reason=%s", company_id, sanitize_db_error(exc))
+        return no_row
+    try:
+        cur = conn.cursor()
+        try:
+            fields = byod_store.get_routing_fields(cur, company_id)
+        finally:
+            cur.close()
+        if fields is None:
+            return no_row
+        return byod_routing_cache.RoutingDecision(status=fields[0], routing_enabled=bool(fields[1]))
+    except Exception as exc:
+        logger.warning("BYOD routing read degraded: company=%s reason=%s", company_id, sanitize_db_error(exc))
+        return no_row
+    finally:
+        if _Deps.control_conn_release is not None:
+            _Deps.control_conn_release(conn)
+
+
+def _routing_decision(company_id: str) -> "byod_routing_cache.RoutingDecision":
+    """Cached ``(status, routing_enabled)`` lookup — one control-plane read per
+    company per TTL (negatives cached too, so non-BYOD companies don't hit the DB
+    every request)."""
+    cache = byod_routing_cache.get_routing_cache()
+    cached = cache.get(company_id)
+    if cached is not None:
+        return cached
+    decision = _read_routing_decision(company_id)
+    cache.put(company_id, decision)
+    return decision
+
+
 def routing_active(company_id: object) -> bool:
     """Whether this request's data plane should be the tenant's own DB.
 
-    Dark by default — delegates to the rollout flag (global switch AND canary
-    allowlist). A tenant is only routed to its own DB once an operator has added
-    it to the canary set, which presupposes it is an entitled, provisioned BYOD
-    tenant."""
-    return byod_flags.byo_database_active(company_id)
+    Phase 3 rule (UI plan §2.1): route iff
+      ``BYOD_ENABLED`` (env, global kill) AND ``status == LIVE`` AND
+      (``routing_enabled`` OR the tenant is in the env-canary list).
+
+    Still DARK by default: with the global switch off (or no LIVE+enabled row) this
+    is False for everyone, so the shared-DB path is byte-for-byte unchanged. The
+    env-canary clause is a one-release backwards-compat fallback so the existing
+    canary keeps routing while the DB switch rolls out; it is dropped in a
+    follow-up once the canary's ``routing_enabled`` is set TRUE. ``BYOD_ENABLED``
+    remains forever as the master kill switch (infra-only)."""
+    if not company_id:
+        return False
+    # Master kill switch (env) wins and short-circuits the control-plane read.
+    if not byod_flags.byo_database_globally_enabled():
+        return False
+    decision = _routing_decision(str(company_id))
+    if decision.status != byod_store.TenantDbStatus.LIVE:
+        return False  # PENDING/PROVISIONING/NEEDS_RECONNECT/DISABLED/ERROR never route
+    if decision.routing_enabled:
+        return True
+    # Backwards-compat fallback (one release): a LIVE env-canary still routes.
+    return byod_flags.is_canary_tenant(company_id)
+
+
+def invalidate_routing_cache(company_id: str) -> None:
+    """Drop a tenant's cached routing decision so a status/flag change takes effect
+    immediately (call after provision, health, enable/disable, offboard,
+    switch-in/out). The short cache TTL is the self-healing backstop."""
+    byod_routing_cache.get_routing_cache().invalidate(company_id)
 
 
 # ── Dependency seam (set by main at startup; avoids a circular import) ───────────

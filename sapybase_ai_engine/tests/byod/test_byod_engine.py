@@ -68,14 +68,26 @@ def test_routing_inactive_by_default(monkeypatch):
 
 
 def test_routing_active_only_when_enabled_and_canary(monkeypatch):
+    # Phase 3: routing now also requires status == LIVE. Seed the routing-decision
+    # cache so this stays a pure (no-DB) test; company-123 is a LIVE tenant whose
+    # routing_enabled flag is still FALSE (it routes only via the env-canary fallback).
+    import byod_routing_cache
+    cache = byod_routing_cache.RoutingDecisionCache()
+    cache.put("company-123", byod_routing_cache.RoutingDecision("LIVE", False))
+    cache.put("company-xyz", byod_routing_cache.RoutingDecision("LIVE", False))
+    cache.put("company-other", byod_routing_cache.RoutingDecision("LIVE", False))
+    byod_routing_cache.set_routing_cache(cache)
+
     monkeypatch.setenv("BYOD_ENABLED", "true")
     monkeypatch.setenv("BYOD_CANARY_COMPANY_IDS", "company-123, company-xyz")
     assert byod_engine.routing_active("company-123") is True
-    # Enabled but NOT a canary → still off.
+    # LIVE but NOT a canary and routing_enabled=False → still off.
     assert byod_engine.routing_active("company-other") is False
-    # Canary listed but global switch off → off.
+    # Canary + LIVE but global switch off → off (master kill wins).
     monkeypatch.setenv("BYOD_ENABLED", "false")
     assert byod_engine.routing_active("company-123") is False
+
+    byod_routing_cache.reset_routing_cache()
 
 
 # ── Pure: E3 output validation ───────────────────────────────────────────────────

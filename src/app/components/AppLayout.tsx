@@ -68,6 +68,7 @@ const PATH_LABELS: Record<string, string> = {
   '/dashboard/register': 'Create Bot Identity',
   '/dashboard/train': 'Train AI',
   '/dashboard/insights': 'Insights Dashboard',
+  '/dashboard/database': 'My Database',
   '/dashboard/pricing': 'Pricing',
   '/dashboard/settings/account': 'Account',
   '/dashboard/settings/customize': 'Customize Bot',
@@ -127,7 +128,7 @@ type SidebarContentProps = {
 
 const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps) => {
   const pathname = usePathname();
-  const { userRole } = useUserRole();
+  const { userRole, entitlements } = useUserRole();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -159,6 +160,18 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
         {TOP_NAV.map(item => (
           <SidebarItem key={item.path} {...item} onClick={onClose} expanded={expanded} />
         ))}
+
+        {/* BYOD: client self-serve "My Database" — only for byo_database-entitled
+            users (UI plan Phase 4). The route itself also re-gates server-side. */}
+        {entitlements.canUseByoDatabase && (
+          <SidebarItem
+            label="My Database"
+            icon="database"
+            path="/dashboard/database"
+            onClick={onClose}
+            expanded={expanded}
+          />
+        )}
 
         {/* Settings group */}
         <div>

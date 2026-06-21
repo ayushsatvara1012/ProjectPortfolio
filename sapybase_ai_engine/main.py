@@ -1087,10 +1087,12 @@ from models import (
     DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
+    ByodRequestChangeRequest,
 )
 
 # ── BYOD super-admin config logic (RFC Phase 2.1–2.3, §3.1) — dark until enabled ──
 import byod_admin
+import byod_client
 import byod_probe
 import byod_dataplane
 import byod_health
@@ -7091,6 +7093,43 @@ def update_user_limits(
 # /custom-plan/override + /limits endpoints (BYOD is Custom-Plan machinery). A
 # decrypted DSN is NEVER logged or echoed (rule 7).
 
+@app.get("/api/admin/byod/tenants")
+@limiter.limit("30/minute")
+def list_byod_tenants(
+    request: Request,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Fleet list for the admin BYOD panel (UI plan Phase 1): every BYOD tenant in
+    any lifecycle state, with owner + status + provisioning flag + a computed
+    ``routing_active`` (the engine's effective routing decision for that tenant
+    today — global kill AND canary, per byod_engine.routing_active). Carries no
+    DSN / credential material; only the safe projection the table renders."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        tenants = byod_store.list_all_tenants(cursor)
+        return {
+            "tenants": [
+                {
+                    "company_id": t.company_id,
+                    "clerk_id": t.clerk_id,
+                    "company_name": t.company_name,
+                    "status": t.status,
+                    "schema_version": t.schema_version,
+                    "provisioned": t.provisioned,
+                    "routing_enabled": t.routing_enabled,
+                    "routing_active": byod_engine.routing_active(t.company_id),
+                    "created_at": t.created_at.isoformat() if hasattr(t.created_at, "isoformat") else None,
+                    "updated_at": t.updated_at.isoformat() if hasattr(t.updated_at, "isoformat") else None,
+                }
+                for t in tenants
+            ]
+        }
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/admin/users/{clerk_id}/byod")
 @limiter.limit("30/minute")
 def get_byod_config(
@@ -7182,6 +7221,9 @@ def provision_byod(
         # A new runtime DSN is now authoritative — drop any cached decrypted DSN so
         # it takes effect immediately rather than after the cache TTL (§16.5).
         byod_engine.invalidate_runtime_dsn_cache(result["company_id"])
+        # Status changed (→ LIVE/ERROR): drop the cached routing decision too so the
+        # engine re-evaluates routing for this tenant immediately (Phase 3 §2.1).
+        byod_engine.invalidate_routing_cache(result["company_id"])
         log_admin_action(
             admin["clerk_id"], "BYOD_PROVISION", clerk_id,
             {"status": result["status"], "idempotent": result.get("idempotent"),
@@ -7226,6 +7268,8 @@ def check_byod_health(
         cursor = conn.cursor()
         result = byod_admin.check_health(cursor, clerk_id, kms)
         conn.commit()
+        # Health may flip status (LIVE/NEEDS_RECONNECT/ERROR) → re-evaluate routing.
+        byod_engine.invalidate_routing_cache(result["company_id"])
         log_admin_action(
             admin["clerk_id"], "BYOD_HEALTH_CHECK", clerk_id,
             {"status": result["status"], "healthy": result.get("healthy")},
@@ -7288,6 +7332,7 @@ def switch_in_byod(
             dest_conn=dest_conn,
             control_conn=conn,
         )
+        byod_engine.invalidate_routing_cache(company_id)  # cutover may change routing
         log_admin_action(
             admin["clerk_id"], "BYOD_SWITCH_IN", clerk_id,
             {"switchin_status": result.status, "cutover_at": str(result.cutover_at),
@@ -7362,6 +7407,7 @@ def switch_out_byod(
             shared_conn=conn,
             control_conn=conn,
         )
+        byod_engine.invalidate_routing_cache(company_id)  # offboarded → stop routing now
         log_admin_action(
             admin["clerk_id"], "BYOD_SWITCH_OUT", clerk_id,
             {"switchout_status": result.status, "cutover_at": str(result.cutover_at),
@@ -7417,6 +7463,7 @@ def offboard_byod(
         result = byod_switchout.offboard_documented_loss(
             company_id=company_id, control_conn=conn
         )
+        byod_engine.invalidate_routing_cache(company_id)  # row removed → stop routing now
         log_admin_action(
             admin["clerk_id"], "BYOD_OFFBOARD", clerk_id,
             {"switchout_status": result.status, "tenant_data_preserved": True,
@@ -7459,6 +7506,195 @@ def set_byod_connection(
     except DsnValidationError as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        release_db_connection(conn)
+
+
+def _set_byod_routing(clerk_id: str, enabled: bool, req: "ByodProvisionRequest", admin: dict):
+    """Shared body for the enable/disable routing endpoints (Phase 3, §2.1): flip
+    routing_enabled, commit, invalidate the routing-decision cache so the toggle is
+    effective immediately, and audit (no DSN). Enable is gated to LIVE tenants
+    (the §3 human gate); disable works from any state and is idempotent."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_admin.set_routing(cursor, clerk_id, enabled)
+        conn.commit()
+        # Make the flip take effect now rather than after the cache TTL.
+        byod_engine.invalidate_routing_cache(result["company_id"])
+        log_admin_action(
+            admin["clerk_id"], "BYOD_ROUTING_ENABLE" if enabled else "BYOD_ROUTING_DISABLE",
+            clerk_id,
+            {"routing_enabled": enabled, "status": result["status"], "reason": req.reason},
+        )
+        return {"status": "success", **result}
+    except byod_admin.CompanyNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="User has no company to attach a database to.")
+    except byod_admin.ConnectionNotConfigured:
+        conn.rollback()
+        raise HTTPException(status_code=409, detail="No tenant database connection has been set yet.")
+    except byod_admin.RoutingNotLive:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Routing can only be enabled for a LIVE tenant — provision + health-check it first.",
+        )
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/enable")
+@limiter.limit("20/minute")
+def enable_byod_routing(
+    request: Request,
+    clerk_id: str,
+    req: ByodProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Turn ON the engine routing switch for a LIVE tenant — the one-click in-app
+    equivalent of the old Render env-canary edit (no redeploy). The §3 human gate:
+    a tenant cannot serve real traffic until a super-admin flips this."""
+    return _set_byod_routing(clerk_id, True, req, admin)
+
+
+@app.post("/api/admin/users/{clerk_id}/byod/disable")
+@limiter.limit("20/minute")
+def disable_byod_routing(
+    request: Request,
+    clerk_id: str,
+    req: ByodProvisionRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Turn OFF the engine routing switch (any state, idempotent): the tenant is cut
+    back to the shared path immediately while its credentials are retained."""
+    return _set_byod_routing(clerk_id, False, req, admin)
+
+
+# ── BYOD client self-serve surface (UI plan Phase 4) ─────────────────────────
+# These are the ONLY non-admin BYOD routes. The company is resolved exclusively
+# from the caller's own session (NO clerk_id / company_id path param) so a client
+# can never reach another company's data (no IDOR). They are entitlement-gated
+# (byo_database) and reuse the same validate → encrypt → store path as the admin
+# connection endpoint. All privileged mutations (provision / enable / disable /
+# switch / offboard) remain admin-only — a client can self-onboard a DSN and
+# request changes, but a human super-admin gates anything that serves real traffic.
+
+
+def _require_byod_client(user: dict):
+    """Client BYOD gate: the caller must hold the ``byo_database`` entitlement.
+    Company is always resolved from THIS session downstream (no id param)."""
+    require_entitlement(user, "byo_database", "Bring Your Own Database")
+
+
+@app.get("/api/byod/me")
+@limiter.limit("30/minute")
+def get_my_byod(request: Request, user: dict = Depends(get_current_user)):
+    """The client's own BYOD status surface: lifecycle status, masked connection,
+    whether they may (re)enter a DSN right now, and the onboarding requirements.
+    Own-company only (resolved from the session). Never returns the real DSN."""
+    _require_byod_client(user)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        return byod_client.get_client_view(cursor, user["clerk_id"])
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/byod/me/test")
+@limiter.limit("20/minute")
+def test_my_byod_connection(
+    request: Request,
+    req: ByodConnectionRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Client **Test** button: validate the candidate DSN (SSRF + allowlist + TLS)
+    and open a real connection to prove pgvector + a vector(768) column. Stores
+    nothing. Same probe path as the admin Test endpoint."""
+    _require_byod_client(user)
+    try:
+        return byod_client.test_dsn(req.db_url)
+    except DsnValidationError as e:
+        # The message is safe (never contains the password — rule 7).
+        raise HTTPException(status_code=400, detail=str(e))
+    except byod_probe.ProbeError as e:
+        raise _byod_provision_http_error(e)
+
+
+@app.put("/api/byod/me/connection")
+@limiter.limit("10/minute")
+def set_my_byod_connection(
+    request: Request,
+    req: ByodConnectionRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Client self-onboarding: validate, envelope-encrypt, and store the caller's
+    own tenant DSN as PENDING for super-admin review — **only while onboarding**
+    (no row yet, or status PENDING / NEEDS_RECONNECT). A LIVE connection is frozen
+    to the client (409): changing it is an admin-driven re-onboarding (plan §0).
+    The plaintext DSN is never logged or returned."""
+    _require_byod_client(user)
+    try:
+        kms = kms_from_env()
+    except KmsUnavailable:
+        raise HTTPException(status_code=503, detail="Encryption service unavailable.")
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_client.set_own_connection(cursor, user["clerk_id"], req.db_url, kms)
+        conn.commit()
+        # Audit WITHOUT the DSN (rule 7) — masked form + status only.
+        log_admin_action(
+            user["clerk_id"], "BYOD_CLIENT_SET_CONNECTION", result["company_id"],
+            {"masked_url": result["masked_url"], "status": result["status"]},
+        )
+        return {"status": "success", **result}
+    except byod_admin.CompanyNotFound:
+        conn.rollback()
+        raise HTTPException(status_code=404, detail="No company is associated with your account.")
+    except byod_client.ConnectionFrozen:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Your database connection is live and can't be changed here. "
+                "Request a reconnect and our team will help you rotate it safely."
+            ),
+        )
+    except DsnValidationError as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/byod/me/request-change")
+@limiter.limit("10/minute")
+def request_my_byod_change(
+    request: Request,
+    req: ByodRequestChangeRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Client self-serve request for an admin-run change (``reconnect`` / ``leave``).
+    Performs **no** mutation — it records an admin-visible audit row so the operator
+    can act (re-provision or switch-out/offboard). Own-company only."""
+    _require_byod_client(user)
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        result = byod_client.request_change(cursor, user["clerk_id"], req.kind, req.note)
+        log_admin_action(
+            user["clerk_id"], "BYOD_CLIENT_REQUEST_CHANGE", result["company_id"],
+            {"kind": req.kind, "note": req.note},
+        )
+        return {"status": "success", **result}
+    except byod_client.InvalidRequestKind:
+        raise HTTPException(status_code=400, detail="Unknown request kind.")
+    except byod_admin.CompanyNotFound:
+        raise HTTPException(status_code=404, detail="No company is associated with your account.")
     finally:
         release_db_connection(conn)
 

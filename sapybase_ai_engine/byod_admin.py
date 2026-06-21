@@ -67,6 +67,10 @@ class ConnectionNotConfigured(ByodAdminError):
     """No tenant DSN has been stored yet — call set_connection before provisioning."""
 
 
+class RoutingNotLive(ByodAdminError):
+    """Routing can only be ENABLED for a LIVE (provisioned + healthy) tenant."""
+
+
 def seed_byod_config() -> dict:
     """Build the per-client ``custom_plan_config`` seed from the BYOD template
     (§3.1). Validated through :class:`CustomPlanConfig` so it can never drift from
@@ -320,6 +324,32 @@ def check_health(
     }
 
 
+def set_routing(cur, clerk_id: str, enabled: bool) -> dict:
+    """Flip the Phase 3 routing switch for a tenant (UI plan §2.1 / §3 human gate).
+
+    ENABLE is allowed only from ``LIVE`` (a tenant must be provisioned + healthy
+    before it can serve real traffic — the §3 human gate). DISABLE is allowed from
+    any state and is idempotent (it cuts the tenant back to the shared path while
+    keeping its credentials). Caller commits, then invalidates the routing-decision
+    cache so the toggle takes effect immediately. Raises :class:`CompanyNotFound`,
+    :class:`ConnectionNotConfigured` (no row yet), or :class:`RoutingNotLive`
+    (enable attempted on a non-LIVE tenant)."""
+    company_id = resolve_company_id(cur, clerk_id)
+    if company_id is None:
+        raise CompanyNotFound(clerk_id)
+    record = byod_store.get_tenant_db_record(cur, company_id)
+    if record is None:
+        raise ConnectionNotConfigured(clerk_id)
+    if enabled and record.status != TenantDbStatus.LIVE:
+        raise RoutingNotLive(record.status)
+    byod_store.set_routing_enabled(cur, company_id, enabled)
+    return {
+        "company_id": company_id,
+        "status": record.status,
+        "routing_enabled": enabled,
+    }
+
+
 def get_admin_view(cur, clerk_id: str) -> dict:
     """The admin BYOD panel surface: plan overrides (editable) + the connection
     block (masked URL, status, schema version — read-only). Never decrypts the
@@ -344,6 +374,7 @@ def get_admin_view(cur, clerk_id: str) -> dict:
                 "status": record.status,
                 "is_live": record.status == TenantDbStatus.LIVE,  # health surface
                 "provisioned": record.runtime_dsn_ciphertext is not None,
+                "routing_enabled": record.routing_enabled,  # Phase 3 switch state
                 "schema_version": record.schema_version,
                 "key_id": record.dsn_key_id,
                 "created_at": _iso(record.created_at),

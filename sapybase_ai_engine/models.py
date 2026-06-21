@@ -7,7 +7,7 @@ neither imports this module, so there is no import cycle.
 """
 
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, validator
 
@@ -352,6 +352,17 @@ class ByodProvisionRequest(BaseModel):
     """Trigger provisioning of the already-stored tenant DSN (RFC §4.1 / §16.6).
     No DSN here — it is read from the stored ciphertext. ``reason`` is audit-only."""
     reason: Optional[str] = Field(None, max_length=500, description="Internal reason (audit log)")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ByodRequestChangeRequest(BaseModel):
+    """A BYOD client's self-serve request for an admin-run change (UI plan Phase 4
+    / §2.2). Performs **no** mutation — it only signals the operator. ``reconnect``
+    = my DB credential/host changed, please re-provision; ``leave`` = take me off
+    BYOD (admin runs switch-out / offboard)."""
+    kind: Literal["reconnect", "leave"] = Field(..., description="reconnect | leave")
+    note: Optional[str] = Field(None, max_length=1000, description="Optional context for the operator")
 
     model_config = ConfigDict(extra="forbid")
 
