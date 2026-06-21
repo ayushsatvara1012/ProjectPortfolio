@@ -136,8 +136,10 @@ class UserRole(str, Enum):
 
 class UserTier(str, Enum):
     FREE = "FREE"
+    EXPLORE = "EXPLORE"
     STARTER = "STARTER"
     PRO = "PRO"
+    BUSINESS = "BUSINESS"
     ENTERPRISE = "ENTERPRISE"
     CUSTOM = "CUSTOM"
 

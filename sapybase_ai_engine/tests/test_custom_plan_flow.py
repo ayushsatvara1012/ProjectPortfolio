@@ -695,3 +695,91 @@ class TestStateMachineTransitions:
     def test_paused_retains_access_regardless_of_billing(self):
         """Polar pause = access preserved. billing_end is irrelevant."""
         assert self.gate("PAUSED", _past(days=10), _now()) is None
+
+
+# ---------------------------------------------------------------------------
+# UserTier enum — EXPLORE and BUSINESS acceptance (Phase 1 fix)
+# ---------------------------------------------------------------------------
+
+class TestUserTierEnum:
+    """The UserTier enum must accept every tier that PLAN_LIMITS and
+    POLAR_PRODUCT_TIER_MAP can produce, including EXPLORE and BUSINESS."""
+
+    def setup_method(self):
+        from models import UserTier
+        self.Tier = UserTier
+
+    def test_explore_is_valid_tier(self):
+        assert self.Tier("EXPLORE") == self.Tier.EXPLORE
+
+    def test_business_is_valid_tier(self):
+        assert self.Tier("BUSINESS") == self.Tier.BUSINESS
+
+    def test_all_plan_limits_tiers_except_byod_in_enum(self):
+        from config import PLAN_LIMITS
+        for tier in PLAN_LIMITS:
+            if tier == "BYOD":
+                continue
+            assert tier in [t.value for t in self.Tier], f"{tier} missing from UserTier"
+
+    def test_all_polar_product_tiers_in_enum(self):
+        import main
+        for tier in set(main.POLAR_PRODUCT_TIER_MAP.values()):
+            assert tier in [t.value for t in self.Tier], f"Polar tier {tier} missing from UserTier"
+
+    def test_admin_update_request_accepts_explore(self):
+        from models import AdminUpdateUserRequest
+        req = AdminUpdateUserRequest(tier="EXPLORE")
+        assert req.tier.value == "EXPLORE"
+
+    def test_admin_update_request_accepts_business(self):
+        from models import AdminUpdateUserRequest
+        req = AdminUpdateUserRequest(tier="BUSINESS")
+        assert req.tier.value == "BUSINESS"
+
+    def test_admin_update_request_rejects_invalid_tier(self):
+        from pydantic import ValidationError
+        from models import AdminUpdateUserRequest
+        with pytest.raises(ValidationError):
+            AdminUpdateUserRequest(tier="PLATINUM")
+
+
+# ---------------------------------------------------------------------------
+# CustomPlanConfig — byo_database flag (Phase 4 fix)
+# ---------------------------------------------------------------------------
+
+class TestCustomPlanConfigByod:
+    """byo_database must be accepted, persisted, and resolved by get_plan."""
+
+    def setup_method(self):
+        from models import CustomPlanConfig
+        self.Model = CustomPlanConfig
+
+    def test_byo_database_defaults_false(self):
+        cfg = self.Model()
+        assert cfg.byo_database is False
+
+    def test_byo_database_true_accepted(self):
+        cfg = self.Model(byo_database=True)
+        assert cfg.byo_database is True
+
+    def test_byo_database_roundtrips_through_model_dump(self):
+        cfg = self.Model(byo_database=True, plan_name="BYOD Client")
+        d = cfg.model_dump()
+        assert d["byo_database"] is True
+        restored = self.Model(**d)
+        assert restored.byo_database is True
+
+    def test_get_plan_resolves_byo_database_from_custom_config(self):
+        from main import get_plan
+        plan = get_plan("CUSTOM", custom_plan_config={"byo_database": True, "max_bots": 1, "max_messages": 50000, "max_chunks": 50000})
+        assert plan["byo_database"] is True
+
+    def test_get_plan_custom_without_byo_database_defaults_false(self):
+        from main import get_plan
+        plan = get_plan("CUSTOM", custom_plan_config={"max_bots": 1})
+        assert plan["byo_database"] is False
+
+    def test_byod_plan_defaults_has_byo_database_true(self):
+        from config import BYOD_PLAN_DEFAULTS
+        assert BYOD_PLAN_DEFAULTS["byo_database"] is True

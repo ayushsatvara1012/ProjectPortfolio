@@ -1,7 +1,7 @@
 // Single source of truth for response shapes from the FastAPI backend.
 // Add fields as endpoints solidify; keep optional where the backend may omit.
 
-export type Tier = 'FREE' | 'STARTER' | 'PRO' | 'ENTERPRISE' | 'CUSTOM';
+export type Tier = 'FREE' | 'EXPLORE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'ENTERPRISE' | 'CUSTOM';
 export type Role = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 
 export interface MeResponse {

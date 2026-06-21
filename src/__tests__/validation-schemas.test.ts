@@ -111,6 +111,16 @@ describe('customPlanConfigSchema', () => {
   it('rejects plan_name over 60 chars', () => {
     expect(customPlanConfigSchema.safeParse({ ...base, plan_name: 'a'.repeat(61) }).success).toBe(false);
   });
+  it('accepts byo_database boolean', () => {
+    const r = customPlanConfigSchema.safeParse({ ...base, byo_database: true });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.byo_database).toBe(true);
+  });
+  it('byo_database defaults to undefined when omitted', () => {
+    const r = customPlanConfigSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.byo_database).toBeUndefined();
+  });
 });
 
 describe('firstIssue', () => {

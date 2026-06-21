@@ -2,13 +2,15 @@ import { describe, it, expect } from 'vitest';
 import type { Tier, MeResponse, BotPlan } from '@/src/lib/types/api';
 import { UpgradeError } from '@/src/lib/errors';
 
-// Mirrors PLAN_LIMITS from main.py — single frontend source of truth for UI gating
+// Mirrors PLAN_LIMITS from config.py — single frontend source of truth for UI gating
 const PLAN_LIMITS: Record<Tier, { max_bots: number; messages: number; chunks: number }> = {
   FREE:       { max_bots: 0,   messages: 0,      chunks: 0     },
-  STARTER:    { max_bots: 3,   messages: 2000,   chunks: 500   },
-  PRO:        { max_bots: 5,   messages: 5000,   chunks: 2000  },
-  ENTERPRISE: { max_bots: 999, messages: 999999, chunks: 999999 },
-  CUSTOM:     { max_bots: 999, messages: 999999, chunks: 999999 },
+  EXPLORE:    { max_bots: 1,   messages: 1000,   chunks: 200   },
+  STARTER:    { max_bots: 1,   messages: 5000,   chunks: 1000  },
+  PRO:        { max_bots: 3,   messages: 15000,  chunks: 4000  },
+  BUSINESS:   { max_bots: 5,   messages: 50000,  chunks: 15000 },
+  ENTERPRISE: { max_bots: 999, messages: 999999, chunks: 99999 },
+  CUSTOM:     { max_bots: 999, messages: 999999, chunks: 99999 },
 };
 
 function canAddBot(plan: BotPlan): boolean {
@@ -37,6 +39,26 @@ describe('Tier hierarchy', () => {
   it('STARTER is between FREE and PRO for messages', () => {
     expect(PLAN_LIMITS.STARTER.messages).toBeGreaterThan(PLAN_LIMITS.FREE.messages);
     expect(PLAN_LIMITS.STARTER.messages).toBeLessThan(PLAN_LIMITS.PRO.messages);
+  });
+
+  it('EXPLORE is between FREE and STARTER for messages', () => {
+    expect(PLAN_LIMITS.EXPLORE.messages).toBeGreaterThan(PLAN_LIMITS.FREE.messages);
+    expect(PLAN_LIMITS.EXPLORE.messages).toBeLessThan(PLAN_LIMITS.STARTER.messages);
+  });
+
+  it('BUSINESS (Scale) has more messages than PRO (Growth)', () => {
+    expect(PLAN_LIMITS.BUSINESS.messages).toBeGreaterThan(PLAN_LIMITS.PRO.messages);
+  });
+
+  it('BUSINESS has more bots than PRO', () => {
+    expect(PLAN_LIMITS.BUSINESS.max_bots).toBeGreaterThan(PLAN_LIMITS.PRO.max_bots);
+  });
+
+  it('full ladder: FREE < EXPLORE < STARTER < PRO < BUSINESS < ENTERPRISE', () => {
+    const tiers: Tier[] = ['FREE', 'EXPLORE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE'];
+    for (let i = 1; i < tiers.length; i++) {
+      expect(PLAN_LIMITS[tiers[i]].messages).toBeGreaterThan(PLAN_LIMITS[tiers[i - 1]].messages);
+    }
   });
 });
 

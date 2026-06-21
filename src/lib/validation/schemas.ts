@@ -55,6 +55,7 @@ export const customPlanConfigSchema = z.object({
   webhook: z.boolean().optional(),
   custom_logo: z.boolean().optional(),
   analytics: z.boolean().optional(),
+  byo_database: z.boolean().optional(),
   notes: z.string().max(2000).optional(),
 });
 export type CustomPlanConfig = z.infer<typeof customPlanConfigSchema>;

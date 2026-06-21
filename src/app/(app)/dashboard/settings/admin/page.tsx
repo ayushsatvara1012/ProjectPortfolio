@@ -12,10 +12,16 @@ import ExploreEnquiriesTab from './ExploreEnquiriesTab';
 import ByodTab from './ByodTab';
 
 // ── Tier config ───────────────────────────────────────────────────────────────
-const TIERS = ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'];
+const TIERS = ['FREE', 'EXPLORE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'];
+
+const TIER_LABELS: Record<string, string> = {
+  FREE: 'Free', EXPLORE: 'Explore', STARTER: 'Starter',
+  PRO: 'Growth', BUSINESS: 'Scale', ENTERPRISE: 'Enterprise', CUSTOM: 'Custom',
+};
 
 const TIER_STYLE: Record<string, string> = {
   FREE: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  EXPLORE: 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
   STARTER: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   PRO: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   BUSINESS: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
@@ -50,7 +56,6 @@ const GEMINI_MODELS = [
   { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (cheapest)' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (balanced)' },
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (flagship)' },
-  { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview (next-gen)' },
 ];
 
 const TOKEN_OPTIONS = [
@@ -70,6 +75,7 @@ const FEATURE_FLAGS = [
   { key: 'webhook', label: 'Webhooks', icon: 'webhook', desc: 'Zapier / Make integration' },
   { key: 'custom_logo', label: 'Custom logo', icon: 'image', desc: 'Upload own logo URL' },
   { key: 'analytics', label: 'Analytics', icon: 'bar_chart', desc: 'Insights & ROI reports' },
+  { key: 'byo_database', label: 'Bring Your Own Database', icon: 'database', desc: 'Client connects their own Postgres (BYOD)' },
 ];
 
 const ACTION_LABELS: Record<string, string> = {
@@ -103,13 +109,14 @@ const BLANK_CUSTOM_CONFIG = {
   webhook: false,
   custom_logo: false,
   analytics: false,
+  byo_database: false,
   notes: '',
 };
 
 // ── Shared small components ───────────────────────────────────────────────────
 const TierBadge = ({ tier }: { tier: string }) => (
   <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${TIER_STYLE[tier] || TIER_STYLE.FREE}`}>
-    {tier || 'FREE'}
+    {TIER_LABELS[tier] || tier || 'Free'}
   </span>
 );
 
@@ -310,6 +317,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
         webhook: !!existingCfg.webhook,
         custom_logo: !!existingCfg.custom_logo,
         analytics: !!existingCfg.analytics,
+        byo_database: !!existingCfg.byo_database,
         notes: existingCfg.notes || '',
       } : {}),
     } as any,
@@ -350,6 +358,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
       webhook: !!c.webhook,
       custom_logo: !!c.custom_logo,
       analytics: !!c.analytics,
+      byo_database: !!c.byo_database,
       notes: c.notes || '',
     };
   };
@@ -474,7 +483,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
               disabled={isSaving}
               className={selectCls}
             >
-              {TIERS.map(t => <option key={t} value={t}>{t}</option>)}
+              {TIERS.map(t => <option key={t} value={t}>{TIER_LABELS[t] || t}</option>)}
             </select>
           </div>
 
@@ -1045,7 +1054,7 @@ export default function AdminPage() {
                 {['ALL', ...TIERS].map(t => (
                   <button key={t} onClick={() => setTierFilter(t)}
                     className={`px-3 py-1.5 text-xs font-medium font-google rounded-lg whitespace-nowrap transition-colors ${tierFilter === t ? 'bg-slate-900 dark:bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
-                    {t}
+                    {t === 'ALL' ? 'All' : (TIER_LABELS[t] || t)}
                   </button>
                 ))}
               </div>
