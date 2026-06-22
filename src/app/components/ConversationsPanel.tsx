@@ -186,6 +186,18 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
 
     return (
         <div className="flex flex-col gap-4 w-full min-w-0">
+            {/* Mobile/tablet: gaps shown on top so they're never hidden */}
+            <div className="lg:hidden">
+                <FixesNeededPanel
+                    selectedBotId={selectedBotId}
+                    authFetch={authFetch}
+                    isAuthorized={isAuthorized}
+                    mode="sidebar"
+                    onSelectQuery={(q) => { setFilter('unanswered'); setSelectedQueryFilter(q); setPage(1); }}
+                    activeQuery={selectedQueryFilter}
+                />
+            </div>
+
             {/* Desktop: list + gaps sidebar */}
             <div className="flex flex-col lg:flex-row gap-4 w-full flex-1 min-w-0">
                 {list}
@@ -199,17 +211,6 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                         activeQuery={selectedQueryFilter}
                     />
                 </div>
-            </div>
-            {/* Mobile/tablet: gaps shown below so they're never hidden */}
-            <div className="lg:hidden">
-                <FixesNeededPanel
-                    selectedBotId={selectedBotId}
-                    authFetch={authFetch}
-                    isAuthorized={isAuthorized}
-                    mode="sidebar"
-                    onSelectQuery={(q) => { setFilter('unanswered'); setSelectedQueryFilter(q); setPage(1); }}
-                    activeQuery={selectedQueryFilter}
-                />
             </div>
         </div>
     );

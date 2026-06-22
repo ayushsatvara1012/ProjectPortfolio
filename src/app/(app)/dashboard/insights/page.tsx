@@ -73,13 +73,13 @@ function pctDelta(values: number[]): number {
 
 const fmtDay = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-// ── Activity heatmap (tap/keyboard accessible) — grayscale GitHub-style strip ─
+// ── Activity heatmap (tap/keyboard accessible) — 10x3 grid with date labels ─
 const HEAT_STEPS = [
-    'bg-slate-100 dark:bg-slate-800',
-    'bg-slate-300 dark:bg-slate-700',
-    'bg-slate-400 dark:bg-slate-600',
-    'bg-slate-600 dark:bg-slate-400',
-    'bg-slate-800 dark:bg-slate-200',
+    'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500',
+    'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
+    'bg-slate-400 dark:bg-slate-600 text-slate-800 dark:text-slate-200',
+    'bg-slate-600 dark:bg-slate-400 text-white dark:text-slate-950',
+    'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900',
 ];
 
 const monthOf = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString(undefined, { month: 'short' });
@@ -96,41 +96,52 @@ function ActivityHeatmap({ series, selected, onSelect }: { series: DayDatum[]; s
     };
     let prevMonth = '';
     return (
-        <div className="flex flex-col gap-3">
-            <div className="overflow-x-auto custom-scrollbar pb-1">
-                <div className="flex gap-1 min-w-max">
-                    {series.map((d) => {
-                        const isSel = selected === d.date;
-                        const month = monthOf(d.date);
-                        const showMonth = month !== prevMonth;
-                        prevMonth = month;
-                        return (
-                            <div key={d.date} className="flex flex-col items-start gap-1 w-3 shrink-0">
-                                <span className="h-3 text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 whitespace-nowrap leading-none">
-                                    {showMonth ? month : ''}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => onSelect(d)}
-                                    onMouseEnter={() => onSelect(d)}
-                                    aria-label={`${fmtDay(d.date)}: ${d.total} queries`}
-                                    title={`${fmtDay(d.date)} · ${d.total} queries`}
-                                    className={cx(
-                                        'h-3 w-3 rounded-[2px] relative transition-transform duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 focus-visible:ring-slate-400',
-                                        HEAT_STEPS[stepFor(d.total)],
-                                        isSel
-                                            ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900 ring-slate-900 dark:ring-white z-10 scale-110'
-                                            : 'hover:scale-110 hover:z-10 hover:ring-1 hover:ring-slate-400/70 dark:hover:ring-slate-500/70',
-                                    )}
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
+        <div className="flex flex-col items-center gap-3 w-full">
+            <div className="flex flex-wrap gap-x-1.5 gap-y-2 justify-center w-full">
+                {series.map((d) => {
+                    const isSel = selected === d.date;
+                    const dateObj = new Date(d.date + 'T00:00:00');
+                    const dayNum = dateObj.getDate();
+                    const month = dateObj.toLocaleDateString(undefined, { month: 'short' });
+                    const showMonth = month !== prevMonth;
+                    prevMonth = month;
+                    return (
+                        <div key={d.date} className="flex flex-col items-center gap-1">
+                            <span className="h-3 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap leading-none select-none">
+                                {showMonth ? month : '\u00A0'}
+                            </span>
+                            <button
+                                key={d.date}
+                                type="button"
+                                onClick={() => onSelect(d)}
+                                onMouseEnter={() => onSelect(d)}
+                                aria-label={`${fmtDay(d.date)}: ${d.total} queries`}
+                                title={`${fmtDay(d.date)} · ${d.total} queries`}
+                                className={cx(
+                                    'h-8 w-8 sm:h-9 sm:w-9 rounded-md relative flex items-center justify-center text-[11px] sm:text-[12px] font-extrabold transition-all duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 focus-visible:ring-slate-400',
+                                    HEAT_STEPS[stepFor(d.total)],
+                                    isSel
+                                        ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900 ring-slate-900 dark:ring-white z-10 scale-105'
+                                        : 'hover:scale-105 hover:z-10 hover:ring-1 hover:ring-slate-400/70 dark:hover:ring-slate-500/70',
+                                )}
+                            >
+                                {dayNum}
+                            </button>
+                        </div>
+                    );
+                })}
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                 <span>Less</span>
-                {HEAT_STEPS.map((c, i) => <span key={i} className={cx('h-3 w-3 rounded-[2px]', c)} />)}
+                {HEAT_STEPS.map((c, i) => (
+                    <span
+                        key={i}
+                        className={cx(
+                            'h-3.5 w-3.5 rounded-[3px]',
+                            c.split(' ')[0] + ' ' + (c.includes('dark:') ? c.split(' ').find(x => x.startsWith('dark:bg-')) : '')
+                        )}
+                    />
+                ))}
                 <span>More</span>
             </div>
         </div>
@@ -211,7 +222,6 @@ function ActivityInsights({ blocks }: { blocks: any[] }) {
                             {/* Header: date + answered / unanswered at a glance */}
                             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                                 <div>
-                                    <span className="text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Daily inspector</span>
                                     <p className="text-[16px] font-semibold text-slate-900 dark:text-slate-100 leading-tight">
                                         {new Date(selected.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
                                     </p>
@@ -243,7 +253,7 @@ function ActivityInsights({ blocks }: { blocks: any[] }) {
                                             <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">Top questions</span>
                                             <ul className="space-y-1">
                                                 {selected.raw.top_questions.map((q: string, i: number) => (
-                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug">“{q}”</li>
+                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug font-medium">“{q}”</li>
                                                 ))}
                                             </ul>
                                         </div>
@@ -253,7 +263,7 @@ function ActivityInsights({ blocks }: { blocks: any[] }) {
                                             <span className="text-[12px] font-semibold text-amber-600 dark:text-amber-400 block mb-1.5">Unanswered queries</span>
                                             <ul className="space-y-1">
                                                 {selected.raw.top_unanswered.map((q: string, i: number) => (
-                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug">“{q}”</li>
+                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug font-medium">“{q}”</li>
                                                 ))}
                                             </ul>
                                         </div>
@@ -365,17 +375,22 @@ export default function AppInsights() {
         <button
             onClick={() => handleGenerate(false)}
             disabled={isGenerating || !selectedBotId}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            title="Generate insights"
+            aria-label="Generate insights"
         >
-            {isGenerating
-                ? <><span className="h-3 w-3 border-2 border-white/40 border-t-white animate-spin rounded-full motion-reduce:animate-none" />Synthesizing…</>
-                : <><span className="material-symbols-outlined text-[16px]">auto_awesome</span>Generate insights</>}
+            <span className={cx("material-symbols-outlined text-[16px]", isGenerating && "animate-spin")}>
+                autorenew
+            </span>
+            <span className="hidden sm:inline">
+                {isGenerating ? 'Synthesizing…' : 'Generate insights'}
+            </span>
         </button>
     );
 
     const renderHeader = () => (
         <div className="relative shrink-0 z-30 bg-[#f8f9fa]/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800/70">
-            <div className="flex items-center justify-between gap-3 px-4 md:px-6 lg:px-8 overflow-x-auto scrollbar-hide">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 md:px-6 lg:px-8 py-1.5 sm:py-0">
                 <div role="tablist" aria-label="Insights sections" className="flex items-center gap-1 min-w-0">
                     {TABS.map((tab) => {
                         const active = activeTab === tab.id;
@@ -398,7 +413,7 @@ export default function AppInsights() {
                         );
                     })}
                 </div>
-                <div className="flex items-center gap-2 shrink-0 py-2">
+                <div className="flex flex-wrap items-center gap-2 py-1.5 sm:py-2">
                     {botSelector}
                     {generateBtn}
                 </div>
