@@ -5,13 +5,93 @@ import { useSearchParams } from 'next/navigation';
 import Alert from '@/src/app/components/Alert';
 import { useAuth } from '@clerk/nextjs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 import { trainUrlSchema, trainTextSchema } from '@/src/lib/validation/schemas';
+import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/app/components/insights/ui';
 
-const StatSkeleton = () => <div className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 transition-colors" />;
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Local design tokens — mirror the Insights MetricCard surface so the Train    */
+/* AI stat strip is visually identical, while adding a progress-bar + footer    */
+/* slot the KPI cards here need (storage / monthly usage).                      */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+type Tone = 'default' | 'accent' | 'info' | 'warn' | 'positive';
+
+const TONE: Record<Tone, { grad: string; ring: string; bar: string }> = {
+    default: { grad: 'from-slate-100 via-slate-50 to-white dark:from-slate-700/40 dark:via-slate-800/30 dark:to-slate-900', ring: 'ring-slate-200/70 dark:ring-slate-700/60', bar: 'bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500' },
+    accent: { grad: 'from-blue-100 via-blue-50 to-white dark:from-blue-900/40 dark:via-blue-950/20 dark:to-slate-900', ring: 'ring-blue-200/70 dark:ring-blue-900/50', bar: 'bg-gradient-to-r from-blue-600 to-blue-400' },
+    info: { grad: 'from-sky-100 via-sky-50 to-white dark:from-sky-900/40 dark:via-sky-950/20 dark:to-slate-900', ring: 'ring-sky-200/70 dark:ring-sky-900/50', bar: 'bg-gradient-to-r from-sky-500 to-sky-400' },
+    warn: { grad: 'from-amber-100 via-amber-50 to-white dark:from-amber-900/40 dark:via-amber-950/20 dark:to-slate-900', ring: 'ring-amber-200/70 dark:ring-amber-900/50', bar: 'bg-gradient-to-r from-amber-500 to-amber-400' },
+    positive: { grad: 'from-emerald-100 via-emerald-50 to-white dark:from-emerald-900/40 dark:via-emerald-950/20 dark:to-slate-900', ring: 'ring-emerald-200/70 dark:ring-emerald-900/50', bar: 'bg-gradient-to-r from-emerald-500 to-emerald-400' },
+};
+
+// Fine fractal-noise grain — same overlay the Insights cards use so the tinted
+// gradients read as a tactile, premium surface rather than a flat fill.
+const NOISE_BG =
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='tnNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23tnNoise)'/%3E%3C/svg%3E\")";
+
+function StatCard({
+    label, icon, tone = 'default', value, limit, unit, progress, progressTone, footer, badge,
+}: {
+    label: React.ReactNode;
+    icon?: string;
+    tone?: Tone;
+    value: React.ReactNode;
+    limit?: React.ReactNode;
+    unit?: React.ReactNode;
+    progress?: number | null;
+    progressTone?: string;
+    footer?: React.ReactNode;
+    badge?: React.ReactNode;
+}) {
+    const t = TONE[tone];
+    return (
+        <div
+            className={cx(
+                'relative flex flex-col gap-3 p-4 sm:p-5 overflow-hidden rounded-2xl',
+                'bg-gradient-to-br ring-1 ring-inset shadow-sm shadow-slate-900/[0.03] transition-colors duration-300',
+                t.grad,
+                t.ring,
+            )}
+        >
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.20] mix-blend-soft-light"
+                style={{ backgroundImage: NOISE_BG, backgroundSize: '140px 140px' }}
+            />
+            <div className="relative z-10 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 leading-tight">
+                    {icon && <span className="material-symbols-outlined text-[16px] text-slate-400/90 dark:text-slate-500">{icon}</span>}
+                    {label}
+                </span>
+                {badge}
+            </div>
+
+            <div className="relative z-10 flex items-end gap-1.5 flex-wrap">
+                <span className="text-[26px] sm:text-[28px] font-bold tabular-nums leading-none tracking-[-0.02em] text-slate-900 dark:text-slate-100">
+                    {value}
+                </span>
+                {limit && <span className="text-[15px] font-semibold tabular-nums text-slate-400 dark:text-slate-500 leading-none mb-0.5">/ {limit}</span>}
+                {unit && <span className="text-[12.5px] font-medium text-slate-500 dark:text-slate-400 leading-none mb-0.5">{unit}</span>}
+            </div>
+
+            {typeof progress === 'number' && (
+                <div className="relative z-10">
+                    <ProgressBar pct={progress} tone={progressTone || t.bar} height="h-1.5" />
+                </div>
+            )}
+
+            {footer && <div className="relative z-10 text-[12px] text-slate-500 dark:text-slate-400 leading-tight">{footer}</div>}
+        </div>
+    );
+}
+
+const StatSkeleton = () => (
+    <div className="rounded-2xl ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/60 bg-slate-50 dark:bg-slate-900 p-4 sm:p-5 h-[140px] animate-pulse motion-reduce:animate-none transition-colors" />
+);
+
 const TABS = [
     { id: 'url', label: 'URL', icon: 'public' },
     { id: 'pdf', label: 'PDF Upload', icon: 'description' },
@@ -19,10 +99,41 @@ const TABS = [
     { id: 'text', label: 'Text', icon: 'notes' },
 ];
 
-// Grid primitives
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
-const inputCls = "w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
-const labelCls = "block text-base font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
+// Form primitives — aligned to the Insights input language.
+const inputCls = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-[13.5px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 transition-colors";
+const labelCls = "block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 transition-colors";
+
+const sourceIconFor = (name: string) =>
+    name.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf'
+        : ['.csv', '.xlsx', '.xls'].some(ext => name.toLowerCase().endsWith(ext)) ? 'table_chart'
+            : 'language';
+
+const prettyBytes = (n: number) => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// ── Selected-file chip ────────────────────────────────────────────────────────
+const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove: () => void }) => (
+    <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-3 transition-colors">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <span className="material-symbols-outlined text-[18px]">{icon}</span>
+        </span>
+        <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-100">{file.name}</p>
+            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 tabular-nums">{prettyBytes(file.size)}</p>
+        </div>
+        <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${file.name}`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+        >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
+);
 
 // ── Source Browser Sub-Component ──────────────────────────────────────────────
 const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refreshUser, isFree }: any) => {
@@ -133,49 +244,56 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
     };
 
     const isDeleting = deleteMutation.isPending || deleteSourceMutation.isPending;
+    const allSelected = selectedChunks.size === chunks.length && chunks.length > 0;
 
     if (isFree || !selectedBotId) {
         return (
-            <div className="py-6 text-center">
-                <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600 mb-2 block">lock</span>
-                <p className="text-lg font-semibold text-slate-500 dark:text-slate-400">Upgrade to browse knowledge sources.</p>
-            </div>
+            <EmptyState
+                icon="lock"
+                title="Upgrade to browse knowledge sources"
+                hint="Inspect, audit, and prune the exact segments powering your bot on Starter and Scale plans."
+            />
         );
     }
 
     return (
         <div className="space-y-4">
             {!sourcesLoading && sources.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <span className="material-symbols-outlined text-[48px] text-gray-200 dark:text-slate-700 mb-4">auto_stories</span>
-                    <p className="text-base uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-display mb-2">No sources yet</p>
-                    <p className="text-base text-slate-400 dark:text-slate-600 font-display mb-6">Add a URL, paste text, or upload a document to start training your bot.</p>
-                </div>
+                <EmptyState
+                    icon="auto_stories"
+                    title="No knowledge sources yet"
+                    hint="Add a URL, paste text, or upload a document above to start training this bot."
+                />
             )}
 
             {sources.length > 0 && (
                 <div className="flex gap-2">
-                    <select
-                        value={selectedSource}
-                        onChange={e => setSelectedSource(e.target.value)}
-                        disabled={sourcesLoading || sources.length === 0 || isDeleting}
-                        className={inputCls + ' appearance-none font-mono text-xs flex-1'}
-                    >
-                        {sourcesLoading && <option>Loading sources...</option>}
-                        {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
-                        {sources.map((s: any) => (
-                            <option key={s.source} value={s.source}>
-                                {(s.source || 'Unknown').length > 40 ? s.source.substring(0, 37) + '...' : s.source} ({s.chunk_count} chunks)
-                            </option>
-                        ))}
-                    </select>
+                    <div className="relative flex-1 min-w-0">
+                        <select
+                            value={selectedSource}
+                            onChange={e => setSelectedSource(e.target.value)}
+                            disabled={sourcesLoading || sources.length === 0 || isDeleting}
+                            aria-label="Select a knowledge source"
+                            className={cx(inputCls, 'appearance-none cursor-pointer pr-9 disabled:opacity-60')}
+                        >
+                            {sourcesLoading && <option>Loading sources…</option>}
+                            {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
+                            {sources.map((s: any) => (
+                                <option key={s.source} value={s.source}>
+                                    {(s.source || 'Unknown').length > 44 ? s.source.substring(0, 41) + '…' : s.source} — {s.chunk_count} segments
+                                </option>
+                            ))}
+                        </select>
+                        <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">expand_more</span>
+                    </div>
 
                     {selectedSource && (
                         <button
                             onClick={handleDeleteSource}
                             disabled={isDeleting}
-                            title="Delete this entire source (all chunks)"
-                            className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 hover:bg-red-600 hover:text-white dark:hover:bg-red-700 transition-all rounded-xs flex items-center justify-center shrink-0"
+                            title="Delete this entire source (all segments)"
+                            aria-label="Delete this entire source"
+                            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600 dark:hover:bg-rose-600 transition-colors disabled:opacity-50"
                         >
                             <span className="material-symbols-outlined text-[18px]">delete_forever</span>
                         </button>
@@ -184,81 +302,92 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
             )}
 
             {selectedSource && (
-                <>
-                    <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl">
-                        <div className="flex items-center gap-2">
-                             <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">
-                                {selectedSource.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf'
-                                    : ['.csv', '.xlsx', '.xls'].some(ext => selectedSource.toLowerCase().endsWith(ext)) ? 'table_chart'
-                                    : 'language'}
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                    <div className="flex flex-col gap-3 bg-slate-50/70 dark:bg-slate-800/30 p-4 transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                                <span className="material-symbols-outlined text-[17px]">{sourceIconFor(selectedSource)}</span>
                             </span>
-                            <span className="text-base font-medium font-google text-slate-700 dark:text-slate-300 truncate flex-1">
+                            <span className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 truncate flex-1 min-w-0">
                                 {selectedSource}
                             </span>
+                            <Badge tone="neutral" dot={false}>
+                                {chunksLoading ? '…' : `${chunks.length}${totalChunks > chunks.length ? `/${totalChunks}` : ''}`} segments
+                            </Badge>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center justify-between border-t border-slate-200/70 dark:border-slate-700/60 pt-2.5">
                             <button
                                 onClick={toggleAll}
                                 disabled={chunks.length === 0}
-                                className="flex items-center gap-1.5 text-base font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+                                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40"
                             >
-                                <span className="material-symbols-outlined text-[16px]">
-                                    {selectedChunks.size === chunks.length && chunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
+                                <span className="material-symbols-outlined text-[17px]">
+                                    {allSelected ? 'check_box' : 'check_box_outline_blank'}
                                 </span>
-                                {selectedChunks.size === chunks.length && chunks.length > 0 ? 'Deselect all' : 'Select all'}
+                                {allSelected ? 'Deselect all' : 'Select all'}
                             </button>
-                            <span className="text-xs font-medium font-google text-slate-400 dark:text-slate-500">
-                                {chunksLoading ? '…' : `${chunks.length}${totalChunks > chunks.length ? ` of ${totalChunks}` : ''} segments`}
-                            </span>
+                            {selectedChunks.size > 0 && (
+                                <span className="text-[12px] font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                                    {selectedChunks.size} selected
+                                </span>
+                            )}
                         </div>
                     </div>
 
-                    <div className="max-h-[240px] overflow-y-auto custom-scrollbar transition-colors">
+                    <div className="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70">
                         {chunksLoading ? (
-                            <div className="p-6 text-center">
-                                <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-slate-600 dark:border-t-slate-300 animate-spin mx-auto mb-2 rounded-full" />
-                                <p className="text-lg font-semibold text-slate-400">Loading chunks...</p>
+                            <div className="flex flex-col items-center justify-center gap-2 py-10">
+                                <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-blue-500 animate-spin rounded-full motion-reduce:hidden" />
+                                <p className="text-[12.5px] font-medium text-slate-500 dark:text-slate-400">Loading segments…</p>
                             </div>
                         ) : chunks.length === 0 ? (
-                            <div className="p-6 text-center">
-                                <span className="material-symbols-outlined text-[24px] text-slate-300 dark:text-slate-600 mb-1 block">inventory_2</span>
-                                <p className="text-lg font-semibold text-slate-400">No chunks for this source.</p>
-                            </div>
+                            <EmptyState icon="inventory_2" title="No segments for this source" />
                         ) : (
-                            chunks.map((chunk: any) => (
-                                <label
-                                    key={chunk.id}
-                                    className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors ${selectedChunks.has(chunk.id) ? 'bg-blue-50/50 dark:bg-blue-900/30' : ''}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedChunks.has(chunk.id)}
-                                        onChange={() => toggleChunk(chunk.id)}
-                                        className="mt-1 shrink-0 accent-slate-900 dark:accent-blue-500"
-                                    />
-                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 font-mono transition-colors">
-                                        {chunk.content || '(empty chunk)'}
-                                    </p>
-                                </label>
-                            ))
+                            chunks.map((chunk: any, i: number) => {
+                                const checked = selectedChunks.has(chunk.id);
+                                return (
+                                    <label
+                                        key={chunk.id}
+                                        className={cx(
+                                            'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors',
+                                            checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
+                                        )}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleChunk(chunk.id)}
+                                            className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 dark:accent-blue-500"
+                                        />
+                                        <span className="text-[11px] font-bold tabular-nums text-slate-300 dark:text-slate-600 mt-0.5 shrink-0 w-6">
+                                            {String(i + 1).padStart(2, '0')}
+                                        </span>
+                                        <p className="text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 transition-colors">
+                                            {chunk.content || '(empty segment)'}
+                                        </p>
+                                    </label>
+                                );
+                            })
                         )}
                     </div>
 
                     {chunks.length > 0 && (
-                        <button
-                            onClick={handleDeleteSelected}
-                            disabled={selectedChunks.size === 0 || isDeleting}
-                            className="w-full sm:w-fit sm:px-6 py-3 min-h-[44px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-base font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
-                        >
-                            {isDeleting ? (
-                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
-                            ) : (
-                                <><span className="material-symbols-outlined text-[16px]">delete_sweep</span> Delete Selected ({selectedChunks.size})</>
-                            )}
-                        </button>
+                        <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+                            <button
+                                onClick={handleDeleteSelected}
+                                disabled={selectedChunks.size === 0 || isDeleting}
+                                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                            >
+                                {isDeleting ? (
+                                    <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:hidden" /> Deleting…</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-[17px]">delete_sweep</span> Delete selected ({selectedChunks.size})</>
+                                )}
+                            </button>
+                        </div>
                     )}
-                </>
+                </div>
             )}
         </div>
     );
@@ -327,6 +456,17 @@ export default function TrainPage() {
 
     const isFree = !ctxLoading && (userTier === 'FREE' || !userTier) && userRole !== 'SUPER_ADMIN';
     const isLockedOut = !ctxLoading && (userTier === 'FREE' || userTier === 'STARTER') && messagesUsed >= messageLimit && userRole !== 'SUPER_ADMIN';
+
+    // Distinct-source count for the current bot — same read-only query the
+    // SourceBrowser uses (React Query dedupes on the shared key), surfaced here
+    // purely to power the "Knowledge sources" KPI card.
+    const { data: sourcesData } = useQuery({
+        queryKey: ['knowledge-sources', selectedBotId],
+        queryFn: () => authFetch(`/api/knowledge/sources/${selectedBotId}`),
+        enabled: !!selectedBotId && !isFree,
+        staleTime: 30_000,
+    });
+    const sourceCount = (sourcesData as any)?.sources?.length ?? 0;
 
     const showAlert = (type: 'success' | 'error' | 'warning' | 'development', msg: string) => {
         setAlert({ open: true, type, msg });
@@ -504,200 +644,218 @@ export default function TrainPage() {
     const selectedBot = bots.find((b: any) => b.id === selectedBotId);
     const chunksUsed = selectedBot?.chunks_used ?? 0;
     const chunkLimit = (botsData as any)?.plan?.chunk_limit ?? 0;
-    const chunkPct = chunkLimit > 0 && chunkLimit < 999999 ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
+    const chunkUnlimited = chunkLimit >= 999999;
+    const chunkPct = chunkLimit > 0 && !chunkUnlimited ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
+
+    const msgUnlimited = (messageLimit ?? 0) >= 999999;
+    const usagePct = !msgUnlimited && (messageLimit ?? 0) > 0
+        ? Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100) : null;
+    const speedTier = (botsData as any)?.plan?.speed_tier as string | undefined;
 
     const periodEndStr = billingPeriodEnd
         ? new Date(billingPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 
+    const barToneFor = (pct: number | null) =>
+        pct === null ? undefined : pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : undefined;
+
     return (
-        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500">
-            <div className="px-6 py-5 md:px-8 md:py-6 shrink-0 transition-colors duration-500">
-                <p className="text-base md:text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">Ingest knowledge sources into your AI's vector brain.</p>
+        <div className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
+            {/* ── Sticky header ──────────────────────────────────────────────── */}
+            <div className="relative shrink-0 z-20 bg-[#f8f9fa]/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800/70">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 px-4 md:px-6 lg:px-8 py-3">
+                    <p className="text-[13px] sm:text-[13.5px] text-slate-500 dark:text-slate-400 leading-snug min-w-0">
+                        Ingest knowledge sources into your AI's vector brain.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {userTier && <Badge tone="ok" dot={false}>{userTier} plan</Badge>}
+                        {speedTier && speedTier !== 'none' && (
+                            <Badge tone="cold" dot={false}>{speedTier} speed</Badge>
+                        )}
+                        {bots.length > 1 && (
+                            <div className="relative">
+                                <select
+                                    value={selectedBotId}
+                                    onChange={e => setSelectedBotId(e.target.value)}
+                                    aria-label="Select bot to train"
+                                    className="appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                >
+                                    {bots.map((b: any) => <option key={b.id} value={b.id}>{b.bot_name}</option>)}
+                                </select>
+                                <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 px-6 md:px-8 mb-6">
-                {ctxLoading ? (
-                    Array(4).fill(0).map((_, i) => <div key={i} className={`${cellCls} p-4 md:p-8`}><StatSkeleton /></div>)
-                ) : (
-                    <>
-                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
-                                    <h4 className="text-base font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Data storage</h4>
-                                </div>
-                                {chunkLimit >= 999999 && (
-                                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-base uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
-                                )}
-                            </div>
-                            <div className="flex items-end gap-1 mb-3">
-                                <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{(chunksUsed * 60).toLocaleString()}</span>
-                                {chunkLimit < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {(chunkLimit * 60).toLocaleString()}</span>}
-                                <span className="text-base font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">words</span>
-                            </div>
-                            {chunkPct !== null && (
-                                <>
-                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
-                                        <motion.div initial={{ width: 0 }}
-                                            animate={{ width: `${chunkPct}%` }}
-                                            className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`} />
-                                    </div>
-                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 transition-colors">
-                                        {Math.round(chunkPct)}% storage used
-                                    </p>
-                                </>
-                            )}
-                        </div>
+            {/* ── Scroll body ────────────────────────────────────────────────── */}
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col gap-5 p-4 md:p-6 lg:p-8">
+                {/* KPI strip — real, bot-scoped figures (no fabricated trends) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {ctxLoading ? (
+                        Array(4).fill(0).map((_, i) => <StatSkeleton key={i} />)
+                    ) : (
+                        <>
+                            <StatCard
+                                label="Knowledge storage"
+                                icon="database"
+                                tone="accent"
+                                value={fmtNum(chunksUsed * 60)}
+                                limit={chunkUnlimited ? undefined : fmtNum(chunkLimit * 60)}
+                                unit="words"
+                                progress={chunkPct}
+                                progressTone={barToneFor(chunkPct)}
+                                badge={chunkUnlimited ? <Badge tone="ok" dot={false}>Unlimited</Badge> : undefined}
+                                footer={
+                                    chunkPct !== null
+                                        ? `${Math.round(chunkPct)}% of storage used`
+                                        : 'Unlimited storage on your plan'
+                                }
+                            />
 
-                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">vital_signs</span>
-                                <p className="text-base font-semibold font-google text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
-                            </div>
-                            <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
-                                {totalMessages ?? 0} <span className="text-base font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">msgs</span>
-                            </p>
-                        </div>
+                            <StatCard
+                                label="Knowledge sources"
+                                icon="folder_open"
+                                tone="info"
+                                value={isFree ? '—' : fmtNum(sourceCount)}
+                                unit={sourceCount === 1 ? 'source' : 'sources'}
+                                footer={isFree
+                                    ? 'Upgrade to manage sources'
+                                    : `${fmtNum(chunksUsed)} segment${chunksUsed === 1 ? '' : 's'} indexed`}
+                            />
 
-                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">bolt</span>
-                                <p className="text-base font-semibold font-google text-slate-600 dark:text-slate-400 transition-colors">System tier</p>
-                            </div>
-                            <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
-                                {userTier || '—'} <span className="text-base font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors">plan</span>
-                            </p>
-                        </div>
+                            <StatCard
+                                label="AI memory"
+                                icon="vital_signs"
+                                tone="default"
+                                value={fmtNum(totalMessages ?? 0)}
+                                unit="msgs"
+                                footer="Lifetime messages across all bots"
+                            />
 
-                        <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                           <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">database</span>
-                                    <h4 className="text-base font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Total usage</h4>
-                                </div>
-                                {(messageLimit ?? 0) >= 999999 && (
-                                    <span className="px-2 py-0.5 bg-white dark:bg-slate-950 text-base uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400 transition-colors">∞</span>
-                                )}
-                            </div>
-                            <div className="flex items-end gap-1 mb-3">
-                                <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{messagesUsed ?? 0}</span>
-                                {(messageLimit ?? 0) < 999999 && <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {messageLimit}</span>}
-                                <span className="text-base font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
-                            </div>
-                            {(messageLimit ?? 0) < 999999 && (
-                                <>
-                                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors">
-                                        <motion.div initial={{ width: 0 }}
-                                            animate={{ width: `${Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100)}%` }}
-                                            className={`h-full bg-slate-900 dark:bg-slate-250`} />
-                                    </div>
-                                    <div className="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 transition-colors">
-                                        <span>{Math.round(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100)}% cap</span>
-                                        <span className="flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[12px]">schedule</span> {periodEndStr}
+                            <StatCard
+                                label="Monthly usage"
+                                icon="bolt"
+                                tone="warn"
+                                value={fmtNum(messagesUsed ?? 0)}
+                                limit={msgUnlimited ? undefined : fmtNum(messageLimit ?? 0)}
+                                unit="reqs"
+                                progress={usagePct}
+                                progressTone={barToneFor(usagePct)}
+                                badge={msgUnlimited ? <Badge tone="ok" dot={false}>Unlimited</Badge> : undefined}
+                                footer={
+                                    usagePct !== null ? (
+                                        <span className="flex items-center justify-between gap-2">
+                                            <span>{Math.round(usagePct)}% of monthly cap</span>
+                                            <span className="inline-flex items-center gap-1 shrink-0">
+                                                <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                                renews {periodEndStr}
+                                            </span>
                                         </span>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
+                                    ) : 'Unlimited requests this period'
+                                }
+                            />
+                        </>
+                    )}
+                </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 px-6 md:px-8 overflow-hidden transition-colors duration-500">
-                <div className={`lg:col-span-12 ${cellCls} p-4 md:p-8 relative overflow-y-auto custom-scrollbar`}>
+                {/* Add knowledge */}
+                <Card className="relative p-4 sm:p-5 overflow-hidden">
                     {isFree && (
-                        <div className="absolute inset-0 z-20 bg-[#f8f9fa]/95 dark:bg-slate-950/95 flex flex-col items-center justify-center gap-5 p-6 md:p-10 transition-colors duration-500">
-                            <div className="w-12 h-12 flex items-center justify-center bg-slate-100 dark:bg-slate-800">
-                                <span className="material-symbols-outlined text-[28px] text-slate-900 dark:text-slate-200 transition-colors">
-                                    lock
-                                </span>
+                        <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 flex flex-col items-center justify-center gap-5 p-6 md:p-10 rounded-2xl transition-colors">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                                <span className="material-symbols-outlined text-[26px] text-slate-700 dark:text-slate-200">lock</span>
                             </div>
                             <div className="text-center">
-                                <p className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2 transition-colors">Trial Plan Required</p>
-                                <p className="text-base font-display text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm transition-colors">
+                                <p className="text-[17px] font-bold text-slate-900 dark:text-slate-100 mb-1.5">Trial plan required</p>
+                                <p className="text-[13.5px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
                                     Vector training is available on Starter and Scale plans. Unlock your bot's brain today.
                                 </p>
                             </div>
-                            <a href="/dashboard/pricing" className="px-7 py-3 bg-slate-900 dark:bg-white text-white dark:text-black text-base font-semibold rounded-xl hover:opacity-90 transition-all flex items-center active:scale-95">
+                            <a href="/dashboard/pricing" className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-700 transition-colors active:scale-95">
                                 Upgrade now
                             </a>
                         </div>
                     )}
 
-                    <h2 className="text-lg font-semibold font-display text-slate-900 dark:text-slate-200 mb-5 transition-colors">Knowledge sources</h2>
+                    <SectionHeader
+                        title="Add knowledge"
+                        subtitle="Pick a source type, then feed it into this bot's knowledge base."
+                        icon="add_circle"
+                        className="mb-4"
+                    />
 
-                    <div className="flex mb-6 overflow-x-auto transition-colors bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-                        {TABS.map(t => (
-                            <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 px-3 text-base font-medium font-google rounded-lg transition-colors min-h-[40px] shrink-0 ${activeTab === t.id
-                                        ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 shadow-sm'
-                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                                    }`}>
-                                <span className="material-symbols-outlined text-[17px]">{t.icon}</span>
-                                <span className="hidden sm:inline">{t.label}</span>
-                            </button>
-                        ))}
+                    {/* Source-type tabs */}
+                    <div role="tablist" aria-label="Knowledge source type" className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 mb-5">
+                        {TABS.map(t => {
+                            const active = activeTab === t.id;
+                            return (
+                                <button
+                                    key={t.id}
+                                    role="tab"
+                                    aria-selected={active}
+                                    onClick={() => setActiveTab(t.id)}
+                                    className={cx(
+                                        'inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-[12.5px] font-semibold whitespace-nowrap transition-colors min-h-[38px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+                                        active
+                                            ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                                    )}
+                                >
+                                    <span className="material-symbols-outlined text-[17px]">{t.icon}</span>
+                                    <span className="hidden sm:inline">{t.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
-
-                    {bots.length > 1 && (
-                        <div className="mb-5">
-                            <label className={labelCls}>Training Target Bot</label>
-                            <select
-                                value={selectedBotId}
-                                onChange={e => setSelectedBotId(e.target.value)}
-                                className={inputCls + ' appearance-none font-mono'}
-                            >
-                                {bots.map((b: any) => (
-                                    <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
 
                     <form onSubmit={handleTrain} className="space-y-4">
                         {activeTab === 'url' && (
                             <div>
                                 <label className={labelCls}>Source URL</label>
-                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls + ' text-base font-google tracking-wide'} placeholder="https://docs.example.com" />
+                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls} placeholder="https://docs.example.com" />
+                                <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    We'll crawl and index the page's readable content.
+                                </p>
                             </div>
                         )}
+
                         {activeTab === 'pdf' && (
                             <div>
-                                <label className={labelCls}>PDF Archive</label>
-                                <div onClick={() => fileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors">
-                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">
-                                        cloud_upload
+                                <label className={labelCls}>PDF document</label>
+                                <button
+                                    type="button"
+                                    onClick={() => fileRef.current?.click()}
+                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                >
+                                    <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                        <span className="material-symbols-outlined text-[24px]">cloud_upload</span>
                                     </span>
-                                    <div className="text-center w-full">
-                                        <p className="text-base text-slate-700 dark:text-slate-300 font-google transition-colors break-all">{file ? file.name : 'Drop PDF here'}</p>
-                                        <p className="text-base uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
-                                        <p className="text-base font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">Only 10MB</p>
+                                    <div className="text-center">
+                                        <p className="text-[13.5px] font-semibold text-slate-700 dark:text-slate-200">Click to upload a PDF</p>
+                                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">PDF only · up to 10 MB</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
                                         onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
-                                </div>
-                                {file && (
-                                    <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-base font-google text-red-500 hover:text-red-700">
-                                        <span className="material-symbols-outlined text-[16px]">close</span> Remove {file.name}
-                                    </button>
-                                )}
+                                </button>
+                                {file && <FileChip file={file} icon="picture_as_pdf" onRemove={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }} />}
                             </div>
                         )}
+
                         {activeTab === 'csv' && (
                             <div>
-                                <label className={labelCls}>CSV / Excel File</label>
-                                <div onClick={() => csvFileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors">
-                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">table_chart</span>
-                                    <div className="text-center w-full">
-                                        <p className="text-base text-slate-700 dark:text-slate-300 font-google transition-colors break-all">
-                                            {csvFile ? csvFile.name : 'Drop CSV or Excel file here'}
-                                        </p>
-                                        <p className="text-base uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">or click to browse</p>
-                                        <p className="text-base font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">.csv, .xlsx, .xls — max 5 MB</p>
+                                <label className={labelCls}>CSV / Excel file</label>
+                                <button
+                                    type="button"
+                                    onClick={() => csvFileRef.current?.click()}
+                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                >
+                                    <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                        <span className="material-symbols-outlined text-[24px]">table_chart</span>
+                                    </span>
+                                    <div className="text-center">
+                                        <p className="text-[13.5px] font-semibold text-slate-700 dark:text-slate-200">Click to upload a spreadsheet</p>
+                                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">.csv, .xlsx, .xls · up to 5 MB</p>
                                     </div>
                                     <input
                                         type="file"
@@ -713,47 +871,44 @@ export default function TrainPage() {
                                             setCsvFile(f);
                                         }}
                                     />
-                                </div>
+                                </button>
+                                {csvFile && <FileChip file={csvFile} icon="table_chart" onRemove={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }} />}
                                 {csvFile && (
-                                    <button type="button" onClick={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-base font-google text-red-500 hover:text-red-700">
-                                        <span className="material-symbols-outlined text-[16px]">close</span> Remove {csvFile.name}
-                                    </button>
-                                )}
-                                {csvFile && (
-                                    <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 flex items-start gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-blue-500 mt-0.5 shrink-0">info</span>
-                                        <p className="text-xs text-blue-700 dark:text-blue-300 font-google leading-relaxed">
-                                            Each row is stored as a piece of knowledge your bot can answer from. Make sure your file has a <span className="font-bold">header row</span> (column names in row 1). Re-uploading the same filename will safely replace the previous version.
+                                    <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 px-3.5 py-3 ring-1 ring-inset ring-blue-100 dark:ring-blue-900/40">
+                                        <span className="material-symbols-outlined text-[16px] text-blue-500 mt-0.5 shrink-0">info</span>
+                                        <p className="text-[12px] text-blue-800 dark:text-blue-200 leading-relaxed">
+                                            Each row becomes a piece of knowledge your bot can answer from. Make sure row 1 holds your <span className="font-semibold">column headers</span>. Re-uploading the same filename safely replaces the previous version.
                                         </p>
                                     </div>
                                 )}
                             </div>
                         )}
+
                         {activeTab === 'text' && (
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className={labelCls}>Source Label <span className="normal-case text-slate-400 dark:text-slate-500 font-normal tracking-normal">(optional)</span></label>
+                                    <label className={labelCls}>Source label <span className="font-normal text-slate-400 dark:text-slate-500">(optional)</span></label>
                                     <input
                                         type="text"
                                         value={textLabel}
                                         onChange={e => setTextLabel(e.target.value)}
-                                        className={inputCls + ' font-mono text-xs'}
+                                        className={inputCls}
                                         placeholder="e.g. faq-returns, pricing-2025"
                                     />
-                                    <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 font-google leading-relaxed">
+                                    <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
                                         {textLabel.trim()
-                                            ? <>Re-uploading with label <span className="font-mono font-bold text-slate-600 dark:text-slate-300">"{textLabel.trim()}"</span> will safely replace only that source.</>
-                                            : 'Without a label, re-submitting will overwrite all previous unlabelled text entries.'}
+                                            ? <>Re-uploading with label <span className="font-semibold text-slate-700 dark:text-slate-200">"{textLabel.trim()}"</span> safely replaces only that source.</>
+                                            : 'Without a label, re-submitting overwrites all previous unlabelled text entries.'}
                                     </p>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Knowledge Text</label>
+                                    <label className={labelCls}>Knowledge text</label>
                                     <textarea value={trainingText} onChange={e => setTrainingText(e.target.value)}
-                                        rows={6} className={inputCls + ' resize-none font-google'} placeholder="Paste your FAQs, services, or raw knowledge here..." />
+                                        rows={6} className={cx(inputCls, 'resize-none leading-relaxed')} placeholder="Paste your FAQs, services, or raw knowledge here…" />
                                 </div>
                             </div>
                         )}
+
                         {upgradeError && (
                             <UpgradePrompt
                                 mode="inline"
@@ -764,57 +919,67 @@ export default function TrainPage() {
                                 onDismiss={() => setUpgradeError(null)}
                             />
                         )}
+
                         <button type="submit" disabled={isTraining || isLockedOut}
-                            className="w-full sm:w-fit sm:px-10 py-3.5 min-h-[48px] rounded-xl bg-linear-to-r from-blue-600 to-green-600 text-white text-base font-medium hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]">
+                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 px-7 py-3 text-[13.5px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 active:scale-[0.99]">
                             {trainingJobId ? (
                                 <>
-                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:hidden" />
                                     Training… {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} chunks
                                 </>
                             ) : trainMutation.isPending ? (
-                                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Uploading…</>
-                            ) : isLockedOut ? 'Quota exceeded' : 'Start training'}
+                                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Uploading…</>
+                            ) : isLockedOut ? 'Quota exceeded' : (
+                                <><span className="material-symbols-outlined text-[18px]">bolt</span> Start training</>
+                            )}
                         </button>
                     </form>
-                </div>
-            </div>
+                </Card>
 
-            <div className={`${cellCls} p-6 md:p-8 mx-6 md:mx-8 my-6 flex-1 overflow-y-auto custom-scrollbar`}>
-                <div className="flex items-center gap-2.5 mb-5">
-                    <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400 transition-colors">folder_open</span>
-                    <h2 className="text-lg font-semibold font-google text-slate-900 dark:text-slate-200 transition-colors">Manage knowledge</h2>
-                </div>
+                {/* Manage knowledge */}
+                <Card className="p-4 sm:p-5">
+                    <SectionHeader
+                        title="Manage knowledge"
+                        subtitle="Review, audit, and prune the exact segments powering this bot."
+                        icon="folder_open"
+                        className="mb-4"
+                    />
 
-                <SourceBrowser
-                    selectedBotId={selectedBotId}
-                    authFetch={authFetch}
-                    queryClient={queryClient}
-                    showAlert={showAlert}
-                    refreshUser={refreshUser}
-                    isFree={isFree}
-                />
+                    <SourceBrowser
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        queryClient={queryClient}
+                        showAlert={showAlert}
+                        refreshUser={refreshUser}
+                        isFree={isFree}
+                    />
 
-                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 transition-colors">
-                    <div className="flex items-start gap-3 mb-4 p-4 bg-red-50/50 dark:bg-red-900/10 rounded-xl transition-colors">
-                        <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
-                            delete_forever
-                        </span>
-                        <p className="text-base font-medium text-red-600 dark:text-red-400 font-sans leading-relaxed transition-colors">
-                            Deleting permanently removes all trained data for this bot. This action cannot be undone.
-                        </p>
+                    {/* Danger zone */}
+                    <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
+                        <div className="flex flex-col gap-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 ring-1 ring-inset ring-rose-100 dark:ring-rose-900/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                                <span className="material-symbols-outlined text-[18px] text-rose-500 dark:text-rose-400 shrink-0 mt-0.5">delete_forever</span>
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-semibold text-rose-700 dark:text-rose-300">Delete all knowledge</p>
+                                    <p className="text-[12px] text-rose-600/90 dark:text-rose-400/90 leading-relaxed mt-0.5">
+                                        Permanently removes every trained segment for this bot. This cannot be undone.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handlePurge}
+                                disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
+                                className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                            >
+                                {isPurging ? (
+                                    <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Deleting…</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-[17px]">delete</span> Delete all ({fmtNum(chunksUsed)})</>
+                                )}
+                            </button>
+                        </div>
                     </div>
-                    <button
-                        onClick={handlePurge}
-                        disabled={isPurging || isFree || !selectedBotId || chunksUsed === 0}
-                        className="w-full sm:w-fit sm:px-8 py-3.5 min-h-[48px] rounded-xl bg-red-600 dark:bg-red-700 text-white text-base font-semibold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
-                    >
-                        {isPurging ? (
-                            <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Deleting…</>
-                        ) : (
-                            <><span className="material-symbols-outlined text-[18px]">delete</span> Delete all knowledge ({chunksUsed})</>
-                        )}
-                    </button>
-                </div>
+                </Card>
             </div>
 
             <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />

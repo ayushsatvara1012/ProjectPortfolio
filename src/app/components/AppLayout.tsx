@@ -57,7 +57,6 @@ const SETTINGS_SUB = [
 
 const TOP_NAV = [
   { label: 'My Bots', icon: 'smart_toy', path: '/dashboard/bots' },
-  { label: 'Create Bot', icon: 'domain', path: '/dashboard/register' },
   { label: 'Train AI', icon: 'psychology', path: '/dashboard/train' },
   { label: 'Insights', icon: 'insights', path: '/dashboard/insights' },
   { label: 'Pricing', icon: 'payments', path: '/dashboard/pricing' },

@@ -9,7 +9,47 @@ import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import DemoMigrationBanner from '@/src/app/components/DemoMigrationBanner';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
+import CreateBotFlow from '@/src/app/components/CreateBotFlow';
 import { deleteBot } from './actions';
+
+// Large, scrollable modal that hosts the shared bot-creation flow. Opening it
+// from My Bots keeps the user in context instead of routing to a separate page.
+function CreateBotModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-start sm:items-center justify-center overflow-y-auto p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Create a new bot">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative my-auto w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl">
+        <div className="relative flex max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-2xl bg-[#f8f9fa] dark:bg-slate-950 shadow-2xl ring-1 ring-slate-200/70 dark:ring-slate-800">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/70 dark:border-slate-800/70 px-6 sm:px-8 py-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                <span className="material-symbols-outlined text-[20px]">add</span>
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100 leading-tight">Create a new bot</h2>
+                <p className="text-[12.5px] text-slate-500 dark:text-slate-400 leading-snug">Provision a bot and get its embed script.</p>
+              </div>
+            </div>
+            <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors">
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-8">
+            <CreateBotFlow variant="modal" onClose={onClose} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function DeleteConfirmModal({ botName, onConfirm, onCancel }: { botName: string; onConfirm: () => void; onCancel: () => void }) {
   return (
@@ -95,6 +135,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
   const upgradeError = queryError instanceof UpgradeError ? queryError : null;
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   // Surface non-upgrade query errors (network, 5xx) as toasts so the page
   // doesn't silently render an empty state when the fetch genuinely failed.
@@ -239,7 +280,7 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
 
               <motion.div layout
                 className={`rounded-2xl flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors ${canAdd ? 'cursor-pointer bg-white dark:bg-slate-900 group shadow-sm' : 'bg-slate-50/60 dark:bg-slate-900/20 cursor-not-allowed'}`}
-                onClick={() => canAdd && router.push('/dashboard/register')}>
+                onClick={() => canAdd && setShowCreate(true)}>
                 {canAdd ? (
                   <>
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-colors bg-slate-100 dark:bg-slate-800">
@@ -270,9 +311,9 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
               <span className="material-symbols-outlined text-[48px] text-slate-200 dark:text-slate-700 mb-5">smart_toy</span>
               <p className="text-lg font-semibold text-slate-700 dark:text-slate-300 font-display mb-2">No bots yet</p>
               <p className="text-sm text-slate-400 dark:text-slate-600 font-display mb-8 max-w-xs leading-relaxed">Create your first AI assistant to get started.</p>
-              <Link href="/dashboard/register" className="px-7 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold font-sans rounded-xl hover:bg-slate-700 dark:hover:bg-white transition-colors">
+              <button onClick={() => setShowCreate(true)} className="px-7 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold font-sans rounded-xl hover:bg-slate-700 dark:hover:bg-white transition-colors cursor-pointer">
                 Create first bot
-              </Link>
+              </button>
             </div>
           )}
         </div>
@@ -290,6 +331,8 @@ export default function BotsClient({ initialData }: { initialData: { bots: Bot[]
         onCancel={() => setDeleteTarget(null)}
       />
     )}
+
+    {showCreate && <CreateBotModal onClose={() => setShowCreate(false)} />}
     </>
   );
 }
