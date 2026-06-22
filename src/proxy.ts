@@ -14,9 +14,21 @@ const APP_HOST = 'vaayu.sapybase.com';
 export const proxy = clerkMiddleware(async (auth, req) => {
   const host = req.headers.get('host');
   const isAppHost = host === APP_HOST;
+  const { pathname, search } = req.nextUrl;
+
+  // Consolidate the product onto the subdomain: any /dashboard request that
+  // arrives on the marketing host (www / apex) is sent to vaayu.sapybase.com,
+  // so every relative <Link href="/dashboard/…"> (navbar, hero, post-sign-in
+  // redirect, etc.) ends up on the product domain without per-link edits. Auth
+  // carries over (cookies on .sapybase.com). Guarded to the production domain so
+  // localhost and *.vercel.app preview deployments still serve /dashboard inline.
+  if (!isAppHost && host?.endsWith('sapybase.com') && pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL(`${pathname}${search}`, `https://${APP_HOST}`), 308);
+  }
+
   // Land the subdomain root on the dashboard. Sign-in / sign-up / sso-callback
   // and existing /dashboard paths are left as-is so the auth flow still works.
-  const landOnDashboard = isAppHost && req.nextUrl.pathname === '/';
+  const landOnDashboard = isAppHost && pathname === '/';
 
   if (isProtectedRoute(req) || landOnDashboard) {
     await auth.protect();
