@@ -1,207 +1,278 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
 import UpgradePrompt from '@/src/app/components/UpgradePrompt';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
+import Link from 'next/link';
+import {
+    Badge,
+    Card,
+    cx,
+    EmptyState,
+    fmtNum,
+    MetricCard,
+    SectionHeader,
+    SkeletonBlock,
+    TrendChart,
+    TrendPoint,
+} from '@/src/app/components/insights/ui';
 
-// Each panel is only visible on its own tab — code-split them so the insights
-// route doesn't ship all three at once. Panels render their own loading states.
+// Code-split panels — each renders its own loading state
 const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
 const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
 const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
-import Link from 'next/link';
 
-// ── Style primitives matching AppTrainAI ────────────────────────────────────
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Activity series helpers — everything below is derived from REAL daily data.  */
+/* `peak_activity_blocks` is a sparse list of active days; we densify to a       */
+/* continuous N-day axis (zero-filling gaps) so trends & deltas are honest.      */
+/* ────────────────────────────────────────────────────────────────────────── */
 
-const ActivityCalendar = ({ data }: { data: any[] }) => {
-    const [selectedCell, setSelectedCell] = useState<any>(null);
+interface DayDatum {
+    date: string;
+    total: number;
+    answered: number;
+    unanswered: number;
+    users: number;
+    raw: any;
+}
 
-    // Build the grid mapping the last 30 days exactly
-    const generateLast30Days = () => {
-        const days = [];
-        const today = new Date();
-        for (let i = 29; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            days.push(d.toISOString().split('T')[0]); // YYYY-MM-DD
-        }
-        return days;
-    };
-
-    const calendarDates = generateLast30Days();
-
-    // Map existing data to dictionary for fast lookup
-    const dataMap: Record<string, any> = {};
-    let maxCount = 0;
-    if (data && data.length > 0) {
-        data.forEach(d => {
-            if (d.date) {
-                dataMap[d.date] = d;
-                if (d.total_questions > maxCount) maxCount = d.total_questions;
-            }
+function buildDailySeries(blocks: any[], days = 30): DayDatum[] {
+    const map: Record<string, any> = {};
+    (blocks || []).forEach((b) => { if (b?.date) map[b.date] = b; });
+    const out: DayDatum[] = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        const b = map[key] || {};
+        out.push({
+            date: key,
+            total: b.total_questions || 0,
+            answered: b.answered_questions || 0,
+            unanswered: b.unanswered_questions || 0,
+            users: b.interacted_users || 0,
+            raw: b,
         });
     }
+    return out;
+}
 
-    // Default to today or most recent
-    useEffect(() => {
-        if (data && data.length > 0 && !selectedCell) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            if (dataMap[todayStr]) {
-                setSelectedCell(dataMap[todayStr]);
-            } else {
-                setSelectedCell(data[0]);
-            }
-        }
-    }, [data, selectedCell]);
+/** Recent-half vs prior-half percentage change of a daily metric. */
+function pctDelta(values: number[]): number {
+    const half = Math.floor(values.length / 2);
+    const prior = values.slice(0, half).reduce((a, b) => a + b, 0);
+    const recent = values.slice(half).reduce((a, b) => a + b, 0);
+    if (prior === 0) return recent > 0 ? 100 : 0;
+    return ((recent - prior) / prior) * 100;
+}
 
-    const formatDateStr = (dateStr: string) => {
-        if (!dateStr) return '';
-        const d = new Date(dateStr);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDay = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+// ── Activity heatmap (tap/keyboard accessible) — grayscale GitHub-style strip ─
+const HEAT_STEPS = [
+    'bg-slate-100 dark:bg-slate-800',
+    'bg-slate-300 dark:bg-slate-700',
+    'bg-slate-400 dark:bg-slate-600',
+    'bg-slate-600 dark:bg-slate-400',
+    'bg-slate-800 dark:bg-slate-200',
+];
+
+const monthOf = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString(undefined, { month: 'short' });
+
+function ActivityHeatmap({ series, selected, onSelect }: { series: DayDatum[]; selected: string | null; onSelect: (d: DayDatum) => void }) {
+    const max = series.reduce((m, d) => Math.max(m, d.total), 0) || 1;
+    const stepFor = (n: number) => {
+        if (n === 0) return 0;
+        const r = n / max;
+        if (r <= 0.25) return 1;
+        if (r <= 0.5) return 2;
+        if (r <= 0.75) return 3;
+        return 4;
     };
-
+    let prevMonth = '';
     return (
-        <div className="flex flex-col lg:flex-row gap-8 w-full p-1">
-            {/* Calendar Grid (50%) */}
-            <div className="w-full lg:w-1/2 flex flex-col gap-4">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium font-google text-slate-500">Activity overview</span>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                            <div className="w-2 h-2 rounded-full border border-slate-200" /> Idle
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                            <div className="w-2 h-2 rounded-full bg-blue-500/50" /> Active
-                        </div>
-                    </div>
-                </div>
-                {/* Enforce 10 columns across all devices to minimize vertical height, allowing the inspector to sit directly below on mobile */}
-                <div className="grid grid-cols-7 gap-1.5 md:gap-3 w-full max-w-full overflow-hidden p-2.5">
-                    {calendarDates.map((dateStr, i) => {
-                        const cellData = dataMap[dateStr];
-                        const count = cellData?.total_questions || 0;
-                        const opacity = maxCount > 0 ? (count / maxCount) : 0;
-                        const isSelected = selectedCell?.date === dateStr;
-
+        <div className="flex flex-col gap-3">
+            <div className="overflow-x-auto custom-scrollbar pb-1">
+                <div className="flex gap-1 min-w-max">
+                    {series.map((d) => {
+                        const isSel = selected === d.date;
+                        const month = monthOf(d.date);
+                        const showMonth = month !== prevMonth;
+                        prevMonth = month;
                         return (
-                            <div
-                                key={dateStr}
-                                onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-xl cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
-                                style={{
-                                    backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent',
-                                    borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)',
-                                }}
-                            >
-                                <span className={`text-[12px] sm:text-[14px] leading-none font-mono font-semibold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
-                                    {new Date(dateStr).getDate()}
+                            <div key={d.date} className="flex flex-col items-start gap-1 w-3 shrink-0">
+                                <span className="h-3 text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 whitespace-nowrap leading-none">
+                                    {showMonth ? month : ''}
                                 </span>
-                                <span className={`text-[8px] sm:text-[9px] font-google font-medium leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>
-                                    {new Date(dateStr).toLocaleDateString(undefined, { month: 'short' })}
-                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => onSelect(d)}
+                                    onMouseEnter={() => onSelect(d)}
+                                    aria-label={`${fmtDay(d.date)}: ${d.total} queries`}
+                                    title={`${fmtDay(d.date)} · ${d.total} queries`}
+                                    className={cx(
+                                        'h-3 w-3 rounded-[2px] relative transition-transform duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 focus-visible:ring-slate-400',
+                                        HEAT_STEPS[stepFor(d.total)],
+                                        isSel
+                                            ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900 ring-slate-900 dark:ring-white z-10 scale-110'
+                                            : 'hover:scale-110 hover:z-10 hover:ring-1 hover:ring-slate-400/70 dark:hover:ring-slate-500/70',
+                                    )}
+                                />
                             </div>
                         );
                     })}
                 </div>
             </div>
-
-            {/* Inspector Panel (50%) */}
-            <div className="w-full lg:w-1/2 flex flex-col">
-                {selectedCell ? (
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        key={selectedCell.date}
-                        className="flex flex-col bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl flex-1"
-                    >
-                        <div className="flex flex-col gap-1 mb-6 pb-4">
-                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google">Daily inspector</span>
-                            <span className="text-lg font-semibold text-slate-900 dark:text-slate-100 font-google">
-                                {formatDateStr(selectedCell.date)}
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="flex flex-col p-4 bg-white dark:bg-slate-800 rounded-xl">
-                                <span className="text-xs text-slate-400 font-google mb-1">Total activity</span>
-                                <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-100">{selectedCell.total_questions || 0}</span>
-                            </div>
-                            <div className="flex flex-col p-4 bg-white dark:bg-slate-800 rounded-xl">
-                                <span className="text-xs text-slate-400 font-google mb-1">Unique users</span>
-                                <span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200">{selectedCell.interacted_users || 0}</span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-1">
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800 transition-colors">
-                                <span className="text-sm font-google text-slate-500 dark:text-slate-400">Answered correctly</span>
-                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/60 dark:hover:bg-slate-800 transition-colors">
-                                <span className="text-sm font-google text-slate-500 dark:text-slate-400">Failed response</span>
-                                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                                    {selectedCell.unanswered_questions || 0}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="mt-6 flex-1 flex flex-col gap-5">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-medium text-slate-400 font-google mb-3 flex items-center gap-2">
-                                    <span className="w-1 h-3 bg-blue-500 rounded-full" />
-                                    Top questions
-                                </span>
-                                {selectedCell.top_questions?.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {selectedCell.top_questions.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed italic bg-white dark:bg-slate-800 p-3 rounded-xl">
-                                                "{q}"
-                                            </p>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <span className="text-sm font-google text-slate-400 italic">No activity recorded</span>
-                                )}
-                            </div>
-
-                            {selectedCell.unanswered_questions > 0 && selectedCell.top_unanswered?.length > 0 && (
-                                <div className="flex flex-col pt-4">
-                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google mb-3 flex items-center gap-2">
-                                        <span className="w-1 h-3 bg-slate-400/60 rounded-full" />
-                                        Unanswered queries
-                                    </span>
-                                    <div className="space-y-2">
-                                        {selectedCell.top_unanswered.map((q: string, qIdx: number) => (
-                                            <p key={qIdx} className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed pl-3">
-                                                "{q}"
-                                            </p>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </motion.div>
-                ) : (
-                    <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 p-8 rounded-2xl items-center justify-center h-full">
-                        <span className="material-symbols-outlined text-[32px] text-slate-300 dark:text-slate-600 mb-2">radar</span>
-                        <p className="text-sm font-google text-slate-400 text-center">Select a day<br />to inspect activity</p>
-                    </div>
-                )}
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <span>Less</span>
+                {HEAT_STEPS.map((c, i) => <span key={i} className={cx('h-3 w-3 rounded-[2px]', c)} />)}
+                <span>More</span>
             </div>
         </div>
     );
-};
+}
+
+// ── Activity insights block: KPI strip + trend chart + heatmap + inspector ──
+function ActivityInsights({ blocks }: { blocks: any[] }) {
+    const series = useMemo(() => buildDailySeries(blocks, 30), [blocks]);
+    const [selected, setSelected] = useState<DayDatum | null>(null);
+
+    useEffect(() => {
+        if (series.length) {
+            const withData = [...series].reverse().find((d) => d.total > 0);
+            setSelected(withData || series[series.length - 1]);
+        }
+    }, [series]);
+
+    const totals = series.map((d) => d.total);
+    const unans = series.map((d) => d.unanswered);
+    const users = series.map((d) => d.users);
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+
+    const totalQ = sum(totals);
+    const totalUn = sum(unans);
+    const totalUsers = sum(users);
+    const answeredRate = totalQ > 0 ? Math.round(((totalQ - totalUn) / totalQ) * 100) : 0;
+
+    // Answer-rate delta in percentage points (recent half vs prior half).
+    const half = Math.floor(series.length / 2);
+    const priorQ = sum(totals.slice(0, half));
+    const priorUn = sum(unans.slice(0, half));
+    const recentQ = sum(totals.slice(half));
+    const recentUn = sum(unans.slice(half));
+    const priorRate = priorQ > 0 ? ((priorQ - priorUn) / priorQ) * 100 : 0;
+    const recentRate = recentQ > 0 ? ((recentQ - recentUn) / recentQ) * 100 : 0;
+    const rateDelta = Math.round((recentRate - priorRate) * 10) / 10;
+
+    const trendPoints: TrendPoint[] = series.map((d) => ({
+        label: fmtDay(d.date),
+        values: { total: d.total, unanswered: d.unanswered },
+    }));
+
+    return (
+        <div className="flex flex-col gap-4">
+            {/* KPI strip — honest period-over-period deltas */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <MetricCard label="Questions" value={fmtNum(totalQ)} hint="last 30 days" delta={pctDelta(totals)} spark={totals} tone="accent" />
+                <MetricCard label="Answer rate" value={`${answeredRate}%`} hint="answered confidently" delta={rateDelta} tone="positive" />
+                <MetricCard label="Chat sessions" value={fmtNum(totalUsers)} hint="engaged conversations" delta={pctDelta(users)} spark={users} tone="info" />
+                <MetricCard label="Gaps" value={fmtNum(totalUn)} hint="unanswered questions" delta={pctDelta(unans)} deltaInvert spark={unans} tone="warn" />
+            </div>
+
+            {/* Trend chart */}
+            <Card className="p-4 sm:p-5">
+                <SectionHeader title="Activity trend" subtitle="Daily question volume and gaps over the last 30 days" icon="show_chart" className="mb-4" />
+                <TrendChart
+                    points={trendPoints}
+                    series={[
+                        { key: 'total', name: 'Questions', color: '#3b82f6', fill: true },
+                        { key: 'unanswered', name: 'Unanswered', color: '#f43f5e', fill: false },
+                    ]}
+                />
+            </Card>
+
+            {/* Activity map + daily inspector — one seamless card, two zones */}
+            <Card className="overflow-hidden">
+                {/* Zone 1: the calendar */}
+                <div className="p-4 sm:p-5">
+                    <SectionHeader title="30-day activity map" subtitle="Tap a day to inspect what customers asked" icon="calendar_view_month" className="mb-4" />
+                    <ActivityHeatmap series={series} selected={selected?.date || null} onSelect={setSelected} />
+                </div>
+
+                {/* Zone 2: the daily inspector — continues seamlessly below a hairline */}
+                <div className="border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-4 sm:p-5">
+                    {selected ? (
+                        <div className="flex flex-col gap-4">
+                            {/* Header: date + answered / unanswered at a glance */}
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                                <div>
+                                    <span className="text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Daily inspector</span>
+                                    <p className="text-[16px] font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                                        {new Date(selected.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge tone="ok">{fmtNum(selected.answered)} answered</Badge>
+                                    <Badge tone={selected.unanswered > 0 ? 'alert' : 'neutral'}>{fmtNum(selected.unanswered)} unanswered</Badge>
+                                </div>
+                            </div>
+
+                            {/* Headline stats */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { label: 'Total activity', value: selected.total },
+                                    { label: 'Chat sessions', value: selected.users },
+                                ].map((s) => (
+                                    <div key={s.label} className="rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 px-3.5 py-2.5">
+                                        <span className="text-[12px] text-slate-500 dark:text-slate-400">{s.label}</span>
+                                        <p className="text-[22px] font-bold tabular-nums text-slate-900 dark:text-slate-100 leading-none mt-1">{fmtNum(s.value)}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Detail lists */}
+                            {(selected.raw?.top_questions?.length > 0 || (selected.unanswered > 0 && selected.raw?.top_unanswered?.length > 0)) && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 pt-1">
+                                    {selected.raw?.top_questions?.length > 0 && (
+                                        <div>
+                                            <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">Top questions</span>
+                                            <ul className="space-y-1">
+                                                {selected.raw.top_questions.map((q: string, i: number) => (
+                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug">“{q}”</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {selected.unanswered > 0 && selected.raw?.top_unanswered?.length > 0 && (
+                                        <div>
+                                            <span className="text-[12px] font-semibold text-amber-600 dark:text-amber-400 block mb-1.5">Unanswered queries</span>
+                                            <ul className="space-y-1">
+                                                {selected.raw.top_unanswered.map((q: string, i: number) => (
+                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug">“{q}”</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <EmptyState icon="touch_app" title="Select a day" hint="Tap a square above to inspect that day's activity." />
+                    )}
+                </div>
+            </Card>
+        </div>
+    );
+}
 
 export default function AppInsights() {
-    const { userTier: rawUserTier, userRole: rawUserRole, entitlements, isLoading: ctxLoading } = useUserRole();
+    const { userTier: rawUserTier, entitlements, isLoading: ctxLoading } = useUserRole();
     const userTier = rawUserTier ?? '';
-    const userRole = rawUserRole ?? '';
     const canAnalytics = entitlements.canUseAnalytics;
     const canLeadCapture = entitlements.canUseLeadCapture;
     const authFetch = useAuthenticatedFetch();
@@ -220,15 +291,13 @@ export default function AppInsights() {
         if (bots.length > 0 && !selectedBotId) setSelectedBotId(bots[0].id);
     }, [bots, selectedBotId]);
 
-    // ── State ────────────────────────────────────────────────────────────────
     const [reportData, setReportData] = useState<any>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [isGhostTown, setIsGhostTown] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState('sales'); // Sales & Leads Center first — drive the next sale
+    const [activeTab, setActiveTab] = useState('sales');
 
-    // Silently try to load a cached report on mount
     useEffect(() => {
         if (selectedBotId && canAnalytics) handleGenerate(true);
     }, [selectedBotId, userTier]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -238,12 +307,8 @@ export default function AppInsights() {
         if (!silentLoad) setIsGenerating(true);
         setError('');
         setIsGhostTown(false);
-
         try {
-            const data = await authFetch(`/api/analytics/generate-report/${selectedBotId}`, {
-                method: 'POST',
-            }) as any;
-
+            const data = await authFetch(`/api/analytics/generate-report/${selectedBotId}`, { method: 'POST' }) as any;
             if (data.status === 'insufficient_data') {
                 setIsGhostTown(true);
                 setReportData(null);
@@ -254,130 +319,103 @@ export default function AppInsights() {
                 throw new Error('Invalid response from server');
             }
         } catch (err: any) {
-            console.error('Failed to generate report:', err);
-            if (err?.message?.includes('404')) {
-                setIsGhostTown(true);
-            } else if (!silentLoad) {
-                setError('Failed to generate report. Please try again or check your data.');
-            }
+            if (err?.message?.includes('404')) setIsGhostTown(true);
+            else if (!silentLoad) setError('Failed to generate report. Please try again.');
         } finally {
             if (!silentLoad) setIsGenerating(false);
         }
     };
 
-    // ── Rendering Helpers ────────────────────────────────────────────────────
-    const renderHeader = () => (
-        <div className="px-6 py-3 sm:px-8 sm:py-4 shrink-0 transition-colors duration-500 min-w-0 w-full">
-            {(activeTab === 'funnel' && (lastGeneratedAt || canAnalytics)) && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                    {lastGeneratedAt && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 font-google transition-colors">
-                            Last generated: {lastGeneratedAt}
-                        </p>
-                    )}
-                </div>
-                {canAnalytics && (
-                    <button
-                        onClick={() => handleGenerate(false)}
-                        disabled={isGenerating || !selectedBotId}
-                        className="w-full sm:w-auto shrink-0 px-7 py-3 min-h-[44px] rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99]"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full" />
-                                Synthesizing...
-                            </>
-                        ) : (
-                            <>
-                                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                                Generate report
-                            </>
-                        )}
-                    </button>
-                )}
-            </div>
-            )}
+    const TABS = [
+        { id: 'sales', label: 'Sales & Leads', shortLabel: 'Sales', icon: 'sell' },
+        { id: 'conversations', label: 'Conversations', shortLabel: 'Chats', icon: 'forum' },
+        { id: 'funnel', label: 'Funnel & Insights', shortLabel: 'Funnel', icon: 'insights' },
+    ];
 
-            {/* Persistent Bot Selector */}
-            {canAnalytics && bots.length > 1 && (
-                <div className="mt-3 flex flex-wrap items-center gap-3 shrink-0 transition-colors duration-500">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-sans whitespace-nowrap">
-                        Reporting for
-                    </span>
-                    <select
-                        value={selectedBotId}
-                        onChange={e => { setSelectedBotId(e.target.value); setReportData(null); }}
-                        className="flex-1 min-w-0 max-w-xs px-3 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-sm font-mono text-slate-900 dark:text-slate-200 rounded-xl transition-colors"
-                    >
-                        {bots.map((b: any) => (
-                            <option key={b.id} value={b.id}>{b.bot_name} — {b.company_name}</option>
-                        ))}
-                    </select>
-                </div>
-            )}
-
-            {/* Tabs */}
-            <div className="mt-3 overflow-x-auto scrollbar-hide">
-                <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
-                    {[
-                        { id: 'sales', label: 'Sales & Leads' },
-                        { id: 'conversations', label: 'Conversations & Training' },
-                        { id: 'funnel', label: 'Funnel & Traffic' },
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${activeTab === tab.id
-                                    ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-
-    // ── Loading state ────────────────────────────────────────────────────────
     const isLoaded = !ctxLoading && !botsLoading;
 
     if (!isLoaded) {
         return (
-            <div className="flex flex-col h-full bg-white dark:bg-slate-900 animate-pulse transition-colors duration-500">
-                <div className="bg-white dark:bg-slate-950 px-4 py-4 sm:px-8 sm:py-6 border-b border-gray-100 dark:border-slate-800">
-                    <div className="h-7 bg-slate-200 dark:bg-slate-800 w-48 mb-2" />
-                    <div className="h-4 bg-slate-100 dark:bg-slate-800 w-72" />
+            <div className="flex flex-col h-full">
+                <div className="px-4 md:px-6 lg:px-8 h-12 shrink-0 border-b border-slate-200 dark:border-slate-800 flex items-center gap-6">
+                    {['w-28', 'w-24', 'w-32'].map((w) => <SkeletonBlock key={w} className={cx('h-4', w)} />)}
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="bg-white dark:bg-slate-950 p-4 sm:p-8">
-                            <div className="h-4 bg-slate-100 dark:bg-slate-800 w-24 mb-3" />
-                            <div className="h-10 bg-slate-100 dark:bg-slate-800 w-16" />
-                        </div>
-                    ))}
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white dark:bg-slate-800 flex-1">
-                    <div className="lg:col-span-7 bg-white dark:bg-slate-950 p-4 sm:p-8" />
-                    <div className="lg:col-span-5 bg-white dark:bg-slate-950 p-4 sm:p-8" />
+                <div className="p-4 md:p-6 lg:p-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map((i) => <SkeletonBlock key={i} className="h-[110px]" />)}
                 </div>
             </div>
         );
     }
 
-    // ── Main Dashboard Return ────────────────────────────────────────────────
-    return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500"
+    const botSelector = canAnalytics && bots.length > 1 && (
+        <div className="relative">
+            <select
+                value={selectedBotId}
+                onChange={(e) => { setSelectedBotId(e.target.value); setReportData(null); }}
+                aria-label="Select bot"
+                className="appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+            >
+                {bots.map((b: any) => <option key={b.id} value={b.id}>{b.bot_name}</option>)}
+            </select>
+            <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
+        </div>
+    );
+
+    const generateBtn = activeTab === 'funnel' && canAnalytics && (
+        <button
+            onClick={() => handleGenerate(false)}
+            disabled={isGenerating || !selectedBotId}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
         >
+            {isGenerating
+                ? <><span className="h-3 w-3 border-2 border-white/40 border-t-white animate-spin rounded-full motion-reduce:animate-none" />Synthesizing…</>
+                : <><span className="material-symbols-outlined text-[16px]">auto_awesome</span>Generate insights</>}
+        </button>
+    );
+
+    const renderHeader = () => (
+        <div className="relative shrink-0 z-30 bg-[#f8f9fa]/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800/70">
+            <div className="flex items-center justify-between gap-3 px-4 md:px-6 lg:px-8 overflow-x-auto scrollbar-hide">
+                <div role="tablist" aria-label="Insights sections" className="flex items-center gap-1 min-w-0">
+                    {TABS.map((tab) => {
+                        const active = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                role="tab"
+                                aria-selected={active}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={cx(
+                                    'relative inline-flex items-center gap-1.5 py-3 px-2 text-[13px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-none',
+                                    active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                                )}
+                            >
+                                <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
+                                <span className="hidden sm:inline">{tab.label}</span>
+                                <span className="sm:hidden">{tab.shortLabel}</span>
+                                {active && <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="flex items-center gap-2 shrink-0 py-2">
+                    {botSelector}
+                    {generateBtn}
+                </div>
+            </div>
+            {activeTab === 'funnel' && lastGeneratedAt && (
+                <div className="px-4 md:px-6 lg:px-8 pb-1.5 -mt-1">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500">Insights last generated {lastGeneratedAt}</span>
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
             {renderHeader()}
 
-            {/* Content Area */}
-            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-4 pt-1">
+            <div data-lenis-prevent className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col p-4 md:p-6 lg:p-8">
                 {activeTab === 'sales' && (
                     <SalesAndLeadsPanel
                         selectedBotId={selectedBotId}
@@ -388,179 +426,121 @@ export default function AppInsights() {
                 )}
 
                 {activeTab === 'conversations' && (
-                    <ConversationsPanel
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        isAuthorized={canAnalytics}
-                    />
+                    <ConversationsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
                 )}
 
                 {activeTab === 'funnel' && (
                     <div className="flex flex-col gap-6 w-full min-w-0">
-                        <FunnelPanel
-                            selectedBotId={selectedBotId}
-                            authFetch={authFetch}
-                            isAuthorized={canAnalytics}
-                        />
+                        <FunnelPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
 
-                        {/* ── Tier Gate for Analytics Report ── */}
                         {!canAnalytics && (
-                            <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800/80">
-                                <UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" />
-                            </div>
+                            <Card className="p-6"><UpgradePrompt code="DEFAULT" tier={userTier} mode="inline" /></Card>
                         )}
 
+                        {/* AI insights report */}
                         {canAnalytics && reportData && !isGenerating && !error && (
                             <div className="flex flex-col gap-6 w-full">
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden transition-colors duration-500 w-full min-w-0">
-                                    {/* Left Column: Top Trends */}
-                                    <div className="lg:col-span-7 flex flex-col gap-4 transition-colors duration-500">
-                                        <div className={`${cellCls} p-4 sm:p-8 flex-1 border border-slate-100 dark:border-slate-800/40`}>
-                                            <div className="flex items-center gap-2 mb-6">
-                                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span>
-                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">
-                                                    Top customer trends
-                                                </h2>
-                                            </div>
-                                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                                                The most common subjects and questions your users are asking.
-                                            </p>
-                                            <div className="space-y-2">
-                                                {reportData?.top_trends?.map((trend: string, idx: number) => (
-                                                    <div key={idx} className={`${cellCls} flex items-start gap-4 p-5 border border-slate-100 dark:border-slate-800/40`}>
-                                                        <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
-                                                            {String(idx + 1).padStart(2, '0')}
-                                                        </div>
-                                                        <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed pt-1.5">
-                                                            {trend}
-                                                        </p>
-                                                    </div>
+                                <div className="border-t border-slate-200/70 dark:border-slate-800/70 pt-2" />
+
+                                <ActivityInsights blocks={reportData?.peak_activity_blocks} />
+
+                                {/* Trends + advice */}
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                                    <Card className="lg:col-span-7 p-4 sm:p-5">
+                                        <SectionHeader title="Top customer trends" subtitle="What people ask about most" icon="trending_up" className="mb-3" />
+                                        {reportData?.top_trends?.length > 0 ? (
+                                            <ol className="flex flex-col">
+                                                {reportData.top_trends.map((trend: string, idx: number) => (
+                                                    <li key={idx} className="flex items-start gap-3 py-2.5 border-b border-slate-100 dark:border-slate-800/60 last:border-0">
+                                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/50 text-[11px] font-bold tabular-nums text-blue-600 dark:text-blue-400">{idx + 1}</span>
+                                                        <p className="text-[13.5px] text-slate-700 dark:text-slate-300 leading-snug">{trend}</p>
+                                                    </li>
                                                 ))}
-                                            </div>
-                                        </div>
-                                    </div>
+                                            </ol>
+                                        ) : (
+                                            <EmptyState icon="lightbulb" title="No trends available yet" />
+                                        )}
+                                    </Card>
 
-                                    {/* Right Column: Actionable Advice */}
-                                    <div className="lg:col-span-5 flex flex-col gap-4 transition-colors duration-500">
-                                        <div className={`${cellCls} p-4 sm:p-8 flex-1 border border-slate-100 dark:border-slate-800/40`}>
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span>
-                                                <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Actionable advice</h2>
-                                            </div>
-                                            <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
-                                                {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
-                                            </p>
+                                    <Card className="lg:col-span-5 p-5 bg-gradient-to-br from-blue-50/70 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/20 border-blue-100 dark:border-blue-900/40">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="material-symbols-outlined text-[18px] text-blue-500">auto_awesome</span>
+                                            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">Recommended action</h3>
                                         </div>
-                                    </div>
+                                        <p className="text-[13.5px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                                            {reportData?.actionable_advice || 'Keep monitoring your analytics.'}
+                                        </p>
+                                    </Card>
                                 </div>
 
-                                {/* ── Peak Activity Full Row ── */}
-                                <div className="flex flex-col gap-4">
-                                    <div className={`${cellCls} p-4 sm:p-8 border border-slate-100 dark:border-slate-800/40`}>
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">calendar_month</span>
-                                            <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">30-day peak activity</h2>
-                                        </div>
-                                        <div className="w-full">
-                                            <ActivityCalendar data={reportData?.peak_activity_blocks} />
-                                        </div>
+                                {/* Recent activity */}
+                                <Card className="overflow-hidden">
+                                    <div className="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800">
+                                        <SectionHeader title="Recent activity" subtitle="The latest questions your assistant handled" icon="history" />
                                     </div>
-                                </div>
-
-                                {/* ── Recent Conversations Log ── */}
-                                <div className="flex flex-col gap-4 w-full overflow-hidden">
-                                    <div className={`${cellCls} p-4 sm:p-8 overflow-x-auto overflow-y-hidden scrollbar-hide border border-slate-100 dark:border-slate-800/40`}>
-                                        <div className="flex items-center gap-2 mb-6">
-                                            <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5 shrink-0">history</span>
-                                            <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Recent activity log</h2>
-                                        </div>
-                                        <div className="w-full min-w-0">
-                                            <div className="hidden md:grid grid-cols-12 gap-4 pb-3 mb-3 px-4">
-                                                <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
-                                                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
-                                                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
-                                            </div>
-                                            <div className="space-y-3 md:space-y-1">
-                                                {reportData?.recent_conversations?.map((log: any, idx: number) => (
-                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-3 sm:px-4 bg-[#f1f3f5]/50 md:bg-transparent dark:bg-slate-900/20 md:dark:bg-transparent rounded-sm hover:bg-[#f1f3f5]/75 dark:hover:bg-slate-900/30 transition-colors md:items-center min-w-0">
-                                                        <div className="col-span-8 min-w-0 text-sm font-google font-medium text-slate-700 dark:text-slate-300 break-words md:truncate">
-                                                            {log.query}
-                                                        </div>
-                                                        <div className="col-span-2 flex items-center md:justify-center gap-3 md:gap-0 mt-2 md:mt-0">
-                                                            <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Status:</span>
-                                                            {log.unanswered ? (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400/60 dark:bg-slate-500/50"></span> Unanswered
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-full">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200 animate-pulse"></span> Handled
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="col-span-2 flex items-center md:justify-end gap-3 md:gap-0 mt-1 md:mt-0">
-                                                            <span className="md:hidden text-[10px] uppercase font-bold text-slate-400 font-google tracking-widest">Time:</span>
-                                                            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                                                                {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                                                            </span>
-                                                        </div>
+                                    <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-2.5 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
+                                        <div className="col-span-8 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">User query</div>
+                                        <div className="col-span-2 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-center">Status</div>
+                                        <div className="col-span-2 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Time</div>
+                                    </div>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                        {reportData?.recent_conversations?.length > 0 ? (
+                                            reportData.recent_conversations.map((log: any, idx: number) => (
+                                                <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-1.5 md:gap-4 px-5 py-3 md:items-center hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <div className="col-span-8 text-[13.5px] text-slate-700 dark:text-slate-300 md:truncate break-words">{log.query}</div>
+                                                    <div className="col-span-2 flex md:justify-center">
+                                                        <Badge tone={log.unanswered ? 'alert' : 'ok'}>{log.unanswered ? 'Unanswered' : 'Handled'}</Badge>
                                                     </div>
-                                                ))}
-                                                {(!reportData?.recent_conversations || reportData.recent_conversations.length === 0) && (
-                                                    <div className="text-center py-6 text-sm italic font-google text-slate-400">No recent activity found.</div>
-                                                )}
-                                            </div>
-                                        </div>
+                                                    <div className="col-span-2 flex md:justify-end">
+                                                        <span className="text-[12px] tabular-nums text-slate-500 dark:text-slate-400">
+                                                            {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <EmptyState icon="history" title="No recent activity found" />
+                                        )}
                                     </div>
-                                </div>
+                                </Card>
                             </div>
                         )}
 
-                        {/* ── Error Banner ── */}
                         {canAnalytics && error && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-250 dark:border-red-800/50 px-4 py-4 sm:px-8 flex items-start gap-3 rounded-2xl">
-                                <span className="material-symbols-outlined text-[18px] text-red-500 dark:text-red-400 mt-0.5">error</span>
-                                <p className="text-sm font-display text-red-700 dark:text-red-300 flex-1">{error}</p>
-                                <button onClick={() => setError('')} className="text-red-400 hover:text-red-600"><span className="material-symbols-outlined text-[18px]">close</span></button>
+                            <div className="flex items-center gap-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3">
+                                <span className="material-symbols-outlined text-[18px] text-rose-500">error</span>
+                                <p className="text-[13.5px] text-rose-700 dark:text-rose-300 flex-1">{error}</p>
+                                <button onClick={() => setError('')} aria-label="Dismiss error"><span className="material-symbols-outlined text-[18px] text-rose-400">close</span></button>
                             </div>
                         )}
 
-                        {/* ── Ghost Town ── */}
                         {canAnalytics && isGhostTown && !isGenerating && (
-                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
-                                <div className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
-                                    <span className="material-symbols-outlined text-[28px] text-slate-400 dark:text-slate-500">chat_bubble</span>
-                                </div>
-                                <h2 className="text-xl md:text-2xl font-display font-bold text-slate-900 dark:text-slate-200 mb-3">No Conversations Yet</h2>
-                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
-                                    Your bot hasn't had any conversations yet. Check back once users start interacting!
-                                </p>
-                                <Link href="/dashboard/bots" className="px-7 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold rounded-xl hover:bg-slate-700 transition-all active:scale-95">View my bots</Link>
-                            </div>
+                            <Card>
+                                <EmptyState
+                                    icon="sentiment_satisfied"
+                                    title="No conversations yet"
+                                    hint={<>Once people start chatting, insights will appear here. <Link href="/dashboard/bots" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">View my bots</Link></>}
+                                />
+                            </Card>
                         )}
 
-                        {/* ── Empty State ── */}
                         {canAnalytics && !reportData && !isGenerating && !error && !isGhostTown && (
-                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
-                                <div className="w-14 h-14 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-5">
-                                    <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600">auto_awesome</span>
-                                </div>
-                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">No Report Generated Yet</h2>
-                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">Click "Generate Report" above to synthesize your chat logs.</p>
-                            </div>
+                            <Card>
+                                <EmptyState icon="auto_awesome" title="Generate your AI insights" hint='Click "Generate insights" above to synthesize trends, gaps and recommendations from your chat logs.' />
+                            </Card>
                         )}
 
-                        {/* ── Loading Spinner ── */}
                         {canAnalytics && isGenerating && (
-                            <div className={`${cellCls} flex flex-col items-center justify-center p-6 sm:p-12 text-center border border-slate-100 dark:border-slate-800/40`}>
-                                <div className="w-10 h-10 border-2 border-slate-200 dark:border-slate-700 border-t-slate-900 dark:border-t-blue-500 animate-spin mb-5 rounded-full" />
-                                <h2 className="text-xl font-display font-bold text-slate-900 dark:text-slate-200 mb-2">Synthesizing...</h2>
-                                <p className="text-sm font-display text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">AI is analyzing logs. This takes 5–10 seconds.</p>
-                            </div>
+                            <Card>
+                                <div className="flex flex-col items-center gap-3 py-10">
+                                    <span className="h-7 w-7 border-2 border-slate-200 dark:border-slate-700 border-t-blue-500 animate-spin rounded-full motion-reduce:animate-none" />
+                                    <p className="text-[13.5px] text-slate-500 dark:text-slate-400">Analyzing your chat logs — this takes 5–10 seconds.</p>
+                                </div>
+                            </Card>
                         )}
                     </div>
                 )}
             </div>
-        </motion.div>
+        </div>
     );
 }
