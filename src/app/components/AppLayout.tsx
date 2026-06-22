@@ -240,12 +240,15 @@ const SidebarContent = ({ user, onClose, expanded = true }: SidebarContentProps)
         </div>
       </nav>
 
-      {/* Back to Sapybase home — same look as the nav items above */}
+      {/* Back to Sapybase home — same look as the nav items above. On the product
+          subdomain the marketing site lives on www, and "/" here would just be
+          rewritten back into the dashboard, so link out to www explicitly. The
+          `mounted` guard keeps SSR/localhost/preview on a relative "/". */}
       <div className="px-2 py-1 border-t border-slate-200/50 dark:border-slate-800/50">
         <SidebarItem
           label="Back to Sapybase"
           icon="home"
-          path="/"
+          path={mounted && window.location.host === 'vaayu.sapybase.com' ? 'https://www.sapybase.com/' : '/'}
           onClick={onClose}
           expanded={expanded}
         />
