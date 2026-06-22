@@ -105,6 +105,7 @@ type BotAvatarProps = {
   bgStyle?: string;
   isCustom?: boolean;
   hasShadow?: boolean;
+  transparentBgImage?: boolean;
 };
 
 export function BotAvatar({
@@ -116,6 +117,7 @@ export function BotAvatar({
   bgStyle = 'none',
   isCustom = true,
   hasShadow = true,
+  transparentBgImage = false,
 }: BotAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
@@ -141,10 +143,10 @@ export function BotAvatar({
   const useFallback = !showImage || !isCustom;
   const FallbackLogoUrl = `${ASSET_BASE_URL}/logo2.svg`;
 
-  // L1 fill: white backdrop when fallback logo is shown, otherwise themeColor or gradient
+  // L1 fill: white backdrop when fallback logo is shown, otherwise themeColor or gradient or transparent
   const baseFill = useFallback
     ? '#ffffff'
-    : (gradient ? `url(#${uid}-grad)` : themeColor);
+    : (gradient ? `url(#${uid}-grad)` : (transparentBgImage ? 'transparent' : themeColor));
 
   // EC2: sizes in SVG coordinate units (viewBox is 0 0 100 100)
   const sizePx = { sm: 28, md: 40, lg: 56 }[size] ?? 40;
@@ -182,7 +184,7 @@ export function BotAvatar({
           {gradient ? (
             <rect x="0" y="0" width="100" height="100" fill={`url(#${uid}-grad)`} />
           ) : (
-            <rect x="0" y="0" width="100" height="100" fill="#f8fafc" />
+            <rect x="0" y="0" width="100" height="100" fill={transparentBgImage ? 'transparent' : '#f8fafc'} />
           )}
         </g>
       )}

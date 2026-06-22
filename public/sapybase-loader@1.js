@@ -31,10 +31,27 @@
     return;
   }
 
-  const IFRAME_ORIGIN =
-    typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:3000'
-      : 'https://www.sapybase.com';
+  let loaderOrigin = 'https://www.sapybase.com';
+  try {
+    var me =
+      document.currentScript ||
+      document.querySelector('script[data-bot-id][src*="sapybase-loader@1.js"]');
+    if (me && me.src) {
+      var url = new URL(me.src);
+      loaderOrigin = url.origin;
+    } else if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        loaderOrigin = 'http://localhost:3000';
+      }
+    }
+  } catch (e) {
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        loaderOrigin = 'http://localhost:3000';
+      }
+    }
+  }
+  const IFRAME_ORIGIN = loaderOrigin;
 
   // Origin where loader assets (e.g. /SB_loading.svg) are served from.
   // Always points at the Sapybase origin so the brand fallback resolves on
@@ -319,13 +336,13 @@
         '  all: initial;',
         '  position: fixed;',
         '  z-index: var(--sapybase-z, 2147483647);',
-        '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
-        '  bottom: 20px;',
+        '  ' + (isLeft ? 'left: 16px;' : 'right: 16px;'),
+        '  bottom: 16px;',
         '  font-family: system-ui, -apple-system, sans-serif;',
         '}',
         '.fab-wrap {',
         '  position: relative;',
-        '  width: 64px; height: 64px;',
+        '  width: 56px; height: 56px;',
         '  display: flex; align-items: center; justify-content: center;',
         '  opacity: 0; transform: scale(.85);',
         '  transition: opacity .25s ease, transform .25s ease;',
@@ -333,7 +350,7 @@
         '}',
         '.fab-wrap.ready { opacity: 1; transform: scale(1); pointer-events: auto; }',
         '.fab {',
-        '  width: 64px; height: 64px; border-radius: 50%; cursor: pointer;',
+        '  width: 56px; height: 56px; border-radius: 50%; cursor: pointer;',
         '  background: transparent; border: none;',
         '  padding: 0; overflow: visible;',
         '  display: flex; align-items: center; justify-content: center;',
@@ -352,9 +369,9 @@
         '.fab > svg.default-icon { width: 28px; height: 28px; fill: white; }',
         '.iframe-wrap {',
         '  position: fixed; z-index: 2147483646;',
-        '  ' + (isLeft ? 'left: 20px;' : 'right: 20px;'),
-        '  bottom: 90px; width: 400px; height: 600px;',
-        '  max-height: calc(100vh - 120px); max-width: calc(100vw - 40px);',
+        '  ' + (isLeft ? 'left: 16px;' : 'right: 16px;'),
+        '  bottom: 80px; width: 420px; height: 650px;',
+        '  max-height: calc(100vh - 110px); max-width: calc(100vw - 40px);',
         '  border-radius: 16px; overflow: hidden;',
         '  box-shadow: 0 12px 48px rgba(0,0,0,.15);',
         '  opacity: 0; transform: translateY(20px) scale(.95);',
@@ -388,13 +405,17 @@
         '  animation: sb-spin .7s linear infinite;',
         '}',
         '@media (max-width: 480px) {',
+        '  :host {',
+        '    ' + (isLeft ? 'left: 12px !important;' : 'right: 12px !important;'),
+        '    bottom: 12px !important;',
+        '  }',
         '  .iframe-wrap {',
         '    width: 100vw; height: 100dvh; max-height: 100dvh; max-width: 100vw;',
         '    bottom: 0; right: 0; left: 0; top: 0; border-radius: 0;',
         '  }',
         '  .iframe-wrap iframe { border-radius: 0; }',
-        '  .fab-wrap { width: 56px; height: 56px; }',
-        '  .fab { width: 56px; height: 56px; }',
+        '  .fab-wrap { width: 48px; height: 48px; }',
+        '  .fab { width: 48px; height: 48px; }',
         '  :host(.chat-open) .fab-wrap { display: none; }',
         '}',
       ].join('\n');

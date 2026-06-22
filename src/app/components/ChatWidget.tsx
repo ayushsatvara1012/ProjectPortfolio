@@ -181,7 +181,7 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
       onClick={onClick}
       aria-label={isOpen ? 'Collapse chat' : 'Open AI chat assistant'} aria-expanded={isOpen}
       style={{ touchAction: 'manipulation', background: 'transparent', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: themeColor, position: 'relative', zIndex: 1 }}
-      className="relative flex flex-col items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-20 sm:h-20 w-15 h-15 shadow-none transition-all p-1">
+      className="relative flex flex-col items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-14 sm:h-14 w-12 h-12 shadow-none transition-all p-1">
       <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full z-0" overflow="visible">
         <defs>
           <clipPath id="fab-clip"><path d={fabPath} /></clipPath>
@@ -674,7 +674,7 @@ function MessageContent({ content, isStreaming, themeColor = '#5730F5', streamCa
         </div>
       )}
       {hasContent && (
-        <div className="leading-relaxed text-[15px] font-normal font-google">
+        <div className="leading-relaxed text-[14px] font-normal font-google">
           {blocks.map((b, i) => (
             <MarkdownBlock key={i} source={b} tail={isStreaming && i === blocks.length - 1} />
           ))}
@@ -1267,10 +1267,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           <motion.div
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
-            className={`${isEmbed ? 'relative w-full h-full bg-white dark:bg-slate-900' : 'fixed inset-0 sm:inset-auto sm:bottom-26 sm:right-6 w-full h-dvh sm:w-[480px] sm:h-[600px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl'} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
+            className={`${isEmbed ? 'relative w-full h-full bg-white dark:bg-slate-900' : 'fixed inset-0 sm:inset-auto sm:bottom-22 sm:right-4 w-full h-dvh sm:w-[500px] sm:h-[650px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl'} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
             style={{ ...themeStyleVars, ...(isEmbed ? { height: '100%' } : isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {}) } as React.CSSProperties}
           >
-            <div className="relative shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200/70 dark:border-slate-800/80">
+            <div className="relative shrink-0 bg-gray-50/50 dark:bg-slate-950/50">
               <div className="text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-3 pl-2">
@@ -1287,14 +1287,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         hasShadow={false}
                         isCustom={!!configData.custom_logo_url}
                         bgStyle={AVATAR_BG_STYLE}
+                        transparentBgImage={true}
                       />
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <p className="text-[15px] font-google font-medium leading-none text-slate-900 dark:text-slate-100">{BOT_NAME}</p>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        <span className="text-xs font-google text-slate-500 dark:text-slate-400 leading-none">Active now</span>
-                      </div>
+                    <div className="flex items-center pl-1">
+                      <p className="text-[15px] font-google font-medium text-slate-900 dark:text-slate-100 leading-none">{BOT_NAME}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -1357,7 +1354,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               )}
               <div ref={scrollContainerRef} onScroll={handleScrollContainer}
                 className="flex-1 min-h-0 px-3 overflow-y-auto overscroll-contain touch-pan-y flex flex-col gap-5 pt-6 pb-2 relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                style={{ maskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 28px), transparent)' }}>
+                style={{ maskImage: 'linear-gradient(to bottom, transparent, black 20px, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20px, black calc(100% - 28px), transparent)' }}>
                 <div className="flex flex-col gap-5">
                   <AnimatePresence initial={false}>
                     {messages.map((msg, idx) => {
@@ -1422,9 +1419,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                             <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                               <div className={`px-4 py-2 min-h-[38px] ${msg.role === 'bot' && msg.isStreaming && isLoading ? '!bg-transparent !p-1' : ''} ${msg.role === 'user' ? 'w-fit max-w-full self-end' : 'w-full max-w-full self-start'} break-words ${msg.role === 'user' ? 'rounded-2xl rounded-tr-none bg-[var(--sapy-user-bg)] dark:bg-[var(--sapy-user-bg-dark)] text-[var(--sapy-user-fg)] dark:text-[var(--sapy-user-fg-dark)]' : 'bg-slate-100/50 dark:bg-slate-900 text-gray-800 dark:text-slate-200 rounded-2xl rounded-tl-none overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:whitespace-pre-wrap prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-regular prose-img:max-w-full prose-img:rounded-lg'}`}>
                                 {msg.role === 'user' ? (
-                                  <div className="max-w-full whitespace-pre-wrap break-words text-[15px] font-normal font-google leading-relaxed">{msg.content}</div>
+                                  <div className="max-w-full whitespace-pre-wrap break-words text-[14px] font-normal font-google leading-relaxed">{msg.content}</div>
                                 ) : (
-                                  <div className="min-w-0 max-w-full text-[15px] font-google leading-relaxed">
+                                  <div className="min-w-0 max-w-full text-[14px] font-google leading-relaxed">
                                     <MessageContent content={msg.content ?? ''} isStreaming={msg.isStreaming} themeColor={THEME_COLOR} streamCallbackRef={msg.isStreaming ? streamingCallbackRef : undefined} />
                                   </div>
                                 )}
@@ -1437,25 +1434,25 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     })}
                   </AnimatePresence>
                 </div>
-                {messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 && (
-                  <div className="flex flex-col items-end gap-2 px-3 pb-2 pt-1">
-                    {configData.quick_questions.map((q, qidx) => {
-                      const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
-                      if (!label) return null;
-                      return (
-                        <button key={qidx} onClick={() => sendMessage(label)}
-                          className="px-4 py-2.5 min-h-[44px] rounded-full text-sm font-regular font-google transition-colors max-w-full text-left break-words bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)]">
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
                 <div ref={messagesEndRef} className="h-5 shrink-0" aria-hidden="true" />
               </div>
             </div>
 
             <div className="bg-gray-50/50 dark:bg-slate-950/50 shrink-0 z-10 flex flex-col">
+              {messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 && (
+                <div className="flex flex-col items-start gap-2 px-3 pb-1 pt-2.5">
+                  {configData.quick_questions.map((q, qidx) => {
+                    const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
+                    if (!label) return null;
+                    return (
+                      <button key={qidx} onClick={() => sendMessage(label)}
+                        className="px-4 py-2.5 min-h-[40px] rounded-full text-[14px] font-normal font-google transition-all max-w-full text-left break-words bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-800/80 shadow-sm hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)] hover:border-slate-300 dark:hover:border-slate-700 hover:shadow">
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="px-3 pt-2 w-full" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
                 <form onSubmit={handleSend} className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
@@ -1483,7 +1480,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       </AnimatePresence>
 
       {!isEmbed && (
-        <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
+        <div className={`fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-2147483646 pointer-events-auto ${isOpen ? 'hidden sm:block' : 'block'}`}>
           <div className="relative flex items-center justify-end">
             <FabButton
               fabPath={FAB_PATH}

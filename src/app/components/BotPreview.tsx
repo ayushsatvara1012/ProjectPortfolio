@@ -38,10 +38,10 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
   return (
     <div className="relative h-full w-full flex items-center justify-center p-2 md:p-4 lg:p-8 transition-all duration-300 bg-transparent">
       {/* ── Main Chatbot Box ── */}
-      <div className={`w-full max-w-[95vw] sm:max-w-[480px] h-[60vh] sm:h-[600px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
+      <div className={`w-full max-w-[95vw] sm:max-w-[500px] h-[60vh] sm:h-[650px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`} style={{ '--sapy-theme': THEME_COLOR } as React.CSSProperties}>
         
         {/* ── Header (mirrors the live ChatWidget top nav exactly) ── */}
-        <div className={`relative shrink-0 border-b ${isDark ? 'bg-slate-900 border-slate-800/80' : 'bg-white border-slate-200/70'}`}>
+        <div className={`relative shrink-0 ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
           <div className={`p-2 flex justify-end items-center relative ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <div className="relative flex flex-row justify-between items-center w-full">
               {/* Left: Avatar + Name — avatar is always a circle, no shadow */}
@@ -55,15 +55,12 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
                   hasShadow={false}
                   bgStyle={avatarBgStyle || 'none'}
                   isCustom={!!customLogoUrl}
+                  transparentBgImage={true}
                 />
-                <div className="flex flex-col gap-1.5">
+                <div className="flex items-center pl-1">
                   <p className={`text-[15px] font-google font-medium leading-none ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                     {BOT_NAME}
                   </p>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span className={`text-xs font-google leading-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Active now</span>
-                  </div>
                 </div>
               </div>
               {/* Right: Action buttons */}
@@ -80,7 +77,8 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         </div>
 
         {/* ── Messages Area ── */}
-        <div className={`flex-1 p-5 flex flex-col gap-6 overflow-y-auto ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
+        <div className={`flex-1 p-5 flex flex-col gap-6 overflow-y-auto ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}
+          style={{ maskImage: 'linear-gradient(to bottom, transparent, black 20px, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20px, black calc(100% - 28px), transparent)' }}>
           
           {/* Bot greeting */}
           <div className="flex gap-3 justify-start items-start w-full">
@@ -101,20 +99,6 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
             </div>
           </div>
 
-          {/* Quick Questions */}
-          {quickQs.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2 justify-start">
-              {quickQs.slice(0, 2).map((label, idx) => (
-                <button
-                  key={idx}
-                  className={`text-xs px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-white dark:bg-white/[0.02] hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-all truncate max-w-[180px] font-google`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
           <div className="flex-1" />
         </div>
 
@@ -129,7 +113,19 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         )}
 
         {/* ── Input Area ── */}
-        <div className={`p-4 shrink-0 z-10 flex flex-col border-t ${isDark ? 'bg-slate-900 border-slate-800/60' : 'bg-[#f8f9fa] border-slate-150'}`}>
+        <div className={`p-4 shrink-0 z-10 flex flex-col ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
+          {quickQs.length > 0 && (
+            <div className="flex flex-col items-start gap-2 pb-3.5">
+              {quickQs.slice(0, 3).map((label, idx) => (
+                <button
+                  key={idx}
+                  className="px-4 py-2.5 min-h-[40px] rounded-full text-[14px] font-normal font-google transition-all max-w-full text-left break-words bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-800/80 shadow-sm hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)] hover:border-slate-300 dark:hover:border-slate-700 hover:shadow"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="w-full">
             <div className="flex items-center gap-2 bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-slate-800/80 rounded-full pl-5 pr-2 py-0.5 shadow-sm">
               <input
