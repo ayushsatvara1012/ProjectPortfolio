@@ -22,6 +22,7 @@ import {
   accentMap,
   ExploreComingSoon
 } from './components';
+import ByodSection from './ByodSection';
 
 export default function PricingClient() {
   const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
@@ -298,6 +299,9 @@ export default function PricingClient() {
               );
             })}
           </div>
+
+          {/* BYOD — Bring Your Own Database (enterprise tier, below the cards) */}
+          <ByodSection />
         </div>
       </section>
 

@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import Alert from '@/src/app/components/Alert';
 // Checkout links resolved from the shared single source (also used by the
 // marketing /pricing page and the /subscribe continuation route).
 import { POLAR_URLS, POLAR_URLS_ANNUAL } from '@/src/lib/billing/checkout';
+// "Get Explore" routing — same business-vs-personal decision used on the
+// marketing /pricing page (backend is the single source of truth).
+import { fetchExploreRoute, exploreDestination } from '@/src/lib/billing/explore';
 
 const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 transition-colors duration-500';
 
@@ -25,6 +28,7 @@ const PRICE_MATRIX = {
 
 const AppPricing = () => {
     const { user } = useUser();
+    const { getToken } = useAuth();
     const router = useRouter();
     const { userTier } = useUserRole();
 
@@ -33,6 +37,7 @@ const AppPricing = () => {
     const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
     const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
     const [isDetecting, setIsDetecting] = useState(true);
+    const [exploreBusy, setExploreBusy] = useState(false);
     const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'development', msg: '' });
 
     const showAlert = (type: 'success' | 'error' | 'development', msg: string) => {
@@ -150,6 +155,28 @@ const AppPricing = () => {
         }, 800);
     };
 
+    // "Get Explore" — the lifetime-free plan. Signed-in dashboard users hit the
+    // backend to decide the path (business → Polar $0 checkout, personal →
+    // enquiry, already-active → dashboard, blocked → message).
+    const handleGetExplore = async () => {
+        if (!user) { window.location.href = '/sign-in'; return; }
+        setExploreBusy(true);
+        try {
+            const token = await getToken();
+            if (!token) throw new Error('no token');
+            const route = await fetchExploreRoute(token);
+            const dest = exploreDestination(route, { userId: user?.id ?? null, origin: window.location.origin });
+            if (dest.kind === 'external') window.location.href = dest.url;
+            else if (dest.kind === 'navigate') router.push(dest.path);
+            else showAlert('error', dest.text);
+        } catch {
+            // Network/auth hiccup — fall back to the enquiry form rather than dead-end.
+            router.push('/explore/enquiry');
+        } finally {
+            setExploreBusy(false);
+        }
+    };
+
     const handleContactCustom = () => {
         window.location.href = `mailto:ayushsatvara2002@gmail.com?subject=Custom%20Plan%20Enquiry&body=Hi%20Ayush%2C%0A%0AI'm%20interested%20in%20a%20custom%20plan%20for%20my%20agency%2Fbusiness.%0A%0AOrganisation%3A%0AExpected%20bots%3A%0AExpected%20monthly%20messages%3A%0AKey%20features%20needed%3A%0A`;
     };
@@ -216,7 +243,7 @@ const AppPricing = () => {
 
                 {/* ── Plan Cards ── */}
                 <div className="px-6 md:px-8 pb-6">
-                    {/* Explore — lifetime-free plan, Coming Soon (in-app teaser above the tiers) */}
+                    {/* Explore — lifetime-free plan, now live (in-app teaser above the tiers) */}
                     <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
@@ -230,16 +257,23 @@ const AppPricing = () => {
                                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
                                             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
                                         </span>
-                                        <span className="text-[10px] font-google font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Coming Soon</span>
+                                        <span className="text-[10px] font-google font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Free Forever</span>
                                     </span>
                                 </div>
-                                <p className="text-xs font-google text-slate-500 dark:text-slate-400">Lifetime-free — the full Vaayu Intelligence platform. Launching soon.</p>
+                                <p className="text-xs font-google text-slate-500 dark:text-slate-400">Lifetime-free — the full Vaayu Intelligence platform. No card required.</p>
                             </div>
                         </div>
-                        <span className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-slate-100 dark:bg-slate-700 px-5 py-2.5 text-sm font-google font-medium text-slate-500 dark:text-slate-400">
-                            <span className="material-symbols-outlined text-[16px]">schedule</span>
-                            Coming Soon
-                        </span>
+                        <button
+                            type="button"
+                            onClick={handleGetExplore}
+                            disabled={exploreBusy}
+                            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-slate-900 dark:bg-white px-5 py-2.5 text-sm font-google font-semibold text-white dark:text-black transition-all hover:bg-slate-700 dark:hover:bg-slate-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span className={`material-symbols-outlined text-[16px] ${exploreBusy ? 'animate-spin' : ''}`}>
+                                {exploreBusy ? 'progress_activity' : 'explore'}
+                            </span>
+                            {exploreBusy ? 'One moment…' : 'Get Explore — Free'}
+                        </button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

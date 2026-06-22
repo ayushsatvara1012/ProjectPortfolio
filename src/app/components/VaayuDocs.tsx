@@ -62,6 +62,17 @@ const NAV: NavGroup[] = [
     ],
   },
   {
+    group: 'Bring Your Own Database',
+    icon: 'database',
+    items: [
+      { id: 'byod-overview', label: 'What is BYOD?' },
+      { id: 'byod-prepare', label: 'Prepare your database' },
+      { id: 'byod-connect', label: 'Connect & test' },
+      { id: 'byod-submit', label: 'Submit & go live' },
+      { id: 'byod-manage', label: 'Manage your connection' },
+    ],
+  },
+  {
     group: 'Account & Help',
     icon: 'support_agent',
     items: [
@@ -87,6 +98,13 @@ const SHOTS: Record<string, { w: number; h: number }> = {
   'insights-roi': { w: 2880, h: 2338 },
   'insights-conversations': { w: 2880, h: 1464 },
   'insights-analytics': { w: 2880, h: 3902 },
+  // BYOD — dimensions are placeholders until the real 2× screenshots are added.
+  'byod-requirements': { w: 2880, h: 1600 },
+  'byod-connect': { w: 2880, h: 1600 },
+  'byod-test-success': { w: 2880, h: 1200 },
+  'byod-submitted': { w: 2880, h: 1200 },
+  'byod-status-live': { w: 2880, h: 1200 },
+  'byod-manage': { w: 2880, h: 1400 },
 };
 
 const VaayuDocs = () => {
@@ -179,6 +197,35 @@ const VaayuDocs = () => {
       </figure>
     );
   };
+
+  // ── Screenshot placeholder ───────────────────────────────────────────────────
+  // Same browser-frame chrome as <Figure>, but with an empty dashed drop-zone that
+  // names the exact file to add. Drop `public/docs/<name>.webp` into place, then
+  // swap <FigurePlaceholder …/> for <Figure …/> (identical props) to go live.
+
+  const FigurePlaceholder = ({ name, alt, caption }: { name: keyof typeof SHOTS | string; alt: string; caption?: string }) => (
+    <figure className="my-6">
+      <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.07] bg-slate-50 dark:bg-white/[0.02] shadow-sm">
+        <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-white/[0.03]">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <span className="ml-3 text-[11px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">app.sapybase.com</span>
+        </div>
+        <div className="aspect-[16/9] w-full flex flex-col items-center justify-center gap-2 p-6 text-center bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(100,116,139,0.04)_10px,rgba(100,116,139,0.04)_20px)]">
+          <span className="material-symbols-outlined text-[34px] text-slate-300 dark:text-slate-600">add_photo_alternate</span>
+          <p className="text-sm font-medium text-slate-400 dark:text-slate-500">Screenshot placeholder</p>
+          <code className="px-2 py-1 rounded-md bg-slate-100 dark:bg-white/[0.05] text-[11px] font-mono text-slate-500 dark:text-slate-400">/docs/{name}.webp</code>
+          <p className="sr-only">{alt}</p>
+        </div>
+      </div>
+      {caption && (
+        <figcaption className="mt-2.5 text-xs lg:text-sm text-slate-400 dark:text-slate-500 text-center px-4 leading-relaxed">
+          {caption}
+        </figcaption>
+      )}
+    </figure>
+  );
 
   // ── Syntax-highlighted code block ────────────────────────────────────────────
 
@@ -341,7 +388,7 @@ const VaayuDocs = () => {
 
       {/* ── Page body ── */}
       <div className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <div className="lg:grid lg:grid-cols-[230px_1fr_190px] lg:gap-10 xl:gap-14">
+        <div className="lg:grid lg:grid-cols-[230px_1fr] lg:gap-10 xl:gap-14">
 
           {/* ── Left: grouped topic nav ── */}
           <aside className="hidden lg:block">
@@ -715,6 +762,130 @@ const VaayuDocs = () => {
                 <Figure name="insights-analytics" alt="The Analytics tab with trend charts and top customer questions" caption="Analytics — volume and lead trends over time, plus the topics your customers ask about most." />
               </section>
 
+              {/* ════════ BRING YOUR OWN DATABASE ════════ */}
+
+              {/* BYOD overview */}
+              <section id="byod-overview" className="scroll-mt-24 space-y-4">
+                <H2 icon="database">Bring Your Own Database (BYOD)</H2>
+                <Lead>
+                  On the <Strong>BYOD plan</Strong>, Vaayu runs on top of <Strong>your own PostgreSQL database</Strong> instead of ours.
+                  Your knowledge, conversations and captured leads are stored entirely in your infrastructure — Supabase, Amazon RDS,
+                  Google Cloud SQL, Azure, or a self-hosted server. You give us a connection string; we validate it, set up the schema,
+                  and connect. The connection is encrypted at rest and only ever shown masked.
+                </Lead>
+                <div className="grid sm:grid-cols-2 gap-3 pt-1">
+                  {[
+                    { icon: 'shield_lock', t: 'Your data stays yours', d: 'Embeddings, chats and leads live in your database — full data residency and compliance control.' },
+                    { icon: 'vpn_key', t: 'Encrypted & masked', d: 'Your connection string is stored encrypted and only ever displayed masked — never in plain text.' },
+                    { icon: 'verified_user', t: 'We provision it', d: 'After you submit, our team creates the required tables and pgvector schema in your database for you.' },
+                    { icon: 'sync', t: 'Managed safely', d: 'Once live, changes are admin-run so there’s no downtime — and leaving never deletes your data.' },
+                  ].map((f) => (
+                    <div key={f.t} className="p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.05]">
+                      <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">{f.icon}</span>
+                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-100">{f.t}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{f.d}</p>
+                    </div>
+                  ))}
+                </div>
+                <Callout tone="info" title="Where to find it">
+                  Once your account is on the BYOD plan, a <Strong>My Database</Strong> item appears in your dashboard sidebar
+                  (<code className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 rounded text-xs font-mono">/dashboard/database</code>).
+                  Don’t see it? <Link href="/pricing" className="font-semibold underline underline-offset-2">Talk to us about BYOD</Link> to enable the plan.
+                </Callout>
+              </section>
+
+              {/* BYOD prepare */}
+              <section id="byod-prepare" className="scroll-mt-24 space-y-4">
+                <H2 badge={1}>Prepare your database</H2>
+                <Lead>
+                  Before you connect, get your PostgreSQL database ready. The exact values — egress IPs to allowlist, the required
+                  pgvector version and embedding dimensions — are always shown live at the top of the <Strong>My Database</Strong> page
+                  under <Strong>“Before you start.”</Strong> Use those as the source of truth.
+                </Lead>
+                <ul className="space-y-2.5">
+                  <Bullet icon="database"><Strong>A PostgreSQL database</Strong> — Supabase, Amazon RDS, Google Cloud SQL, Azure Database, or self-hosted.</Bullet>
+                  <Bullet icon="extension"><Strong>The pgvector extension</Strong> installed (at least the minimum version shown) — this stores your knowledge embeddings.</Bullet>
+                  <Bullet icon="lock"><Strong>TLS / SSL enabled</Strong> — connections must use <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/[0.04] rounded text-xs font-mono">sslmode=require</code>.</Bullet>
+                  <Bullet icon="lan"><Strong>Allowlist our egress IPs</Strong> — add the IP ranges shown on the page to your database firewall so we can reach it.</Bullet>
+                  <Bullet icon="admin_panel_settings"><Strong>A privileged database user</Strong> — one able to create tables and extensions, so we can provision the schema.</Bullet>
+                </ul>
+                <FigurePlaceholder name="byod-requirements" alt="The Before you start card on the My Database page showing copyable egress IP ranges, a readiness checklist and the connection-string format" caption="“Before you start” — copy the egress IP ranges into your database firewall and run through the readiness checklist." />
+                <Callout tone="tip">
+                  Every value on this card is copy-to-clipboard. Grab the egress IPs straight from here rather than typing them, so your
+                  firewall allowlist matches exactly.
+                </Callout>
+              </section>
+
+              {/* BYOD connect */}
+              <section id="byod-connect" className="scroll-mt-24 space-y-4">
+                <H2 badge={2}>Connect &amp; test</H2>
+                <Lead>
+                  Open <Strong>Dashboard → My Database</Strong> and paste your PostgreSQL connection string (DSN) into the connection field.
+                  It’s a masked password field — what you type is hidden, stored encrypted, and only ever shown masked afterwards.
+                </Lead>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 pt-1">Connection string format</p>
+                <CodeBlock id="byod-dsn" code={`postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require`} />
+                <FigurePlaceholder name="byod-connect" alt="The Connect your database card with a masked connection-string input, a Test connection button and a disabled Submit for review button" caption="Connect your database — paste your DSN, then run a test before you can submit." />
+                <Lead>
+                  Click <Strong>Test connection</Strong>. Vaayu runs a live, read-only probe that checks reachability, TLS, the pgvector
+                  version and embedding dimensions — and <Strong>stores nothing</Strong>. On success you’ll see a green confirmation with
+                  the detected host, database, pgvector version and embedding size.
+                </Lead>
+                <FigurePlaceholder name="byod-test-success" alt="A green Connection looks good panel listing the detected host, database name, pgvector version and embedding dimensions" caption="A successful test confirms the host, database, pgvector version and embedding dimensions." />
+                <Callout tone="warn" title="If the test fails">
+                  The error tells you exactly what to fix — most often a firewall/allowlist gap, TLS not enabled, a missing pgvector
+                  extension, or wrong credentials. Note: editing the connection string clears your previous test result, so re-test
+                  after any change before submitting.
+                </Callout>
+              </section>
+
+              {/* BYOD submit */}
+              <section id="byod-submit" className="scroll-mt-24 space-y-4">
+                <H2 badge={3}>Submit &amp; go live</H2>
+                <Lead>
+                  A successful test unlocks the <Strong>Submit for review</Strong> button. Submitting stores your connection encrypted
+                  and sets the status to <Strong>Pending</Strong> — our team then reviews and provisions it, creating the required schema
+                  in your database. When provisioning finishes, the status flips to <Strong>Live</Strong> and your assistant immediately
+                  starts reading and writing in your own database.
+                </Lead>
+                <FigurePlaceholder name="byod-submitted" alt="The Submitted for review confirmation panel shown after submitting the connection" caption="After you submit, the connection is stored encrypted and queued for review — no further action needed." />
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 pt-1">What each status means</p>
+                <ul className="space-y-2.5">
+                  <Bullet icon="hourglass_top"><Strong>Pending</Strong> — submitted; our team is reviewing your connection.</Bullet>
+                  <Bullet icon="build"><Strong>Provisioning</Strong> — we’re setting up the schema in your database.</Bullet>
+                  <Bullet icon="check_circle"><Strong>Live</Strong> — connected and serving your assistant.</Bullet>
+                  <Bullet icon="sync_problem"><Strong>Needs reconnect</Strong> — we couldn’t authenticate; re-enter your connection string to reconnect.</Bullet>
+                  <Bullet icon="pause_circle"><Strong>Disabled</Strong> — the connection is paused; contact support to resume.</Bullet>
+                </ul>
+                <FigurePlaceholder name="byod-status-live" alt="The Connection status card in the Live state showing the masked connection, schema version and last health check" caption="A Live connection — the status card shows the masked URL, schema version and last health check." />
+                <Callout tone="info">
+                  You don’t need to do anything during review. The My Database page reflects the live status and updates automatically as
+                  your connection moves from Pending → Provisioning → Live.
+                </Callout>
+              </section>
+
+              {/* BYOD manage */}
+              <section id="byod-manage" className="scroll-mt-24 space-y-4">
+                <H2 badge={4}>Manage your connection</H2>
+                <Lead>
+                  Once your database is <Strong>Live</Strong>, the connection is frozen in the UI for safety — you can’t edit the DSN
+                  directly. Instead, you make a request and our team handles the change without downtime.
+                </Lead>
+                <ul className="space-y-2.5">
+                  <Bullet icon="sync"><Strong>Request reconnect</Strong> — use this when credentials rotate or you move hosts. We re-provision and update the status here.</Bullet>
+                  <Bullet icon="logout"><Strong>Request to leave</Strong> — we safely move your data back and follow up. Your database is <Strong>never deleted</Strong>.</Bullet>
+                  <Bullet icon="sync_problem"><Strong>Needs reconnect</Strong> — if we ever can’t authenticate, the page lets you re-enter your connection string to reconnect yourself.</Bullet>
+                </ul>
+                <FigurePlaceholder name="byod-manage" alt="The Manage your connection panel with Request reconnect and Request to leave buttons" caption="Manage your connection — request a reconnect or to leave; both are handled by our team without downtime." />
+                <Callout tone="tip">
+                  A pending request shows a persistent banner at the top of the page until our team completes it — so you always know
+                  where things stand, even after a reload.
+                </Callout>
+                <Callout tone="danger">
+                  Leaving BYOD never deletes your data. We migrate it back to managed storage safely and confirm with you before anything changes.
+                </Callout>
+              </section>
+
               {/* ════════ ACCOUNT & HELP ════════ */}
 
               {/* Billing */}
@@ -772,33 +943,6 @@ const VaayuDocs = () => {
 
             </div>
           </main>
-
-          {/* ── Right: On This Page ── */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar">
-              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 px-3 mb-3">
-                <span className="material-symbols-outlined text-[14px]">toc</span>On this page
-              </p>
-              <div className="space-y-0.5">
-                {FLAT.map((it) => (
-                  <button
-                    key={it.id}
-                    onClick={() => scrollTo(it.id)}
-                    className={`block w-full text-left px-3 py-1.5 rounded-lg text-[13px] leading-snug transition-colors ${
-                      activeId === it.id
-                        ? 'text-slate-900 dark:text-slate-100 font-semibold'
-                        : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                  >
-                    {it.label}
-                  </button>
-                ))}
-              </div>
-              <Link href="/" className="flex items-center gap-2 px-3 mt-5 pt-4 border-t border-slate-100 dark:border-white/[0.05] text-[13px] text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-                <span className="material-symbols-outlined text-[15px]">arrow_back</span>Back to home
-              </Link>
-            </div>
-          </aside>
 
         </div>
       </div>
