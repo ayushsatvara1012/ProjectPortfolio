@@ -245,7 +245,7 @@ export default function Navbar() {
 
                     {/* Desktop Dropdown */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white dark:bg-slate-950 backdrop-blur-md shadow-none rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isActive ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      className={`absolute top-full -left-1/4 w-[760px] bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isActive ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
                       onMouseLeave={() => setActiveDropdown(null)}
                     >
                       <div className="flex p-8">
@@ -277,8 +277,8 @@ export default function Navbar() {
                                   />
                                 )
                               ) : (
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 dark:from-slate-900 dark:via-slate-950 dark:to-slate-800 flex items-end p-5">
-                                  <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">
+                                <div className="absolute inset-0 flex items-center justify-center p-5">
+                                  <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed text-center">
                                     {cfg.pitch}
                                   </p>
                                 </div>
@@ -291,7 +291,7 @@ export default function Navbar() {
                         </div>
 
                         {/* Right Content - Item List */}
-                        <div className="w-1/2 flex flex-col gap-0.5">
+                        <div className="w-1/2 flex flex-col divide-y divide-slate-200/70 dark:divide-slate-800/70">
                           {cfg.items.map((service, idx) => {
                             return (
                                <Link
@@ -306,8 +306,8 @@ export default function Navbar() {
                                     {service.title}
                                   </span>
                                 </div>
-                                <span className="material-symbols-outlined text-[16px] text-slate-300 dark:text-slate-600 opacity-0 -translate-x-2 group-hover/item:opacity-100 group-hover/item:translate-x-0 transition-all duration-300 ease-out">
-                                  chevron_right
+                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 transition-all duration-300 ease-out">
+                                  arrow_outward
                                 </span>
                               </Link>
                             );

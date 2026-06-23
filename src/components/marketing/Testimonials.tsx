@@ -11,23 +11,23 @@ const TESTIMONIALS = [
   {
     quote:
       'Set it up in 20 minutes, no developer needed. It handles our FAQ questions all day so my team can focus on real issues.',
-    name: '[Name]',
-    role: 'E-commerce Store Owner',
-    initials: 'NA',
+    name: 'Piyush Satvara',
+    role: 'Technical Director',
+    initials: 'PS',
   },
   {
     quote:
       "The ROI dashboard showed us our bot handled 300 conversations in the first month — that's hours we didn't have to pay for.",
-    name: '[Name]',
-    role: 'SaaS Founder',
-    initials: 'NA',
+    name: 'Kathan Pandya',
+    role: 'Frontend Engineer',
+    initials: 'KP',
   },
   {
     quote:
       "I embedded it on our agency's client sites. Clients love seeing it capture leads they would have missed.",
-    name: '[Name]',
-    role: 'Marketing Agency Owner',
-    initials: 'NA',
+    name: 'Rutvik Chauhan',
+    role: 'Backend Engineer',
+    initials: 'RC',
   },
 ];
 

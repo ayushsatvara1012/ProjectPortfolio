@@ -1,75 +1,14 @@
-'use client';
-
-import React, { useState, useEffect, useTransition } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import Button from './Button';
-import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
-
-import type { AntigravityBackgroundProps } from './AntigravityBackground';
-
-const AntigravityBackground = dynamic<AntigravityBackgroundProps>(() => import('./AntigravityBackground'), {
-  ssr: false,
-});
 import { PRODUCT } from '@/src/lib/brand';
+import { HeroBackground, DemoButton } from './HeroClient';
 
-const HeroSection = () => {
-  const router = useRouter();
-  const { isSignedIn } = useUser();
-  const [, startTransition] = useTransition();
-
-  const [isMobile, setIsMobile] = useState(false);
-  // Defer mounting the WebGL background until the browser is idle. The Three.js
-  // chunk (~880 kB) is heavy to parse/execute; mounting it during hydration is
-  // the single biggest contributor to mobile TBT. Gating the mount to idle moves
-  // that work out of the critical path. The animation is unchanged — the scene's
-  // built-in staggered reveal fades it in once mounted.
-  const [mountBackground, setMountBackground] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize, { passive: true });
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    // requestIdleCallback isn't available in Safari/iOS — fall back to a short
-    // timeout. The `timeout` option guarantees the scene still mounts promptly
-    // even if the main thread stays busy.
-    const ric = window.requestIdleCallback;
-    if (typeof ric === 'function') {
-      const id = ric(() => setMountBackground(true), { timeout: 2000 });
-      return () => window.cancelIdleCallback?.(id);
-    }
-    const id = window.setTimeout(() => setMountBackground(true), 200);
-    return () => window.clearTimeout(id);
-  }, []);
-
+export default function HeroSection() {
   return (
     <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
-
-
-
-      {/* Desktop (≥768px): the WebGL particle scene, mounted at idle. The
-          !isMobile guard means it never mounts on phones. */}
-      {!isMobile && mountBackground && (
-        <AntigravityBackground
-          particleCount={50}
-          particleType="capsule"
-          particleSeparation={4}
-          effectStyle="classic"
-          interactive
-        />
-      )}
+      <HeroBackground />
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-
-        {/* Text and controls centered */}
         <div className="relative z-10 max-w-xl lg:max-w-3xl flex flex-col justify-center items-center text-center">
-
           <h1
             className="font-google font-medium tracking-tight leading-[1.05] text-slate-900 dark:text-slate-200 mb-6 transition-colors"
             aria-label={`Introducing ${PRODUCT.name} — A Business Intelligence`}
@@ -101,41 +40,21 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">
-            {/* Primary CTA is a prefetched <Link>, not a Clerk-gated onClick. The
-                tap navigates natively (no JS on the main thread) so it stays
-                instant even before Clerk hydrates. href upgrades to /dashboard
-                once useUser() resolves a signed-in session. */}
             <Link
-              href={isSignedIn ? '/dashboard' : '/sign-up'}
+              href="/vaayu"
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
             >
               Get {PRODUCT.name}<span className='material-symbols-outlined ml-2'>arrow_forward</span>
-              <span
-                className="absolute w-40 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left"
-              ></span>
-              <span
-                className="absolute w-40 h-36 -top-15 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-[120%] transition-transform group-hover:duration-700 duration-700 origin-left"
-              ></span>
-              <span
-                className="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-75 transition-transform group-hover:duration-1000 duration-500 origin-left"
-              ></span>
-              <span
-                className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap"
-              >Explore Now!</span>
+              <span className="absolute w-40 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left" />
+              <span className="absolute w-40 h-36 -top-15 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-[120%] transition-transform group-hover:duration-700 duration-700 origin-left" />
+              <span className="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-75 transition-transform group-hover:duration-1000 duration-500 origin-left" />
+              <span className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap">Explore Now!</span>
             </Link>
 
-
-            <Button onClick={() => startTransition(() => router.push('/demo/train'))} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1">
-              <span className="material-symbols-outlined text-lg">
-                experiment
-              </span>
-              Try Demo
-            </Button>
+            <DemoButton />
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default HeroSection;
+}

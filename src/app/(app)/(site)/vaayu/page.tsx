@@ -7,6 +7,7 @@ import BreadcrumbJsonLd from '@/src/components/seo/BreadcrumbJsonLd';
 import GetVaayuButton from '@/src/components/vaayu/GetVaayuButton';
 import ConsoleFrame from '@/src/components/vaayu/ConsoleFrame';
 import SetupStrip from '@/src/components/vaayu/SetupStrip';
+import HowItWorks from '@/src/components/vaayu/HowItWorks';
 import LeadsFrame from '@/src/components/vaayu/LeadsFrame';
 import FunnelFrame from '@/src/components/vaayu/FunnelFrame';
 import RoiFrame from '@/src/components/vaayu/RoiFrame';
@@ -212,6 +213,9 @@ export default function VaayuPage() {
             </ScrollReveal>
           </div>
         </section>
+
+        {/* ── How it works ───────────────────────────────── */}
+        <HowItWorks />
 
         {/* ── Feature sections ───────────────────────────── */}
         {FEATURES.map((f, i) => {

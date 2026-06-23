@@ -41,7 +41,7 @@ const SidebarItem = ({ label, icon: iconName, path, expanded, trained, onClick }
             href={isChatLocked ? '#' : path}
             onClick={isChatLocked ? undefined : onClick}
             title={!expanded ? label : undefined}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-display font-medium transition-all min-h-[38px] w-full overflow-hidden rounded-lg ${isChatLocked
+            className={`flex items-center gap-3 px-3 py-2 text-sm tracking-normal font-display font-medium transition-all min-h-[38px] w-full overflow-hidden rounded-lg ${isChatLocked
                 ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
                 : isActive
                     ? 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
@@ -105,7 +105,7 @@ const SidebarContent = ({ onClose, expanded = true, trained, handleReset }: any)
                         <span className={`flex-1 text-left transition-all duration-200 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 pointer-events-none'}`}>
                             Settings
                         </span>
-                        <span className={`material-symbols-outlined text-sm text-slate-400 dark:text-slate-500 transition-all duration-200 ${settingsOpen ? 'rotate-180' : ''} ${expanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
+                        <span className={`material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 transition-all duration-200 ${settingsOpen ? 'rotate-180' : ''} ${expanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
                             expand_more
                         </span>
                     </button>
@@ -208,12 +208,12 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
     };
 
     const pageLabel = (pathname && PATH_LABELS[pathname]) || 'Demo Dashboard';
-    const isFullHeightPane = pathname === '/demo/customize';
+    const isFullHeightPane = pathname === '/demo/customize' || pathname === '/demo/insights';
 
     return (
         <div className="flex min-h-screen w-full overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 antialiased transition-colors duration-500">
-            <header className="fixed top-0 left-0 right-0 h-16 bg-[#f8f9fa] dark:bg-slate-950 border-b border-slate-200/50 dark:border-slate-800/50 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
-                <div className="flex items-center gap-2 lg:w-[calc(256px-1rem)]">
+            <header className="fixed top-0 left-0 right-0 h-14 bg-[#f8f9fa] dark:bg-slate-950 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
+                <div className="flex items-center gap-2 lg:w-12">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-slate-900 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
@@ -222,14 +222,14 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                         <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-400 transition-colors">menu</span>
                     </button>
                     <Link href="/" aria-label="Vaayu home" className="flex items-center hover:opacity-80 transition-opacity">
-                        <VaayuLogo size={26} className="text-slate-900 dark:text-slate-100" />
+                        <VaayuLogo iconOnly size={26} className="text-slate-900 dark:text-slate-100" />
                     </Link>
                 </div>
 
                 {/* Breadcrumb */}
-                <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors ml-4 pl-4">
+                <div className="flex items-center gap-1.5 text-[13px] text-slate-500 dark:text-slate-500 min-w-0 flex-1 transition-colors">
                     <div className="hidden sm:flex items-center gap-1.5 min-w-0">
-                        <span className="truncate max-w-[140px] text-slate-600 dark:text-slate-400 font-google text-sm transition-colors">
+                        <span className="truncate max-w-[140px] text-slate-600 dark:text-slate-400 font-google text-[13px] transition-colors">
                             Jane Doe (Demo)
                         </span>
                         <span className="shrink-0 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
@@ -237,7 +237,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                         </span>
                         <span className="material-symbols-outlined text-[16px] shrink-0 text-slate-400 dark:text-slate-600">chevron_right</span>
                     </div>
-                    <span className="truncate text-slate-800 dark:text-slate-200 font-google text-sm font-medium transition-colors">{pageLabel}</span>
+                    <span className="truncate text-slate-800 dark:text-slate-200 font-google text-[13px] font-medium transition-colors">{pageLabel}</span>
                 </div>
 
                 {/* Demo Mode indicator & Sign Up Button */}
@@ -284,36 +284,21 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
             <aside
                 onMouseEnter={() => setSidebarExpanded(true)}
                 onMouseLeave={() => setSidebarExpanded(false)}
-                className={`hidden lg:flex lg:flex-col fixed left-0 bottom-0 z-30 bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
-                style={{ top: '4rem' }}
+                className={`hidden lg:flex lg:flex-col fixed top-14 left-0 bottom-0 z-30 bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-300 ease-in-out ${sidebarExpanded ? 'w-64' : 'w-16'}`}
             >
                 <SidebarContent onClose={null} expanded={sidebarExpanded} trained={trained} handleReset={handleReset} />
             </aside>
 
             {/* Main content */}
-            <main className={`flex-1 relative mt-16 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-4rem)]'}`} style={{ marginTop: '4rem' }}>
+            <main className={`flex-1 relative mt-14 min-w-0 overflow-x-hidden bg-[#f8f9fa] dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-16'} ${isFullHeightPane ? 'lg:h-[calc(100vh-3.5rem)] lg:min-h-0 lg:overflow-hidden' : 'min-h-[calc(100vh-3.5rem)]'}`}>
                 <div className={`flex-1 flex flex-col pt-0 ${isFullHeightPane ? 'lg:min-h-0 lg:overflow-hidden' : ''}`}>
                     <Suspense fallback={null}>
                         <div className={`flex-1 relative ${isFullHeightPane ? 'flex flex-col lg:min-h-0 lg:overflow-hidden' : ''}`}>{children}</div>
                     </Suspense>
                 </div>
 
-                {/* Demo Dashboard Footer */}
-                {!isFullHeightPane && <footer className="md:col-span-12 bg-[#f8f9fa] dark:bg-slate-950 px-6 py-5 md:px-8 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500">
-                    <div className="flex flex-col md:flex-row items-center gap-6 text-sm text-slate-500 dark:text-slate-400 font-sans">
-                        <p className="text-center">© 2026 Sapybase LLC — Engineered with precision.</p>
-                        <div className="flex gap-5">
-                            <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Privacy</Link>
-                            <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Terms</Link>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[14px] text-emerald-500">browse_activity</span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                            Status: <span className="text-emerald-600 font-medium">Demo Live</span>
-                        </span>
-                    </div>
-                </footer>}
+                {/* Bottom spacer — matches the dashboard shell (footer text removed) */}
+                {!isFullHeightPane && <footer aria-hidden="true" className="bg-[#f8f9fa] dark:bg-slate-950 py-4 mt-auto transition-colors duration-500" />}
             </main>
         </div>
     );

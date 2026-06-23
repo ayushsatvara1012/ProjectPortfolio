@@ -57,13 +57,9 @@ export default function DemoMyBotsPage() {
     return (
         <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 transition-all duration-500 relative overflow-hidden">
             <div className="relative flex flex-col h-full z-10">
-                {/* Header */}
-                <div className="px-6 py-6 sm:px-8 sm:py-8 flex items-center justify-between transition-colors">
+                {/* Header — breadcrumb in the top nav carries the title (matches dashboard) */}
+                <div className="px-6 py-5 sm:px-8 sm:py-6 flex items-center justify-between transition-colors">
                     <div>
-                        <div className="flex items-center gap-2.5 mb-1.5">
-                            <span className="material-symbols-outlined text-[20px] text-slate-500 dark:text-slate-400">smart_toy</span>
-                            <h1 className="text-2xl md:text-3xl font-display font-semibold text-slate-900 dark:text-slate-200">My Bots</h1>
-                        </div>
                         <p className="text-sm md:text-base font-display text-slate-500 dark:text-slate-400">Manage all your AI assistants across your plan.</p>
                     </div>
                     <div className="hidden sm:flex items-center gap-3">
@@ -108,11 +104,8 @@ export default function DemoMyBotsPage() {
                                             <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">{bot.bot_name}</h3>
                                             <p className="text-xs text-slate-400 dark:text-slate-500 font-google mt-0.5">{bot.company_name}</p>
                                         </div>
-                                        <div
-                                            className="w-9 h-9 rounded-xl flex items-center justify-center"
-                                            style={{ backgroundColor: bot.theme_color + '15' }}
-                                        >
-                                            <span className="material-symbols-outlined text-[18px]" style={{ color: bot.theme_color }}>smart_toy</span>
+                                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+                                            <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-300">smart_toy</span>
                                         </div>
                                     </div>
 
@@ -162,7 +155,7 @@ export default function DemoMyBotsPage() {
                                         </button>
                                         <button
                                             onClick={() => router.push('/demo/chat')}
-                                            className="flex items-center justify-center p-2.5 rounded-xl bg-blue-55/90 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
+                                            className="flex items-center justify-center p-2.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
                                         >
                                             <span className="material-symbols-outlined text-[16px]">chat</span>
                                         </button>
@@ -171,10 +164,10 @@ export default function DemoMyBotsPage() {
                             </motion.div>
                         </AnimatePresence>
 
-                        {/* Locked slot */}
+                        {/* Locked slot — matches the dashboard's bot-limit-reached card */}
                         <motion.div
                             layout
-                            className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors cursor-not-allowed"
+                            className="rounded-2xl bg-slate-50/60 dark:bg-slate-900/20 flex flex-col items-center justify-center p-8 min-h-[200px] transition-colors cursor-not-allowed"
                         >
                             <span className="material-symbols-outlined text-[22px] text-slate-300 dark:text-slate-600 mb-3">lock</span>
                             <p className="text-sm font-medium text-slate-400 dark:text-slate-600 font-sans text-center">Bot limit reached</p>

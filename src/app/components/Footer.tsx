@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Github, Linkedin, ArrowUpRight, Zap, Activity } from 'lucide-react';
+import { ArrowUpRight, Zap, Activity } from 'lucide-react';
 
 const InteractiveSchematic = dynamic(() => import('./InteractiveSchematic'), { ssr: false });
 
@@ -14,15 +14,6 @@ const navLinks = [
   { name: 'Process', href: '#process' },
   { name: 'About', href: '/about' },
   { name: 'Contact', href: '/contact' },
-];
-
-const usecaseList = [
-  'E-commerce support',
-  'SaaS customer success',
-  'Local business FAQs',
-  'Agency client bots',
-  'Real estate inquiries',
-  'HR & internal knowledge bases',
 ];
 
 export default function Footer() {
@@ -104,19 +95,58 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Use Cases */}
+            {/* Launched On */}
             <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors">
               <div className="flex items-center gap-2 text-sm tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google">
-                <div className="h-1.5 w-1.5 rounded-none bg-slate-900 dark:bg-slate-200" />
-                <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Use Cases</span>
+                <div className="h-1.5 w-1.5 rounded-none bg-orange-500" />
+                <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Launched On</span>
               </div>
-              <ul className="space-y-4">
-                {usecaseList.map((name, idx) => (
-                  <li key={idx} className="text-slate-600 dark:text-slate-300 text-sm tracking-wider font-normal font-google cursor-default">
-                    {name}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-col gap-5 cursor-pointer items-center justify-around">
+                {/* Product Hunt — light/dark themed variants */}
+                <a
+                  href="https://www.producthunt.com/products/sapybase?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-vaayu-intelligence"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <img
+                    alt="Vaayu Intelligence - Intelligence Integrated | Product Hunt"
+                    width={250}
+                    height={54}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-auto w-full max-w-[220px] dark:hidden"
+                    src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1179236&theme=light&t=1782237888926"
+                  />
+                  <img
+                    alt="Vaayu Intelligence - Intelligence Integrated | Product Hunt"
+                    width={250}
+                    height={54}
+                    loading="lazy"
+                    decoding="async"
+                    className="hidden h-auto w-full max-w-[220px] dark:block"
+                    src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1179236&theme=neutral&t=1782237888926"
+                  />
+                </a>
+                {/* Fazier */}
+                <a href="https://fazier.com/launches/vaayu" target="_blank"><img src="https://fazier.com/api/v1/public/badges/embed_image.svg?launch_id=9650&badge_type=daily&variant=2&theme=light" width="270" alt="Fazier badge" /></a>
+                <a
+                  href="https://fazier.com/launches/www.sapybase.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <img
+                    src="https://fazier.com/api/v1/public/badges/embed_image.svg?launch_id=9650&badge_type=featured&theme=light"
+                    width={120}
+                    height={51}
+                    loading="lazy"
+                    decoding="async"
+                    alt="Sapybase launch on Fazier"
+                    className="h-auto w-auto"
+                  />
+                </a>
+              </div>
             </div>
 
             {/* Social */}
@@ -126,35 +156,28 @@ export default function Footer() {
                 <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Social Network</span>
               </div>
               <div className="flex flex-col gap-8 relative z-10">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-200 dark:bg-slate-800 border border-gray-100 dark:border-slate-800">
-                    {[
-                      { Icon: Github, href: 'https://github.com/ayushsatvara1012', label: 'GIT' },
-                      { Icon: Linkedin, href: 'https://www.linkedin.com/in/ayushsatvara', label: 'LNK' },
-                    ].map((social, i) => (
+                <ul className="space-y-4">
+                  {[
+                    { icon: 'code', href: 'https://github.com/ayushsatvara1012', label: 'ayushsatvara1012', external: true },
+                    { icon: 'work', href: 'https://www.linkedin.com/in/ayushsatvara', label: '/ayushsatvara', external: true },
+                    { icon: 'mail', href: 'mailto:ayush@sapybase.com', label: 'ayush@sapybase.com', external: false },
+                    { icon: 'call', href: 'tel:+15626681855', label: '+1 562 668 1855', external: false },
+                  ].map((social, i) => (
+                    <li key={i}>
                       <a
-                        key={i}
                         href={social.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-white dark:bg-slate-950 p-6 flex flex-row min-[1011px]:flex-col items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white transition-all gap-2 group/social"
+                        {...(social.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                        className="flex items-center gap-3 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-600 transition-colors group/social"
                       >
-                        <social.Icon size={18} className="opacity-40 group-hover/social:opacity-100" />
-                        <span className="text-sm tracking-widest font-bold font-google">{social.label}</span>
+                        <span className="material-symbols-outlined text-[18px] shrink-0 opacity-50 group-hover/social:opacity-100 transition-opacity">
+                          {social.icon}
+                        </span>
+                        <span className="text-sm tracking-wider font-normal font-google break-all">{social.label}</span>
                       </a>
-                    ))}
-                  </div>
-                </div>
+                    </li>
+                  ))}
+                </ul>
                 <div className="space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] tracking-[0.2em] font-bold text-slate-400 dark:text-slate-600">Connect_Direct</p>
-                    <a
-                      href="mailto:ayush@sapybase.com"
-                      className="text-sm font-google font-medium text-slate-900 dark:text-slate-200 hover:text-blue-400 dark:hover:text-blue-400 break-all transition-colors block"
-                    >
-                      ayush@sapybase.com
-                    </a>
-                  </div>
                   <div className="space-y-2">
                     <p className="text-[10px] tracking-[0.2em] font-bold text-slate-400 dark:text-slate-600">Operations_Base</p>
                     <p className="text-sm font-google font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
@@ -170,20 +193,17 @@ export default function Footer() {
 
           {/* Bottom legend row */}
           <div className="min-[1011px]:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 min-[1011px]:px-8 min-[1011px]:py-4 border-t border-white dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
-            <div className="flex flex-col min-[1011px]:flex-row items-center gap-6 text-sm tracking-widest font-normal text-slate-600 dark:text-slate-400 font-google">
+            <div className="flex flex-col min-[1011px]:flex-row items-center gap-6 text-sm tracking-wide font-normal text-slate-600 dark:text-slate-400 font-google">
               <p className="text-center">© 2026 Sapybase LLC — Built to make AI work for every business.</p>
               <div className="hidden min-[1011px]:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
               <div className="flex gap-6">
-                <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Privacy</Link>
-                <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Terms</Link>
+                <Link href="/privacy-policy" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Privacy Policy</Link>
+                <Link href="/terms-and-conditions" className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors">Terms and Conditions</Link>
               </div>
-            </div>
-            <div>
-              <a href="https://fazier.com/launches/www.sapybase.com" target="_blank" rel="noopener noreferrer"><img src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=launched&theme=neutral" width={120} height={51} loading="lazy" decoding="async" alt="Sapybase launch on Fazier" /></a>
             </div>
             <div className="flex items-center gap-3">
               <Activity size={14} className="text-emerald-500" />
-              <span className="text-sm tracking-wider font-normal text-slate-900 dark:text-slate-200 font-google">
+              <span className="text-sm tracking-wide font-normal text-slate-900 dark:text-slate-200 font-google">
                 Status: <span className="text-emerald-600">Operational</span>
               </span>
             </div>

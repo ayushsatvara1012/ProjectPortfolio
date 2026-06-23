@@ -45,7 +45,7 @@ const PricingPreview = () => {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
                   </span>
-                  <span className="text-[10px] font-display font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Coming Soon</span>
+                  <span className="text-[10px] font-display font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Grab It Now !</span>
                 </span>
               </div>
               <p className="text-sm font-google text-slate-500 dark:text-slate-400">The full Vaayu Intelligence platform — free, forever.</p>

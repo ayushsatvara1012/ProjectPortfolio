@@ -1,9 +1,84 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import Alert from '@/src/app/components/Alert';
 import { parseFileToChunks } from '@/src/lib/demo/demoRag';
 import { saveKnowledge, getKnowledge, clearKnowledge, getBotConfig } from '@/src/lib/demo/demoStorage';
+import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/app/components/insights/ui';
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Local design tokens — mirror the dashboard Train AI surface so the demo KPI  */
+/* strip is visually identical to /dashboard/train.                             */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+type Tone = 'default' | 'accent' | 'info' | 'warn' | 'positive';
+
+const TONE: Record<Tone, { grad: string; ring: string; bar: string }> = {
+    default: { grad: 'from-slate-100 via-slate-50 to-white dark:from-slate-700/40 dark:via-slate-800/30 dark:to-slate-900', ring: 'ring-slate-200/70 dark:ring-slate-700/60', bar: 'bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500' },
+    accent: { grad: 'from-blue-100 via-blue-50 to-white dark:from-blue-900/40 dark:via-blue-950/20 dark:to-slate-900', ring: 'ring-blue-200/70 dark:ring-blue-900/50', bar: 'bg-gradient-to-r from-blue-600 to-blue-400' },
+    info: { grad: 'from-sky-100 via-sky-50 to-white dark:from-sky-900/40 dark:via-sky-950/20 dark:to-slate-900', ring: 'ring-sky-200/70 dark:ring-sky-900/50', bar: 'bg-gradient-to-r from-sky-500 to-sky-400' },
+    warn: { grad: 'from-amber-100 via-amber-50 to-white dark:from-amber-900/40 dark:via-amber-950/20 dark:to-slate-900', ring: 'ring-amber-200/70 dark:ring-amber-900/50', bar: 'bg-gradient-to-r from-amber-500 to-amber-400' },
+    positive: { grad: 'from-emerald-100 via-emerald-50 to-white dark:from-emerald-900/40 dark:via-emerald-950/20 dark:to-slate-900', ring: 'ring-emerald-200/70 dark:ring-emerald-900/50', bar: 'bg-gradient-to-r from-emerald-500 to-emerald-400' },
+};
+
+const NOISE_BG =
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='tnNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23tnNoise)'/%3E%3C/svg%3E\")";
+
+function StatCard({
+    label, icon, tone = 'default', value, limit, unit, progress, progressTone, footer, badge,
+}: {
+    label: React.ReactNode;
+    icon?: string;
+    tone?: Tone;
+    value: React.ReactNode;
+    limit?: React.ReactNode;
+    unit?: React.ReactNode;
+    progress?: number | null;
+    progressTone?: string;
+    footer?: React.ReactNode;
+    badge?: React.ReactNode;
+}) {
+    const t = TONE[tone];
+    return (
+        <div
+            className={cx(
+                'relative flex flex-col gap-3 p-4 sm:p-5 overflow-hidden rounded-2xl',
+                'bg-gradient-to-br ring-1 ring-inset shadow-sm shadow-slate-900/[0.03] transition-colors duration-300',
+                t.grad,
+                t.ring,
+            )}
+        >
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.20] mix-blend-soft-light"
+                style={{ backgroundImage: NOISE_BG, backgroundSize: '140px 140px' }}
+            />
+            <div className="relative z-10 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 leading-tight">
+                    {icon && <span className="material-symbols-outlined text-[16px] text-slate-400/90 dark:text-slate-500">{icon}</span>}
+                    {label}
+                </span>
+                {badge}
+            </div>
+
+            <div className="relative z-10 flex items-end gap-1.5 flex-wrap">
+                <span className="text-[26px] sm:text-[28px] font-bold tabular-nums leading-none tracking-[-0.02em] text-slate-900 dark:text-slate-100">
+                    {value}
+                </span>
+                {limit && <span className="text-[15px] font-semibold tabular-nums text-slate-400 dark:text-slate-500 leading-none mb-0.5">/ {limit}</span>}
+                {unit && <span className="text-[12.5px] font-medium text-slate-500 dark:text-slate-400 leading-none mb-0.5">{unit}</span>}
+            </div>
+
+            {typeof progress === 'number' && (
+                <div className="relative z-10">
+                    <ProgressBar pct={progress} tone={progressTone || t.bar} height="h-1.5" />
+                </div>
+            )}
+
+            {footer && <div className="relative z-10 text-[12px] text-slate-500 dark:text-slate-400 leading-tight">{footer}</div>}
+        </div>
+    );
+}
 
 const TABS = [
     { id: 'pdf', label: 'PDF Upload', icon: 'description' },
@@ -11,46 +86,70 @@ const TABS = [
     { id: 'text', label: 'Text', icon: 'notes' },
 ];
 
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
-const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
-const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
+// Form primitives — aligned to the Insights/dashboard input language.
+const inputCls = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-[13.5px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 transition-colors";
+const labelCls = "block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 transition-colors";
+
+const prettyBytes = (n: number) => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// ── Selected-file chip ────────────────────────────────────────────────────────
+const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove: () => void }) => (
+    <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-3 transition-colors">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <span className="material-symbols-outlined text-[18px]">{icon}</span>
+        </span>
+        <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">{file.name}</p>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400">{prettyBytes(file.size)}</p>
+        </div>
+        <button type="button" onClick={onRemove} aria-label="Remove file"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
+);
 
 export default function DemoTrainAIPage() {
-    const [botConfig, setBotConfig] = React.useState<any>(null);
-    const [chunks, setChunks] = React.useState<any[]>([]);
-    const [mounted, setMounted] = React.useState(false);
+    const [botConfig, setBotConfig] = useState<any>(null);
+    const [chunks, setChunks] = useState<string[]>([]);
+    const [mounted, setMounted] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         setBotConfig(getBotConfig());
         setChunks(getKnowledge());
         setMounted(true);
     }, []);
 
-    const [activeTab, setActiveTab] = React.useState('pdf');
-    const [file, setFile] = React.useState<File | null>(null);
-    const [csvFile, setCsvFile] = React.useState<File | null>(null);
-    const [trainingText, setTrainingText] = React.useState('');
-    const [textLabel, setTextLabel] = React.useState('');
-    const [isTraining, setIsTraining] = React.useState(false);
-    const [isPurging, setIsPurging] = React.useState(false);
-    const [alert, setAlert] = React.useState<{ open: boolean; type: 'success' | 'error' | 'warning'; msg: string }>({ open: false, type: 'success', msg: '' });
+    const [activeTab, setActiveTab] = useState('pdf');
+    const [file, setFile] = useState<File | null>(null);
+    const [csvFile, setCsvFile] = useState<File | null>(null);
+    const [trainingText, setTrainingText] = useState('');
+    const [textLabel, setTextLabel] = useState('');
+    const [isTraining, setIsTraining] = useState(false);
+    const [isPurging, setIsPurging] = useState(false);
+    const [alert, setAlert] = useState<{ open: boolean; type: 'success' | 'error' | 'warning'; msg: string }>({ open: false, type: 'success', msg: '' });
 
-    const fileRef = React.useRef<HTMLInputElement>(null);
-    const csvFileRef = React.useRef<HTMLInputElement>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
+    const csvFileRef = useRef<HTMLInputElement>(null);
 
     if (!mounted) return null;
 
     const chunksUsed = chunks.length;
     const chunkLimit = 200;
     const chunkPct = chunkLimit > 0 ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
+    const sourceCount = chunksUsed > 0 ? 1 : 0;
+    const msgUsed = 0;
+    const msgLimit = 15;
+    const usagePct = Math.min((msgUsed / msgLimit) * 100, 100);
+    const barToneFor = (pct: number | null) =>
+        pct === null ? undefined : pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : undefined;
 
-    const refresh = () => {
-        setChunks(getKnowledge());
-    };
-
-    const showAlert = (type: 'success' | 'error' | 'warning', msg: string) => {
-        setAlert({ open: true, type, msg });
-    };
+    const refresh = () => setChunks(getKnowledge());
+    const showAlert = (type: 'success' | 'error' | 'warning', msg: string) => setAlert({ open: true, type, msg });
 
     const handleTrain = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,7 +170,7 @@ export default function DemoTrainAIPage() {
             if (newChunks.length > 200) newChunks = newChunks.slice(0, 200);
             saveKnowledge(newChunks);
             refresh();
-            showAlert('success', `Training complete! ${newChunks.length} chunks committed to your bot's knowledge base.`);
+            showAlert('success', `Training complete! ${newChunks.length} segments committed to your bot's knowledge base.`);
             setFile(null); setCsvFile(null); setTrainingText(''); setTextLabel('');
             if (fileRef.current) fileRef.current.value = '';
             if (csvFileRef.current) csvFileRef.current.value = '';
@@ -93,311 +192,260 @@ export default function DemoTrainAIPage() {
         showAlert('success', 'Knowledge purged successfully.');
     };
 
-    // ── Source Browser ────────────────────────────────────────────────────────
+    // ── Source browser — mirrors the dashboard "Manage knowledge" panel ─────────
     const DemoSourceBrowser = () => {
         const allChunks = chunks;
-        const [selectedChunks, setSelectedChunks] = React.useState(new Set<number>());
+        const [selectedChunks, setSelectedChunks] = useState(new Set<number>());
 
-        const toggleChunk = (i: number) => {
+        const toggleChunk = (i: number) =>
             setSelectedChunks(prev => {
                 const next = new Set(prev);
                 if (next.has(i)) next.delete(i); else next.add(i);
                 return next;
             });
-        };
 
         const toggleAll = () => {
-            if (selectedChunks.size === allChunks.length) {
-                setSelectedChunks(new Set());
-            } else {
-                setSelectedChunks(new Set(allChunks.map((_: string, i: number) => i)));
-            }
+            if (selectedChunks.size === allChunks.length) setSelectedChunks(new Set());
+            else setSelectedChunks(new Set(allChunks.map((_: string, i: number) => i)));
         };
 
         const handleDeleteSelected = () => {
             if (selectedChunks.size === 0) return;
-            if (!window.confirm(`Delete ${selectedChunks.size} selected chunk(s)? This cannot be undone.`)) return;
+            if (!window.confirm(`Delete ${selectedChunks.size} selected segment(s)? This cannot be undone.`)) return;
             const remaining = allChunks.filter((_: string, i: number) => !selectedChunks.has(i));
             saveKnowledge(remaining);
             setChunks(remaining);
             setSelectedChunks(new Set());
-            showAlert('success', `${selectedChunks.size} chunk(s) deleted successfully.`);
+            showAlert('success', `${selectedChunks.size} segment(s) deleted successfully.`);
         };
+
+        const allSelected = selectedChunks.size === allChunks.length && allChunks.length > 0;
 
         if (allChunks.length === 0) {
             return (
-                <div className="py-12 text-center flex flex-col items-center">
-                    <span className="material-symbols-outlined text-[48px] text-slate-200 dark:text-slate-700 mb-4">auto_stories</span>
-                    <p className="text-sm font-semibold text-slate-400 dark:text-slate-500 font-display mb-2">No sources yet</p>
-                    <p className="text-sm text-slate-400 dark:text-slate-600 font-display">Add a PDF, CSV, or paste text to train your bot.</p>
-                </div>
+                <EmptyState
+                    icon="auto_stories"
+                    title="No knowledge sources yet"
+                    hint="Add a PDF, CSV, or paste text above to start training this bot."
+                />
             );
         }
 
         return (
-            <div className="space-y-4">
-                <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">notes</span>
-                        <span className="text-sm font-medium font-google text-slate-700 dark:text-slate-300 truncate flex-1">
+            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                <div className="flex flex-col gap-3 bg-slate-50/70 dark:bg-slate-800/30 p-4 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                            <span className="material-symbols-outlined text-[17px]">notes</span>
+                        </span>
+                        <span className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 truncate flex-1 min-w-0">
                             demo-knowledge
                         </span>
+                        <Badge tone="neutral" dot={false}>{allChunks.length} segments</Badge>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
+
+                    <div className="flex items-center justify-between border-t border-slate-200/70 dark:border-slate-700/60 pt-2.5">
                         <button
                             onClick={toggleAll}
                             disabled={allChunks.length === 0}
-                            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+                            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40"
                         >
-                            <span className="material-symbols-outlined text-[16px]">
-                                {selectedChunks.size === allChunks.length && allChunks.length > 0 ? 'check_box' : 'check_box_outline_blank'}
+                            <span className="material-symbols-outlined text-[17px]">
+                                {allSelected ? 'check_box' : 'check_box_outline_blank'}
                             </span>
-                            {selectedChunks.size === allChunks.length && allChunks.length > 0 ? 'Deselect all' : 'Select all'}
+                            {allSelected ? 'Deselect all' : 'Select all'}
                         </button>
-                        <span className="text-xs font-medium font-google text-slate-400 dark:text-slate-500">
-                            {allChunks.length} segments
-                        </span>
+                        {selectedChunks.size > 0 && (
+                            <span className="text-[12px] font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                                {selectedChunks.size} selected
+                            </span>
+                        )}
                     </div>
                 </div>
 
-                <div className="max-h-[240px] overflow-y-auto custom-scrollbar transition-colors" data-lenis-prevent>
-                    {allChunks.map((chunk: string, i: number) => (
-                        <label
-                            key={i}
-                            className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors ${selectedChunks.has(i) ? 'bg-blue-50/50 dark:bg-blue-900/30' : ''}`}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={selectedChunks.has(i)}
-                                onChange={() => toggleChunk(i)}
-                                className="mt-1 shrink-0 accent-slate-900 dark:accent-blue-500"
-                            />
-                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 font-mono transition-colors">
-                                {chunk || '(empty chunk)'}
-                            </p>
-                        </label>
-                    ))}
+                <div className="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70" data-lenis-prevent>
+                    {allChunks.map((chunk: string, i: number) => {
+                        const checked = selectedChunks.has(i);
+                        return (
+                            <label
+                                key={i}
+                                className={cx(
+                                    'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors',
+                                    checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
+                                )}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleChunk(i)}
+                                    className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 dark:accent-blue-500"
+                                />
+                                <span className="text-[11px] font-bold tabular-nums text-slate-300 dark:text-slate-600 mt-0.5 shrink-0 w-6">
+                                    {String(i + 1).padStart(2, '0')}
+                                </span>
+                                <p className="text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 transition-colors">
+                                    {chunk || '(empty segment)'}
+                                </p>
+                            </label>
+                        );
+                    })}
                 </div>
 
                 {allChunks.length > 0 && (
-                    <button
-                        onClick={handleDeleteSelected}
-                        disabled={selectedChunks.size === 0}
-                        className="w-full py-3 min-h-[44px] rounded-xl bg-red-650/90 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
-                    >
-                        <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
-                        Delete Selected ({selectedChunks.size})
-                    </button>
+                    <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+                        <button
+                            onClick={handleDeleteSelected}
+                            disabled={selectedChunks.size === 0}
+                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                        >
+                            <span className="material-symbols-outlined text-[17px]">delete_sweep</span>
+                            Delete selected ({selectedChunks.size})
+                        </button>
+                    </div>
                 )}
             </div>
         );
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500">
-            {/* Page Header */}
-            <div className="px-6 py-7 md:px-8 md:py-8 shrink-0 transition-colors duration-500">
-                <div className="flex items-center gap-2.5 mb-2">
-                    <span className="material-symbols-outlined text-[22px] text-slate-500 dark:text-slate-400 transition-colors">
-                        psychology
-                    </span>
-                    <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight leading-none text-slate-900 dark:text-slate-200 transition-colors">
-                        Train AI
-                    </h1>
-                </div>
-                <p className="text-sm md:text-base font-display text-slate-500 dark:text-slate-400 leading-relaxed transition-colors">
-                    Ingest knowledge sources into your AI's vector brain.
-                </p>
-            </div>
-
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 px-6 md:px-8 mb-6">
-                {/* Data Storage */}
-                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">psychology</span>
-                        <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Data storage</h4>
-                    </div>
-                    <div className="flex items-end gap-1 mb-3">
-                        <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">{(chunksUsed * 60).toLocaleString()}</span>
-                        <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ {(chunkLimit * 60).toLocaleString()}</span>
-                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">words</span>
-                    </div>
-                    {chunkPct !== null && (
-                        <>
-                            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors rounded-full">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${chunkPct}%` }}
-                                    className={`h-full ${chunkPct >= 100 ? 'bg-red-500' : chunkPct >= 80 ? 'bg-amber-500' : 'bg-slate-900 dark:bg-blue-500'}`}
-                                />
-                            </div>
-                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 transition-colors">
-                                {Math.round(chunkPct)}% storage used
-                            </p>
-                        </>
-                    )}
-                </div>
-
-                {/* AI Memory */}
-                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">vital_signs</span>
-                        <p className="text-sm font-semibold font-google text-slate-600 dark:text-slate-400 transition-colors">AI Memory</p>
-                    </div>
-                    <p className="text-3xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">
-                        {chunksUsed}
-                        <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors ml-1">segs</span>
+        <div className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
+            {/* ── Sticky header ──────────────────────────────────────────────── */}
+            <div className="relative shrink-0 z-20 bg-[#f8f9fa]/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800/70">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 px-4 md:px-6 lg:px-8 py-3">
+                    <p className="text-[13px] sm:text-[13.5px] text-slate-500 dark:text-slate-400 leading-snug min-w-0">
+                        Ingest knowledge sources into your AI's vector brain.
                     </p>
-                </div>
-
-                {/* System Tier */}
-                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">bolt</span>
-                        <p className="text-sm font-semibold font-google text-slate-600 dark:text-slate-400 transition-colors">System tier</p>
-                    </div>
-                    <p className="text-3xl font-google font-bold tracking-tight text-amber-500 transition-colors">
-                        DEMO
-                        <span className="text-sm font-google font-semibold text-slate-600 dark:text-slate-400 transition-colors ml-1">plan</span>
-                    </p>
-                </div>
-
-                {/* Total Usage */}
-                <div className={`${cellCls} p-4 md:p-8 flex flex-col justify-center`}>
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 transition-colors">database</span>
-                        <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google transition-colors">Total usage</h4>
-                    </div>
-                    <div className="flex items-end gap-1 mb-3">
-                        <span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 transition-colors">0</span>
-                        <span className="text-xl text-slate-600 dark:text-slate-400 mb-1 font-medium italic transition-colors">/ 15</span>
-                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 ml-1 transition-colors">reqs</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 overflow-hidden transition-colors rounded-full">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: '0%' }}
-                            className="h-full bg-slate-900 dark:bg-blue-500"
-                        />
-                    </div>
-                    <div className="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mt-3 transition-colors">
-                        <span>0% cap</span>
-                        <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[12px]">schedule</span> Demo
-                        </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="alert" dot={false}>Demo plan</Badge>
                     </div>
                 </div>
             </div>
 
-            {/* Main Body */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 px-6 md:px-8 overflow-hidden transition-colors duration-500 pb-8">
-                {/* Knowledge Sources Form */}
-                <div className={`lg:col-span-7 ${cellCls} p-6 md:p-8 relative`}>
-                    <h2 className="text-lg font-semibold font-display text-slate-900 dark:text-slate-200 mb-5 transition-colors">
-                        Knowledge sources
-                    </h2>
+            {/* ── Scroll body ────────────────────────────────────────────────── */}
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col gap-5 p-4 md:p-6 lg:p-8">
+                {/* KPI strip */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <StatCard
+                        label="Knowledge storage"
+                        icon="database"
+                        tone="accent"
+                        value={fmtNum(chunksUsed * 60)}
+                        limit={fmtNum(chunkLimit * 60)}
+                        unit="words"
+                        progress={chunkPct ?? undefined}
+                        progressTone={barToneFor(chunkPct)}
+                        footer={chunkPct !== null ? `${Math.round(chunkPct)}% of storage used` : undefined}
+                    />
 
-                    {/* Tabs */}
-                    <div className="flex mb-6 overflow-x-auto transition-colors bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-                        {TABS.map(t => (
-                            <button
-                                key={t.id}
-                                onClick={() => setActiveTab(t.id)}
-                                className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 px-3 text-sm font-medium font-google rounded-lg transition-colors min-h-[40px] shrink-0 ${
-                                    activeTab === t.id
-                                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 shadow-sm'
-                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                                }`}
-                            >
-                                <span className="material-symbols-outlined text-[17px]">{t.icon}</span>
-                                <span className="hidden sm:inline">{t.label}</span>
-                            </button>
-                        ))}
+                    <StatCard
+                        label="Knowledge sources"
+                        icon="folder_open"
+                        tone="info"
+                        value={fmtNum(sourceCount)}
+                        unit={sourceCount === 1 ? 'source' : 'sources'}
+                        footer={`${fmtNum(chunksUsed)} segment${chunksUsed === 1 ? '' : 's'} indexed`}
+                    />
+
+                    <StatCard
+                        label="AI memory"
+                        icon="vital_signs"
+                        tone="default"
+                        value={fmtNum(chunksUsed)}
+                        unit="segs"
+                        footer="Segments in this demo session"
+                    />
+
+                    <StatCard
+                        label="Monthly usage"
+                        icon="bolt"
+                        tone="warn"
+                        value={fmtNum(msgUsed)}
+                        limit={fmtNum(msgLimit)}
+                        unit="reqs"
+                        progress={usagePct}
+                        progressTone={barToneFor(usagePct)}
+                        footer={
+                            <span className="flex items-center justify-between gap-2">
+                                <span>{Math.round(usagePct)}% of demo cap</span>
+                                <span className="inline-flex items-center gap-1 shrink-0">
+                                    <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                    demo
+                                </span>
+                            </span>
+                        }
+                    />
+                </div>
+
+                {/* Add knowledge */}
+                <Card className="relative p-4 sm:p-5 overflow-hidden">
+                    <SectionHeader
+                        title="Add knowledge"
+                        subtitle="Pick a source type, then feed it into this bot's knowledge base."
+                        icon="add_circle"
+                        className="mb-4"
+                    />
+
+                    {/* Source-type tabs */}
+                    <div role="tablist" aria-label="Knowledge source type" className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 mb-5">
+                        {TABS.map(t => {
+                            const active = activeTab === t.id;
+                            return (
+                                <button
+                                    key={t.id}
+                                    role="tab"
+                                    aria-selected={active}
+                                    onClick={() => setActiveTab(t.id)}
+                                    className={cx(
+                                        'inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-[12.5px] font-semibold whitespace-nowrap transition-colors min-h-[38px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+                                        active
+                                            ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                                    )}
+                                >
+                                    <span className="material-symbols-outlined text-[17px]">{t.icon}</span>
+                                    <span className="hidden sm:inline">{t.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
-
-                    {/* Alert banner */}
-                    {alert.open && (
-                        <div className={`mb-5 p-4 rounded-xl border flex items-start justify-between gap-3 ${
-                            alert.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/30'
-                            : alert.type === 'error' ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/30'
-                            : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/30'
-                        }`}>
-                            <span className="text-sm font-google leading-relaxed">{alert.msg}</span>
-                            <button
-                                onClick={() => setAlert(p => ({ ...p, open: false }))}
-                                className="shrink-0 opacity-60 hover:opacity-100 min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer"
-                            >
-                                <span className="material-symbols-outlined text-[16px]">close</span>
-                            </button>
-                        </div>
-                    )}
 
                     <form onSubmit={handleTrain} className="space-y-4">
-                        {/* PDF Tab */}
                         {activeTab === 'pdf' && (
                             <div>
-                                <label className={labelCls}>PDF Archive</label>
-                                <div
+                                <label className={labelCls}>PDF document</label>
+                                <button
+                                    type="button"
                                     onClick={() => fileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors rounded-xl border border-dashed border-slate-200 dark:border-slate-800"
+                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 >
-                                    <span className="material-symbols-outlined text-[32px] text-slate-650 dark:text-slate-400 transition-colors">cloud_upload</span>
-                                    <div className="text-center w-full px-2">
-                                        <p className="text-sm text-slate-705 dark:text-slate-300 font-google transition-colors break-all">
-                                            {file ? file.name : 'Drop PDF here'}
-                                        </p>
-                                        <p className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">
-                                            or click to browse
-                                        </p>
-                                        <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">
-                                            PDF only — max 10 MB
-                                        </p>
+                                    <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                        <span className="material-symbols-outlined text-[24px]">cloud_upload</span>
+                                    </span>
+                                    <div className="text-center">
+                                        <p className="text-[13.5px] font-semibold text-slate-700 dark:text-slate-200">Click to upload a PDF</p>
+                                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">PDF only · up to 10 MB</p>
                                     </div>
-                                    <input
-                                        type="file"
-                                        ref={fileRef}
-                                        className="hidden"
-                                        accept=".pdf"
-                                        onChange={e => {
-                                            const f = e.target.files?.[0];
-                                            if (f?.type === 'application/pdf') setFile(f);
-                                            else showAlert('error', 'Please select a valid PDF.');
-                                        }}
-                                    />
-                                </div>
-                                {file && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-sm font-google text-red-500 hover:text-red-700 min-h-[36px]"
-                                    >
-                                        <span className="material-symbols-outlined text-[16px]">close</span>
-                                        <span className="truncate max-w-[240px] sm:max-w-none">Remove {file.name}</span>
-                                    </button>
-                                )}
+                                    <input type="file" ref={fileRef} className="hidden" accept=".pdf"
+                                        onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
+                                </button>
+                                {file && <FileChip file={file} icon="picture_as_pdf" onRemove={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }} />}
                             </div>
                         )}
 
-                        {/* CSV Tab */}
                         {activeTab === 'csv' && (
                             <div>
-                                <label className={labelCls}>CSV / Excel File</label>
-                                <div
+                                <label className={labelCls}>CSV / Excel file</label>
+                                <button
+                                    type="button"
                                     onClick={() => csvFileRef.current?.click()}
-                                    className="flex flex-col items-center justify-center gap-3 px-4 py-6 md:px-6 md:py-8 bg-[#f1f3f5]/70 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors rounded-xl border border-dashed border-slate-200 dark:border-slate-800"
+                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                                 >
-                                    <span className="material-symbols-outlined text-[32px] text-slate-600 dark:text-slate-400 transition-colors">table_chart</span>
-                                    <div className="text-center w-full px-2">
-                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-google transition-colors break-all">
-                                            {csvFile ? csvFile.name : 'Drop CSV or Excel file here'}
-                                        </p>
-                                        <p className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">
-                                            or click to browse
-                                        </p>
-                                        <p className="text-sm font-medium font-google text-slate-600 dark:text-slate-400 mt-0.5 transition-colors">
-                                            .csv, .xlsx, .xls — max 5 MB
-                                        </p>
+                                    <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                        <span className="material-symbols-outlined text-[24px]">table_chart</span>
+                                    </span>
+                                    <div className="text-center">
+                                        <p className="text-[13.5px] font-semibold text-slate-700 dark:text-slate-200">Click to upload a spreadsheet</p>
+                                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">.csv, .xlsx, .xls · up to 5 MB</p>
                                     </div>
                                     <input
                                         type="file"
@@ -413,36 +461,23 @@ export default function DemoTrainAIPage() {
                                             setCsvFile(f);
                                         }}
                                     />
-                                </div>
+                                </button>
+                                {csvFile && <FileChip file={csvFile} icon="table_chart" onRemove={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }} />}
                                 {csvFile && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }}
-                                        className="mt-2 flex items-center gap-1 text-sm font-google text-red-500 hover:text-red-700 min-h-[36px]"
-                                    >
-                                        <span className="material-symbols-outlined text-[16px]">close</span>
-                                        <span className="truncate max-w-[240px] sm:max-w-none">Remove {csvFile.name}</span>
-                                    </button>
-                                )}
-                                {csvFile && (
-                                    <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 flex items-start gap-2">
-                                        <span className="material-symbols-outlined text-[15px] text-blue-500 mt-0.5 shrink-0">info</span>
-                                        <p className="text-xs text-blue-700 dark:text-blue-300 font-google leading-relaxed">
-                                            Each row is stored as a piece of knowledge your bot can answer from. Make sure your file has a <span className="font-bold">header row</span>. Re-uploading replaces the previous version.
+                                    <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 px-3.5 py-3 ring-1 ring-inset ring-blue-100 dark:ring-blue-900/40">
+                                        <span className="material-symbols-outlined text-[16px] text-blue-500 mt-0.5 shrink-0">info</span>
+                                        <p className="text-[12px] text-blue-800 dark:text-blue-200 leading-relaxed">
+                                            Each row becomes a piece of knowledge your bot can answer from. Make sure row 1 holds your <span className="font-semibold">column headers</span>. Re-uploading the same filename safely replaces the previous version.
                                         </p>
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Text Tab */}
                         {activeTab === 'text' && (
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className={labelCls}>
-                                        Source Label{' '}
-                                        <span className="normal-case text-slate-400 dark:text-slate-500 font-normal tracking-normal">(optional)</span>
-                                    </label>
+                                    <label className={labelCls}>Source label <span className="font-normal text-slate-400 dark:text-slate-500">(optional)</span></label>
                                     <input
                                         type="text"
                                         value={textLabel}
@@ -450,72 +485,71 @@ export default function DemoTrainAIPage() {
                                         className={inputCls}
                                         placeholder="e.g. faq-returns, pricing-2025"
                                     />
-                                    <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500 font-google leading-relaxed">
+                                    <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
                                         {textLabel.trim()
-                                            ? <>Re-uploading with label <span className="font-mono font-bold text-slate-600 dark:text-slate-300">"{textLabel.trim()}"</span> will safely replace only that source.</>
-                                            : 'Without a label, re-submitting will overwrite all previous unlabelled text entries.'}
+                                            ? <>Re-uploading with label <span className="font-semibold text-slate-700 dark:text-slate-200">"{textLabel.trim()}"</span> safely replaces only that source.</>
+                                            : 'Without a label, re-submitting overwrites all previous unlabelled text entries.'}
                                     </p>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Knowledge Text</label>
-                                    <textarea
-                                        value={trainingText}
-                                        onChange={e => setTrainingText(e.target.value)}
-                                        rows={6}
-                                        className={inputCls + ' resize-none'}
-                                        placeholder="Paste your FAQs, services, or raw knowledge here..."
-                                    />
+                                    <label className={labelCls}>Knowledge text</label>
+                                    <textarea value={trainingText} onChange={e => setTrainingText(e.target.value)}
+                                        rows={6} className={cx(inputCls, 'resize-none leading-relaxed')} placeholder="Paste your FAQs, services, or raw knowledge here…" />
                                 </div>
                             </div>
                         )}
 
-                        <button
-                            type="submit"
-                            disabled={isTraining}
-                            className="w-full py-3.5 min-h-[48px] bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-40"
-                        >
+                        <button type="submit" disabled={isTraining}
+                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 px-7 py-3 text-[13.5px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 active:scale-[0.99]">
                             {isTraining ? (
-                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading...</>
-                            ) : 'Start training sequence'}
+                                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Uploading…</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-[18px]">bolt</span> Start training</>
+                            )}
                         </button>
                     </form>
-                </div>
+                </Card>
 
-                {/* Manage Knowledge */}
-                <div className={`lg:col-span-5 ${cellCls} p-6 md:p-8 relative`}>
-                    <div className="flex items-center gap-2 mb-5">
-                        <span className="material-symbols-outlined text-[18px] text-slate-650 dark:text-slate-400 transition-colors">folder_open</span>
-                        <h2 className="text-sm font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest transition-colors">
-                            Manage Knowledge
-                        </h2>
-                    </div>
+                {/* Manage knowledge */}
+                <Card className="p-4 sm:p-5">
+                    <SectionHeader
+                        title="Manage knowledge"
+                        subtitle="Review, audit, and prune the exact segments powering this bot."
+                        icon="folder_open"
+                        className="mb-4"
+                    />
 
                     <DemoSourceBrowser />
 
-                    {/* Danger Zone */}
-                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 transition-colors">
-                        <div className="flex items-start gap-3 mb-4 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl transition-colors">
-                            <span className="material-symbols-outlined text-[18px] text-red-550 dark:text-red-400 shrink-0 mt-0.5 transition-colors">
-                                delete_forever
-                            </span>
-                            <p className="text-xs font-medium tracking-wide text-red-650 dark:text-red-400 font-sans leading-relaxed transition-colors">
-                                Deleting permanently removes all trained data for this bot. This action cannot be undone.
-                            </p>
+                    {/* Danger zone */}
+                    <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
+                        <div className="flex flex-col gap-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 ring-1 ring-inset ring-rose-100 dark:ring-rose-900/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                                <span className="material-symbols-outlined text-[18px] text-rose-500 dark:text-rose-400 shrink-0 mt-0.5">delete_forever</span>
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-semibold text-rose-700 dark:text-rose-300">Delete all knowledge</p>
+                                    <p className="text-[12px] text-rose-600/90 dark:text-rose-400/90 leading-relaxed mt-0.5">
+                                        Permanently removes every trained segment for this bot. This cannot be undone.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handlePurge}
+                                disabled={isPurging || chunksUsed === 0}
+                                className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                            >
+                                {isPurging ? (
+                                    <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Deleting…</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-[17px]">delete</span> Delete all ({fmtNum(chunksUsed)})</>
+                                )}
+                            </button>
                         </div>
-                        <button
-                            onClick={handlePurge}
-                            disabled={isPurging || chunksUsed === 0}
-                            className="w-full py-3.5 min-h-[48px] bg-red-650/90 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
-                        >
-                            {isPurging ? (
-                                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
-                            ) : (
-                                <><span className="material-symbols-outlined text-[18px] sm:text-[20px]">delete</span> Delete All Knowledge ({chunksUsed})</>
-                            )}
-                        </button>
                     </div>
-                </div>
+                </Card>
             </div>
+
+            <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />
         </div>
     );
 }

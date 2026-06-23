@@ -4,9 +4,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getBotConfig } from '@/src/lib/demo/demoStorage';
+import { card, cx } from '@/src/app/components/insights/ui';
 // FunnelVisual and QualityDonut are local demo-only components defined below
 
-const cellCls = 'bg-white dark:bg-slate-900 rounded-2xl transition-colors duration-500';
+// Use the shared Insights card surface (bordered + soft shadow) so every demo
+// card matches the real dashboard look exactly.
+const cellCls = cx(card, 'transition-colors duration-500');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // One coherent demo business, told across every tab. Numbers reconcile:
@@ -156,7 +159,7 @@ const DemoActionCenterPanel = () => {
 
     const summaryChip = (label: string, n: number, cls: string) => (
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${cls}`}>
-            <span className="text-sm font-google font-bold">{n}</span>
+            <span className="text-sm font-bold tabular-nums">{n}</span>
             <span className="text-xs font-google font-medium">{label}</span>
         </div>
     );
@@ -457,7 +460,7 @@ const DemoFunnelPanel = () => {
                     <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-google uppercase tracking-wider mb-2">
                         Overall conversion rate
                     </span>
-                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">
+                    <span className="text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">
                         {f.overall}%
                     </span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
@@ -468,7 +471,7 @@ const DemoFunnelPanel = () => {
                     <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wider mb-2">
                         Revenue won
                     </span>
-                    <span className="text-3xl md:text-4xl font-google font-bold tracking-tight text-emerald-500 dark:text-emerald-400">
+                    <span className="text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-emerald-500 dark:text-emerald-400">
                         {fmtMoney(f.wonValue)}
                     </span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
@@ -572,7 +575,7 @@ const DemoFunnelPanel = () => {
                                             </span>
                                             <span className="text-[10px] font-google text-slate-400 dark:text-slate-500 font-medium">leads</span>
                                             {s.won > 0 && (
-                                                <span className="text-[10px] font-google font-bold text-emerald-500 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-2 py-0.5 rounded-md">
+                                                <span className="text-[10px] font-bold tabular-nums text-emerald-500 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-2 py-0.5 rounded-md">
                                                     {fmtMoney(s.won_value)} won
                                                 </span>
                                             )}
@@ -614,7 +617,7 @@ const DemoFixesNeededPanel = () => {
             <div className={`${cellCls} p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
                 <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">build</span>
-                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">{fixes.length} Fixes Needed</h2>
+                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100">{fixes.length} Fixes Needed</h2>
                 </div>
                 <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest font-bold font-google">
                     <span className="flex items-center gap-1.5 text-amber-500"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{unansweredCount} Unanswered</span>
@@ -660,7 +663,7 @@ const DemoLeadsPanel = () => {
             <div className={`${cellCls} p-4 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
                 <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">group</span>
-                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">Total Leads: {leads.length}</h2>
+                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100">Total Leads: {leads.length}</h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {(['All', 'HOT', 'WARM', 'COLD'] as const).map(b => (
@@ -848,7 +851,7 @@ const DemoConversationsPanel = () => {
             <div className={`${cellCls} p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
                 <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">forum</span>
-                    <h2 className="text-md font-google font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest">{total} Conversation{total !== 1 ? 's' : ''}</h2>
+                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100">{total} Conversation{total !== 1 ? 's' : ''}</h2>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => setFilter('all')} className={`px-3 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google rounded-sm transition-colors ${filter === 'all' ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900'}`}>All</button>
@@ -951,17 +954,17 @@ const DemoROIPanel = ({ botName }: { botName: string }) => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                     <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Support cost saved</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{fmt2(previewSavings)}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{fmt2(previewSavings)}</span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">{stats.answered_queries_30d.toLocaleString()} queries × ${previewCost.toFixed(2)}/ticket</p>
                 </div>
                 <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                     <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Potential revenue</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{fmt2(previewRevenue)}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{fmt2(previewRevenue)}</span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">{stats.leads_30d.toLocaleString()} leads × ${previewLead.toFixed(2)}/lead</p>
                 </div>
                 <div className={`${cellCls} p-8 flex flex-col justify-center`}>
                     <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Total ROI</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{fmt2(previewTotal)}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{fmt2(previewTotal)}</span>
                     <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Answer rate: {answerRate}%</p>
                 </div>
             </div>
@@ -973,11 +976,11 @@ const DemoROIPanel = ({ botName }: { botName: string }) => {
                         <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0"><span className="material-symbols-outlined text-[18px] text-emerald-500 dark:text-emerald-400">paid</span></div>
                         <div>
                             <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wide">Proven revenue · closed-won</span>
-                            <p className="text-2xl sm:text-3xl md:text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200 mt-0.5">{fmt2(realizedRevenue)}</p>
+                            <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200 mt-0.5">{fmt2(realizedRevenue)}</p>
                         </div>
                     </div>
                     <div className="text-right">
-                        <span className="text-xl sm:text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{wonDeals.toLocaleString()}</span>
+                        <span className="text-xl sm:text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-200">{wonDeals.toLocaleString()}</span>
                         <p className="text-xs font-medium text-slate-400 font-google mt-0.5">deals won (all-time)</p>
                     </div>
                 </div>
@@ -994,7 +997,7 @@ const DemoROIPanel = ({ botName }: { botName: string }) => {
                     <div key={s.label} className={`${cellCls} p-6 flex items-center gap-4`}>
                         <div className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-white/[0.04] shrink-0"><span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">{s.icon}</span></div>
                         <div>
-                            <span className="text-lg sm:text-xl md:text-2xl font-google font-bold text-slate-900 dark:text-slate-200">{s.val.toLocaleString()}</span>
+                            <span className="text-lg sm:text-xl md:text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-200">{s.val.toLocaleString()}</span>
                             <p className="text-xs font-medium text-slate-400 font-google mt-0.5">{s.label}</p>
                         </div>
                     </div>
@@ -1037,17 +1040,17 @@ const DemoAnalyticsPanel = ({ report }: { report: ReturnType<typeof buildDemoRep
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
             <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                 <div className="flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span><h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Support hours saved</h3></div>
-                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">12</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
+                <div className="flex items-end gap-1"><span className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">12</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
                 <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
             </div>
             <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                 <div className="flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span><h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Estimated savings</h3></div>
-                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{report.roi_metrics.support_savings}</span></div>
+                <div className="flex items-end gap-1"><span className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{report.roi_metrics.support_savings}</span></div>
                 <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
             </div>
             <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
                 <div className="flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span><h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Potential revenue</h3></div>
-                <div className="flex items-end gap-1"><span className="text-4xl font-google font-bold tracking-tight text-slate-900 dark:text-slate-200">{report.roi_metrics.potential_revenue}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
+                <div className="flex items-end gap-1"><span className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{report.roi_metrics.potential_revenue}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
                 <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
             </div>
         </div>
@@ -1151,9 +1154,9 @@ export default function DemoInsightsPage() {
             {/* Header — tabs sit near the top; demo context lives in the top bar */}
             <div className="px-6 py-3 sm:px-8 sm:py-4 shrink-0 min-w-0 w-full">
                 <div className="overflow-x-auto scrollbar-hide">
-                    <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                    <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1">
                         {TABS.map(tab => (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-sm font-medium font-google rounded-lg whitespace-nowrap transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>{tab.label}</button>
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-[12.5px] font-semibold rounded-lg whitespace-nowrap transition-colors min-h-[38px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${activeTab === tab.id ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}>{tab.label}</button>
                         ))}
                     </div>
                 </div>
