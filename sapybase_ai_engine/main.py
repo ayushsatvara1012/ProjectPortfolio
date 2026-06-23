@@ -1025,6 +1025,7 @@ ALLOWED_ORIGINS = {
     "https://www.sapybase.com",
     "https://app.sapybase.com",
     "https://admin.sapybase.com",
+    "https://vaayu.sapybase.com",
     "https://sapybase-deploy-test.vercel.app",
     "https://projectportfolio-ayushsatvara2002-4930s-projects.vercel.app",
     "http://localhost:5173",
