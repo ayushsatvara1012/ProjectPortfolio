@@ -1308,6 +1308,12 @@ api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 # `from main import ...` / `main.X` and the test suite resolve unchanged.
 from parsing_utils import safe_json_loads, normalize_quick_questions
 
+# Vertical-pack machinery (chemical-vertical-agent plan, Phase 0). normalize_vertical
+# canonicalizes the raw companies.vertical value (NULL/garbage -> None = generic bot);
+# load_pack resolves it to a Pack. Phase 0 only carries `vertical` on the company
+# dict so Phase 1 can read it — no behaviour change here.
+from packs import normalize_vertical
+
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
     """
@@ -1342,7 +1348,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    u.email, c.handoff_redirect_url, c.hide_branding,
                    u.id, u.subscription_status, u.billing_period_end,
                    c.hot_lead_alerts_enabled, c.alert_email, c.slack_webhook_url,
-                   c.booking_url
+                   c.booking_url, c.vertical
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1484,6 +1490,9 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         "alert_email": company_data[23],
         "slack_webhook_url": company_data[24],
         "booking_url": company_data[25],
+        # Vertical-pack selector (Phase 0). Normalized: NULL/empty/garbage -> None
+        # = generic bot. Carried for Phase 1's agent loop; unused on this path today.
+        "vertical": normalize_vertical(company_data[26]),
         # Carry the resolved custom plan config so the chat handler's get_plan()
         # applies the CUSTOM tier's real message/chunk limits + features. Without it,
         # get_plan() falls back to the FREE plan (0 messages) and blocks the chat.
@@ -1891,7 +1900,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url
+                       booking_url, vertical
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1903,7 +1912,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url
+                       booking_url, vertical
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1938,6 +1947,8 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "weekly_digest_enabled": True if company_row[20] is None else bool(company_row[20]),
             "slack_webhook_url": company_row[21],
             "booking_url": company_row[22],
+            # Vertical-pack selector (Phase 0); normalized to a slug or None.
+            "vertical": normalize_vertical(company_row[23]),
         }
     finally:
         release_db_connection(conn)
