@@ -226,6 +226,54 @@ ReAct pattern end-to-end.
 calls `get_sds`, returns the *correct real document*, and provably refuses to fabricate
 safety info.
 
+### 9.1 — Phase 1 as BUILT (2026-06-24) + edge-case audit
+
+Implemented in `sapybase_ai_engine/agent.py` + surgical wiring in `main.py` `chat_endpoint`.
+
+**Two codebase realities the original plan missed (and how they're handled):**
+1. **It's LangChain + SSE streaming, not the raw Gemini SDK.** "Native function-calling"
+   = `chat_model.bind_tools(...)`. The loop is **bounded** (`MAX_TOOL_ROUNDS=3`,
+   `MAX_CALLS_PER_ROUND=4`) and lives in `agent.run_agent_loop`.
+2. **🔴 The DB connection is released BEFORE the SSE generator runs.** Starlette consumes
+   the generator only after the handler's `finally: release_db_connection(conn)` fires. So
+   a tool can't touch `cursor` from inside the generator. **Fix:** the entire ReAct loop
+   runs in the handler body (conn alive); the answer is *precomputed*, and the generator
+   just emits it. The generic (`vertical=NULL`) path still streams live, byte-for-byte
+   unchanged.
+3. **🔴 Cache must be bypassed for packs.** A cached reply could serve a *stale SDS link* —
+   unacceptable. `query_hash` is nulled when a pack is active, killing both cache lookup
+   and save in one line.
+
+**`get_sds` resolution + edge cases (deterministic, tenant-scoped, fully unit-tested):**
+
+| Case | Status | Agent does |
+|---|---|---|
+| no CAS & no name | `missing_identifier` | ask for product/CAS |
+| CAS exact, 1 row, valid https `sds_ref` | `found` | share link |
+| exact name (case-insensitive), 1 row | `found` | share link |
+| product exists, `sds_ref` NULL **or non-https** | `no_sheet_on_file` | decline + escalate; no improvising |
+| CAS/exact-name → >1 (multi-grade) | `ambiguous` + candidates | ask which grade |
+| only partial/fuzzy name (even single) | `ambiguous` (confirm) | never auto-serve wrong sheet |
+| nothing matches | `not_found` | escalate |
+| DB/LLM error, or loop exhausted | fallback text | escalate, never 500 |
+
+Hard invariants: every query is `WHERE company_id = %s` (no cross-tenant SDS leak); CAS is
+trimmed; a non-https `sds_ref` is refused; unknown/hallucinated tool names return a benign
+error; `vertical=NULL` companies bind **zero tools** (the safety net).
+
+**Guardrail:** pack persona (absolute safety rule) injected into the business-instructions
+region + an enforceable `build_agent_directive` block appended *after* the platform rules
+(highest priority). The adversarial **guardrail eval gate** is `tests/test_guardrail_eval.py`,
+skipped unless `RUN_LLM_EVALS=1` (needs a live key) — run it + a positive real-SDS check
+against the factory data before going wider.
+
+**Phase 1 is text-only** (SDS link rendered as a markdown link in the reply) → **zero widget
+changes**. The structured "Download SDS" card is Phase 3 (hub UI).
+
+> Known Phase 1.x optimization: the agent path is fully non-streaming (precompute then emit
+> one chunk). Fine for short SDS answers at customer-zero volume; could stream the final pass
+> later. Also: agent answers currently reuse the generic unanswered/confidence heuristic.
+
 ---
 
 ## 10. Repeating Pattern (Phases 2+)

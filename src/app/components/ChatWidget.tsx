@@ -510,6 +510,13 @@ const MD_COMPONENTS = {
       <pre {...props}>{children}</pre>
     </div>
   ),
+  // Links in bot replies (e.g. a chemical agent's SDS document link) open in a
+  // NEW tab so the visitor never loses their chat, with rel="noopener" to close
+  // the tab-nabbing gap. Applies to every link the bot emits, not just SDS.
+  a: ({ children, ...props }: React.ComponentPropsWithoutRef<'a'>) => (
+    <a {...props} target="_blank" rel="noopener noreferrer"
+       className="underline underline-offset-2">{children}</a>
+  ),
 };
 
 // Split markdown into top-level blocks (paragraphs / lists / headings / code),
