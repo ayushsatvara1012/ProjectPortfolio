@@ -257,6 +257,170 @@ class TestExecuteTool:
         assert out["status"] == "error"
         assert "not available" in out["message"]
 
+    def test_dispatches_request_quote(self):
+        cur = FakeSkuCursor(name_exact=[_sku()])
+        out = execute_tool(
+            "request_quote",
+            {"product_name": "acetone", "grade": "AR", "pack_size": "2.5 Ltr", "quantity": "2"},
+            cur, CID,
+        )
+        assert out["status"] == "quoted"
+
+
+# ── request_quote (Phase 4a) ─────────────────────────────────────────────────
+
+from agent import request_quote  # noqa: E402
+
+
+class FakeSkuCursor:
+    """Returns programmed product_skus rows by SQL shape, and records INSERTs +
+    commit so quote tests can assert persistence and tenant scoping. Acts as its
+    own ``connection`` so ``cursor.connection.commit()`` works."""
+
+    def __init__(self, *, cas=None, name_exact=None, partial=None):
+        self._cas = cas or []
+        self._name = name_exact or []
+        self._partial = partial or []
+        self._last = ""
+        self.calls = []        # (sql, params)
+        self.inserts = []      # params of INSERTs
+        self.committed = False
+        self.connection = self
+
+    def execute(self, sql, params=None):
+        self._last = sql
+        self.calls.append((sql, params))
+        if sql.strip().upper().startswith("INSERT"):
+            self.inserts.append(params)
+
+    def fetchall(self):
+        s = self._last
+        if "product_skus" not in s:
+            return []
+        if "cas_number = %s" in s:
+            return list(self._cas)
+        if "lower(product_name) = lower" in s:
+            return list(self._name)
+        if "ILIKE" in s:
+            return list(self._partial)
+        return []
+
+    def commit(self):
+        self.committed = True
+
+
+def _sku(name="Acetone", cas="67-64-1", grade="AR", pack="2.5 Ltr", norm=None,
+         code="100AR2500M", price=1894, gst=18, por=False, currency="INR"):
+    """A product_skus row tuple in _SKU_COLS order."""
+    return (name, cas, grade, pack, norm, code, price, gst, por, currency)
+
+
+class TestRequestQuote:
+    def test_missing_identifier(self):
+        out = request_quote(FakeSkuCursor(), CID)
+        assert out["status"] == "missing_identifier"
+
+    def test_not_found(self):
+        out = request_quote(FakeSkuCursor(), CID, product_name="unobtainium")
+        assert out["status"] == "not_found"
+
+    def test_needs_grade_lists_available_grades(self):
+        cur = FakeSkuCursor(name_exact=[_sku(grade="LR", price=1660),
+                                        _sku(grade="AR", price=1894)])
+        out = request_quote(cur, CID, product_name="acetone")
+        assert out["status"] == "needs_grade"
+        assert set(out["grades"]) == {"LR", "AR"}
+
+    def test_needs_pack_lists_available_packs(self):
+        cur = FakeSkuCursor(name_exact=[_sku(grade="AR", pack="500 ml", price=507),
+                                        _sku(grade="AR", pack="2.5 Ltr", price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR")
+        assert out["status"] == "needs_pack"
+        assert set(out["pack_sizes"]) == {"500 ml", "2.5 Ltr"}
+
+    def test_quoted_computes_subtotal_and_persists(self):
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="3")
+        assert out["status"] == "quoted"
+        assert out["unit_price"] == 1894.0
+        assert out["subtotal"] == 5682.0       # 1894 * 3, code never trusts the model
+        assert out["gst_note"] == "GST extra as applicable"
+        assert len(cur.inserts) == 1 and cur.committed   # owner lead recorded + committed
+
+    def test_quote_pack_match_is_tolerant(self):
+        cur = FakeSkuCursor(name_exact=[_sku(pack="2.5 Ltr", price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 litre")   # spelling variant
+        assert out["status"] == "quoted"
+
+    def test_quantity_defaults_to_one_when_missing_or_invalid(self):
+        for qty in (None, "0", "-5", "abc"):
+            cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
+            out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                                pack_size="2.5 Ltr", quantity=qty)
+            assert out["status"] == "quoted"
+            assert out["quantity"] == 1 and out["subtotal"] == 1894.0
+
+    def test_por_needs_contact_then_records(self):
+        # Price-on-request pack with no contact -> ask for it, do NOT record.
+        cur = FakeSkuCursor(name_exact=[_sku(pack="25 Ltr", price=None, por=True)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="25 Ltr")
+        assert out["status"] == "needs_contact"
+        assert cur.inserts == []
+        # With a contact -> route-to-human record created.
+        cur2 = FakeSkuCursor(name_exact=[_sku(pack="25 Ltr", price=None, por=True)])
+        out2 = request_quote(cur2, CID, product_name="acetone", grade="AR",
+                             pack_size="25 Ltr", contact_email="buyer@acme.com")
+        assert out2["status"] == "price_on_request"
+        assert len(cur2.inserts) == 1 and cur2.committed
+
+    def test_zero_price_treated_as_por_not_free(self):
+        cur = FakeSkuCursor(name_exact=[_sku(price=0)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr")
+        assert out["status"] == "needs_contact"   # 0 price -> POR path, never "free"
+
+    def test_ambiguous_price_escalates_never_guesses(self):
+        # Same product/grade/pack, two different prices (real data-entry dup).
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894, code="A"),
+                                        _sku(price=2000, code="B")])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr")
+        assert out["status"] == "ambiguous_price"
+        assert cur.inserts == []   # never persist/quote a guessed number
+
+    def test_ambiguous_product_when_cas_maps_to_many(self):
+        # CAS is NOT unique in this catalog (e.g. an acid AND a rust remover).
+        cur = FakeSkuCursor(cas=[_sku(name="Hydrochloric acid", cas="7647-01-0"),
+                                 _sku(name="RustEXclean", cas="7647-01-0")])
+        out = request_quote(cur, CID, cas_number="7647-01-0")
+        assert out["status"] == "ambiguous"
+        assert len(out["candidates"]) == 2
+
+    def test_not_found_sku_when_pack_absent_for_grade(self):
+        cur = FakeSkuCursor(name_exact=[_sku(grade="AR", pack="2.5 Ltr", price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="999 Ltr")
+        assert out["status"] == "not_found_sku"
+
+    def test_every_query_is_tenant_scoped(self):
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
+        request_quote(cur, CID, product_name="acetone", grade="AR", pack_size="2.5 Ltr")
+        selects = [c for c in cur.calls if "product_skus" in c[0] and c[0].strip().upper().startswith("SELECT")]
+        assert selects  # at least one lookup ran
+        for _sql, params in selects:
+            assert params[0] == CID   # company_id is always the first bound param
+
+    def test_insert_carries_company_id_and_snapshot(self):
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894, gst=18)])
+        request_quote(cur, CID, product_name="acetone", grade="AR",
+                      pack_size="2.5 Ltr", quantity="2")
+        assert cur.inserts and cur.inserts[0][0] == CID   # tenant-scoped write
+        # subtotal snapshot = 1894 * 2 (frozen on the record).
+        assert 3788.0 in cur.inserts[0]
+
 
 # ── pack -> schema + directive ───────────────────────────────────────────────
 
@@ -264,21 +428,29 @@ class TestSchemasAndDirective:
     def test_chemical_schema_shape(self):
         schemas = build_tool_schemas(load_pack("chemical"))
         by_name = {s["name"]: s for s in schemas}
-        assert set(by_name) == {"get_sds", "get_product_spec"}
-        for s in by_name.values():
-            props = s["parameters"]["properties"]
+        assert set(by_name) == {"get_sds", "get_product_spec", "request_quote"}
+        # The two read-only tools take exactly CAS or name (neither individually required).
+        for name in ("get_sds", "get_product_spec"):
+            props = by_name[name]["parameters"]["properties"]
             assert set(props) == {"cas_number", "product_name"}
-            # Both tools need CAS *or* name, so neither slot is individually required.
-            assert s["parameters"]["required"] == []
+            assert by_name[name]["parameters"]["required"] == []
+        # request_quote adds the pricing slots; still nothing hard-required (the tool
+        # guides collection step by step).
+        qp = by_name["request_quote"]["parameters"]["properties"]
+        assert {"product_name", "cas_number", "grade", "pack_size", "quantity"} <= set(qp)
+        assert by_name["request_quote"]["parameters"]["required"] == []
 
     def test_directive_names_tools_and_states_safety_rule(self):
         directive = build_agent_directive(load_pack("chemical"))
         assert "get_sds" in directive
         assert "get_product_spec" in directive
+        assert "request_quote" in directive
         assert "NEVER" in directive
         assert "Safety Data Sheet" in directive
         # The spec tool must not become a backdoor: safety still routes to get_sds.
         assert "safety-class question still goes to get_sds" in directive
+        # Pricing guardrail: the model must never compute a price itself.
+        assert "NEVER state, compute" in directive
 
 
 # ── run_agent_loop ───────────────────────────────────────────────────────────

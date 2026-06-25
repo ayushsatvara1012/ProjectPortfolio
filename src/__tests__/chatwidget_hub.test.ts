@@ -92,7 +92,8 @@ describe('Phase 3 hub — card message composition', () => {
   });
 });
 
-// Mirrors hubProductMatches: filter the catalog by name OR cas, cap the list.
+// Mirrors hubProductMatches: filter the catalog by name OR cas, collapse to one
+// row per product (the catalog has a row per grade -> same name+CAS), cap the list.
 type ProductOption = { name: string; cas_number?: string; grade?: string };
 function filterProducts(opts: ProductOption[], query: string): ProductOption[] {
   const q = query.trim().toLowerCase();
@@ -101,7 +102,16 @@ function filterProducts(opts: ProductOption[], query: string): ProductOption[] {
         p.name.toLowerCase().includes(q) ||
         (p.cas_number || '').toLowerCase().includes(q))
     : opts;
-  return list.slice(0, 50);
+  const seen = new Set<string>();
+  const distinct: ProductOption[] = [];
+  for (const p of list) {
+    const k = `${p.name.toLowerCase()}|${p.cas_number || ''}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    distinct.push(p);
+    if (distinct.length >= 50) break;
+  }
+  return distinct;
 }
 
 const CATALOG: ProductOption[] = [
@@ -125,16 +135,28 @@ describe('Phase 3 hub — product picker filter', () => {
     expect(filterProducts(CATALOG, '108-88-3').map(p => p.name)).toEqual(['Toluene']);
   });
 
+  it('collapses multiple grades of one product to a single row (dup-key fix)', () => {
+    const multiGrade: ProductOption[] = [
+      { name: 'Acetonitrile', cas_number: '75-05-8', grade: 'LR' },
+      { name: 'Acetonitrile', cas_number: '75-05-8', grade: 'AR' },
+      { name: 'Acetonitrile', cas_number: '75-05-8', grade: 'HPLC' },
+    ];
+    expect(filterProducts(multiGrade, 'aceto')).toHaveLength(1);
+  });
+
   it('returns nothing for a non-match', () => {
     expect(filterProducts(CATALOG, 'xylene')).toEqual([]);
   });
 });
 
-// Mirrors the onmessage SSE handler: an {sds:{url}} event is captured as a
-// pending action; a normal {token} event is treated as streamed text.
-function parseSseEvent(raw: string): { sds?: { url: string }; token?: string } {
+// Mirrors the onmessage SSE handler: an {sds:{url}} or {quote:{...}} event is
+// captured as a pending action; a normal {token} event is treated as streamed text.
+function parseSseEvent(raw: string): { sds?: { url: string }; quote?: { status: string }; token?: string } {
   const parsed = JSON.parse(raw);
   if (parsed.sds && typeof parsed.sds.url === 'string') return { sds: parsed.sds };
+  if (parsed.quote && (parsed.quote.status === 'quoted' || parsed.quote.status === 'price_on_request')) {
+    return { quote: parsed.quote };
+  }
   return { token: parsed.token || parsed.content || parsed.text || '' };
 }
 
@@ -154,6 +176,37 @@ describe('Phase 3 hub — SDS action event', () => {
   it('ignores a malformed sds event with no url', () => {
     const out = parseSseEvent(JSON.stringify({ sds: { product: 'Acetone' } }));
     expect(out.sds).toBeUndefined();
+  });
+});
+
+// Mirrors the INR formatter used by the quote card (deterministic figures only).
+function fmtINR(n?: number | null, currency?: string): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  const sym = (currency || 'INR') === 'INR' ? '₹' : `${currency} `;
+  return `${sym}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+describe('Phase 4a — quote action event', () => {
+  it('captures a priced quote event as a structured card, not text', () => {
+    const out = parseSseEvent(JSON.stringify({ quote: { status: 'quoted', product: 'Acetone', subtotal: 5682 } }));
+    expect(out.quote?.status).toBe('quoted');
+    expect(out.token).toBeUndefined();
+  });
+
+  it('captures a price-on-request event as a card', () => {
+    const out = parseSseEvent(JSON.stringify({ quote: { status: 'price_on_request', product: 'Acetone' } }));
+    expect(out.quote?.status).toBe('price_on_request');
+  });
+
+  it('ignores a non-terminal quote status (e.g. needs_grade is text-only)', () => {
+    const out = parseSseEvent(JSON.stringify({ quote: { status: 'needs_grade' } }));
+    expect(out.quote).toBeUndefined();
+  });
+
+  it('formats INR figures and dashes nulls', () => {
+    expect(fmtINR(5682, 'INR')).toBe('₹5,682');
+    expect(fmtINR(null)).toBe('—');
+    expect(fmtINR(undefined)).toBe('—');
   });
 });
 

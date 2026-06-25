@@ -260,6 +260,240 @@ def get_product_spec(
     }
 
 
+# ── request_quote: the first transactional tool (Phase 4a, §10) ──────────────
+#
+# Pricing is a LOOKUP, not a formula: the real Expresolv catalog prices each SKU
+# at the pack level (product × grade × pack size). The model collects which
+# grade/pack/qty; this code reads the number. Larger bulk packs carry no list
+# price by design ("POR" = Price On Request) → those route to a human, recorded
+# for the owner. A (product, grade, pack) that maps to >1 *different* price (real
+# data-entry dups exist) is treated as ambiguous and escalates — we never guess a
+# price. Every query is tenant-scoped: pricing is commercially sensitive.
+
+# product_skus columns, one fixed shape shared by the resolver below.
+#   0 name  1 cas  2 grade  3 pack_size  4 pack_norm  5 pack_code
+#   6 list_price  7 gst_rate  8 is_por  9 currency
+_SKU_COLS = (
+    "product_name, cas_number, grade, pack_size, pack_size_norm, pack_code, "
+    "list_price, gst_rate, is_por, currency"
+)
+
+
+def _norm_pack(s: object) -> str:
+    """Loose pack-size key for tolerant matching (mirrors the ingest normaliser):
+    '2.5 Litre' / '2.5 ltr' / '2.5L' all collapse to the same key as '2.5 Ltr'."""
+    import re
+    t = (s if isinstance(s, str) else "").lower().strip().rstrip(".")
+    t = t.replace("ltr", "l").replace("litre", "l").replace("lit", "l")
+    t = t.replace("kg", "kg").replace("gm", "gm")
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _parse_qty(v: object) -> int:
+    """Quantity = number of packs. Missing/invalid/≤0 degrades to 1 (the agent is
+    told to confirm the count), never an error — a quote should still render."""
+    try:
+        q = int(float(str(v).strip()))
+        return q if q > 0 else 1
+    except (TypeError, ValueError):
+        return 1
+
+
+def _quote_rows(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
+    """Fetch the SKU rows for ONE product, or a terminal status.
+
+    Unlike ``_resolve_product`` (which keys on CAS), pricing must resolve to a
+    single *product* first — and CAS is NOT unique in this catalog (one CAS can be
+    two different products, e.g. an acid and a rust-remover). So after any lookup
+    we check: if the rows span >1 distinct product name, it's ``ambiguous`` and we
+    ask the visitor to pick. Resolution order mirrors the other tools: CAS exact →
+    name exact (ci) → partial (confirm, never auto-serve).
+    """
+    if not cas and not name:
+        return {"status": "missing_identifier",
+                "message": "Ask the visitor which product (name or CAS number)."}
+
+    rows: List[Any] = []
+    if cas:
+        cursor.execute(
+            f"SELECT {_SKU_COLS} FROM product_skus WHERE company_id = %s AND cas_number = %s",
+            (company_id, cas),
+        )
+        rows = cursor.fetchall() or []
+    if not rows and name:
+        cursor.execute(
+            f"SELECT {_SKU_COLS} FROM product_skus WHERE company_id = %s AND lower(product_name) = lower(%s)",
+            (company_id, name),
+        )
+        rows = cursor.fetchall() or []
+    if not rows and name:
+        cursor.execute(
+            f"SELECT {_SKU_COLS} FROM product_skus WHERE company_id = %s AND product_name ILIKE %s",
+            (company_id, f"%{name}%"),
+        )
+        rows = cursor.fetchall() or []
+
+    if not rows:
+        return {"status": "not_found",
+                "message": ("No matching product in the price list. Tell the visitor "
+                            "you don't have it and offer to connect them to the team.")}
+
+    distinct = sorted({r[0] for r in rows})
+    if len(distinct) > 1:
+        return {"status": "ambiguous", "candidates": distinct[:8],
+                "message": "Several products match. Ask the visitor to pick the exact one."}
+    return {"rows": rows}
+
+
+def request_quote(
+    cursor,
+    company_id,
+    *,
+    product_name: Optional[str] = None,
+    cas_number: Optional[str] = None,
+    grade: Optional[str] = None,
+    pack_size: Optional[str] = None,
+    quantity: object = None,
+    contact_name: Optional[str] = None,
+    contact_email: Optional[str] = None,
+    contact_phone: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Price a SKU deterministically, or route a Price-On-Request to a human.
+
+    Collects product → grade → pack, then reads the list price (never computes it).
+    Statuses the model reads as its observation:
+      missing_identifier | not_found | ambiguous   (product step)
+      needs_grade | needs_pack | not_found_sku      (narrowing step)
+      ambiguous_price                               (dup rows, differing price → escalate)
+      needs_contact                                 (POR with no way to reach the lead)
+      price_on_request                              (POR → quote_requests record + handoff)
+      quoted                                        (priced → quote_requests record)
+
+    GST is shown as "extra as applicable" (pre-GST total quoted), per the owner's
+    choice; the gst_rate is still snapshotted on the record. The priced/ POR record
+    is the owner's lead — written tenant-scoped, committed here.
+    """
+    resolved = _quote_rows(
+        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip()
+    )
+    if "rows" not in resolved:
+        return resolved
+    rows = resolved["rows"]
+    product = rows[0][0]
+
+    # 1. Grade. Match case-insensitively (exact preferred, else substring).
+    grade_in = (grade or "").strip()
+    grades = sorted({(r[2] or "") for r in rows if r[2]})
+    if not grade_in:
+        return {"status": "needs_grade", "product": product, "grades": grades[:20],
+                "message": f"Ask which grade of {product} they need."}
+    gmatch = [g for g in grades if g.lower() == grade_in.lower()] or \
+             [g for g in grades if grade_in.lower() in g.lower()]
+    if len(gmatch) != 1:
+        return {"status": "needs_grade", "product": product, "grades": grades[:20],
+                "message": (f"Couldn't match grade '{grade_in}'. Ask the visitor to pick "
+                            f"one of the available grades for {product}.")}
+    grade_sel = gmatch[0]
+    grows = [r for r in rows if (r[2] or "") == grade_sel]
+
+    # 2. Pack size. Tolerant normalised match.
+    pack_in = (pack_size or "").strip()
+    packs = sorted({(r[3] or "") for r in grows if r[3]})
+    if not pack_in:
+        return {"status": "needs_pack", "product": product, "grade": grade_sel,
+                "pack_sizes": packs[:20],
+                "message": f"Ask which pack size of {product} ({grade_sel}) they need."}
+    pnorm = _norm_pack(pack_in)
+    prows = [r for r in grows if (r[4] or _norm_pack(r[3])) == pnorm]
+    if not prows:
+        prows = [r for r in grows if pnorm and pnorm in _norm_pack(r[3])]
+    if not prows:
+        return {"status": "not_found_sku", "product": product, "grade": grade_sel,
+                "pack_sizes": packs[:20],
+                "message": (f"No '{pack_in}' pack for {product} ({grade_sel}). Offer the "
+                            "available pack sizes or connect them to the team.")}
+
+    # 3. Resolve to one priced SKU. Dup rows with DIFFERENT prices = ambiguous data
+    #    → escalate, never pick. POR (or NULL/0 price) = route-to-human.
+    priced = {(r[6] is None or bool(r[8]), None if r[6] is None else float(r[6])) for r in prows}
+    if len({p for _, p in priced if p is not None}) > 1:
+        return {"status": "ambiguous_price", "product": product, "grade": grade_sel,
+                "message": ("More than one price is on file for this exact pack — do NOT "
+                            "quote a number. Tell the visitor you'll confirm with the team.")}
+    sku = prows[0]
+    pack_sel, pack_code = sku[3], sku[5]
+    # POR if flagged, or the price is missing/zero (a 0 list price is never "free").
+    is_por = bool(sku[8]) or sku[6] is None or float(sku[6]) == 0
+    gst_rate = float(sku[7]) if sku[7] is not None else None
+    currency = sku[9] or "INR"
+    qty = _parse_qty(quantity)
+    has_contact = any([(contact_email or "").strip(), (contact_phone or "").strip()])
+
+    if is_por:
+        if not has_contact:
+            return {"status": "needs_contact", "product": product, "grade": grade_sel,
+                    "pack_size": pack_sel,
+                    "message": ("This pack is priced on request. Ask for the visitor's "
+                                "name and email (or phone) so the team can send a quote.")}
+        _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
+                      pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=None,
+                      subtotal=None, gst_rate=gst_rate, currency=currency, is_por=True,
+                      name=contact_name, email=contact_email, phone=contact_phone,
+                      session_id=session_id)
+        return {"status": "price_on_request", "product": product, "grade": grade_sel,
+                "pack_size": pack_sel, "quantity": qty, "currency": currency,
+                "message": ("Confirm you've logged the request and the team will send a "
+                            "price shortly. Do NOT invent a number.")}
+
+    unit_price = float(sku[6])
+    subtotal = round(unit_price * qty, 2)
+    _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
+                  pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=unit_price,
+                  subtotal=subtotal, gst_rate=gst_rate, currency=currency, is_por=False,
+                  name=contact_name, email=contact_email, phone=contact_phone,
+                  session_id=session_id)
+    return {
+        "status": "quoted", "product": product, "grade": grade_sel,
+        "pack_size": pack_sel, "quantity": qty, "unit_price": unit_price,
+        "subtotal": subtotal, "gst_rate": gst_rate, "currency": currency,
+        "gst_note": "GST extra as applicable",
+        "message": ("The visitor is shown a structured quote card with these figures — "
+                    "state the pack, quantity and total briefly and note GST is extra as "
+                    "applicable; the quote is subject to confirmation. Do NOT make up any "
+                    "figure beyond what is given here."),
+    }
+
+
+def _insert_quote(cursor, company_id, *, product, cas, grade, pack_size, pack_code,
+                  qty, unit_price, subtotal, gst_rate, currency, is_por,
+                  name, email, phone, session_id) -> None:
+    """Persist the quote/POR as the owner's lead record, tenant-scoped, committed.
+
+    Failure must never break the conversation: a logged insert error degrades to a
+    still-valid quote on screen (the record is the owner's nicety, not the visitor's
+    answer)."""
+    try:
+        cursor.execute(
+            """
+            INSERT INTO quote_requests
+                (company_id, session_id, product_name, cas_number, grade, pack_size,
+                 pack_code, quantity, unit_price, subtotal, gst_rate, currency, is_por,
+                 contact_name, contact_email, contact_phone, status)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'new')
+            """,
+            (company_id, session_id, product, cas, grade, pack_size, pack_code, qty,
+             unit_price, subtotal, gst_rate, currency, is_por,
+             (name or None), (email or None), (phone or None)),
+        )
+        conn = getattr(cursor, "connection", None)
+        if conn is not None:
+            conn.commit()
+    except Exception:
+        logger.exception("request_quote: failed to persist quote_requests record")
+
+
 def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[str, Any]:
     """Dispatch a model-requested tool to its deterministic implementation.
 
@@ -280,6 +514,19 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
             company_id,
             cas_number=args.get("cas_number"),
             product_name=args.get("product_name"),
+        )
+    if name == "request_quote":
+        return request_quote(
+            cursor,
+            company_id,
+            product_name=args.get("product_name"),
+            cas_number=args.get("cas_number"),
+            grade=args.get("grade"),
+            pack_size=args.get("pack_size"),
+            quantity=args.get("quantity"),
+            contact_name=args.get("contact_name"),
+            contact_email=args.get("contact_email"),
+            contact_phone=args.get("contact_phone"),
         )
     return {
         "status": "error",
@@ -345,6 +592,13 @@ def build_agent_directive(pack) -> str:
         "sizes) call get_product_spec. That tool returns commercial data only — "
         "never treat its grade or purity as a basis to infer hazards or handling. "
         "Any safety-class question still goes to get_sds, even mid-conversation.\n\n"
+        "For a PRICE or quotation call request_quote. Pricing needs the product, "
+        "the grade and the pack size — if any is missing the tool tells you what to "
+        "ask for; collect them one step at a time. NEVER state, compute, estimate, "
+        "or round a price yourself — quote ONLY the figures request_quote returns. "
+        "If it returns price_on_request, ask for the visitor's name and email so the "
+        "team can send a price; if ambiguous_price, say you'll confirm with the team. "
+        "Pricing is not safety: a hazard question still goes to get_sds.\n\n"
         "If a tool returns no servable result (statuses not_found or "
         "no_sheet_on_file), tell the visitor you don't have it on file and offer "
         "to connect them to the team. If it is ambiguous, ask the visitor to "

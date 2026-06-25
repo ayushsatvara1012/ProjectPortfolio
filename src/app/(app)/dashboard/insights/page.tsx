@@ -22,6 +22,7 @@ import {
 
 // Code-split panels — each renders its own loading state
 const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
+const QuoteRequestsPanel = dynamic(() => import('@/src/app/components/QuoteRequestsPanel'));
 const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
 const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
 
@@ -432,12 +433,16 @@ export default function AppInsights() {
 
             <div data-lenis-prevent className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col p-4 md:p-6 lg:p-8">
                 {activeTab === 'sales' && (
-                    <SalesAndLeadsPanel
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        entitlements={{ canUseAnalytics: canAnalytics, canUseLeadCapture: canLeadCapture }}
-                        selectedBot={bots.find((b: any) => b.id === selectedBotId)}
-                    />
+                    <div className="flex flex-col gap-6 w-full min-w-0">
+                        <SalesAndLeadsPanel
+                            selectedBotId={selectedBotId}
+                            authFetch={authFetch}
+                            entitlements={{ canUseAnalytics: canAnalytics, canUseLeadCapture: canLeadCapture }}
+                            selectedBot={bots.find((b: any) => b.id === selectedBotId)}
+                        />
+                        {/* Self-hides unless the bot has quote requests (chemical vertical). */}
+                        <QuoteRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                    </div>
                 )}
 
                 {activeTab === 'conversations' && (

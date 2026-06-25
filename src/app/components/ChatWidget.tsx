@@ -466,6 +466,12 @@ type Message = {
   redirectUrl?: string;
   bookingUrl?: string;
   sds?: { url: string; product?: string; label?: string };
+  quote?: {
+    status: 'quoted' | 'price_on_request';
+    product?: string; grade?: string; pack_size?: string; quantity?: number;
+    unit_price?: number | null; subtotal?: number | null;
+    gst_rate?: number | null; currency?: string; gst_note?: string | null;
+  };
   ts?: number;
 };
 
@@ -547,7 +553,15 @@ const HUB_ICON: Record<string, string> = {
   'file-certificate': 'description',
   flask: 'science',
   'message-circle': 'forum',
+  receipt: 'receipt_long',
 };
+
+// Format a deterministic quote figure (₹ for INR). Null/undefined -> em dash.
+function fmtINR(n?: number | null, currency?: string): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  const sym = (currency || 'INR') === 'INR' ? '₹' : `${currency} `;
+  return `${sym}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
 
 // Split markdown into top-level blocks (paragraphs / lists / headings / code),
 // breaking on blank lines but never inside a fenced code block. This lets each
@@ -1097,7 +1111,18 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           p.name.toLowerCase().includes(q) ||
           (p.cas_number || '').toLowerCase().includes(q))
       : opts;
-    return list.slice(0, 50);
+    // One row per product — the catalog has a row per grade (same name+CAS), so
+    // collapse to distinct products for the picker; the agent collects grade next.
+    const seen = new Set<string>();
+    const distinct: ProductOption[] = [];
+    for (const p of list) {
+      const k = `${p.name.toLowerCase()}|${p.cas_number || ''}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      distinct.push(p);
+      if (distinct.length >= 50) break;
+    }
+    return distinct;
   }, [activeHubCard, hubInput, configData.products]);
 
   const handleSend = async (e: React.FormEvent | null, overrideText?: string) => {
@@ -1139,6 +1164,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // Structured "Open SDS" action emitted by the agent stream (a {sds:{...}}
     // event); captured here and attached to the bot message on [DONE].
     let pendingSds: Message['sds'] | null = null;
+    // Structured quote card emitted by the agent stream (a {quote:{...}} event);
+    // captured here and attached to the bot message on [DONE], like pendingSds.
+    let pendingQuote: Message['quote'] | null = null;
     const SSE_MAX_RETRIES = 1;
     try {
       const parentOriginChat = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
@@ -1231,7 +1259,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot') {
-                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingSds ? { sds: pendingSds } : {}) };
+                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingSds ? { sds: pendingSds } : {}), ...(pendingQuote ? { quote: pendingQuote } : {}) };
               }
               return updated;
             });
@@ -1271,6 +1299,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // widget renders a deterministic "Open SDS" button (no raw link).
             if (parsed.sds && typeof parsed.sds.url === 'string') {
               pendingSds = { url: parsed.sds.url, product: parsed.sds.product, label: parsed.sds.label };
+              return;
+            }
+            // Structured side-channel: the agent emits {quote:{...}} with the
+            // deterministic figures so the widget renders a quote card (no
+            // model-typed numbers).
+            if (parsed.quote && (parsed.quote.status === 'quoted' || parsed.quote.status === 'price_on_request')) {
+              pendingQuote = parsed.quote;
               return;
             }
             chunk = parsed.token || parsed.content || parsed.text || '';
@@ -1549,6 +1584,33 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                   <span className="material-symbols-outlined text-[16px] leading-none">arrow_outward</span>
                                 </a>
                               )}
+                              {msg.role === 'bot' && !msg.isStreaming && msg.quote && (
+                                // Deterministic quote card — the agent describes but
+                                // never re-derives these figures. GST is shown as
+                                // "extra"; a POR quote shows a "requested" confirmation.
+                                <div className="mt-2 w-full max-w-[280px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+                                  <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: THEME_COLOR }}>
+                                    <span className="material-symbols-outlined text-[16px] leading-none">receipt_long</span>
+                                    {msg.quote.status === 'quoted' ? 'Quote' : 'Quote requested'}
+                                  </div>
+                                  <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
+                                    <div className="font-bold">{msg.quote.product}</div>
+                                    <div className="text-[12px] text-slate-500 dark:text-slate-400">
+                                      {[msg.quote.grade, msg.quote.pack_size].filter(Boolean).join(' · ')}
+                                    </div>
+                                    {msg.quote.status === 'quoted' ? (
+                                      <>
+                                        <div className="mt-2 flex justify-between"><span>Unit price</span><span>{fmtINR(msg.quote.unit_price, msg.quote.currency)}</span></div>
+                                        <div className="flex justify-between"><span>Quantity</span><span>× {msg.quote.quantity}</span></div>
+                                        <div className="mt-1 pt-1.5 border-t border-slate-200 dark:border-slate-700 flex justify-between font-bold"><span>Subtotal</span><span>{fmtINR(msg.quote.subtotal, msg.quote.currency)}</span></div>
+                                        <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{msg.quote.gst_note || 'GST extra as applicable'} · subject to confirmation</div>
+                                      </>
+                                    ) : (
+                                      <div className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">This pack is priced on request — our team will get back to you with a price.</div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                               {metaLabel && !msg.isStreaming && <span className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-1 px-1 leading-none">{metaLabel}</span>}
                             </div>
                           )}
@@ -1614,8 +1676,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         {activeHubCard.input_source === 'products' && hubProductMatches.length > 0 && (
                           // Drop-UP (input sits near the bottom): the searchable catalog.
                           <div className="absolute bottom-full left-0 right-0 mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin z-20">
-                            {hubProductMatches.map((p) => (
-                              <button key={`${p.name}-${p.cas_number || ''}`} type="button" onClick={() => submitHubValue(p.name)}
+                            {hubProductMatches.map((p, i) => (
+                              <button key={`${p.name}-${p.cas_number || ''}-${i}`} type="button" onClick={() => submitHubValue(p.name)}
                                 className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                                 <span className="text-[14px] font-google text-slate-800 dark:text-slate-200 truncate">{p.name}</span>
                                 <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{p.cas_number || p.grade || ''}</span>

@@ -62,11 +62,18 @@ class TestChemicalPack:
         assert "sds" in prompt or "safety data sheet" in prompt
         assert "never" in prompt  # the forbiddance of model-generated safety info
 
-    def test_declares_phase2a_read_only_tools(self):
-        # Phase 2a adds get_product_spec alongside the Phase 1 get_sds tool.
-        assert CHEMICAL_PACK.tool_names() == ("get_sds", "get_product_spec")
-        for name in ("get_sds", "get_product_spec"):
+    def test_declares_tools(self):
+        # Phase 1 get_sds + Phase 2a get_product_spec + Phase 4a request_quote.
+        assert CHEMICAL_PACK.tool_names() == ("get_sds", "get_product_spec", "request_quote")
+        for name in ("get_sds", "get_product_spec", "request_quote"):
             assert isinstance(CHEMICAL_PACK.get_tool(name), ToolSpec)
+
+    def test_quote_tool_collects_pricing_slots(self):
+        tool = CHEMICAL_PACK.get_tool("request_quote")
+        slot_names = {s.name for s in tool.slots}
+        assert {"product_name", "cas_number", "grade", "pack_size", "quantity"} <= slot_names
+        # Pricing collects contact for the price-on-request follow-up path.
+        assert "contact_email" in slot_names
 
     def test_product_tool_slots_cover_cas_and_name(self):
         for name in ("get_sds", "get_product_spec"):
@@ -85,6 +92,7 @@ class TestChemicalPack:
         card_by_id = {c.id: c for c in cards}
         assert card_by_id["sds"].action == "tool" and "get_sds" in live_tools
         assert card_by_id["spec"].action == "tool" and "get_product_spec" in live_tools
+        assert card_by_id["quote"].action == "tool" and "request_quote" in live_tools
         assert card_by_id["ask"].action == "chat"  # chat card needs no tool
 
     def test_hub_cards_payload_is_json_serializable(self):

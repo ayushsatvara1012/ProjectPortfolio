@@ -1315,7 +1315,12 @@ from parsing_utils import safe_json_loads, normalize_quick_questions
 from packs import normalize_vertical, load_pack
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
-from agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop
+from agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, AGENT_FALLBACK_TEXT
+
+# Hard ceiling on the blocking vertical-agent precompute (Gemini tool-loop) so a
+# slow/overloaded model degrades to the fallback instead of hanging /api/chat
+# until the dev proxy / client resets the socket.
+AGENT_PRECOMPUTE_TIMEOUT_S = 30
 
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
@@ -2698,8 +2703,15 @@ async def chat_endpoint(
         bot_name        = company.get("bot_name") or "Sapy AI"
         company_name    = company.get("company_name") or "Sapybase"
         company_tone    = company.get("company_tone") or "Professional, expert and highly descriptive"
-        contact_email   = company.get("contact_email") or f"support@{(company.get('allowed_origin') or 'Sapybase.com').replace('https://', '').replace('http://', '').rstrip('/')}"
+        contact_email   = company.get("contact_email")
         contact_website = (company.get("allowed_origin") or "https://Sapybase.com").rstrip("/")
+        
+        contact_info = []
+        if contact_email:
+            contact_info.append(f"  📧 **Email:** {contact_email}")
+        if contact_website:
+            contact_info.append(f"  🌐 **Website:** {contact_website}")
+        contact_block = "\n".join(contact_info)
 
         # ── Custom prompt from DB (tenant-written, stored in system_prompt col) ─
         raw_custom = (company.get("system_prompt") or "").strip()
@@ -2800,8 +2812,7 @@ DO NOT guess. Respond with EXACTLY this:
 
   For accurate help, please reach out to the {company_name} team directly:
 
-  📧 **Email:** {contact_email}
-  🌐 **Website:** {contact_website}
+{contact_block}
 
   I'm happy to help with anything else I have information on!
 
@@ -2884,6 +2895,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         # (vertical=NULL) companies skip this entirely and stream live as before.
         precomputed_answer = None
         agent_sds = None  # structured "Open SDS" action surfaced as a widget button
+        agent_quote = None  # structured quote card surfaced as a widget card
         if pack is not None:
             agent_model = chat_model.bind_tools(build_tool_schemas(pack))
 
@@ -2900,10 +2912,40 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         "product": (obs.get("product") or {}).get("name"),
                         "label": "Open SDS",
                     }
+                # When request_quote prices a SKU (or logs a price-on-request),
+                # surface the deterministic figures as a structured quote card — the
+                # model is told to describe, not re-derive, these numbers.
+                if (tool_name == "request_quote" and isinstance(obs, dict)
+                        and obs.get("status") in ("quoted", "price_on_request")):
+                    _captured["quote"] = {
+                        "status": obs["status"],
+                        "product": obs.get("product"),
+                        "grade": obs.get("grade"),
+                        "pack_size": obs.get("pack_size"),
+                        "quantity": obs.get("quantity"),
+                        "unit_price": obs.get("unit_price"),
+                        "subtotal": obs.get("subtotal"),
+                        "gst_rate": obs.get("gst_rate"),
+                        "currency": obs.get("currency") or "INR",
+                        "gst_note": obs.get("gst_note"),
+                    }
                 return obs
 
-            precomputed_answer = await run_agent_loop(agent_model, messages, _tool_executor)
+            # Bound the whole precompute: the agent makes BLOCKING Gemini calls here
+            # (before streaming), so an overloaded/slow Gemini (503 retry storms)
+            # would otherwise hang /api/chat until the proxy resets the socket. On
+            # timeout we degrade to the safe human-routing fallback, same as any
+            # other agent failure — never leave the request hanging.
+            try:
+                precomputed_answer = await asyncio.wait_for(
+                    run_agent_loop(agent_model, messages, _tool_executor),
+                    timeout=AGENT_PRECOMPUTE_TIMEOUT_S,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("agent precompute timed out (Gemini slow/overloaded); using fallback")
+                precomputed_answer = AGENT_FALLBACK_TEXT
             agent_sds = _captured.get("sds")
+            agent_quote = _captured.get("quote")
 
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         async def stream_generator():
@@ -2918,6 +2960,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'token': full_reply})}\n\n"
                     if agent_sds:
                         yield f"data: {json.dumps({'sds': agent_sds})}\n\n"
+                    if agent_quote:
+                        yield f"data: {json.dumps({'quote': agent_quote})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
@@ -4071,6 +4115,68 @@ def update_lead_outcome(
     except Exception as e:
         if conn: conn.rollback()
         print(f"LEAD OUTCOME UPDATE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/companies/{company_id}/quote-requests")
+def list_quote_requests(
+    company_id: str,
+    limit: int = 50,
+    status: str = "all",   # "all" | "new" | "sent" | "won" | "lost"
+    user: dict = Depends(get_current_user),
+):
+    """Owner dashboard: quote / price-on-request records from the chemical agent.
+
+    Vertical-feature data on the CONTROL DB (like `products`), tenant-scoped by an
+    ownership check. A non-chemical company simply has no rows. Read-only."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        limit = max(1, min(int(limit or 50), 200))
+        status_filter = status if status in ("new", "sent", "won", "lost") else None
+        status_clause = "AND status = %s" if status_filter else ""
+        params = [company_id] + ([status_filter] if status_filter else []) + [limit]
+        cursor.execute(
+            f"""
+            SELECT id, product_name, grade, pack_size, quantity, unit_price, subtotal,
+                   gst_rate, currency, is_por, contact_name, contact_email,
+                   contact_phone, status, created_at
+            FROM quote_requests
+            WHERE company_id = %s {status_clause}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            params,
+        )
+        rows = cursor.fetchall() or []
+        items = [
+            {
+                "id": str(r[0]), "product": r[1], "grade": r[2], "pack_size": r[3],
+                "quantity": r[4],
+                "unit_price": float(r[5]) if r[5] is not None else None,
+                "subtotal": float(r[6]) if r[6] is not None else None,
+                "gst_rate": float(r[7]) if r[7] is not None else None,
+                "currency": r[8] or "INR", "is_por": bool(r[9]),
+                "contact_name": r[10], "contact_email": r[11], "contact_phone": r[12],
+                "status": r[13],
+                "created_at": r[14].isoformat() if hasattr(r[14], "isoformat") else str(r[14]),
+            }
+            for r in rows
+        ]
+        return {"items": items, "count": len(items)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"list_quote_requests error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         release_db_connection(conn)
@@ -6476,13 +6582,17 @@ def get_config(
             pconn = get_db_connection()
             try:
                 pcur = pconn.cursor()
+                # One row per PRODUCT for the picker — the catalog stores a row per
+                # grade (same name+CAS), so collapse to distinct products here; the
+                # agent collects grade/pack after the visitor picks the product.
                 pcur.execute(
-                    "SELECT name, cas_number, grade, packaging FROM products "
-                    "WHERE company_id = %s ORDER BY name LIMIT 500",
+                    "SELECT DISTINCT ON (lower(name), cas_number) name, cas_number, packaging "
+                    "FROM products WHERE company_id = %s "
+                    "ORDER BY lower(name), cas_number, packaging LIMIT 1000",
                     (safe_company.get("id"),),
                 )
                 safe_company["products"] = [
-                    {"name": r[0], "cas_number": r[1], "grade": r[2], "packaging": r[3]}
+                    {"name": r[0], "cas_number": r[1], "packaging": r[2]}
                     for r in (pcur.fetchall() or [])
                 ]
                 pcur.close()

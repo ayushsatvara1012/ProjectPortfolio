@@ -68,6 +68,35 @@ get_product_spec = ToolSpec(
     slots=_PRODUCT_SLOTS,
 )
 
+request_quote = ToolSpec(
+    name="request_quote",
+    description=(
+        "Get a PRICE / quotation for a product. Pricing is per pack and needs the "
+        "product, the grade, and the pack size; the tool says what to ask for if "
+        "any is missing. NEVER state a price yourself — quote only what this tool "
+        "returns. Some packs are price-on-request: collect the visitor's name and "
+        "email so the team can follow up. Not for safety questions (use get_sds)."
+    ),
+    slots=(
+        Slot("product_name", required=False,
+             description="Product name (or use the CAS number)."),
+        Slot("cas_number", required=False,
+             description="CAS registry number — the precise product key."),
+        Slot("grade", required=False,
+             description="Grade/purity, e.g. LR, AR, HPLC. Required to price."),
+        Slot("pack_size", required=False,
+             description="Pack size, e.g. '500 ml', '2.5 Ltr'. Required to price."),
+        Slot("quantity", required=False,
+             description="Number of packs the visitor wants (defaults to 1)."),
+        Slot("contact_name", required=False,
+             description="Visitor's name (for price-on-request follow-up)."),
+        Slot("contact_email", required=False,
+             description="Visitor's email (for price-on-request follow-up)."),
+        Slot("contact_phone", required=False,
+             description="Visitor's phone (optional, for follow-up)."),
+    ),
+)
+
 # Phase 3 hub cards — only capabilities backed by a LIVE tool get a card. Stock
 # (check_availability) and Quote land here once Phase 2b/4 ship; the widget shows
 # whatever this tuple contains, so the hub grows by editing config, not the UI.
@@ -93,6 +122,16 @@ _HUB_CARDS = (
         input_source="products",
     ),
     HubCard(
+        id="quote",
+        label="Get a quote",
+        subtitle="Price for a product",
+        icon="receipt",
+        action="tool",
+        input_label="Search products…",
+        prompt_template="I'd like a price quote for {value}.",
+        input_source="products",
+    ),
+    HubCard(
         id="ask",
         label="Ask a question",
         subtitle="Chat with the assistant",
@@ -104,7 +143,7 @@ _HUB_CARDS = (
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
-    tools=(get_sds, get_product_spec),
+    tools=(get_sds, get_product_spec, request_quote),
     hub_cards=_HUB_CARDS,
     knowledge_kinds=("catalog", "sds"),
     version=1,
