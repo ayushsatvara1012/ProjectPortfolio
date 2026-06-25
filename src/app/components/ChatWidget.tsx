@@ -465,8 +465,28 @@ type Message = {
   visitorEmail?: string;
   redirectUrl?: string;
   bookingUrl?: string;
+  sds?: { url: string; product?: string; label?: string };
   ts?: number;
 };
+
+// Phase 3 — pack-driven hub. A vertical pack ships these cards via /api/config;
+// a generic bot returns none, so no hub renders. `action` decides the tap:
+// "tool" opens a slot mini-form then sends `prompt_template` ({value} filled in);
+// "chat" just drops the visitor into the chat input.
+type HubCard = {
+  id: string;
+  label: string;
+  icon: string;
+  action: 'tool' | 'chat';
+  subtitle?: string;
+  input_label?: string;
+  prompt_template?: string;
+  input_source?: string;            // "products" => searchable catalog picker
+};
+
+// Commercial catalog row shipped to the widget for the hub's product picker.
+// Never includes the SDS url — that stays behind the get_sds agent tool.
+type ProductOption = { name: string; cas_number?: string; grade?: string; packaging?: string };
 
 type ConfigData = {
   theme_color: string;
@@ -479,6 +499,8 @@ type ConfigData = {
   avatar_bg_style: string;
   lead_capture_enabled?: boolean;
   white_label_enabled?: boolean;
+  hub_cards?: HubCard[];
+  products?: ProductOption[];
 };
 
 // ── Stream-safe Markdown sanitizer ───────────────────────────────────────────
@@ -517,6 +539,14 @@ const MD_COMPONENTS = {
     <a {...props} target="_blank" rel="noopener noreferrer"
        className="underline underline-offset-2">{children}</a>
   ),
+};
+
+// Phase 3 hub cards carry a semantic (Tabler-style) icon name from the pack; the
+// widget renders with Material Symbols, so map the few we use. Unknown → "bolt".
+const HUB_ICON: Record<string, string> = {
+  'file-certificate': 'description',
+  flask: 'science',
+  'message-circle': 'forum',
 };
 
 // Split markdown into top-level blocks (paragraphs / lists / headings / code),
@@ -821,6 +851,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             avatar_bg_style: data.avatar_bg_style || 'none',
             lead_capture_enabled: data.lead_capture_enabled || false,
             white_label_enabled: data.white_label_enabled === true,
+            hub_cards: Array.isArray(data.hub_cards) ? data.hub_cards : [],
+            products: Array.isArray(data.products) ? data.products : [],
           });
           leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
           setMessages(prev => {
@@ -853,6 +885,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const LOGO_URL = configData.custom_logo_url || '';
   const LOGO_SHAPE = configData.logo_shape || 'circle';
   const AVATAR_BG_STYLE = configData.avatar_bg_style || 'none';
+  // A vertical pack supplies hub cards → the widget gets the Chat/Home hybrid.
+  // Generic (vertical=NULL) bots have none → no nav arrow, no Home, plain chat.
+  const hasHub = (configData.hub_cards?.length ?? 0) > 0;
   const themeStyleVars = useMemo(() => themeVars(THEME_COLOR), [THEME_COLOR]);
 
   const leadCapturedRef = useRef(false);
@@ -873,6 +908,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [messages, setMessages] = useState<Message[]>([{ role: 'bot', content: DEFAULT_CONFIG.initial_message, ts: Date.now() }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Phase 3 hub: the tool card currently expanded into a slot mini-form (null =
+  // showing the card strip), and the mini-form's single input value.
+  const [activeHubCard, setActiveHubCard] = useState<HubCard | null>(null);
+  const [hubInput, setHubInput] = useState('');
+  // Hybrid hub: which screen is showing. Opens on 'chat' (with the inline cards);
+  // the nav back-arrow goes to 'home' (the list screen + bottom Home/Chat tabs).
+  const [hubView, setHubView] = useState<'chat' | 'home'>('chat');
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -1013,6 +1055,51 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     await handleSend(null, userMessage);
   };
 
+  // Phase 3 hub: a "chat" card just focuses the input; a "tool" card expands the
+  // slot mini-form. Submitting the form fills {value} into the card's template
+  // and sends it — driving the existing agent loop to the card's tool.
+  const handleHubCardTap = (card: HubCard) => {
+    if (card.action === 'chat') {
+      setActiveHubCard(null);
+      inputRef.current?.focus();
+      return;
+    }
+    setActiveHubCard(card);
+    setHubInput('');
+  };
+
+  // Home-screen card tap: jump to the Chat screen, then run the card (opens its
+  // mini-form for tool cards, or focuses the input for the "Ask" card).
+  const openCardFromHome = (card: HubCard) => {
+    setHubView('chat');
+    handleHubCardTap(card);
+  };
+
+  const submitHubValue = (value: string) => {
+    const card = activeHubCard;
+    const v = value.trim();
+    if (!card || !v || isLoading) return;
+    const message = (card.prompt_template || '{value}').replace('{value}', v);
+    setActiveHubCard(null);
+    setHubInput('');
+    void sendMessage(message);
+  };
+  const submitHubCard = () => submitHubValue(hubInput);
+
+  // Searchable product picker: filter the pack-supplied catalog by name or CAS as
+  // the visitor types. Empty query shows the full list (browse). Capped for perf.
+  const hubProductMatches = useMemo(() => {
+    if (!activeHubCard || activeHubCard.input_source !== 'products') return [];
+    const opts = configData.products || [];
+    const q = hubInput.trim().toLowerCase();
+    const list = q
+      ? opts.filter(p =>
+          p.name.toLowerCase().includes(q) ||
+          (p.cas_number || '').toLowerCase().includes(q))
+      : opts;
+    return list.slice(0, 50);
+  }, [activeHubCard, hubInput, configData.products]);
+
   const handleSend = async (e: React.FormEvent | null, overrideText?: string) => {
     if (e) e.preventDefault();
     if (!overrideText && !input.trim()) return;
@@ -1049,6 +1136,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       .map(m => ({ role: m.role, content: m.content! }));
     let firstChunkReceived = false;
     let sseRetryCount = 0;
+    // Structured "Open SDS" action emitted by the agent stream (a {sds:{...}}
+    // event); captured here and attached to the bot message on [DONE].
+    let pendingSds: Message['sds'] | null = null;
     const SSE_MAX_RETRIES = 1;
     try {
       const parentOriginChat = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
@@ -1141,7 +1231,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot') {
-                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false };
+                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingSds ? { sds: pendingSds } : {}) };
               }
               return updated;
             });
@@ -1177,6 +1267,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           let chunk = '';
           try {
             const parsed = JSON.parse(msg.data);
+            // Structured side-channel: the agent emits {sds:{url,...}} so the
+            // widget renders a deterministic "Open SDS" button (no raw link).
+            if (parsed.sds && typeof parsed.sds.url === 'string') {
+              pendingSds = { url: parsed.sds.url, product: parsed.sds.product, label: parsed.sds.label };
+              return;
+            }
             chunk = parsed.token || parsed.content || parsed.text || '';
           } catch {
             chunk = msg.data;
@@ -1280,7 +1376,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             <div className="relative shrink-0 bg-gray-50/50 dark:bg-slate-950/50">
               <div className="text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
-                  <div className="relative flex items-center gap-3 pl-2">
+                  <div className="relative flex items-center gap-2 pl-1">
+                    {hasHub && hubView === 'chat' && (
+                      // Top-nav back arrow → Home screen (only for vertical bots).
+                      <button onClick={() => { setActiveHubCard(null); setHubView('home'); }}
+                        style={{ WebkitTapHighlightColor: 'transparent', outlineColor: THEME_COLOR }}
+                        className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Go to home">
+                        <span className="material-symbols-outlined text-[22px] leading-none text-slate-500 dark:text-slate-400">arrow_back</span>
+                      </button>
+                    )}
                     <div className="relative">
                       {/* In-chat profile avatar is ALWAYS a circle with no shadow so any
                           custom logo sits seamlessly. The selected shape applies to the
@@ -1349,6 +1453,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             </div>
 
+            {hubView === 'chat' && (
             <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
               {showJumpPill && (
                 <button
@@ -1433,6 +1538,17 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                   </div>
                                 )}
                               </div>
+                              {msg.role === 'bot' && !msg.isStreaming && msg.sds?.url && (
+                                // Deterministic SDS action — the agent never pastes
+                                // the raw link; this button carries the real sheet.
+                                <a href={msg.sds.url} target="_blank" rel="noopener noreferrer"
+                                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-google font-bold text-white transition-opacity hover:opacity-90"
+                                  style={{ backgroundColor: THEME_COLOR }}>
+                                  <span className="material-symbols-outlined text-[18px] leading-none">description</span>
+                                  {msg.sds.label || 'Open SDS'}
+                                  <span className="material-symbols-outlined text-[16px] leading-none">arrow_outward</span>
+                                </a>
+                              )}
                               {metaLabel && !msg.isStreaming && <span className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-1 px-1 leading-none">{metaLabel}</span>}
                             </div>
                           )}
@@ -1444,9 +1560,98 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div ref={messagesEndRef} className="h-5 shrink-0" aria-hidden="true" />
               </div>
             </div>
+            )}
 
+            {hubView === 'home' && hasHub && (
+              // Home screen — list of action cards + bottom Home/Chat tab bar.
+              <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
+                <div className="flex-1 overflow-y-auto px-3 pt-5 pb-3 flex flex-col gap-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <p className="text-[15px] font-google font-medium text-slate-900 dark:text-slate-100 px-1 mb-1">How can we help you today?</p>
+                  {(configData.hub_cards ?? []).map((card) => (
+                    <button key={card.id} type="button" onClick={() => openCardFromHome(card)}
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-3 text-left transition-colors hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                      <span className="material-symbols-outlined text-[22px] leading-none text-[var(--sapy-theme)] shrink-0" aria-hidden="true">{HUB_ICON[card.icon] || 'bolt'}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[14px] font-google font-medium text-slate-800 dark:text-slate-100">{card.label}</span>
+                        {card.subtitle && <span className="block text-[12px] font-google text-slate-500 dark:text-slate-400 mt-0.5">{card.subtitle}</span>}
+                      </span>
+                      <span className="material-symbols-outlined text-[20px] leading-none text-slate-300 dark:text-slate-600 shrink-0" aria-hidden="true">chevron_right</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-gray-100 dark:border-slate-800 flex shrink-0" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 4px))' : 'env(safe-area-inset-bottom, 4px)' }}>
+                  <button type="button" onClick={() => setHubView('home')} aria-label="Home"
+                    className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[var(--sapy-theme)]">
+                    <span className="material-symbols-outlined text-[21px] leading-none">home</span>
+                    <span className="text-[11px] font-google font-medium">Home</span>
+                  </button>
+                  <button type="button" onClick={() => setHubView('chat')} aria-label="Chat"
+                    className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <span className="material-symbols-outlined text-[21px] leading-none">chat_bubble</span>
+                    <span className="text-[11px] font-google">Chat</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {hubView === 'chat' && (
             <div className="bg-gray-50/50 dark:bg-slate-950/50 shrink-0 z-10 flex flex-col">
-              {messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 && (
+              {hasHub && (activeHubCard || (messages.length === 1 && !input.trim())) ? (
+                // Phase 3 — pack-driven hub. Card strip on a fresh conversation;
+                // a tool card (here or from Home) swaps in its slot mini-form,
+                // which may open mid-conversation when launched from the Home tab.
+                <div className="px-3 pb-1 pt-2.5">
+                  {activeHubCard ? (
+                    <div className="flex flex-col gap-2">
+                      {/* Back sits at the top so the visitor can return to asking;
+                          below it is the single required field (no duplicate input). */}
+                      <button type="button" onClick={() => setActiveHubCard(null)} aria-label="Back to options"
+                        className="flex items-center gap-1 self-start -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
+                        <span className="material-symbols-outlined text-[18px] leading-none">arrow_back</span>
+                        <span className="text-[13px] font-medium font-google">Back</span>
+                      </button>
+                      <div className="relative">
+                        {activeHubCard.input_source === 'products' && hubProductMatches.length > 0 && (
+                          // Drop-UP (input sits near the bottom): the searchable catalog.
+                          <div className="absolute bottom-full left-0 right-0 mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin z-20">
+                            {hubProductMatches.map((p) => (
+                              <button key={`${p.name}-${p.cas_number || ''}`} type="button" onClick={() => submitHubValue(p.name)}
+                                className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                <span className="text-[14px] font-google text-slate-800 dark:text-slate-200 truncate">{p.name}</span>
+                                <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{p.cas_number || p.grade || ''}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <form onSubmit={(e) => { e.preventDefault(); submitHubCard(); }}
+                          className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-3.5 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+                          {activeHubCard.input_source === 'products' && (
+                            <span className="material-symbols-outlined text-[18px] leading-none text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true">search</span>
+                          )}
+                          <input value={hubInput} onChange={e => setHubInput(e.target.value)} autoFocus
+                            placeholder={activeHubCard.input_label || 'Type your answer'}
+                            aria-label={activeHubCard.input_label || activeHubCard.label}
+                            className="flex-1 min-w-0 bg-transparent focus:outline-none text-[15px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
+                          <button type="submit" disabled={!hubInput.trim() || isLoading} aria-label="Submit"
+                            className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 transition-colors disabled:cursor-not-allowed ${hubInput.trim() && !isLoading ? 'text-blue-900 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                            <span className="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {configData.hub_cards!.map((card) => (
+                        <button key={card.id} type="button" onClick={() => handleHubCardTap(card)} aria-label={card.label}
+                          className="flex-1 min-w-0 flex flex-col items-center gap-1 rounded-xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900 px-2 py-2.5 shadow-sm transition-all hover:text-[var(--sapy-theme)] hover:border-slate-300 dark:hover:border-slate-700 hover:shadow">
+                          <span className="material-symbols-outlined text-[20px] leading-none text-[var(--sapy-theme)]" aria-hidden="true">{HUB_ICON[card.icon] || 'bolt'}</span>
+                          <span className="text-[12px] font-medium font-google text-slate-800 dark:text-slate-200 text-center leading-tight break-words">{card.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 ? (
                 <div className="flex flex-col items-start gap-2 px-3 pb-1 pt-2.5">
                   {configData.quick_questions.map((q, qidx) => {
                     const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
@@ -1459,8 +1664,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     );
                   })}
                 </div>
-              )}
+              ) : null}
               <div className="px-3 pt-2 w-full" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
+                {/* Hide the main chat input while a hub mini-form is open — the
+                    card's own field is the only input required; the Back button
+                    above returns the visitor here to free-ask. */}
+                {!activeHubCard && (
                 <form onSubmit={handleSend} className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                     placeholder="Ask anything"
@@ -1471,6 +1680,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     <span className="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                   </button>
                 </form>
+                )}
                 {!configData.white_label_enabled && (
                   <div className="flex items-center justify-center gap-1.5 py-2.5">
                     <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
@@ -1482,6 +1692,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 )}
               </div>
             </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

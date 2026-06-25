@@ -12,8 +12,34 @@ value — packs are defined once at import time and never mutated at runtime.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from typing import List, Optional, Tuple
+
+
+@dataclass(frozen=True)
+class HubCard:
+    """One action card on the pack-driven hub (Phase 3, plan §10).
+
+    A card is a discoverable shortcut to a capability. ``action`` decides what a
+    tap does:
+      - ``"tool"`` opens an inline slot mini-form (one ``input_label`` field) and,
+        on submit, sends ``prompt_template`` with ``{value}`` substituted — which
+        drives the agent loop to the card's ``tool``.
+      - ``"chat"`` just drops the visitor into the normal chat input (no form).
+
+    Cards are *config*: the widget renders whatever the pack supplies and never
+    hardcodes a vertical. A no-pack (``vertical=NULL``) company has no cards, so
+    no hub renders — the generic chat is untouched.
+    """
+
+    id: str
+    label: str
+    icon: str                       # Tabler outline icon name, e.g. "file-certificate"
+    action: str = "tool"            # "tool" | "chat"
+    subtitle: str = ""
+    input_label: str = ""           # mini-form placeholder (action="tool")
+    prompt_template: str = ""       # message sent on submit; "{value}" is substituted
+    input_source: str = ""          # "" = free text; "products" = searchable catalog picker
 
 
 @dataclass(frozen=True)
@@ -59,7 +85,7 @@ class Pack:
     vertical: str
     persona_prompt: str
     tools: Tuple[ToolSpec, ...] = ()
-    hub_cards: Tuple[dict, ...] = ()          # filled in Phase 3 (pack-driven hub UI)
+    hub_cards: Tuple[HubCard, ...] = ()        # Phase 3 — pack-driven hub UI cards
     knowledge_kinds: Tuple[str, ...] = ()      # what doc kinds feed RAG/tools
     version: int = 1
 
@@ -71,6 +97,15 @@ class Pack:
             if t.name == name:
                 return t
         return None
+
+    def hub_cards_payload(self) -> List[dict]:
+        """JSON-serializable card list for the widget config (``/api/config``).
+
+        Empty when the pack defines no cards — the widget then renders no hub and
+        opens straight to chat. Card-launching tools are assumed declared in
+        ``tools``; cards are authored alongside them in the pack file.
+        """
+        return [asdict(card) for card in self.hub_cards]
 
 
 def normalize_vertical(value: object) -> Optional[str]:

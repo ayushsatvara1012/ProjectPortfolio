@@ -74,8 +74,41 @@ class TestChemicalPack:
             slot_names = {s.name for s in tool.slots}
             assert {"cas_number", "product_name"} <= slot_names
 
-    def test_hub_cards_empty_until_phase3(self):
-        assert CHEMICAL_PACK.hub_cards == ()
+    def test_hub_cards_present_and_only_for_live_tools(self):
+        # Phase 3: cards are declared; every "tool" card must map to a tool the
+        # pack actually enables (no card for an unbuilt capability).
+        cards = CHEMICAL_PACK.hub_cards
+        assert len(cards) >= 1
+        ids = {c.id for c in cards}
+        assert {"sds", "spec", "ask"} <= ids
+        live_tools = set(CHEMICAL_PACK.tool_names())
+        card_by_id = {c.id: c for c in cards}
+        assert card_by_id["sds"].action == "tool" and "get_sds" in live_tools
+        assert card_by_id["spec"].action == "tool" and "get_product_spec" in live_tools
+        assert card_by_id["ask"].action == "chat"  # chat card needs no tool
+
+    def test_hub_cards_payload_is_json_serializable(self):
+        import json
+        payload = CHEMICAL_PACK.hub_cards_payload()
+        assert isinstance(payload, list) and payload
+        # Round-trips through JSON (this is what /api/config ships to the widget).
+        json.dumps(payload)
+        first = payload[0]
+        assert {"id", "label", "icon", "action"} <= set(first)
+        # A tool card carries a {value} template the widget fills from the form.
+        sds = next(c for c in payload if c["id"] == "sds")
+        assert "{value}" in sds["prompt_template"]
+
+    def test_config_glue_pack_vs_generic(self):
+        # Mirrors get_config: vertical -> pack -> hub_cards, else []. A generic
+        # (NULL/blank/unknown) company gets no cards, so the widget shows no hub.
+        def hub_cards_for(vertical):
+            pack = load_pack(vertical)
+            return pack.hub_cards_payload() if pack else []
+
+        assert hub_cards_for("chemical")          # chemical ships cards
+        for generic in (None, "", "  ", "plumbing", 123):
+            assert hub_cards_for(generic) == []   # everyone else: no hub
 
     def test_knowledge_kinds(self):
         assert set(CHEMICAL_PACK.knowledge_kinds) == {"catalog", "sds"}

@@ -204,9 +204,11 @@ def get_sds(
             else (str(updated_) if updated_ else None)
         ),
         "message": (
-            "Share this official SDS link with the visitor. Do not summarise or "
-            "paraphrase hazard, handling, or storage details beyond pointing them "
-            "to the sheet — the document is the source of truth."
+            "The visitor is automatically shown an 'Open SDS' button that links to "
+            "this official sheet — do NOT paste the URL or a markdown link yourself. "
+            "Just briefly confirm the safety sheet for this product is ready. Do not "
+            "summarise or paraphrase hazard, handling, or storage details — the "
+            "document is the source of truth."
         ),
     }
 

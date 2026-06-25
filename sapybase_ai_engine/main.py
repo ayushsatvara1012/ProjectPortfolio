@@ -2883,13 +2883,27 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         # The result is precomputed; the generator just emits it. Generic
         # (vertical=NULL) companies skip this entirely and stream live as before.
         precomputed_answer = None
+        agent_sds = None  # structured "Open SDS" action surfaced as a widget button
         if pack is not None:
             agent_model = chat_model.bind_tools(build_tool_schemas(pack))
 
+            _captured = {}
+
             def _tool_executor(tool_name, tool_args):
-                return execute_tool(tool_name, tool_args, cursor, company["id"])
+                obs = execute_tool(tool_name, tool_args, cursor, company["id"])
+                # When get_sds resolves a real sheet, surface it as a deterministic
+                # button payload — the model is told NOT to paste the link itself.
+                if (tool_name == "get_sds" and isinstance(obs, dict)
+                        and obs.get("status") == "found" and obs.get("sds_url")):
+                    _captured["sds"] = {
+                        "url": obs["sds_url"],
+                        "product": (obs.get("product") or {}).get("name"),
+                        "label": "Open SDS",
+                    }
+                return obs
 
             precomputed_answer = await run_agent_loop(agent_model, messages, _tool_executor)
+            agent_sds = _captured.get("sds")
 
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         async def stream_generator():
@@ -2902,6 +2916,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     full_reply = precomputed_answer
                     if full_reply:
                         yield f"data: {json.dumps({'token': full_reply})}\n\n"
+                    if agent_sds:
+                        yield f"data: {json.dumps({'sds': agent_sds})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
@@ -6447,6 +6463,35 @@ def get_config(
             else:
                 # Fallback: convert to string representation
                 safe_company[key] = str(value)
+
+        # Phase 3 — pack-driven hub. A company whose `vertical` resolves to a pack
+        # ships its action cards to the widget; everyone else gets an empty list,
+        # so the widget renders no hub and opens straight to chat (unchanged).
+        pack = load_pack(safe_company.get("vertical"))
+        if pack:
+            safe_company["hub_cards"] = pack.hub_cards_payload()
+            # Catalog for the hub's searchable product picker. COMMERCIAL fields
+            # only — never the SDS url (that stays the audited get_sds path). Tenant
+            # scoped; cached with the rest of the config (300s) so it's one query.
+            pconn = get_db_connection()
+            try:
+                pcur = pconn.cursor()
+                pcur.execute(
+                    "SELECT name, cas_number, grade, packaging FROM products "
+                    "WHERE company_id = %s ORDER BY name LIMIT 500",
+                    (safe_company.get("id"),),
+                )
+                safe_company["products"] = [
+                    {"name": r[0], "cas_number": r[1], "grade": r[2], "packaging": r[3]}
+                    for r in (pcur.fetchall() or [])
+                ]
+                pcur.close()
+            finally:
+                release_db_connection(pconn)
+        else:
+            safe_company["hub_cards"] = []
+            safe_company["products"] = []
+
         return safe_company
     except Exception as e:
         logger.error(f"ERROR in get_config serialization: {e}", exc_info=True)

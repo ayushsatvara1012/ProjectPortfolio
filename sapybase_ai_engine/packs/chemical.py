@@ -12,7 +12,7 @@ guardrail eval gate that enforces it.
 """
 from __future__ import annotations
 
-from packs.schema import Pack, Slot, ToolSpec
+from packs.schema import HubCard, Pack, Slot, ToolSpec
 
 CHEMICAL_VERTICAL = "chemical"
 
@@ -68,11 +68,44 @@ get_product_spec = ToolSpec(
     slots=_PRODUCT_SLOTS,
 )
 
+# Phase 3 hub cards — only capabilities backed by a LIVE tool get a card. Stock
+# (check_availability) and Quote land here once Phase 2b/4 ship; the widget shows
+# whatever this tuple contains, so the hub grows by editing config, not the UI.
+_HUB_CARDS = (
+    HubCard(
+        id="sds",
+        label="Request SDS",
+        subtitle="Get the official safety sheet",
+        icon="file-certificate",
+        action="tool",
+        input_label="Search products…",
+        prompt_template="I need the Safety Data Sheet for {value}.",
+        input_source="products",
+    ),
+    HubCard(
+        id="spec",
+        label="Product specs",
+        subtitle="Grade & packaging",
+        icon="flask",
+        action="tool",
+        input_label="Search products…",
+        prompt_template="What grade and packaging is available for {value}?",
+        input_source="products",
+    ),
+    HubCard(
+        id="ask",
+        label="Ask a question",
+        subtitle="Chat with the assistant",
+        icon="message-circle",
+        action="chat",
+    ),
+)
+
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
     tools=(get_sds, get_product_spec),
-    hub_cards=(),                      # Phase 3 fills this (Quote / SDS / Stock / Ask)
+    hub_cards=_HUB_CARDS,
     knowledge_kinds=("catalog", "sds"),
     version=1,
 )
