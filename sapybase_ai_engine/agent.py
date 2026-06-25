@@ -59,44 +59,43 @@ def _candidate(row) -> Dict[str, Any]:
     return {"name": row[0], "cas_number": row[1], "grade": row[2]}
 
 
-def get_sds(
-    cursor,
-    company_id,
-    *,
-    cas_number: Optional[str] = None,
-    product_name: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Look up a product's real SDS, scoped to ONE tenant. Pure data, no LLM.
+# The single column list every product lookup selects. A superset: ``get_sds``
+# needs ``sds_ref``/``updated_at``; ``get_product_spec`` ignores them. Keeping one
+# shape lets both tools share the resolver and the ``_candidate`` row indexing.
+_PRODUCT_COLS = "name, cas_number, grade, packaging, sds_ref, updated_at"
 
-    Resolution order (CAS is the precise key; a fuzzy name never auto-serves):
+
+def _resolve_product(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
+    """Resolve a CAS/name to exactly one product row, or a terminal status.
+
+    Shared by every product tool so resolution can never drift between them.
+    Resolution order (CAS is the precise key; a fuzzy name never auto-resolves):
       1. exact CAS match
       2. exact (case-insensitive) name match
       3. partial name match -> returned as candidates to CONFIRM, never served
 
-    Returns a status dict the model reads as its observation. Possible statuses:
-      found | no_sheet_on_file | ambiguous | not_found | missing_identifier
+    Returns one of:
+      - ``{"row": <tuple>}``                  — a single unambiguous match
+      - ``{"status": "missing_identifier"}``  — neither CAS nor name supplied
+      - ``{"status": "not_found", ...}``      — nothing matched
+      - ``{"status": "ambiguous", ...}``      — >1 exact, or any partial match
 
     SECURITY: every query is filtered by ``company_id`` — a tenant can never see
-    another tenant's catalog or SDS. A product with a missing/non-https ``sds_ref``
-    is reported as ``no_sheet_on_file`` (we have the product but no servable sheet)
-    so the agent escalates instead of handing out a broken or insecure link.
+    another tenant's catalog. The caller decides what to do with the single row
+    (e.g. ``get_sds`` still has to vet the ``sds_ref``).
     """
-    cas = (cas_number or "").strip()
-    name = (product_name or "").strip()
-
     if not cas and not name:
         return {
             "status": "missing_identifier",
             "message": "Ask the visitor for the product name or, ideally, its CAS number.",
         }
 
-    cols = "name, cas_number, grade, packaging, sds_ref, updated_at"
     rows = []
 
     # 1. CAS exact — the precise, unambiguous key.
     if cas:
         cursor.execute(
-            f"SELECT {cols} FROM products WHERE company_id = %s AND cas_number = %s",
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE company_id = %s AND cas_number = %s",
             (company_id, cas),
         )
         rows = cursor.fetchall() or []
@@ -104,16 +103,16 @@ def get_sds(
     # 2. Name exact (case-insensitive) fallback.
     if not rows and name:
         cursor.execute(
-            f"SELECT {cols} FROM products WHERE company_id = %s AND lower(name) = lower(%s)",
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE company_id = %s AND lower(name) = lower(%s)",
             (company_id, name),
         )
         rows = cursor.fetchall() or []
 
-    # 3. Partial name — present as candidates, NEVER auto-serve (safety domain:
-    #    a wrong sheet is worse than asking one more question).
+    # 3. Partial name — present as candidates, NEVER auto-resolve (a wrong product
+    #    is worse than asking one more question; identical discipline for spec+SDS).
     if not rows and name:
         cursor.execute(
-            f"SELECT {cols} FROM products WHERE company_id = %s AND name ILIKE %s LIMIT 8",
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE company_id = %s AND name ILIKE %s LIMIT 8",
             (company_id, f"%{name}%"),
         )
         partial = cursor.fetchall() or []
@@ -122,7 +121,7 @@ def get_sds(
                 "status": "not_found",
                 "message": (
                     "No matching product in the catalog. Tell the visitor you don't "
-                    "have that sheet and offer to connect them to the team."
+                    "have it on file and offer to connect them to the team."
                 ),
             }
         return {
@@ -130,7 +129,7 @@ def get_sds(
             "candidates": [_candidate(r) for r in partial[:8]],
             "message": (
                 "One or more products partially match. Ask the visitor to confirm "
-                "the exact product (by grade or CAS number) before sharing any SDS."
+                "the exact product (by grade or CAS number) before sharing anything."
             ),
         }
 
@@ -139,7 +138,7 @@ def get_sds(
             "status": "not_found",
             "message": (
                 "No matching product in the catalog. Tell the visitor you don't have "
-                "that sheet and offer to connect them to the team."
+                "it on file and offer to connect them to the team."
             ),
         }
 
@@ -151,7 +150,34 @@ def get_sds(
             "message": "Several grades match. Ask the visitor which grade they need.",
         }
 
-    name_, cas_, grade_, packaging_, sds_ref_, updated_ = rows[0]
+    return {"row": rows[0]}
+
+
+def get_sds(
+    cursor,
+    company_id,
+    *,
+    cas_number: Optional[str] = None,
+    product_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Look up a product's real SDS, scoped to ONE tenant. Pure data, no LLM.
+
+    Resolution is delegated to ``_resolve_product`` (CAS exact -> name exact ->
+    partial = confirm). Returns a status dict the model reads as its observation:
+      found | no_sheet_on_file | ambiguous | not_found | missing_identifier
+
+    SECURITY: resolution is tenant-scoped. A product with a missing/non-https
+    ``sds_ref`` is reported as ``no_sheet_on_file`` (we have the product but no
+    servable sheet) so the agent escalates instead of handing out a broken or
+    insecure link.
+    """
+    resolved = _resolve_product(
+        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip()
+    )
+    if "row" not in resolved:
+        return resolved
+
+    name_, cas_, grade_, packaging_, sds_ref_, updated_ = resolved["row"]
 
     if not _is_https(sds_ref_):
         return {
@@ -185,6 +211,53 @@ def get_sds(
     }
 
 
+def get_product_spec(
+    cursor,
+    company_id,
+    *,
+    cas_number: Optional[str] = None,
+    product_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Look up a product's COMMERCIAL spec (grade, packaging), tenant-scoped.
+
+    Read-only, no LLM. Resolution is the same shared ``_resolve_product`` path as
+    ``get_sds`` (CAS exact -> name exact -> partial = confirm), so a fuzzy name
+    never auto-serves the wrong product's spec. Statuses:
+      found | ambiguous | not_found | missing_identifier
+
+    This is COMMERCIAL data only — it never returns hazard/handling info and never
+    returns the SDS URL itself (``sds_available`` is a boolean nudge so the agent
+    can offer the sheet via ``get_sds``). The safety guardrail is preserved: the
+    ``message`` tells the model to route any safety question to ``get_sds`` and to
+    not infer hazards from grade or purity.
+    """
+    resolved = _resolve_product(
+        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip()
+    )
+    if "row" not in resolved:
+        return resolved
+
+    name_, cas_, grade_, packaging_, sds_ref_, _updated_ = resolved["row"]
+
+    return {
+        "status": "found",
+        "product": {
+            "name": name_,
+            "cas_number": cas_,
+            "grade": grade_,
+            "packaging": packaging_,
+        },
+        "sds_available": _is_https(sds_ref_),
+        "message": (
+            "Share the commercial spec fields that are present; do not invent any "
+            "field that is null. This is commercial information only — for ANY "
+            "safety, hazard, handling, storage, or regulatory question call get_sds "
+            "and answer only from that document. Never infer hazards from grade or "
+            "purity. If sds_available is true, you may offer to fetch the SDS."
+        ),
+    }
+
+
 def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[str, Any]:
     """Dispatch a model-requested tool to its deterministic implementation.
 
@@ -194,6 +267,13 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
     """
     if name == "get_sds":
         return get_sds(
+            cursor,
+            company_id,
+            cas_number=args.get("cas_number"),
+            product_name=args.get("product_name"),
+        )
+    if name == "get_product_spec":
+        return get_product_spec(
             cursor,
             company_id,
             cas_number=args.get("cas_number"),
@@ -259,8 +339,12 @@ def build_agent_directive(pack) -> str:
         "the get_sds tool and answer ONLY from the document it returns. NEVER "
         "generate, paraphrase, estimate, or infer such information from your own "
         "knowledge or from the knowledge-base text.\n\n"
-        "If get_sds returns no servable document (statuses not_found or "
-        "no_sheet_on_file), tell the visitor you don't have that sheet and offer "
+        "For a product's COMMERCIAL spec (grade, purity, packaging, available "
+        "sizes) call get_product_spec. That tool returns commercial data only — "
+        "never treat its grade or purity as a basis to infer hazards or handling. "
+        "Any safety-class question still goes to get_sds, even mid-conversation.\n\n"
+        "If a tool returns no servable result (statuses not_found or "
+        "no_sheet_on_file), tell the visitor you don't have it on file and offer "
         "to connect them to the team. If it is ambiguous, ask the visitor to "
         "confirm the exact product (by grade or CAS number). Never guess."
     )

@@ -36,30 +36,42 @@ name is ambiguous, ask for the CAS number. Be concise, accurate, and never
 improvise chemistry.
 """
 
+_PRODUCT_SLOTS = (
+    Slot(
+        "cas_number",
+        required=False,
+        description="CAS registry number — the precise, unambiguous product key.",
+    ),
+    Slot(
+        "product_name",
+        required=False,
+        description="Product name; used when the CAS number is unknown.",
+    ),
+)
+
 get_sds = ToolSpec(
     name="get_sds",
     description=(
         "Fetch the real Safety Data Sheet (SDS) for a product. The ONLY source of "
         "safety/hazard/handling information — never answer those from memory."
     ),
-    slots=(
-        Slot(
-            "cas_number",
-            required=False,
-            description="CAS registry number — the precise, unambiguous product key.",
-        ),
-        Slot(
-            "product_name",
-            required=False,
-            description="Product name; used when the CAS number is unknown.",
-        ),
+    slots=_PRODUCT_SLOTS,
+)
+
+get_product_spec = ToolSpec(
+    name="get_product_spec",
+    description=(
+        "Look up a product's COMMERCIAL spec — grade, purity, packaging/available "
+        "sizes — from the catalog. Use for product details, NOT for safety: any "
+        "hazard/handling/storage/regulatory question goes to get_sds instead."
     ),
+    slots=_PRODUCT_SLOTS,
 )
 
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
-    tools=(get_sds,),
+    tools=(get_sds, get_product_spec),
     hub_cards=(),                      # Phase 3 fills this (Quote / SDS / Stock / Ask)
     knowledge_kinds=("catalog", "sds"),
     version=1,

@@ -62,16 +62,17 @@ class TestChemicalPack:
         assert "sds" in prompt or "safety data sheet" in prompt
         assert "never" in prompt  # the forbiddance of model-generated safety info
 
-    def test_declares_get_sds_only(self):
-        # Phase 0 ships exactly one declared tool.
-        assert CHEMICAL_PACK.tool_names() == ("get_sds",)
-        tool = CHEMICAL_PACK.get_tool("get_sds")
-        assert isinstance(tool, ToolSpec)
+    def test_declares_phase2a_read_only_tools(self):
+        # Phase 2a adds get_product_spec alongside the Phase 1 get_sds tool.
+        assert CHEMICAL_PACK.tool_names() == ("get_sds", "get_product_spec")
+        for name in ("get_sds", "get_product_spec"):
+            assert isinstance(CHEMICAL_PACK.get_tool(name), ToolSpec)
 
-    def test_get_sds_slots_cover_cas_and_name(self):
-        tool = CHEMICAL_PACK.get_tool("get_sds")
-        slot_names = {s.name for s in tool.slots}
-        assert {"cas_number", "product_name"} <= slot_names
+    def test_product_tool_slots_cover_cas_and_name(self):
+        for name in ("get_sds", "get_product_spec"):
+            tool = CHEMICAL_PACK.get_tool(name)
+            slot_names = {s.name for s in tool.slots}
+            assert {"cas_number", "product_name"} <= slot_names
 
     def test_hub_cards_empty_until_phase3(self):
         assert CHEMICAL_PACK.hub_cards == ()

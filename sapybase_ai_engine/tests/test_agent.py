@@ -22,6 +22,7 @@ from agent import (
     build_agent_directive,
     build_tool_schemas,
     execute_tool,
+    get_product_spec,
     get_sds,
     run_agent_loop,
 )
@@ -167,6 +168,76 @@ class TestGetSdsTenantScoping:
             assert params[0] == CID  # company_id is always the first bound param
 
 
+# ── get_product_spec ─────────────────────────────────────────────────────────
+
+class TestGetProductSpec:
+    def test_missing_identifier(self):
+        out = get_product_spec(FakeCursor(), CID)
+        assert out["status"] == "missing_identifier"
+
+    def test_found_by_cas_returns_commercial_fields_only(self):
+        out = get_product_spec(FakeCursor(cas=[_row()]), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+        assert out["product"] == {
+            "name": "Sulphuric Acid",
+            "cas_number": "7664-93-9",
+            "grade": "Battery",
+            "packaging": "35kg can",
+        }
+        # The SDS URL is NEVER exposed by this tool — only a boolean nudge.
+        assert "sds_url" not in out
+        assert "sds_ref" not in out
+
+    def test_found_by_exact_name_case_insensitive(self):
+        out = get_product_spec(FakeCursor(name_exact=[_row()]), CID,
+                               product_name="sulphuric acid")
+        assert out["status"] == "found"
+
+    def test_sds_available_true_when_https_on_file(self):
+        out = get_product_spec(FakeCursor(cas=[_row()]), CID, cas_number="7664-93-9")
+        assert out["sds_available"] is True
+
+    def test_sds_available_false_when_no_or_insecure_ref(self):
+        out = get_product_spec(FakeCursor(cas=[_row(sds_ref=None)]), CID,
+                               cas_number="7664-93-9")
+        assert out["status"] == "found"  # spec still resolves without a sheet
+        assert out["sds_available"] is False
+        out2 = get_product_spec(FakeCursor(cas=[_row(sds_ref="http://insecure/x")]),
+                                CID, cas_number="7664-93-9")
+        assert out2["sds_available"] is False
+
+    def test_null_spec_fields_returned_as_none_not_invented(self):
+        row = _row(grade=None, packaging=None)
+        out = get_product_spec(FakeCursor(cas=[row]), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] is None
+        assert out["product"]["packaging"] is None
+
+    def test_not_found(self):
+        out = get_product_spec(FakeCursor(), CID, product_name="unobtainium")
+        assert out["status"] == "not_found"
+
+    def test_multiple_exact_matches_are_ambiguous(self):
+        rows = [_row(grade="Battery"), _row(grade="Technical")]
+        out = get_product_spec(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "ambiguous"
+        assert {c["grade"] for c in out["candidates"]} == {"Battery", "Technical"}
+
+    def test_partial_name_single_match_still_confirms(self):
+        # Same discipline as get_sds: a fuzzy match never auto-serves a spec.
+        out = get_product_spec(FakeCursor(partial=[_row()]), CID, product_name="acid")
+        assert out["status"] == "ambiguous"
+        assert len(out["candidates"]) == 1
+
+    def test_every_query_is_company_scoped(self):
+        cur = FakeCursor(cas=[], name_exact=[], partial=[])
+        get_product_spec(cur, CID, cas_number="7664-93-9", product_name="acid")
+        assert cur.calls
+        for sql, params in cur.calls:
+            assert "company_id = %s" in sql
+            assert params[0] == CID
+
+
 # ── execute_tool ─────────────────────────────────────────────────────────────
 
 class TestExecuteTool:
@@ -174,6 +245,12 @@ class TestExecuteTool:
         out = execute_tool("get_sds", {"cas_number": "7664-93-9"},
                            FakeCursor(cas=[_row()]), CID)
         assert out["status"] == "found"
+
+    def test_dispatches_get_product_spec(self):
+        out = execute_tool("get_product_spec", {"cas_number": "7664-93-9"},
+                           FakeCursor(cas=[_row()]), CID)
+        assert out["status"] == "found"
+        assert "sds_url" not in out
 
     def test_unknown_tool_is_benign_error(self):
         out = execute_tool("delete_everything", {}, FakeCursor(), CID)
@@ -186,19 +263,22 @@ class TestExecuteTool:
 class TestSchemasAndDirective:
     def test_chemical_schema_shape(self):
         schemas = build_tool_schemas(load_pack("chemical"))
-        assert len(schemas) == 1
-        s = schemas[0]
-        assert s["name"] == "get_sds"
-        props = s["parameters"]["properties"]
-        assert set(props) == {"cas_number", "product_name"}
-        # get_sds needs CAS *or* name, so neither is individually required.
-        assert s["parameters"]["required"] == []
+        by_name = {s["name"]: s for s in schemas}
+        assert set(by_name) == {"get_sds", "get_product_spec"}
+        for s in by_name.values():
+            props = s["parameters"]["properties"]
+            assert set(props) == {"cas_number", "product_name"}
+            # Both tools need CAS *or* name, so neither slot is individually required.
+            assert s["parameters"]["required"] == []
 
-    def test_directive_names_tool_and_states_safety_rule(self):
+    def test_directive_names_tools_and_states_safety_rule(self):
         directive = build_agent_directive(load_pack("chemical"))
         assert "get_sds" in directive
+        assert "get_product_spec" in directive
         assert "NEVER" in directive
         assert "Safety Data Sheet" in directive
+        # The spec tool must not become a backdoor: safety still routes to get_sds.
+        assert "safety-class question still goes to get_sds" in directive
 
 
 # ── run_agent_loop ───────────────────────────────────────────────────────────
