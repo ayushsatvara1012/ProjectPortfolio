@@ -23,8 +23,10 @@ import {
 // Code-split panels — each renders its own loading state
 const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
 const QuoteRequestsPanel = dynamic(() => import('@/src/app/components/QuoteRequestsPanel'));
+const AgentRequestsPanel = dynamic(() => import('@/src/app/components/AgentRequestsPanel'));
 const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
 const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
+const PipelineKpisStrip = dynamic(() => import('@/src/app/components/PipelineKpis'));
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Activity series helpers — everything below is derived from REAL daily data.  */
@@ -297,6 +299,11 @@ export default function AppInsights() {
 
     const bots = (botsData as any)?.bots || [];
     const [selectedBotId, setSelectedBotId] = useState('');
+    const selectedBot = bots.find((b: any) => b.id === selectedBotId);
+    // Phase 5a — the pack vertical drives this page. A chemical bot relabels the
+    // tabs (Pipeline / Operations) and leads its Pipeline with a quote+sample KPI
+    // strip. A generic (vertical=NULL) bot is byte-for-byte unchanged.
+    const isChemical = selectedBot?.vertical === 'chemical';
 
     useEffect(() => {
         if (bots.length > 0 && !selectedBotId) setSelectedBotId(bots[0].id);
@@ -337,11 +344,19 @@ export default function AppInsights() {
         }
     };
 
-    const TABS = [
-        { id: 'sales', label: 'Sales & Leads', shortLabel: 'Sales', icon: 'sell' },
-        { id: 'conversations', label: 'Conversations', shortLabel: 'Chats', icon: 'forum' },
-        { id: 'funnel', label: 'Funnel & Insights', shortLabel: 'Funnel', icon: 'insights' },
-    ];
+    // Same tab IDs in both verticals (so all branch logic / the Generate button
+    // keep working) — only the labels + icons swap for the chemical pack.
+    const TABS = isChemical
+        ? [
+            { id: 'sales', label: 'Pipeline', shortLabel: 'Pipeline', icon: 'receipt_long' },
+            { id: 'conversations', label: 'Conversations', shortLabel: 'Chats', icon: 'forum' },
+            { id: 'funnel', label: 'Operations', shortLabel: 'Ops', icon: 'monitoring' },
+        ]
+        : [
+            { id: 'sales', label: 'Sales & Leads', shortLabel: 'Sales', icon: 'sell' },
+            { id: 'conversations', label: 'Conversations', shortLabel: 'Chats', icon: 'forum' },
+            { id: 'funnel', label: 'Funnel & Insights', shortLabel: 'Funnel', icon: 'insights' },
+        ];
 
     const isLoaded = !ctxLoading && !botsLoading;
 
@@ -434,14 +449,32 @@ export default function AppInsights() {
             <div data-lenis-prevent className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col p-4 md:p-6 lg:p-8">
                 {activeTab === 'sales' && (
                     <div className="flex flex-col gap-6 w-full min-w-0">
+                        {/* Chemical Pipeline leads with its order pipeline (quotes +
+                            samples) — that IS the business here — then the generic
+                            lead/ROI panels sit below. A generic bot skips the strip
+                            and the quote/sample panels self-hide as before. */}
+                        {isChemical && canAnalytics && (
+                            <PipelineKpisStrip selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                        )}
+                        {isChemical && (
+                            <>
+                                <QuoteRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                                <AgentRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                            </>
+                        )}
                         <SalesAndLeadsPanel
                             selectedBotId={selectedBotId}
                             authFetch={authFetch}
                             entitlements={{ canUseAnalytics: canAnalytics, canUseLeadCapture: canLeadCapture }}
-                            selectedBot={bots.find((b: any) => b.id === selectedBotId)}
+                            selectedBot={selectedBot}
                         />
-                        {/* Self-hides unless the bot has quote requests (chemical vertical). */}
-                        <QuoteRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                        {/* Generic bots: panels self-hide unless quote/sample records exist. */}
+                        {!isChemical && (
+                            <>
+                                <QuoteRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                                <AgentRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -493,36 +526,9 @@ export default function AppInsights() {
                                     </Card>
                                 </div>
 
-                                {/* Recent activity */}
-                                <Card className="overflow-hidden">
-                                    <div className="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800">
-                                        <SectionHeader title="Recent activity" subtitle="The latest questions your assistant handled" icon="history" />
-                                    </div>
-                                    <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-2.5 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
-                                        <div className="col-span-8 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">User query</div>
-                                        <div className="col-span-2 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-center">Status</div>
-                                        <div className="col-span-2 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Time</div>
-                                    </div>
-                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                        {reportData?.recent_conversations?.length > 0 ? (
-                                            reportData.recent_conversations.map((log: any, idx: number) => (
-                                                <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-1.5 md:gap-4 px-5 py-3 md:items-center hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
-                                                    <div className="col-span-8 text-[13.5px] text-slate-700 dark:text-slate-300 md:truncate break-words">{log.query}</div>
-                                                    <div className="col-span-2 flex md:justify-center">
-                                                        <Badge tone={log.unanswered ? 'alert' : 'ok'}>{log.unanswered ? 'Unanswered' : 'Handled'}</Badge>
-                                                    </div>
-                                                    <div className="col-span-2 flex md:justify-end">
-                                                        <span className="text-[12px] tabular-nums text-slate-500 dark:text-slate-400">
-                                                            {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <EmptyState icon="history" title="No recent activity found" />
-                                        )}
-                                    </div>
-                                </Card>
+                                {/* Phase 5a — "Recent activity" table removed: it
+                                    duplicated the Conversations tab (which shows the
+                                    same logs with full transcripts + training). */}
                             </div>
                         )}
 

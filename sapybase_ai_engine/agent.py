@@ -494,6 +494,83 @@ def _insert_quote(cursor, company_id, *, product, cas, grade, pack_size, pack_co
         logger.exception("request_quote: failed to persist quote_requests record")
 
 
+# ── request_sample: opens the structured sample FORM (Phase 4b, §10) ──────────
+#
+# A sample request is a structured intake (product, grade, quantity, contact,
+# shipping, …), so collection is a FORM, not conversational slot-filling. When the
+# visitor asks for a sample the agent calls this tool, which simply tells the
+# widget to open the sample form (optionally prefilled with the product/grade the
+# visitor named). The deterministic record-and-route + spreadsheet push happen when
+# the FORM is submitted (main.submit_sample_request), never from the model. This
+# keeps the sample flow LLM-free, so it can't loop on disambiguation or time out.
+
+
+def request_sample(
+    cursor,
+    company_id,
+    *,
+    product_name: Optional[str] = None,
+    cas_number: Optional[str] = None,
+    grade: Optional[str] = None,
+    **_ignored,
+) -> Dict[str, Any]:
+    """Open the sample request form for the visitor. No DB write, no LLM.
+
+    Returns a single ``open_form`` status; ``main`` turns it into a {form} action
+    the widget renders. Any product/grade the model parsed from the message is
+    passed back as a prefill hint so the form opens with those fields filled in.
+    Extra kwargs are ignored so the model can't drive collection through the tool
+    (``cursor`` is unused; the signature stays uniform with the other tools)."""
+    prefill: Dict[str, Any] = {}
+    if (product_name or "").strip():
+        prefill["product"] = product_name.strip()
+    if (grade or "").strip():
+        prefill["grade"] = grade.strip()
+    if (cas_number or "").strip():
+        prefill["cas_number"] = cas_number.strip()
+    return {
+        "status": "open_form",
+        "form_id": "sample",
+        "prefill": prefill,
+        "message": (
+            "A sample request form has been opened for the visitor to fill in. Tell "
+            "them briefly to complete the short form and you'll get their request to "
+            "the team. Do NOT ask for the fields yourself, and do NOT promise a "
+            "price, a quantity limit, or a delivery date."
+        ),
+    }
+
+
+def _insert_agent_request(cursor, company_id, *, kind, product, cas, grade,
+                          pack_size, qty, note, name, email, phone,
+                          session_id, form_data=None) -> None:
+    """Persist a record-and-route request as the owner's lead, tenant-scoped, committed.
+
+    Used by the form-submit endpoint (the typed columns power the dashboard panel;
+    ``form_data`` JSONB carries the FULL customizable submission so the spreadsheet
+    columns can match the client's form exactly). Mirrors ``_insert_quote``: a
+    logged insert error degrades gracefully — capturing the lead must never break
+    the request. Returns nothing; raises nothing."""
+    try:
+        cursor.execute(
+            """
+            INSERT INTO agent_requests
+                (company_id, session_id, kind, product_name, cas_number, grade,
+                 pack_size, quantity, contact_name, contact_email, contact_phone,
+                 note, form_data, status)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,'new')
+            """,
+            (company_id, session_id, kind, product, cas, grade, pack_size, qty,
+             (name or None), (email or None), (phone or None), note,
+             json.dumps(form_data) if form_data else None),
+        )
+        conn = getattr(cursor, "connection", None)
+        if conn is not None:
+            conn.commit()
+    except Exception:
+        logger.exception("request_sample: failed to persist agent_requests record")
+
+
 def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[str, Any]:
     """Dispatch a model-requested tool to its deterministic implementation.
 
@@ -527,6 +604,14 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
             contact_name=args.get("contact_name"),
             contact_email=args.get("contact_email"),
             contact_phone=args.get("contact_phone"),
+        )
+    if name == "request_sample":
+        return request_sample(
+            cursor,
+            company_id,
+            product_name=args.get("product_name"),
+            cas_number=args.get("cas_number"),
+            grade=args.get("grade"),
         )
     return {
         "status": "error",
@@ -599,6 +684,13 @@ def build_agent_directive(pack) -> str:
         "If it returns price_on_request, ask for the visitor's name and email so the "
         "team can send a price; if ambiguous_price, say you'll confirm with the team. "
         "Pricing is not safety: a hazard question still goes to get_sds.\n\n"
+        "When the visitor wants a free SAMPLE of a product, call request_sample. It "
+        "opens a short sample request FORM for them to fill in — do NOT collect the "
+        "product, grade, contact, or address yourself. If you know the product (and "
+        "grade) they mentioned, pass them so the form opens prefilled. After "
+        "calling it, just tell them to complete the form; never quote a price (use "
+        "request_quote), never give safety info (use get_sds), and never promise a "
+        "delivery date or quantity limit.\n\n"
         "If a tool returns no servable result (statuses not_found or "
         "no_sheet_on_file), tell the visitor you don't have it on file and offer "
         "to connect them to the team. If it is ambiguous, ask the visitor to "

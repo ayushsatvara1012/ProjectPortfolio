@@ -12,7 +12,7 @@ guardrail eval gate that enforces it.
 """
 from __future__ import annotations
 
-from packs.schema import HubCard, Pack, Slot, ToolSpec
+from packs.schema import FormField, HubCard, Pack, Slot, ToolSpec
 
 CHEMICAL_VERTICAL = "chemical"
 
@@ -97,6 +97,25 @@ request_quote = ToolSpec(
     ),
 )
 
+request_sample = ToolSpec(
+    name="request_sample",
+    description=(
+        "Open the free-SAMPLE request form for the visitor. Call this whenever they "
+        "want a product sample; it shows a short form they fill in (the team then "
+        "ships and follows up). Pass the product name/CAS and grade if they "
+        "mentioned them, so the form opens prefilled. Do NOT collect the fields "
+        "yourself. Not for pricing (use request_quote) or safety (use get_sds)."
+    ),
+    slots=(
+        Slot("product_name", required=False,
+             description="Product name the visitor mentioned (prefills the form)."),
+        Slot("cas_number", required=False,
+             description="CAS registry number, if mentioned (prefills the form)."),
+        Slot("grade", required=False,
+             description="Grade/purity, if mentioned, e.g. LR, AR, HPLC (prefills)."),
+    ),
+)
+
 # Phase 3 hub cards — only capabilities backed by a LIVE tool get a card. Stock
 # (check_availability) and Quote land here once Phase 2b/4 ship; the widget shows
 # whatever this tuple contains, so the hub grows by editing config, not the UI.
@@ -132,6 +151,14 @@ _HUB_CARDS = (
         input_source="products",
     ),
     HubCard(
+        id="sample",
+        label="Request a sample",
+        subtitle="Try before you buy",
+        icon="package",
+        action="form",          # opens the structured sample form, not slot-filling
+        form_id="sample",
+    ),
+    HubCard(
         id="ask",
         label="Ask a question",
         subtitle="Chat with the assistant",
@@ -140,11 +167,33 @@ _HUB_CARDS = (
     ),
 )
 
+# Phase 4b — the structured sample-request form. Fields are CONFIG (the customise
+# section edits this list per client to mirror their current Google Form so the
+# resulting spreadsheet columns line up). `product`/`grade` are catalog-aware.
+_SAMPLE_FORM = (
+    FormField("product", "Product", type="product", required=True,
+              placeholder="Search products…"),
+    FormField("grade", "Grade", type="grade", required=True,
+              placeholder="Select a grade"),
+    FormField("quantity", "Quantity (units)", type="number", required=True,
+              placeholder="e.g. 1"),
+    FormField("contact_name", "Full name", type="text", required=True),
+    FormField("company", "Company name", type="text", required=True),
+    FormField("contact_email", "Work email", type="email", required=True),
+    FormField("contact_phone", "Phone", type="tel", required=False),
+    FormField("address", "Shipping address", type="textarea", required=True,
+              placeholder="Where should we ship the sample?"),
+    FormField("application", "Application / intended use", type="textarea",
+              required=False),
+    FormField("notes", "Additional notes", type="textarea", required=False),
+)
+
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
-    tools=(get_sds, get_product_spec, request_quote),
+    tools=(get_sds, get_product_spec, request_quote, request_sample),
     hub_cards=_HUB_CARDS,
+    sample_form=_SAMPLE_FORM,
     knowledge_kinds=("catalog", "sds"),
     version=1,
 )

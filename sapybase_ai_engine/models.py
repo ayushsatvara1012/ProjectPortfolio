@@ -229,6 +229,11 @@ class CompanyUpdate(BaseModel):
     weekly_digest_enabled:   Optional[bool] = None  # owner opt-in for the weekly results email
     slack_webhook_url:       Optional[str]  = None  # Slack Incoming Webhook for lead handoff
     booking_url:             Optional[str]  = None  # HTTPS scheduling link offered to qualified leads
+    # ── Phase 5 (customise): per-company vertical-pack overrides. These don't map to
+    # plain columns — the handler folds them into the companies.pack_overrides JSONB.
+    sample_form:        Optional[list] = None  # full replacement field list; [] = reset to pack default
+    sample_sink_url:    Optional[str]  = None  # owner's own sheet/Zapier webhook (HTTPS); "" = clear
+    sample_sink_secret: Optional[str]  = None  # HMAC secret paired with the sink url
 
     @validator('booking_url')
     def validate_booking_url(cls, v):

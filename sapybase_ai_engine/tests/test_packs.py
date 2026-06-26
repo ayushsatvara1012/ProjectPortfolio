@@ -63,10 +63,33 @@ class TestChemicalPack:
         assert "never" in prompt  # the forbiddance of model-generated safety info
 
     def test_declares_tools(self):
-        # Phase 1 get_sds + Phase 2a get_product_spec + Phase 4a request_quote.
-        assert CHEMICAL_PACK.tool_names() == ("get_sds", "get_product_spec", "request_quote")
-        for name in ("get_sds", "get_product_spec", "request_quote"):
+        # Phase 1 get_sds + Phase 2a get_product_spec + Phase 4a request_quote
+        # + Phase 4b request_sample.
+        assert CHEMICAL_PACK.tool_names() == (
+            "get_sds", "get_product_spec", "request_quote", "request_sample")
+        for name in ("get_sds", "get_product_spec", "request_quote", "request_sample"):
             assert isinstance(CHEMICAL_PACK.get_tool(name), ToolSpec)
+
+    def test_sample_tool_is_a_form_launcher(self):
+        # Phase 4b form: request_sample only carries prefill hints — collection is
+        # the structured form, not conversational slots.
+        tool = CHEMICAL_PACK.get_tool("request_sample")
+        slot_names = {s.name for s in tool.slots}
+        assert slot_names == {"product_name", "cas_number", "grade"}
+
+    def test_sample_form_fields_and_required(self):
+        names = [f["name"] for f in CHEMICAL_PACK.sample_form_payload()]
+        # Catalog-aware product+grade, plus the contact/shipping intake set.
+        assert {"product", "grade", "quantity", "contact_name", "company",
+                "contact_email", "address"} <= set(names)
+        required = set(CHEMICAL_PACK.required_form_fields())
+        assert {"product", "grade", "contact_email", "address"} <= required
+        # Optional fields are not required.
+        assert "notes" not in required and "application" not in required
+        # The product/grade fields are catalog-aware types.
+        by_name = {f["name"]: f for f in CHEMICAL_PACK.sample_form_payload()}
+        assert by_name["product"]["type"] == "product"
+        assert by_name["grade"]["type"] == "grade"
 
     def test_quote_tool_collects_pricing_slots(self):
         tool = CHEMICAL_PACK.get_tool("request_quote")
@@ -93,6 +116,9 @@ class TestChemicalPack:
         assert card_by_id["sds"].action == "tool" and "get_sds" in live_tools
         assert card_by_id["spec"].action == "tool" and "get_product_spec" in live_tools
         assert card_by_id["quote"].action == "tool" and "request_quote" in live_tools
+        # Phase 4b: sample is a FORM card (opens the structured form), not slot-filling.
+        assert card_by_id["sample"].action == "form" and card_by_id["sample"].form_id == "sample"
+        assert "request_sample" in live_tools
         assert card_by_id["ask"].action == "chat"  # chat card needs no tool
 
     def test_hub_cards_payload_is_json_serializable(self):

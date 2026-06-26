@@ -149,13 +149,19 @@ describe('Phase 3 hub — product picker filter', () => {
   });
 });
 
-// Mirrors the onmessage SSE handler: an {sds:{url}} or {quote:{...}} event is
-// captured as a pending action; a normal {token} event is treated as streamed text.
-function parseSseEvent(raw: string): { sds?: { url: string }; quote?: { status: string }; token?: string } {
+// Mirrors the onmessage SSE handler: an {sds:{url}}, {quote:{...}} or {form:{...}}
+// event is captured as a pending action; a normal {token} event is streamed text.
+function parseSseEvent(raw: string): {
+  sds?: { url: string }; quote?: { status: string };
+  form?: { form_id: string; prefill: Record<string, string> }; token?: string;
+} {
   const parsed = JSON.parse(raw);
   if (parsed.sds && typeof parsed.sds.url === 'string') return { sds: parsed.sds };
   if (parsed.quote && (parsed.quote.status === 'quoted' || parsed.quote.status === 'price_on_request')) {
     return { quote: parsed.quote };
+  }
+  if (parsed.form && typeof parsed.form.form_id === 'string') {
+    return { form: { form_id: parsed.form.form_id, prefill: parsed.form.prefill || {} } };
   }
   return { token: parsed.token || parsed.content || parsed.text || '' };
 }
@@ -207,6 +213,52 @@ describe('Phase 4a — quote action event', () => {
     expect(fmtINR(5682, 'INR')).toBe('₹5,682');
     expect(fmtINR(null)).toBe('—');
     expect(fmtINR(undefined)).toBe('—');
+  });
+});
+
+describe('Phase 4b — open-form action event', () => {
+  it('captures a {form} event as an open-form action (with prefill), not text', () => {
+    const out = parseSseEvent(JSON.stringify({ form: { form_id: 'sample', prefill: { product: 'Acetone', grade: 'AR' } } }));
+    expect(out.form?.form_id).toBe('sample');
+    expect(out.form?.prefill.product).toBe('Acetone');
+    expect(out.token).toBeUndefined();
+  });
+
+  it('defaults prefill to empty when omitted', () => {
+    const out = parseSseEvent(JSON.stringify({ form: { form_id: 'sample' } }));
+    expect(out.form?.prefill).toEqual({});
+  });
+
+  it('ignores a malformed form event with no form_id', () => {
+    const out = parseSseEvent(JSON.stringify({ form: { prefill: {} } }));
+    expect(out.form).toBeUndefined();
+  });
+});
+
+// The form's required-field validation (mirrors SampleForm's `missing` computation
+// and the server's required_form_fields check — they must agree).
+function missingRequired(schema: { name: string; required?: boolean }[], values: Record<string, string>): string[] {
+  return schema.filter(f => f.required && !(values[f.name] || '').trim()).map(f => f.name);
+}
+
+describe('Phase 4b — sample form validation', () => {
+  const schema = [
+    { name: 'product', required: true },
+    { name: 'grade', required: true },
+    { name: 'contact_email', required: true },
+    { name: 'notes', required: false },
+  ];
+
+  it('flags every empty required field', () => {
+    expect(missingRequired(schema, {})).toEqual(['product', 'grade', 'contact_email']);
+  });
+
+  it('passes when required fields are filled (optional may be blank)', () => {
+    expect(missingRequired(schema, { product: 'Acetone', grade: 'AR', contact_email: 'a@b.com' })).toEqual([]);
+  });
+
+  it('treats whitespace-only as missing', () => {
+    expect(missingRequired(schema, { product: '  ', grade: 'AR', contact_email: 'a@b.com' })).toEqual(['product']);
   });
 });
 

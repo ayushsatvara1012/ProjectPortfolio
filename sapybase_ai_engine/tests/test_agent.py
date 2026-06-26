@@ -266,6 +266,16 @@ class TestExecuteTool:
         )
         assert out["status"] == "quoted"
 
+    def test_dispatches_request_sample(self):
+        cur = FakeProductCursor(cas=[_row()])
+        out = execute_tool(
+            "request_sample",
+            {"product_name": "Acetone", "grade": "AR"},
+            cur, CID,
+        )
+        assert out["status"] == "open_form"   # form launcher, no DB write
+        assert cur.inserts == []
+
 
 # ── request_quote (Phase 4a) ─────────────────────────────────────────────────
 
@@ -422,13 +432,105 @@ class TestRequestQuote:
         assert 3788.0 in cur.inserts[0]
 
 
+# ── request_sample (Phase 4b) ────────────────────────────────────────────────
+
+from agent import request_sample  # noqa: E402
+
+
+class FakeProductCursor:
+    """products-shaped cursor (drives `_resolve_product`) that ALSO records INSERTs
+    + commit, so request_sample's record-and-route path is fully testable."""
+
+    def __init__(self, *, cas=None, name_exact=None, partial=None):
+        self._cas = cas or []
+        self._name = name_exact or []
+        self._partial = partial or []
+        self._last = ""
+        self.calls = []        # (sql, params)
+        self.inserts = []      # params of INSERTs
+        self.committed = False
+        self.connection = self
+
+    def execute(self, sql, params=None):
+        self._last = sql
+        self.calls.append((sql, params))
+        if sql.strip().upper().startswith("INSERT"):
+            self.inserts.append(params)
+
+    def fetchall(self):
+        s = self._last
+        if "FROM products" not in s:
+            return []
+        if "cas_number = %s" in s:
+            return list(self._cas)
+        if "lower(name) = lower" in s:
+            return list(self._name)
+        if "ILIKE" in s:
+            return list(self._partial)
+        return []
+
+    def commit(self):
+        self.committed = True
+
+
+class TestRequestSample:
+    # Phase 4b form: request_sample is a FORM LAUNCHER — it never resolves a product,
+    # never touches the DB, and never records. Collection + recording happen on the
+    # form submit (main.submit_sample_request). It only emits an open_form action
+    # with any product/grade the model parsed as a prefill hint.
+
+    def test_returns_open_form(self):
+        out = request_sample(None, CID)
+        assert out["status"] == "open_form"
+        assert out["form_id"] == "sample"
+        assert out["prefill"] == {}
+
+    def test_prefills_from_parsed_fields(self):
+        out = request_sample(None, CID, product_name="Acetone", grade="AR",
+                             cas_number="67-64-1")
+        assert out["prefill"] == {"product": "Acetone", "grade": "AR",
+                                  "cas_number": "67-64-1"}
+
+    def test_never_touches_db_and_ignores_extra_kwargs(self):
+        cur = FakeProductCursor(cas=[_row()])
+        out = request_sample(cur, CID, product_name="Acetone", quantity="3",
+                             contact_email="a@b.com")  # extras the model might pass
+        assert out["status"] == "open_form"
+        assert cur.calls == [] and cur.inserts == []   # launcher does zero DB work
+
+
+class TestInsertAgentRequest:
+    # The endpoint's persistence helper: typed columns for the dashboard + a JSON
+    # form_data blob for the full customizable submission, tenant-scoped + committed.
+
+    def test_records_form_data_tenant_scoped_and_commits(self):
+        cur = FakeProductCursor()
+        agent._insert_agent_request(
+            cur, CID, kind="sample", product="Acetone", cas="67-64-1", grade="AR",
+            pack_size=None, qty=2, note="urgent", name="Asha", email="a@b.com",
+            phone=None, session_id="s1", form_data={"product": "Acetone", "company": "Acme"})
+        assert len(cur.inserts) == 1 and cur.committed
+        params = cur.inserts[0]
+        assert params[0] == CID and "sample" in params   # tenant-scoped, kind recorded
+        # form_data is serialized to a JSON string for the ::jsonb cast.
+        assert any(isinstance(p, str) and "Acme" in p for p in params)
+
+    def test_null_form_data_is_allowed(self):
+        cur = FakeProductCursor()
+        agent._insert_agent_request(
+            cur, CID, kind="sample", product="X", cas=None, grade=None,
+            pack_size=None, qty=1, note=None, name=None, email="a@b.com",
+            phone=None, session_id=None, form_data=None)
+        assert len(cur.inserts) == 1 and cur.committed
+
+
 # ── pack -> schema + directive ───────────────────────────────────────────────
 
 class TestSchemasAndDirective:
     def test_chemical_schema_shape(self):
         schemas = build_tool_schemas(load_pack("chemical"))
         by_name = {s["name"]: s for s in schemas}
-        assert set(by_name) == {"get_sds", "get_product_spec", "request_quote"}
+        assert set(by_name) == {"get_sds", "get_product_spec", "request_quote", "request_sample"}
         # The two read-only tools take exactly CAS or name (neither individually required).
         for name in ("get_sds", "get_product_spec"):
             props = by_name[name]["parameters"]["properties"]
@@ -439,12 +541,17 @@ class TestSchemasAndDirective:
         qp = by_name["request_quote"]["parameters"]["properties"]
         assert {"product_name", "cas_number", "grade", "pack_size", "quantity"} <= set(qp)
         assert by_name["request_quote"]["parameters"]["required"] == []
+        # request_sample is a form launcher: only product/CAS/grade prefill hints.
+        sp = by_name["request_sample"]["parameters"]["properties"]
+        assert set(sp) == {"product_name", "cas_number", "grade"}
+        assert by_name["request_sample"]["parameters"]["required"] == []
 
     def test_directive_names_tools_and_states_safety_rule(self):
         directive = build_agent_directive(load_pack("chemical"))
         assert "get_sds" in directive
         assert "get_product_spec" in directive
         assert "request_quote" in directive
+        assert "request_sample" in directive
         assert "NEVER" in directive
         assert "Safety Data Sheet" in directive
         # The spec tool must not become a backdoor: safety still routes to get_sds.

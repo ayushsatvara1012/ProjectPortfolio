@@ -5,6 +5,17 @@ import { useAuth } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 
+// Phase 5 — one field of the customizable vertical-pack sample form.
+export type SampleFormField = {
+  name: string;
+  label: string;
+  type: string;       // text|email|tel|number|textarea|product|grade
+  required: boolean;
+  placeholder?: string;
+};
+// Phase 5 — a pack hub card (read-only here; drives the bot PREVIEW's hub render).
+export type PreviewHubCard = { id: string; label: string; icon: string; subtitle?: string; action?: string };
+
 type BotSettings = {
   name: string;
   primaryColor: string;
@@ -25,6 +36,12 @@ type BotSettings = {
   weeklyDigestEnabled: boolean;
   slackWebhookUrl: string;
   bookingUrl: string;
+  // ── Phase 5 (customise): vertical-pack config ──
+  vertical: string;                 // '' = generic bot; 'chemical' = chemical pack
+  hubCards: PreviewHubCard[];        // read-only pack cards, for the preview's hub
+  sampleForm: SampleFormField[];     // editable per-client sample form fields
+  sampleSinkUrl: string;             // owner's own sheet/Zapier webhook
+  sampleSinkSecret: string;          // HMAC secret paired with the sink
 };
 
 type BotSettingsContextValue = {
@@ -60,6 +77,11 @@ const DEFAULT_SETTINGS: BotSettings = {
   weeklyDigestEnabled: true,
   slackWebhookUrl: '',
   bookingUrl: '',
+  vertical: '',
+  hubCards: [],
+  sampleForm: [],
+  sampleSinkUrl: '',
+  sampleSinkSecret: '',
 };
 
 const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
@@ -92,6 +114,13 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     weeklyDigestEnabled: company.weekly_digest_enabled !== false,
     slackWebhookUrl: company.slack_webhook_url || '',
     bookingUrl: company.booking_url || '',
+    // Phase 5 — vertical-pack config. sample_form is the EFFECTIVE form (override or
+    // pack default, pre-filled by the backend) so the editor starts from the live state.
+    vertical: company.vertical || '',
+    hubCards: Array.isArray(company.hub_cards) ? company.hub_cards : [],
+    sampleForm: Array.isArray(company.sample_form) ? company.sample_form : [],
+    sampleSinkUrl: company.sample_sink?.url || '',
+    sampleSinkSecret: company.sample_sink?.secret || '',
   };
 };
 
@@ -138,32 +167,40 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
     setIsSaving(true);
     setError(null);
     try {
+      const payload: Record<string, any> = {
+        company_id: botId,
+        bot_name: botSettings.name,
+        theme_color: botSettings.primaryColor,
+        initial_message: botSettings.greeting,
+        company_tone: botSettings.companyTone.join(','),
+        system_prompt: botSettings.systemPrompt,
+        quick_questions: botSettings.quickQuestions,
+        ai_model: botSettings.aiModel || null,
+        logo_shape: botSettings.logoShape,
+        custom_logo_url: botSettings.customLogoUrl || null,
+        avatar_bg_style: botSettings.avatarBgStyle,
+        webhook_url: botSettings.webhookUrl || null,
+        handoff_redirect_url: botSettings.handoffRedirectUrl || null,
+        hide_branding: botSettings.hideBranding,
+        hot_lead_alerts_enabled: botSettings.hotLeadAlertsEnabled,
+        alert_email: botSettings.alertEmail.trim() || null,
+        weekly_digest_enabled: botSettings.weeklyDigestEnabled,
+        slack_webhook_url: botSettings.slackWebhookUrl.trim() || null,
+        booking_url: botSettings.bookingUrl.trim() || null,
+      };
+      // Phase 5 — only a vertical (pack) bot carries pack_overrides; a generic bot
+      // never sends these, so it can never accidentally grow a pack_overrides row.
+      if (botSettings.vertical) {
+        payload.sample_form = botSettings.sampleForm;
+        payload.sample_sink_url = botSettings.sampleSinkUrl.trim();
+        payload.sample_sink_secret = botSettings.sampleSinkSecret.trim();
+      }
       const data = await authFetch<any>('/api/company', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          company_id: botId,
-          bot_name: botSettings.name,
-          theme_color: botSettings.primaryColor,
-          initial_message: botSettings.greeting,
-          company_tone: botSettings.companyTone.join(','),
-          system_prompt: botSettings.systemPrompt,
-          quick_questions: botSettings.quickQuestions,
-          ai_model: botSettings.aiModel || null,
-          logo_shape: botSettings.logoShape,
-          custom_logo_url: botSettings.customLogoUrl || null,
-          avatar_bg_style: botSettings.avatarBgStyle,
-          webhook_url: botSettings.webhookUrl || null,
-          handoff_redirect_url: botSettings.handoffRedirectUrl || null,
-          hide_branding: botSettings.hideBranding,
-          hot_lead_alerts_enabled: botSettings.hotLeadAlertsEnabled,
-          alert_email: botSettings.alertEmail.trim() || null,
-          weekly_digest_enabled: botSettings.weeklyDigestEnabled,
-          slack_webhook_url: botSettings.slackWebhookUrl.trim() || null,
-          booking_url: botSettings.bookingUrl.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
       // Invalidate cached company details so the next read fetches fresh data.
       // Invalidate cached company details so the next read fetches fresh data.

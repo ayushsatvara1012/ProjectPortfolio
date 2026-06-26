@@ -26,6 +26,9 @@ class HubCard:
         on submit, sends ``prompt_template`` with ``{value}`` substituted — which
         drives the agent loop to the card's ``tool``.
       - ``"chat"`` just drops the visitor into the normal chat input (no form).
+      - ``"form"`` opens a structured multi-field intake form (Phase 4b) named by
+        ``form_id`` — e.g. the sample request form. Submitting it posts directly to
+        a deterministic endpoint (no LLM), so the flow can't loop or time out.
 
     Cards are *config*: the widget renders whatever the pack supplies and never
     hardcodes a vertical. A no-pack (``vertical=NULL``) company has no cards, so
@@ -35,11 +38,30 @@ class HubCard:
     id: str
     label: str
     icon: str                       # Tabler outline icon name, e.g. "file-certificate"
-    action: str = "tool"            # "tool" | "chat"
+    action: str = "tool"            # "tool" | "chat" | "form"
     subtitle: str = ""
     input_label: str = ""           # mini-form placeholder (action="tool")
     prompt_template: str = ""       # message sent on submit; "{value}" is substituted
     input_source: str = ""          # "" = free text; "products" = searchable catalog picker
+    form_id: str = ""               # which structured form to open (action="form")
+
+
+@dataclass(frozen=True)
+class FormField:
+    """One field in a structured intake form (Phase 4b, plan §10).
+
+    Forms are *config*, customizable per client (the "customise section"): a client
+    edits this list to mirror the exact fields their current Google Form collects,
+    so the resulting spreadsheet columns line up 1:1. ``type`` tells the widget how
+    to render it; ``product``/``grade`` are catalog-aware (a searchable product
+    picker and a grade dropdown derived from the chosen product).
+    """
+
+    name: str                       # submission key, e.g. "contact_email"
+    label: str                      # visible label
+    type: str = "text"              # text|email|tel|number|textarea|product|grade
+    required: bool = False
+    placeholder: str = ""
 
 
 @dataclass(frozen=True)
@@ -86,6 +108,7 @@ class Pack:
     persona_prompt: str
     tools: Tuple[ToolSpec, ...] = ()
     hub_cards: Tuple[HubCard, ...] = ()        # Phase 3 — pack-driven hub UI cards
+    sample_form: Tuple[FormField, ...] = ()    # Phase 4b — structured sample intake form
     knowledge_kinds: Tuple[str, ...] = ()      # what doc kinds feed RAG/tools
     version: int = 1
 
@@ -106,6 +129,18 @@ class Pack:
         ``tools``; cards are authored alongside them in the pack file.
         """
         return [asdict(card) for card in self.hub_cards]
+
+    def sample_form_payload(self) -> List[dict]:
+        """JSON-serializable field list for the widget config (``/api/config``).
+
+        Empty when the pack defines no form. The widget renders these fields in
+        order; the submit endpoint validates the same list server-side."""
+        return [asdict(f) for f in self.sample_form]
+
+    def required_form_fields(self) -> Tuple[str, ...]:
+        """Names of the form fields that must be present on submit (server-side
+        validation source of truth — the widget mirrors this)."""
+        return tuple(f.name for f in self.sample_form if f.required)
 
 
 def normalize_vertical(value: object) -> Optional[str]:

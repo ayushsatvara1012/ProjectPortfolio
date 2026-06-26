@@ -550,10 +550,21 @@ def _reset_elapsed_usage_periods(cursor, *, company_id=None, user_id=None, now=N
     return cursor.rowcount
 
 
-def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dict = None):
+def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dict = None,
+                   *, for_agent: bool = False):
     """
     Factory to returned initialized model for a specific tier.
     Optimized for Pre-Revenue Startup Costs (Low tokens, High speed).
+
+    ``for_agent=True`` hardens the model for the vertical ReAct loop (Phase 4b):
+    the agent makes 3-5 BLOCKING Gemini calls per message inside a single 30s
+    precompute budget, so a transient 503 ("model overloaded") under LangChain's
+    default 6-retry backoff can blow the whole budget and surface to the dev proxy
+    as an ECONNRESET. For the agent we therefore (1) prefer the fast, far-more-
+    available gemini-2.5-flash over a tier's heavy 2.5-pro default (tool-calling
+    works great on flash), and (2) cap retries + add a per-call timeout so a bad
+    upstream fails FAST into the safe fallback instead of hanging. The generic
+    (vertical=NULL) path passes for_agent=False and is byte-for-byte unchanged.
     """
     # ── SECURITY: Model Allowlist Check ──
     # Prevents arbitrary model strings from being injected via database
@@ -567,7 +578,13 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
         if plan_model and plan_model in VALID_MODELS:
             company_model = company_model or plan_model
 
-    model_name = company_model or MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
+    # Agent: honour an explicit bot/plan model, but never fall back to a tier's
+    # 2.5-pro default — pin flash for reliable, available tool-calling.
+    agent_default = "gemini-2.5-flash"
+    model_name = company_model or (
+        agent_default if for_agent
+        else MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
+    )
 
     # ── STARTUP COST CONTROL: Dynamic Token Caching Efficiency ────────────────
     # Output tokens are expensive. We cap them based on user tier to prevent
@@ -584,11 +601,17 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
     if tier == "CUSTOM" and custom_plan_config and custom_plan_config.get("max_output_tokens"):
         max_tokens = custom_plan_config["max_output_tokens"]
 
+    # Agent path: bound each call so a transient 503/429 fails fast (max_retries=2,
+    # per-request timeout) instead of riding LangChain's default 6-retry backoff
+    # past the precompute budget. Generic path keeps the library defaults.
+    extra = {"max_retries": 2, "timeout": 20} if for_agent else {}
+
     return ChatGoogleGenerativeAI(
         model=model_name,
         google_api_key=GEMINI_KEY,
         max_output_tokens=max_tokens,
         temperature=0.7,
+        **extra,
     )
 
 def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> dict:
@@ -1313,14 +1336,34 @@ from parsing_utils import safe_json_loads, normalize_quick_questions
 # load_pack resolves it to a Pack. Phase 0 only carries `vertical` on the company
 # dict so Phase 1 can read it — no behaviour change here.
 from packs import normalize_vertical, load_pack
+# Phase 5 (customise) — merge a bot's per-company overrides over the pack defaults
+# (sample-form fields + the spreadsheet sink). Pure helpers; the source of truth for
+# both the runtime read paths and the customise-tab write path.
+from packs import (
+    coerce_overrides,
+    sanitize_overrides,
+    effective_sample_form,
+    effective_required_fields,
+    effective_sample_sink,
+)
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, AGENT_FALLBACK_TEXT
+from agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
 
 # Hard ceiling on the blocking vertical-agent precompute (Gemini tool-loop) so a
 # slow/overloaded model degrades to the fallback instead of hanging /api/chat
 # until the dev proxy / client resets the socket.
 AGENT_PRECOMPUTE_TIMEOUT_S = 30
+
+# Phase 4b form — the spreadsheet sink for sample-request submissions. The widget
+# form POST is recorded locally AND pushed to this outbound webhook, which the
+# owner points at a Google Apps Script (bound to their Sheet) / Zapier / Power
+# Automate flow that appends a row. One fixed destination for now (MVP); the
+# customise section makes it per-company later. Empty url => push is dormant (we
+# still record locally + notify), so nothing breaks before it's configured.
+SAMPLE_SINK_WEBHOOK_URL = os.getenv("SAMPLE_SINK_WEBHOOK_URL", "").strip()
+SAMPLE_SINK_SECRET = os.getenv("SAMPLE_SINK_SECRET", "").strip()
 
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
@@ -1356,7 +1399,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    u.email, c.handoff_redirect_url, c.hide_branding,
                    u.id, u.subscription_status, u.billing_period_end,
                    c.hot_lead_alerts_enabled, c.alert_email, c.slack_webhook_url,
-                   c.booking_url, c.vertical
+                   c.booking_url, c.vertical, c.pack_overrides
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1501,6 +1544,9 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         # Vertical-pack selector (Phase 0). Normalized: NULL/empty/garbage -> None
         # = generic bot. Carried for Phase 1's agent loop; unused on this path today.
         "vertical": normalize_vertical(company_data[26]),
+        # Phase 5 — per-company pack overrides (sample form + sheet sink). Raw value
+        # (dict | JSON str | None); coerced where used. Drives the customizable form.
+        "pack_overrides": company_data[27],
         # Carry the resolved custom plan config so the chat handler's get_plan()
         # applies the CUSTOM tier's real message/chunk limits + features. Without it,
         # get_plan() falls back to the FREE plan (0 messages) and blocks the chat.
@@ -1908,7 +1954,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url, vertical
+                       booking_url, vertical, pack_overrides
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -1920,7 +1966,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url, vertical
+                       booking_url, vertical, pack_overrides
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -1931,7 +1977,9 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
         if not company_row:
             return None
 
-        return {
+        _vertical = normalize_vertical(company_row[23])
+        _overrides = coerce_overrides(company_row[24])
+        result = {
             "id": company_row[0],
             "company_name": company_row[1],
             "company_tone": company_row[2],
@@ -1956,8 +2004,19 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "slack_webhook_url": company_row[21],
             "booking_url": company_row[22],
             # Vertical-pack selector (Phase 0); normalized to a slug or None.
-            "vertical": normalize_vertical(company_row[23]),
+            "vertical": _vertical,
         }
+        # Phase 5 — for a vertical bot, hand the customise tab everything it edits:
+        # the EFFECTIVE sample form (the owner's override if any, else the pack
+        # default, pre-filled so they tweak rather than build from scratch), the
+        # per-bot sheet sink (owner's own — secret returned only to the authenticated
+        # owner here), and the hub cards so the bot PREVIEW can render the real hub.
+        pack = load_pack(_vertical)
+        if pack:
+            result["sample_form"] = effective_sample_form(pack, _overrides)
+            result["hub_cards"] = pack.hub_cards_payload()
+            result["sample_sink"] = _overrides.get("sample_sink") if isinstance(_overrides.get("sample_sink"), dict) else {}
+        return result
     finally:
         release_db_connection(conn)
 
@@ -2246,8 +2305,46 @@ async def update_company_details(
         updates = []
         params = []
 
-        for field, value in update.model_dump(exclude_unset=True).items():
-            if field == "company_id":
+        # ── Phase 5 (customise): fold pack overrides into the JSONB column ──
+        # sample_form / sample_sink_* aren't plain columns; intercept them here,
+        # merge over the bot's existing pack_overrides, and write the column once.
+        # (Pulled out of the generic loop below so they don't become bad SET clauses.)
+        _ov_keys = {"sample_form", "sample_sink_url", "sample_sink_secret"}
+        _ov_sent = update.model_dump(exclude_unset=True)
+        if _ov_keys & set(_ov_sent.keys()):
+            # The sink is an outbound webhook → gate it like webhook_url.
+            if _ov_sent.get("sample_sink_url") and str(_ov_sent["sample_sink_url"]).strip():
+                require_entitlement(user, "webhook", "Sample data destination webhook")
+            cursor.execute(
+                "SELECT pack_overrides FROM companies WHERE id = %s AND user_id = %s",
+                (target_company_id, user["id"]),
+            )
+            _row = cursor.fetchone()
+            _existing = coerce_overrides(_row[0]) if _row else {}
+            _merged = dict(_existing)
+            if "sample_form" in _ov_sent:
+                # [] (or all-invalid) => drop the override => fall back to pack default.
+                _fields = sanitize_overrides({"sample_form": _ov_sent["sample_form"]}).get("sample_form")
+                if _fields:
+                    _merged["sample_form"] = _fields
+                else:
+                    _merged.pop("sample_form", None)
+            # Sink url+secret travel together; a blank url clears the per-bot sink.
+            if "sample_sink_url" in _ov_sent or "sample_sink_secret" in _ov_sent:
+                _url = (_ov_sent.get("sample_sink_url") if "sample_sink_url" in _ov_sent
+                        else (_existing.get("sample_sink") or {}).get("url", ""))
+                _secret = (_ov_sent.get("sample_sink_secret") if "sample_sink_secret" in _ov_sent
+                           else (_existing.get("sample_sink") or {}).get("secret", ""))
+                _sink = sanitize_overrides({"sample_sink": {"url": _url or "", "secret": _secret or ""}}).get("sample_sink")
+                if _sink:
+                    _merged["sample_sink"] = _sink
+                else:
+                    _merged.pop("sample_sink", None)
+            updates.append("pack_overrides = %s::jsonb")
+            params.append(json.dumps(_merged) if _merged else None)
+
+        for field, value in _ov_sent.items():
+            if field == "company_id" or field in _ov_keys:
                 continue
             if field == "quick_questions" and value is not None:
                 # Normalise to plain string list before storing
@@ -2861,8 +2958,9 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
         # ── Dynamic Model Selection (Tier-Based or BOT Override) ─────────────
         chat_model = get_tier_model(
-            tier=company.get("tier", "FREE"), 
-            company_model=company.get("ai_model")
+            tier=company.get("tier", "FREE"),
+            company_model=company.get("ai_model"),
+            for_agent=(pack is not None),
         )
         
         # ── PROMPT INJECTION DEFENSE: XML-Delimited User Input ────────────────
@@ -2896,6 +2994,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         precomputed_answer = None
         agent_sds = None  # structured "Open SDS" action surfaced as a widget button
         agent_quote = None  # structured quote card surfaced as a widget card
+        agent_form = None  # "open a structured form" action (Phase 4b sample form)
+        agent_handoff = None  # real-time owner notification (Slack/email) payload
         if pack is not None:
             agent_model = chat_model.bind_tools(build_tool_schemas(pack))
 
@@ -2929,6 +3029,34 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         "currency": obs.get("currency") or "INR",
                         "gst_note": obs.get("gst_note"),
                     }
+                    # Every priced/POR quote is a warm lead → notify the owner in
+                    # real time (Phase 4b). Contact came in via the tool args.
+                    _captured["handoff"] = {
+                        "kind": "quote",
+                        "status": obs["status"],
+                        "product": obs.get("product"),
+                        "grade": obs.get("grade"),
+                        "pack_size": obs.get("pack_size"),
+                        "quantity": obs.get("quantity"),
+                        "unit_price": obs.get("unit_price"),
+                        "subtotal": obs.get("subtotal"),
+                        "gst_rate": obs.get("gst_rate"),
+                        "currency": obs.get("currency") or "INR",
+                        "is_por": obs["status"] == "price_on_request",
+                        "contact_name": tool_args.get("contact_name"),
+                        "contact_email": tool_args.get("contact_email"),
+                        "contact_phone": tool_args.get("contact_phone"),
+                    }
+                # request_sample opens the structured form (Phase 4b form): surface a
+                # {form} action so the widget renders it inline (prefilled with any
+                # product/grade the model parsed). The record + spreadsheet push +
+                # owner handoff happen on FORM SUBMIT (submit_sample_request), not here.
+                if (tool_name == "request_sample" and isinstance(obs, dict)
+                        and obs.get("status") == "open_form"):
+                    _captured["form"] = {
+                        "form_id": obs.get("form_id") or "sample",
+                        "prefill": obs.get("prefill") or {},
+                    }
                 return obs
 
             # Bound the whole precompute: the agent makes BLOCKING Gemini calls here
@@ -2946,6 +3074,24 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                 precomputed_answer = AGENT_FALLBACK_TEXT
             agent_sds = _captured.get("sds")
             agent_quote = _captured.get("quote")
+            agent_form = _captured.get("form")
+            agent_handoff = _captured.get("handoff")
+
+            # Real-time owner handoff (Phase 4b): any priced/POR quote pings the
+            # owner on Slack + email so a warm lead doesn't wait for a dashboard
+            # visit. (Sample handoff fires on FORM SUBMIT, not here.) Best-effort +
+            # non-blocking — the reply is computed; an outage can't affect the visitor.
+            if agent_handoff:
+                slack_url = company.get("slack_webhook_url")
+                owner_to = company.get("alert_email") or company.get("owner_email")
+                if slack_url or owner_to:
+                    background_tasks.add_task(
+                        _fire_agent_handoff,
+                        slack_url,
+                        owner_to,
+                        company.get("bot_name", ""),
+                        agent_handoff,
+                    )
 
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         async def stream_generator():
@@ -2962,6 +3108,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'sds': agent_sds})}\n\n"
                     if agent_quote:
                         yield f"data: {json.dumps({'quote': agent_quote})}\n\n"
+                    if agent_form:
+                        yield f"data: {json.dumps({'form': agent_form})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
@@ -3175,6 +3323,72 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
 
     subject = f"[{bot_name}] {visitor_label} requested human support"
     send_transactional_email(owner_email, subject, html, reply_to=visitor_email or None)
+
+
+# ── Real-time owner handoff for transactional agent actions (Phase 4b) ────────
+from agent_handoff import build_agent_request_slack_payload, build_agent_request_email
+
+
+async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict):
+    """Notify the owner of a transactional agent action (sample / quote) in real time.
+
+    Best-effort and never raises: the visitor's reply has already gone out, so a
+    Slack or email outage must not affect the request path. Slack and email are
+    attempted independently — one failing does not skip the other. The Slack host
+    is re-validated as an SSRF guard, identical to ``_fire_slack``."""
+    if is_valid_slack_webhook(slack_url):
+        try:
+            payload = build_agent_request_slack_payload(bot_name, req)
+            body = json.dumps(payload, separators=(",", ":")).encode()
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    slack_url, content=body, headers={"Content-Type": "application/json"}
+                )
+            if not resp.is_success:
+                logger.warning("AGENT HANDOFF slack non-2xx: %s", resp.status_code)
+        except Exception as exc:
+            logger.warning("AGENT HANDOFF slack error: %s", str(exc)[:200])
+
+    if owner_email:
+        try:
+            subject, html = build_agent_request_email(bot_name, req)
+            send_transactional_email(
+                owner_email, subject, html, reply_to=(req.get("contact_email") or None)
+            )
+        except Exception as exc:
+            logger.warning("AGENT HANDOFF email error: %s", str(exc)[:200])
+
+
+async def _fire_sheet_sink(url: str, secret: str, payload: dict):
+    """Push a sample submission to the owner's spreadsheet sink (Phase 4b form).
+
+    The sink is an owner-configured webhook (Google Apps Script / Zapier / Power
+    Automate) that appends a row to their Sheet or Excel table. Best-effort and
+    never raises: the visitor already saw their confirmation and we already recorded
+    the request locally, so a sink outage can't affect the request path. Signs the
+    body with HMAC-SHA256 (like ``_fire_webhook``) so the receiver can verify it,
+    and retries once on transient failure. The body carries an ``idempotency_key``
+    so the receiver can drop a duplicate row if a retry double-delivers."""
+    if not url:
+        return  # sink not configured yet — dormant, not an error
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    headers = {"Content-Type": "application/json"}
+    if secret:
+        headers["X-Sapybase-Signature"] = hmac.new(
+            secret.encode(), body, hashlib.sha256).hexdigest()
+
+    for attempt, delay in enumerate((0, 2), start=1):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+                resp = await client.post(url, content=body, headers=headers)
+            if resp.is_success:
+                return
+            logger.warning("SAMPLE SINK attempt %s non-2xx: %s", attempt, resp.status_code)
+        except Exception as exc:
+            logger.warning("SAMPLE SINK attempt %s error: %s", attempt, str(exc)[:200])
+    logger.error("SAMPLE SINK FAILED after retries.")
 
 
 # ── Instant HOT-lead alert (speed-to-lead) — pure builders in lead_alerts.py ──
@@ -4180,6 +4394,179 @@ def list_quote_requests(
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         release_db_connection(conn)
+
+
+@app.get("/api/companies/{company_id}/agent-requests")
+def list_agent_requests(
+    company_id: str,
+    limit: int = 50,
+    kind: str = "all",     # "all" | "sample" | (future) "consult" ...
+    status: str = "all",   # "all" | "new" | "handled" | ...
+    user: dict = Depends(get_current_user),
+):
+    """Owner dashboard: record-and-route requests (samples, …) from the agent.
+
+    The generic counterpart to /quote-requests: reads the ``agent_requests`` table
+    (kind-discriminated). Vertical-feature data on the CONTROL DB, tenant-scoped by
+    an ownership check. A non-chemical company simply has no rows. Read-only."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        limit = max(1, min(int(limit or 50), 200))
+        clauses = ["company_id = %s"]
+        params: list = [company_id]
+        if kind and kind != "all":
+            clauses.append("kind = %s")
+            params.append(kind)
+        if status and status != "all":
+            clauses.append("status = %s")
+            params.append(status)
+        params.append(limit)
+        cursor.execute(
+            f"""
+            SELECT id, kind, product_name, cas_number, grade, pack_size, quantity,
+                   contact_name, contact_email, contact_phone, note, status, created_at
+            FROM agent_requests
+            WHERE {' AND '.join(clauses)}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            params,
+        )
+        rows = cursor.fetchall() or []
+        items = [
+            {
+                "id": str(r[0]), "kind": r[1], "product": r[2], "cas_number": r[3],
+                "grade": r[4], "pack_size": r[5], "quantity": r[6],
+                "contact_name": r[7], "contact_email": r[8], "contact_phone": r[9],
+                "note": r[10], "status": r[11],
+                "created_at": r[12].isoformat() if hasattr(r[12], "isoformat") else str(r[12]),
+            }
+            for r in rows
+        ]
+        return {"items": items, "count": len(items)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"list_agent_requests error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+class SampleRequestPayload(BaseModel):
+    """Widget sample-form submission (Phase 4b form)."""
+    fields: dict = {}
+    session_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+
+
+def _sample_confirmation(fields: dict) -> dict:
+    """The structured confirmation card the widget renders after a submit."""
+    return {
+        "product": fields.get("product"),
+        "grade": fields.get("grade"),
+        "quantity": fields.get("quantity"),
+    }
+
+
+@app.post("/api/widget/sample-request")
+@limiter.limit("20/minute")
+async def submit_sample_request(
+    request: Request,
+    payload: SampleRequestPayload,
+    background_tasks: BackgroundTasks,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Deterministic sample-form submit (Phase 4b form) — NO LLM.
+
+    Validates the pack's required fields, records the request (typed columns for the
+    dashboard + ``form_data`` JSONB for the full customizable set), then fires the
+    owner handoff (Slack/email) and the spreadsheet sink webhook in the background.
+    Idempotent per ``idempotency_key`` (best-effort via redis) so a double-submit
+    or retry can't create duplicate rows. A non-chemical bot has no sample form, so
+    this 404s for them — the generic path is untouched."""
+    # Anti-replay: same widget session-token gate as /api/chat (soft unless enforced).
+    _sess_token = request.headers.get("x-Sapybase-session", "")
+    _sess_ok, _sess_info = _verify_widget_session(
+        _sess_token, company["id"],
+        request.headers.get("x-Sapybase-parent-origin") or request.headers.get("origin") or "")
+    if not _sess_ok and WIDGET_SESSION_ENFORCE:
+        raise HTTPException(status_code=401, detail="Invalid or missing widget session token.")
+
+    pack = load_pack(company.get("vertical"))
+    if not pack or not pack.sample_form or "request_sample" not in pack.tool_names():
+        raise HTTPException(status_code=404, detail="Sample requests are not enabled for this bot.")
+
+    # Phase 5 — validate against the EFFECTIVE form (the owner's per-bot override if
+    # they customised the fields, else the pack default), not the bare pack.
+    _overrides = company.get("pack_overrides")
+    fields = payload.fields if isinstance(payload.fields, dict) else {}
+    missing = [f for f in effective_required_fields(pack, _overrides) if not str(fields.get(f, "") or "").strip()]
+    if missing:
+        raise HTTPException(status_code=422,
+                            detail={"code": "MISSING_FIELDS", "fields": missing})
+
+    qty = _parse_qty(fields.get("quantity"))
+
+    # Idempotency: drop a duplicate submit/retry (best-effort; absent redis = proceed).
+    idem = (payload.idempotency_key or "").strip()
+    if idem and r is not None:
+        try:
+            first = await r.set(f"sample_idem:{company['id']}:{idem}", b"1", ex=600, nx=True)
+            if not first:
+                return {"status": "ok", "duplicate": True,
+                        "confirmation": _sample_confirmation(fields)}
+        except Exception:
+            pass  # redis hiccup must not block a real submission
+
+    # Record (best-effort persistence inside _insert_agent_request; never raises).
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        _insert_agent_request(
+            cursor, company["id"], kind="sample",
+            product=fields.get("product"), cas=fields.get("cas_number"),
+            grade=fields.get("grade"), pack_size=None, qty=qty,
+            note=(fields.get("notes") or None),
+            name=fields.get("contact_name"), email=fields.get("contact_email"),
+            phone=fields.get("contact_phone"), session_id=payload.session_id,
+            form_data=fields,
+        )
+    finally:
+        release_db_connection(conn)
+
+    # Owner handoff (Slack + email) + the spreadsheet sink, both background + best-effort.
+    handoff = {
+        "kind": "sample", "product": fields.get("product"), "grade": fields.get("grade"),
+        "pack_size": None, "quantity": qty, "note": fields.get("notes"),
+        "contact_name": fields.get("contact_name"),
+        "contact_email": fields.get("contact_email"),
+        "contact_phone": fields.get("contact_phone"),
+    }
+    slack_url = company.get("slack_webhook_url")
+    owner_to = company.get("alert_email") or company.get("owner_email")
+    if slack_url or owner_to:
+        background_tasks.add_task(_fire_agent_handoff, slack_url, owner_to,
+                                 company.get("bot_name", ""), handoff)
+    # Per-bot sheet sink (the owner's own Google Sheet / Zapier / Power Automate
+    # webhook) wins; we fall back to the global env sink only if they haven't set one.
+    _sink_url, _sink_secret = effective_sample_sink(_overrides, SAMPLE_SINK_WEBHOOK_URL, SAMPLE_SINK_SECRET)
+    background_tasks.add_task(
+        _fire_sheet_sink, _sink_url, _sink_secret,
+        {"event": "sample_request", "company_id": str(company["id"]),
+         "submitted_at": datetime.now(timezone.utc).isoformat(),
+         "idempotency_key": idem or None, "fields": fields},
+    )
+
+    return {"status": "ok", "confirmation": _sample_confirmation(fields)}
 
 
 @app.get("/api/leads/{company_id}/pipeline")
@@ -6156,7 +6543,8 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                       c.created_at, c.ai_model,
                       COALESCE(ut.messages_used, 0) as messages_used,
                       COALESCE(ut.period_end, now() + interval '30 days') as period_end,
-                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id AND ck.chunk_type = 'child') as chunks_used
+                      (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id AND ck.chunk_type = 'child') as chunks_used,
+                      c.vertical
                FROM companies c
                LEFT JOIN usage_tracking ut ON ut.company_id = c.id
                WHERE c.user_id = %s AND c.is_active = true
@@ -6183,6 +6571,9 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                     "messages_used": r[11],
                     "period_end": r[12].isoformat() if r[12] else None,
                     "chunks_used": r[13],
+                    # Phase 5a — pack vertical drives the dashboard's tab labels +
+                    # Pipeline view. Normalized (NULL/garbage -> None = generic bot).
+                    "vertical": normalize_vertical(r[14]),
                 }
                 for r in rows
             ],
@@ -6573,9 +6964,15 @@ def get_config(
         # Phase 3 — pack-driven hub. A company whose `vertical` resolves to a pack
         # ships its action cards to the widget; everyone else gets an empty list,
         # so the widget renders no hub and opens straight to chat (unchanged).
+        # Phase 5 — never ship the raw overrides (it holds the sink secret) to the
+        # widget; we only expose the resolved sample_form below.
+        _overrides = safe_company.pop("pack_overrides", None)
         pack = load_pack(safe_company.get("vertical"))
         if pack:
             safe_company["hub_cards"] = pack.hub_cards_payload()
+            # Phase 4b/5 — the structured sample form: the owner's per-bot override
+            # if they customised it, otherwise the pack default.
+            safe_company["sample_form"] = effective_sample_form(pack, _overrides)
             # Catalog for the hub's searchable product picker. COMMERCIAL fields
             # only — never the SDS url (that stays the audited get_sds path). Tenant
             # scoped; cached with the rest of the config (300s) so it's one query.
@@ -6583,16 +6980,18 @@ def get_config(
             try:
                 pcur = pconn.cursor()
                 # One row per PRODUCT for the picker — the catalog stores a row per
-                # grade (same name+CAS), so collapse to distinct products here; the
-                # agent collects grade/pack after the visitor picks the product.
+                # grade (same name+CAS), so collapse to one row and aggregate the
+                # grades into an array (the sample form's grade dropdown reads them).
                 pcur.execute(
-                    "SELECT DISTINCT ON (lower(name), cas_number) name, cas_number, packaging "
+                    "SELECT name, cas_number, min(packaging) AS packaging, "
+                    "       array_agg(DISTINCT grade) FILTER (WHERE grade IS NOT NULL) AS grades "
                     "FROM products WHERE company_id = %s "
-                    "ORDER BY lower(name), cas_number, packaging LIMIT 1000",
+                    "GROUP BY name, cas_number ORDER BY name LIMIT 1000",
                     (safe_company.get("id"),),
                 )
                 safe_company["products"] = [
-                    {"name": r[0], "cas_number": r[1], "packaging": r[2]}
+                    {"name": r[0], "cas_number": r[1], "packaging": r[2],
+                     "grades": sorted(r[3]) if r[3] else []}
                     for r in (pcur.fetchall() or [])
                 ]
                 pcur.close()
@@ -6601,6 +7000,7 @@ def get_config(
         else:
             safe_company["hub_cards"] = []
             safe_company["products"] = []
+            safe_company["sample_form"] = []
 
         return safe_company
     except Exception as e:

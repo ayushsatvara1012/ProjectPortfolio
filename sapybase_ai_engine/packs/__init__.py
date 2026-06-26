@@ -8,6 +8,13 @@ See docs/chemical-vertical-agent-plan.md. Public surface:
 """
 from packs.registry import known_verticals, load_pack
 from packs.schema import Pack, Slot, ToolSpec, normalize_vertical
+from packs.overrides import (
+    coerce_overrides,
+    effective_required_fields,
+    effective_sample_form,
+    effective_sample_sink,
+    sanitize_overrides,
+)
 
 __all__ = [
     "load_pack",
@@ -16,4 +23,10 @@ __all__ = [
     "Pack",
     "ToolSpec",
     "Slot",
+    # Phase 5 — per-company override merge (pack_defaults | company_overrides)
+    "coerce_overrides",
+    "sanitize_overrides",
+    "effective_sample_form",
+    "effective_required_fields",
+    "effective_sample_sink",
 ]
