@@ -193,10 +193,10 @@ export default function DemoChatPage() {
                                     <div className={`flex flex-col max-w-[80%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         {msg.role === 'user' ? (
                                             <div className="px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-                                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [word-break:break-word]">{msg.content}</p>
                                             </div>
                                         ) : (
-                                            <div className="px-1 py-1 text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert text-slate-800 dark:text-slate-200">
+                                            <div className="px-1 py-1 text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert text-slate-800 dark:text-slate-200 prose-p:break-words prose-pre:overflow-x-auto prose-pre:whitespace-pre">
                                                 <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
                                                     {msg.content}
                                                 </ReactMarkdown>
