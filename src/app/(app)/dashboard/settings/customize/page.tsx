@@ -10,6 +10,10 @@ import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthen
 import LogoCustomizer from '@/src/app/components/LogoCustomizer';
 import BotPreview from '@/src/app/components/BotPreview';
 import Alert from '@/src/app/components/Alert';
+import SampleFormEditor, { validateSampleForm } from '@/src/app/components/SampleFormEditor';
+
+// Friendly heading per vertical pack (kept tiny; grows as packs are added).
+const VERTICAL_LABEL: Record<string, string> = { chemical: 'Chemical agent' };
 
 const inputCls = "w-full text-sm font-google px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-xl";
 const labelCls = "block text-sm font-medium font-google text-slate-600 dark:text-slate-400 mb-2 transition-colors";
@@ -129,6 +133,14 @@ export default function CustomizePage() {
   const slackUrlInvalid = slackUrlTrimmed !== '' && !slackUrlTrimmed.startsWith(SLACK_WEBHOOK_PREFIX);
   const bookingUrlInvalid = bookingUrlTrimmed !== '' && !bookingUrlTrimmed.toLowerCase().startsWith('https://');
   const leadAlertsInvalid = alertEmailInvalid || slackUrlInvalid || bookingUrlInvalid;
+
+  // ── Phase 5 (customise): vertical-pack section validity (only when a pack is set) ──
+  const isVerticalBot = !!botSettings.vertical;
+  const sampleFormValidation = validateSampleForm(botSettings.sampleForm || []);
+  const sampleSinkInvalid =
+    (botSettings.sampleSinkUrl || '').trim() !== '' &&
+    !(botSettings.sampleSinkUrl || '').trim().toLowerCase().startsWith('https://');
+  const packConfigInvalid = isVerticalBot && (!sampleFormValidation.valid || sampleSinkInvalid);
 
   return (
     <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
@@ -366,6 +378,30 @@ export default function CustomizePage() {
               </div>
             </div>
 
+            {/* ── Vertical agent (Phase 5 customise) — only for a pack bot ── */}
+            {isVerticalBot && (
+              <div className={cardCls + ' space-y-4'}>
+                <p className={sectionHeadingCls}>
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">science</span>
+                  {VERTICAL_LABEL[botSettings.vertical] || 'Vertical agent'}
+                </p>
+                <p className="text-xs font-google text-slate-400 dark:text-slate-500 -mt-2 leading-relaxed">
+                  Your industry pack pre-configures the agent. Customise the sample-request form your widget collects and where its submissions land.
+                </p>
+                <div>
+                  <label className={labelCls}>Sample request form</label>
+                  <SampleFormEditor
+                    fields={botSettings.sampleForm || []}
+                    onChange={(f) => updateSetting('sampleForm', f)}
+                    sinkUrl={botSettings.sampleSinkUrl || ''}
+                    onSinkUrlChange={(v) => updateSetting('sampleSinkUrl', v)}
+                    sinkSecret={botSettings.sampleSinkSecret || ''}
+                    onSinkSecretChange={(v) => updateSetting('sampleSinkSecret', v)}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* ── Integrations ── */}
             {hasIntegrationsAccess && (
               <div className={cardCls + ' space-y-5'}>
@@ -564,6 +600,16 @@ export default function CustomizePage() {
                       : slackUrlInvalid
                         ? 'Slack webhook URL must start with https://hooks.slack.com/.'
                         : 'Booking link must start with https://.',
+                  });
+                  return;
+                }
+                if (packConfigInvalid) {
+                  setAlert({
+                    open: true,
+                    type: 'error',
+                    msg: sampleSinkInvalid
+                      ? 'Data destination must be a secure link (starts with https://).'
+                      : 'Fix the sample form: every field needs a unique key.',
                   });
                   return;
                 }

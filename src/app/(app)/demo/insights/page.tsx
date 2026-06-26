@@ -1,24 +1,39 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { getBotConfig } from '@/src/lib/demo/demoStorage';
-import { card, cx } from '@/src/app/components/insights/ui';
-// FunnelVisual and QualityDonut are local demo-only components defined below
-
-// Use the shared Insights card surface (bordered + soft shadow) so every demo
-// card matches the real dashboard look exactly.
-const cellCls = cx(card, 'transition-colors duration-500');
+import {
+    card,
+    cx,
+    Badge,
+    Card,
+    EmptyState,
+    fmtNum,
+    fmtMoney,
+    MetricCard,
+    SectionHeader,
+    SkeletonBlock,
+    TrendChart,
+    TrendPill,
+    Segmented,
+    FunnelChart,
+    DonutChart,
+    HorizontalBars,
+    badgeToneFor,
+} from '@/src/app/components/insights/ui';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// One coherent demo business, told across every tab. Numbers reconcile:
-// 420 conversations → 64 leads → 28 contacted → 11 won ($8,400) over 30 days.
+// Time and formatting helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+const fmtDay = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-const DEMO_LEADS = [
+// ─────────────────────────────────────────────────────────────────────────────
+// Initial Mock Data
+// ─────────────────────────────────────────────────────────────────────────────
+const INITIAL_DEMO_LEADS = [
     { id: '1', email: 'amelia@northstar.io', name: 'Amelia Wong', score: 92, band: 'HOT', status: 'new', value_usd: null, context: 'Ready to buy — asked for a demo this week and pricing for 12 seats.', created_at: hoursAgo(2) },
     { id: '2', email: 'sarah@brightwell.co', name: 'Sarah Johnson', score: 88, band: 'HOT', status: 'new', value_usd: null, context: 'Asked about enterprise pricing and onboarding timeline.', created_at: hoursAgo(5) },
     { id: '3', email: 'marcus@techcorp.io', name: 'Marcus Chen', score: 76, band: 'WARM', status: 'contacted', value_usd: null, context: 'Wanted to confirm it integrates with Shopify before committing.', created_at: hoursAgo(26) },
@@ -27,7 +42,38 @@ const DEMO_LEADS = [
     { id: '6', email: 'tom@harborgoods.com', name: 'Tom Becker', score: 38, band: 'COLD', status: 'lost', value_usd: null, context: 'Asked about free-trial length, never replied to follow-up.', created_at: hoursAgo(72) },
 ];
 
-const DEMO_FUNNEL = {
+const INITIAL_DEMO_FIXES = [
+    { query: 'Do you offer a free trial?', ask_count: 9, last_asked: hoursAgo(3), confidence: null, category: 'unanswered' as const },
+    { query: 'What is your refund policy?', ask_count: 6, last_asked: hoursAgo(20), confidence: null, category: 'unanswered' as const },
+    { query: 'Can I export my leads to CSV?', ask_count: 4, last_asked: hoursAgo(28), confidence: 0.42, category: 'low_confidence' as const },
+    { query: 'Do you support multiple languages?', ask_count: 3, last_asked: hoursAgo(40), confidence: 0.55, category: 'low_confidence' as const },
+    { query: 'Is there a discount for nonprofits?', ask_count: 2, last_asked: hoursAgo(60), confidence: null, category: 'unanswered' as const },
+];
+
+const INITIAL_DEMO_SESSIONS = [
+    {
+        session_id: 's1', last_active: hoursAgo(1), message_count: 4, has_unanswered: false,
+        messages: [
+            { user_query: 'What are the pricing plans?', bot_response: 'We offer Starter, Pro, and Business plans starting at $29/month — you can upgrade or downgrade anytime.', is_unanswered: false, timestamp: hoursAgo(1) },
+            { user_query: 'Can I upgrade anytime?', bot_response: 'Yes — change your plan at any time from account settings, and changes are prorated automatically.', is_unanswered: false, timestamp: hoursAgo(1) },
+        ],
+    },
+    {
+        session_id: 's2', last_active: hoursAgo(24), message_count: 2, has_unanswered: true,
+        messages: [
+            { user_query: 'Do you offer a free trial?', bot_response: "I'm sorry, I don't have information about free trials at the moment.", is_unanswered: true, timestamp: hoursAgo(24) },
+            { user_query: 'What is your refund policy?', bot_response: "I'm sorry, I don't have details on the refund policy.", is_unanswered: true, timestamp: hoursAgo(24) },
+        ],
+    },
+    {
+        session_id: 's3', last_active: hoursAgo(48), message_count: 2, has_unanswered: false,
+        messages: [
+            { user_query: 'How do I integrate the widget on my website?', bot_response: 'Add a single script tag to your HTML — we provide step-by-step docs for Shopify, WordPress, Webflow and more.', is_unanswered: false, timestamp: hoursAgo(48) },
+        ],
+    },
+];
+
+const DEMO_FUNNEL_RAW = {
     stages: [
         { key: 'conversations', label: 'Conversations', count: 420, pct_of_top: 100, pct_of_prev: 100, dropoff_pct: 0 },
         { key: 'leads', label: 'Leads captured', count: 64, pct_of_top: 15, pct_of_prev: 15, dropoff_pct: 85 },
@@ -54,18 +100,38 @@ const DEMO_FUNNEL = {
     },
 };
 
-const DEMO_FIXES = [
-    { query: 'Do you offer a free trial?', ask_count: 9, last_asked: hoursAgo(3), confidence: null, category: 'unanswered' as const },
-    { query: 'What is your refund policy?', ask_count: 6, last_asked: hoursAgo(20), confidence: null, category: 'unanswered' as const },
-    { query: 'Can I export my leads to CSV?', ask_count: 4, last_asked: hoursAgo(28), confidence: 0.42, category: 'low_confidence' as const },
-    { query: 'Do you support multiple languages?', ask_count: 3, last_asked: hoursAgo(40), confidence: 0.55, category: 'low_confidence' as const },
-    { query: 'Is there a discount for nonprofits?', ask_count: 2, last_asked: hoursAgo(60), confidence: null, category: 'unanswered' as const },
-];
+const STAGE_DESCRIPTIONS: Record<string, string> = {
+    conversations: 'Visitors who chatted with the assistant.',
+    leads: 'Provided their email or contact details.',
+    contacted: 'Followed up by email or suggestion.',
+    won: 'Closed and converted to a deal.',
+};
 
-const fmtMoney = (n: number) => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-const fmtNum = (n: number) => Number(n || 0).toLocaleString('en-US');
+const QUALITY_COLORS: Record<string, string> = { hot: '#f43f5e', warm: '#f59e0b', cold: '#0ea5e9' };
+const QUALITY_DESCRIPTIONS: Record<string, string> = {
+    hot: 'High intent — follow up now.',
+    warm: 'Engaged — asked about features or pricing.',
+    cold: 'Browsing or low-intent signals.',
+};
 
-// ── Analytics report mock ────────────────────────────────────────────────────
+const SOURCE_ICONS: Record<string, string> = {
+    'chat widget': 'forum',
+    'pricing page': 'sell',
+    docs: 'menu_book',
+    direct: 'arrow_outward',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity insights helpers (from dashboard/insights/page.tsx)
+// ─────────────────────────────────────────────────────────────────────────────
+interface DayDatum {
+    date: string;
+    total: number;
+    answered: number;
+    unanswered: number;
+    users: number;
+    raw: any;
+}
 
 function buildCalendarData() {
     const today = new Date();
@@ -84,6 +150,36 @@ function buildCalendarData() {
             top_unanswered: q > 0 && Math.floor(q * 0.18) > 0 ? ['Do you offer a free trial?'] : [],
         };
     });
+}
+
+function buildDailySeries(blocks: any[], days = 30): DayDatum[] {
+    const map: Record<string, any> = {};
+    (blocks || []).forEach((b) => { if (b?.date) map[b.date] = b; });
+    const out: DayDatum[] = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        const b = map[key] || {};
+        out.push({
+            date: key,
+            total: b.total_questions || 0,
+            answered: b.answered_questions || 0,
+            unanswered: b.unanswered_questions || 0,
+            users: b.interacted_users || 0,
+            raw: b,
+        });
+    }
+    return out;
+}
+
+function pctDelta(values: number[]): number {
+    const half = Math.floor(values.length / 2);
+    const prior = values.slice(0, half).reduce((a, b) => a + b, 0);
+    const recent = values.slice(half).reduce((a, b) => a + b, 0);
+    if (prior === 0) return recent > 0 ? 100 : 0;
+    return ((recent - prior) / prior) * 100;
 }
 
 function buildDemoReport(botName: string) {
@@ -108,1070 +204,1510 @@ function buildDemoReport(botName: string) {
     };
 }
 
-// ── Score / status styles (mirror LeadsPanel) ────────────────────────────────
-
-const BAND_STYLES: Record<string, string> = {
-    HOT: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-900/40',
-    WARM: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/40',
-    COLD: 'text-slate-500 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-800/40 dark:border-slate-700',
-};
-const STATUS_STYLES: Record<string, string> = {
-    new: 'text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-300 dark:bg-slate-800/40 dark:border-slate-700',
-    contacted: 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-900/40',
-    won: 'text-emerald-500 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-900/40',
-    lost: 'text-slate-400 bg-slate-50 border-slate-200 dark:text-slate-500 dark:bg-slate-800/40 dark:border-slate-700',
-};
-
-const ScoreBadge = ({ score, band }: { score: number; band: string }) => (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold font-google whitespace-nowrap ${BAND_STYLES[band] || BAND_STYLES.COLD}`}>
-        {band} · {score}
-    </span>
-);
-
-// ── Action Center (default tab) ──────────────────────────────────────────────
-
-const URGENCY = {
-    high: { label: 'Act now', accent: 'border-l-rose-500', badge: 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400' },
-    medium: { label: 'Soon', accent: 'border-l-amber-400', badge: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' },
-    low: { label: 'Later', accent: 'border-l-slate-300 dark:border-l-slate-600', badge: 'bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400' },
-} as const;
-const BAND_CHIP: Record<string, string> = { HOT: 'bg-rose-500 text-white', WARM: 'bg-amber-400 text-white', COLD: 'bg-sky-400 text-white' };
-
-const DemoActionCenterPanel = () => {
-    const initialQueue = [
-        { ...DEMO_LEADS[0], urgency: 'high' as const, reason: 'Hot lead · 2h old' },
-        { ...DEMO_LEADS[1], urgency: 'high' as const, reason: 'Hot lead · 5h old' },
-        { ...DEMO_LEADS[4], urgency: 'medium' as const, reason: 'Awaiting first reply · 8h old' },
-    ];
-    const [queue, setQueue] = React.useState(initialQueue);
-    const [acted, setActed] = React.useState<Record<string, 'won' | 'lost'>>({});
-    // Register the green/red colour, then drop the row a beat later.
-    const act = (id: string, outcome: 'won' | 'lost') => {
-        setActed(a => ({ ...a, [id]: outcome }));
-        setTimeout(() => setQueue(q => q.filter(l => l.id !== id)), 480);
-    };
-
-    const counts = {
-        high: queue.filter(l => l.urgency === 'high').length,
-        medium: queue.filter(l => l.urgency === 'medium').length,
-        total: queue.length,
-    };
-
-    const summaryChip = (label: string, n: number, cls: string) => (
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${cls}`}>
-            <span className="text-sm font-bold tabular-nums">{n}</span>
-            <span className="text-xs font-google font-medium">{label}</span>
-        </div>
-    );
-
-    return (
-        <div className="flex flex-col gap-3 flex-1">
-            {/* Slim header row */}
-            <div className="flex items-center justify-between gap-3 flex-wrap px-1">
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">bolt</span>
-                    <h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Action Center</h2>
-                    <span className="hidden sm:inline text-xs font-google text-slate-400 dark:text-slate-500">· your next actions, ranked</span>
-                </div>
-                {counts.total > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {counts.high > 0 && summaryChip('Act now', counts.high, URGENCY.high.badge)}
-                        {counts.medium > 0 && summaryChip('Soon', counts.medium, URGENCY.medium.badge)}
-                    </div>
-                )}
-            </div>
-
-            {queue.length === 0 ? (
-                <div className={`${cellCls} p-10 sm:p-14 flex flex-col items-center text-center`}>
-                    <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-900/20">
-                        <span className="material-symbols-outlined text-[22px] text-emerald-500">task_alt</span>
-                    </div>
-                    <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200 mt-4">You&apos;re all caught up</h3>
-                    <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-                        No open leads need attention right now. New hot leads appear here the moment they come in.
-                    </p>
-                </div>
-            ) : (
-                <>
-                    <div className={`${cellCls} overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/50`}>
-                        {queue.map(lead => {
-                            const u = URGENCY[lead.urgency] || URGENCY.low;
-                            return (
-                                <div key={lead.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                                    {/* Identity + context — left */}
-                                    <div className="min-w-0 w-full sm:w-[32%] sm:shrink-0">
-                                        <div className="flex items-baseline gap-2 min-w-0">
-                                            <span className="text-sm font-google font-semibold text-slate-900 dark:text-slate-200 truncate max-w-[55%] shrink-0">{lead.name || lead.email}</span>
-                                            <span className="text-xs font-sans text-slate-500 dark:text-slate-400 truncate">{lead.email}</span>
-                                        </div>
-                                        {lead.context && <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate mt-0.5">“{lead.context}”</p>}
-                                    </div>
-
-                                    {/* Three columns — reason · urgency · band, no partitions */}
-                                    <div className="w-full sm:flex-1 grid grid-cols-3 items-center gap-3">
-                                        <span className="text-[11px] font-google text-slate-500 dark:text-slate-400 truncate text-center">{lead.reason}</span>
-                                        <div className="flex justify-center">
-                                            <span className={`text-[10px] font-bold font-google uppercase tracking-widest px-2 py-0.5 rounded-md ${u.badge}`}>{u.label}</span>
-                                        </div>
-                                        <div className="flex justify-center">
-                                            {lead.band && <span className={`text-[10px] font-bold font-google uppercase tracking-widest px-2 py-0.5 rounded-md ${BAND_CHIP[lead.band] || BAND_CHIP.COLD}`}>{lead.band}</span>}
-                                        </div>
-                                    </div>
-                                    {/* Actions — right */}
-                                    <div className="shrink-0 flex items-center gap-1.5 self-end sm:self-auto">
-                                        <span aria-hidden="true" className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400">
-                                            <span className="material-symbols-outlined text-[15px]">mail</span>
-                                        </span>
-                                        <button onClick={() => act(lead.id, 'won')} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors ${acted[lead.id] === 'won' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-400'}`}>Won</button>
-                                        <button onClick={() => act(lead.id, 'lost')} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold font-google transition-colors ${acted[lead.id] === 'lost' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400'}`}>Lost</button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <p className="text-xs font-google text-slate-400 dark:text-slate-500 text-center">
-                        Won deals add to realized revenue · set the exact deal value in the Leads CRM tab.
-                    </p>
-                </>
-            )}
-        </div>
-    );
-};
-
-// ── Demo-local FunnelVisual (SVG horizontal bars, no import needed) ──────────
-const FunnelVisual = ({ stages, hoveredStage, setHoveredStage }: {
-    stages: any[];
-    hoveredStage: string | null;
-    setHoveredStage: (s: string | null) => void;
-}) => {
-    const maxCount = stages.reduce((m, s) => Math.max(m, s.count), 0) || 1;
-    const COLORS: Record<string, string> = {
-        conversations: '#94a3b8', leads: '#818cf8', contacted: '#fbbf24', won: '#10b981',
-    };
-    return (
-        <div className="w-full flex flex-col gap-1.5">
-            {stages.map((s, i) => {
-                const barPct = (s.count / maxCount) * 100;
-                const isHov = hoveredStage === s.key;
-                const color = COLORS[s.key] || '#94a3b8';
-                return (
-                    <div key={s.key}
-                        onMouseEnter={() => setHoveredStage(s.key)}
-                        onMouseLeave={() => setHoveredStage(null)}
-                        className={`flex items-center gap-3 px-2 py-1.5 rounded-sm cursor-pointer transition-colors ${isHov ? 'bg-slate-50 dark:bg-slate-900/40' : ''}`}
-                    >
-                        <span className="w-20 text-[10px] font-sans uppercase tracking-wide text-slate-500 shrink-0">{s.key}</span>
-                        <div className="flex-1 h-[6px] bg-slate-100 dark:bg-slate-800 rounded-none overflow-hidden">
-                            <div className="h-full transition-all duration-500" style={{ width: `${Math.max(barPct, s.count > 0 ? 2 : 0)}%`, backgroundColor: color }} />
-                        </div>
-                        <span className="w-12 text-right font-sans tabular-nums text-sm text-slate-800 dark:text-slate-200 shrink-0">{s.count.toLocaleString()}</span>
-                        <span className="w-10 text-right font-sans text-[11px] text-slate-400 shrink-0">{s.pct_of_top}%</span>
-                        {i > 0 && s.dropoff_pct > 0 && (
-                            <span className="text-[10px] font-sans text-rose-400 shrink-0">↓{s.dropoff_pct}%</span>
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
-
-// ── Demo-local QualityDonut (thin flat ring) ──────────────────────────────────
-const QualityDonut = ({ quality, activeBand, setActiveBand }: {
-    quality: { total_scored: number; bands: { band: string; count: number; pct: number }[] };
-    activeBand: string | null;
-    setActiveBand: (b: string | null) => void;
-}) => {
-    const total = quality.total_scored;
-    const bands = [...(quality.bands || [])].sort((a, b) => {
-        return ['hot', 'warm', 'cold'].indexOf(a.band.toLowerCase()) - ['hot', 'warm', 'cold'].indexOf(b.band.toLowerCase());
-    });
-    const radius = 68; const sw = 7; const circ = 2 * Math.PI * radius;
-    const COLORS: Record<string, string> = { hot: '#ef4444', warm: '#f59e0b', cold: '#38bdf8' };
-    let acc = 0;
-    if (total === 0) return <p className="text-sm italic text-slate-400 py-4 text-center">No scored leads yet.</p>;
-    return (
-        <div className="relative w-[140px] h-[140px]">
-            <svg viewBox="0 0 200 200" className="w-full h-auto -rotate-90">
-                <circle cx="100" cy="100" r={radius} fill="transparent" stroke="rgba(148,163,184,0.1)" strokeWidth={sw} />
-                {bands.map(b => {
-                    const key = b.band.toLowerCase();
-                    const seg = (b.pct / 100) * circ;
-                    const offset = -((acc / 100) * circ);
-                    acc += b.pct;
-                    const isHov = activeBand === key;
-                    return (
-                        <circle key={b.band} cx="100" cy="100" r={radius} fill="transparent"
-                            stroke={COLORS[key] || '#94a3b8'} strokeWidth={sw}
-                            strokeDasharray={`${seg} ${circ}`} strokeDashoffset={offset}
-                            strokeLinecap="butt" opacity={activeBand !== null && !isHov ? 0.3 : 1}
-                            className="transition-opacity duration-300 cursor-pointer"
-                            onMouseEnter={() => setActiveBand(key)} onMouseLeave={() => setActiveBand(null)}
-                        />
-                    );
-                })}
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-sans tabular-nums font-semibold text-slate-900 dark:text-slate-100 leading-none">{total}</span>
-                <span className="text-[9px] uppercase tracking-widest font-sans text-slate-400 mt-0.5">Scored</span>
-            </div>
-        </div>
-    );
-};
-
-
-const STAGE_ACCENT: Record<string, { bar: string; dot: string; text: string }> = {
-    conversations: { bar: 'bg-slate-400 dark:bg-slate-500', dot: 'bg-slate-400', text: 'text-slate-600 dark:text-slate-300' },
-    leads: { bar: 'bg-indigo-400 dark:bg-indigo-500', dot: 'bg-indigo-400', text: 'text-indigo-600 dark:text-indigo-400' },
-    contacted: { bar: 'bg-amber-400 dark:bg-amber-500', dot: 'bg-amber-400', text: 'text-amber-600 dark:text-amber-400' },
-    won: { bar: 'bg-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-500 dark:text-emerald-400' },
-};
-const QUALITY_ACCENT: Record<string, { bar: string; chip: string; dot: string }> = {
-    hot: { bar: 'bg-rose-500', chip: 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400', dot: 'bg-rose-500' },
-    warm: { bar: 'bg-amber-400', chip: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400', dot: 'bg-amber-400' },
-    cold: { bar: 'bg-sky-400', chip: 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400', dot: 'bg-sky-400' },
-};
-
-const DEMO_STAGE_DESCRIPTIONS: Record<string, string> = {
-    conversations: 'Total volume of visitors who interacted with the chatbot.',
-    leads: 'Potential customers who provided their email or details.',
-    contacted: 'Leads followed up with by email or suggestions.',
-    won: 'Leads successfully closed and converted to deals.',
-};
-
-const DEMO_QUALITY_DESCRIPTIONS: Record<string, string> = {
-    hot: 'Ready to buy! High purchase intent detected. Follow up immediately.',
-    warm: 'Interested. Asked questions about features, pricing, or integrations.',
-    cold: 'General browsing, FAQs, or low conversion signals.',
-};
-
-const DEMO_SOURCE_ICONS: Record<string, string> = {
-    'chat widget': 'forum',
-    'pricing page': 'credit_card',
-    'docs': 'menu_book',
-};
-
-const DemoFunnelPanel = () => {
-    const [windowDays, setWindowDays] = React.useState(30);
-    const [hoveredStage, setHoveredStage] = React.useState<string | null>(null);
-    const [activeBand, setActiveBand] = React.useState<string | null>(null);
-
-    const f = DEMO_FUNNEL;
-    const stages = f.stages || [];
-    const maxLeads = f.sources.items.reduce((m, s) => Math.max(m, s.leads), 0) || 1;
-
-    return (
-        <div className="flex flex-col gap-4 flex-1">
-            <div className={`${cellCls} p-6 sm:p-8`}>
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">filter_alt</span>
-                        <div>
-                            <h2 className="text-lg font-semibold font-google text-slate-900 dark:text-slate-200">Conversion funnel</h2>
-                            <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-0.5">How visitors turn into revenue, stage by stage</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 self-start">
-                        {[{ v: 7, l: '7d' }, { v: 30, l: '30d' }, { v: 90, l: '90d' }, { v: 0, l: 'All' }].map(w => (
-                            <button key={w.v} onClick={() => setWindowDays(w.v)} className={`px-3 py-1.5 text-xs font-medium font-google rounded-lg transition-all ${windowDays === w.v ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>{w.l}</button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Visual Funnel Chart & Interactive Details */}
-            <div className={`${cellCls} p-5 sm:p-8`}>
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                    {/* Graphic Visual Funnel Chart */}
-                    <div className="lg:col-span-5 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/40 pb-6 lg:pb-0 lg:pr-6">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4 font-google">
-                            Interactive Funnel Graph
-                        </span>
-                        <FunnelVisual
-                            stages={stages}
-                            hoveredStage={hoveredStage}
-                            setHoveredStage={setHoveredStage}
-                        />
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-google text-center mt-2">
-                            Hover slices to examine conversion parameters
-                        </span>
-                    </div>
-
-                    {/* Informative Stage Description Details */}
-                    <div className="lg:col-span-7 flex flex-col gap-3">
-                        {stages.map((s, i) => {
-                            const accent = STAGE_ACCENT[s.key] || STAGE_ACCENT.conversations;
-                            const isHovered = hoveredStage === s.key;
-                            const prev = i > 0 ? stages[i - 1] : null;
-
-                            return (
-                                <React.Fragment key={s.key}>
-                                    {/* lost visitors indicator details */}
-                                    {prev && (
-                                        <div className="flex items-center gap-2 pl-4 py-0.5 select-none opacity-80">
-                                            <span className="material-symbols-outlined text-[13px] text-slate-400 dark:text-slate-600">south</span>
-                                            <span className="text-[11px] font-google text-slate-400 dark:text-slate-500">
-                                                {s.pct_of_prev}% continued
-                                                {s.dropoff_pct > 0 && (
-                                                    <span className="text-rose-400 font-medium"> · {s.dropoff_pct}% lost visitors</span>
-                                                )}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    <div
-                                        onMouseEnter={() => setHoveredStage(s.key)}
-                                        onMouseLeave={() => setHoveredStage(null)}
-                                        className={`p-4 rounded-xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer ${isHovered
-                                                ? 'border-indigo-400 dark:border-indigo-500 bg-slate-50 dark:bg-white/[0.04] translate-x-1'
-                                                : 'border-slate-100/50 dark:border-slate-800/20 bg-slate-50/20 dark:bg-white/[0.005]'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-3 min-w-0">
-                                            <span className={`w-2 h-2 rounded-full ${accent.dot} mt-1.5 shrink-0`} />
-                                            <div className="min-w-0">
-                                                <span className="text-sm font-semibold font-google text-slate-800 dark:text-slate-200">
-                                                    {s.label}
-                                                </span>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-google leading-relaxed">
-                                                    {DEMO_STAGE_DESCRIPTIONS[s.key] || ''}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-baseline sm:flex-col sm:items-end justify-between sm:justify-center shrink-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-2 sm:pt-0">
-                                            <span className="text-base font-bold font-google text-slate-900 dark:text-slate-100">
-                                                {fmtNum(s.count)}
-                                            </span>
-                                            <span className={`text-xs font-google font-semibold ${accent.text} sm:mt-0.5`}>
-                                                {s.pct_of_top}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                </React.Fragment>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            {/* Conversion Outcomes Card */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center`}>
-                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-google uppercase tracking-wider mb-2">
-                        Overall conversion rate
-                    </span>
-                    <span className="text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">
-                        {f.overall}%
-                    </span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
-                        percentage of bot conversations that end in a won customer deal
-                    </p>
-                </div>
-                <div className={`${cellCls} p-6 sm:p-8 flex flex-col justify-center border border-emerald-200/60 dark:border-emerald-900/30 bg-emerald-50/[0.02] dark:bg-emerald-900/[0.01]`}>
-                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wider mb-2">
-                        Revenue won
-                    </span>
-                    <span className="text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-emerald-500 dark:text-emerald-400">
-                        {fmtMoney(f.wonValue)}
-                    </span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">
-                        value of closed-won deals generated in this time window
-                    </p>
-                </div>
-            </div>
-
-            {/* Lead Quality & Attribution Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Lead Quality donut chart */}
-                <div className={`${cellCls} p-5 sm:p-8 flex flex-col`}>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">local_fire_department</span>
-                        <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Lead quality breakdown</h3>
-                    </div>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-6">
-                        Lead volume in this window categorized by intent signals.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
-                        {/* Donut graphic */}
-                        <div className="sm:col-span-5 flex justify-center pb-4 sm:pb-0">
-                            <QualityDonut
-                                quality={f.quality}
-                                activeBand={activeBand}
-                                setActiveBand={setActiveBand}
-                            />
-                        </div>
-
-                        {/* Legends details list */}
-                        <div className="sm:col-span-7 flex flex-col gap-2.5">
-                            {f.quality.bands.map(b => {
-                                const key = b.band.toLowerCase();
-                                const accent = QUALITY_ACCENT[key] || QUALITY_ACCENT.cold;
-                                const isHovered = activeBand === key;
-
-                                return (
-                                    <div
-                                        key={b.band}
-                                        onMouseEnter={() => setActiveBand(key)}
-                                        onMouseLeave={() => setActiveBand(null)}
-                                        className={`p-3 rounded-xl border transition-all duration-300 cursor-pointer ${isHovered
-                                                ? 'border-indigo-400 dark:border-indigo-500 bg-slate-50 dark:bg-white/[0.04]'
-                                                : 'border-transparent bg-slate-50/20 dark:bg-white/[0.005]'
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${accent.dot}`} />
-                                                <span className="text-[11px] font-bold uppercase tracking-wider font-google text-slate-700 dark:text-slate-300">
-                                                    {b.band}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-baseline gap-1.5 shrink-0">
-                                                <span className="text-sm font-bold font-google text-slate-900 dark:text-slate-100">
-                                                    {fmtNum(b.count)}
-                                                </span>
-                                                <span className="text-xs font-google text-slate-400 dark:text-slate-500">
-                                                    ({b.pct}%)
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-google mt-1 leading-relaxed">
-                                            {DEMO_QUALITY_DESCRIPTIONS[key] || ''}
-                                        </p>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Source Attribution visual bar chart */}
-                <div className={`${cellCls} p-5 sm:p-8 flex flex-col`}>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">travel_explore</span>
-                        <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Where customers found you</h3>
-                    </div>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-6">
-                        Top traffic channels by lead volume and realized revenue won.
-                    </p>
-
-                    <div className="flex flex-col gap-4 flex-1 justify-center">
-                        {f.sources.items.map(s => {
-                            const icon = DEMO_SOURCE_ICONS[s.source.toLowerCase()] || 'language';
-                            const barPct = (s.leads / maxLeads) * 100;
-
-                            return (
-                                <div key={s.source} className="flex flex-col gap-2 p-3 bg-slate-50/20 dark:bg-white/[0.005] rounded-xl border border-transparent hover:border-slate-100 dark:hover:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-all duration-300">
-                                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="material-symbols-outlined text-[16px] text-slate-400 shrink-0">{icon}</span>
-                                            <span className="text-xs font-semibold font-google text-slate-700 dark:text-slate-300 truncate">
-                                                {s.source}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="text-xs font-bold font-google text-slate-900 dark:text-slate-100">
-                                                {fmtNum(s.leads)}
-                                            </span>
-                                            <span className="text-[10px] font-google text-slate-400 dark:text-slate-500 font-medium">leads</span>
-                                            {s.won > 0 && (
-                                                <span className="text-[10px] font-bold tabular-nums text-emerald-500 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 px-2 py-0.5 rounded-md">
-                                                    {fmtMoney(s.won_value)} won
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div
-                                        className="w-full h-2 rounded-full bg-slate-100 dark:bg-white/[0.04] overflow-hidden"
-                                        role="img"
-                                        aria-label={`${s.source}: ${fmtNum(s.leads)} leads, ${fmtMoney(s.won_value)} won`}
-                                    >
-                                        <div
-                                            className="h-full rounded-full bg-indigo-500/80 dark:bg-indigo-600/80 transition-all duration-700"
-                                            style={{ width: `${Math.max(barPct, 3)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ── Fixes Needed ─────────────────────────────────────────────────────────────
-
-const DemoFixesNeededPanel = () => {
-    const fixes = DEMO_FIXES;
-    const unansweredCount = fixes.filter(f => f.category === 'unanswered').length;
-    const lowConfCount = fixes.filter(f => f.category === 'low_confidence').length;
-    const formatTime = (iso: string) => {
-        const d = new Date(iso);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    return (
-        <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 overflow-hidden rounded-2xl">
-            <div className={`${cellCls} p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
-                <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400">build</span>
-                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100">{fixes.length} Fixes Needed</h2>
-                </div>
-                <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest font-bold font-google">
-                    <span className="flex items-center gap-1.5 text-amber-500"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{unansweredCount} Unanswered</span>
-                    <span className="flex items-center gap-1.5 text-orange-500"><span className="w-1.5 h-1.5 rounded-full bg-orange-400" />{lowConfCount} Low confidence</span>
-                </div>
-            </div>
-            <div className={`${cellCls} flex-1 divide-y divide-gray-100 dark:divide-slate-800/50`}>
-                {fixes.map((fix, idx) => {
-                    const isUnanswered = fix.category === 'unanswered';
-                    return (
-                        <div key={idx} className="px-3 py-3 sm:px-6 sm:py-4 flex items-start gap-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
-                            <span className={`w-2 h-2 rounded-full block mt-2 shrink-0 ${isUnanswered ? 'bg-amber-400' : 'bg-orange-400'}`} />
-                            <div className="flex-1 min-w-0">
-                                <p className="text-md font-google text-slate-700 dark:text-slate-300 font-medium break-words">{fix.query}</p>
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1.5">
-                                    <span className={`text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm ${isUnanswered ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20' : 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20'}`}>
-                                        {isUnanswered ? 'Unanswered' : 'Low confidence'}
-                                    </span>
-                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">Asked {fix.ask_count}×</span>
-                                    {!isUnanswered && fix.confidence !== null && (
-                                        <span className="text-[10px] uppercase tracking-widest font-bold text-orange-500 font-google">{Math.round(fix.confidence * 100)}% grounded</span>
-                                    )}
-                                    <span className="text-[11px] font-sans text-slate-400 dark:text-slate-500">{formatTime(fix.last_asked)}</span>
-                                </div>
-                            </div>
-                            <Link href={`/demo/train?query=${encodeURIComponent(fix.query)}`} className="shrink-0 inline-flex items-center gap-1 mt-0.5 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold font-google rounded-sm bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors">
-                                <span className="material-symbols-outlined text-[12px]">build</span> Train
-                            </Link>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
-// ── Leads CRM (with scoring + pipeline) ──────────────────────────────────────
-
-const DemoLeadsPanel = () => {
-    const leads = DEMO_LEADS;
-    return (
-        <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 overflow-hidden rounded-2xl">
-            <div className={`${cellCls} p-4 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
-                <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">group</span>
-                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100">Total Leads: {leads.length}</h2>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    {(['All', 'HOT', 'WARM', 'COLD'] as const).map(b => (
-                        <span key={b} className={`px-3 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google rounded-sm ${b === 'All' ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>{b}</span>
-                    ))}
-                    <span className="px-4 py-2 border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold font-google uppercase tracking-widest flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[16px]">download</span> Export CSV
-                    </span>
-                </div>
-            </div>
-
-            <div className={`${cellCls} flex-1 overflow-x-auto custom-scrollbar`}>
-                <table className="w-full text-left border-collapse min-w-[820px]">
-                    <thead className="bg-gray-50 dark:bg-slate-900/90 border-b border-gray-100 dark:border-slate-800">
-                        <tr>
-                            {['Contact Info', 'Score', 'Status / Value', 'Context / Query', 'Captured At'].map(h => (
-                                <th key={h} className="px-6 py-4 text-[11px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google border-r border-gray-100 dark:border-slate-800/50">{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
-                        {leads.map(lead => (
-                            <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-slate-900/30 transition-colors align-top">
-                                <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="font-bold font-google text-slate-900 dark:text-slate-100 text-md break-all">{lead.email}</span>
-                                        <span className="text-md text-slate-500 dark:text-slate-400 font-sans tracking-wide">{lead.name}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50"><ScoreBadge score={lead.score} band={lead.band} /></td>
-                                <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold font-google ${STATUS_STYLES[lead.status]}`}>{lead.status}</span>
-                                    {lead.status === 'won' && lead.value_usd != null && (
-                                        <div className="mt-1.5 text-xs font-sans text-emerald-500 dark:text-emerald-400">{fmtMoney(lead.value_usd)}</div>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 border-r border-gray-100 dark:border-slate-800/50">
-                                    <p className="text-md font-google text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded-sm border border-slate-100 dark:border-slate-800 leading-relaxed max-w-xs">{lead.context}</p>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-sm font-sans text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                        {new Date(lead.created_at).toLocaleDateString()}<br />
-                                        {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
-
-// ── Activity Calendar (Analytics) ────────────────────────────────────────────
-
-const ActivityCalendar = ({ data }: { data: any[] }) => {
-    const [selectedCell, setSelectedCell] = React.useState<any>(null);
-    const calendarDates = React.useMemo(() => {
-        const days: string[] = [];
-        const today = new Date();
-        for (let i = 29; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            days.push(d.toISOString().split('T')[0]);
-        }
-        return days;
-    }, []);
-
-    const dataMap: Record<string, any> = {};
-    let maxCount = 0;
-    data?.forEach(d => { if (d.date) { dataMap[d.date] = d; if (d.total_questions > maxCount) maxCount = d.total_questions; } });
-
-    React.useEffect(() => {
-        if (data && data.length > 0 && !selectedCell) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            setSelectedCell(dataMap[todayStr] || data[data.length - 1]);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data]);
-
-    const formatDateStr = (s: string) => s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-
-    return (
-        <div className="flex flex-col lg:flex-row gap-8 w-full p-1">
-            <div className="w-full lg:w-1/2 flex flex-col gap-4">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium font-google text-slate-500">Activity overview</span>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400"><div className="w-2 h-2 rounded-full border border-slate-200" /> Idle</div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400"><div className="w-2 h-2 rounded-full bg-blue-500/50" /> Active</div>
-                    </div>
-                </div>
-                <div className="grid grid-cols-7 gap-1.5 md:gap-3 w-full overflow-hidden p-2.5">
-                    {calendarDates.map(dateStr => {
-                        const cellData = dataMap[dateStr];
-                        const count = cellData?.total_questions || 0;
-                        const opacity = maxCount > 0 ? (count / maxCount) : 0;
-                        const isSelected = selectedCell?.date === dateStr;
-                        return (
-                            <div
-                                key={dateStr}
-                                onClick={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                onMouseEnter={() => setSelectedCell(cellData || { date: dateStr, count: 0 })}
-                                className={`aspect-[3/4] sm:aspect-square w-full min-w-[24px] rounded-xl cursor-pointer transition-all duration-200 border relative flex flex-col items-center justify-center gap-0.5 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 z-10 scale-105' : 'hover:scale-105 z-0'}`}
-                                style={{ backgroundColor: count > 0 ? `rgba(59, 130, 246, ${Math.max(0.15, opacity)})` : 'transparent', borderColor: count === 0 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(59, 130, 246, 0.4)' }}
-                            >
-                                <span className={`text-[12px] sm:text-[14px] leading-none font-sans font-semibold ${count > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>{new Date(dateStr).getDate()}</span>
-                                <span className={`text-[8px] sm:text-[9px] font-google font-medium leading-none ${count > 0 ? 'text-blue-600/70 dark:text-blue-300/70' : 'text-slate-300 dark:text-slate-600'}`}>{new Date(dateStr).toLocaleDateString(undefined, { month: 'short' })}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="w-full lg:w-1/2 flex flex-col">
-                {selectedCell && (
-                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} key={selectedCell.date} className="flex flex-col bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl flex-1">
-                        <div className="flex flex-col gap-1 mb-6 pb-4">
-                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 font-google">Daily inspector</span>
-                            <span className="text-lg font-semibold text-slate-900 dark:text-slate-100 font-google">{formatDateStr(selectedCell.date)}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="flex flex-col p-4 bg-white dark:bg-slate-900 rounded-xl"><span className="text-xs text-slate-400 font-google mb-1">Total activity</span><span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-100">{selectedCell.total_questions || 0}</span></div>
-                            <div className="flex flex-col p-4 bg-white dark:bg-slate-900 rounded-xl"><span className="text-xs text-slate-400 font-google mb-1">Unique users</span><span className="text-2xl font-semibold font-google text-slate-900 dark:text-slate-200">{selectedCell.interacted_users || 0}</span></div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg"><span className="text-sm font-google text-slate-500 dark:text-slate-400">Answered correctly</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedCell.answered_questions || 0}</span></div>
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg"><span className="text-sm font-google text-slate-500 dark:text-slate-400">Failed response</span><span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{selectedCell.unanswered_questions || 0}</span></div>
-                        </div>
-                        <div className="mt-6 flex-1 flex flex-col gap-5">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-medium text-slate-400 font-google mb-3 flex items-center gap-2"><span className="w-1 h-3 bg-blue-500 rounded-full" />Top questions</span>
-                                {selectedCell.top_questions?.length > 0 ? (
-                                    <div className="space-y-2">{selectedCell.top_questions.map((q: string, i: number) => <p key={i} className="text-sm font-google text-slate-600 dark:text-slate-400 italic bg-white dark:bg-slate-900 p-3 rounded-xl">&quot;{q}&quot;</p>)}</div>
-                                ) : <span className="text-sm font-google text-slate-400 italic">No activity recorded</span>}
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// ── Conversations ────────────────────────────────────────────────────────────
-
-const DemoConversationsPanel = () => {
-    const [filter, setFilter] = React.useState('all');
-    const [expandedSession, setExpandedSession] = React.useState<string | null>(null);
-
-    const sessions = [
-        {
-            session_id: 's1', last_active: hoursAgo(1), message_count: 4, has_unanswered: false,
-            messages: [
-                { user_query: 'What are the pricing plans?', bot_response: 'We offer Starter, Pro, and Business plans starting at $29/month — you can upgrade or downgrade anytime.', is_unanswered: false, timestamp: hoursAgo(1) },
-                { user_query: 'Can I upgrade anytime?', bot_response: 'Yes — change your plan at any time from account settings, and changes are prorated automatically.', is_unanswered: false, timestamp: hoursAgo(1) },
-            ],
-        },
-        {
-            session_id: 's2', last_active: hoursAgo(24), message_count: 2, has_unanswered: true,
-            messages: [
-                { user_query: 'Do you offer a free trial?', bot_response: "I'm sorry, I don't have information about free trials at the moment.", is_unanswered: true, timestamp: hoursAgo(24) },
-                { user_query: 'What is your refund policy?', bot_response: "I'm sorry, I don't have details on the refund policy.", is_unanswered: true, timestamp: hoursAgo(24) },
-            ],
-        },
-        {
-            session_id: 's3', last_active: hoursAgo(48), message_count: 2, has_unanswered: false,
-            messages: [
-                { user_query: 'How do I integrate the widget on my website?', bot_response: 'Add a single script tag to your HTML — we provide step-by-step docs for Shopify, WordPress, Webflow and more.', is_unanswered: false, timestamp: hoursAgo(48) },
-            ],
-        },
-    ];
-
-    const filtered = filter === 'unanswered' ? sessions.filter(s => s.has_unanswered) : sessions;
-    const total = filtered.length;
-    const formatTime = (iso: string) => {
-        const d = new Date(iso);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    return (
-        <div className="flex flex-col gap-px bg-white dark:bg-slate-800 flex-1 overflow-hidden rounded-2xl">
-            {/* Header */}
-            <div className={`${cellCls} p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-slate-800`}>
-                <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[18px] text-blue-500 dark:text-blue-400">forum</span>
-                    <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100">{total} Conversation{total !== 1 ? 's' : ''}</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setFilter('all')} className={`px-3 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google rounded-sm transition-colors ${filter === 'all' ? 'bg-slate-900 dark:bg-blue-600 text-white' : 'border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900'}`}>All</button>
-                    <button onClick={() => setFilter('unanswered')} className={`px-3 py-1.5 text-[11px] uppercase tracking-widest font-bold font-google rounded-sm flex items-center gap-1.5 transition-colors ${filter === 'unanswered' ? 'bg-amber-500 text-white' : 'border border-gray-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-900'}`}><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Unanswered</button>
-                </div>
-            </div>
-
-            {/* Session list */}
-            <div className={`${cellCls} flex-1 divide-y divide-gray-100 dark:divide-slate-800/50`}>
-                {filtered.map(session => {
-                    const isExpanded = expandedSession === session.session_id;
-                    const preview = session.messages[0]?.user_query || '';
-                    return (
-                        <div key={session.session_id} className="flex flex-col">
-                            <button onClick={() => setExpandedSession(isExpanded ? null : session.session_id)} className="w-full text-left px-3 py-3 sm:px-6 sm:py-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors flex items-start gap-4">
-                                <div className="mt-1 shrink-0">
-                                    <span className={`w-2 h-2 rounded-full block mt-1 ${session.has_unanswered ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-md font-google text-slate-700 dark:text-slate-300 truncate font-medium">{preview || 'No messages'}</p>
-                                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
-                                        <span className="text-[11px] font-sans text-slate-400 dark:text-slate-500">{formatTime(session.last_active)}</span>
-                                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-google">{session.message_count} msg{session.message_count !== 1 ? 's' : ''}</span>
-                                        {session.has_unanswered && <span className="text-[10px] uppercase tracking-widest font-bold text-amber-500 font-google">Has gaps</span>}
-                                    </div>
-                                </div>
-                                <span className={`material-symbols-outlined text-[18px] text-slate-400 shrink-0 transition-transform mt-0.5 ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
-                            </button>
-
-                            {isExpanded && (
-                                <div className="px-3 pb-4 sm:px-6 sm:pb-6 bg-slate-50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-800 flex flex-col gap-4 pt-4">
-                                    {session.messages.map((msg, idx) => (
-                                        <div key={idx} className="flex flex-col gap-2">
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-0.5"><span className="material-symbols-outlined text-[12px] text-slate-500 dark:text-slate-400">person</span></div>
-                                                <div className="flex-1">
-                                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User</span>
-                                                    <p className="text-sm font-google text-slate-700 dark:text-slate-300 leading-relaxed mt-0.5">{msg.user_query}</p>
-                                                </div>
-                                                <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
-                                            <div className={`flex items-start gap-3 ml-4 pl-4 border-l-2 ${msg.is_unanswered ? 'border-amber-300 dark:border-amber-700' : 'border-blue-200 dark:border-blue-900'}`}>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">Bot</span>
-                                                        {msg.is_unanswered && <span className="text-[9px] uppercase tracking-widest font-bold text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-sm">Unanswered</span>}
-                                                    </div>
-                                                    <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed mt-0.5">{msg.bot_response}</p>
-                                                    {msg.is_unanswered && (
-                                                        <Link href={`/demo/train?query=${encodeURIComponent(msg.user_query)}`} className="inline-flex items-center gap-1 mt-2 text-[10px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 transition-colors"><span className="material-symbols-outlined text-[12px]">build</span>Train this gap</Link>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
-// ── ROI Calculator ───────────────────────────────────────────────────────────
-
-const DemoROIPanel = ({ botName }: { botName: string }) => {
-    const [costPerTicket, setCostPerTicket] = React.useState('5');
-    const [leadValue, setLeadValue] = React.useState('50');
-    const [saved, setSaved] = React.useState(false);
-
-    // Reconciles with the rest of the demo business.
-    const stats = { total_queries_30d: 420, answered_queries_30d: 344, leads_30d: 64 };
-    const realizedRevenue = 8400;
-    const wonDeals = 11;
-
-    const previewCost = parseFloat(costPerTicket) || 0;
-    const previewLead = parseFloat(leadValue) || 0;
-    const previewSavings = stats.answered_queries_30d * previewCost;
-    const previewRevenue = stats.leads_30d * previewLead;
-    const previewTotal = previewSavings + previewRevenue;
-    const answerRate = stats.total_queries_30d > 0 ? Math.round((stats.answered_queries_30d / stats.total_queries_30d) * 100) : 0;
-    const fmt2 = (n: number) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    return (
-        <div className="flex flex-col gap-4 flex-1">
-            {/* Header */}
-            <div className={`${cellCls} p-6 sm:p-8`}>
-                <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">savings</span>
-                    <div>
-                        <h2 className="text-lg font-semibold font-google text-slate-900 dark:text-slate-200">Live ROI dashboard</h2>
-                        <p className="text-sm font-google text-slate-500 dark:text-slate-400 mt-0.5">Real-time value your bot generates — last 30 days</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Scorecards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className={`${cellCls} p-8 flex flex-col justify-center`}>
-                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Support cost saved</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{fmt2(previewSavings)}</span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">{stats.answered_queries_30d.toLocaleString()} queries × ${previewCost.toFixed(2)}/ticket</p>
-                </div>
-                <div className={`${cellCls} p-8 flex flex-col justify-center`}>
-                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Potential revenue</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{fmt2(previewRevenue)}</span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">{stats.leads_30d.toLocaleString()} leads × ${previewLead.toFixed(2)}/lead</p>
-                </div>
-                <div className={`${cellCls} p-8 flex flex-col justify-center`}>
-                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 font-google mb-2">Total ROI</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{fmt2(previewTotal)}</span>
-                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Answer rate: {answerRate}%</p>
-                </div>
-            </div>
-
-            {/* Proven (realized) revenue */}
-            <div className={`${cellCls} p-6 sm:p-8 border border-emerald-200 dark:border-emerald-900/40`}>
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0"><span className="material-symbols-outlined text-[18px] text-emerald-500 dark:text-emerald-400">paid</span></div>
-                        <div>
-                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 font-google uppercase tracking-wide">Proven revenue · closed-won</span>
-                            <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200 mt-0.5">{fmt2(realizedRevenue)}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <span className="text-xl sm:text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-200">{wonDeals.toLocaleString()}</span>
-                        <p className="text-xs font-medium text-slate-400 font-google mt-0.5">deals won (all-time)</p>
-                    </div>
-                </div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">Actual revenue from leads you marked <span className="font-semibold text-emerald-700 dark:text-emerald-400">Won</span>. Update lead outcomes in the Leads tab to grow this number.</p>
-            </div>
-
-            {/* Activity stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {[
-                    { icon: 'forum', val: stats.total_queries_30d, label: 'Total queries' },
-                    { icon: 'check_circle', val: stats.answered_queries_30d, label: 'Answered' },
-                    { icon: 'group', val: stats.leads_30d, label: 'Leads captured' },
-                ].map(s => (
-                    <div key={s.label} className={`${cellCls} p-6 flex items-center gap-4`}>
-                        <div className="w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-white/[0.04] shrink-0"><span className="material-symbols-outlined text-[18px] text-slate-700 dark:text-slate-400">{s.icon}</span></div>
-                        <div>
-                            <span className="text-lg sm:text-xl md:text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-200">{s.val.toLocaleString()}</span>
-                            <p className="text-xs font-medium text-slate-400 font-google mt-0.5">{s.label}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Benchmark editor */}
-            <div className={`${cellCls} p-4 sm:p-8`}>
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400">tune</span>
-                    <h3 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Calibrate your benchmarks</h3>
-                </div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mb-6">Set values that match your business. Numbers update live above as you type.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 font-google mb-2">Cost per support ticket ($)</label>
-                        <input type="number" min="0" step="0.5" value={costPerTicket} onChange={e => { setCostPerTicket(e.target.value); setSaved(false); }} className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-base font-sans text-slate-900 dark:text-slate-200 rounded-xl transition-colors" placeholder="5.00" />
-                        <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-1.5">Industry avg: $5–$25 per ticket</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 font-google mb-2">Average lead value ($)</label>
-                        <input type="number" min="0" step="5" value={leadValue} onChange={e => { setLeadValue(e.target.value); setSaved(false); }} className="w-full px-4 py-3 bg-slate-100 dark:bg-white/[0.04] focus:bg-slate-200 dark:focus:bg-white/[0.08] focus:outline-none text-base font-sans text-slate-900 dark:text-slate-200 rounded-xl transition-colors" placeholder="50.00" />
-                        <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-1.5">What is one captured lead worth to you?</p>
-                    </div>
-                </div>
-                <button onClick={() => setSaved(true)} className="w-full sm:w-auto px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black text-sm font-semibold font-google rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-[0.98]">
-                    {saved ? (<><span className="material-symbols-outlined text-[14px]">check</span> Saved</>) : (<>Save Benchmarks</>)}
-                </button>
-                <p className="text-xs font-google text-slate-400 dark:text-slate-500 text-center mt-4">Demo data for {botName} — connect your bot to see real metrics</p>
-            </div>
-        </div>
-    );
-};
-
-// ── Analytics tab ────────────────────────────────────────────────────────────
-
-const DemoAnalyticsPanel = ({ report }: { report: ReturnType<typeof buildDemoReport> }) => (
-    <div className="flex flex-col gap-6 flex-1 w-full">
-        {/* Scorecards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
-            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                <div className="flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">timer</span><h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Support hours saved</h3></div>
-                <div className="flex items-end gap-1"><span className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">12</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">hours</span></div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Based on estimated handled query resolution time.</p>
-            </div>
-            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                <div className="flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[18px] text-green-600 dark:text-green-500 pt-0.5">savings</span><h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Estimated savings</h3></div>
-                <div className="flex items-end gap-1"><span className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{report.roi_metrics.support_savings}</span></div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Cost avoided against standard human agent hourly rates.</p>
-            </div>
-            <div className={`${cellCls} p-4 sm:p-8 flex flex-col justify-center`}>
-                <div className="flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-500 pt-0.5">leaderboard</span><h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 font-google">Potential revenue</h3></div>
-                <div className="flex items-end gap-1"><span className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-slate-900 dark:text-slate-200">{report.roi_metrics.potential_revenue}</span><span className="text-sm uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-2 ml-1">est. value</span></div>
-                <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-2">Calculated from the leads captured by the AI.</p>
-            </div>
-        </div>
-
-        {/* Trends + Gaps */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
-            <div className="lg:col-span-7 flex flex-col gap-4">
-                <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
-                    <div className="flex items-center gap-2 mb-6"><span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">trending_up</span><h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Top customer trends</h2></div>
-                    <p className="text-sm font-google text-slate-500 dark:text-slate-400 mb-6">The most common subjects and questions your users are asking.</p>
-                    <div className="space-y-2">
-                        {report.top_trends.map((trend, idx) => (
-                            <div key={idx} className={`${cellCls} flex items-start gap-4 p-5`}>
-                                <div className="w-8 h-8 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold font-sans text-slate-500 dark:text-slate-400">{String(idx + 1).padStart(2, '0')}</div>
-                                <p className="text-sm font-google text-slate-700 dark:text-slate-300 pt-1.5">{trend}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-            <div className="lg:col-span-5 flex flex-col gap-4">
-                <div className={`${cellCls} p-4 sm:p-8 flex-1`}>
-                    <div className="flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">warning</span><h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">High value gaps</h2></div>
-                    <p className="text-sm font-google text-slate-500 dark:text-slate-400 mb-5">Questions your bot failed to answer. Train these topics to secure leads.</p>
-                    <div className="space-y-2 mb-4">
-                        {report.high_value_gaps.map((gap, idx) => (
-                            <div key={idx} className="flex items-start gap-3 p-4 bg-slate-100 dark:bg-slate-800">
-                                <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">help_center</span>
-                                <p className="text-sm font-google text-slate-700 dark:text-slate-300 flex-1">&quot;{gap}&quot;</p>
-                                <Link href={`/demo/train?query=${encodeURIComponent(gap)}`} className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 flex items-center transition-colors">Fix <span className="material-symbols-outlined text-[12px] ml-1">build</span></Link>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">lightbulb</span><h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Actionable advice</h2></div>
-                    <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed">{report.actionable_advice}</p>
-                </div>
-            </div>
-        </div>
-
-        {/* Peak activity */}
-        <div className={`${cellCls} p-4 sm:p-8`}>
-            <div className="flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400">calendar_month</span><h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">30-day peak activity</h2></div>
-            <ActivityCalendar data={report.peak_activity_blocks} />
-        </div>
-
-        {/* Recent log */}
-        <div className={`${cellCls} p-4 sm:p-8`}>
-            <div className="flex items-center gap-2 mb-6"><span className="material-symbols-outlined text-[18px] text-slate-600 dark:text-slate-400 pt-0.5">history</span><h2 className="text-base font-semibold font-google text-slate-900 dark:text-slate-200">Recent activity log</h2></div>
-            <div className="hidden md:grid grid-cols-12 gap-4 pb-3 mb-3 px-4">
-                <div className="col-span-8 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google">User Query</div>
-                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-center">Status</div>
-                <div className="col-span-2 text-[10px] uppercase tracking-widest font-bold text-slate-400 font-google text-right">Time</div>
-            </div>
-            <div className="space-y-3 md:space-y-1">
-                {report.recent_conversations.map((log, idx) => (
-                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 py-4 md:py-3 px-3 sm:px-4 bg-[#f1f3f5]/50 md:bg-transparent dark:bg-slate-900/20 md:dark:bg-transparent rounded-xl md:items-center">
-                        <div className="col-span-8 text-sm font-google font-medium text-slate-700 dark:text-slate-300">{log.query}</div>
-                        <div className="col-span-2 flex items-center md:justify-center">
-                            {log.unanswered ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-slate-400/60" /> Unanswered</span>
-                            ) : (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200 animate-pulse" /> Handled</span>
-                            )}
-                        </div>
-                        <div className="col-span-2 flex items-center md:justify-end"><span className="text-[11px] font-sans text-slate-500 dark:text-slate-400">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </div>
-);
-
-// ── Main page ────────────────────────────────────────────────────────────────
-
-const TABS = [
-    { id: 'action', label: 'Action Center' },
-    { id: 'analytics', label: 'Analytics' },
-    { id: 'leads', label: 'Leads CRM' },
-    { id: 'funnel', label: 'Funnel' },
-    { id: 'conversations', label: 'Conversations' },
-    { id: 'fixes', label: 'Fixes Needed' },
-    { id: 'roi', label: 'ROI' },
+const HEAT_STEPS = [
+    'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500',
+    'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
+    'bg-slate-400 dark:bg-slate-600 text-slate-800 dark:text-slate-200',
+    'bg-slate-600 dark:bg-slate-400 text-white dark:text-slate-950',
+    'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900',
 ];
 
-export default function DemoInsightsPage() {
-    const [botConfig, setBotConfig] = React.useState<any>(getBotConfig());
-    const [mounted, setMounted] = React.useState(false);
-    const [activeTab, setActiveTab] = React.useState('action');
+// ─────────────────────────────────────────────────────────────────────────────
+// Local Sub-components matching Dashboard Look & Feel
+// ─────────────────────────────────────────────────────────────────────────────
 
-    React.useEffect(() => {
+// ── Activity Heatmap ──
+function ActivityHeatmap({ series, selected, onSelect }: { series: DayDatum[]; selected: string | null; onSelect: (d: DayDatum) => void }) {
+    const max = series.reduce((m, d) => Math.max(m, d.total), 0) || 1;
+    const stepFor = (n: number) => {
+        if (n === 0) return 0;
+        const r = n / max;
+        if (r <= 0.25) return 1;
+        if (r <= 0.5) return 2;
+        if (r <= 0.75) return 3;
+        return 4;
+    };
+    let prevMonth = '';
+    return (
+        <div className="flex flex-col items-center gap-3 w-full">
+            <div className="flex flex-wrap gap-x-1.5 gap-y-2 justify-center w-full">
+                {series.map((d) => {
+                    const isSel = selected === d.date;
+                    const dateObj = new Date(d.date + 'T00:00:00');
+                    const dayNum = dateObj.getDate();
+                    const month = dateObj.toLocaleDateString(undefined, { month: 'short' });
+                    const showMonth = month !== prevMonth;
+                    prevMonth = month;
+                    return (
+                        <div key={d.date} className="flex flex-col items-center gap-1">
+                            <span className="h-3 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap leading-none select-none">
+                                {showMonth ? month : '\u00A0'}
+                            </span>
+                            <button
+                                key={d.date}
+                                type="button"
+                                onClick={() => onSelect(d)}
+                                onMouseEnter={() => onSelect(d)}
+                                aria-label={`${fmtDay(d.date)}: ${d.total} queries`}
+                                title={`${fmtDay(d.date)} · ${d.total} queries`}
+                                className={cx(
+                                    'h-8 w-8 sm:h-9 sm:w-9 rounded-md relative flex items-center justify-center text-[11px] sm:text-[12px] font-extrabold transition-all duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 focus-visible:ring-slate-400',
+                                    HEAT_STEPS[stepFor(d.total)],
+                                    isSel
+                                        ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900 ring-slate-900 dark:ring-white z-10 scale-105'
+                                        : 'hover:scale-105 hover:z-10 hover:ring-1 hover:ring-slate-400/70 dark:hover:ring-slate-500/70',
+                                )}
+                            >
+                                {dayNum}
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                <span>Less</span>
+                {HEAT_STEPS.map((c, i) => (
+                    <span
+                        key={i}
+                        className={cx(
+                            'h-3.5 w-3.5 rounded-[3px]',
+                            c.split(' ')[0] + ' ' + (c.includes('dark:') ? c.split(' ').find(x => x.startsWith('dark:bg-')) : '')
+                        )}
+                    />
+                ))}
+                <span>More</span>
+            </div>
+        </div>
+    );
+}
+
+// ── Activity Insights ──
+function ActivityInsights({ blocks }: { blocks: any[] }) {
+    const series = useMemo(() => buildDailySeries(blocks, 30), [blocks]);
+    const [selected, setSelected] = useState<DayDatum | null>(null);
+
+    useEffect(() => {
+        if (series.length) {
+            const withData = [...series].reverse().find((d) => d.total > 0);
+            setSelected(withData || series[series.length - 1]);
+        }
+    }, [series]);
+
+    const totals = series.map((d) => d.total);
+    const unans = series.map((d) => d.unanswered);
+    const users = series.map((d) => d.users);
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+
+    const totalQ = sum(totals);
+    const totalUn = sum(unans);
+    const totalUsers = sum(users);
+    const answeredRate = totalQ > 0 ? Math.round(((totalQ - totalUn) / totalQ) * 100) : 0;
+
+    const half = Math.floor(series.length / 2);
+    const priorQ = sum(totals.slice(0, half));
+    const priorUn = sum(unans.slice(0, half));
+    const recentQ = sum(totals.slice(half));
+    const recentUn = sum(unans.slice(half));
+    const priorRate = priorQ > 0 ? ((priorQ - priorUn) / priorQ) * 100 : 0;
+    const recentRate = recentQ > 0 ? ((recentQ - recentUn) / recentQ) * 100 : 0;
+    const rateDelta = Math.round((recentRate - priorRate) * 10) / 10;
+
+    const trendPoints = series.map((d) => ({
+        label: fmtDay(d.date),
+        values: { total: d.total, unanswered: d.unanswered },
+    }));
+
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <MetricCard label="Questions" value={fmtNum(totalQ)} hint="last 30 days" delta={pctDelta(totals)} spark={totals} tone="accent" />
+                <MetricCard label="Answer rate" value={`${answeredRate}%`} hint="answered confidently" delta={rateDelta} tone="positive" />
+                <MetricCard label="Chat sessions" value={fmtNum(totalUsers)} hint="engaged conversations" delta={pctDelta(users)} spark={users} tone="info" />
+                <MetricCard label="Gaps" value={fmtNum(totalUn)} hint="unanswered questions" delta={pctDelta(unans)} deltaInvert spark={unans} tone="warn" />
+            </div>
+
+            <Card className="p-4 sm:p-5">
+                <SectionHeader title="Activity trend" subtitle="Daily question volume and gaps over the last 30 days" icon="show_chart" className="mb-4" />
+                <TrendChart
+                    points={trendPoints}
+                    series={[
+                        { key: 'total', name: 'Questions', color: '#3b82f6', fill: true },
+                        { key: 'unanswered', name: 'Unanswered', color: '#f43f5e', fill: false },
+                    ]}
+                />
+            </Card>
+
+            <Card className="overflow-hidden">
+                <div className="p-4 sm:p-5">
+                    <SectionHeader title="30-day activity map" subtitle="Tap a day to inspect what customers asked" icon="calendar_view_month" className="mb-4" />
+                    <ActivityHeatmap series={series} selected={selected?.date || null} onSelect={setSelected} />
+                </div>
+
+                <div className="border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-4 sm:p-5">
+                    {selected ? (
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                                <div>
+                                    <p className="text-[16px] font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                                        {new Date(selected.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge tone="ok">{fmtNum(selected.answered)} answered</Badge>
+                                    <Badge tone={selected.unanswered > 0 ? 'alert' : 'neutral'}>{fmtNum(selected.unanswered)} unanswered</Badge>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { label: 'Total activity', value: selected.total },
+                                    { label: 'Chat sessions', value: selected.users },
+                                ].map((s) => (
+                                    <div key={s.label} className="rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 px-3.5 py-2.5">
+                                        <span className="text-[12px] text-slate-500 dark:text-slate-400">{s.label}</span>
+                                        <p className="text-[22px] font-bold tabular-nums text-slate-900 dark:text-slate-100 leading-none mt-1">{fmtNum(s.value)}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {(selected.raw?.top_questions?.length > 0 || (selected.unanswered > 0 && selected.raw?.top_unanswered?.length > 0)) && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 pt-1">
+                                    {selected.raw?.top_questions?.length > 0 && (
+                                        <div>
+                                            <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">Top questions</span>
+                                            <ul className="space-y-1">
+                                                {selected.raw.top_questions.map((q: string, i: number) => (
+                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug font-medium">“{q}”</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {selected.unanswered > 0 && selected.raw?.top_unanswered?.length > 0 && (
+                                        <div>
+                                            <span className="text-[12px] font-semibold text-amber-600 dark:text-amber-400 block mb-1.5">Unanswered queries</span>
+                                            <ul className="space-y-1">
+                                                {selected.raw.top_unanswered.map((q: string, i: number) => (
+                                                    <li key={i} className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-snug font-medium">“{q}”</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <EmptyState icon="touch_app" title="Select a day" hint="Tap a square above to inspect that day's activity." />
+                    )}
+                </div>
+            </Card>
+        </div>
+    );
+}
+
+// ── Demo Inline Training Widget ──
+function DemoInlineTrainingWidget({ query, onCancel, onSuccess }: { query: string; onCancel: () => void; onSuccess: (ans: string) => void }) {
+    const [activeTab, setActiveTab] = useState<'quick' | 'pdf'>('quick');
+    const [answerText, setAnswerText] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [isPending, setIsPending] = useState(false);
+
+    const handleSave = () => {
+        setIsPending(true);
+        setTimeout(() => {
+            setIsPending(false);
+            if (activeTab === 'quick') {
+                onSuccess(answerText);
+            } else {
+                onSuccess(`Trained via uploaded PDF: ${file?.name || 'document.pdf'}`);
+            }
+        }, 1200);
+    };
+
+    return (
+        <div className="w-full bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex flex-col gap-3 transition-all">
+            <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold font-google text-slate-700 dark:text-slate-300">
+                    Teach Vaayu AI the Answer
+                </span>
+                <div className="flex gap-1">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('quick')}
+                        disabled={isPending}
+                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'quick' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                        Write Answer
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('pdf')}
+                        disabled={isPending}
+                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'pdf' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                        Upload PDF
+                    </button>
+                </div>
+            </div>
+
+            {activeTab === 'quick' ? (
+                <div className="flex flex-col gap-2">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                        <span className="font-semibold">Question:</span> "{query}"
+                    </div>
+                    <textarea
+                        rows={3}
+                        value={answerText}
+                        onChange={(e) => setAnswerText(e.target.value)}
+                        disabled={isPending}
+                        placeholder="Provide the facts or response that Vaayu should use to answer this..."
+                        className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-blue-500 focus:outline-none rounded-xl text-slate-900 dark:text-slate-200 transition-all resize-none"
+                    />
+                </div>
+            ) : (
+                <div className="flex flex-col gap-2">
+                    <div
+                        className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined text-[24px] text-slate-500 dark:text-slate-400">
+                            cloud_upload
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 text-center mt-1">
+                            {file ? file.name : 'Choose PDF file'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">Max 10MB</span>
+                        <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf"
+                            onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f && f.type === 'application/pdf') {
+                                    setFile(f);
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 mt-1">
+                <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={onCancel}
+                    className="px-3 py-1.5 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    disabled={isPending || (activeTab === 'quick' ? !answerText.trim() : !file)}
+                    onClick={handleSave}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                    {isPending ? (
+                        <>
+                            <div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin rounded-full" />
+                            Training...
+                        </>
+                    ) : (
+                        'Save & Train'
+                    )}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Page Component
+// ─────────────────────────────────────────────────────────────────────────────
+export default function DemoInsightsPage() {
+    const [botConfig, setBotConfig] = useState<any>({ name: 'Vaayu AI' });
+    const [mounted, setMounted] = useState(false);
+    const [activeTab, setActiveTab] = useState('sales');
+    const [mobileSubTab, setMobileSubTab] = useState<'action' | 'leads'>('action');
+
+    // Shared States
+    const [leads, setLeads] = useState(INITIAL_DEMO_LEADS);
+    const [costPerTicket, setCostPerTicket] = useState('5');
+    const [leadValue, setLeadValue] = useState('50');
+    const [showCalibrate, setShowCalibrate] = useState(false);
+    const [calibrateSaved, setCalibrateSaved] = useState(false);
+    const [isCalibrating, setIsCalibrating] = useState(false);
+
+    // Action Queue items mapped to leads state
+    const actionQueue = useMemo(() => {
+        // High = HOT, Medium = WARM, Low = COLD.
+        // Return active ones (not won and not lost, or new/contacted status)
+        return leads
+            .filter((l) => l.status === 'new' || l.status === 'contacted')
+            .map((l) => {
+                const urgency = l.band === 'HOT' ? 'high' as const : l.band === 'WARM' ? 'medium' as const : 'low' as const;
+                const hoursText = l.id === '1' ? '2h' : l.id === '2' ? '5h' : '8h';
+                return {
+                    ...l,
+                    urgency,
+                    reason: `${l.band === 'HOT' ? 'Hot lead' : l.band === 'WARM' ? 'Awaiting first reply' : 'Leads captures'} · ${hoursText} old`,
+                };
+            });
+    }, [leads]);
+
+    const [acted, setActed] = useState<Record<string, 'won' | 'lost'>>({});
+    const [enteringValueLeadId, setEnteringValueLeadId] = useState<string | null>(null);
+    const [dealValueInput, setDealValueInput] = useState('');
+    const [emailDraftLead, setEmailDraftLead] = useState<any | null>(null);
+    const [draftSubject, setDraftSubject] = useState('');
+    const [draftBody, setDraftBody] = useState('');
+    const [draftCc, setDraftCc] = useState('');
+    const [copied, setCopied] = useState(false);
+    const [showEmailProviders, setShowEmailProviders] = useState(false);
+
+    // Leads CRM table filters & states
+    const [leadsPage, setLeadsPage] = useState(1);
+    const [leadsSort, setLeadsSort] = useState('recent');
+    const [leadsBandFilter, setLeadsBandFilter] = useState('all');
+    const [leadsStatusFilter, setLeadsStatusFilter] = useState('all');
+    const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(null);
+    const [leadValueDrafts, setLeadValueDrafts] = useState<Record<string, string>>({});
+
+    // Conversations state
+    const [sessions, setSessions] = useState(INITIAL_DEMO_SESSIONS);
+    const [conversationsPage, setConversationsPage] = useState(1);
+    const [conversationsFilter, setConversationsFilter] = useState('all'); // all, unanswered
+    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+    const [selectedQueryFilter, setSelectedQueryFilter] = useState<string | null>(null);
+    const [trainingQuery, setTrainingQuery] = useState<string | null>(null);
+
+    // Gaps (fixes) state
+    const [fixes, setFixes] = useState(INITIAL_DEMO_FIXES);
+
+    // Funnel state & Simulated Insights
+    const [windowDays, setWindowDays] = useState<number>(30);
+    const [activeBand, setActiveBand] = useState<string | null>(null);
+    const [reportData, setReportData] = useState<any>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
+
+    useEffect(() => {
         setBotConfig(getBotConfig());
         setMounted(true);
     }, []);
 
-    const report = buildDemoReport(botConfig.name);
+    const report = useMemo(() => buildDemoReport(botConfig.name), [botConfig.name]);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Financial ROI Computations
+    // ─────────────────────────────────────────────────────────────────────────
+    const stats30d = { total_queries: 420, answered_queries: 344, leads: 64 };
+    const numCostPerTicket = parseFloat(costPerTicket) || 0;
+    const numLeadValue = parseFloat(leadValue) || 0;
+    const previewSavings = stats30d.answered_queries * numCostPerTicket;
+    const previewRevenue = stats30d.leads * numLeadValue;
+    const previewTotal = previewSavings + previewRevenue;
+    const answerRate = stats30d.total_queries > 0 ? Math.round((stats30d.answered_queries / stats30d.total_queries) * 100) : 0;
+
+    // We baseline realized revenue at $7,200 (10 deals) + Priya Patel ($1,200 won)
+    // Plus any other leads marked Won during this demo run.
+    const wonActiveLeads = leads.filter((l) => l.status === 'won' && l.id !== '4');
+    const activeWonValue = wonActiveLeads.reduce((acc, l) => acc + (l.value_usd || 0), 0);
+    const priyaStatus = leads.find((l) => l.id === '4')?.status;
+    const priyaValue = priyaStatus === 'won' ? (leads.find((l) => l.id === '4')?.value_usd || 1200) : 0;
+
+    const realizedRevenue = 7200 + activeWonValue + priyaValue;
+    const wonDealsCount = 10 + wonActiveLeads.length + (priyaStatus === 'won' ? 1 : 0);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Handlers
+    // ─────────────────────────────────────────────────────────────────────────
+    const handleCalibrateSave = () => {
+        setIsCalibrating(true);
+        setTimeout(() => {
+            setIsCalibrating(false);
+            setCalibrateSaved(true);
+            setTimeout(() => setCalibrateSaved(false), 2500);
+        }, 800);
+    };
+
+    const handleActionOutcome = (leadId: string, status: 'won' | 'lost', valUsd: number | null) => {
+        setActed((prev) => ({ ...prev, [leadId]: status }));
+        setTimeout(() => {
+            setLeads((prev) =>
+                prev.map((l) => (l.id === leadId ? { ...l, status, value_usd: valUsd } : l))
+            );
+            setActed((prev) => {
+                const n = { ...prev };
+                delete n[leadId];
+                return n;
+            });
+        }, 480);
+    };
+
+    const handleLeadStatusChange = (leadId: string, newStatus: string) => {
+        setLeads((prev) =>
+            prev.map((l) =>
+                l.id === leadId
+                    ? { ...l, status: newStatus, value_usd: newStatus === 'won' ? (l.value_usd ?? 0) : null }
+                    : l
+            )
+        );
+    };
+
+    const handleSaveLeadValue = (leadId: string) => {
+        const valStr = leadValueDrafts[leadId];
+        const val = parseFloat(valStr);
+        setLeads((prev) =>
+            prev.map((l) =>
+                l.id === leadId ? { ...l, status: 'won', value_usd: Number.isFinite(val) && val >= 0 ? val : 0 } : l
+            )
+        );
+        setLeadValueDrafts((prev) => {
+            const n = { ...prev };
+            delete n[leadId];
+            return n;
+        });
+    };
+
+    const handleExportCSV = () => {
+        try {
+            const headers = 'ID,Name,Email,Score,Band,Status,Value (USD),Context,Created At\n';
+            const rows = leads
+                .map((l) => `${l.id},"${l.name || ''}",${l.email},${l.score},${l.band},${l.status},${l.value_usd || ''},"${l.context || ''}",${l.created_at}`)
+                .join('\n');
+            const blob = new Blob([headers + rows], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `leads_demo_${botConfig.name.toLowerCase().replace(/\s+/g, '_')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            alert('Export failed. Please try again.');
+        }
+    };
+
+    const handleEmailDraftOpen = (lead: any) => {
+        setEmailDraftLead(lead);
+        const leadName = lead.name || 'there';
+        const context = lead.context ? `"${lead.context}"` : 'your questions';
+        const companyName = 'our company';
+        const subject = `Following up on your inquiry with ${botConfig.name}`;
+        const body = `Hi ${leadName},\n\n` +
+            `Thanks for checking out our website and chatting with our AI assistant, ${botConfig.name}.\n\n` +
+            `I saw you were asking about ${context}. I wanted to follow up personally to see if you have any other questions, or if we can help you with anything else.\n\n` +
+            `Looking forward to hearing from you!\n\nBest regards,\nThe team at ${companyName}`;
+        setDraftSubject(subject);
+        setDraftBody(body);
+        setDraftCc('');
+        setCopied(false);
+        setShowEmailProviders(false);
+    };
+
+    const handleCopyEmailDraft = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleTeachSuccess = (queryText: string, taughtAnswer: string) => {
+        // Mark transcripts matching the query as handled
+        setSessions((prev) =>
+            prev.map((s) => {
+                const matched = s.messages.some((m) => m.user_query.toLowerCase() === queryText.toLowerCase());
+                if (!matched) return s;
+                const newMessages = s.messages.map((m) =>
+                    m.user_query.toLowerCase() === queryText.toLowerCase()
+                        ? { ...m, is_unanswered: false, bot_response: taughtAnswer }
+                        : m
+                );
+                const hasUnans = newMessages.some((m) => m.is_unanswered);
+                return { ...s, messages: newMessages, has_unanswered: hasUnans };
+            })
+        );
+
+        // Remove from gaps list
+        setFixes((prev) => prev.filter((f) => f.query.toLowerCase() !== queryText.toLowerCase()));
+        setTrainingQuery(null);
+    };
+
+    const handleGenerate = () => {
+        setIsGenerating(true);
+        setReportData(null);
+        setTimeout(() => {
+            setIsGenerating(false);
+            setReportData(report);
+            setLastGeneratedAt(new Date().toLocaleString());
+        }, 1500);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Filtered / Sorted Data Sets
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Filtered Leads CRM
+    const filteredLeads = useMemo(() => {
+        return leads
+            .filter((l) => {
+                if (leadsBandFilter !== 'all' && l.band !== leadsBandFilter) return false;
+                if (leadsStatusFilter !== 'all' && l.status !== leadsStatusFilter) return false;
+                return true;
+            })
+            .sort((a, b) => {
+                if (leadsSort === 'score') return b.score - a.score;
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
+    }, [leads, leadsBandFilter, leadsStatusFilter, leadsSort]);
+
+    // Filtered Transcripts
+    const filteredSessions = useMemo(() => {
+        let list = sessions;
+        if (conversationsFilter === 'unanswered') {
+            list = list.filter((s) => s.has_unanswered);
+        }
+        if (selectedQueryFilter) {
+            list = list.filter((s) =>
+                s.messages.some((m) => m.user_query.toLowerCase().includes(selectedQueryFilter.toLowerCase()))
+            );
+        }
+        return list;
+    }, [sessions, conversationsFilter, selectedQueryFilter]);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tab Headers Rendering
+    // ─────────────────────────────────────────────────────────────────────────
+    const TABS = [
+        { id: 'sales', label: 'Sales & Leads', shortLabel: 'Sales', icon: 'sell' },
+        { id: 'conversations', label: 'Conversations', shortLabel: 'Chats', icon: 'forum' },
+        { id: 'funnel', label: 'Funnel & Insights', shortLabel: 'Funnel', icon: 'insights' },
+    ];
+
+    const botSelector = (
+        <div className="relative">
+            <select
+                value="demo"
+                disabled
+                aria-label="Select bot"
+                className="appearance-none cursor-not-allowed rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none"
+            >
+                <option value="demo">{botConfig.name}</option>
+            </select>
+            <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
+        </div>
+    );
+
+    const generateBtn = activeTab === 'funnel' && (
+        <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            title="Generate insights"
+            aria-label="Generate insights"
+        >
+            <span className={cx("material-symbols-outlined text-[16px]", isGenerating && "animate-spin")}>
+                autorenew
+            </span>
+            <span className="hidden sm:inline">
+                {isGenerating ? 'Synthesizing…' : 'Generate insights'}
+            </span>
+        </button>
+    );
+
+    const renderHeader = () => (
+        <div className="relative shrink-0 z-30 bg-[#f8f9fa]/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800/70">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 md:px-6 lg:px-8 py-1.5 sm:py-0">
+                <div role="tablist" aria-label="Insights sections" className="flex items-center gap-1 min-w-0">
+                    {TABS.map((tab) => {
+                        const active = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                role="tab"
+                                aria-selected={active}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={cx(
+                                    'relative inline-flex items-center gap-1.5 py-3 px-2 text-[13px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-none',
+                                    active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
+                                )}
+                            >
+                                <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
+                                <span className="hidden sm:inline">{tab.label}</span>
+                                <span className="sm:hidden">{tab.shortLabel}</span>
+                                {active && <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 py-1.5 sm:py-2">
+                    {botSelector}
+                    {generateBtn}
+                </div>
+            </div>
+            {activeTab === 'funnel' && lastGeneratedAt && (
+                <div className="px-4 md:px-6 lg:px-8 pb-1.5 -mt-1">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500">Insights last generated {lastGeneratedAt}</span>
+                </div>
+            )}
+        </div>
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tab Paner Renderers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── Tab 1: Sales & Leads ──
+    const renderSalesAndLeadsTab = () => {
+        // ROIPanel Mock
+        const roiPanel = (
+            <section className="flex flex-col gap-3" aria-label="Financial impact and ROI">
+                <SectionHeader
+                    title="Financial impact & ROI"
+                    subtitle="What your assistant is worth — last 30 days"
+                    icon="payments"
+                    right={
+                        <button
+                            onClick={() => setShowCalibrate((v) => !v)}
+                            aria-expanded={showCalibrate}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">tune</span>
+                            {showCalibrate ? 'Hide' : 'Calibrate'}
+                        </button>
+                    }
+                />
+
+                {showCalibrate && (
+                    <div className={cx(card, 'p-5')}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-[12px] font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Cost per support ticket ($)</label>
+                                <input
+                                    type="number" min="0" step="0.5"
+                                    value={costPerTicket}
+                                    onChange={(e) => setCostPerTicket(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[14px] tabular-nums text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                    placeholder="5.00"
+                                />
+                                <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Industry avg: $5–$25 per ticket</p>
+                            </div>
+                            <div>
+                                <label className="block text-[12px] font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Average lead value ($)</label>
+                                <input
+                                    type="number" min="0" step="5"
+                                    value={leadValue}
+                                    onChange={(e) => setLeadValue(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[14px] tabular-nums text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                    placeholder="50.00"
+                                />
+                                <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Estimate of one captured lead's worth</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleCalibrateSave}
+                            disabled={isCalibrating}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 px-4 py-2 text-[12.5px] font-semibold text-white dark:text-slate-900 disabled:opacity-50 transition-colors"
+                        >
+                            {isCalibrating ? (
+                                <><span className="h-3 w-3 border-2 border-slate-400 border-t-white animate-spin rounded-full motion-reduce:animate-none" />Saving…</>
+                            ) : calibrateSaved ? (
+                                <><span className="material-symbols-outlined text-[16px]">check</span>Saved</>
+                            ) : (
+                                'Save benchmarks'
+                            )}
+                        </button>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <MetricCard label="Support saved" value={fmtMoney(previewSavings)} hint={`${fmtNum(stats30d.answered_queries)} queries answered`} icon="support_agent" tone="default" />
+                    <MetricCard label="Potential revenue" value={fmtMoney(previewRevenue)} hint={`${fmtNum(stats30d.leads)} leads captured`} icon="trending_up" tone="info" />
+                    <MetricCard label="Proven revenue" value={fmtMoney(realizedRevenue)} hint={`${fmtNum(wonDealsCount)} closed-won deal${wonDealsCount !== 1 ? 's' : ''}`} icon="verified" tone="positive" />
+                    <MetricCard label="Estimated total ROI" value={fmtMoney(previewTotal)} hint={`${answerRate}% answer rate`} icon="account_balance" tone="accent" />
+                </div>
+            </section>
+        );
+
+        // ActionCenterPanel Mock
+        const actionCenterPanel = (
+            <Card className="overflow-hidden">
+                <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+                    <SectionHeader title="Action queue" subtitle="Hot leads worth a follow-up right now" icon="bolt" />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {actionQueue.filter((l) => l.urgency === 'high').length > 0 && (
+                            <Badge tone="hot">{actionQueue.filter((l) => l.urgency === 'high').length} urgent</Badge>
+                        )}
+                        {actionQueue.filter((l) => l.urgency === 'medium').length > 0 && (
+                            <Badge tone="warm">{actionQueue.filter((l) => l.urgency === 'medium').length} soon</Badge>
+                        )}
+                    </div>
+                </div>
+
+                {actionQueue.length === 0 ? (
+                    <EmptyState icon="celebration" title="You're all caught up" hint="New hot leads will appear here the moment they come in." />
+                ) : (
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        {actionQueue.map((lead) => {
+                            const isEnteringValue = enteringValueLeadId === lead.id;
+                            const isHigh = lead.urgency === 'high';
+                            const badgeTone = isHigh ? 'hot' as const : 'warm' as const;
+                            const labelText = isHigh ? 'Act now' : 'Soon';
+
+                            return (
+                                <li key={lead.id} className="px-4 sm:px-5 py-3.5 flex flex-col lg:flex-row lg:items-center gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                                    <div className="min-w-0 lg:w-[34%] lg:shrink-0">
+                                        <div className="flex items-baseline gap-2 min-w-0">
+                                            <span className="text-[14px] font-semibold text-slate-900 dark:text-slate-100 truncate">{lead.name || lead.email}</span>
+                                            {lead.name && <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate">{lead.email}</span>}
+                                        </div>
+                                        {lead.context && <p className="text-[12.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5">“{lead.context}”</p>}
+                                    </div>
+
+                                    <div className="lg:flex-1 flex flex-wrap items-center gap-2 min-w-0">
+                                        <span className="text-[12.5px] text-slate-600 dark:text-slate-300 truncate max-w-full">{lead.reason}</span>
+                                        <Badge tone={badgeTone}>{labelText}</Badge>
+                                        {lead.band && <Badge tone={badgeToneFor(lead.band)}>{lead.band}</Badge>}
+                                    </div>
+
+                                    <div className="shrink-0 flex items-center gap-2 self-end lg:self-auto">
+                                        {isEnteringValue ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1">
+                                                    <span className="text-[12px] text-slate-400">$</span>
+                                                    <input
+                                                        type="number" placeholder="Value" value={dealValueInput}
+                                                        onChange={(e) => setDealValueInput(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                const val = parseFloat(dealValueInput);
+                                                                handleActionOutcome(lead.id, 'won', Number.isFinite(val) && val >= 0 ? val : 0);
+                                                                setEnteringValueLeadId(null);
+                                                            } else if (e.key === 'Escape') setEnteringValueLeadId(null);
+                                                        }}
+                                                        autoFocus
+                                                        className="w-16 bg-transparent text-[12px] tabular-nums text-slate-900 dark:text-slate-100 focus:outline-none"
+                                                    />
+                                                </div>
+                                                <button onClick={() => { const val = parseFloat(dealValueInput); handleActionOutcome(lead.id, 'won', Number.isFinite(val) && val >= 0 ? val : 0); setEnteringValueLeadId(null); }} className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors">Save</button>
+                                                <button onClick={() => { handleActionOutcome(lead.id, 'won', null); setEnteringValueLeadId(null); }} className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[12px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Skip</button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <button type="button" onClick={() => handleEmailDraftOpen(lead)} title="Draft follow-up email" className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">mail</span>
+                                                </button>
+                                                <button type="button" onClick={() => { setEnteringValueLeadId(lead.id); setDealValueInput(''); }} className={cx('rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-colors', acted[lead.id] === 'won' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400')}>Won</button>
+                                                <button type="button" onClick={() => handleActionOutcome(lead.id, 'lost', null)} className={cx('rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-colors', acted[lead.id] === 'lost' ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400')}>Lost</button>
+                                            </>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+
+                {actionQueue.length > 0 && (
+                    <p className="px-5 py-2.5 text-[11.5px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
+                        Won deals add to realized revenue · edit values in the Leads CRM below
+                    </p>
+                )}
+            </Card>
+        );
+
+        // LeadsPanel Mock
+        const STATUS_OPTIONS = ['new', 'contacted', 'won', 'lost'] as const;
+        const STATUS_DOT: Record<string, string> = { new: 'bg-slate-400', contacted: 'bg-sky-500', won: 'bg-emerald-500', lost: 'bg-slate-300 dark:bg-slate-600' };
+
+        const renderStatusCell = (lead: any) => {
+            const status = lead.status || 'new';
+            return (
+                <div className="flex flex-col gap-1.5">
+                    <div className="relative inline-flex items-center">
+                        <span className={cx('absolute left-2.5 h-1.5 w-1.5 rounded-full pointer-events-none', STATUS_DOT[status])} />
+                        <select
+                            value={status}
+                            onChange={(e) => handleLeadStatusChange(lead.id, e.target.value)}
+                            aria-label="Lead status"
+                            className="appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-5 pr-7 py-1 text-[12px] font-semibold capitalize text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                        >
+                            {STATUS_OPTIONS.map((s) => <option key={s} value={s} className="capitalize">{s}</option>)}
+                        </select>
+                        <span className="material-symbols-outlined absolute right-1 text-[14px] text-slate-400 pointer-events-none">expand_more</span>
+                    </div>
+                    {status === 'won' && (
+                        <div className="flex items-center gap-1">
+                            <span className="text-[12px] text-slate-400">$</span>
+                            <input
+                                type="number" min="0" step="any" inputMode="decimal"
+                                value={leadValueDrafts[lead.id] ?? (lead.value_usd ?? '')}
+                                onChange={(e) => setLeadValueDrafts((p) => ({ ...p, [lead.id]: e.target.value }))}
+                                onBlur={() => { if (leadValueDrafts[lead.id] !== undefined) handleSaveLeadValue(lead.id); }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') { handleSaveLeadValue(lead.id); (e.target as HTMLInputElement).blur(); }
+                                    else if (e.key === 'Escape') { setLeadValueDrafts((p) => { const n = { ...p }; delete n[lead.id]; return n; }); (e.target as HTMLInputElement).blur(); }
+                                }}
+                                placeholder="0"
+                                aria-label="Deal value in USD"
+                                className="w-20 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1 text-[12px] tabular-nums text-right text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                            />
+                            <button onClick={() => handleSaveLeadValue(lead.id)} title="Save deal value" className="flex h-6 w-6 items-center justify-center rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
+                                <span className="material-symbols-outlined text-[14px]">check</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const deleteCell = (lead: any, align = 'center') => {
+            const isConfirming = deleteConfirmLeadId === lead.id;
+            return isConfirming ? (
+                <div className={cx('flex flex-col gap-1.5', align === 'center' ? 'items-center' : 'items-end')}>
+                    <span className="text-[11px] font-semibold uppercase text-rose-600 dark:text-rose-400">Delete?</span>
+                    <div className="flex gap-1.5">
+                        <button onClick={() => { setLeads((prev) => prev.filter((l) => l.id !== lead.id)); setDeleteConfirmLeadId(null); }} className="rounded-md bg-rose-500 hover:bg-rose-600 px-2 py-1 text-[11px] font-semibold text-white">Yes</button>
+                        <button onClick={() => setDeleteConfirmLeadId(null)} className="rounded-md px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">No</button>
+                    </div>
+                </div>
+            ) : (
+                <button onClick={() => setDeleteConfirmLeadId(lead.id)} title="Delete lead" className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors', align === 'center' && 'mx-auto')}>
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+            );
+        };
+
+        const leadsPanel = (
+            <Card className="flex flex-col overflow-hidden">
+                <div className="px-4 sm:px-5 py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-slate-400">contacts</span>
+                        <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">{fmtNum(filteredLeads.length)} lead{filteredLeads.length !== 1 ? 's' : ''}</h3>
+                    </div>
+                    {(leads.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative">
+                                <select
+                                    value={leadsStatusFilter}
+                                    onChange={(e) => { setLeadsStatusFilter(e.target.value); setLeadsPage(1); }}
+                                    aria-label="Filter by pipeline status"
+                                    className="appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-7 py-1.5 text-[12px] font-semibold capitalize text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                >
+                                    <option value="all">All statuses</option>
+                                    {STATUS_OPTIONS.map((s) => <option key={s} value={s} className="capitalize">{s}</option>)}
+                                </select>
+                                <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] text-slate-400 pointer-events-none">expand_more</span>
+                            </div>
+                            <Segmented
+                                ariaLabel="Filter by lead quality"
+                                size="sm"
+                                options={[{ value: 'all', label: 'All' }, { value: 'HOT', label: 'Hot' }, { value: 'WARM', label: 'Warm' }, { value: 'COLD', label: 'Cold' }]}
+                                value={leadsBandFilter}
+                                onChange={(v) => { setLeadsBandFilter(v); setLeadsPage(1); }}
+                            />
+                            <button
+                                onClick={() => { setLeadsSort((s) => (s === 'score' ? 'recent' : 'score')); setLeadsPage(1); }}
+                                title="Toggle sort order"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">swap_vert</span>{leadsSort === 'score' ? 'Score' : 'Recent'}
+                            </button>
+                            <button onClick={handleExportCSV} title="Export CSV" className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <span className="material-symbols-outlined text-[14px]">download</span>CSV
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {filteredLeads.length === 0 ? (
+                    <EmptyState
+                        icon="person_search"
+                        title={leadsBandFilter !== 'all' ? `No ${leadsBandFilter.toLowerCase()} leads` : leadsStatusFilter !== 'all' ? `No ${leadsStatusFilter} leads` : 'No leads captured yet'}
+                        hint="When your assistant triggers the lead form, contacts will appear here."
+                    />
+                ) : (
+                    <>
+                        {/* Mobile cards */}
+                        <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800/60">
+                            {filteredLeads.map((lead: any) => (
+                                <div key={lead.id} className="px-4 py-3.5 flex flex-col gap-2.5">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-100 break-all">{lead.email}</p>
+                                            {lead.name && <p className="text-[12px] text-slate-500 dark:text-slate-400">{lead.name}</p>}
+                                        </div>
+                                        <Badge tone={badgeToneFor(lead.band)}>
+                                            {lead.band} · {lead.score}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">{renderStatusCell(lead)}</div>
+                                    {lead.context && <p className="text-[12.5px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-2.5 py-1.5 leading-snug break-words">{lead.context}</p>}
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11.5px] tabular-nums text-slate-400">{new Date(lead.created_at).toLocaleDateString()} · {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        {deleteCell(lead, 'end')}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop table */}
+                        <div className="hidden sm:block overflow-x-auto custom-scrollbar">
+                            <table className="w-full text-left border-collapse min-w-[920px]">
+                                <thead className="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
+                                    <tr>
+                                        {['Contact', 'Quality', 'Deal stage & value', 'What they wanted', 'Captured', ''].map((h, i) => (
+                                            <th key={i} className={cx('px-4 py-2.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400', i === 5 && 'text-center')}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                    {filteredLeads.map((lead: any) => (
+                                        <tr key={lead.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors align-top">
+                                            <td className="px-4 py-3">
+                                                <p className="text-[13.5px] font-semibold text-slate-900 dark:text-slate-100 truncate max-w-[200px]" title={lead.email}>{lead.email}</p>
+                                                {lead.name && <p className="text-[12px] text-slate-500 dark:text-slate-400">{lead.name}</p>}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge tone={badgeToneFor(lead.band)}>
+                                                    {lead.band} · {lead.score}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3">{renderStatusCell(lead)}</td>
+                                            <td className="px-4 py-3">
+                                                <p className="text-[12.5px] text-slate-600 dark:text-slate-300 leading-snug break-words max-w-[260px]">{lead.context || '—'}</p>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="text-[12px] tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                    {new Date(lead.created_at).toLocaleDateString()}<br />{new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">{deleteCell(lead)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
+            </Card>
+        );
+
+        return (
+            <div className="flex flex-col gap-6 w-full min-w-0">
+                {roiPanel}
+
+                {/* Desktop consolidated layout */}
+                <div className="hidden sm:flex flex-col gap-6 w-full">
+                    {actionCenterPanel}
+                    {leadsPanel}
+                </div>
+
+                {/* Mobile sub-tabs */}
+                <div className="flex sm:hidden flex-col gap-4 w-full">
+                    <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 p-0.5 self-start">
+                        {([['action', 'Action queue'], ['leads', 'All leads']] as const).map(([id, label]) => {
+                            const active = mobileSubTab === id;
+                            return (
+                                <button
+                                    key={id}
+                                    onClick={() => setMobileSubTab(id)}
+                                    aria-pressed={active}
+                                    className={cx(
+                                        'rounded-[6px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
+                                        active ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400',
+                                    )}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {mobileSubTab === 'action' ? actionCenterPanel : leadsPanel}
+                </div>
+            </div>
+        );
+    };
+
+    // ── Tab 2: Conversations & Gaps ──
+    const renderConversationsTab = () => {
+        const filterButton = (id: string, label: string, dotColor?: string) => {
+            const active = conversationsFilter === id && !selectedQueryFilter;
+            return (
+                <button
+                    onClick={() => { setConversationsFilter(id); setSelectedQueryFilter(null); setConversationsPage(1); }}
+                    aria-pressed={active}
+                    className={cx(
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none',
+                        active ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
+                    )}
+                >
+                    {dotColor && <span className={cx('h-1.5 w-1.5 rounded-full', dotColor)} />}
+                    {label}
+                </button>
+            );
+        };
+
+        const transcriptListCard = (
+            <Card className="flex-1 min-w-0 flex flex-col overflow-hidden">
+                <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-slate-400">forum</span>
+                        <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">{fmtNum(filteredSessions.length)} conversation{filteredSessions.length !== 1 ? 's' : ''}</h3>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        {filterButton('all', 'All')}
+                        {filterButton('unanswered', 'Has gaps', 'bg-amber-500')}
+                    </div>
+                </div>
+
+                {selectedQueryFilter && (
+                    <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between gap-2 text-[12px] text-amber-700 dark:text-amber-300">
+                        <span className="truncate">Showing matches for <span className="font-semibold">“{selectedQueryFilter}”</span></span>
+                        <button onClick={() => setSelectedQueryFilter(null)} className="shrink-0 inline-flex items-center gap-0.5 font-semibold hover:underline">
+                            Clear <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                    </div>
+                )}
+
+                {filteredSessions.length === 0 ? (
+                    <EmptyState
+                        icon={conversationsFilter === 'unanswered' ? 'task_alt' : 'chat'}
+                        title={conversationsFilter === 'unanswered' ? 'No gaps here' : 'No conversations yet'}
+                        hint={conversationsFilter === 'unanswered' ? 'Your assistant answered everything it was asked.' : 'Transcripts appear here once people start chatting.'}
+                    />
+                ) : (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/60">
+                        {filteredSessions.map((session) => {
+                            const isExpanded = expandedSessionId === session.session_id;
+                            const preview = session.messages[0]?.user_query || '';
+                            return (
+                                <div key={session.session_id} className="flex flex-col">
+                                    <button
+                                        onClick={() => setExpandedSessionId(isExpanded ? null : session.session_id)}
+                                        aria-expanded={isExpanded}
+                                        className={cx(
+                                            'w-full text-left px-4 py-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors flex items-start gap-3 border-l-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40',
+                                            session.has_unanswered ? 'border-l-amber-500' : 'border-l-transparent',
+                                        )}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[13.5px] font-medium text-slate-800 dark:text-slate-200 truncate">{preview || 'No messages'}</p>
+                                            <div className="flex flex-wrap items-center gap-2 mt-1 text-[11.5px] text-slate-500 dark:text-slate-400">
+                                                <span className="tabular-nums">{new Date(session.last_active).toLocaleDateString()}</span>
+                                                <span aria-hidden>·</span>
+                                                <span className="tabular-nums">{session.message_count} msg{session.message_count !== 1 ? 's' : ''}</span>
+                                                {session.has_unanswered && <Badge tone="alert">Has gaps</Badge>}
+                                            </div>
+                                        </div>
+                                        <span className={cx('material-symbols-outlined text-[18px] text-slate-400 shrink-0 transition-transform mt-0.5', isExpanded && 'rotate-180')}>expand_more</span>
+                                    </button>
+
+                                    {isExpanded && (
+                                        <div className="px-4 py-3 bg-slate-50/60 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-800/50 flex flex-col gap-3 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                                            {session.messages.map((msg, idx) => {
+                                                const isTrainingThis = trainingQuery === msg.user_query;
+                                                return (
+                                                    <div key={idx} className="flex flex-col gap-1.5">
+                                                        <div className="flex items-start gap-2">
+                                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 shrink-0 mt-0.5">
+                                                                <span className="material-symbols-outlined text-[11px] text-slate-500 dark:text-slate-300">person</span>
+                                                            </span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">User</span>
+                                                                <p className="text-[13.5px] text-slate-800 dark:text-slate-200 leading-snug mt-0.5 break-words whitespace-pre-wrap">{msg.user_query}</p>
+                                                            </div>
+                                                            <span className="text-[11.5px] tabular-nums text-slate-400 shrink-0 mt-0.5">
+                                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        </div>
+                                                        <div className={cx('ml-2.5 pl-3 border-l-2', msg.is_unanswered ? 'border-l-amber-400' : 'border-l-slate-200 dark:border-l-slate-700')}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Assistant</span>
+                                                                {msg.is_unanswered && <Badge tone="alert">Unanswered</Badge>}
+                                                            </div>
+                                                            <p className="text-[13.5px] text-slate-600 dark:text-slate-400 leading-snug mt-0.5 break-words whitespace-pre-wrap">{msg.bot_response}</p>
+                                                            {msg.is_unanswered && !isTrainingThis && (
+                                                                <button
+                                                                    onClick={() => setTrainingQuery(msg.user_query)}
+                                                                    className="inline-flex items-center gap-1 mt-1.5 text-[12px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-[14px]">school</span>Teach the assistant
+                                                                </button>
+                                                            )}
+                                                            {isTrainingThis && (
+                                                                <div className="mt-2 w-full max-w-lg">
+                                                                    <DemoInlineTrainingWidget
+                                                                        query={msg.user_query}
+                                                                        onCancel={() => setTrainingQuery(null)}
+                                                                        onSuccess={(ansText) => handleTeachSuccess(msg.user_query, ansText)}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </Card>
+        );
+
+        // Sidebar Gaps list matching FixesNeededPanel.tsx in mode="sidebar"
+        const fixesNeededPanel = (
+            <Card className="flex flex-col overflow-hidden h-full">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="material-symbols-outlined text-[18px] text-amber-500 shrink-0">build</span>
+                        <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100 truncate">
+                            Gaps to teach
+                        </h3>
+                    </div>
+                    {fixes.length > 0 && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {fixes.filter(f => f.category === 'unanswered').length > 0 && (
+                                <Badge tone="alert" title="Unanswered">{fixes.filter(f => f.category === 'unanswered').length}</Badge>
+                            )}
+                            {fixes.filter(f => f.category === 'low_confidence').length > 0 && (
+                                <Badge tone="warm" title="Low confidence">{fixes.filter(f => f.category === 'low_confidence').length}</Badge>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {fixes.length === 0 ? (
+                    <EmptyState icon="task_alt" title="No gaps detected" hint="Your assistant answered confidently across the last 30 days." />
+                ) : (
+                    <ul className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/60">
+                        {fixes.map((fix, idx) => {
+                            const isUnanswered = fix.category === 'unanswered';
+                            const isActive = selectedQueryFilter === fix.query;
+                            return (
+                                <li key={idx}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setConversationsFilter('unanswered');
+                                            setSelectedQueryFilter(isActive ? null : fix.query);
+                                            setConversationsPage(1);
+                                        }}
+                                        aria-pressed={isActive}
+                                        className={cx(
+                                            'w-full text-left px-4 py-3 flex items-start gap-2.5 transition-colors',
+                                            'hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer border-l-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40',
+                                            isActive ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : 'border-l-transparent',
+                                        )}
+                                    >
+                                        <span className={cx('h-2 w-2 rounded-full mt-1.5 shrink-0', isUnanswered ? 'bg-amber-500' : 'bg-orange-400')} />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug break-words">{fix.query}</p>
+                                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5 text-[11.5px] text-slate-500 dark:text-slate-400">
+                                                <span className={cx('font-semibold', isUnanswered ? 'text-amber-600 dark:text-amber-400' : 'text-orange-600 dark:text-orange-400')}>
+                                                    {isUnanswered ? 'Unanswered' : 'Low confidence'}
+                                                </span>
+                                                <span className="tabular-nums">Asked {fix.ask_count}×</span>
+                                                {!isUnanswered && fix.confidence !== null && <span className="tabular-nums">{Math.round(fix.confidence * 100)}% grounded</span>}
+                                            </div>
+                                        </div>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </Card>
+        );
+
+        return (
+            <div className="flex flex-col gap-4 w-full min-w-0">
+                {/* Mobile / Tablet layout */}
+                <div className="lg:hidden">
+                    {fixesNeededPanel}
+                </div>
+
+                {/* Desktop layout */}
+                <div className="flex flex-col lg:flex-row gap-4 w-full flex-1 min-w-0">
+                    {transcriptListCard}
+                    <div className="hidden lg:block lg:w-[34%] min-w-0 shrink-0">
+                        {fixesNeededPanel}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ── Tab 3: Funnel & Insights ──
+    const renderFunnelTab = () => {
+        const windowSelector = (
+            <Segmented
+                ariaLabel="Funnel time window"
+                options={[{ value: 7, label: '7d' }, { value: 30, label: '30d' }, { value: 90, label: '90d' }, { value: 0, label: 'All' }]}
+                value={windowDays}
+                onChange={setWindowDays}
+                size="sm"
+            />
+        );
+
+        const funnelStages = DEMO_FUNNEL_RAW.stages.map(s => ({
+            ...s,
+            description: STAGE_DESCRIPTIONS[s.key],
+        }));
+
+        const sourceAttributionBars = DEMO_FUNNEL_RAW.sources.items.map(s => ({
+            label: s.source,
+            value: s.leads,
+            secondary: s.won > 0 ? fmtMoney(s.won_value) : undefined,
+            icon: SOURCE_ICONS[s.source.toLowerCase()] || 'language',
+        }));
+
+        const donutChartData = DEMO_FUNNEL_RAW.quality.bands.map(b => ({
+            key: b.band.toLowerCase(),
+            label: b.band.charAt(0).toUpperCase() + b.band.slice(1),
+            count: b.count,
+            pct: b.pct,
+            color: QUALITY_COLORS[b.band.toLowerCase()] || '#94a3b8',
+            description: QUALITY_DESCRIPTIONS[b.band.toLowerCase()],
+        }));
+
+        return (
+            <div className="flex flex-col gap-6 w-full min-w-0">
+                {/* Funnel Section */}
+                <div className="flex flex-col gap-4">
+                    <SectionHeader
+                        title="Conversion funnel"
+                        subtitle="How visitors turn into revenue, stage by stage"
+                        icon="filter_alt"
+                        right={windowSelector}
+                    />
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        <Card className="lg:col-span-8 p-4 sm:p-5">
+                            <FunnelChart stages={funnelStages} />
+                        </Card>
+                        <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4">
+                            <MetricCard
+                                label="Overall conversion"
+                                value="2.6%"
+                                hint="conversations → won deals"
+                                icon="conversion_path"
+                                tone="accent"
+                            />
+                            <MetricCard
+                                label="Revenue won"
+                                value={fmtMoney(realizedRevenue)}
+                                hint="closed-won in this window"
+                                icon="paid"
+                                tone="positive"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <Card className="p-4 sm:p-5">
+                            <SectionHeader title="Lead quality" subtitle="Volume by purchase-intent signals" className="mb-4" />
+                            <DonutChart data={donutChartData} total={DEMO_FUNNEL_RAW.quality.total_scored} totalLabel="Scored" />
+                        </Card>
+
+                        <Card className="p-4 sm:p-5">
+                            <SectionHeader title="Where customers found you" subtitle="Top channels by leads & revenue won" className="mb-4" />
+                            <HorizontalBars data={sourceAttributionBars} valueFormat={(n) => `${fmtNum(n)}`} />
+                        </Card>
+                    </div>
+                </div>
+
+                {/* AI Insights Synthesis Report (Simulated) */}
+                {reportData && !isGenerating && (
+                    <div className="flex flex-col gap-6 w-full">
+                        <div className="border-t border-slate-200/70 dark:border-slate-800/70 pt-2" />
+
+                        <ActivityInsights blocks={reportData.peak_activity_blocks} />
+
+                        {/* Trends + advice */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                            <Card className="lg:col-span-7 p-4 sm:p-5">
+                                <SectionHeader title="Top customer trends" subtitle="What people ask about most" icon="trending_up" className="mb-3" />
+                                {reportData.top_trends?.length > 0 ? (
+                                    <ol className="flex flex-col">
+                                        {reportData.top_trends.map((trend: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-3 py-2.5 border-b border-slate-100 dark:border-slate-800/60 last:border-0">
+                                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/50 text-[11px] font-bold tabular-nums text-blue-600 dark:text-blue-400">{idx + 1}</span>
+                                                <p className="text-[13.5px] text-slate-700 dark:text-slate-300 leading-snug">{trend}</p>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                ) : (
+                                    <EmptyState icon="lightbulb" title="No trends available yet" />
+                                )}
+                            </Card>
+
+                            <Card className="lg:col-span-5 p-5 bg-gradient-to-br from-blue-50/70 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/20 border-blue-100 dark:border-blue-900/40">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="material-symbols-outlined text-[18px] text-blue-500">auto_awesome</span>
+                                    <h3 className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">Recommended action</h3>
+                                </div>
+                                <p className="text-[13.5px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    {reportData.actionable_advice || 'Keep monitoring your analytics.'}
+                                </p>
+                            </Card>
+                        </div>
+
+                        {/* Recent activity */}
+                        <Card className="overflow-hidden">
+                            <div className="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800">
+                                <SectionHeader title="Recent activity" subtitle="The latest questions your assistant handled" icon="history" />
+                            </div>
+                            <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-2.5 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
+                                <div className="col-span-8 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">User query</div>
+                                <div className="col-span-2 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-center">Status</div>
+                                <div className="col-span-2 text-[11.5px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Time</div>
+                            </div>
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                {reportData.recent_conversations?.length > 0 ? (
+                                    reportData.recent_conversations.map((log: any, idx: number) => (
+                                        <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-1.5 md:gap-4 px-5 py-3 md:items-center hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                                            <div className="col-span-8 text-[13.5px] text-slate-700 dark:text-slate-300 md:truncate break-words">{log.query}</div>
+                                            <div className="col-span-2 flex md:justify-center">
+                                                <Badge tone={log.unanswered ? 'alert' : 'ok'}>{log.unanswered ? 'Unanswered' : 'Handled'}</Badge>
+                                            </div>
+                                            <div className="col-span-2 flex md:justify-end">
+                                                <span className="text-[12px] tabular-nums text-slate-500 dark:text-slate-400">
+                                                    {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <EmptyState icon="history" title="No recent activity found" />
+                                )}
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
+                {/* Empty State before generating */}
+                {!reportData && !isGenerating && (
+                    <Card>
+                        <EmptyState icon="auto_awesome" title="Generate your AI insights" hint='Click "Generate insights" above to synthesize trends, gaps and recommendations from your chat logs.' />
+                    </Card>
+                )}
+
+                {/* Generator loading spinner */}
+                {isGenerating && (
+                    <Card>
+                        <div className="flex flex-col items-center gap-3 py-10">
+                            <span className="h-7 w-7 border-2 border-slate-200 dark:border-slate-700 border-t-blue-500 animate-spin rounded-full motion-reduce:animate-none" />
+                            <p className="text-[13.5px] text-slate-500 dark:text-slate-400">Analyzing your chat logs — this takes 5–10 seconds.</p>
+                        </div>
+                    </Card>
+                )}
+            </div>
+        );
+    };
 
     if (!mounted) return null;
 
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500">
-            {/* Header — tabs sit near the top; demo context lives in the top bar */}
-            <div className="px-6 py-3 sm:px-8 sm:py-4 shrink-0 min-w-0 w-full">
-                <div className="overflow-x-auto scrollbar-hide">
-                    <div className="flex items-center gap-1 min-w-max sm:min-w-0 bg-slate-100 dark:bg-slate-800/80 rounded-xl p-1">
-                        {TABS.map(tab => (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-[12.5px] font-semibold rounded-lg whitespace-nowrap transition-colors min-h-[38px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${activeTab === tab.id ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}>{tab.label}</button>
-                        ))}
-                    </div>
-                </div>
+            {renderHeader()}
+
+            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col p-4 md:p-6 lg:p-8">
+                {activeTab === 'sales' && renderSalesAndLeadsTab()}
+                {activeTab === 'conversations' && renderConversationsTab()}
+                {activeTab === 'funnel' && renderFunnelTab()}
             </div>
 
-            {/* Content */}
-            <div className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col px-6 pb-8 md:px-8 gap-4 pt-1">
-                {activeTab === 'action' && <DemoActionCenterPanel />}
-                {activeTab === 'analytics' && <DemoAnalyticsPanel report={report} />}
-                {activeTab === 'leads' && <DemoLeadsPanel />}
-                {activeTab === 'funnel' && <DemoFunnelPanel />}
-                {activeTab === 'conversations' && <DemoConversationsPanel />}
-                {activeTab === 'fixes' && <DemoFixesNeededPanel />}
-                {activeTab === 'roi' && <DemoROIPanel botName={botConfig.name} />}
-            </div>
+            {/* Email Draft Modal Overlay */}
+            <AnimatePresence>
+                {emailDraftLead && (() => {
+                    const toStr = encodeURIComponent(emailDraftLead.email);
+                    const ccStr = encodeURIComponent(draftCc);
+                    const subStr = encodeURIComponent(draftSubject);
+                    const bodyStr = encodeURIComponent(draftBody);
+                    const authUserStr = encodeURIComponent('demo-agent@example.com');
+                    const mailto = `mailto:${emailDraftLead.email}?cc=${ccStr}&subject=${subStr}&body=${bodyStr}`;
+                    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${toStr}&cc=${ccStr}&su=${subStr}&body=${bodyStr}&authuser=${authUserStr}`;
+                    const outlookUrl = `https://outlook.live.com/mail/0/deeplink/compose?to=${toStr}&cc=${ccStr}&subject=${subStr}&body=${bodyStr}`;
+                    const yahooUrl = `https://compose.mail.yahoo.com/?to=${toStr}&cc=${ccStr}&subject=${subStr}&body=${bodyStr}`;
+
+                    return (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3 sm:p-4"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Compose follow-up email"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, y: 10 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 10 }}
+                                className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]"
+                            >
+                                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[18px] text-blue-500">auto_awesome</span>
+                                        <span className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">AI-drafted follow-up</span>
+                                    </div>
+                                    <button onClick={() => setEmailDraftLead(null)} aria-label="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                        <span className="material-symbols-outlined text-[20px]">close</span>
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-col flex-1 overflow-hidden">
+                                    <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3">
+                                        <span className="text-slate-400 text-[13px] w-16">From</span>
+                                        <div className="flex-1 text-[14px] text-slate-500 dark:text-slate-400 truncate">demo-agent@example.com</div>
+                                    </div>
+                                    <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3">
+                                        <span className="text-slate-400 text-[13px] w-16">To</span>
+                                        <div className="flex-1 text-[14px] font-medium text-slate-800 dark:text-slate-200 truncate">{emailDraftLead.name ? `${emailDraftLead.name} <${emailDraftLead.email}>` : emailDraftLead.email}</div>
+                                    </div>
+                                    <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3">
+                                        <span className="text-slate-400 text-[13px] w-16">Cc</span>
+                                        <input value={draftCc} onChange={(e) => setDraftCc(e.target.value)} placeholder="Add Cc…" className="flex-1 bg-transparent text-[14px] text-slate-800 dark:text-slate-200 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-600" />
+                                    </div>
+                                    <div className="flex items-center border-b border-slate-100 dark:border-slate-800 px-6 py-3">
+                                        <span className="text-slate-400 text-[13px] w-16">Subject</span>
+                                        <input value={draftSubject} onChange={(e) => setDraftSubject(e.target.value)} placeholder="Email subject…" className="flex-1 bg-transparent text-[14px] font-semibold text-slate-900 dark:text-slate-100 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-600" />
+                                    </div>
+                                    <div className="flex-1 p-6 overflow-hidden">
+                                        <textarea value={draftBody} onChange={(e) => setDraftBody(e.target.value)} placeholder="Write your email here…" className="w-full h-full bg-transparent text-[14.5px] leading-relaxed text-slate-700 dark:text-slate-300 focus:outline-none resize-none custom-scrollbar" />
+                                    </div>
+                                </div>
+
+                                <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3 bg-slate-50/50 dark:bg-slate-900">
+                                    <button type="button" onClick={() => handleCopyEmailDraft(`${draftSubject}\n\n${draftBody}`)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                        <span className="material-symbols-outlined text-[16px]">content_copy</span>{copied ? 'Copied!' : 'Copy draft'}
+                                    </button>
+                                    <div className="relative">
+                                        <button type="button" onClick={() => setShowEmailProviders((p) => !p)} aria-expanded={showEmailProviders} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 text-[13px] font-semibold text-white transition-colors">
+                                            <span className="material-symbols-outlined text-[16px]">send</span>Send via…
+                                            <span className="material-symbols-outlined text-[16px]">{showEmailProviders ? 'expand_more' : 'expand_less'}</span>
+                                        </button>
+                                        {showEmailProviders && (
+                                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-10 flex flex-col py-1">
+                                                {[{ href: gmailUrl, icon: 'mail', label: 'Gmail' }, { href: outlookUrl, icon: 'forward_to_inbox', label: 'Outlook' }, { href: yahooUrl, icon: 'email', label: 'Yahoo Mail' }].map((p) => (
+                                                    <a key={p.label} href={p.href} target="_blank" rel="noopener noreferrer" onClick={() => setEmailDraftLead(null)} className="px-4 py-2 text-[13px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
+                                                        <span className="material-symbols-outlined text-[16px]">{p.icon}</span>{p.label}
+                                                    </a>
+                                                ))}
+                                                <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                                                <a href={mailto} onClick={() => setEmailDraftLead(null)} className="px-4 py-2 text-[13px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">devices</span>Default mail app
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    );
+                })()}
+            </AnimatePresence>
         </motion.div>
     );
 }
