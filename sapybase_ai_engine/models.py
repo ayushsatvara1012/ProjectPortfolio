@@ -229,6 +229,7 @@ class CompanyUpdate(BaseModel):
     weekly_digest_enabled:   Optional[bool] = None  # owner opt-in for the weekly results email
     slack_webhook_url:       Optional[str]  = None  # Slack Incoming Webhook for lead handoff
     booking_url:             Optional[str]  = None  # HTTPS scheduling link offered to qualified leads
+    vertical:                Optional[str]  = None  # vertical pack slug ('chemical', etc.) or '' to clear
     # ── Phase 5 (customise): per-company vertical-pack overrides. These don't map to
     # plain columns — the handler folds them into the companies.pack_overrides JSONB.
     sample_form:        Optional[list] = None  # full replacement field list; [] = reset to pack default

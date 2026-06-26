@@ -182,6 +182,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         webhook_url: botSettings.webhookUrl || null,
         handoff_redirect_url: botSettings.handoffRedirectUrl || null,
         hide_branding: botSettings.hideBranding,
+        vertical: botSettings.vertical || null,
         hot_lead_alerts_enabled: botSettings.hotLeadAlertsEnabled,
         alert_email: botSettings.alertEmail.trim() || null,
         weekly_digest_enabled: botSettings.weeklyDigestEnabled,

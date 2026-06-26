@@ -2346,6 +2346,9 @@ async def update_company_details(
         for field, value in _ov_sent.items():
             if field == "company_id" or field in _ov_keys:
                 continue
+            if field == "vertical":
+                value = value.strip().lower() if value else None
+                value = value or None
             if field == "quick_questions" and value is not None:
                 # Normalise to plain string list before storing
                 normalised = []

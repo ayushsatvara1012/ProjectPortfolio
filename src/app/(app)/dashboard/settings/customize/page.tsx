@@ -223,6 +223,31 @@ export default function CustomizePage() {
               </div>
             )}
 
+            {/* ── Vertical / Industry pack ── */}
+            <div className={cardCls + ' space-y-4'}>
+              <p className={sectionHeadingCls}>
+                <span className="material-symbols-outlined text-[16px] text-slate-400">category</span>
+                Industry vertical
+              </p>
+              <div>
+                <label className={labelCls}>Vertical pack</label>
+                <div className="relative">
+                  <select
+                    value={botSettings.vertical || ''}
+                    onChange={e => updateSetting('vertical', e.target.value)}
+                    className={inputCls + ' appearance-none pr-10'}
+                  >
+                    <option value="">Generic (no vertical)</option>
+                    <option value="chemical">Chemical industry</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                </div>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                  Selecting a vertical activates industry-specific tools, hub cards, and dashboard views.
+                </p>
+              </div>
+            </div>
+
             {/* ── Bot Appearance ── */}
             <div className={cardCls + ' space-y-4'}>
               <p className={sectionHeadingCls}>
