@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Plus_Jakarta_Sans, Inter } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
@@ -9,6 +9,13 @@ const googleSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-google',
+  weight: ['400', '500', '600', '700'],
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
   weight: ['400', '500', '600', '700'],
 });
 
@@ -38,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={googleSans.variable}>
+    <html lang="en" className={`${googleSans.variable} ${inter.variable}`}>
       <head>
         {/* Google tag (gtag.js) */}
         <Script
@@ -57,26 +64,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          id="material-symbols-stylesheet"
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap"
-          media="print"
-          suppressHydrationWarning
         />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              var link = document.getElementById('material-symbols-stylesheet');
-              if (link) { link.media = 'all'; }
-            `,
-          }}
-        />
-        <noscript>
-          <link
-            rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,200,0,0&display=swap"
-          />
-        </noscript>
       </head>
       <body suppressHydrationWarning>
         <SmoothScrollProvider>

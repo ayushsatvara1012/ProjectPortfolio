@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
-import { MoreHorizontal, X, Send } from 'lucide-react';
+import { MoreHorizontal, X, Send, Maximize2, Minimize2 } from 'lucide-react';
 import { useBotSettings } from '@/src/lib/context/BotSettingsContext';
 import { BotAvatar } from './LogoCustomizer';
 
@@ -25,6 +25,7 @@ type BotPreviewProps = {
 };
 
 const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const { botSettings } = useBotSettings();
   const {
     name,
@@ -57,7 +58,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
   return (
     <div className="relative h-full w-full flex items-center justify-center p-2 md:p-4 lg:p-8 transition-all duration-300 bg-transparent">
       {/* ── Main Chatbot Box ── */}
-      <div className={`w-full max-w-[95vw] sm:max-w-[500px] h-[60vh] sm:h-[650px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`} style={{ '--sapy-theme': THEME_COLOR } as React.CSSProperties}>
+      <div className={`w-full max-w-[95vw] ${isExpanded ? 'sm:max-w-[500px] lg:max-w-[600px] h-[80vh] sm:h-[85vh]' : 'sm:max-w-[450px] h-[60vh] sm:h-[650px]'} flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all duration-300 ease-out ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`} style={{ '--sapy-theme': THEME_COLOR } as React.CSSProperties}>
         
         {/* ── Header (mirrors the live ChatWidget top nav exactly) ── */}
         <div className={`relative shrink-0 ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
@@ -86,6 +87,13 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
               <div className="flex items-center gap-1">
                 <button className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>
                   <MoreHorizontal size={22} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+                </button>
+                <button onClick={() => setIsExpanded(!isExpanded)} className={`flex p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`} aria-label={isExpanded ? 'Minimize chat' : 'Expand chat'}>
+                  {isExpanded ? (
+                    <Minimize2 size={20} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+                  ) : (
+                    <Maximize2 size={20} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+                  )}
                 </button>
                 <button className={`p-2 rounded-full transition-colors group ${isDark ? 'hover:bg-red-950/30' : 'hover:bg-red-50'}`}>
                   <X size={22} className={`${isDark ? 'text-slate-500 group-hover:text-red-400' : 'text-slate-400 group-hover:text-red-500'} transition-colors`} />
@@ -174,7 +182,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
 
         {/* ── Branding Strip ── */}
         {!hideBranding && (
-          <div className={`shrink-0 py-1.5 flex justify-center items-center border-t border-slate-100/10 ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
+          <div className={`shrink-0 py-3 flex justify-center items-center border-t border-slate-100/10 ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
             <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               <Image src={BrandLogo} alt="Vaayu" width={20} height={13} className="opacity-60" />
               Vaayu Intelligence

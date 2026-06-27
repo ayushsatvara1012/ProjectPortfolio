@@ -6992,10 +6992,20 @@ def get_config(
                     "GROUP BY name, cas_number ORDER BY name LIMIT 1000",
                     (safe_company.get("id"),),
                 )
+                _prod_rows = pcur.fetchall() or []
+                if not _prod_rows:
+                    pcur.execute(
+                        "SELECT product_name, cas_number, min(pack_size) AS packaging, "
+                        "       array_agg(DISTINCT grade) FILTER (WHERE grade IS NOT NULL) AS grades "
+                        "FROM product_skus WHERE company_id = %s "
+                        "GROUP BY product_name, cas_number ORDER BY product_name LIMIT 1000",
+                        (safe_company.get("id"),),
+                    )
+                    _prod_rows = pcur.fetchall() or []
                 safe_company["products"] = [
                     {"name": r[0], "cas_number": r[1], "packaging": r[2],
                      "grades": sorted(r[3]) if r[3] else []}
-                    for r in (pcur.fetchall() or [])
+                    for r in _prod_rows
                 ]
                 pcur.close()
             finally:

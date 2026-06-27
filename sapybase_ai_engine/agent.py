@@ -284,8 +284,11 @@ def _norm_pack(s: object) -> str:
     '2.5 Litre' / '2.5 ltr' / '2.5L' all collapse to the same key as '2.5 Ltr'."""
     import re
     t = (s if isinstance(s, str) else "").lower().strip().rstrip(".")
-    t = t.replace("ltr", "l").replace("litre", "l").replace("lit", "l")
-    t = t.replace("kg", "kg").replace("gm", "gm")
+    t = t.replace("litres", "l").replace("liters", "l").replace("litre", "l")
+    t = t.replace("liter", "l").replace("ltr", "l").replace("lit", "l")
+    t = t.replace("millilitre", "ml").replace("milliliter", "ml")
+    t = t.replace("gram", "g").replace("gms", "g").replace("gm", "g")
+    t = t.replace("kilogram", "kg").replace("kgs", "kg")
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
@@ -677,12 +680,13 @@ def build_agent_directive(pack) -> str:
         "sizes) call get_product_spec. That tool returns commercial data only — "
         "never treat its grade or purity as a basis to infer hazards or handling. "
         "Any safety-class question still goes to get_sds, even mid-conversation.\n\n"
-        "For a PRICE or quotation call request_quote. Pricing needs the product, "
-        "the grade and the pack size — if any is missing the tool tells you what to "
-        "ask for; collect them one step at a time. NEVER state, compute, estimate, "
-        "or round a price yourself — quote ONLY the figures request_quote returns. "
-        "If it returns price_on_request, ask for the visitor's name and email so the "
-        "team can send a price; if ambiguous_price, say you'll confirm with the team. "
+        "For a PRICE or quotation call request_quote. Pass ALL info the visitor "
+        "already gave (product, grade, pack size) in ONE call — do NOT pre-ask for "
+        "contact details or anything the tool hasn't requested yet. The tool itself "
+        "tells you what is missing; relay that to the visitor. NEVER state, compute, "
+        "estimate, or round a price yourself — quote ONLY the figures request_quote "
+        "returns. If it returns needs_contact (price-on-request only), THEN ask for "
+        "name and email. If ambiguous_price, say you'll confirm with the team. "
         "Pricing is not safety: a hazard question still goes to get_sds.\n\n"
         "When the visitor wants a free SAMPLE of a product, call request_sample. It "
         "opens a short sample request FORM for them to fill in — do NOT collect the "
