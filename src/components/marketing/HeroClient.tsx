@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type { AntigravityBackgroundProps } from './AntigravityBackground';
+import { ExperimentIcon } from '../icons';
 
 const AntigravityBackground = dynamic<AntigravityBackgroundProps>(
   () => import('./AntigravityBackground'),
@@ -52,7 +53,7 @@ export function DemoButton() {
       className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1"
     >
       Try Demo
-      <span className="material-symbols-outlined text-lg">experiment</span>
+      <ExperimentIcon size={30} />
     </Link>
   );
 }
