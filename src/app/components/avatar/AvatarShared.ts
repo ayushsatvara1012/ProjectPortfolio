@@ -22,6 +22,28 @@ export const AVATAR_GRADIENTS: Record<string, [string, string] | null> = {
   hacker: ['#22c55e', '#14b8a6'],
 };
 
+// ── Avatar background resolver ────────────────────────────────────────────────
+// `avatar_bg_style` historically stored a gradient name ('none', 'sunset', …).
+// As of the customise-page refactor it stores a solid hex string ('#ffffff').
+// This resolver handles BOTH during the transition so existing bots keep their
+// gradients while new bots get an exact solid colour. Edit the catalogue above;
+// the renderers (LogoCustomizer, ChatWidget, BotPreview) consume this resolver.
+
+export type ResolvedAvatarBg =
+  | { kind: 'none' }
+  | { kind: 'gradient'; colors: [string, string] }
+  | { kind: 'solid'; color: string };
+
+const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export function resolveAvatarBg(bgStyle?: string | null): ResolvedAvatarBg {
+  if (!bgStyle || bgStyle === 'none') return { kind: 'none' };
+  const grad = AVATAR_GRADIENTS[bgStyle];
+  if (grad) return { kind: 'gradient', colors: grad };
+  if (HEX_RE.test(bgStyle)) return { kind: 'solid', color: bgStyle };
+  return { kind: 'none' };
+}
+
 // ── FAB shape SVG paths ───────────────────────────────────────────────────────
 // All paths use a 0 0 100 100 viewBox coordinate space.
 // `x` and `y` are offsets applied to image/text content within the shape

@@ -2,56 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { AVATAR_GRADIENTS, FAB_SHAPES, SHAPE_CLASS_MAP } from './avatar/AvatarShared';
+import { FAB_SHAPES, resolveAvatarBg } from './avatar/AvatarShared';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const ASSET_BASE_URL = IS_DEV ? '' : 'https://www.sapybase.com';
-
-// ── Shape catalogue (for shape picker UI) ─────────────────────────────────────
-export const SHAPES = [
-  {
-    id: 'circle',
-    label: 'Circle',
-    twClass: 'rounded-full',
-    icon: (
-      <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d={FAB_SHAPES.circle.path} />
-      </svg>
-    ),
-  },
-  {
-    id: 'squircle',
-    label: 'Squircle',
-    twClass: 'rounded-[2rem]',
-    icon: (
-      <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d={FAB_SHAPES.squircle.path} />
-      </svg>
-    ),
-  },
-  {
-    id: 'bento',
-    label: 'Bento',
-    twClass: 'rounded-2xl',
-    icon: (
-      <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d={FAB_SHAPES.bento.path} />
-      </svg>
-    ),
-  },
-  {
-    id: 'sharp',
-    label: 'Sharp',
-    twClass: 'rounded-lg',
-    icon: (
-      <svg viewBox="0 0 100 100" className="w-14 h-14" fill="currentColor">
-        <path d={FAB_SHAPES.sharp.path} />
-      </svg>
-    ),
-  },
-];
-
-
 
 const BLOCKED_LOGO_HOSTS = [
   'cdn.discordapp.com',
@@ -138,15 +92,18 @@ export function BotAvatar({
   const offsetX = shape.x || 0;
   const offsetY = shape.y || 0;
 
-  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
+  const bg = resolveAvatarBg(bgStyle);
+  const gradient = bg.kind === 'gradient' ? bg.colors : null;
+  const solid = bg.kind === 'solid' ? bg.color : null;
   const showImage = !!(logoUrl && logoUrl.trim() && !imgFailed);
   const useFallback = !showImage || !isCustom;
   const FallbackLogoUrl = `${ASSET_BASE_URL}/logo2.svg`;
 
-  // L1 fill: white backdrop when fallback logo is shown, otherwise themeColor or gradient or transparent
+  // L1 fill: white backdrop when fallback logo is shown, otherwise solid colour,
+  // gradient, themeColor, or transparent — in that priority order.
   const baseFill = useFallback
     ? '#ffffff'
-    : (gradient ? `url(#${uid}-grad)` : (transparentBgImage ? 'transparent' : themeColor));
+    : (gradient ? `url(#${uid}-grad)` : (solid ? solid : (transparentBgImage ? 'transparent' : themeColor)));
 
   // EC2: sizes in SVG coordinate units (viewBox is 0 0 100 100)
   const sizePx = { sm: 28, md: 40, lg: 56 }[size] ?? 40;
@@ -184,7 +141,7 @@ export function BotAvatar({
           {gradient ? (
             <rect x="0" y="0" width="100" height="100" fill={`url(#${uid}-grad)`} />
           ) : (
-            <rect x="0" y="0" width="100" height="100" fill={transparentBgImage ? 'transparent' : '#f8fafc'} />
+            <rect x="0" y="0" width="100" height="100" fill={solid ? solid : (transparentBgImage ? 'transparent' : '#f8fafc')} />
           )}
         </g>
       )}
@@ -238,11 +195,14 @@ export const FabWidgetPreview = ({
   bgStyle: string;
   isCustomUrl?: boolean;
 }) => {
-  const fabShape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
+  // Avatar shape is locked to circle across the product.
+  const fabShape = FAB_SHAPES.circle;
   const FAB_PATH = fabShape.path;
   const THEME_COLOR = themeColor || '#5730F5';
   const BOT_NAME = botName || 'S';
-  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
+  const bg = resolveAvatarBg(bgStyle);
+  const gradient = bg.kind === 'gradient' ? bg.colors : null;
+  const solid = bg.kind === 'solid' ? bg.color : null;
   const idPrefix = 'fab-preview';
   const useFallback = !logoUrl || !isCustomUrl;
   const FallbackLogoUrl = `${ASSET_BASE_URL}/logo2.svg`;
@@ -293,10 +253,12 @@ export const FabWidgetPreview = ({
             ? '#ffffff'
             : gradient
               ? `url(#${idPrefix}-grad)`
-              : THEME_COLOR
+              : solid
+                ? solid
+                : THEME_COLOR
         }
         className={
-          !gradient && !useFallback
+          !gradient && !solid && !useFallback
             ? `dark:fill-[url(#${idPrefix}-dark)] transition-all duration-500`
             : 'transition-all duration-500'
         }
@@ -308,7 +270,7 @@ export const FabWidgetPreview = ({
           {gradient ? (
             <rect x="0" y="0" width="100" height="100" fill={`url(#${idPrefix}-grad)`} />
           ) : (
-            <rect x="0" y="0" width="100" height="100" fill="#f8fafc" />
+            <rect x="0" y="0" width="100" height="100" fill={solid ? solid : '#f8fafc'} />
           )}
         </g>
       )}
@@ -347,25 +309,26 @@ export const FabWidgetPreview = ({
 
 // ── LogoCustomizer ──────────────────────────────────────────────────────────────
 type LogoCustomizerProps = {
-  logoShape: string;
   customLogoUrl: string;
   primaryColor: string;
   botName: string;
   isProUser: boolean;
-  onShapeChange: (shapeId: string) => void;
   onUrlChange: (url: string) => void;
   avatarBgStyle: string;
   onBgStyleChange: (styleId: string) => void;
   onPrimaryColorChange: (val: string) => void;
 };
 
+// Avatar shape is locked to circle product-wide. The previous gradient catalogue
+// stored a name here; we now store a solid hex. 'none' (legacy) and gradient
+// names are still honoured by the renderer; the picker writes a hex.
+const DEFAULT_AVATAR_BG = '#ffffff';
+
 export default function LogoCustomizer({
-  logoShape,
   customLogoUrl,
   primaryColor,
   botName,
   isProUser,
-  onShapeChange,
   onUrlChange,
   avatarBgStyle,
   onBgStyleChange,
@@ -394,19 +357,172 @@ export default function LogoCustomizer({
   const labelCls = 'block text-lg font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5 transition-colors';
   const inputCls = 'w-full text-md font-google px-3 py-2.5 bg-transparent border border-gray-300 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900/20 dark:focus:ring-blue-500/50 focus:border-slate-400 dark:focus:border-blue-400 text-slate-900 dark:text-slate-200 transition-colors rounded-sm';
 
+  const bg = resolveAvatarBg(avatarBgStyle);
+  const avatarHex = bg.kind === 'solid' ? bg.color : DEFAULT_AVATAR_BG;
+
   return (
-    <div className="space-y-6">
-      {/* ── Live Shape Preview ── */}
-      <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800">
-        <FabWidgetPreview
-          shapeId={logoShape}
-          logoUrl={(!urlError && urlInput) ? urlInput : customLogoUrl}
-          botName={botName}
-          themeColor={primaryColor}
-          bgStyle={avatarBgStyle}
-          isCustomUrl={!!customLogoUrl}
-        />
-        <div className="flex flex-1 items-center gap-4 ml-2">
+    <div className="space-y-8">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          Section 1 — FAB Logo
+          Live preview · custom URL · background colour of the floating button
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div>
+        <label className={labelCls}>
+          <span className="material-symbols-outlined text-[15px] align-middle mr-1.5 text-slate-400">smart_toy</span>
+          FAB Logo
+        </label>
+        <p className="text-sm text-slate-400 dark:text-slate-500 font-google leading-relaxed mb-4">
+          The floating action button your visitors see. Upload a logo and pick its background colour.
+        </p>
+
+        {/* Live preview strip */}
+        <div className="flex items-center gap-5 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 mb-5">
+          <FabWidgetPreview
+            shapeId="circle"
+            logoUrl={(!urlError && urlInput) ? urlInput : customLogoUrl}
+            botName={botName}
+            themeColor={primaryColor}
+            bgStyle={avatarBgStyle}
+            isCustomUrl={!!customLogoUrl}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium font-google text-slate-700 dark:text-slate-300 truncate">{botName || 'Your bot'}</p>
+            <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-0.5">Live preview</p>
+          </div>
+        </div>
+
+        {/* Custom Logo URL (PRO GATE) */}
+        <div className="relative mb-5">
+          <label className={`text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-1.5 block`}>
+            Logo URL
+            {!isProUser && (
+              <span className="ml-2 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] rounded-full border border-amber-200 dark:border-amber-800">
+                Pro only
+              </span>
+            )}
+          </label>
+
+          {!isProUser ? (
+            <div className="relative">
+              <div className={`${inputCls} opacity-40 pointer-events-none select-none`}>
+                https://your-domain.com/logo.png
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-slate-950/60 backdrop-blur-[1px]">
+                <Link
+                  href="/dashboard/pricing"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-sm font-medium font-sans hover:opacity-90 transition-all shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[12px]">lock</span>
+                  Upgrade to Pro
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500">
+                  link
+                </span>
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={handleUrlChange}
+                  onBlur={handleUrlBlur}
+                  placeholder="https://your-domain.com/logo.png"
+                  className={`${inputCls} pl-9 pr-10 ${urlError ? 'border-red-300 dark:border-red-700 focus:ring-red-300' : ''}`}
+                  autoComplete="off"
+                  spellCheck="false"
+                />
+                {urlInput && (
+                  <span
+                    className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] ${urlError ? 'text-red-500' : 'text-emerald-500'}`}
+                  >
+                    {urlError ? 'error' : 'check_circle'}
+                  </span>
+                )}
+              </div>
+
+              {urlError && (
+                <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+                  <span className="material-symbols-outlined text-[14px] text-red-500 shrink-0 mt-0.5">warning</span>
+                  <p className="text-[10px] text-red-700 dark:text-red-300 font-sans leading-relaxed">{urlError}</p>
+                </div>
+              )}
+
+              <p className="text-xs text-slate-400 dark:text-slate-500 font-google leading-relaxed px-1">
+                Public HTTPS image (PNG, JPG, SVG, WebP) under 2 MB.
+              </p>
+
+              {urlInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUrlInput('');
+                    setUrlError(null);
+                    onUrlChange('');
+                  }}
+                  className="flex items-center gap-1 text-md font-medium text-red-500 hover:text-red-700 transition-colors font-sans"
+                >
+                  <span className="material-symbols-outlined text-[12px]">close</span>
+                  Clear logo URL
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Avatar background colour */}
+        <div>
+          <label className={`text-sm font-medium font-google text-slate-500 dark:text-slate-400 mb-1.5 block`}>
+            Logo Background
+          </label>
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-google leading-relaxed mb-2.5">
+            Solid backdrop behind transparent logos. Does not affect the chat theme.
+          </p>
+          <div className="flex items-center gap-4">
+            <input
+              type="text"
+              value={avatarHex}
+              onChange={e => onBgStyleChange(e.target.value)}
+              className={`${inputCls} flex-1 uppercase`}
+              placeholder={DEFAULT_AVATAR_BG}
+              spellCheck="false"
+              autoComplete="off"
+            />
+            <div
+              className="w-12 h-12 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden cursor-pointer shrink-0 transition-colors"
+              style={{ background: avatarHex }}
+            >
+              <input
+                type="color"
+                value={avatarHex}
+                onChange={e => onBgStyleChange(e.target.value)}
+                className="opacity-0 w-full h-full cursor-pointer"
+                aria-label="Logo background colour"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-gray-100 dark:border-slate-800" />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          Section 2 — Chat Theme
+          Brand colour applied across the chat widget — gradient tints, header
+          accents, user message bubbles, quick-question chips, and button highlights.
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div>
+        <label className={labelCls}>
+          <span className="material-symbols-outlined text-[15px] align-middle mr-1.5 text-slate-400">palette</span>
+          Chat Theme
+        </label>
+        <p className="text-sm text-slate-400 dark:text-slate-500 font-google leading-relaxed mb-4">
+          Your brand colour. Applied to the chat header gradient, user message bubbles, quick-question chips, and action buttons throughout the widget.
+        </p>
+
+        <div className="flex items-center gap-4">
           <input
             type="text"
             value={primaryColor}
@@ -415,7 +531,7 @@ export default function LogoCustomizer({
             placeholder="#5730F5"
           />
           <div
-            className="w-12 h-12 border border-gray-200 dark:border-slate-700 overflow-hidden cursor-pointer shrink-0 rounded-none bg-slate-100 dark:bg-slate-900 transition-colors"
+            className="w-12 h-12 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden cursor-pointer shrink-0 transition-colors"
             style={{ background: primaryColor }}
           >
             <input
@@ -423,194 +539,10 @@ export default function LogoCustomizer({
               value={primaryColor}
               onChange={e => onPrimaryColorChange?.(e.target.value)}
               className="opacity-0 w-full h-full cursor-pointer"
+              aria-label="Chat theme colour"
             />
           </div>
         </div>
-      </div>
-
-      {/* ── Shape Picker ── */}
-      <div>
-        <label className={labelCls + ' flex items-center'}>
-          Bot Avatar Shape
-          {!isProUser && (
-            <span className="ml-2 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] rounded-full border border-amber-200 dark:border-amber-800">
-              Pro+
-            </span>
-          )}
-        </label>
-
-        <div className="grid grid-cols-4 gap-4 py-2">
-          {SHAPES.map(shape => {
-            const isSelected = logoShape === shape.id;
-            return (
-              <button
-                key={shape.id}
-                type="button"
-                onClick={() => onShapeChange(shape.id)}
-                disabled={!isProUser}
-                className={`
-                  group relative flex flex-col items-center gap-3 transition-all duration-300
-                  ${!isProUser ? 'opacity-40 cursor-not-allowed' : ''}
-                `}
-                title={shape.label}
-              >
-                <div className={`
-                  flex items-center justify-center transition-all duration-300
-                  ${isSelected
-                    ? 'text-blue-500 dark:text-blue-400 scale-110 drop-shadow-[0_8px_16px_rgba(59,130,246,0.25)]'
-                    : 'text-slate-300 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 group-hover:scale-105'
-                  }
-                `}>
-                  {shape.icon}
-                  {isSelected && (
-                    <div className="absolute -top-1 -right-1 bg-white dark:bg-slate-900 rounded-full">
-                      <span className="material-symbols-outlined text-[16px] text-blue-500 dark:text-blue-400 block p-0.5">
-                        check_circle
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <span className={`text-md font-medium font-sans transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                  {shape.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Background Style ── */}
-      <div>
-        <label className={labelCls}>
-          Avatar Background
-          {!isProUser && (
-            <span className="ml-2 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] rounded-full border border-amber-200 dark:border-amber-800">
-              Pro+
-            </span>
-          )}
-        </label>
-        <p className="text-md text-slate-400 dark:text-slate-500 font-google leading-relaxed mb-3">
-          Premium gradients for transparent logo URLs.
-        </p>
-
-        <div className="flex flex-wrap gap-6 py-2">
-          {Object.entries(AVATAR_GRADIENTS).map(([baseId, gradData]) => {
-            const isSelected = (avatarBgStyle || 'none') === baseId;
-            const hasGradient = gradData !== null;
-
-            return (
-              <button
-                key={baseId}
-                type="button"
-                onClick={() => onBgStyleChange(baseId)}
-                disabled={!isProUser}
-                className={`
-                  group relative flex flex-col items-center gap-2 transition-all duration-300
-                  ${!isProUser ? 'opacity-40 cursor-not-allowed' : ''}
-                `}
-                title={`${baseId} gradient`}
-              >
-                <div className={`
-                  w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center
-                  ${isSelected ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-blue-400 scale-110 drop-shadow-md' : 'ring-1 ring-gray-200 dark:ring-slate-700 hover:scale-105 hover:ring-slate-300 dark:hover:ring-slate-500'}
-                  ${!hasGradient ? 'bg-white dark:bg-slate-900' : ''}
-                `}
-                  style={hasGradient ? { background: `linear-gradient(135deg, ${gradData[0]}, ${gradData[1]})` } : {}}
-                >
-                  {!hasGradient && <span className="material-symbols-outlined text-[16px] text-slate-400">block</span>}
-                  {isSelected && hasGradient && (
-                    <span className="material-symbols-outlined text-[18px] text-white drop-shadow-sm font-bold">check</span>
-                  )}
-                </div>
-                <span className={`text-sm font-normal font-google transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                  {baseId}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Custom Logo URL (PRO GATE) ── */}
-      <div className="relative">
-        <label className={labelCls}>
-          Custom Logo URL
-          {!isProUser && (
-            <span className="ml-2 px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] rounded-full border border-amber-200 dark:border-amber-800">
-              Pro only
-            </span>
-          )}
-        </label>
-
-        {!isProUser ? (
-          <div className="relative">
-            <div className={`${inputCls} opacity-40 pointer-events-none select-none`}>
-              https://your-domain.com/logo.png
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-slate-950/60 backdrop-blur-[1px]">
-              <Link
-                href="/dashboard/pricing"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-linear-to-r from-blue-600 to-green-600 text-white text-sm font-medium font-sans hover:opacity-90 transition-all shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[12px]">lock</span>
-                Upgrade to Pro
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500">
-                link
-              </span>
-              <input
-                type="url"
-                value={urlInput}
-                onChange={handleUrlChange}
-                onBlur={handleUrlBlur}
-                placeholder="https://your-domain.com/logo.png"
-                className={`${inputCls} pl-9 pr-10 ${urlError ? 'border-red-300 dark:border-red-700 focus:ring-red-300' : ''}`}
-                autoComplete="off"
-                spellCheck="false"
-              />
-              {urlInput && (
-                <span
-                  className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] ${urlError ? 'text-red-500' : 'text-emerald-500'}`}
-                >
-                  {urlError ? 'error' : 'check_circle'}
-                </span>
-              )}
-            </div>
-
-            {urlError && (
-              <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
-                <span className="material-symbols-outlined text-[14px] text-red-500 shrink-0 mt-0.5">warning</span>
-                <p className="text-[10px] text-red-700 dark:text-red-300 font-sans leading-relaxed">{urlError}</p>
-              </div>
-            )}
-
-            <div className="space-y-1.5 px-1">
-              <p className="text-sm text-slate-400 dark:text-slate-500 font-google leading-relaxed">
-                <span className="font-bold">Requirements:</span> Must be a public HTTPS URL serving an image (PNG, JPG, SVG, or WebP) under 2 MB.
-              </p>
-            </div>
-
-            {urlInput && (
-              <button
-                type="button"
-                onClick={() => {
-                  setUrlInput('');
-                  setUrlError(null);
-                  onUrlChange('');
-                }}
-                className="flex items-center gap-1 text-md font-medium text-red-500 hover:text-red-700 transition-colors font-sans"
-              >
-                <span className="material-symbols-outlined text-[12px]">close</span>
-                Clear logo URL
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

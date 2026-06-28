@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import ThinkingLogo from './ThinkingLogo';
 import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
-import { FAB_SHAPES, SHAPE_CLASS_MAP, AVATAR_GRADIENTS } from './avatar/AvatarShared';
+import { FAB_SHAPES, resolveAvatarBg } from './avatar/AvatarShared';
 import {
   ArrowBackIcon,
   MenuIcon,
@@ -100,15 +100,18 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
   const offsetX = shape.x || 0;
   const offsetY = shape.y || 0;
 
-  const gradient = bgStyle && bgStyle !== 'none' ? AVATAR_GRADIENTS[bgStyle] : null;
+  const bg = resolveAvatarBg(bgStyle);
+  const gradient = bg.kind === 'gradient' ? bg.colors : null;
+  const solid = bg.kind === 'solid' ? bg.color : null;
   const showImage = logoUrl && logoUrl.trim() && !imgFailed;
   const useFallback = !showImage || !isCustom;
   const FallbackLogoUrl = `${ASSET_BASE}/logo2.svg`;
 
-  // L1 fill: white backdrop when fallback logo is shown, otherwise themeColor or gradient or custom white
+  // L1 fill: white backdrop when fallback logo is shown, otherwise gradient,
+  // solid colour, or custom white (transparent when transparentBgImage).
   const baseFill = useFallback
     ? '#ffffff'
-    : (gradient ? `url(#${uid}-grad)` : (transparentBgImage ? 'transparent' : '#ffffff'));
+    : (gradient ? `url(#${uid}-grad)` : (solid ? solid : (transparentBgImage ? 'transparent' : '#ffffff')));
 
   return (
     <div className={`${sizeClass} shrink-0 ${hasShadow ? 'shadow-sm' : ''} relative flex items-center justify-center`}>
@@ -171,6 +174,7 @@ function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow
 type FabButtonProps = {
   fabPath: string;
   fabGradient: [string, string] | null;
+  fabSolid?: string | null;
   logoUrl: string;
   botName: string;
   themeColor: string;
@@ -181,7 +185,7 @@ type FabButtonProps = {
   onClick: () => void;
 };
 
-function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCustomLogo, fabShapeX, fabShapeY, isOpen, onClick }: FabButtonProps) {
+function FabButton({ fabPath, fabGradient, fabSolid = null, logoUrl, botName, themeColor, isCustomLogo, fabShapeX, fabShapeY, isOpen, onClick }: FabButtonProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
 
@@ -232,8 +236,8 @@ function FabButton({ fabPath, fabGradient, logoUrl, botName, themeColor, isCusto
             </linearGradient>
           )}
         </defs>
-        <path d={fabPath} fill={useFallback ? (hasCustomColor ? (fabGradient ? 'url(#Sapybase-avatar-grad)' : themeColor) : '#000d42') : (fabGradient ? 'url(#Sapybase-avatar-grad)' : 'url(#fab-gradient)')}
-          className={!useFallback && !fabGradient ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
+        <path d={fabPath} fill={useFallback ? (fabGradient ? 'url(#Sapybase-avatar-grad)' : fabSolid ? fabSolid : (hasCustomColor ? themeColor : '#000d42')) : (fabGradient ? 'url(#Sapybase-avatar-grad)' : fabSolid ? fabSolid : 'url(#fab-gradient)')}
+          className={!useFallback && !fabGradient && !fabSolid ? 'dark:fill-[url(#fab-gradient-dark)] transition-all duration-500' : 'transition-all duration-500'} />
 
         <g style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 0.3s ease-in-out', transform: 'translate(33px, 33px)' }}>
           <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -278,10 +282,11 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
 }) => {
   const fabShape = FAB_SHAPES[shapeId] || FAB_SHAPES.circle;
   const FAB_PATH = fabShape.path;
-  const AVATAR_BG_STYLE = bgStyle || 'none';
   const THEME_COLOR = themeColor || '#5730F5';
   const BOT_NAME = botName || 'S';
-  const gradient = AVATAR_BG_STYLE !== 'none' ? AVATAR_GRADIENTS[AVATAR_BG_STYLE] : null;
+  const bg = resolveAvatarBg(bgStyle);
+  const gradient = bg.kind === 'gradient' ? bg.colors : null;
+  const solid = bg.kind === 'solid' ? bg.color : null;
   const idPrefix = 'preview';
   const FallbackLogoUrl = `${ASSET_BASE}/logo2.svg`;
   const useFallback = !logoUrl || !isCustomUrl;
@@ -317,8 +322,8 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
           </linearGradient>
         )}
       </defs>
-      <path d={FAB_PATH} fill={useFallback ? (hasCustomColor ? (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : themeColor) : '#000d42') : (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : `url(#${idPrefix}-fab-gradient)`)}
-        className={!useFallback && !gradient ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
+      <path d={FAB_PATH} fill={useFallback ? (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : solid ? solid : (hasCustomColor ? themeColor : '#000d42')) : (gradient ? `url(#${idPrefix}-Sapybase-avatar-grad)` : solid ? solid : `url(#${idPrefix}-fab-gradient)`)}
+        className={!useFallback && !gradient && !solid ? `dark:fill-[url(#${idPrefix}-fab-gradient-dark)] transition-all duration-500` : 'transition-all duration-500'} />
       {!useFallback ? (
         <g clipPath={`url(#${idPrefix}-fab-clip)`}>
           <image href={logoUrl} xlinkHref={logoUrl} x={fabShape.x || 0} y={fabShape.y || 0}
@@ -1734,7 +1739,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   const fabShape = FAB_SHAPES[LOGO_SHAPE] || FAB_SHAPES.circle;
   const FAB_PATH = fabShape.path;
-  const fabGradient = AVATAR_BG_STYLE !== 'none' ? AVATAR_GRADIENTS[AVATAR_BG_STYLE] : null;
+  const fabBg = resolveAvatarBg(AVATAR_BG_STYLE);
+  const fabGradient = fabBg.kind === 'gradient' ? fabBg.colors : null;
+  const fabSolid = fabBg.kind === 'solid' ? fabBg.color : null;
 
   return (
     <div className={`sapy-chat-root ${isEmbed ? 'relative w-full h-full' : 'fixed bottom-0 right-0 sm:bottom-6 sm:right-6'} z-2147483647 font-sans pointer-events-none`}
@@ -2186,6 +2193,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             <FabButton
               fabPath={FAB_PATH}
               fabGradient={fabGradient}
+              fabSolid={fabSolid}
               logoUrl={LOGO_URL}
               botName={BOT_NAME}
               themeColor={THEME_COLOR}

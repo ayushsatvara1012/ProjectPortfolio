@@ -101,7 +101,8 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     companyTone: company.company_tone ? company.company_tone.split(',') : [],
     systemPrompt: company.system_prompt || '',
     aiModel: company.ai_model || '',
-    logoShape: company.logo_shape || 'circle',
+    // Avatar shape is locked to circle product-wide; coerce any legacy value.
+    logoShape: 'circle',
     customLogoUrl: company.custom_logo_url || '',
     avatarBgStyle: company.avatar_bg_style || 'none',
     webhookUrl: company.webhook_url || '',

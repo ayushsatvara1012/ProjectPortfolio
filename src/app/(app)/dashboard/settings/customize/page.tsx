@@ -70,12 +70,20 @@ const LockOverlay = ({ label, href = '/dashboard/pricing' }: { label: string; hr
   </div>
 );
 
+type Tab = 'appearance' | 'behavior' | 'leads';
+const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'appearance', label: 'Appearance', icon: 'palette' },
+  { id: 'behavior',   label: 'Behavior',   icon: 'psychology' },
+  { id: 'leads',      label: 'Leads & Integrations', icon: 'notifications_active' },
+];
+
 export default function CustomizePage() {
   const { botSettings, updateSetting, saveSettings, fetchSettings, isSaving, isLoading } = useBotSettings();
   const { userTier, userRole, entitlements, isLoading: userLoading } = useUserRole();
   const authFetch = useAuthenticatedFetch();
   const isAuthReady = useIsAuthReady();
   const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'warning', msg: '' });
+  const [activeTab, setActiveTab] = useState<Tab>('appearance');
 
   const searchParams = useSearchParams();
   const editBotId = searchParams.get('edit');
@@ -148,9 +156,27 @@ export default function CustomizePage() {
       {/* ── LEFT: Settings ── */}
       <div className="flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden border-r border-slate-100 dark:border-slate-800 transition-colors duration-500">
 
-        {/* Header */}
-        <div className="px-6 md:px-8 pt-5 pb-4 shrink-0">
+        {/* Header + tab bar */}
+        <div className="px-6 md:px-8 pt-5 pb-4 shrink-0 space-y-3">
           <p className="text-sm font-google text-slate-500 dark:text-slate-400 transition-colors">Changes reflect instantly in the preview.</p>
+
+          {/* Segmented control */}
+          <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl transition-colors">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold font-google rounded-lg transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Scrollable cards body */}
@@ -223,31 +249,9 @@ export default function CustomizePage() {
               </div>
             )}
 
-            {/* ── Vertical / Industry pack ── */}
-            <div className={cardCls + ' space-y-4'}>
-              <p className={sectionHeadingCls}>
-                <span className="material-symbols-outlined text-[16px] text-slate-400">category</span>
-                Industry vertical
-              </p>
-              <div>
-                <label className={labelCls}>Vertical pack</label>
-                <div className="relative">
-                  <select
-                    value={botSettings.vertical || ''}
-                    onChange={e => updateSetting('vertical', e.target.value)}
-                    className={inputCls + ' appearance-none pr-10'}
-                  >
-                    <option value="">Generic (no vertical)</option>
-                    <option value="chemical">Chemical industry</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
-                </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-                  Selecting a vertical activates industry-specific tools, hub cards, and dashboard views.
-                </p>
-              </div>
-            </div>
-
+            {/* ═══ APPEARANCE TAB ═══ */}
+            {activeTab === 'appearance' && (
+            <>
             {/* ── Bot Appearance ── */}
             <div className={cardCls + ' space-y-4'}>
               <p className={sectionHeadingCls}>
@@ -301,20 +305,48 @@ export default function CustomizePage() {
             <div className={cardCls}>
               <p className={sectionHeadingCls}>
                 <span className="material-symbols-outlined text-[16px] text-slate-400">image</span>
-                Logo &amp; avatar shape
+                Logo &amp; avatar
               </p>
               <LogoCustomizer
-                logoShape={botSettings.logoShape || 'circle'}
                 customLogoUrl={botSettings.customLogoUrl || ''}
                 primaryColor={botSettings.primaryColor || '#5730F5'}
                 botName={botSettings.name || 'S'}
                 isProUser={canUseCustomLogo}
                 avatarBgStyle={botSettings.avatarBgStyle || 'none'}
-                onShapeChange={(shapeId) => updateSetting('logoShape', shapeId)}
                 onUrlChange={(url) => updateSetting('customLogoUrl', url)}
                 onBgStyleChange={(styleId) => updateSetting('avatarBgStyle', styleId)}
                 onPrimaryColorChange={(val) => updateSetting('primaryColor', val)}
               />
+            </div>
+            </>
+            )}
+
+            {/* ═══ BEHAVIOR TAB ═══ */}
+            {activeTab === 'behavior' && (
+            <>
+            {/* ── Vertical / Industry pack ── */}
+            <div className={cardCls + ' space-y-4'}>
+              <p className={sectionHeadingCls}>
+                <span className="material-symbols-outlined text-[16px] text-slate-400">category</span>
+                Industry vertical
+              </p>
+              <div>
+                <label className={labelCls}>Vertical pack</label>
+                <div className="relative">
+                  <select
+                    value={botSettings.vertical || ''}
+                    onChange={e => updateSetting('vertical', e.target.value)}
+                    className={inputCls + ' appearance-none pr-10'}
+                  >
+                    <option value="">Generic (no vertical)</option>
+                    <option value="chemical">Chemical industry</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                </div>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                  Selecting a vertical activates industry-specific tools, hub cards, and dashboard views.
+                </p>
+              </div>
             </div>
 
             {/* ── Advanced Behavior ── */}
@@ -426,7 +458,12 @@ export default function CustomizePage() {
                 </div>
               </div>
             )}
+            </>
+            )}
 
+            {/* ═══ LEADS & INTEGRATIONS TAB ═══ */}
+            {activeTab === 'leads' && (
+            <>
             {/* ── Integrations ── */}
             {hasIntegrationsAccess && (
               <div className={cardCls + ' space-y-5'}>
@@ -608,6 +645,8 @@ export default function CustomizePage() {
 
               </div>
             </div>
+            </>
+            )}
 
             {/* ── Save button ── */}
             <button
