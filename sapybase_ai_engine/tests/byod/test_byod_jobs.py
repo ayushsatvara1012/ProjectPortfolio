@@ -17,7 +17,7 @@ import time
 
 import pytest
 
-import byod_engine
+from services import byod_engine
 import byod_jobs
 from byod_breaker import BreakerState
 

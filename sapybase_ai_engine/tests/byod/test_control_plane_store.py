@@ -20,7 +20,7 @@ from pathlib import Path
 import psycopg2
 import pytest
 
-from byod_store import (
+from db.byod_store import (
     CONTROL_PLANE_SCHEMA_SQL,
     TABLE_NAME,
     TENANT_DB_STATUSES,

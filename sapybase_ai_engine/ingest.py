@@ -3,7 +3,7 @@ import psycopg2
 from pgvector.psycopg2 import register_vector
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
+from core.embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
 
 load_dotenv()
 

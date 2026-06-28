@@ -6,8 +6,8 @@ the process singleton.
 """
 from __future__ import annotations
 
-import byod_dsn_cache
-from byod_dsn_cache import DecryptedDsnCache
+from db import byod_dsn_cache
+from db.byod_dsn_cache import DecryptedDsnCache
 
 
 class _Clock:

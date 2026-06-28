@@ -35,11 +35,15 @@ src/app/(app)/dashboard/   # Owner dashboard (settings, insights, customize)
 src/app/(app)/(site)/      # Public marketing site
 src/app/(app)/(auth)/      # Clerk auth pages
 src/app/embed/             # Widget embed route
-src/app/components/        # Shared components (ChatWidget, BotPreview, etc.)
+src/components/            # Shared components (ui, chat, dashboard, layout, features)
 src/lib/context/           # React contexts (BotSettings, User, etc.)
 sapybase_ai_engine/        # Python backend
+  api/                     #   API routers and endpoints
+  core/                    #   Configuration and security
+  services/                #   Business logic and agent implementations
+  db/                      #   Database models and connections
+  utils/                   #   Helper functions
   packs/                   #   Vertical-pack registry (chemical.py, schema.py)
-  agent.py                 #   ReAct agent loop + tool implementations
   main.py                  #   FastAPI app (~7k lines, all endpoints)
   tests/                   #   pytest suite
 docs/                      # Feature plan documents

@@ -38,7 +38,7 @@ import time
 import pytest
 
 from byod_breaker import BreakerConfig, BreakerOpen, BreakerState
-from byod_pool import PoolConfig, TenantPoolRegistry
+from db.byod_pool import PoolConfig, TenantPoolRegistry
 from observability import slo
 
 

@@ -15,8 +15,8 @@ import os
 
 import pytest
 
-import byod_crypto
-from byod_crypto import (
+from core import byod_crypto
+from core.byod_crypto import (
     DecryptionError,
     EncryptedDsn,
     KmsUnavailable,
@@ -32,7 +32,7 @@ from byod_crypto import (
     rotate_stored_dsn,
     store_encrypted_dsn,
 )
-from byod_store import TenantDbStatus, get_tenant_db_record
+from db.byod_store import TenantDbStatus, get_tenant_db_record
 
 DSN = "postgresql://app_user:s3cr3t-pw@db.acme-tenant.example.com:5432/tenantdb?sslmode=verify-full"
 COMPANY_A = "00000000-0000-4000-8000-00000000000a"

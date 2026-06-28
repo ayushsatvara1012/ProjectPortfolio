@@ -28,7 +28,7 @@ import psycopg2
 import pytest
 
 import byod_dataplane
-import byod_engine
+from services import byod_engine
 import byod_orchestrator
 from byod_orchestrator import MigrationStatus, MigrationVerificationError
 

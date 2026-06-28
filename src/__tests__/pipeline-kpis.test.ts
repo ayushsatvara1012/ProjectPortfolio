@@ -13,7 +13,7 @@
  *   4. Empty / non-array input is safe (early dashboard state).
  */
 import { describe, it, expect } from 'vitest';
-import { computePipelineKpis } from '@/src/app/components/PipelineKpis';
+import { computePipelineKpis } from '@/src/components/dashboard/PipelineKpis';
 
 describe('computePipelineKpis', () => {
   it('sums only priced quotes and counts POR separately', () => {

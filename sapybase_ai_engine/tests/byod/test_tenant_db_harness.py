@@ -9,7 +9,7 @@ no backend is available, so the broader suite is unaffected.
 """
 from __future__ import annotations
 
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 from .tenant_harness import (
     KNOWLEDGE_FIXTURES,

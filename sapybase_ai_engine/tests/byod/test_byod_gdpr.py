@@ -20,7 +20,7 @@ from pathlib import Path
 import psycopg2
 import pytest
 
-import byod_store
+from db import byod_store
 
 _MAIN_PY = Path(__file__).resolve().parents[1].parent / "main.py"
 

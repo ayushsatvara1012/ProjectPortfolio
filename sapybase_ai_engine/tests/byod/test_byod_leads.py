@@ -18,7 +18,7 @@ import psycopg2
 import pytest
 
 import byod_dataplane
-import byod_engine
+from services import byod_engine
 
 from .tenant_harness import TENANT_COMPANY_ID
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { UserProvider } from '@/src/lib/context/UserContext';
 import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
+import { BotSwitcherProvider } from '@/src/lib/context/BotSwitcherContext';
 import { UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 
 export default function DashboardProviders({ children }: { children: React.ReactNode }) {
@@ -36,7 +37,9 @@ export default function DashboardProviders({ children }: { children: React.React
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
-        <BotSettingsProvider>{children}</BotSettingsProvider>
+        <BotSettingsProvider>
+          <BotSwitcherProvider>{children}</BotSwitcherProvider>
+        </BotSettingsProvider>
       </UserProvider>
     </QueryClientProvider>
   );

@@ -20,7 +20,7 @@ import uuid
 import psycopg2
 import pytest
 
-import byod_engine
+from services import byod_engine
 import byod_ingest
 from byod_ingest import (
     EmbeddingCostExceeded,
@@ -32,7 +32,7 @@ from byod_ingest import (
     plan_prune,
     retry_with_backoff,
 )
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 
 # ── Pure: identity + normalization ───────────────────────────────────────────────

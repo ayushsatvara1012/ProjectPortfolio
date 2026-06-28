@@ -35,7 +35,7 @@ from byod_dataplane import (
     DATA_PLANE_SCHEMA_VERSION,
     DATA_PLANE_TABLES,
 )
-from byod_store import CONTROL_PLANE_SCHEMA_SQL, TABLE_NAME as CONTROL_TABLE_NAME
+from db.byod_store import CONTROL_PLANE_SCHEMA_SQL, TABLE_NAME as CONTROL_TABLE_NAME
 
 _ENGINE_ROOT = Path(__file__).resolve().parents[2]
 _DATAPLANE_INI = _ENGINE_ROOT / "alembic_dataplane.ini"

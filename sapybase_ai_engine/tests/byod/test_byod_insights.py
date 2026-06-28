@@ -28,7 +28,7 @@ import psycopg2
 import pytest
 
 import byod_dataplane
-import byod_engine
+from services import byod_engine
 
 # Pure aggregation helpers shared with the endpoints — the "insight numbers"
 # are the endpoint output, so we feed the tenant-DB rows through the same math.

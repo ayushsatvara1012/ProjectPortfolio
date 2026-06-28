@@ -7,7 +7,7 @@ from typing import Callable, Iterator
 import psycopg2
 import pytest
 
-from byod_store import CONTROL_PLANE_SCHEMA_SQL
+from db.byod_store import CONTROL_PLANE_SCHEMA_SQL
 
 from .tenant_harness import (
     TenantDBUnavailable,

@@ -3,10 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { SignUp, useUser, useAuth } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import Alert from '@/src/app/components/Alert';
-import CreateBotFlow from '@/src/app/components/CreateBotFlow';
+import Alert from '@/src/components/ui/Alert';
+import CreateBotFlow from '@/src/components/features/CreateBotFlow';
 import { useUserRole } from '@/src/lib/context/UserContext';
-import { Card } from '@/src/app/components/insights/ui';
+import { Card } from '@/src/components/dashboard/insights/ui';
 
 const AppRegistration = () => {
     const { isLoaded, isSignedIn } = useUser();

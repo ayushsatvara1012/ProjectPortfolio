@@ -7,7 +7,7 @@ each channel (a security property: product/contact strings are interpolated).
 """
 import json
 
-from agent_handoff import (
+from services.agent_handoff import (
     build_agent_request_email,
     build_agent_request_slack_payload,
     summarize_agent_request,

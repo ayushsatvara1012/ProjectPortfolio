@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import AppLayout from '@/src/app/components/AppLayout';
-import UserSeed from '@/src/app/components/UserSeed';
+import AppLayout from '@/src/components/layout/AppLayout';
+import UserSeed from '@/src/components/features/UserSeed';
 import DashboardProviders from './DashboardProviders';
 import { isDashboardAccessAllowed } from '@/src/lib/auth/accessGate';
 

@@ -22,8 +22,8 @@ from __future__ import annotations
 import pytest
 
 import byod_dataplane
-import byod_engine
-import byod_schema
+from services import byod_engine
+from db import byod_schema
 
 
 # ── Pure: version parsing ────────────────────────────────────────────────────────

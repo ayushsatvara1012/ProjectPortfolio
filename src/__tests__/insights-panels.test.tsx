@@ -2,8 +2,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import SalesAndLeadsPanel from '@/src/app/components/SalesAndLeadsPanel';
-import ActionCenterPanel from '@/src/app/components/ActionCenterPanel';
+import SalesAndLeadsPanel from '@/src/components/dashboard/SalesAndLeadsPanel';
+import ActionCenterPanel from '@/src/components/dashboard/ActionCenterPanel';
 
 // Mock react-query
 vi.mock('@tanstack/react-query', () => {
@@ -26,17 +26,17 @@ vi.mock('@tanstack/react-query', () => {
 });
 
 // Mock UpgradePrompt
-vi.mock('@/src/app/components/UpgradePrompt', () => ({
+vi.mock('@/src/components/features/UpgradePrompt', () => ({
   default: ({ code }: any) => <div data-testid="upgrade-prompt">Upgrade Prompt: {code}</div>,
 }));
 
 // Mock LeadsPanel to isolate testing of SalesAndLeadsPanel
-vi.mock('@/src/app/components/LeadsPanel', () => ({
+vi.mock('@/src/components/dashboard/LeadsPanel', () => ({
   default: () => <div data-testid="leads-panel">CRM Leads Table</div>,
 }));
 
 // Mock ROIPanel to isolate testing
-vi.mock('@/src/app/components/ROIPanel', () => ({
+vi.mock('@/src/components/dashboard/ROIPanel', () => ({
   default: () => <div data-testid="roi-panel">ROI Financial Impact</div>,
 }));
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
 import BreadcrumbJsonLd from '@/src/components/seo/BreadcrumbJsonLd';
-import VaayuDocs from '@/src/app/components/VaayuDocs';
+import VaayuDocs from '@/src/components/features/VaayuDocs';
 
 export const metadata: Metadata = buildMetadata('docs');
 

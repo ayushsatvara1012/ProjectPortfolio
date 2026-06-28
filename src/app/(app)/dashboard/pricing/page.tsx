@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useUserRole } from '@/src/lib/context/UserContext';
-import Alert from '@/src/app/components/Alert';
+import Alert from '@/src/components/ui/Alert';
 // Checkout links resolved from the shared single source (also used by the
 // marketing /pricing page and the /subscribe continuation route).
 import { POLAR_URLS, POLAR_URLS_ANNUAL } from '@/src/lib/billing/checkout';

@@ -24,8 +24,8 @@ import uuid
 import psycopg2
 import pytest
 
-import byod_config
-from byod_config import (
+from core import byod_config
+from core.byod_config import (
     ConfigPropagation,
     invalidate_company_caches,
     propagate_config_change,

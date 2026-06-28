@@ -30,13 +30,13 @@ from urllib.parse import urlsplit, urlunsplit
 import psycopg2
 import pytest
 
-import byod_crypto
+from core import byod_crypto
 import byod_dataplane
-import byod_engine
-from byod_crypto import LocalKmsProvider
+from services import byod_engine
+from core.byod_crypto import LocalKmsProvider
 from byod_dsn import DsnValidationError, validate_db_url
 from byod_dataplane import RUNTIME_ROLE_NAME
-from byod_pool import PoolConfig, RoutingIntegrityError, TenantPoolRegistry
+from db.byod_pool import PoolConfig, RoutingIntegrityError, TenantPoolRegistry
 
 
 _PW = "S3cretPass_do_not_leak"

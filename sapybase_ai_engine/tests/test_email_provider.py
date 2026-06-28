@@ -5,7 +5,7 @@ the pure provider-selection and Resend payload logic, plus the no-op guards in
 send_transactional_email (which must never raise or attempt a send when
 unconfigured).
 """
-from email_provider import (
+from services.email_provider import (
     resolve_email_provider,
     build_resend_payload,
     email_from_header,

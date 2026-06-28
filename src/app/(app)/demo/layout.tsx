@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import VaayuLogo from '@/src/app/components/VaayuLogo';
+import VaayuLogo from '@/src/components/ui/VaayuLogo';
 import { isTrained, resetDemo } from '@/src/lib/demo/demoStorage';
 
 const TOP_NAV = [

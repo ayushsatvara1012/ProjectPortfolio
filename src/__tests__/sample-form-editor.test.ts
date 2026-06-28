@@ -6,7 +6,7 @@
  * the pure helpers (no rendering), per the chatwidget_hub.test.ts convention.
  */
 import { describe, it, expect } from 'vitest';
-import { slugifyFieldName, validateSampleForm } from '@/src/app/components/SampleFormEditor';
+import { slugifyFieldName, validateSampleForm } from '@/src/components/dashboard/SampleFormEditor';
 
 describe('slugifyFieldName', () => {
   it('lowercases and underscores spaces/dashes', () => {

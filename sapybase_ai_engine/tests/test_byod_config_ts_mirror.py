@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from config import CUSTOM_PLAN_FEATURE_KEYS, PLAN_LIMITS
+from core.config import CUSTOM_PLAN_FEATURE_KEYS, PLAN_LIMITS
 
 # repo_root/sapybase_ai_engine/tests/<this file>  →  parents[2] == repo root
 ENTITLEMENTS_TS = (

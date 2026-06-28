@@ -15,9 +15,9 @@ import uuid
 import psycopg2
 import pytest
 
-import byod_admin
+from api.routers import byod_admin
 import byod_probe
-from byod_admin import (
+from api.routers.byod_admin import (
     CompanyNotFound,
     ConnectionNotConfigured,
     MASKED_URL,
@@ -28,13 +28,13 @@ from byod_admin import (
     seed_byod_config,
     set_connection,
 )
-from byod_admin import test_dsn as run_test_dsn  # aliased: bare `test_dsn` would be collected as a test
+from api.routers.byod_admin import test_dsn as run_test_dsn  # aliased: bare `test_dsn` would be collected as a test
 import os
 
-from byod_crypto import LocalKmsProvider, load_decrypted_dsn, load_decrypted_runtime_dsn
+from core.byod_crypto import LocalKmsProvider, load_decrypted_dsn, load_decrypted_runtime_dsn
 from byod_dsn import DsnValidationError
-from byod_store import CONTROL_PLANE_SCHEMA_SQL, TenantDbStatus, get_tenant_db_record
-from config import CUSTOM_PLAN_FEATURE_KEYS
+from db.byod_store import CONTROL_PLANE_SCHEMA_SQL, TenantDbStatus, get_tenant_db_record
+from core.config import CUSTOM_PLAN_FEATURE_KEYS
 
 from .test_byod_probe import FakeDbError, make_fake_connector
 

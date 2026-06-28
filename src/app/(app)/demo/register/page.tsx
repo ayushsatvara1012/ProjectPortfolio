@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
-import { Card, SectionHeader, Badge, cx, card } from '@/src/app/components/insights/ui';
-import BotIntegrationDocs from '@/src/app/components/BotIntegrationDocs';
+import { Card, SectionHeader, Badge, cx, card } from '@/src/components/dashboard/insights/ui';
+import BotIntegrationDocs from '@/src/components/features/BotIntegrationDocs';
 
 // Mirrors the production CreateBotFlow look (bordered inputs, slim labels) so the
 // demo register screen is visually identical to /dashboard/register. The logic is

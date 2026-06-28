@@ -39,7 +39,7 @@ from pgvector.psycopg2 import register_vector
 from polar_sdk.webhooks import WebhookVerificationError, validate_event
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI
-from embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
+from core.embedding_config import get_embedding_model, EMBEDDING_DIMENSIONS
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader
@@ -480,7 +480,7 @@ def require_fresh_admin(request: Request):
 # ── Plan / model definitions — extracted to config.py ──
 # Re-exported so main.PLAN_LIMITS / get_plan() / get_tier_model() and the test
 # suite resolve unchanged. These are immutable; functions below read them here.
-from config import PLAN_LIMITS, MODEL_MAPPING, VALID_MODELS, UNLIMITED_PLAN
+from core.config import PLAN_LIMITS, MODEL_MAPPING, VALID_MODELS, UNLIMITED_PLAN
 
 # ── Monthly usage-period reset (Explore D2) ──────────────────────────────────
 # Pure decision logic lives in usage_period.py; the DB write is below. Reset is
@@ -494,7 +494,7 @@ from access_gate import is_dashboard_access_allowed
 
 # ── Signup routing (Explore §3, Phase B) ─────────────────────────────────────
 # Stamps the initial subscription_status on brand-new signups (PENDING/BLOCKED).
-from email_routing import initial_signup_status, signup_provisioning, explore_cta_route
+from services.email_routing import initial_signup_status, signup_provisioning, explore_cta_route
 
 # ── Enquiry approval (Explore §6, Phase C) ───────────────────────────────────
 # Signed one-click tokens + the pending→approved/rejected state machine.
@@ -730,7 +730,7 @@ print(f"POLAR PRODUCT MAP: {len(POLAR_PRODUCT_TIER_MAP)} products mapped: {sorte
 # the priority Gemini model (see MODEL_MAPPING) — so "ultra" is genuinely
 # both lower-latency model AND higher concurrent throughput.
 # ── Tier-aware per-minute caps — extracted to config.py (re-exported) ──
-from config import TIER_RATE_LIMITS
+from core.config import TIER_RATE_LIMITS
 
 
 # ── Widget session tokens (anti quota-drain) ─────────────────────────────────
@@ -1103,7 +1103,7 @@ app.add_middleware(RequestMetricsMiddleware)
 
 # 4. Define Request/Response Models — extracted to models.py and re-exported so
 # `from main import ChatRequest` (etc.) and the test suite resolve unchanged.
-from models import (
+from db.models import (
     RegisterRequest, ChatMessage, ChatRequest, ChatResponse, LeadCaptureRequest,
     ExploreEnquiryRequest, EnquiryDeclineRequest,
     SubscriptionRequest, HandoffMessage, HandoffRequest, UserRole, UserTier,
@@ -1115,24 +1115,24 @@ from models import (
 )
 
 # ── BYOD super-admin config logic (RFC Phase 2.1–2.3, §3.1) — dark until enabled ──
-import byod_admin
-import byod_client
+from api.routers import byod_admin
+from api.routers import byod_client
 import byod_probe
 import byod_dataplane
 import byod_health
-import byod_engine
+from services import byod_engine
 import byod_jobs
-import byod_config
+from core import byod_config
 import byod_metering
 import byod_ingest
-import byod_store
-import byod_insight_cache
+from db import byod_store
+from db import byod_insight_cache
 import byod_orchestrator
 import byod_switchin
 import byod_switchout
-import byod_crypto
+from core import byod_crypto
 from byod_dsn import DsnValidationError, validate_db_url
-from byod_crypto import KmsUnavailable, kms_from_env
+from core.byod_crypto import KmsUnavailable, kms_from_env
 
 # Wire the BYOD engine's control-plane accessors (Phase 3.2). Stores callables
 # only — nothing connects or builds a tenant pool here, so this is a no-op at
@@ -1227,19 +1227,19 @@ import input_safety
 from input_safety import _strip_control_tags, sanitize_message
 
 # ── Logo validation limits / allowlists — extracted to config.py (re-exported) ──
-from config import VALID_LOGO_SHAPES, BLOCKED_LOGO_URL_PATTERNS, MAX_LOGO_BYTES
+from core.config import VALID_LOGO_SHAPES, BLOCKED_LOGO_URL_PATTERNS, MAX_LOGO_BYTES
 
 # (ChatMessage … UserTier moved to models.py — re-exported above)
 
 # ── Custom plan feature keys / defaults — extracted to config.py (re-exported) ──
-from config import CUSTOM_PLAN_FEATURE_KEYS, CUSTOM_PLAN_DEFAULTS, BYOD_PLAN_DEFAULTS
+from core.config import CUSTOM_PLAN_FEATURE_KEYS, CUSTOM_PLAN_DEFAULTS, BYOD_PLAN_DEFAULTS
 
 # (CustomPlanConfig moved to models.py — re-exported above)
 
 
 # ── Custom plan access gate constants — extracted to config.py (re-exported) ──
 # The gate function (_check_custom_plan_gate) stays in main; these are its inputs.
-from config import _CUSTOM_PLAN_GATE_MESSAGES, _CUSTOM_PLAN_GATE_GRACE, _CUSTOM_PLAN_GATE_BLOCKED
+from core.config import _CUSTOM_PLAN_GATE_MESSAGES, _CUSTOM_PLAN_GATE_GRACE, _CUSTOM_PLAN_GATE_BLOCKED
 
 
 def _check_custom_plan_gate(
@@ -1329,7 +1329,7 @@ api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 
 # Pure parsing helpers extracted to parsing_utils.py; re-exported so
 # `from main import ...` / `main.X` and the test suite resolve unchanged.
-from parsing_utils import safe_json_loads, normalize_quick_questions
+from utils.parsing_utils import safe_json_loads, normalize_quick_questions
 
 # Vertical-pack machinery (chemical-vertical-agent plan, Phase 0). normalize_vertical
 # canonicalizes the raw companies.vertical value (NULL/garbage -> None = generic bot);
@@ -1348,8 +1348,8 @@ from packs import (
 )
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
-from agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, AGENT_FALLBACK_TEXT
-from agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
+from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, AGENT_FALLBACK_TEXT
+from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
 
 # Hard ceiling on the blocking vertical-agent precompute (Gemini tool-loop) so a
 # slow/overloaded model degrades to the fallback instead of hanging /api/chat
@@ -3258,7 +3258,7 @@ async def _fire_webhook(webhook_url: str, lead_data: dict, secret: str | None, c
     logger.error(f"WEBHOOK FIRE FAILED after {len(delays)} attempts: {webhook_url}")
 
 
-from slack_handoff import is_valid_slack_webhook, build_slack_lead_message
+from services.slack_handoff import is_valid_slack_webhook, build_slack_lead_message
 
 
 async def _fire_slack(slack_url: str, bot_name: str, lead: dict):
@@ -3292,7 +3292,7 @@ async def _fire_slack(slack_url: str, bot_name: str, lead: dict):
 # Transactional email transport: picks Resend → Gmail SMTP → no-op at send time.
 # `_email_from_header` is re-exported so `from main import _email_from_header`
 # (used by the test suite) keeps resolving.
-from email_provider import send_transactional_email, email_from_header as _email_from_header
+from services.email_provider import send_transactional_email, email_from_header as _email_from_header
 
 
 async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None):
@@ -3329,7 +3329,7 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
 
 
 # ── Real-time owner handoff for transactional agent actions (Phase 4b) ────────
-from agent_handoff import build_agent_request_slack_payload, build_agent_request_email
+from services.agent_handoff import build_agent_request_slack_payload, build_agent_request_email
 
 
 async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict):
@@ -3396,7 +3396,7 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
 
 # ── Instant HOT-lead alert (speed-to-lead) — pure builders in lead_alerts.py ──
 from lead_alerts import should_alert_hot_lead, build_hot_lead_email, resolve_alert_recipient
-from weekly_digest import (
+from services.weekly_digest import (
     iso_week_key, resolve_digest_recipient, summarize_leads,
     should_send_digest, build_digest_email,
 )
@@ -3431,7 +3431,7 @@ def _get_company_key(request: Request) -> str:
 # ── LEAD SCORING (deterministic, no LLM) — extracted to lead_scoring.py ──
 # Re-exported here so `from main import _score_lead` and `main._score_lead`
 # (used by endpoints and the test suite) keep resolving unchanged.
-from lead_scoring import (
+from services.lead_scoring import (
     _FREE_EMAIL_DOMAINS, _BUYING_KEYWORDS, _CONTACT_KEYWORDS,
     _email_domain, _score_lead,
 )

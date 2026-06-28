@@ -14,7 +14,7 @@ import threading
 import pytest
 
 from byod_breaker import BreakerConfig, BreakerOpen, BreakerState
-from byod_pool import (
+from db.byod_pool import (
     CeilingExceeded,
     PoolConfig,
     RoutingIntegrityError,

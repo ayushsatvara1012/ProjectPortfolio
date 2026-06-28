@@ -48,7 +48,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import byod_jobs
-import byod_schema
+from db import byod_schema
 
 logger = logging.getLogger(__name__)
 

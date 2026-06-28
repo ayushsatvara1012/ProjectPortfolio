@@ -16,8 +16,8 @@ import json
 
 import pytest
 
-import agent
-from agent import (
+from services import agent
+from services.agent import (
     AGENT_FALLBACK_TEXT,
     build_agent_directive,
     build_tool_schemas,
@@ -279,7 +279,7 @@ class TestExecuteTool:
 
 # ── request_quote (Phase 4a) ─────────────────────────────────────────────────
 
-from agent import request_quote  # noqa: E402
+from services.agent import request_quote  # noqa: E402
 
 
 class FakeSkuCursor:
@@ -434,7 +434,7 @@ class TestRequestQuote:
 
 # ── request_sample (Phase 4b) ────────────────────────────────────────────────
 
-from agent import request_sample  # noqa: E402
+from services.agent import request_sample  # noqa: E402
 
 
 class FakeProductCursor:

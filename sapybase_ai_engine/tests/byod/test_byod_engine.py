@@ -25,8 +25,8 @@ import psycopg2
 import pytest
 
 import byod_dataplane
-import byod_engine
-from byod_engine import (
+from services import byod_engine
+from services.byod_engine import (
     MAX_KNOWLEDGE_CONTENT_CHARS,
     MAX_URL_CHARS,
     TenantDataError,
@@ -34,7 +34,7 @@ from byod_engine import (
     sanitize_db_error,
     validate_knowledge_rows,
 )
-from byod_pool import CeilingExceeded, RoutingIntegrityError
+from db.byod_pool import CeilingExceeded, RoutingIntegrityError
 from byod_breaker import BreakerOpen
 
 from .tenant_harness import (

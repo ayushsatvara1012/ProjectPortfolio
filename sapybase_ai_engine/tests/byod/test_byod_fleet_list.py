@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 
-from byod_store import (
+from db.byod_store import (
     TenantDbStatus,
     TenantSummary,
     list_all_tenants,

@@ -3,7 +3,7 @@
 // TEMPORARY preview harness — verifies the gradient + noise metric cards. Delete after.
 
 import React from 'react';
-import { MetricCard } from '@/src/app/components/insights/ui';
+import { MetricCard } from '@/src/components/dashboard/insights/ui';
 
 const totals = [8, 12, 9, 14, 18, 11, 7, 13, 22, 19, 16, 24, 28, 21, 17, 26, 31, 29, 23, 33, 27, 19, 25, 34, 30, 22, 28, 36, 32, 25];
 const unanswered = [2, 3, 1, 4, 3, 2, 1, 3, 5, 4, 3, 4, 6, 3, 2, 4, 5, 3, 2, 4, 3, 1, 2, 3, 2, 1, 2, 3, 2, 1];

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import ChatWidget from '@/src/app/components/ChatWidget';
-import EmbedBootstrapper from '@/src/app/components/EmbedBootstrapper';
+import ChatWidget from '@/src/components/chat/ChatWidget';
+import EmbedBootstrapper from '@/src/components/chat/EmbedBootstrapper';
 
 async function getBotConfig(botId: string) {
   try {

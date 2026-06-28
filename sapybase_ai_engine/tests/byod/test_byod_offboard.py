@@ -29,9 +29,9 @@ import psycopg2
 import pytest
 
 import byod_dataplane
-import byod_engine
-import byod_store
-from byod_store import (
+from services import byod_engine
+from db import byod_store
+from db.byod_store import (
     TenantDbStatus,
     delete_tenant_db_record,
     get_tenant_db_record,

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
-import UpgradePrompt from '@/src/app/components/UpgradePrompt';
+import UpgradePrompt from '@/src/components/features/UpgradePrompt';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
@@ -18,15 +19,22 @@ import {
     SkeletonBlock,
     TrendChart,
     TrendPoint,
-} from '@/src/app/components/insights/ui';
+} from '@/src/components/dashboard/insights/ui';
 
-// Code-split panels — each renders its own loading state
-const SalesAndLeadsPanel = dynamic(() => import('@/src/app/components/SalesAndLeadsPanel'));
-const QuoteRequestsPanel = dynamic(() => import('@/src/app/components/QuoteRequestsPanel'));
-const AgentRequestsPanel = dynamic(() => import('@/src/app/components/AgentRequestsPanel'));
-const ConversationsPanel = dynamic(() => import('@/src/app/components/ConversationsPanel'));
-const FunnelPanel = dynamic(() => import('@/src/app/components/FunnelPanel'));
-const PipelineKpisStrip = dynamic(() => import('@/src/app/components/PipelineKpis'));
+// Code-split panels — explicit loading fallbacks prevent React.lazy from
+// suspending up to the layout's <Suspense fallback={null}> which would
+// unmount the entire page (including the tab header) while chunks load.
+const PanelSkeleton = () => (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-pulse">
+        {[1, 2, 3, 4].map((i) => <div key={i} className="h-[110px] rounded-xl bg-slate-200/60 dark:bg-slate-800/60" />)}
+    </div>
+);
+const SalesAndLeadsPanel = dynamic(() => import('@/src/components/dashboard/SalesAndLeadsPanel'), { loading: PanelSkeleton });
+const QuoteRequestsPanel = dynamic(() => import('@/src/components/dashboard/QuoteRequestsPanel'), { loading: PanelSkeleton });
+const AgentRequestsPanel = dynamic(() => import('@/src/components/dashboard/AgentRequestsPanel'), { loading: PanelSkeleton });
+const ConversationsPanel = dynamic(() => import('@/src/components/dashboard/ConversationsPanel'), { loading: PanelSkeleton });
+const FunnelPanel = dynamic(() => import('@/src/components/dashboard/FunnelPanel'), { loading: PanelSkeleton });
+const PipelineKpisStrip = dynamic(() => import('@/src/components/dashboard/PipelineKpis'), { loading: PanelSkeleton });
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Activity series helpers — everything below is derived from REAL daily data.  */
@@ -360,19 +368,6 @@ export default function AppInsights() {
 
     const isLoaded = !ctxLoading && !botsLoading;
 
-    if (!isLoaded) {
-        return (
-            <div className="flex flex-col h-full">
-                <div className="px-4 md:px-6 lg:px-8 h-12 shrink-0 border-b border-slate-200 dark:border-slate-800 flex items-center gap-6">
-                    {['w-28', 'w-24', 'w-32'].map((w) => <SkeletonBlock key={w} className={cx('h-4', w)} />)}
-                </div>
-                <div className="p-4 md:p-6 lg:p-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    {[1, 2, 3, 4].map((i) => <SkeletonBlock key={i} className="h-[110px]" />)}
-                </div>
-            </div>
-        );
-    }
-
     const botSelector = canAnalytics && bots.length > 1 && (
         <div className="relative">
             <select
@@ -391,7 +386,7 @@ export default function AppInsights() {
         <button
             onClick={() => handleGenerate(false)}
             disabled={isGenerating || !selectedBotId}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+            className="inline-flex items-center justify-center gap-1.5 px-2.5 text-[12.5px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-40 transition-colors focus-visible:outline-none"
             title="Generate insights"
             aria-label="Generate insights"
         >
@@ -434,11 +429,6 @@ export default function AppInsights() {
                     {generateBtn}
                 </div>
             </div>
-            {activeTab === 'funnel' && lastGeneratedAt && (
-                <div className="px-4 md:px-6 lg:px-8 pb-1.5 -mt-1">
-                    <span className="text-[11px] text-slate-400 dark:text-slate-500">Insights last generated {lastGeneratedAt}</span>
-                </div>
-            )}
         </div>
     );
 
@@ -447,6 +437,24 @@ export default function AppInsights() {
             {renderHeader()}
 
             <div data-lenis-prevent className="flex-1 w-full min-w-0 overflow-y-auto custom-scrollbar flex flex-col p-4 md:p-6 lg:p-8">
+                {!isLoaded ? (
+                    <PanelSkeleton />
+                ) : (<>
+                {activeTab === 'funnel' && lastGeneratedAt && (
+                    <div className="flex justify-center w-full pb-4 -mt-2">
+                        <span className="text-[11.5px] font-medium text-slate-400 dark:text-slate-500">Insights last generated {lastGeneratedAt}</span>
+                    </div>
+                )}
+                <Suspense fallback={<PanelSkeleton />}>
+                <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex flex-col flex-1"
+                >
                 {activeTab === 'sales' && (
                     <div className="flex flex-col gap-6 w-full min-w-0">
                         {/* Chemical Pipeline leads with its order pipeline (quotes +
@@ -536,7 +544,7 @@ export default function AppInsights() {
                             <div className="flex items-center gap-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3">
                                 <span className="material-symbols-outlined text-[18px] text-rose-500">error</span>
                                 <p className="text-[13.5px] text-rose-700 dark:text-rose-300 flex-1">{error}</p>
-                                <button onClick={() => setError('')} aria-label="Dismiss error"><span className="material-symbols-outlined text-[18px] text-rose-400">close</span></button>
+                                <button onClick={() => setError('')} aria-label="Dismiss error" className="p-2 -m-2 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"><span className="material-symbols-outlined text-[18px] text-rose-400">close</span></button>
                             </div>
                         )}
 
@@ -566,6 +574,10 @@ export default function AppInsights() {
                         )}
                     </div>
                 )}
+                </motion.div>
+                </AnimatePresence>
+                </Suspense>
+                </>)}
             </div>
         </div>
     );

@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-import byod_store
+from db import byod_store
 from byod_switchin import (
     SWITCHIN_TABLES,
     TableSpec,

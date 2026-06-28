@@ -2,14 +2,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Alert from '@/src/app/components/Alert';
+import Alert from '@/src/components/ui/Alert';
 import { useAuth } from '@clerk/nextjs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
-import UpgradePrompt from '@/src/app/components/UpgradePrompt';
+import UpgradePrompt from '@/src/components/features/UpgradePrompt';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 import { trainUrlSchema, trainTextSchema } from '@/src/lib/validation/schemas';
-import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/app/components/insights/ui';
+import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/components/dashboard/insights/ui';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Local design tokens — mirror the Insights MetricCard surface so the Train    */

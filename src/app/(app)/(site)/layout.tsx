@@ -1,5 +1,5 @@
-import Navbar from '@/src/app/components/Navbar';
-import Footer from '@/src/app/components/Footer';
+import Navbar from '@/src/components/layout/Navbar';
+import Footer from '@/src/components/layout/Footer';
 import ClientEffects from '@/src/app/client-effects';
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {

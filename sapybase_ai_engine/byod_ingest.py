@@ -40,7 +40,7 @@ from typing import (
     Tuple,
 )
 
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 logger = logging.getLogger(__name__)
 

@@ -22,10 +22,10 @@ import uuid
 import psycopg2
 import pytest
 
-import byod_admin
-import byod_client
-import byod_store
-from byod_client import (
+from api.routers import byod_admin
+from api.routers import byod_client
+from db import byod_store
+from api.routers.byod_client import (
     CLIENT_EDITABLE_STATUSES,
     CLIENT_REQUIREMENTS,
     REQUEST_KINDS,
@@ -36,9 +36,9 @@ from byod_client import (
     request_change,
     set_own_connection,
 )
-from byod_crypto import LocalKmsProvider, load_decrypted_dsn
+from core.byod_crypto import LocalKmsProvider, load_decrypted_dsn
 from byod_dsn import DsnValidationError
-from byod_store import (
+from db.byod_store import (
     CONTROL_PLANE_SCHEMA_SQL,
     TenantDbStatus,
     get_tenant_db_record,

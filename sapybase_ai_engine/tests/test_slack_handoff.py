@@ -6,7 +6,7 @@ handling of missing data.
 """
 import json
 
-from slack_handoff import is_valid_slack_webhook, build_slack_lead_message
+from services.slack_handoff import is_valid_slack_webhook, build_slack_lead_message
 
 
 class TestIsValidSlackWebhook:

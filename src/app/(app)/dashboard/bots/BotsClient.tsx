@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
-import UpgradePrompt from '@/src/app/components/UpgradePrompt';
-import DemoMigrationBanner from '@/src/app/components/DemoMigrationBanner';
+import { SkeletonBase } from '@/src/components/ui/SkeletonLoader';
+import UpgradePrompt from '@/src/components/features/UpgradePrompt';
+import DemoMigrationBanner from '@/src/components/features/DemoMigrationBanner';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
-import CreateBotFlow from '@/src/app/components/CreateBotFlow';
+import CreateBotFlow from '@/src/components/features/CreateBotFlow';
 import { deleteBot } from './actions';
 
 // Large, scrollable modal that hosts the shared bot-creation flow. Opening it

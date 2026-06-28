@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import pytest
 
-import byod_engine
+from services import byod_engine
 import byod_routing_cache
 from byod_routing_cache import RoutingDecision, RoutingDecisionCache
-from byod_store import TenantDbStatus
+from db.byod_store import TenantDbStatus
 
 CID = "11111111-1111-4111-8111-111111111111"
 

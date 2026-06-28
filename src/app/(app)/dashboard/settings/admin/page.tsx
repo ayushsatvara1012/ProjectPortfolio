@@ -6,7 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
-import SkeletonLoader from '@/src/app/components/SkeletonLoader';
+import SkeletonLoader from '@/src/components/ui/SkeletonLoader';
 import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
 import ExploreEnquiriesTab from './ExploreEnquiriesTab';
 import ByodTab from './ByodTab';

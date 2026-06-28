@@ -39,7 +39,7 @@ _ENGINE_ROOT = Path(__file__).resolve().parents[2]
 if str(_ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(_ENGINE_ROOT))
 
-from embedding_config import EMBEDDING_DIMENSIONS  # noqa: E402
+from core.embedding_config import EMBEDDING_DIMENSIONS  # noqa: E402
 
 # Default pgvector image for the local (testcontainers) path. pg16 ships a
 # recent pgvector with HNSW support.

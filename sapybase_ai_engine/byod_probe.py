@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
 from byod_dsn import validate_db_url
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 # A connector takes a DSN and returns an open DB-API connection (cursor/rollback/
 # close). Injectable so the probe is testable without a real Postgres.

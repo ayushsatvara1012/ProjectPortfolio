@@ -25,7 +25,7 @@ from byod_probe import (
     VectorDimensionUnsupported,
     probe_tenant_database,
 )
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 GOOD_DSN = "postgresql://app:s3cr3t@db.tenant.example.com:5432/tenantdb?sslmode=require"
 

@@ -40,7 +40,7 @@ import os
 from typing import Callable, Optional
 from urllib.parse import quote, urlsplit, urlunsplit
 
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 # Bumped whenever the data-plane DDL below changes (expand->migrate->contract,
 # §8.2). Recorded in the control-plane schema_version registry (§8.1) so the

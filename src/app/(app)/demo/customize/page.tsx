@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
-import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/app/components/avatar/AvatarShared';
-import BotPreview from '@/src/app/components/BotPreview';
-import { BotAvatar } from '@/src/app/components/LogoCustomizer';
+import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/components/ui/avatar/AvatarShared';
+import BotPreview from '@/src/components/chat/BotPreview';
+import { BotAvatar } from '@/src/components/features/LogoCustomizer';
 import { BotSettingsContext } from '@/src/lib/context/BotSettingsContext';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -452,6 +452,7 @@ export default function DemoCustomizePage() {
                             fetchSettings: async () => {},
                             isLoading: false,
                             isSaving: false,
+                            isDirty: false,
                             error: null,
                             previewOpen: false,
                             setPreviewOpen: () => {},

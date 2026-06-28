@@ -7,8 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Zap, Rocket } from 'lucide-react';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
-import Alert from '@/src/app/components/Alert';
-import { SkeletonBase } from '@/src/app/components/SkeletonLoader';
+import Alert from '@/src/components/ui/Alert';
+import { SkeletonBase } from '@/src/components/ui/SkeletonLoader';
 
 // ── Tier metadata ──
 const TIER_META: Record<string, any> = {

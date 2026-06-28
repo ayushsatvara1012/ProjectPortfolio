@@ -22,7 +22,7 @@ import {
     DonutChart,
     HorizontalBars,
     badgeToneFor,
-} from '@/src/app/components/insights/ui';
+} from '@/src/components/dashboard/insights/ui';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Time and formatting helpers

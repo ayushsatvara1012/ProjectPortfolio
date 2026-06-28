@@ -22,8 +22,8 @@ import json
 
 import pytest
 
-import byod_insight_cache
-from byod_insight_cache import (
+from db import byod_insight_cache
+from db.byod_insight_cache import (
     InsightCache,
     NullInsightCache,
     from_env,

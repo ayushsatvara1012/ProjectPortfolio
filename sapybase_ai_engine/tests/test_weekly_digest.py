@@ -6,7 +6,7 @@ empty-week skip, and HTML-injection escaping in the digest email.
 """
 from datetime import datetime, timezone
 
-from weekly_digest import (
+from services.weekly_digest import (
     iso_week_key,
     resolve_digest_recipient,
     summarize_leads,

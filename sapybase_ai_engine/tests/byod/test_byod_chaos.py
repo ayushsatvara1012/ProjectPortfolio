@@ -24,12 +24,12 @@ from contextlib import contextmanager
 
 import pytest
 
-import byod_crypto
-import byod_dsn_cache
-import byod_engine
+from core import byod_crypto
+from db import byod_dsn_cache
+from services import byod_engine
 from byod_breaker import BreakerConfig, BreakerRegistry, BreakerState
-from byod_crypto import KmsUnavailable, LocalKmsProvider
-from byod_engine import TenantDataError
+from core.byod_crypto import KmsUnavailable, LocalKmsProvider
+from services.byod_engine import TenantDataError
 
 
 # ── KMS outage: serve from the decrypted-DSN cache (§16.5) ───────────────────────

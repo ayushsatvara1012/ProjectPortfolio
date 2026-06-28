@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 from typing import Callable, List, Sequence
 from urllib.parse import parse_qsl, urlparse
 
-from config import BLOCKED_LOGO_URL_PATTERNS
+from core.config import BLOCKED_LOGO_URL_PATTERNS
 
 # Accepted URI schemes for a Postgres connection string.
 _ALLOWED_SCHEMES = frozenset({"postgres", "postgresql"})

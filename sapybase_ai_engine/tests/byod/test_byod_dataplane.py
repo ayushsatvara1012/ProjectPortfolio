@@ -22,7 +22,7 @@ from byod_dataplane import (
     RUNTIME_ROLE_NAME,
     build_runtime_dsn,
 )
-from embedding_config import EMBEDDING_DIMENSIONS
+from core.embedding_config import EMBEDDING_DIMENSIONS
 
 GOOD_DSN = "postgresql://owner:s3cr3t@db.tenant.example.com:5432/tenantdb?sslmode=require"
 

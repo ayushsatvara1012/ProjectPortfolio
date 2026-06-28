@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Alert from '@/src/app/components/Alert';
+import Alert from '@/src/components/ui/Alert';
 import { parseFileToChunks } from '@/src/lib/demo/demoRag';
 import { saveKnowledge, getKnowledge, clearKnowledge, getBotConfig } from '@/src/lib/demo/demoStorage';
-import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/app/components/insights/ui';
+import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/components/dashboard/insights/ui';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Local design tokens — mirror the dashboard Train AI surface so the demo KPI  */

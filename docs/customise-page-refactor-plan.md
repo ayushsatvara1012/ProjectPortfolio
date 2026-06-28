@@ -61,6 +61,16 @@
 - Preview in customize page matches the real widget pixel-for-pixel.
 - Preview updates live as settings change.
 
+### Phase 4: UX polish — low risk
+**Files**: `customize/page.tsx`, `BotSettingsContext.tsx`
+
+- **Unsaved changes guard**: snapshot `botSettings` after each fetch/save, compare for dirty state. Show a pulsing dot on the save button when dirty. Wire `beforeunload` to warn before navigating away with unsaved changes.
+- **Tab transition animations**: wrap tab content in framer-motion `AnimatePresence` with a subtle vertical slide + fade. Keyed by `activeTab` so the old content exits before the new enters.
+- **Keyboard save (Cmd+S / Ctrl+S)**: global keydown handler on the page, calls `handleSave`. Prevent default so the browser "Save page" dialog doesn't fire.
+- **Toast auto-dismiss**: success alerts auto-close after 3s; error alerts stay until manually dismissed.
+
+**Verify**: Dirty dot appears on first edit, clears on save. Navigating away with unsaved changes shows browser confirm. Cmd+S saves. Tab switches have smooth animation. Success toast fades.
+
 ## Risk notes
 
 - Phase 3 modifies the production widget (`ChatWidget.tsx`). The `previewConfig` prop is strictly additive — absence = no change. Test both generic and chemical bots before merging.
@@ -73,3 +83,6 @@
 - [ ] Preview matches real widget exactly
 - [ ] All tests pass (frontend + backend + tsc)
 - [ ] No regression on generic (non-chemical) bots
+- [ ] Dirty dot + beforeunload guard works
+- [ ] Cmd+S saves, tab transitions animate
+- [ ] Success toast auto-dismisses after 3s

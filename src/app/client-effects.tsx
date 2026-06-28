@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Analytics } from '@vercel/analytics/next';
-import UpgradePrompt from './components/UpgradePrompt';
-import type { UpgradePromptProps } from './components/UpgradePrompt';
+import UpgradePrompt from '../components/features/UpgradePrompt';
+import type { UpgradePromptProps } from '../components/features/UpgradePrompt';
 
 type UpgradeDetail = Pick<UpgradePromptProps, 'code' | 'tier' | 'current' | 'limit'>;
 
