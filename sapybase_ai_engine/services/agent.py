@@ -314,17 +314,46 @@ _SKU_COLS = (
 
 
 def _norm_pack(s: object) -> str:
-    """Loose pack-size key for tolerant matching (mirrors the ingest normaliser):
-    '2.5 Litre' / '2.5 ltr' / '2.5L' all collapse to the same key as '2.5 Ltr'."""
+    """Canonical pack-size key for exact, collision-free matching.
+
+    Converts a size to a NUMERIC BASE UNIT so every spelling of the same size
+    collapses to one key AND different sizes never collide:
+      '5 Ltr' / '5L' / '5 litre' / '5000 ml'  -> '5000ml'
+      '2.5 Ltr'                                -> '2500ml'
+      '35 Kg' / '35000 g'                      -> '35000g'
+
+    This replaces the old letter-form key ('5 l'), which was BOTH unreliable
+    (stored pack_size_norm could be '5000 ml', never equal to '5 l') and unsafe
+    for substring matching ('5 l' is a substring of '2.5 l', so a 5 Ltr query
+    wrongly matched the 2.5 Ltr SKU and surfaced two prices as 'ambiguous').
+
+    Unparseable input (no number+unit) falls back to whitespace-collapsed text so
+    a non-standard pack still compares equal to an identical non-standard pack.
+    """
     import re
-    t = (s if isinstance(s, str) else "").lower().strip().rstrip(".")
-    t = t.replace("litres", "l").replace("liters", "l").replace("litre", "l")
-    t = t.replace("liter", "l").replace("ltr", "l").replace("lit", "l")
-    t = t.replace("millilitre", "ml").replace("milliliter", "ml")
-    t = t.replace("gram", "g").replace("gms", "g").replace("gm", "g")
-    t = t.replace("kilogram", "kg").replace("kgs", "kg")
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
+    t = (s if isinstance(s, str) else "").lower().strip()
+    # Last number+unit pair wins (handles '8 x 500 ml' -> the 500 ml size).
+    matches = re.findall(
+        r"(\d+(?:\.\d+)?)\s*"
+        r"(kilograms?|kgs?|kg|grams?|gms?|gm|g|"
+        r"millilitres?|milliliters?|ml|litres?|liters?|ltrs?|ltr|lit|l)\b",
+        t,
+    )
+    if not matches:
+        return re.sub(r"\s+", " ", t)
+    num_str, unit = matches[-1]
+    num = float(num_str)
+    if unit in ("kg", "kgs", "kilogram", "kilograms"):
+        base, u = num * 1000, "g"
+    elif unit in ("g", "gm", "gms", "gram", "grams"):
+        base, u = num, "g"
+    elif unit in ("ml", "millilitre", "millilitres", "milliliter", "milliliters"):
+        base, u = num, "ml"
+    else:  # litre family → millilitres
+        base, u = num * 1000, "ml"
+    if base == int(base):
+        base = int(base)
+    return f"{base}{u}"
 
 
 def _parse_qty(v: object) -> int:
@@ -442,10 +471,12 @@ def request_quote(
         return {"status": "needs_pack", "product": product, "grade": grade_sel,
                 "pack_sizes": packs[:20],
                 "message": f"Ask which pack size of {product} ({grade_sel}) they need."}
+    # Canonicalise BOTH sides from the human pack_size text (r[3]) — the stored
+    # pack_size_norm (r[4]) is unreliable (uploads use different formats) and the
+    # old substring fallback collided '5 Ltr' with '2.5 Ltr'. Exact canonical
+    # match only: '5 Ltr' -> '5000ml' matches the 5 Ltr SKU and nothing else.
     pnorm = _norm_pack(pack_in)
-    prows = [r for r in grows if (r[4] or _norm_pack(r[3])) == pnorm]
-    if not prows:
-        prows = [r for r in grows if pnorm and pnorm in _norm_pack(r[3])]
+    prows = [r for r in grows if r[3] and _norm_pack(r[3]) == pnorm]
     if not prows:
         return {"status": "not_found_sku", "product": product, "grade": grade_sel,
                 "pack_sizes": packs[:20],

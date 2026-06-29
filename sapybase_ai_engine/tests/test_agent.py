@@ -322,7 +322,32 @@ class TestExecuteTool:
 
 # ── request_quote (Phase 4a) ─────────────────────────────────────────────────
 
-from services.agent import request_quote  # noqa: E402
+from services.agent import request_quote, _norm_pack  # noqa: E402
+
+
+class TestNormPack:
+    """Pack-size canonicalisation: same size collapses, different sizes never."""
+
+    def test_spellings_collapse_to_one_key(self):
+        keys = {_norm_pack(x) for x in ("5 Ltr", "5L", "5 litre", "5000 ml")}
+        assert keys == {"5000ml"}
+
+    def test_fractional_litre(self):
+        assert _norm_pack("2.5 Ltr") == "2500ml" == _norm_pack("2.5 litre")
+
+    def test_mass_to_grams(self):
+        assert _norm_pack("35 Kg") == "35000g" == _norm_pack("35000 g")
+
+    def test_different_sizes_never_collide(self):
+        assert _norm_pack("5 Ltr") != _norm_pack("2.5 Ltr")   # the reported bug
+        assert _norm_pack("5 Ltr") != _norm_pack("25 Ltr")
+        assert _norm_pack("500 ml") != _norm_pack("5 Ltr")
+
+    def test_last_size_wins_for_multipack_text(self):
+        assert _norm_pack("8 x 500 ml") == "500ml"
+
+    def test_unparseable_falls_back_to_text(self):
+        assert _norm_pack("sample") == "sample"
 
 
 class FakeSkuCursor:
@@ -406,6 +431,32 @@ class TestRequestQuote:
         out = request_quote(cur, CID, product_name="acetone", grade="AR",
                             pack_size="2.5 litre")   # spelling variant
         assert out["status"] == "quoted"
+
+    def test_pack_match_no_cross_size_collision(self):
+        # Regression: '5 Litre' must resolve to ONLY the 5 Ltr SKU. The old
+        # substring key ('5 l' is a substring of '2.5 l') pulled in the 2.5 Ltr
+        # row too, and the two prices surfaced as a false 'ambiguous_price'.
+        cur = FakeSkuCursor(name_exact=[
+            _sku(grade="LR", pack="500 ml", code="c1", price=230),
+            _sku(grade="LR", pack="2.5 Ltr", code="c2", price=510),
+            _sku(grade="LR", pack="5 Ltr", code="c3", price=950),
+        ])
+        out = request_quote(cur, CID, product_name="acetone", grade="LR",
+                            pack_size="5 Litre")
+        assert out["status"] == "quoted"
+        assert out["unit_price"] == 950.0
+
+    def test_pack_match_ignores_inconsistent_stored_norm(self):
+        # The stored pack_size_norm can be a foreign format ('5000 ml') the query
+        # key never equals — matching must rely on the pack_size text, not r[4].
+        cur = FakeSkuCursor(name_exact=[
+            _sku(grade="LR", pack="2.5 Ltr", norm="2500 ml", code="c2", price=510),
+            _sku(grade="LR", pack="5 Ltr", norm="5000 ml", code="c3", price=950),
+        ])
+        out = request_quote(cur, CID, product_name="acetone", grade="LR",
+                            pack_size="5 Ltr")
+        assert out["status"] == "quoted"
+        assert out["unit_price"] == 950.0
 
     def test_quantity_defaults_to_one_when_missing_or_invalid(self):
         for qty in (None, "0", "-5", "abc"):
