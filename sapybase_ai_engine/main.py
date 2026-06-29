@@ -186,6 +186,63 @@ def normalize_source_url(url: str) -> str:
     return normalised
 
 
+def _df_to_documents(df, source_name: str, sheet_label: str = "") -> List[Document]:
+    """Turn one cleaned DataFrame into per-row RAG Documents.
+
+    Shared by ``parse_tabular_to_docs`` (normal tabular upload) and the catalog
+    auto-import path (for sheets that don't match a structured table) so the
+    chunk format and metadata never diverge. Returns [] for a header-less or
+    empty frame (the caller decides whether that's an error).
+
+    Chunk format per row: ``<header1>: <value1> | <header2>: <value2> | ...``
+    prefixed with ``[Sheet: <label>]`` when the source had named sheets.
+    """
+    import re as _re
+    MAX_CELL_CHARS = 500
+
+    # Deduplicate column names (Product, Product → Product, Product_1).
+    seen: dict = {}
+    new_cols = []
+    for col in df.columns:
+        col_str = str(col).strip()
+        if col_str in seen:
+            seen[col_str] += 1
+            new_cols.append(f"{col_str}_{seen[col_str]}")
+        else:
+            seen[col_str] = 0
+            new_cols.append(col_str)
+    df = df.copy()
+    df.columns = new_cols
+
+    real_headers = [c for c in df.columns if not _re.match(r"^(\d+|Unnamed: \d+)$", c)]
+    if not real_headers:
+        return []
+
+    df = df.replace("", float("nan")).dropna(how="all").fillna("")
+    if df.empty:
+        return []
+
+    meta = {"source": source_name}
+    if sheet_label:
+        meta["sheet"] = sheet_label
+
+    out: List[Document] = []
+    for _, row in df.iterrows():
+        parts = []
+        for col in df.columns:
+            val = str(row[col]).strip()
+            if not val:
+                continue
+            if len(val) > MAX_CELL_CHARS:
+                val = val[:MAX_CELL_CHARS] + "…"
+            parts.append(f"{col}: {val}")
+        if not parts:
+            continue
+        prefix = f"[Sheet: {sheet_label}] " if sheet_label else ""
+        out.append(Document(page_content=prefix + " | ".join(parts), metadata=meta))
+    return out
+
+
 def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) -> List[Document]:
     """
     Convert a CSV or Excel file into a list of LangChain Documents suitable for
@@ -320,55 +377,21 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
         sheet_pairs = loaded  # list[tuple[str, DataFrame]] from Excel
 
     docs: List[Document] = []
+    saw_header = False
 
     for sheet_label, df in sheet_pairs:
-        # Deduplicate column names per sheet.
-        seen: dict = {}
-        new_cols = []
-        for col in df.columns:
-            col_str = str(col).strip()
-            if col_str in seen:
-                seen[col_str] += 1
-                new_cols.append(f"{col_str}_{seen[col_str]}")
-            else:
-                seen[col_str] = 0
-                new_cols.append(col_str)
-        df.columns = new_cols
+        sheet_docs = _df_to_documents(df, source_name, sheet_label)
+        if sheet_docs:
+            saw_header = True
+        docs.extend(sheet_docs)
 
-        real_headers = [c for c in df.columns if not re.match(r"^(\d+|Unnamed: \d+)$", c)]
-        if not real_headers:
-            if sheet_label:
-                continue  # skip header-less sheets silently; other sheets may be fine
+    if not docs:
+        # Distinguish "no header at all" (CSV / single sheet) from "had headers
+        # but every row was blank" to keep the original, actionable messages.
+        if not saw_header and len(sheet_pairs) == 1 and not sheet_pairs[0][0]:
             raise ValueError(
                 "The file has no header row. Add column names in the first row (e.g. 'Product', 'Price', 'Description') and re-upload."
             )
-
-        df = df.replace("", float("nan")).dropna(how="all").fillna("")
-        if df.empty:
-            continue
-
-        meta = {"source": source_name}
-        if sheet_label:
-            meta["sheet"] = sheet_label
-
-        for _, row in df.iterrows():
-            parts = []
-            for col in df.columns:
-                val = str(row[col]).strip()
-                if not val:
-                    continue
-                if len(val) > MAX_CELL_CHARS:
-                    val = val[:MAX_CELL_CHARS] + "…"
-                parts.append(f"{col}: {val}")
-
-            if not parts:
-                continue
-
-            prefix = f"[Sheet: {sheet_label}] " if sheet_label else ""
-            chunk_text = prefix + " | ".join(parts)
-            docs.append(Document(page_content=chunk_text, metadata=meta))
-
-    if not docs:
         raise ValueError("No usable data rows found in the file.")
 
     return docs
@@ -1377,6 +1400,7 @@ from packs import (
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, AGENT_FALLBACK_TEXT
 from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
+from services import catalog_import as catalog_import
 
 # Hard ceiling on the blocking vertical-agent precompute (Gemini tool-loop) so a
 # slow/overloaded model degrades to the fallback instead of hanging /api/chat
@@ -6153,19 +6177,20 @@ async def train_chatbot(
 
         if company_id:
             cursor.execute(
-                "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+                "SELECT id, vertical FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
                 (company_id, current_user["id"])
             )
         elif api_key:
             hashed = hashlib.sha256(api_key.encode()).hexdigest()
-            cursor.execute("SELECT id FROM companies WHERE api_key = %s", (hashed,))
+            cursor.execute("SELECT id, vertical FROM companies WHERE api_key = %s", (hashed,))
         else:
-            cursor.execute("SELECT id FROM companies WHERE user_id = %s LIMIT 1", (current_user["id"],))
+            cursor.execute("SELECT id, vertical FROM companies WHERE user_id = %s LIMIT 1", (current_user["id"],))
 
         company_row = cursor.fetchone()
         if not company_row:
             raise HTTPException(status_code=404, detail="Company not found or invalid API key.")
         resolved_company_id = company_row[0]
+        resolved_vertical = company_row[1] if len(company_row) > 1 else None
 
         plan = get_plan(current_user["tier"], role=current_user.get("role"), custom_plan_config=current_user.get("custom_plan_config"))
         limit = plan["chunks"]
@@ -6315,11 +6340,96 @@ async def train_chatbot(
             if os.path.exists(temp_pdf_path):
                 os.remove(temp_pdf_path)
 
+    catalog_import_summary: list[str] = []
+    catalog_warnings: list[str] = []
+
     if csv_file:
         try:
             csv_bytes = await csv_file.read()
-            tabular_docs = parse_tabular_to_docs(csv_bytes, csv_file.filename, pending_source_name)
-            docs.extend(tabular_docs)
+            pack = load_pack(resolved_vertical)
+            catalog_tables = pack.catalog_tables if pack else ()
+
+            if catalog_tables:
+                # Vertical bot: route catalog-shaped sheets into structured tables
+                # (products / product_skus) and embed the rest as RAG knowledge.
+                import pandas as pd
+                from io import BytesIO
+
+                fname = csv_file.filename.lower()
+                # 1. Read every sheet RAW (header=None) so the header row can be
+                #    detected — title/logo rows above it are skipped.
+                raw_sheets: list[tuple[str, "pd.DataFrame"]] = []
+                if fname.endswith((".xlsx", ".xls")):
+                    engine = "openpyxl" if fname.endswith(".xlsx") else None
+                    all_sheets = pd.read_excel(
+                        BytesIO(csv_bytes), dtype=str, keep_default_na=False,
+                        engine=engine, header=None, sheet_name=None,
+                    )
+                    raw_sheets = [(str(n), d) for n, d in all_sheets.items()]
+                else:  # CSV — one unnamed pseudo-sheet
+                    for enc in ("utf-8", "utf-8-sig", "latin-1", "cp1252"):
+                        try:
+                            raw_csv = pd.read_csv(
+                                BytesIO(csv_bytes), dtype=str, encoding=enc,
+                                keep_default_na=False, header=None,
+                            )
+                            raw_sheets = [("", raw_csv)]
+                            break
+                        except UnicodeDecodeError:
+                            continue
+
+                # 2. Fetch the catalog tables' real columns + types once.
+                db_schema: dict[str, dict[str, str]] = {}
+                schema_conn = get_db_connection()
+                try:
+                    sc = schema_conn.cursor()
+                    for ct in catalog_tables:
+                        sc.execute(
+                            "SELECT column_name, data_type FROM information_schema.columns "
+                            "WHERE table_name = %s AND column_name NOT IN "
+                            "('id', 'created_at', 'updated_at', 'company_id') "
+                            "ORDER BY ordinal_position",
+                            (ct.table_name,),
+                        )
+                        db_schema[ct.table_name] = {row[0]: row[1] for row in sc.fetchall()}
+                    sc.close()
+                finally:
+                    release_db_connection(schema_conn)
+
+                # 3. Plan (pure) — classify, clean, safety-gate. May raise
+                #    CatalogImportError (zero valid rows → never wipe).
+                plan = catalog_import.plan_catalog_import(
+                    raw_sheets, catalog_tables, db_schema,
+                )
+
+                # 4. Apply all structured tables in ONE transaction.
+                if plan.tables:
+                    write_conn = get_db_connection()
+                    try:
+                        wc = write_conn.cursor()
+                        catalog_import_summary = catalog_import.apply_catalog_import(
+                            wc, resolved_company_id, plan,
+                        )
+                        write_conn.commit()
+                        wc.close()
+                    except Exception:
+                        write_conn.rollback()
+                        raise
+                    finally:
+                        release_db_connection(write_conn)
+
+                catalog_warnings.extend(plan.warnings)
+
+                # 5. Leftover (unmatched / near-miss) sheets → RAG embedding.
+                for sheet_name, clean_df in plan.rag_sheets:
+                    docs.extend(_df_to_documents(clean_df, pending_source_name, sheet_name))
+            else:
+                tabular_docs = parse_tabular_to_docs(csv_bytes, csv_file.filename, pending_source_name)
+                docs.extend(tabular_docs)
+        except catalog_import.CatalogImportError as e:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise HTTPException(status_code=400, detail=str(e))
         except ValueError as e:
             if r and lock_acquired:
                 await r.delete(lock_key)
@@ -6332,10 +6442,30 @@ async def train_chatbot(
     if text and text.strip():
         docs.append(Document(page_content=text.strip(), metadata={"source": pending_source_name}))
 
-    if not docs:
+    if not docs and not catalog_import_summary:
         if r and lock_acquired:
             await r.delete(lock_key)
         raise HTTPException(status_code=400, detail="No content could be extracted from the provided source.")
+
+    # ── Catalog-only upload: all sheets matched structured tables ───────────
+    if not docs and catalog_import_summary:
+        if r and lock_acquired:
+            try:
+                await r.delete(lock_key)
+            except Exception:
+                pass
+        catalog_msg = "Catalog imported: " + "; ".join(catalog_import_summary) + "."
+        if catalog_warnings:
+            catalog_msg += " " + " ".join(catalog_warnings)
+        return {
+            "status": "completed",
+            "job_id": None,
+            "is_upsert": is_upsert,
+            "source_name": pending_source_name,
+            "catalog_import": catalog_import_summary,
+            "catalog_warnings": catalog_warnings or None,
+            "message": catalog_msg,
+        }
 
     # ── 4. Quota overflow check against effective (post-replacement) capacity ─
     # Quota counts child chunks only. With parent-child chunking each parent
@@ -6389,13 +6519,17 @@ async def train_chatbot(
         " Note: re-submitting text without a label will overwrite all previous unlabelled manual entries."
         if pending_source_name == "Manual Entry" else ""
     )
+    catalog_note = (" " + "; ".join(catalog_import_summary) + ".") if catalog_import_summary else ""
+    warn_note = (" " + " ".join(catalog_warnings)) if catalog_warnings else ""
 
     return {
         "status": "queued",
         "job_id": job_id,
         "is_upsert": is_upsert,
         "source_name": pending_source_name,
-        "message": f"{upsert_msg}{manual_entry_warning} Poll /api/train/status/{job_id} to track progress.",
+        "catalog_import": catalog_import_summary or None,
+        "catalog_warnings": catalog_warnings or None,
+        "message": f"{upsert_msg}{manual_entry_warning}{catalog_note}{warn_note} Poll /api/train/status/{job_id} to track progress.",
     }
 
 

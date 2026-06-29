@@ -65,6 +65,35 @@ class FormField:
 
 
 @dataclass(frozen=True)
+class CatalogTable:
+    """Maps an uploaded sheet to a structured DB table for auto-import.
+
+    When a vertical bot uploads a tabular file, sheets whose columns match
+    ``required_columns`` are imported into ``table_name`` (replace-all) instead
+    of being embedded as RAG knowledge.
+
+    Real client spreadsheets are dirty, so matching is *forgiving*:
+      - ``synonyms`` maps a canonical DB column to the header aliases clients use
+        (e.g. ``cas_number`` ← ``CAS #``, ``CAS No``). Header names are normalized
+        (lowercase, trimmed, punctuation→``_``) before lookup, and a column's own
+        name is always an implicit alias.
+      - ``not_null_columns`` are the fields a row MUST have a value for; a row
+        missing any is skipped with a reason (never crashes on a NOT-NULL insert).
+      - ``boolean_columns`` are parsed from ``TRUE``/``yes``/``Y``/``1`` etc.
+
+    ``column_map`` is the legacy direct ``normalized_header → db_col`` escape hatch;
+    ``synonyms`` is the preferred, readable form.
+    """
+
+    table_name: str
+    required_columns: Tuple[str, ...]
+    column_map: dict = field(default_factory=dict)
+    boolean_columns: Tuple[str, ...] = ()
+    synonyms: dict = field(default_factory=dict)        # db_col -> (alias, ...)
+    not_null_columns: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Slot:
     """A single field a tool needs to collect before it can run.
 
@@ -110,6 +139,7 @@ class Pack:
     hub_cards: Tuple[HubCard, ...] = ()        # Phase 3 — pack-driven hub UI cards
     sample_form: Tuple[FormField, ...] = ()    # Phase 4b — structured sample intake form
     knowledge_kinds: Tuple[str, ...] = ()      # what doc kinds feed RAG/tools
+    catalog_tables: Tuple[CatalogTable, ...] = ()  # structured tables for auto-import
     version: int = 1
 
     def tool_names(self) -> Tuple[str, ...]:

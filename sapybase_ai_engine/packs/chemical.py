@@ -12,7 +12,7 @@ guardrail eval gate that enforces it.
 """
 from __future__ import annotations
 
-from packs.schema import FormField, HubCard, Pack, Slot, ToolSpec
+from packs.schema import CatalogTable, FormField, HubCard, Pack, Slot, ToolSpec
 
 CHEMICAL_VERTICAL = "chemical"
 
@@ -188,6 +188,47 @@ _SAMPLE_FORM = (
     FormField("notes", "Additional notes", type="textarea", required=False),
 )
 
+_CATALOG_TABLES = (
+    CatalogTable(
+        table_name="products",
+        required_columns=("name", "cas_number"),
+        not_null_columns=("name",),
+        synonyms={
+            "name": ("product", "product_name", "chemical", "chemical_name",
+                     "item", "item_name", "material"),
+            "cas_number": ("cas", "cas_no", "cas_number", "cas_#", "cas_num",
+                           "casno", "cas_registry", "cas_rn"),
+            "grade": ("grade", "purity", "spec", "specification"),
+            "packaging": ("packaging", "pack", "pack_size", "packing",
+                          "available_sizes", "sizes", "pack_sizes"),
+            "sds_ref": ("sds_ref", "sds", "sds_url", "sds_link", "msds",
+                        "msds_url", "safety_data_sheet", "datasheet_url"),
+        },
+    ),
+    CatalogTable(
+        table_name="product_skus",
+        required_columns=("product_name", "cas_number", "grade", "pack_size", "list_price"),
+        boolean_columns=("is_por",),
+        not_null_columns=("product_name",),
+        synonyms={
+            "product_name": ("product", "product_name", "name", "chemical",
+                             "chemical_name", "item", "material"),
+            "cas_number": ("cas", "cas_no", "cas_number", "cas_#", "casno",
+                           "cas_registry", "cas_rn"),
+            "grade": ("grade", "purity", "spec", "specification"),
+            "pack_code": ("pack_code", "sku", "sku_code", "code", "item_code"),
+            "pack_size": ("pack_size", "size", "pack", "packing", "packaging"),
+            "pack_size_norm": ("pack_size_norm", "size_norm", "normalized_size"),
+            "list_price": ("list_price", "price", "rate", "mrp", "unit_price",
+                           "cost", "amount", "selling_price"),
+            "gst_rate": ("gst_rate", "gst", "gst_%", "tax", "tax_rate", "gst_percent"),
+            "hsn_code": ("hsn_code", "hsn", "hsn_sac", "hsn_no"),
+            "is_por": ("is_por", "por", "price_on_request", "on_request"),
+            "currency": ("currency", "curr", "ccy"),
+        },
+    ),
+)
+
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
@@ -195,5 +236,6 @@ CHEMICAL_PACK = Pack(
     hub_cards=_HUB_CARDS,
     sample_form=_SAMPLE_FORM,
     knowledge_kinds=("catalog", "sds"),
+    catalog_tables=_CATALOG_TABLES,
     version=1,
 )
