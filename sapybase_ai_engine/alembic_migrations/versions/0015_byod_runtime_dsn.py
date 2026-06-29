@@ -19,7 +19,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa  # noqa: F401
 
-from byod_store import RUNTIME_DSN_ADD_COLUMNS_SQL, RUNTIME_DSN_DROP_COLUMNS_SQL
+from db.byod_store import RUNTIME_DSN_ADD_COLUMNS_SQL, RUNTIME_DSN_DROP_COLUMNS_SQL
 
 
 revision: str = '0015'

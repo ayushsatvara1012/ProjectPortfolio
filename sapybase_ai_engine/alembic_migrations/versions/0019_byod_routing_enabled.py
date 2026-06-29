@@ -20,7 +20,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa  # noqa: F401
 
-from byod_store import ROUTING_ENABLED_ADD_COLUMN_SQL, ROUTING_ENABLED_DROP_COLUMN_SQL
+from db.byod_store import ROUTING_ENABLED_ADD_COLUMN_SQL, ROUTING_ENABLED_DROP_COLUMN_SQL
 
 
 revision: str = '0019'

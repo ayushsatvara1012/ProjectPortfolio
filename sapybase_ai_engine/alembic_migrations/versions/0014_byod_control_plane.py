@@ -23,7 +23,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa  # noqa: F401
 
-from byod_store import CONTROL_PLANE_SCHEMA_SQL, CONTROL_PLANE_SCHEMA_DROP_SQL
+from db.byod_store import CONTROL_PLANE_SCHEMA_SQL, CONTROL_PLANE_SCHEMA_DROP_SQL
 
 
 revision: str = '0014'

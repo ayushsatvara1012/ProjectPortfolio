@@ -22,7 +22,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa  # noqa: F401
 
-from byod_store import PHASE5_SIGNALS_ADD_COLUMNS_SQL, PHASE5_SIGNALS_DROP_COLUMNS_SQL
+from db.byod_store import PHASE5_SIGNALS_ADD_COLUMNS_SQL, PHASE5_SIGNALS_DROP_COLUMNS_SQL
 
 
 revision: str = '0020'
