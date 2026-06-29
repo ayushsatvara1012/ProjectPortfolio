@@ -65,8 +65,8 @@ def _candidate(row) -> Dict[str, Any]:
 _PRODUCT_COLS = "name, cas_number, grade, packaging, sds_ref, updated_at"
 
 
-def _resolve_product(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
-    """Resolve a CAS/name to exactly one product row, or a terminal status.
+def _resolve_product(cursor, company_id, cas: str, name: str, grade: str = "") -> Dict[str, Any]:
+    """Resolve a CAS/name(/grade) to exactly one product row, or a terminal status.
 
     Shared by every product tool so resolution can never drift between them.
     Resolution order (CAS is the precise key; a fuzzy name never auto-resolves):
@@ -74,11 +74,16 @@ def _resolve_product(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
       2. exact (case-insensitive) name match
       3. partial name match -> returned as candidates to CONFIRM, never served
 
+    When a name/CAS matches several rows (the common case: one product sold in
+    LR / AR / HPLC grades, each with its OWN sheet), a supplied ``grade`` narrows
+    them to the exact one. Without a grade, multiple matches stay ``ambiguous`` so
+    the agent asks which grade — and can then act on the answer.
+
     Returns one of:
       - ``{"row": <tuple>}``                  — a single unambiguous match
       - ``{"status": "missing_identifier"}``  — neither CAS nor name supplied
       - ``{"status": "not_found", ...}``      — nothing matched
-      - ``{"status": "ambiguous", ...}``      — >1 exact, or any partial match
+      - ``{"status": "ambiguous", ...}``      — >1 match and no/!matching grade
 
     SECURITY: every query is filtered by ``company_id`` — a tenant can never see
     another tenant's catalog. The caller decides what to do with the single row
@@ -124,6 +129,11 @@ def _resolve_product(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
                     "have it on file and offer to connect them to the team."
                 ),
             }
+        # A grade can still single out one of the partial candidates.
+        if grade:
+            narrowed = [r for r in partial if (r[2] or "").strip().lower() == grade.strip().lower()]
+            if len(narrowed) == 1:
+                return {"row": narrowed[0]}
         return {
             "status": "ambiguous",
             "candidates": [_candidate(r) for r in partial[:8]],
@@ -142,8 +152,27 @@ def _resolve_product(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
             ),
         }
 
-    # Multiple exact matches = several grades share a name/CAS. Disambiguate.
+    # Multiple exact matches = several grades share a name/CAS. A supplied grade
+    # picks the exact one; otherwise ask which grade.
     if len(rows) > 1:
+        if grade:
+            g = grade.strip().lower()
+            narrowed = [r for r in rows if (r[2] or "").strip().lower() == g]
+            if len(narrowed) == 1:
+                return {"row": narrowed[0]}
+            if len(narrowed) > 1:
+                rows = narrowed  # same grade duplicated — still ambiguous below
+            else:
+                # Grade given but not stocked — name the grades that ARE available.
+                available = [str(r[2]) for r in rows if r[2]]
+                return {
+                    "status": "ambiguous",
+                    "candidates": [_candidate(r) for r in rows[:8]],
+                    "message": (
+                        f"No '{grade}' grade is on file for this product. Available "
+                        f"grades: {', '.join(available)}. Ask the visitor to pick one."
+                    ),
+                }
         return {
             "status": "ambiguous",
             "candidates": [_candidate(r) for r in rows[:8]],
@@ -159,11 +188,13 @@ def get_sds(
     *,
     cas_number: Optional[str] = None,
     product_name: Optional[str] = None,
+    grade: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Look up a product's real SDS, scoped to ONE tenant. Pure data, no LLM.
 
     Resolution is delegated to ``_resolve_product`` (CAS exact -> name exact ->
-    partial = confirm). Returns a status dict the model reads as its observation:
+    partial = confirm), with ``grade`` narrowing the common many-grades-per-name
+    case to one sheet. Returns a status dict the model reads as its observation:
       found | no_sheet_on_file | ambiguous | not_found | missing_identifier
 
     SECURITY: resolution is tenant-scoped. A product with a missing/non-https
@@ -172,7 +203,8 @@ def get_sds(
     insecure link.
     """
     resolved = _resolve_product(
-        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip()
+        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip(),
+        (grade or "").strip(),
     )
     if "row" not in resolved:
         return resolved
@@ -219,12 +251,13 @@ def get_product_spec(
     *,
     cas_number: Optional[str] = None,
     product_name: Optional[str] = None,
+    grade: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Look up a product's COMMERCIAL spec (grade, packaging), tenant-scoped.
 
     Read-only, no LLM. Resolution is the same shared ``_resolve_product`` path as
-    ``get_sds`` (CAS exact -> name exact -> partial = confirm), so a fuzzy name
-    never auto-serves the wrong product's spec. Statuses:
+    ``get_sds`` (CAS exact -> name exact -> partial = confirm, ``grade`` narrows),
+    so a fuzzy name never auto-serves the wrong product's spec. Statuses:
       found | ambiguous | not_found | missing_identifier
 
     This is COMMERCIAL data only — it never returns hazard/handling info and never
@@ -234,7 +267,8 @@ def get_product_spec(
     not infer hazards from grade or purity.
     """
     resolved = _resolve_product(
-        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip()
+        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip(),
+        (grade or "").strip(),
     )
     if "row" not in resolved:
         return resolved
@@ -587,6 +621,7 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
             company_id,
             cas_number=args.get("cas_number"),
             product_name=args.get("product_name"),
+            grade=args.get("grade"),
         )
     if name == "get_product_spec":
         return get_product_spec(
@@ -594,6 +629,7 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
             company_id,
             cas_number=args.get("cas_number"),
             product_name=args.get("product_name"),
+            grade=args.get("grade"),
         )
     if name == "request_quote":
         return request_quote(
@@ -695,10 +731,20 @@ def build_agent_directive(pack) -> str:
         "calling it, just tell them to complete the form; never quote a price (use "
         "request_quote), never give safety info (use get_sds), and never promise a "
         "delivery date or quantity limit.\n\n"
+        "GRADE DISAMBIGUATION: many products share one name/CAS across several "
+        "grades (e.g. LR, AR, HPLC), each with its OWN sheet. When a tool returns "
+        "ambiguous, ask which grade — then call the tool AGAIN passing that grade "
+        "in the grade argument. Once the visitor names a grade (e.g. 'AR'), you "
+        "MUST re-call the tool with grade set; do not re-ask the same question. If "
+        "the visitor wants several grades ('both', 'AR and LR', 'all of them'), "
+        "call the tool ONCE PER GRADE and present each result.\n\n"
         "If a tool returns no servable result (statuses not_found or "
         "no_sheet_on_file), tell the visitor you don't have it on file and offer "
         "to connect them to the team. If it is ambiguous, ask the visitor to "
-        "confirm the exact product (by grade or CAS number). Never guess."
+        "confirm the exact product (by grade or CAS number). Never guess, and NEVER "
+        "fall back to a generic 'I don't have specific information about that' "
+        "reply for a product/SDS/price request — drive it through the tools or "
+        "offer the team handoff."
     )
 
 

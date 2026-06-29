@@ -47,6 +47,16 @@ _PRODUCT_SLOTS = (
         required=False,
         description="Product name; used when the CAS number is unknown.",
     ),
+    Slot(
+        "grade",
+        required=False,
+        description=(
+            "Product grade (e.g. LR, AR, HPLC, Battery). Many products share one "
+            "name/CAS across several grades with DIFFERENT sheets — pass the grade "
+            "the visitor specified to fetch the exact one. For several grades, call "
+            "the tool once per grade."
+        ),
+    ),
 )
 
 get_sds = ToolSpec(

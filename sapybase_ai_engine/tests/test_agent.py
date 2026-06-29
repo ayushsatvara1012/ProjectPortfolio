@@ -158,6 +158,49 @@ class TestGetSdsResolution:
         assert out["status"] == "found"
 
 
+class TestGetSdsGradeDisambiguation:
+    """Regression: a name/CAS with several grades must resolve once a grade is
+    given — previously get_sds had no grade slot and looped on 'ambiguous'."""
+
+    def test_grade_narrows_multiple_matches_to_one(self):
+        rows = [_row(grade="LR"), _row(grade="AR"), _row(grade="HPLC")]
+        out = get_sds(FakeCursor(name_exact=rows), CID,
+                      product_name="Acetone", grade="AR")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] == "AR"
+
+    def test_grade_is_case_insensitive(self):
+        rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="ar")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] == "AR"
+
+    def test_unstocked_grade_lists_available_grades(self):
+        rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="HPLC")
+        assert out["status"] == "ambiguous"
+        assert "HPLC" in out["message"]
+        assert "LR" in out["message"] and "AR" in out["message"]
+
+    def test_no_grade_still_ambiguous(self):
+        rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "ambiguous"
+
+    def test_grade_narrows_partial_name_match(self):
+        rows = [_row(name="Acetone", grade="LR"), _row(name="Acetone", grade="AR")]
+        out = get_sds(FakeCursor(partial=rows), CID, product_name="aceto", grade="AR")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] == "AR"
+
+    def test_grade_threaded_through_product_spec(self):
+        rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_product_spec(FakeCursor(cas=rows), CID,
+                               cas_number="7664-93-9", grade="LR")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] == "LR"
+
+
 class TestGetSdsTenantScoping:
     def test_every_query_is_company_scoped(self):
         cur = FakeCursor(cas=[], name_exact=[], partial=[])
@@ -531,10 +574,11 @@ class TestSchemasAndDirective:
         schemas = build_tool_schemas(load_pack("chemical"))
         by_name = {s["name"]: s for s in schemas}
         assert set(by_name) == {"get_sds", "get_product_spec", "request_quote", "request_sample"}
-        # The two read-only tools take exactly CAS or name (neither individually required).
+        # The two read-only tools take CAS or name, plus an optional grade to
+        # disambiguate the many-grades-per-product case (none individually required).
         for name in ("get_sds", "get_product_spec"):
             props = by_name[name]["parameters"]["properties"]
-            assert set(props) == {"cas_number", "product_name"}
+            assert set(props) == {"cas_number", "product_name", "grade"}
             assert by_name[name]["parameters"]["required"] == []
         # request_quote adds the pricing slots; still nothing hard-required (the tool
         # guides collection step by step).
