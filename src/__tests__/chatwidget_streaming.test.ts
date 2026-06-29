@@ -272,6 +272,58 @@ describe('Lead capture trigger detection', () => {
   });
 });
 
+// ── 5b. Generic lead form suppressed for vertical/agentic bots ───────────────
+// Mirrors the [DONE] heuristic in ChatWidget: the keyword-based generic lead form
+// must NOT fire for a vertical/pack bot, which runs its own structured capture
+// (request_quote's contact step, the sample form, handoff). Regression for the
+// form popping mid-quote while the agent was still asking for grade/pack size.
+
+describe('Generic lead form vs vertical bot', () => {
+  const userBuyingIntent = ['quote', 'pricing', 'how much', 'cost', 'buy', 'purchase', 'hire', 'sign up', 'get started', 'book a', 'schedule', 'free trial', 'demo', 'subscribe'];
+  const userHumanIntent = ['talk to a human', 'speak to someone', 'real person', 'contact you', 'reach out', 'get in touch', 'help me', 'i need help', 'support team', 'sales team'];
+  const fallbackPhrases = ['does not appear in my knowledge base', "don't have information on that", 'please reach out to', "i'm not sure", 'i do not have'];
+
+  function shouldShowGenericLeadForm(
+    userMsg: string,
+    botReply: string,
+    opts: { leadCaptureEnabled: boolean; alreadyShown: boolean; isVerticalBot: boolean }
+  ): boolean {
+    if (!opts.leadCaptureEnabled || opts.alreadyShown || opts.isVerticalBot) return false;
+    const u = userMsg.toLowerCase();
+    const r = botReply.toLowerCase();
+    const isBuying = userBuyingIntent.some(w => u.includes(w));
+    const isHuman = userHumanIntent.some(w => u.includes(w));
+    const isFallback = fallbackPhrases.some(w => r.includes(w));
+    return isBuying || isHuman || isFallback;
+  }
+
+  const base = { leadCaptureEnabled: true, alreadyShown: false, isVerticalBot: false };
+
+  it('fires on buying intent for a generic bot', () => {
+    expect(shouldShowGenericLeadForm("I'd like a price quote for Ethanol.", 'Sure!', base)).toBe(true);
+  });
+
+  it('does NOT fire on a quote for a vertical bot (agent handles capture)', () => {
+    expect(shouldShowGenericLeadForm(
+      "I'd like a price quote for Ethanol.",
+      'I need to know the grade and pack size you are interested in.',
+      { ...base, isVerticalBot: true }
+    )).toBe(false);
+  });
+
+  it('does NOT fire on human-intent for a vertical bot', () => {
+    expect(shouldShowGenericLeadForm('can I talk to a human', 'Let me connect you.', { ...base, isVerticalBot: true })).toBe(false);
+  });
+
+  it('does NOT fire on a fallback reply for a vertical bot', () => {
+    expect(shouldShowGenericLeadForm('random thing', "i'm not sure about that", { ...base, isVerticalBot: true })).toBe(false);
+  });
+
+  it('still suppressed when lead capture disabled, regardless of vertical', () => {
+    expect(shouldShowGenericLeadForm('quote please', 'ok', { ...base, leadCaptureEnabled: false })).toBe(false);
+  });
+});
+
 // ── 6. Quick question normalization ──────────────────────────────────────────
 
 describe('normalizeQuickQuestions', () => {

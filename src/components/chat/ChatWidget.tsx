@@ -1092,6 +1092,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   }, [activeApiKey, getSessionToken]);
 
   const leadCaptureEnabledRef = useRef(false);
+  // A vertical/pack bot (hub cards present) runs its OWN structured capture via
+  // agent tools — request_quote's contact step, the sample form, handoff. The
+  // generic keyword-heuristic lead form must NOT fire over those flows (it pops
+  // mid-quote while the agent is still asking for grade/pack size). Mirror the
+  // signal in a ref so the streaming [DONE] handler reads it without stale state.
+  const isVerticalBotRef = useRef(false);
 
   useEffect(() => {
     if (!activeApiKey) return;
@@ -1125,6 +1131,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             sample_form: Array.isArray(data.sample_form) ? data.sample_form : [],
           });
           leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
+          // A pack-enabled bot is signalled by `vertical` (most precise) or, as a
+          // fallback, the presence of hub cards.
+          isVerticalBotRef.current = Boolean(data.vertical)
+            || (Array.isArray(data.hub_cards) && data.hub_cards.length > 0);
           setMessages(prev => {
             if (prev.length === 1 && prev[0].role === 'bot') {
               return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message, ts: Date.now() }];
@@ -1606,7 +1616,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // they choose. Deferred a frame so isNearBottom reads the FINAL height
             // (the message just jumped from typed-out text to full content).
             requestAnimationFrame(() => { if (!isNearBottom()) setShowJumpPill(true); });
-            if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current) {
+            if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current && !isVerticalBotRef.current) {
               const lowerReply = fullContent.toLowerCase();
               const lowerUserMsg = userMessage.toLowerCase();
               const userBuyingIntent = ['quote', 'pricing', 'how much', 'cost', 'buy', 'purchase', 'hire', 'sign up', 'get started', 'book a', 'schedule', 'free trial', 'demo', 'subscribe'];
