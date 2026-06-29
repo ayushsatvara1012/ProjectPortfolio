@@ -198,7 +198,7 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
 
     Edge cases handled:
       - CSV: tries UTF-8, then latin-1 (covers Windows-exported files).
-      - Excel: reads the first sheet; skips sheets that are entirely empty.
+      - Excel: reads ALL sheets and concatenates them; skips sheets that are entirely empty.
       - Dirty files: heuristic scan of first 15 rows to find the true header row,
         discarding title/logo/metadata rows above it.
       - Rows where every cell is blank/NaN are dropped.
@@ -279,15 +279,31 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
         elif ext in ("xlsx", "xls"):
             try:
                 engine = "openpyxl" if ext == "xlsx" else None
-                # Load without a header row to probe for the real one
-                raw = pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False,
-                                    engine=engine, header=None)
-                header_row = _find_header_row(raw)
-                if header_row == 0:
-                    return pd.read_excel(BytesIO(file_bytes), dtype=str,
-                                         keep_default_na=False, engine=engine)
-                return pd.read_excel(BytesIO(file_bytes), dtype=str, keep_default_na=False,
-                                     engine=engine, skiprows=header_row, header=0)
+                # Read ALL sheets (sheet_name=None returns a dict of DataFrames)
+                all_sheets = pd.read_excel(BytesIO(file_bytes), dtype=str,
+                                           keep_default_na=False, engine=engine,
+                                           header=None, sheet_name=None)
+                sheets_out: list[tuple[str, pd.DataFrame]] = []
+                for sname, raw in all_sheets.items():
+                    if raw.empty:
+                        continue
+                    header_row = _find_header_row(raw)
+                    if header_row == 0:
+                        sheet_df = pd.read_excel(
+                            BytesIO(file_bytes), dtype=str,
+                            keep_default_na=False, engine=engine,
+                            sheet_name=sname)
+                    else:
+                        sheet_df = pd.read_excel(
+                            BytesIO(file_bytes), dtype=str,
+                            keep_default_na=False, engine=engine,
+                            sheet_name=sname, skiprows=header_row,
+                            header=0)
+                    if not sheet_df.empty:
+                        sheets_out.append((str(sname), sheet_df))
+                if not sheets_out:
+                    raise ValueError("All sheets in the Excel file are empty.")
+                return sheets_out
             except ValueError:
                 raise
             except Exception as e:
@@ -295,51 +311,62 @@ def parse_tabular_to_docs(file_bytes: bytes, filename: str, source_name: str) ->
         else:
             raise ValueError(f"Unsupported tabular format: .{ext}")
 
-    df = _load_df()
+    loaded = _load_df()
 
-    # Deduplicate column names (pandas already does this with .1/.2 suffix by default,
-    # but we normalise to underscore style for cleaner output).
-    seen: dict = {}
-    new_cols = []
-    for col in df.columns:
-        col_str = str(col).strip()
-        if col_str in seen:
-            seen[col_str] += 1
-            new_cols.append(f"{col_str}_{seen[col_str]}")
-        else:
-            seen[col_str] = 0
-            new_cols.append(col_str)
-    df.columns = new_cols
-
-    # Reject files where every column name is "Unnamed: N" (no real header).
-    real_headers = [c for c in df.columns if not re.match(r"^(\d+|Unnamed: \d+)$", c)]
-    if not real_headers:
-        raise ValueError(
-            "The file has no header row. Add column names in the first row (e.g. 'Product', 'Price', 'Description') and re-upload."
-        )
-
-    # Drop completely blank rows.
-    df = df.replace("", float("nan")).dropna(how="all").fillna("")
-
-    if df.empty:
-        raise ValueError("The file contains no data rows after removing blank lines.")
+    # Normalise to a list of (sheet_label, DataFrame) — CSV has no sheets.
+    if isinstance(loaded, pd.DataFrame):
+        sheet_pairs: list[tuple[str, pd.DataFrame]] = [("", loaded)]
+    else:
+        sheet_pairs = loaded  # list[tuple[str, DataFrame]] from Excel
 
     docs: List[Document] = []
-    for _, row in df.iterrows():
-        parts = []
+
+    for sheet_label, df in sheet_pairs:
+        # Deduplicate column names per sheet.
+        seen: dict = {}
+        new_cols = []
         for col in df.columns:
-            val = str(row[col]).strip()
-            if not val:
+            col_str = str(col).strip()
+            if col_str in seen:
+                seen[col_str] += 1
+                new_cols.append(f"{col_str}_{seen[col_str]}")
+            else:
+                seen[col_str] = 0
+                new_cols.append(col_str)
+        df.columns = new_cols
+
+        real_headers = [c for c in df.columns if not re.match(r"^(\d+|Unnamed: \d+)$", c)]
+        if not real_headers:
+            if sheet_label:
+                continue  # skip header-less sheets silently; other sheets may be fine
+            raise ValueError(
+                "The file has no header row. Add column names in the first row (e.g. 'Product', 'Price', 'Description') and re-upload."
+            )
+
+        df = df.replace("", float("nan")).dropna(how="all").fillna("")
+        if df.empty:
+            continue
+
+        meta = {"source": source_name}
+        if sheet_label:
+            meta["sheet"] = sheet_label
+
+        for _, row in df.iterrows():
+            parts = []
+            for col in df.columns:
+                val = str(row[col]).strip()
+                if not val:
+                    continue
+                if len(val) > MAX_CELL_CHARS:
+                    val = val[:MAX_CELL_CHARS] + "…"
+                parts.append(f"{col}: {val}")
+
+            if not parts:
                 continue
-            if len(val) > MAX_CELL_CHARS:
-                val = val[:MAX_CELL_CHARS] + "…"
-            parts.append(f"{col}: {val}")
 
-        if not parts:
-            continue  # entire row was empty after stripping — skip
-
-        chunk_text = " | ".join(parts)
-        docs.append(Document(page_content=chunk_text, metadata={"source": source_name}))
+            prefix = f"[Sheet: {sheet_label}] " if sheet_label else ""
+            chunk_text = prefix + " | ".join(parts)
+            docs.append(Document(page_content=chunk_text, metadata=meta))
 
     if not docs:
         raise ValueError("No usable data rows found in the file.")
