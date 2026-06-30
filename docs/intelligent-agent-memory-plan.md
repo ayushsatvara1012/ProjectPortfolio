@@ -416,7 +416,17 @@ the wrong shape (text-only, no tool calls, no state). Clean schema from the star
 - [x] **Phase 2 wiring** — `session_store` getters/writers + `main.py` chat path; no new migration
       (0026 columns existed). Tests `test_sales_funnel.py` (23). Build 2026-06-30, uncommitted.
       Remaining: live-verify → commit → push/merge to MainV2.
-- [ ] Phase 3 — BI / owner analytics
+- [x] **Phase 3a** — pure analytics module `services/session_bi.py`: `build_demand_signal`,
+      `build_stage_funnel`, `build_lost_sales`, `build_lead_quality`. 18 tests in
+      `test_session_bi.py`. LLM-free, same discipline as `funnel.py`.
+- [x] **Phase 3b** — `GET /api/sessions/bi/{company_id}?window_days=` endpoint in `main.py`:
+      product demand (JSONB unnest), stage distribution, POR escalations, lead quality bands.
+      Gated on `has_entitlement(user, "analytics")` + company ownership check. 0/7/30/90/all-time windows.
+- [x] **Phase 3c** — `SessionBiPanel.tsx`: product demand (`HorizontalBars`), session funnel
+      (`FunnelChart`), lost-sales metric cards (POR + quoted-not-captured), lead quality donut.
+      Window picker (`Segmented`). Handles 402→UpgradePrompt, empty state, loading skeletons.
+- [x] **Phase 3d** — wired into Operations tab (`insights/page.tsx`) for chemical bots only,
+      above the existing `FunnelPanel`. tsc clean. Uncommitted — live-verify → commit → push.
 - [ ] Phase 4 — privacy/retention/deletion hardening
 
 ## Related

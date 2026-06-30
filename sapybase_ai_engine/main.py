@@ -5192,6 +5192,156 @@ def get_widget_session_messages(
         release_db_connection(conn)
 
 
+# ── SESSION BI: owner-facing demand/funnel/lost-sales analytics (Phase 3) ────
+from services.session_bi import (
+    build_demand_signal,
+    build_stage_funnel,
+    build_lost_sales,
+    build_lead_quality,
+)
+
+
+@app.get("/api/sessions/bi/{company_id}")
+def get_session_bi(
+    company_id: str,
+    window_days: int = 30,
+    user: dict = Depends(get_current_user),
+):
+    """Session-level BI derived from agent_sessions.state + lead_profile.
+
+    Returns product demand, stage funnel, lost-sale signals, and lead quality
+    for the company's pack-bot sessions. Gated on analytics entitlement.
+    Only sessions within the past `window_days` days are included (0 = all-time).
+    """
+    company_id = str(company_id).strip()
+    if not company_id:
+        raise HTTPException(status_code=400, detail="company_id required")
+
+    window_days = max(0, min(int(window_days or 30), 365))
+    ts_filter = (
+        "AND s.last_active_at >= NOW() - INTERVAL '%s days'" % window_days
+        if window_days > 0
+        else ""
+    )
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        if not has_entitlement(user, "analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "Session BI requires the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing",
+            })
+
+        # 1. Product demand — unnest state.products JSONB array.
+        cursor.execute(
+            f"""
+            SELECT
+                prod->>'name'  AS product_name,
+                prod->>'grade' AS grade,
+                COUNT(*)       AS session_count
+            FROM agent_sessions s,
+                 jsonb_array_elements(s.state->'products') AS prod
+            WHERE s.company_id = %s
+              AND s.state IS NOT NULL
+              AND jsonb_array_length(s.state->'products') > 0
+              {ts_filter}
+            GROUP BY product_name, grade
+            ORDER BY session_count DESC
+            LIMIT 20
+            """,
+            (company_id,),
+        )
+        demand_rows = [
+            {"product_name": r[0], "grade": r[1], "session_count": r[2]}
+            for r in cursor.fetchall()
+        ]
+
+        # 2. Stage distribution.
+        cursor.execute(
+            f"""
+            SELECT state->>'stage' AS stage, COUNT(*) AS cnt
+            FROM agent_sessions s
+            WHERE s.company_id = %s
+              AND s.state IS NOT NULL
+              {ts_filter}
+            GROUP BY stage
+            """,
+            (company_id,),
+        )
+        stage_counts = {r[0]: r[1] for r in cursor.fetchall() if r[0]}
+
+        # 3a. POR escalations — quotes where por = true.
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS por_count
+            FROM agent_sessions s,
+                 jsonb_array_elements(s.state->'quotes') AS q
+            WHERE s.company_id = %s
+              AND s.state IS NOT NULL
+              AND (q->>'por')::boolean IS TRUE
+              {ts_filter}
+            """,
+            (company_id,),
+        )
+        por_count = int((cursor.fetchone() or [0])[0] or 0)
+
+        # 3b. Sessions that reached 'quoted' but not 'captured' or 'handed_off'.
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS cnt
+            FROM agent_sessions s
+            WHERE s.company_id = %s
+              AND s.state->>'stage' = 'quoted'
+              {ts_filter}
+            """,
+            (company_id,),
+        )
+        quoted_not_captured = int((cursor.fetchone() or [0])[0] or 0)
+
+        # 4. Lead quality from lead_profile.band.
+        cursor.execute(
+            f"""
+            SELECT
+                LOWER(lead_profile->>'band') AS band,
+                COUNT(*) AS cnt
+            FROM agent_sessions s
+            WHERE s.company_id = %s
+              AND s.lead_profile IS NOT NULL
+              AND lead_profile->>'band' IS NOT NULL
+              {ts_filter}
+            GROUP BY band
+            """,
+            (company_id,),
+        )
+        band_counts = {r[0]: r[1] for r in cursor.fetchall() if r[0]}
+
+        return {
+            "window_days": window_days,
+            "product_demand": build_demand_signal(demand_rows),
+            "stage_funnel": build_stage_funnel(stage_counts),
+            "lost_sales": build_lost_sales(por_count, quoted_not_captured),
+            "lead_quality": build_lead_quality(band_counts),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"get_session_bi error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        release_db_connection(conn)
+
+
 # ── FIXES NEEDED (gap worklist) — extracted to fixes_logic.py ──
 # Re-exported so `from main import _build_fixes_list` and `main._build_fixes_list`
 # (used by the endpoint below and the test suite) keep resolving unchanged.
