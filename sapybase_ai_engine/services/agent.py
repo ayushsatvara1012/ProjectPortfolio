@@ -59,6 +59,28 @@ def _candidate(row) -> Dict[str, Any]:
     return {"name": row[0], "cas_number": row[1], "grade": row[2]}
 
 
+def _split_packs(packaging: object) -> list:
+    """Split a free-text packaging field into ordered pack-size options.
+
+    Catalog packaging is stored as free text ("500 ml, 2.5 Ltr" / "500 ml and
+    2.5 Ltr / 5 Ltr"). We split on commas, slashes, and the word 'and' so the
+    widget can render selectable pack chips for product-discovery questions too
+    (not just the quote flow). Returns [] when there's nothing usable.
+    """
+    if not isinstance(packaging, str) or not packaging.strip():
+        return []
+    import re
+    parts = re.split(r"\s*(?:,|/|\band\b)\s*", packaging.strip(), flags=re.IGNORECASE)
+    seen, out = set(), []
+    for p in parts:
+        p = p.strip()
+        key = p.lower()
+        if p and key not in seen:
+            seen.add(key)
+            out.append(p)
+    return out
+
+
 # The single column list every product lookup selects. A superset: ``get_sds``
 # needs ``sds_ref``/``updated_at``; ``get_product_spec`` ignores them. Keeping one
 # shape lets both tools share the resolver and the ``_candidate`` row indexing.
@@ -271,6 +293,19 @@ def get_product_spec(
         (grade or "").strip(),
     )
     if "row" not in resolved:
+        # Ambiguous (several grades share the name): enrich with a flat grade list
+        # + the product name so the widget can render selectable grade chips for a
+        # product-discovery question — same interactive UI as the quote flow.
+        if resolved.get("status") == "ambiguous":
+            cands = resolved.get("candidates") or []
+            grades = []
+            for c in cands:
+                g = (c.get("grade") or "").strip()
+                if g and g not in grades:
+                    grades.append(g)
+            if grades:
+                resolved["grades"] = grades
+                resolved["product"] = cands[0].get("name") if cands else None
         return resolved
 
     name_, cas_, grade_, packaging_, sds_ref_, _updated_ = resolved["row"]
@@ -283,6 +318,7 @@ def get_product_spec(
             "grade": grade_,
             "packaging": packaging_,
         },
+        "pack_sizes": _split_packs(packaging_),
         "sds_available": _is_https(sds_ref_),
         "message": (
             "Share the commercial spec fields that are present; do not invent any "
@@ -752,9 +788,14 @@ def build_agent_directive(pack) -> str:
         "generate, paraphrase, estimate, or infer such information from your own "
         "knowledge or from the knowledge-base text.\n\n"
         "For a product's COMMERCIAL spec (grade, purity, packaging, available "
-        "sizes) call get_product_spec. That tool returns commercial data only — "
-        "never treat its grade or purity as a basis to infer hazards or handling. "
-        "Any safety-class question still goes to get_sds, even mid-conversation.\n\n"
+        "sizes) call get_product_spec — including when the visitor asks which "
+        "grades or pack sizes are available. Do NOT answer grade/pack availability "
+        "from your own memory or the knowledge base; route it through the tool so "
+        "the widget can show selectable grade/pack chips. That tool returns "
+        "commercial data only — never treat its grade or purity as a basis to "
+        "infer hazards or handling. After sharing the spec, proactively offer to "
+        "prepare a price quote (request_quote) — do not wait to be asked. Any "
+        "safety-class question still goes to get_sds, even mid-conversation.\n\n"
         "For a PRICE or quotation call request_quote IMMEDIATELY when the visitor "
         "mentions a product and price — do NOT ask for grade or pack size yourself "
         "before calling the tool. Pass whatever the visitor already gave (product, "

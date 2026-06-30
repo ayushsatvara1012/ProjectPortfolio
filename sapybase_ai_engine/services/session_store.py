@@ -162,6 +162,52 @@ def count_messages(cursor, session_id: str, company_id: str) -> int:
     return int(row[0]) if row else 0
 
 
+# ── Funnel state + lead profile (Phase 2) ─────────────────────────────────────
+
+def load_session_meta(
+    cursor, session_id: str, company_id: str
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Return (state, lead_profile) JSON for a session; empty dicts if unset.
+
+    Tenant-scoped. Used to seed the next turn's stage machine and next-best-action.
+    """
+    cursor.execute(
+        "SELECT state, lead_profile FROM agent_sessions "
+        "WHERE session_id = %s AND company_id = %s",
+        (session_id, company_id),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return {}, {}
+    state = row[0] if isinstance(row[0], dict) else (json.loads(row[0]) if row[0] else {})
+    profile = row[1] if isinstance(row[1], dict) else (json.loads(row[1]) if row[1] else {})
+    return state or {}, profile or {}
+
+
+def update_session_state(cursor, session_id: str, company_id: str, state: Dict[str, Any]) -> None:
+    """Persist the derived funnel state (Phase 2). Tenant-scoped."""
+    cursor.execute(
+        """
+        UPDATE agent_sessions
+           SET state = %s::jsonb
+         WHERE session_id = %s AND company_id = %s
+        """,
+        (json.dumps(state), session_id, company_id),
+    )
+
+
+def update_lead_profile(cursor, session_id: str, company_id: str, profile: Dict[str, Any]) -> None:
+    """Persist the rolling lead profile (Phase 2). Tenant-scoped."""
+    cursor.execute(
+        """
+        UPDATE agent_sessions
+           SET lead_profile = %s::jsonb
+         WHERE session_id = %s AND company_id = %s
+        """,
+        (json.dumps(profile), session_id, company_id),
+    )
+
+
 # ── Auto-title derivation ─────────────────────────────────────────────────────
 
 def derive_title(captured: Dict[str, Any]) -> Optional[str]:
@@ -179,6 +225,10 @@ def derive_title(captured: Dict[str, Any]) -> Optional[str]:
         product = (captured["sds"].get("product") or "").strip()
         if product:
             return f"{product} SDS"
+    if captured.get("spec"):
+        product = (captured["spec"].get("product") or "").strip()
+        if product:
+            return f"{product} enquiry"
     if captured.get("form"):
         prefill = captured["form"].get("prefill") or {}
         product = (prefill.get("product") or "").strip()

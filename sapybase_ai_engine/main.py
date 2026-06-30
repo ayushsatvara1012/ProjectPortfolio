@@ -1402,6 +1402,7 @@ from services.agent import build_tool_schemas, build_agent_directive, execute_to
 from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
 from services import catalog_import as catalog_import
 from services import session_store  # Phase 1b — persistent session memory
+from services import sales_funnel    # Phase 2 — funnel stage + next-best-action
 
 # Hard ceiling on the blocking vertical-agent precompute (Gemini tool-loop) so a
 # slow/overloaded model degrades to the fallback instead of hanging /api/chat
@@ -2690,12 +2691,17 @@ async def chat_endpoint(
         _session_active: bool = False
         _session_summary: Optional[str] = None
         _prior_session_messages: list = []
+        _prior_state: dict = {}
+        _prior_lead_profile: dict = {}
         if pack is not None and chat_req.session_id:
             try:
                 session_store.upsert_session(
                     cursor, chat_req.session_id, company["id"], chat_req.visitor_id
                 )
                 _session_summary, _prior_session_messages = session_store.load_hybrid_context(
+                    cursor, chat_req.session_id, company["id"]
+                )
+                _prior_state, _prior_lead_profile = session_store.load_session_meta(
                     cursor, chat_req.session_id, company["id"]
                 )
                 conn.commit()
@@ -3073,6 +3079,21 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
 
+        # ── SALES ORCHESTRATION: next-best-action directive (Phase 2) ─────────
+        # Deterministic — the funnel stage is derived from prior state (no LLM
+        # classification). We tell the agent where the buyer is and what to do
+        # next so it pushes the sale forward instead of waiting to be asked.
+        if _session_active:
+            _stage = (_prior_state or {}).get("stage")
+            _action = sales_funnel.next_best_action(_stage, _prior_lead_profile)
+            system_message = system_message + (
+                "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "SALES FUNNEL — NEXT BEST ACTION\n"
+                f"The buyer is at stage '{_stage or 'browsing'}'. "
+                f"{sales_funnel.action_directive(_action)}\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+
         messages = [SystemMessage(content=system_message)]
 
         if _session_active and _prior_session_messages:
@@ -3186,6 +3207,32 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         "grade": obs.get("grade"),
                         "pack_sizes": obs.get("pack_sizes", []),
                     }
+                # Phase 2: product-discovery questions go through get_product_spec
+                # (commercial spec), NOT request_quote — so without this they'd never
+                # surface selection chips nor advance the funnel. Mirror the quote
+                # flow: emit chips when there's a choice, and record the resolved
+                # product into state so the stage moves browsing → qualifying/recommended.
+                if tool_name == "get_product_spec" and isinstance(obs, dict):
+                    if obs.get("status") == "ambiguous" and obs.get("grades"):
+                        _captured["grade_selector"] = {
+                            "product": obs.get("product"),
+                            "grades": obs.get("grades", []),
+                            "grade_pack_map": {},
+                        }
+                    elif obs.get("status") == "found":
+                        _prod = obs.get("product") or {}
+                        _packs = obs.get("pack_sizes") or []
+                        _captured["spec"] = {
+                            "product": _prod.get("name"),
+                            "grade": _prod.get("grade"),
+                            "packaging": _prod.get("packaging"),
+                        }
+                        if len(_packs) > 1:
+                            _captured["pack_selector"] = {
+                                "product": _prod.get("name"),
+                                "grade": _prod.get("grade"),
+                                "pack_sizes": _packs,
+                            }
                 return obs
 
             # Bound the whole precompute: the agent makes BLOCKING Gemini calls here
@@ -3234,6 +3281,26 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         session_store.set_session_title(
                             cursor, chat_req.session_id, _title
                         )
+
+                    # ── SALES ORCHESTRATION: persist funnel state + lead profile ──
+                    # Score the lead deterministically (reuse lead_scoring) so the
+                    # band drives next-turn booking/handoff offers. Context = the
+                    # rolling summary + this turn's message (cheap, no LLM).
+                    _ctx = " ".join(filter(None, [_session_summary, chat_req.message]))
+                    _lp = sales_funnel.build_lead_profile(
+                        _prior_lead_profile, _captured,
+                        _score_lead(_ctx,
+                                    (_prior_lead_profile or {}).get("email"),
+                                    (_prior_lead_profile or {}).get("name")),
+                    )
+                    _new_state = sales_funnel.derive_state(_prior_state, _captured, _lp)
+                    session_store.update_session_state(
+                        cursor, chat_req.session_id, company["id"], _new_state
+                    )
+                    session_store.update_lead_profile(
+                        cursor, chat_req.session_id, company["id"], _lp
+                    )
+
                     conn.commit()
                     _msg_count = session_store.count_messages(
                         cursor, chat_req.session_id, company["id"]

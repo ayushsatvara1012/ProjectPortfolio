@@ -218,11 +218,101 @@ GET  /api/sessions/{session_id}/messages  # load messages for a resumed session
 - New Alembic migration for `agent_sessions` + `agent_messages`.
 
 ### Phase 2 — Sales orchestration (automating the owner)
-- A goal-driven funnel the agent tracks: qualify → recommend → quote → capture →
-  handoff, with explicit "next best action" per state.
-- Persist a **lead profile** across the conversation (and optionally across visits)
-  — identity, intent, objections — so it behaves like a salesperson who remembers.
-- Proactive nudges (follow the buyer forward) rather than purely reactive Q&A.
+
+> **Revised 2026-06-30 after Phase 1 shipped.** Phase 1 created
+> `agent_sessions.state` and `agent_sessions.lead_profile` JSONB columns but
+> **nothing writes to them yet** — they are empty. Phase 2's first job is to
+> populate them. Phase 2 also must **connect to existing infrastructure, not
+> rebuild it**: `lead_scoring.py` (deterministic HOT/WARM/COLD), `funnel.py`
+> (conversations→leads→contacted→won BI), `booking.py` (qualified-band CTA), and
+> `agent_handoff.py` / `agent_requests` (owner notify) already exist. Phase 2 is
+> the **session-level state machine that feeds them**, not a parallel system.
+
+**Guiding principle:** the funnel stage is *derived deterministically* from
+session state (no extra LLM call per turn), mirroring the LLM-free
+`lead_scoring.py` discipline. The LLM gets the *current stage + next best action*
+injected into its prompt and decides how to phrase the push — it does not
+classify the stage itself.
+
+#### 2a — Session state machine (populate `state`)
+
+Define an explicit, ordered funnel the agent advances through, stored in
+`agent_sessions.state.stage`:
+
+```
+browsing → qualifying → recommended → quoted → captured → handed_off
+```
+
+After each turn, a pure function `derive_stage(state, captured)` advances the
+stage from what the turn produced (product resolved → `recommended`, quote
+returned → `quoted`, lead form submitted → `captured`, handoff fired →
+`handed_off`). Monotonic — never regresses. This reuses the same `captured`
+dict that Phase 1c's `derive_title` already reads, so no new capture plumbing.
+
+`state` shape (locked):
+```jsonc
+{
+  "stage": "quoted",
+  "products": [{"name": "Ethanol", "grade": "Absolute", "pack": "5 Ltr"}],
+  "quotes":   [{"product": "Ethanol", "amount": 1450, "por": false}],
+  "missing":  ["pack_size"],          // what the next step still needs
+  "objections": ["price too high"],   // surfaced from the turn (2c)
+  "next_action": "ask_for_email"      // computed, see 2b
+}
+```
+
+#### 2b — Next-best-action injected into the prompt
+
+A pure `next_best_action(stage, lead_profile)` returns one directive
+(`recommend_product`, `offer_quote`, `ask_for_email`, `offer_booking`,
+`offer_handoff`). It is injected as a single system line each turn — *"The buyer
+is at stage `quoted`; your next best action is `ask_for_email` so the owner can
+follow up."* This replaces the old reactive behaviour where the agent waits to be
+asked. `offer_booking` only fires when `lead_scoring` band ∈ {HOT, WARM} and a
+valid booking URL exists (reuse `booking.should_offer_booking`) — Phase 2 does
+not duplicate that gate.
+
+#### 2c — Lead profile (populate `lead_profile`, cross-visit seam)
+
+Persist identity + intent + objections to `agent_sessions.lead_profile`:
+```jsonc
+{
+  "name": "Rahul", "email": "rahul@acme.com", "company": "Acme",
+  "intent": "recurring supply", "score": 72, "band": "WARM",
+  "objections": ["price", "lead time"]
+}
+```
+- `score`/`band` come straight from `lead_scoring._score_lead` (already computed
+  in the chat path — just persist it onto the session instead of discarding it).
+- **Cross-visit linking is server-side only.** When an email is captured, write
+  it to `lead_profile.email`. A `lead_profiles(company_id, email, …)` rollup (or a
+  view over sessions) lets the owner-facing BI (Phase 3) see one buyer across
+  sessions. **We do NOT auto-merge the visitor's *visible history list* across
+  devices/emails** — a typo'd or shared email must never surface another person's
+  conversations. The `visitor_id` seam (Phase 1d) stays the history-scoping key;
+  email is a BI/CRM join only. *(This is a refinement of the original plan, which
+  implied email would link the visible history — that's a privacy risk.)*
+
+#### 2d — Proactive nudges (in-conversation only for Phase 2)
+
+The agent follows the buyer forward *within the live conversation* using
+`next_action` (e.g. after a quote with no email, it asks for one; after capture,
+it offers booking/handoff). **Outbound buyer email nurture (re-engaging a buyer
+who left) is explicitly deferred** — it adds deliverability, consent, and
+unsubscribe obligations and belongs with the owner's Resend layer, not the
+chat agent. Tracked as Phase 2-later / backlog.
+
+**Files changed (anticipated):**
+- New `services/sales_funnel.py` — pure `derive_stage`, `next_best_action`
+  (LLM-free, unit-testable like `funnel.py` / `lead_scoring.py`).
+- `session_store.py` — `update_session_state` / `update_lead_profile` writers.
+- `main.py` chat path — call the writers + inject the next-action system line;
+  persist the already-computed lead score onto the session.
+- No new migration expected (columns exist from Phase 1; a `lead_profiles`
+  rollup table is the only possible addition, decided in 2c).
+
+**Open questions for Phase 2 (need answers before build):** see the new
+"Phase 2 open questions" section below.
 
 ### Phase 3 — Business intelligence (owner-facing)
 - Turn every conversation into structured signal: demand by product/grade, lost
@@ -287,6 +377,19 @@ the wrong shape (text-only, no tool calls, no state). Clean schema from the star
   **purged after 1 year** — covers the full B2B sales cycle in the list, keeps
   ROI panel data intact long-term without unbounded DB growth. ✓
 
+## Phase 2 decisions (locked 2026-06-30)
+1. **Stage authority = deterministic** `derive_stage` — pure, no per-turn LLM
+   call, matches `lead_scoring.py`/`funnel.py`. ✓
+2. **Cross-visit = BI rollup only** — email joins sessions server-side for the
+   owner; the visitor's visible history stays `visitor_id`-scoped. No email-based
+   merge of the visible list (typo/shared-email privacy risk). ✓
+3. **Lead rollup = view over `agent_sessions`** — aggregate by
+   `(company_id, email)` on read. **Zero migration for Phase 2.** ✓
+4. **Nudge scope = in-conversation only** — outbound buyer re-engagement email
+   deferred to a later phase (consent/unsubscribe/deliverability). ✓
+5. **Reuse, don't rebuild** — Phase 2 calls `booking.should_offer_booking`,
+   `lead_scoring._score_lead`, and `agent_handoff`; it adds no parallel gates. ✓
+
 ## Status checklist
 - [x] Diagnosis written (this doc)
 - [x] **Phase 0a** — grade/pack chip + dropdown selector in `ChatWidget.tsx`
@@ -300,8 +403,19 @@ the wrong shape (text-only, no tool calls, no state). Clean schema from the star
       + 3 widget session endpoints (`GET/POST /api/sessions`, `GET /api/sessions/{id}/messages`)
       + **per-visitor scoping** via device-local `visitor_id` (migration `0027`) so the
       history list never leaks another visitor's titles/previews. Tests:
-      `test_session_store.py` (18) + `test_widget_sessions.py` (9).
-- [ ] Phase 2 — funnel orchestration + email-linked cross-visit lead profile
+      `test_session_store.py` (18) + `test_widget_sessions.py` (9). Committed `5b8c46d0`.
+      Migrations 0026+0027 applied dark to control DB (alembic_version left at 0025).
+      Live-verified 2026-06-30. **Phase 1 COMPLETE.** Remaining: push/merge to MainV2.
+- [x] **Phase 2a** — session state machine: `services/sales_funnel.py` `derive_stage`/`derive_state`
+      (monotonic browsing→…→handed_off) populates `agent_sessions.state`
+- [x] **Phase 2b** — `next_best_action` + `action_directive` injected as one system line/turn
+      (deterministic; reuses `booking.should_offer_booking` band gate)
+- [x] **Phase 2c** — `build_lead_profile` populates `agent_sessions.lead_profile` (reuses
+      `lead_scoring._score_lead`); email is server-side BI seam only, NOT visible-history merge
+- [x] **Phase 2d** — in-conversation nudges via `next_action`; outbound buyer email deferred
+- [x] **Phase 2 wiring** — `session_store` getters/writers + `main.py` chat path; no new migration
+      (0026 columns existed). Tests `test_sales_funnel.py` (23). Build 2026-06-30, uncommitted.
+      Remaining: live-verify → commit → push/merge to MainV2.
 - [ ] Phase 3 — BI / owner analytics
 - [ ] Phase 4 — privacy/retention/deletion hardening
 
