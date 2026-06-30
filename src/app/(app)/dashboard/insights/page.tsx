@@ -35,6 +35,7 @@ const AgentRequestsPanel = dynamic(() => import('@/src/components/dashboard/Agen
 const ConversationsPanel = dynamic(() => import('@/src/components/dashboard/ConversationsPanel'), { loading: PanelSkeleton });
 const FunnelPanel = dynamic(() => import('@/src/components/dashboard/FunnelPanel'), { loading: PanelSkeleton });
 const PipelineKpisStrip = dynamic(() => import('@/src/components/dashboard/PipelineKpis'), { loading: PanelSkeleton });
+const SessionBiPanel = dynamic(() => import('@/src/components/dashboard/SessionBiPanel'), { loading: PanelSkeleton });
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Activity series helpers — everything below is derived from REAL daily data.  */
@@ -492,6 +493,16 @@ export default function AppInsights() {
 
                 {activeTab === 'funnel' && (
                     <div className="flex flex-col gap-6 w-full min-w-0">
+                        {/* Phase 3 — session-level BI (demand, funnel, lost sales, lead quality).
+                            Chemical bots only: generic bots lack agent_sessions.state data. */}
+                        {isChemical && (
+                            <SessionBiPanel
+                                selectedBotId={selectedBotId}
+                                authFetch={authFetch}
+                                isAuthorized={canAnalytics}
+                                userTier={userTier}
+                            />
+                        )}
                         <FunnelPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
 
                         {!canAnalytics && (

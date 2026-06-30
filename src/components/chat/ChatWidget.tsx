@@ -510,9 +510,16 @@ type Message = {
   sample?: {
     product?: string; grade?: string; packaging?: string; quantity?: number;
   };
-  grade_selector?: { product?: string; grades: string[] };
+  grade_selector?: { product?: string; grades: string[]; grade_pack_map?: Record<string, string[]> };
   pack_selector?: { product?: string; grade?: string; pack_sizes: string[] };
   ts?: number;
+};
+
+type SessionRow = {
+  session_id: string;
+  title: string | null;
+  preview: string | null;
+  last_active_at: string;
 };
 
 // Phase 3 — pack-driven hub. A vertical pack ships these cards via /api/config;
@@ -676,6 +683,16 @@ function MIcon({ name, className }: { name: string; className?: string }) {
       <path d={icon.d} />
     </svg>
   );
+}
+
+function formatRelativeDate(iso: string): string {
+  const date = new Date(iso);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 // Format a deterministic quote figure (₹ for INR). Null/undefined -> em dash.
@@ -893,10 +910,98 @@ function themeVars(hex: string): Record<string, string> {
   };
 }
 
-// ── Phase 0a: Pack-size selector ────────────────────────────────────────────
-// Rendered below the bot's "which pack size?" reply. A dropdown lists the
-// available sizes (as returned by request_quote needs_pack), and a confirm
-// button sends the selection as a clean typed message — no spelling errors.
+// ── Phase 0a: Grade + pack-size selectors ────────────────────────────────────
+// Grade: ≤4 options → tap-to-send pill chips (auto-sends immediately).
+//        >4 options → dropdown + "Select grade" confirm button (many grades
+//        in a chemical catalog, e.g. LR / GC / HPLC & spec / HPLC GG / …).
+// Pack:  always a dropdown + "Get quote" button (sizes are ordered as returned
+//        by request_quote needs_pack — usually small → large from the catalog).
+
+// Combined grade + pack size picker. Shows both selectors at once so the user
+// never has to wait for a second round-trip to see pack options.
+// - ≤4 grades → chips (click to select, highlighted); >4 → dropdown
+// - Pack sizes come from grade_pack_map keyed by the selected grade
+// - Single "Get quote" button submits grade + pack together
+function GradePackSelector({ grades, gradePackMap, themeColor, onSelect }: {
+  grades: string[];
+  gradePackMap: Record<string, string[]>;
+  themeColor: string;
+  onSelect: (grade: string, pack: string) => void;
+}) {
+  const [selectedGrade, setSelectedGrade] = useState(grades[0] ?? '');
+  const packOptions = gradePackMap[selectedGrade] ?? [];
+  const [selectedPack, setSelectedPack] = useState(packOptions[0] ?? '');
+
+  useEffect(() => {
+    const packs = gradePackMap[selectedGrade] ?? [];
+    setSelectedPack(packs[0] ?? '');
+  }, [selectedGrade, gradePackMap]);
+
+  const hasPacks = Object.keys(gradePackMap).length > 0;
+
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      {grades.length <= 4 ? (
+        <div className="flex flex-wrap gap-2">
+          {grades.map(g => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => hasPacks ? setSelectedGrade(g) : onSelect(g, '')}
+              className="px-3 py-1.5 rounded-full text-[13px] font-google font-semibold border-2 transition-colors"
+              style={{
+                borderColor: themeColor,
+                color: (hasPacks && selectedGrade !== g) ? themeColor : 'white',
+                backgroundColor: (!hasPacks || selectedGrade === g) ? themeColor : '',
+              }}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <select
+          value={selectedGrade}
+          onChange={e => setSelectedGrade(e.target.value)}
+          className="px-3 py-1.5 rounded-xl text-[13px] font-google font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2"
+        >
+          {grades.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+      )}
+
+      {hasPacks ? (
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedPack}
+            onChange={e => setSelectedPack(e.target.value)}
+            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl text-[13px] font-google font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2"
+          >
+            {packOptions.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => onSelect(selectedGrade, selectedPack)}
+            disabled={!selectedGrade || !selectedPack}
+            className="shrink-0 px-4 py-1.5 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+            style={{ backgroundColor: themeColor }}
+          >
+            Get quote
+          </button>
+        </div>
+      ) : grades.length > 4 ? (
+        <button
+          type="button"
+          onClick={() => onSelect(selectedGrade, '')}
+          disabled={!selectedGrade}
+          className="self-start px-4 py-1.5 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          style={{ backgroundColor: themeColor }}
+        >
+          Select grade
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function PackSizeSelector({ packSizes, themeColor, onSelect }: {
   packSizes: string[];
@@ -1084,11 +1189,32 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   };
 
   const [configData, setConfigData] = useState<ConfigData>(DEFAULT_CONFIG);
-  const [sessionId] = useState<string>(() =>
-    typeof window !== 'undefined' && window.crypto?.randomUUID
-      ? window.crypto.randomUUID()
-      : Math.random().toString(36).substring(2, 15)
-  );
+  const [sessionId, setSessionId] = useState<string>(() => {
+    if (typeof window === 'undefined') return Math.random().toString(36).substring(2, 15);
+    const lsKey = activeApiKey ? `sapy_sid_${activeApiKey}` : null;
+    if (lsKey) {
+      const stored = localStorage.getItem(lsKey);
+      if (stored) return stored;
+    }
+    const newId = window.crypto?.randomUUID?.() ?? Math.random().toString(36).substring(2, 15);
+    if (lsKey) localStorage.setItem(lsKey, newId);
+    return newId;
+  });
+
+  // Phase 1d: stable device-local visitor identity. Unlike sessionId (which rotates
+  // per conversation), this persists across "New conversation" so the history list
+  // can be scoped to THIS visitor — the server never returns another visitor's
+  // sessions. Opaque UUID, no PII; Phase 2 will link it to a captured email.
+  const visitorIdRef = useRef<string>('');
+  if (typeof window !== 'undefined' && !visitorIdRef.current) {
+    const vKey = activeApiKey ? `sapy_vid_${activeApiKey}` : null;
+    let vid = vKey ? localStorage.getItem(vKey) : null;
+    if (!vid) {
+      vid = window.crypto?.randomUUID?.() ?? Math.random().toString(36).substring(2, 15);
+      if (vKey) localStorage.setItem(vKey, vid);
+    }
+    visitorIdRef.current = vid;
+  }
 
   // Widget session token (anti quota-drain). Minted from /api/widget/session and
   // sent as x-Sapybase-session on every /api/chat call. Stored in a ref; lazily
@@ -1170,6 +1296,25 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           // fallback, the presence of hub cards.
           isVerticalBotRef.current = Boolean(data.vertical)
             || (Array.isArray(data.hub_cards) && data.hub_cards.length > 0);
+          // Phase 1d: fetch past sessions for returning visitors on vertical bots.
+          if (isVerticalBotRef.current && activeApiKey && visitorIdRef.current) {
+            setIsLoadingHistory(true);
+            fetch(`${activeApiUrl}/api/sessions?visitor_id=${encodeURIComponent(visitorIdRef.current)}`, {
+              headers: {
+                'x-api-key': activeApiKey,
+                ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+              },
+            })
+              .then(r => r.ok ? r.json() : null)
+              .then(d => {
+                if (d?.sessions?.length > 0) {
+                  setSessionHistory(d.sessions);
+                  setView('history');
+                }
+              })
+              .catch(() => { /* first visit — stay on chat */ })
+              .finally(() => setIsLoadingHistory(false));
+          }
           setMessages(prev => {
             if (prev.length === 1 && prev[0].role === 'bot') {
               return [{ role: 'bot', content: data.initial_message || DEFAULT_CONFIG.initial_message, ts: Date.now() }];
@@ -1239,6 +1384,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // action-card grid + bottom Home/Chat tabs) per the chemical Figma; the header
   // back-arrow returns there from 'chat'. A generic bot has no hub → always 'chat'.
   const [hubView, setHubView] = useState<'chat' | 'home'>('chat');
+  // Phase 1d: two-screen widget. 'history' shows past sessions for returning visitors;
+  // 'chat' is the normal chat/home experience. First visit (no sessions) skips history.
+  const [view, setView] = useState<'history' | 'chat'>('chat');
+  const [sessionHistory, setSessionHistory] = useState<SessionRow[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   // Land a vertical bot on Home the first time its config (hub cards) arrives.
   const didInitHubView = useRef(false);
   useEffect(() => {
@@ -1464,6 +1614,86 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     handleHubCardTap(card);
   };
 
+  // Phase 1d: (re)load this visitor's recent sessions. Called on config load and
+  // whenever the visitor opens the Conversations screen from the menu, so a just-
+  // finished conversation appears instead of a stale snapshot. Scoped to visitor_id.
+  const loadSessionHistory = async (): Promise<SessionRow[]> => {
+    if (!activeApiKey || !visitorIdRef.current) return [];
+    setIsLoadingHistory(true);
+    try {
+      const parentOriginHist = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const res = await fetch(`${activeApiUrl}/api/sessions?visitor_id=${encodeURIComponent(visitorIdRef.current)}`, {
+        headers: {
+          'x-api-key': activeApiKey,
+          ...(parentOriginHist ? { 'x-Sapybase-parent-origin': parentOriginHist } : {}),
+        },
+      });
+      const data = res.ok ? await res.json() : null;
+      const rows: SessionRow[] = data?.sessions ?? [];
+      setSessionHistory(rows);
+      return rows;
+    } catch {
+      return [];
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Phase 1d: start a fresh session — new UUID, clear messages, persist to localStorage.
+  const startNewSession = () => {
+    const newId = window.crypto?.randomUUID?.() ?? Math.random().toString(36).substring(2, 15);
+    if (activeApiKey) localStorage.setItem(`sapy_sid_${activeApiKey}`, newId);
+    setSessionId(newId);
+    setMessages([{ role: 'bot', content: configData.initial_message, ts: Date.now() }]);
+    userMessageCountRef.current = 0;
+    leadCapturedRef.current = false;
+    leadFormShownRef.current = false;
+    animatedMsgIndices.current.clear();
+    setHandoffSent(false);
+    setShowMenu(false);
+    setView('chat');
+    if (hasHub) setHubView('home');
+    setClearCount(c => c + 1);
+  };
+
+  // Phase 1d: resume a past session — load messages from DB and switch to chat view.
+  const resumeSession = async (sid: string) => {
+    if (activeApiKey) localStorage.setItem(`sapy_sid_${activeApiKey}`, sid);
+    setSessionId(sid);
+    setView('chat');
+    if (hasHub) setHubView('chat');
+    animatedMsgIndices.current.clear();
+    // Reset per-conversation gates so the resumed thread doesn't inherit the prior
+    // view's lead-capture / handoff state. The fresh greeting shows until rows load.
+    userMessageCountRef.current = 0;
+    leadFormShownRef.current = false;
+    setHandoffSent(false);
+    const fresh: Message[] = [{ role: 'bot', content: configData.initial_message, ts: Date.now() }];
+    setMessages(fresh);
+    try {
+      const parentOriginResume = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const res = await fetch(`${activeApiUrl}/api/sessions/${encodeURIComponent(sid)}/messages?visitor_id=${encodeURIComponent(visitorIdRef.current)}`, {
+        headers: {
+          'x-api-key': activeApiKey!,
+          ...(parentOriginResume ? { 'x-Sapybase-parent-origin': parentOriginResume } : {}),
+        },
+      });
+      // Non-ok (404 visitor mismatch / 5xx) keeps the fresh greeting — never the
+      // previous conversation's stale messages under this session's header.
+      if (res.ok) {
+        const data = await res.json();
+        const loaded: Message[] = (data.messages || []).map((m: { role: string; content: string; ts: string }) => ({
+          role: (m.role === 'assistant' ? 'bot' : m.role) as Message['role'],
+          content: m.content || '',
+          ts: m.ts ? new Date(m.ts).getTime() : Date.now(),
+        }));
+        if (loaded.length > 0) setMessages(loaded);
+      }
+    } catch {
+      /* network error — keep the fresh greeting already set above */
+    }
+  };
+
   const submitHubValue = (value: string) => {
     const card = activeHubCard;
     const v = value.trim();
@@ -1530,10 +1760,34 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       setIsLoading(false);
       return;
     }
+    // Phase 0d: widened from 4 → 8 as a bridge until Phase 1 session store is live.
+    // State notes appended to bot messages so the model carries structured context
+    // (resolved product/grade/quote) across turns without re-deriving.
     const recentHistory = messages
       .filter(m => (m.role === 'user' || m.role === 'bot') && typeof m.content === 'string')
-      .slice(-4)
-      .map(m => ({ role: m.role, content: m.content! }));
+      .slice(-8)
+      .map(m => {
+        let content = m.content!;
+        if (m.role === 'bot') {
+          if (m.quote) {
+            const q = m.quote;
+            const parts = [q.product, q.grade, q.pack_size].filter(Boolean).join(' ');
+            if (q.status === 'quoted' && q.unit_price != null) {
+              content += `\n[State: ${parts} quoted at ${q.currency ?? 'INR'} ${q.unit_price}]`;
+            } else if (q.status === 'price_on_request') {
+              content += `\n[State: ${parts} — price on request, contact captured]`;
+            }
+          }
+          if (m.sds) {
+            content += `\n[State: SDS provided for ${m.sds.product ?? 'product'}]`;
+          }
+          if (m.sample) {
+            const sp = [m.sample.product, m.sample.grade].filter(Boolean).join(' ');
+            content += `\n[State: sample requested for ${sp}]`;
+          }
+        }
+        return { role: m.role, content };
+      });
     let firstChunkReceived = false;
     let sseRetryCount = 0;
     // Structured "Open SDS" action emitted by the agent stream (a {sds:{...}}
@@ -1561,7 +1815,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           ...(parentOriginChat ? { 'x-Sapybase-parent-origin': parentOriginChat } : {}),
           ...(sessionToken ? { 'x-Sapybase-session': sessionToken } : {}),
         },
-        body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId }),
+        body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId, visitor_id: visitorIdRef.current }),
         signal: ctrl.signal,
         openWhenHidden: true,
         async onopen(response) {
@@ -1823,8 +2077,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               <div className="text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-2 pl-1">
-                    {hasHub && hubView === 'chat' && (
-                      // Top-nav back arrow → Home screen (only for vertical bots).
+                    {hasHub && hubView === 'chat' && view === 'chat' && (
+                      // Top-nav back arrow → Home screen (only for vertical bots in chat view).
                       <button onClick={() => { setActiveHubCard(null); setHubView('home'); }}
                         style={{ WebkitTapHighlightColor: 'transparent', outlineColor: THEME_COLOR }}
                         className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Go to home">
@@ -1853,8 +2107,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   </div>
                   <div className="flex items-center gap-1">
                     {/* The ⋮ menu acts on a conversation (clear chat / handoff) — hide
-                        it on the Home screen where there's nothing to act on; ✕ stays. */}
-                    {hubView !== 'home' && (
+                        it on the Home screen and history screen where there's nothing to act on; ✕ stays. */}
+                    {hubView !== 'home' && view === 'chat' && (
                       <button onClick={() => setShowMenu(!showMenu)}
                         style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', outlineColor: THEME_COLOR }}
                         className="p-2.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Chat menu">
@@ -1887,17 +2141,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                             <ConnectIcon size={20} />
                           </button>
                         )}
-                        <button onClick={() => {
-                          setMessages([{ role: 'bot', content: configData.initial_message, ts: Date.now() }]);
-                          userMessageCountRef.current = 0;
-                          leadCapturedRef.current = false;
-                          leadFormShownRef.current = false;
-                          animatedMsgIndices.current.clear();
-                          setHandoffSent(false);
-                          setShowMenu(false);
-                          setClearCount(c => c + 1);
-                        }} className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
-                          Clear chat <MIcon name="refresh" className="text-[20px]" />
+                        {sessionHistory.length > 0 && (
+                          <button onClick={() => { setView('history'); setShowMenu(false); loadSessionHistory(); }}
+                            className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+                            Conversations <ForumIcon size={20} />
+                          </button>
+                        )}
+                        <button onClick={startNewSession}
+                          className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+                          {hasHub ? 'New conversation' : 'Clear chat'}
+                          <MIcon name={hasHub ? 'add' : 'refresh'} className="text-[20px]" />
                         </button>
                         <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                           className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
@@ -1912,7 +2165,52 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             </div>
 
-            {hubView === 'chat' && !sampleFormOpen && (
+            {/* Phase 1d — session history screen (returning visitors on vertical bots) */}
+            {view === 'history' && (
+              <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
+                <div className="px-4 pt-4 pb-2 shrink-0">
+                  <p className="text-[11px] font-google font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Recent conversations
+                  </p>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {isLoadingHistory ? (
+                    <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
+                      Loading…
+                    </div>
+                  ) : (
+                    sessionHistory.map(sess => (
+                      <button key={sess.session_id} type="button" onClick={() => resumeSession(sess.session_id)}
+                        className="w-full text-left px-4 py-3.5 border-b border-gray-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800/60 active:bg-slate-100 dark:active:bg-slate-800 transition-colors flex flex-col gap-0.5">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100 truncate leading-snug">
+                            {sess.title || 'Conversation'}
+                          </span>
+                          <span className="text-[11px] font-google text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">
+                            {sess.last_active_at ? formatRelativeDate(sess.last_active_at) : ''}
+                          </span>
+                        </div>
+                        {sess.preview && (
+                          <span className="text-[12px] font-google text-slate-500 dark:text-slate-400 truncate">
+                            {sess.preview}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="shrink-0 p-4 border-t border-gray-100 dark:border-slate-800">
+                  <button type="button" onClick={startNewSession}
+                    className="w-full py-2.5 rounded-full text-[14px] font-google font-semibold text-white transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                    style={{ backgroundColor: THEME_COLOR }}>
+                    <MIcon name="add" className="text-[18px] leading-none" />
+                    New conversation
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
               <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
                 {showJumpPill && (
                   <button
@@ -2064,24 +2362,17 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                       </div>
                                     </div>
                                   )}
-                                  {/* Phase 0a: grade chips — only on the latest bot message so
-                                      earlier selectors don't stay interactive after the user replied. */}
+                                  {/* Phase 0a: combined grade + pack selector. Shows both in one UI
+                                      so the user never needs a second round-trip. Grade chips for
+                                      ≤4 options (click = highlight), dropdown for more; pack sizes
+                                      update live from grade_pack_map. Only on the latest bot message. */}
                                   {msg.role === 'bot' && !msg.isStreaming && msg.grade_selector && msg.grade_selector.grades.length > 0 && idx === messages.length - 1 && (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                      {msg.grade_selector.grades.map(grade => (
-                                        <button
-                                          key={grade}
-                                          type="button"
-                                          onClick={() => handleSend(null, grade)}
-                                          className="px-3 py-1.5 rounded-full text-[13px] font-google font-semibold border-2 transition-colors hover:text-white"
-                                          style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}
-                                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = THEME_COLOR; }}
-                                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = ''; }}
-                                        >
-                                          {grade}
-                                        </button>
-                                      ))}
-                                    </div>
+                                    <GradePackSelector
+                                      grades={msg.grade_selector.grades}
+                                      gradePackMap={msg.grade_selector.grade_pack_map ?? {}}
+                                      themeColor={THEME_COLOR}
+                                      onSelect={(grade, pack) => handleSend(null, pack ? `${grade}, ${pack}` : grade)}
+                                    />
                                   )}
                                   {/* Phase 0a: pack-size dropdown + confirm — only on the latest bot message. */}
                                   {msg.role === 'bot' && !msg.isStreaming && msg.pack_selector && msg.pack_selector.pack_sizes.length > 0 && idx === messages.length - 1 && (
@@ -2105,7 +2396,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {hubView === 'chat' && sampleFormOpen && (
+            {view === 'chat' && hubView === 'chat' && sampleFormOpen && (
               <SampleForm
                 schema={configData.sample_form ?? []}
                 products={configData.products ?? []}
@@ -2118,7 +2409,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               />
             )}
 
-            {hubView === 'home' && hasHub && (
+            {view === 'chat' && hubView === 'home' && hasHub && (
               // Home screen — branded gradient + 2-col action grid + pill Home/Chat
               // nav + Vaayu footer (chemical Figma).
               <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50 bg-gradient-to-b from-[var(--sapy-theme)]/[0.06] via-[var(--sapy-theme)]/[0.02] to-transparent">
@@ -2165,7 +2456,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {hubView === 'chat' && !sampleFormOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
               <div className="bg-gray-50/50 dark:bg-slate-950/50 shrink-0 z-10 flex flex-col">
                 {hasHub && (activeHubCard || (messages.length === 1 && !input.trim())) ? (
                   // Phase 3 — pack-driven hub. Card strip on a fresh conversation;
