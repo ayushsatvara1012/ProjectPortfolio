@@ -3111,6 +3111,25 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         "form_id": obs.get("form_id") or "sample",
                         "prefill": obs.get("prefill") or {},
                     }
+                # Phase 0a: when request_quote needs a grade, surface the options as
+                # interactive pill chips in the widget — no typing, no spelling errors.
+                if (tool_name == "request_quote" and isinstance(obs, dict)
+                        and obs.get("status") == "needs_grade"
+                        and obs.get("grades")):
+                    _captured["grade_selector"] = {
+                        "product": obs.get("product"),
+                        "grades": obs.get("grades", []),
+                    }
+                # Phase 0a: when request_quote needs a pack size, surface the options
+                # as a dropdown + confirm button — ordered as returned by the catalog.
+                if (tool_name == "request_quote" and isinstance(obs, dict)
+                        and obs.get("status") == "needs_pack"
+                        and obs.get("pack_sizes")):
+                    _captured["pack_selector"] = {
+                        "product": obs.get("product"),
+                        "grade": obs.get("grade"),
+                        "pack_sizes": obs.get("pack_sizes", []),
+                    }
                 return obs
 
             # Bound the whole precompute: the agent makes BLOCKING Gemini calls here
@@ -3130,6 +3149,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
             agent_quote = _captured.get("quote")
             agent_form = _captured.get("form")
             agent_handoff = _captured.get("handoff")
+            agent_grade_selector = _captured.get("grade_selector")
+            agent_pack_selector = _captured.get("pack_selector")
 
             # Real-time owner handoff (Phase 4b): any priced/POR quote pings the
             # owner on Slack + email so a warm lead doesn't wait for a dashboard
@@ -3164,6 +3185,10 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'quote': agent_quote})}\n\n"
                     if agent_form:
                         yield f"data: {json.dumps({'form': agent_form})}\n\n"
+                    if agent_grade_selector:
+                        yield f"data: {json.dumps({'grade_selector': agent_grade_selector})}\n\n"
+                    if agent_pack_selector:
+                        yield f"data: {json.dumps({'pack_selector': agent_pack_selector})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 

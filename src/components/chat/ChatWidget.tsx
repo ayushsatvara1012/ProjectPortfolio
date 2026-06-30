@@ -510,6 +510,8 @@ type Message = {
   sample?: {
     product?: string; grade?: string; packaging?: string; quantity?: number;
   };
+  grade_selector?: { product?: string; grades: string[] };
+  pack_selector?: { product?: string; grade?: string; pack_sizes: string[] };
   ts?: number;
 };
 
@@ -889,6 +891,39 @@ function themeVars(hex: string): Record<string, string> {
     '--sapy-user-fg': fgFor(A_LIGHT, 0.96),      // bubble text over the light chat surface
     '--sapy-user-fg-dark': fgFor(A_DARK, 0.06),  // bubble text over the dark chat surface
   };
+}
+
+// ── Phase 0a: Pack-size selector ────────────────────────────────────────────
+// Rendered below the bot's "which pack size?" reply. A dropdown lists the
+// available sizes (as returned by request_quote needs_pack), and a confirm
+// button sends the selection as a clean typed message — no spelling errors.
+
+function PackSizeSelector({ packSizes, themeColor, onSelect }: {
+  packSizes: string[];
+  themeColor: string;
+  onSelect: (pack: string) => void;
+}) {
+  const [selected, setSelected] = useState(packSizes[0] ?? '');
+  return (
+    <div className="mt-3 flex items-center gap-2 flex-wrap">
+      <select
+        value={selected}
+        onChange={e => setSelected(e.target.value)}
+        className="flex-1 min-w-0 px-3 py-1.5 rounded-xl text-[13px] font-google font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2"
+      >
+        {packSizes.map(p => <option key={p} value={p}>{p}</option>)}
+      </select>
+      <button
+        type="button"
+        onClick={() => onSelect(selected)}
+        disabled={!selected}
+        className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+        style={{ backgroundColor: themeColor }}
+      >
+        Get quote
+      </button>
+    </div>
+  );
 }
 
 // ── Structured sample form (Phase 4b) ───────────────────────────────────────
@@ -1510,6 +1545,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // "Open the sample form" action (a {form:{...}} event); captured here and acted
     // on at [DONE] so the form opens right after the bot's text reply lands.
     let pendingForm: { form_id: string; prefill: Record<string, string> } | null = null;
+    // Phase 0a: grade/pack selectors emitted by the agent when request_quote
+    // returns needs_grade / needs_pack. Attached to the bot message at [DONE].
+    let pendingGradeSelector: Message['grade_selector'] | null = null;
+    let pendingPackSelector: Message['pack_selector'] | null = null;
     const SSE_MAX_RETRIES = 1;
     try {
       const parentOriginChat = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
@@ -1602,7 +1641,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot') {
-                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingSds ? { sds: pendingSds } : {}), ...(pendingQuote ? { quote: pendingQuote } : {}) };
+                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingSds ? { sds: pendingSds } : {}), ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}) };
               }
               return updated;
             });
@@ -1659,6 +1698,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // hub card). Acted on at [DONE], after the bot's text reply.
             if (parsed.form && typeof parsed.form.form_id === 'string') {
               pendingForm = { form_id: parsed.form.form_id, prefill: parsed.form.prefill || {} };
+              return;
+            }
+            // Phase 0a: grade/pack selector side-channels from request_quote.
+            if (parsed.grade_selector && Array.isArray(parsed.grade_selector.grades)) {
+              pendingGradeSelector = parsed.grade_selector as Message['grade_selector'];
+              return;
+            }
+            if (parsed.pack_selector && Array.isArray(parsed.pack_selector.pack_sizes)) {
+              pendingPackSelector = parsed.pack_selector as Message['pack_selector'];
               return;
             }
             chunk = parsed.token || parsed.content || parsed.text || '';
@@ -2015,6 +2063,33 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                         <div className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">Our team will be in touch to arrange your sample.</div>
                                       </div>
                                     </div>
+                                  )}
+                                  {/* Phase 0a: grade chips — only on the latest bot message so
+                                      earlier selectors don't stay interactive after the user replied. */}
+                                  {msg.role === 'bot' && !msg.isStreaming && msg.grade_selector && msg.grade_selector.grades.length > 0 && idx === messages.length - 1 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      {msg.grade_selector.grades.map(grade => (
+                                        <button
+                                          key={grade}
+                                          type="button"
+                                          onClick={() => handleSend(null, grade)}
+                                          className="px-3 py-1.5 rounded-full text-[13px] font-google font-semibold border-2 transition-colors hover:text-white"
+                                          style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}
+                                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = THEME_COLOR; }}
+                                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = ''; }}
+                                        >
+                                          {grade}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {/* Phase 0a: pack-size dropdown + confirm — only on the latest bot message. */}
+                                  {msg.role === 'bot' && !msg.isStreaming && msg.pack_selector && msg.pack_selector.pack_sizes.length > 0 && idx === messages.length - 1 && (
+                                    <PackSizeSelector
+                                      packSizes={msg.pack_selector.pack_sizes}
+                                      themeColor={THEME_COLOR}
+                                      onSelect={pack => handleSend(null, pack)}
+                                    />
                                   )}
                                   {metaLabel && !msg.isStreaming && <span suppressHydrationWarning className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-1 px-1 leading-none">{metaLabel}</span>}
                                 </div>
