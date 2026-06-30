@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
     history: Optional[list[ChatMessage]] = Field(None, description="Last N chat messages for context-aware caching")
     session_id: Optional[str] = Field(None, description="Client-side session tracking id")
+    visitor_id: Optional[str] = Field(None, description="Device-local visitor id (localStorage UUID) — scopes the Phase 1d history list")
 
     @validator('message')
     def sanitize_jailbreak_patterns(cls, v):

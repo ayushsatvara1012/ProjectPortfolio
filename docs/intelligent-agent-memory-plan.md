@@ -192,10 +192,17 @@ crush the message area. Instead, two screens:
 - Grade/pack chips render here (Phase 0a) for new turns in this session.
 
 **Visitor identity across visits:**
-- `session_id` is stored in browser `localStorage` keyed by `company_id`.
+- `session_id` (current conversation) is stored in `localStorage` keyed by api_key.
+- A separate stable `visitor_id` (also `localStorage`, keyed by api_key) survives
+  "New conversation" and **scopes the history list** — `GET /api/sessions` filters
+  `(company_id, visitor_id)`, so one buyer never sees another buyer's conversations.
+  Missing `visitor_id` → empty list (never a company-wide leak). Stored on
+  `agent_sessions.visitor_id` (migration `0027`), backfilled onto legacy NULL rows
+  on the visitor's next message via `COALESCE`.
 - Same device + same browser = sessions persist and resume correctly.
 - Different device or cleared browser = treated as a new visitor (no cross-device
-  link until email is captured during qualification; Phase 2 will link by email).
+  link until email is captured during qualification; Phase 2 will link by email,
+  reusing `visitor_id` as the join seam).
 
 **New endpoints needed:**
 ```
@@ -282,14 +289,18 @@ the wrong shape (text-only, no tool calls, no state). Clean schema from the star
 
 ## Status checklist
 - [x] Diagnosis written (this doc)
-- [ ] **Phase 0a** — grade/pack chip + dropdown selector in `ChatWidget.tsx`
-- [ ] **Phase 0b** — RULE 6 generic fallback removed for pack bots (`main.py:2962`)
-- [ ] **Phase 0c** — narrowing tools list options not just ask (`agent.py:~427`)
-- [ ] **Phase 0d** — widen history window 4→8, stop stripping client-side, state note
-- [ ] **Phase 1a** — `agent_sessions` + `agent_messages` tables + Alembic migration
-- [ ] **Phase 1b** — hybrid context feed (verbatim recent + Haiku summary on idle)
-- [ ] **Phase 1c** — auto-title generation from session state
-- [ ] **Phase 1d** — two-screen widget (history screen + chat screen + back nav)
+- [x] **Phase 0a** — grade/pack chip + dropdown selector in `ChatWidget.tsx`
+- [x] **Phase 0b** — RULE 6 generic fallback removed for pack bots (`main.py:2962`)
+- [x] **Phase 0c** — narrowing tools list options not just ask (`agent.py:~427`)
+- [x] **Phase 0d** — widen history window 4→8, stop stripping client-side, state note
+- [x] **Phase 1a** — `agent_sessions` + `agent_messages` tables + Alembic migration (`0026`)
+- [x] **Phase 1b** — hybrid context feed (verbatim recent + flash-lite summary on idle; `services/session_store.py`)
+- [x] **Phase 1c** — auto-title generation from session state (`session_store.derive_title`)
+- [x] **Phase 1d** — two-screen widget (history screen + chat screen + menu nav)
+      + 3 widget session endpoints (`GET/POST /api/sessions`, `GET /api/sessions/{id}/messages`)
+      + **per-visitor scoping** via device-local `visitor_id` (migration `0027`) so the
+      history list never leaks another visitor's titles/previews. Tests:
+      `test_session_store.py` (18) + `test_widget_sessions.py` (9).
 - [ ] Phase 2 — funnel orchestration + email-linked cross-visit lead profile
 - [ ] Phase 3 — BI / owner analytics
 - [ ] Phase 4 — privacy/retention/deletion hardening

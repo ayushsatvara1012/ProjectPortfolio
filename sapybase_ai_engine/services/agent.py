@@ -453,14 +453,21 @@ def request_quote(
     grade_in = (grade or "").strip()
     grades = sorted({(r[2] or "") for r in rows if r[2]})
     if not grade_in:
+        grade_pack_map: Dict[str, list] = {}
+        for g in grades[:20]:
+            gps = sorted({r[3] or "" for r in rows if (r[2] or "") == g and r[3]})
+            if gps:
+                grade_pack_map[g] = gps
         return {"status": "needs_grade", "product": product, "grades": grades[:20],
-                "message": f"Ask which grade of {product} they need."}
+                "grade_pack_map": grade_pack_map,
+                "message": (f"Tell the visitor: {product} is available in these grades: "
+                            f"{', '.join(grades[:20])}. Ask which grade they need.")}
     gmatch = [g for g in grades if g.lower() == grade_in.lower()] or \
              [g for g in grades if grade_in.lower() in g.lower()]
     if len(gmatch) != 1:
         return {"status": "needs_grade", "product": product, "grades": grades[:20],
-                "message": (f"Couldn't match grade '{grade_in}'. Ask the visitor to pick "
-                            f"one of the available grades for {product}.")}
+                "message": (f"Couldn't match grade '{grade_in}'. Tell the visitor the available grades "
+                            f"for {product}: {', '.join(grades[:20])}. Ask them to pick one.")}
     grade_sel = gmatch[0]
     grows = [r for r in rows if (r[2] or "") == grade_sel]
 
@@ -470,7 +477,8 @@ def request_quote(
     if not pack_in:
         return {"status": "needs_pack", "product": product, "grade": grade_sel,
                 "pack_sizes": packs[:20],
-                "message": f"Ask which pack size of {product} ({grade_sel}) they need."}
+                "message": (f"Tell the visitor: {product} ({grade_sel}) is available in these pack sizes: "
+                            f"{', '.join(packs[:20])}. Ask which pack size they need.")}
     # Canonicalise BOTH sides from the human pack_size text (r[3]) — the stored
     # pack_size_norm (r[4]) is unreliable (uploads use different formats) and the
     # old substring fallback collided '5 Ltr' with '2.5 Ltr'. Exact canonical
@@ -747,10 +755,11 @@ def build_agent_directive(pack) -> str:
         "sizes) call get_product_spec. That tool returns commercial data only — "
         "never treat its grade or purity as a basis to infer hazards or handling. "
         "Any safety-class question still goes to get_sds, even mid-conversation.\n\n"
-        "For a PRICE or quotation call request_quote. Pass ALL info the visitor "
-        "already gave (product, grade, pack size) in ONE call — do NOT pre-ask for "
-        "contact details or anything the tool hasn't requested yet. The tool itself "
-        "tells you what is missing; relay that to the visitor. NEVER state, compute, "
+        "For a PRICE or quotation call request_quote IMMEDIATELY when the visitor "
+        "mentions a product and price — do NOT ask for grade or pack size yourself "
+        "before calling the tool. Pass whatever the visitor already gave (product, "
+        "grade, pack size) in ONE call; the tool tells you step-by-step what is "
+        "still missing and the widget handles the selection UI. NEVER state, compute, "
         "estimate, or round a price yourself — quote ONLY the figures request_quote "
         "returns. If it returns needs_contact (price-on-request only), THEN ask for "
         "name and email. If ambiguous_price, say you'll confirm with the team. "
