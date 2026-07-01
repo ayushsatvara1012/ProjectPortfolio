@@ -1531,6 +1531,50 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
   }, [input]);
 
+  // Mobile keyboard: keep the focused field visible. The main composer is
+  // already pinned above the keyboard (the panel is sized to the visual
+  // viewport), so this only handles fields that live higher up in the thread —
+  // hub mini-forms, the lead-capture / handoff forms, and the sample form.
+  // We re-center on the actual viewport reflow (the resize the keyboard
+  // triggers) rather than a blind timeout, so the field never jumps before
+  // the keyboard has settled, and a short fallback covers field-to-field
+  // switches where the keyboard is already open and no resize fires.
+  useEffect(() => {
+    if (!isMobile || !isOpen) return;
+    let pending: HTMLElement | null = null;
+    let fallbackTimer: number | undefined;
+
+    const isEditable = (el: EventTarget | null): el is HTMLElement =>
+      el instanceof HTMLElement && el.matches('input, textarea, select');
+
+    const bringIntoView = (el: HTMLElement | null) => {
+      if (!el || el === inputRef.current) return; // composer stays put
+      try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      catch { el.scrollIntoView(); }
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isEditable(e.target) || e.target === inputRef.current) { pending = null; return; }
+      pending = e.target;
+      window.clearTimeout(fallbackTimer);
+      fallbackTimer = window.setTimeout(() => { if (pending) bringIntoView(pending); }, 350);
+    };
+    const onFocusOut = () => { pending = null; window.clearTimeout(fallbackTimer); };
+    const onReflow = () => { if (pending) bringIntoView(pending); };
+
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    window.addEventListener('resize', onReflow);
+    window.visualViewport?.addEventListener('resize', onReflow);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+      window.removeEventListener('resize', onReflow);
+      window.visualViewport?.removeEventListener('resize', onReflow);
+      window.clearTimeout(fallbackTimer);
+    };
+  }, [isMobile, isOpen]);
+
   const sendMessage = async (text: string) => {
     const userMessage = text.trim();
     if (!userMessage || isLoading) return;

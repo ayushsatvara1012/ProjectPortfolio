@@ -401,6 +401,12 @@
         '  display: block; opacity: 1; transform: translateY(0) scale(1);',
         '  pointer-events: auto;',
         '}',
+        // While the on-screen keyboard is being tracked (mobile fullscreen),
+        // suppress the width/height transition below. Without this, every
+        // visualViewport resize event animates the wrap's height over .2s,
+        // and since that lags the keyboard's own show/hide animation, host
+        // page background flashes through as a white gap for that duration.
+        '.iframe-wrap.vv-tracking { transition: none; }',
         '@media (min-width: 481px) {',
         '  .iframe-wrap.expanded { width: 500px; height: 85vh; max-height: calc(100vh - 40px); }',
         '}',
@@ -490,28 +496,46 @@
     // the layout viewport unchanged — so a 100dvh wrap shows the host page
     // between the chat input and the keyboard. Track visualViewport.height +
     // offsetTop while open and pin the wrap to the visible region.
+    // overflow:hidden alone does not stop iOS Safari's rubber-band scroll —
+    // the page can still shift under the fixed overlay while the keyboard
+    // animates, which is what shows up as a white gap. Pinning body with
+    // position:fixed at its current scroll offset is the standard fix.
     _lockScroll() {
       var de = document.documentElement;
       var body = document.body;
+      var scrollY = window.scrollY || window.pageYOffset || 0;
+      this._savedScrollY = scrollY;
       this._savedScrollStyles = {
         deOverflow: de.style.overflow,
-        deHeight: de.style.height,
+        bodyPosition: body.style.position,
+        bodyTop: body.style.top,
+        bodyLeft: body.style.left,
+        bodyRight: body.style.right,
+        bodyWidth: body.style.width,
         bodyOverflow: body.style.overflow,
-        bodyHeight: body.style.height,
       };
       de.style.overflow = 'hidden';
-      de.style.height = '100%';
+      body.style.position = 'fixed';
+      body.style.top = (-scrollY) + 'px';
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.width = '100%';
       body.style.overflow = 'hidden';
-      body.style.height = '100%';
     }
 
     _unlockScroll() {
       if (!this._savedScrollStyles) return;
       var s = this._savedScrollStyles;
+      var body = document.body;
       document.documentElement.style.overflow = s.deOverflow;
-      document.documentElement.style.height = s.deHeight;
-      document.body.style.overflow = s.bodyOverflow;
-      document.body.style.height = s.bodyHeight;
+      body.style.position = s.bodyPosition;
+      body.style.top = s.bodyTop;
+      body.style.left = s.bodyLeft;
+      body.style.right = s.bodyRight;
+      body.style.width = s.bodyWidth;
+      body.style.overflow = s.bodyOverflow;
+      window.scrollTo(0, this._savedScrollY || 0);
+      this._savedScrollY = 0;
       this._savedScrollStyles = null;
     }
 
@@ -520,24 +544,36 @@
       var vv = window.visualViewport;
       var wrap = this._wrap;
       if (!wrap) return;
-      var isMobile = window.matchMedia && window.matchMedia('(max-width: 480px)').matches;
-      if (isMobile) this._lockScroll();
+      var mq = window.matchMedia && window.matchMedia('(max-width: 480px)');
       var sync = function () {
-        if (window.matchMedia && !window.matchMedia('(max-width: 480px)').matches) {
+        var isMobile = !!(mq && mq.matches);
+        if (!isMobile) {
+          wrap.classList.remove('vv-tracking');
           wrap.style.height = '';
           wrap.style.top = '';
           wrap.style.left = '';
           wrap.style.width = '';
+          wrap.style.right = '';
+          wrap.style.bottom = '';
           return;
         }
+        // Suppress the CSS width/height transition while pinning to the
+        // live visual viewport — see the .vv-tracking rule above.
+        wrap.classList.add('vv-tracking');
         wrap.style.height = vv.height + 'px';
         wrap.style.top = vv.offsetTop + 'px';
         wrap.style.left = vv.offsetLeft + 'px';
         wrap.style.width = vv.width + 'px';
+        // Explicitly clear right/bottom (set by the mobile media query) so
+        // top/left/width/height are never fighting an over-constrained box
+        // in engines that don't resolve that per spec.
+        wrap.style.right = 'auto';
+        wrap.style.bottom = 'auto';
       };
       this._onVvSync = sync;
       vv.addEventListener('resize', sync);
       vv.addEventListener('scroll', sync);
+      if (mq && mq.matches) this._lockScroll();
       sync();
     }
 
@@ -551,10 +587,13 @@
       }
       this._unlockScroll();
       if (this._wrap) {
+        this._wrap.classList.remove('vv-tracking');
         this._wrap.style.height = '';
         this._wrap.style.top = '';
         this._wrap.style.left = '';
         this._wrap.style.width = '';
+        this._wrap.style.right = '';
+        this._wrap.style.bottom = '';
       }
     }
 
@@ -650,7 +689,7 @@
   function autoMount() {
     var currentScript =
       document.currentScript ||
-      document.querySelector('script[data-bot-id][src*="sapybase-loader.js"]');
+      document.querySelector('script[data-bot-id][src*="sapybase-loader@1.js"]');
     if (!currentScript) return;
 
     var botId = currentScript.getAttribute('data-bot-id');
