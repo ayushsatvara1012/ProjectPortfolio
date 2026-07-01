@@ -88,7 +88,7 @@ class TestRoutingEnabledMigration:
 
     def test_uses_canonical_additive_ddl(self):
         # Imports the store's single-source-of-truth ALTER (idempotent, default FALSE).
-        from byod_store import ROUTING_ENABLED_ADD_COLUMN_SQL
+        from db.byod_store import ROUTING_ENABLED_ADD_COLUMN_SQL
         m = _load_module("byod_migration_0019b", _MIGRATION_0019_PATH)
         assert m.ROUTING_ENABLED_ADD_COLUMN_SQL is ROUTING_ENABLED_ADD_COLUMN_SQL
         assert "IF NOT EXISTS" in ROUTING_ENABLED_ADD_COLUMN_SQL
@@ -106,7 +106,7 @@ class TestPhase5SignalsMigration:
 
     def test_uses_canonical_additive_ddl(self):
         # Imports the store's single-source-of-truth ALTERs (idempotent + additive).
-        from byod_store import PHASE5_SIGNALS_ADD_COLUMNS_SQL, PHASE5_SIGNALS_DROP_COLUMNS_SQL
+        from db.byod_store import PHASE5_SIGNALS_ADD_COLUMNS_SQL, PHASE5_SIGNALS_DROP_COLUMNS_SQL
         m = _load_module("byod_migration_0020b", _MIGRATION_0020_PATH)
         assert m.PHASE5_SIGNALS_ADD_COLUMNS_SQL is PHASE5_SIGNALS_ADD_COLUMNS_SQL
         assert m.PHASE5_SIGNALS_DROP_COLUMNS_SQL is PHASE5_SIGNALS_DROP_COLUMNS_SQL

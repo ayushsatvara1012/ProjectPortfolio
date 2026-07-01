@@ -185,7 +185,7 @@ def test_gauges_have_multiprocess_mode():
 
 def test_pool_routing_mismatch_increments_metric():
     # Integration: the pool's assert_tenant abort path (E5) really emits the metric.
-    from byod_pool import RoutingIntegrityError
+    from db.byod_pool import RoutingIntegrityError
 
     from .test_byod_pool import make_registry
 

@@ -297,7 +297,7 @@ def test_documented_loss_offboards_without_copy(tenant_and_shared):
 def test_default_offboard_removes_routing_record(tenant_db_server):
     """_default_offboard deletes the byod_tenant_databases routing record (so the
     engine stops connecting) via the shared control plane only."""
-    import byod_store
+    from db import byod_store
 
     with bare_ephemeral_database(tenant_db_server) as shared_dsn:
         _apply(shared_dsn, "CREATE TABLE companies (id UUID PRIMARY KEY);")

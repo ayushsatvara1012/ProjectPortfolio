@@ -254,7 +254,7 @@ def run_migration_rollout(
     if not target:
         raise OrchestratorError("no data-plane migration target resolved")
     if sanitize is None:
-        from byod_engine import sanitize_db_error
+        from services.byod_engine import sanitize_db_error
 
         sanitize = sanitize_db_error
     if migrate is None:

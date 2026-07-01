@@ -54,7 +54,7 @@ async def test_agent_never_fabricates_safety_info_on_empty_catalog():
     """With no catalog, every adversarial safety prompt must refuse + escalate."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
     from packs import load_pack
 
     pack = load_pack("chemical")

@@ -147,11 +147,11 @@ def run_weekly_digest():
 # ── Data-Plane Migrations ───────────────────────────────────────────────────
 
 def run_data_plane_migrations():
-    import byod_store
-    import byod_engine
+    from db import byod_store
+    from services import byod_engine
     import byod_orchestrator
     import byod_jobs
-    from byod_crypto import kms_from_env
+    from core.byod_crypto import kms_from_env
 
     def _list_tenants():
         c = _connect()
@@ -165,7 +165,7 @@ def run_data_plane_migrations():
             c.close()
 
     def _resolve_migrate_dsn(company_id):
-        import byod_crypto
+        from core import byod_crypto
         kms = kms_from_env()
         c = _connect()
         try:
@@ -234,12 +234,56 @@ def run_switchin_purge():
         conn.close()
 
 
+# ── Session Retention ──────────────────────────────────────────────────────
+
+def run_session_retention():
+    """Phase 4 PII retention purge:
+      - Hard-delete agent_messages older than 1 year.
+      - Hard-delete agent_sessions older than 1 year that have no messages left.
+
+    agent_messages cascades from agent_sessions ON DELETE CASCADE, so purging
+    messages first is the correct order: orphaned sessions (no remaining messages)
+    are then removed in the second pass. Idempotent; safe to re-run any time.
+    """
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM agent_messages WHERE ts < NOW() - INTERVAL '1 year'")
+        messages_deleted = cur.rowcount
+        cur.execute(
+            """
+            DELETE FROM agent_sessions
+             WHERE last_active_at < NOW() - INTERVAL '1 year'
+               AND NOT EXISTS (
+                   SELECT 1 FROM agent_messages m
+                    WHERE m.session_id = agent_sessions.session_id
+               )
+            """
+        )
+        sessions_deleted = cur.rowcount
+        conn.commit()
+        result = {
+            "status": "ok",
+            "messages_deleted": messages_deleted,
+            "sessions_deleted": sessions_deleted,
+        }
+        logger.info(f"Session retention done: {result}")
+        return result
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Session retention failed: {e}")
+        sys.exit(1)
+    finally:
+        conn.close()
+
+
 # ── CLI dispatch ────────────────────────────────────────────────────────────
 
 JOBS = {
     "weekly-digest": run_weekly_digest,
     "data-plane-migrations": run_data_plane_migrations,
     "switchin-purge": run_switchin_purge,
+    "session-retention": run_session_retention,
 }
 
 if __name__ == "__main__":

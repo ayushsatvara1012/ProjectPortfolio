@@ -706,7 +706,7 @@ class TestUserTierEnum:
     POLAR_PRODUCT_TIER_MAP can produce, including EXPLORE and BUSINESS."""
 
     def setup_method(self):
-        from models import UserTier
+        from db.models import UserTier
         self.Tier = UserTier
 
     def test_explore_is_valid_tier(self):
@@ -716,7 +716,7 @@ class TestUserTierEnum:
         assert self.Tier("BUSINESS") == self.Tier.BUSINESS
 
     def test_all_plan_limits_tiers_except_byod_in_enum(self):
-        from config import PLAN_LIMITS
+        from core.config import PLAN_LIMITS
         for tier in PLAN_LIMITS:
             if tier == "BYOD":
                 continue
@@ -728,18 +728,18 @@ class TestUserTierEnum:
             assert tier in [t.value for t in self.Tier], f"Polar tier {tier} missing from UserTier"
 
     def test_admin_update_request_accepts_explore(self):
-        from models import AdminUpdateUserRequest
+        from db.models import AdminUpdateUserRequest
         req = AdminUpdateUserRequest(tier="EXPLORE")
         assert req.tier.value == "EXPLORE"
 
     def test_admin_update_request_accepts_business(self):
-        from models import AdminUpdateUserRequest
+        from db.models import AdminUpdateUserRequest
         req = AdminUpdateUserRequest(tier="BUSINESS")
         assert req.tier.value == "BUSINESS"
 
     def test_admin_update_request_rejects_invalid_tier(self):
         from pydantic import ValidationError
-        from models import AdminUpdateUserRequest
+        from db.models import AdminUpdateUserRequest
         with pytest.raises(ValidationError):
             AdminUpdateUserRequest(tier="PLATINUM")
 
@@ -752,7 +752,7 @@ class TestCustomPlanConfigByod:
     """byo_database must be accepted, persisted, and resolved by get_plan."""
 
     def setup_method(self):
-        from models import CustomPlanConfig
+        from db.models import CustomPlanConfig
         self.Model = CustomPlanConfig
 
     def test_byo_database_defaults_false(self):
@@ -781,5 +781,5 @@ class TestCustomPlanConfigByod:
         assert plan["byo_database"] is False
 
     def test_byod_plan_defaults_has_byo_database_true(self):
-        from config import BYOD_PLAN_DEFAULTS
+        from core.config import BYOD_PLAN_DEFAULTS
         assert BYOD_PLAN_DEFAULTS["byo_database"] is True

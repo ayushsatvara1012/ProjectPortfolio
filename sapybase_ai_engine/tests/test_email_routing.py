@@ -3,7 +3,7 @@ import pytest
 
 
 def _import():
-    import email_routing as er
+    import services.email_routing as er
     return er
 
 
@@ -72,7 +72,7 @@ class TestClassify:
     def test_disposable_takes_priority(self):
         # Guard the ordering even though the lists are disjoint today.
         er = _import()
-        from config import FREE_EMAIL_DOMAINS, DISPOSABLE_EMAIL_DOMAINS
+        from core.config import FREE_EMAIL_DOMAINS, DISPOSABLE_EMAIL_DOMAINS
         assert FREE_EMAIL_DOMAINS.isdisjoint(DISPOSABLE_EMAIL_DOMAINS)
 
 
@@ -112,7 +112,7 @@ class TestInitialSignupStatus:
         # Guard the contract: PENDING/BLOCKED are subscription_status values,
         # deliberately NOT in PLAN_LIMITS (tier lookups stay valid via FREE).
         er = _import()
-        from config import PLAN_LIMITS
+        from core.config import PLAN_LIMITS
         assert er.SIGNUP_STATUS_PENDING != er.SIGNUP_STATUS_BLOCKED
         assert er.SIGNUP_STATUS_PENDING not in PLAN_LIMITS
         assert er.SIGNUP_STATUS_BLOCKED not in PLAN_LIMITS
@@ -139,7 +139,7 @@ class TestSignupProvisioning:
 
     def test_provisioned_tier_is_a_valid_plan_limits_key(self):
         er = _import()
-        from config import PLAN_LIMITS
+        from core.config import PLAN_LIMITS
         tier, _ = er.signup_provisioning("a@gmail.com")
         assert tier in PLAN_LIMITS  # FREE must be a real tier
 

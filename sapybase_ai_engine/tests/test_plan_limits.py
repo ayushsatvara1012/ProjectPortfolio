@@ -206,7 +206,7 @@ class TestExploreRateLimitsAndDomains:
         assert caps["per_day"] == 1200
 
     def test_domain_lists_loaded_and_disjoint(self):
-        from config import FREE_EMAIL_DOMAINS, DISPOSABLE_EMAIL_DOMAINS
+        from core.config import FREE_EMAIL_DOMAINS, DISPOSABLE_EMAIL_DOMAINS
         assert "gmail.com" in FREE_EMAIL_DOMAINS
         assert "mailinator.com" in DISPOSABLE_EMAIL_DOMAINS
         # A domain must not be classified as both free-mail and disposable.

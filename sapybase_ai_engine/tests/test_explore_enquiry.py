@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 
 def _model():
-    from models import ExploreEnquiryRequest
+    from db.models import ExploreEnquiryRequest
     return ExploreEnquiryRequest
 
 
@@ -51,7 +51,7 @@ class TestExploreEnquiryRequest:
 
 class TestEnquiryDeclineRequest:
     def _model(self):
-        from models import EnquiryDeclineRequest
+        from db.models import EnquiryDeclineRequest
         return EnquiryDeclineRequest
 
     def test_valid_reason_trimmed(self):
