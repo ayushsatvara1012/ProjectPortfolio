@@ -42,11 +42,14 @@ def _candidate_stage(captured: Dict[str, Any]) -> str:
     if handoff.get("kind") == "human":
         return "handed_off"
 
+    # Any contact info in hand means the lead is captured, regardless of
+    # whether it arrived alongside a quote (request_quote) or a standalone
+    # form submit (submit_sample_request) — both set handoff.contact_*.
+    if handoff.get("contact_email") or handoff.get("contact_phone"):
+        return "captured"
+
     quote = captured.get("quote")
     if quote:
-        # A quote with contact details in hand means we captured the lead too.
-        if handoff.get("contact_email") or handoff.get("contact_phone"):
-            return "captured"
         return "quoted"
 
     if captured.get("sds") or captured.get("form") or captured.get("spec"):

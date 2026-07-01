@@ -8,6 +8,7 @@ Covers the pure persistence helpers with a scripted fake cursor (no real DB):
   - count_messages     : COUNT scoped (session_id, company_id)
   - derive_title       : quote / SDS / sample / nothing
 """
+import asyncio
 import sys
 import os
 
@@ -172,3 +173,83 @@ class TestDeriveTitle:
 
     def test_blank_product_ignored(self):
         assert session_store.derive_title({"quote": {"product": "   "}}) is None
+
+
+# ── maybe_summarize_session: rolling-summary gating (no LLM call needed) ──────
+# These only exercise the cheap DB-only gate that decides whether a summarize
+# pass is due — they never reach the LLM call, so no network/mock needed.
+
+class FakeConn:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.committed = False
+        self.rolled_back = False
+
+    def cursor(self):
+        return self._cursor
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+
+class TestMaybeSummarizeSessionGating:
+    def _run(self, cur):
+        conn = FakeConn(cur)
+        released = []
+        asyncio.run(session_store.maybe_summarize_session(
+            "sess-1", "comp-1",
+            get_conn=lambda: conn,
+            release_conn=lambda c: released.append(c),
+        ))
+        assert released == [conn]
+        return conn, cur
+
+    def test_no_session_row_skips(self):
+        cur = FakeCursor(fetchone_results=[None])
+        conn, cur = self._run(cur)
+        assert not conn.committed
+
+    def test_below_summary_threshold_skips(self):
+        # summary=None, summarized_through=0, total=8 (== SUMMARY_THRESHOLD, not >).
+        cur = FakeCursor(fetchone_results=[(None, 0), (8,)])
+        conn, cur = self._run(cur)
+        assert not conn.committed
+        # Only the two gating SELECTs ran — never reached the transcript load.
+        assert len(cur.calls) == 2
+
+    def test_nothing_new_since_last_summary_skips(self):
+        # Already summarized through message 10; total 15 → summarize_through
+        # = 15 - VERBATIM_LIMIT(8) = 7, which is <= summarized_through(10).
+        cur = FakeCursor(fetchone_results=[("prior summary", 10), (15,)])
+        conn, cur = self._run(cur)
+        assert not conn.committed
+        assert len(cur.calls) == 2
+
+    def test_new_messages_since_last_summary_proceeds_to_transcript_load(self):
+        # summarized_through=0, total=20 → summarize_through = 12 > 0, due.
+        # No GEMINI_API_KEY in a way that short-circuits before the LLM call
+        # is fine here — we only assert it got past the gate to load messages.
+        cur = FakeCursor(
+            fetchone_results=[(None, 0), (20,)],
+            fetchall_results=[[("user", "hi")] * 12],
+        )
+        conn = FakeConn(cur)
+        released = []
+        import os as _os
+        old_key = _os.environ.pop("GEMINI_API_KEY", None)
+        try:
+            asyncio.run(session_store.maybe_summarize_session(
+                "sess-1", "comp-1",
+                get_conn=lambda: conn,
+                release_conn=lambda c: released.append(c),
+            ))
+        finally:
+            if old_key is not None:
+                _os.environ["GEMINI_API_KEY"] = old_key
+        # Got past the gate (transcript SELECT ran, 3rd call) then bailed
+        # cleanly on the missing API key — never committed.
+        assert len(cur.calls) == 3
+        assert not conn.committed

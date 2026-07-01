@@ -26,15 +26,26 @@ class RegisterRequest(BaseModel):
 
 
 class ChatMessage(BaseModel):
-    role: str
-    content: str
+    role: str = Field(..., max_length=20)
+    # The widget only ever sends the last 8 turns (ChatWidget.tsx `.slice(-8)`),
+    # each capped by the same 1500-char message limit plus a short state note.
+    # 4000 gives headroom for that without letting a non-widget caller pad the
+    # request body / cache-key hash / eventual prompt tokens for free.
+    content: str = Field(..., max_length=4000)
 
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=1500, description="User query limited to 1500 chars")
-    history: Optional[list[ChatMessage]] = Field(None, description="Last N chat messages for context-aware caching")
-    session_id: Optional[str] = Field(None, description="Client-side session tracking id")
-    visitor_id: Optional[str] = Field(None, description="Device-local visitor id (localStorage UUID) — scopes the Phase 1d history list")
+    # Bounded to well above what the widget sends (8 turns, see ChatMessage)
+    # so a direct API caller can't submit an unbounded history array to drive
+    # up per-request parsing/hashing cost or (if this ever gets fed further
+    # upstream) LLM input-token cost. Server-side the agent path additionally
+    # re-caps to the last 8 regardless.
+    history: Optional[list[ChatMessage]] = Field(
+        None, max_length=16, description="Last N chat messages for context-aware caching"
+    )
+    session_id: Optional[str] = Field(None, max_length=128, description="Client-side session tracking id")
+    visitor_id: Optional[str] = Field(None, max_length=128, description="Device-local visitor id (localStorage UUID) — scopes the Phase 1d history list")
 
     @validator('message')
     def sanitize_jailbreak_patterns(cls, v):
