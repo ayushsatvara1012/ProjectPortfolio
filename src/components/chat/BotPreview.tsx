@@ -58,10 +58,16 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
   return (
     <div className="relative h-full w-full flex items-center justify-center p-2 md:p-4 lg:p-8 transition-all duration-300 bg-transparent">
       {/* ── Main Chatbot Box ── */}
-      <div className={`w-full max-w-[95vw] ${isExpanded ? 'sm:max-w-[500px] lg:max-w-[600px] h-[80vh] sm:h-[85vh]' : 'sm:max-w-[450px] h-[60vh] sm:h-[650px]'} flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all duration-300 ease-out ${isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'}`} style={{ '--sapy-theme': THEME_COLOR } as React.CSSProperties}>
-        
-        {/* ── Header (mirrors the live ChatWidget top nav exactly) ── */}
-        <div className={`relative shrink-0 ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
+      <div className={`w-full max-w-[95vw] ${isExpanded ? 'sm:max-w-[500px] lg:max-w-[600px] h-[80vh] sm:h-[85vh]' : 'sm:max-w-[450px] h-[60vh] sm:h-[650px]'} flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative z-10 transition-all duration-300 ease-out ${
+          showHub
+            ? (isDark ? 'bg-slate-950/95 border-slate-800 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent' : 'bg-gray-50/95 border-slate-200 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent')
+            : (isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200')
+        }`} style={{ '--sapy-theme': THEME_COLOR } as React.CSSProperties}>
+
+        {/* ── Header (mirrors the live ChatWidget top nav exactly) — transparent
+            when the hub is on so the gradient painted on the outer box shows
+            through seamlessly behind the nav, matching ChatWidget.tsx. ── */}
+        <div className={`relative shrink-0 ${showHub ? 'bg-transparent' : (isDark ? 'bg-slate-950/50' : 'bg-gray-50/50')}`}>
           <div className={`p-2 flex justify-end items-center relative ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             <div className="relative flex flex-row justify-between items-center w-full">
               {/* Left: Avatar + Name — avatar is always a circle, no shadow */}
@@ -104,7 +110,7 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         </div>
 
         {/* ── Messages Area ── */}
-        <div className={`flex-1 p-5 flex flex-col overflow-y-auto ${showHub ? 'gap-4 bg-gradient-to-b from-[var(--sapy-theme)]/[0.06] via-[var(--sapy-theme)]/[0.02] to-transparent' : 'gap-6'} ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}
+        <div className={`flex-1 p-5 flex flex-col overflow-y-auto ${showHub ? 'gap-4 bg-transparent' : `gap-6 ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}`}
           style={{ maskImage: 'linear-gradient(to bottom, transparent, black 20px, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20px, black calc(100% - 28px), transparent)' }}>
 
           {showHub ? (
@@ -191,15 +197,15 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         )}
 
         {/* ── Input Area ── */}
-        <div className={`p-4 shrink-0 z-10 flex flex-col ${isDark ? 'bg-slate-950/50' : 'bg-gray-50/50'}`}>
+        <div className={`p-4 shrink-0 z-10 flex flex-col ${showHub ? 'bg-transparent' : (isDark ? 'bg-slate-950/50' : 'bg-gray-50/50')}`}>
           {showHub && (
-            <div className={`flex items-center gap-1 p-1 mb-3 rounded-full self-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'}`}>
+            <div className={`flex items-center gap-1.5 p-1.5 mb-3 rounded-full self-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'}`}>
               {[['Home', 'home', true], ['Chat', 'forum', false]].map(([label, icon, active]) => (
                 <span
                   key={label as string}
-                  className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12.5px] font-google font-medium transition-colors ${active ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[14.5px] font-google font-semibold transition-colors ${active ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                 >
-                  <span className="material-symbols-outlined text-[15px]">{icon as string}</span>
+                  <span className="material-symbols-outlined text-[19px] leading-none">{icon as string}</span>
                   {label as string}
                 </span>
               ))}

@@ -29,6 +29,7 @@ import {
   CrossIcon,
   ConnectIcon,
   ForumIcon,
+  PlusIcon,
 } from '@/src/components/icons';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -2070,10 +2071,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           <motion.div
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
-            className={`${isEmbed ? 'relative w-full h-full bg-white dark:bg-slate-900' : `fixed inset-0 sm:inset-auto sm:bottom-22 sm:right-4 w-full h-dvh ${isExpanded ? 'sm:w-[500px] sm:h-[85vh] lg:w-[600px]' : 'sm:w-[450px] sm:h-[650px]'} transition-all duration-300 ease-out bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl`} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
+            className={`${isEmbed ? `relative w-full h-full ${hasHub ? 'bg-gray-50 dark:bg-slate-950 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent' : 'bg-white dark:bg-slate-900'}` : `fixed inset-0 sm:inset-auto sm:bottom-22 sm:right-4 w-full h-dvh ${isExpanded ? 'sm:w-[500px] sm:h-[85vh] lg:w-[600px]' : 'sm:w-[450px] sm:h-[650px]'} transition-all duration-300 ease-out backdrop-blur-2xl ${hasHub ? 'bg-gray-50/95 dark:bg-slate-950/95 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent' : 'bg-white/95 dark:bg-slate-900/95'}`} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
             style={{ ...themeStyleVars, ...(isEmbed ? { height: '100%' } : isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {}) } as React.CSSProperties}
           >
-            <div className={`relative shrink-0 ${hasHub && hubView === 'home' ? 'bg-gray-50/50 dark:bg-slate-950/50 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] to-[var(--sapy-theme)]/[0.04]' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
+            {/* Header sits on transparent bg for hub bots so the single gradient
+                painted on the panel root shows through seamlessly behind the nav. */}
+            <div className={`relative shrink-0 ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
               <div className="text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-2 pl-1">
@@ -2149,8 +2152,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         )}
                         <button onClick={startNewSession}
                           className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
-                          {hasHub ? 'New conversation' : 'Clear chat'}
-                          <MIcon name={hasHub ? 'add' : 'refresh'} className="text-[20px]" />
+                          {hasHub ? 'New chat' : 'Clear chat'}
+                          {hasHub ? <PlusIcon size={20} /> : <MIcon name="refresh" className="text-[20px]" />}
                         </button>
                         <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                           className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex items-center justify-between group"
@@ -2167,7 +2170,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
             {/* Phase 1d — session history screen (returning visitors on vertical bots) */}
             {view === 'history' && (
-              <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
+              <div className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-slate-100 ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
                 <div className="px-4 pt-4 pb-2 shrink-0">
                   <p className="text-[11px] font-google font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                     Recent conversations
@@ -2203,7 +2206,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   <button type="button" onClick={startNewSession}
                     className="w-full py-2.5 rounded-full text-[14px] font-google font-semibold text-white transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
                     style={{ backgroundColor: THEME_COLOR }}>
-                    <MIcon name="add" className="text-[18px] leading-none" />
+                    <PlusIcon size={18} className="leading-none" />
                     New conversation
                   </button>
                 </div>
@@ -2211,7 +2214,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             )}
 
             {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
-              <div className="flex-1 relative flex flex-col min-h-0 bg-gray-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100">
+              <div className={`flex-1 relative flex flex-col min-h-0 text-slate-900 dark:text-slate-100 ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
                 {showJumpPill && (
                   <button
                     type="button"
@@ -2410,9 +2413,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             )}
 
             {view === 'chat' && hubView === 'home' && hasHub && (
-              // Home screen — branded gradient + 2-col action grid + pill Home/Chat
-              // nav + Vaayu footer (chemical Figma).
-              <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50 bg-gradient-to-b from-[var(--sapy-theme)]/[0.06] via-[var(--sapy-theme)]/[0.02] to-transparent">
+              // Home screen — 2-col action grid + pill Home/Chat nav + Vaayu footer
+              // (chemical Figma). Background is transparent: the gradient is painted
+              // once on the panel root so it's seamless across header/home/chat/history.
+              <div className="flex-1 min-h-0 flex flex-col bg-transparent">
                 <div className="flex-1 overflow-y-auto px-3 pt-6 pb-3 flex flex-col [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <p className="text-[19px] font-google font-semibold text-slate-900 dark:text-slate-100 px-1 mb-4 leading-snug">How can we help you today?</p>
                   {/* 2-col action grid (chemical Figma). An odd last card spans both
@@ -2433,15 +2437,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 </div>
                 {/* Pill-shaped Home/Chat segmented nav (active = inner white pill) */}
                 <div className="shrink-0 flex flex-col items-center px-3 pt-2" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 6px))' : 'env(safe-area-inset-bottom, 6px)' }}>
-                  <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+                  <div className="inline-flex items-center gap-1.5 p-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
                     <button type="button" onClick={() => setHubView('home')} aria-label="Home" aria-pressed="true"
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white dark:bg-slate-950 text-[var(--sapy-theme)] shadow-sm text-[12.5px] font-google font-medium">
-                      <MIcon name="home" className="text-[16px] leading-none" />
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white dark:bg-slate-950 text-[var(--sapy-theme)] shadow-sm text-[14.5px] font-google font-semibold">
+                      <MIcon name="home" className="text-[19px] leading-none" />
                       Home
                     </button>
                     <button type="button" onClick={() => setHubView('chat')} aria-label="Chat" aria-pressed="false"
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-slate-500 dark:text-slate-400 text-[12.5px] font-google font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                      <MIcon name="chat_bubble" className="text-[16px] leading-none" />
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-slate-500 dark:text-slate-400 text-[14.5px] font-google font-semibold hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                      <MIcon name="chat_bubble" className="text-[19px] leading-none" />
                       Chat
                     </button>
                   </div>
@@ -2457,7 +2461,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             )}
 
             {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
-              <div className="bg-gray-50/50 dark:bg-slate-950/50 shrink-0 z-10 flex flex-col">
+              <div className={`shrink-0 z-10 flex flex-col ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
                 {hasHub && (activeHubCard || (messages.length === 1 && !input.trim())) ? (
                   // Phase 3 — pack-driven hub. Card strip on a fresh conversation;
                   // a tool card (here or from Home) swaps in its slot mini-form,
