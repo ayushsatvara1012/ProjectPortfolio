@@ -363,3 +363,21 @@ body.mobile-menu-open .sapy-chat-root {
 .sapy-chat-root * {
   font-family: var(--font-inter), "Inter", sans-serif !important;
 }
+
+/* iOS Safari force-zooms the page whenever a focused input/textarea has a
+   font-size under 16px, and never zooms back out — so the host page stays
+   zoomed after the chat closes. The widget's fields are 13–15px by design, so
+   we pin them to 16px on small screens only (the actual zoom trigger); the
+   larger desktop breakpoints keep their designed sizes. text-size-adjust stops
+   Safari from separately inflating text after the viewport resizes. */
+.sapy-chat-root {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+@media (max-width: 640px) {
+  .sapy-chat-root input:not([type="checkbox"]):not([type="radio"]),
+  .sapy-chat-root textarea,
+  .sapy-chat-root select {
+    font-size: 16px !important;
+  }
+}

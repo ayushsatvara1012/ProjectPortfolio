@@ -1401,10 +1401,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    setIsMobile(window.innerWidth < 640);
-    const handleResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    // "Mobile" tracks the widget's own Tailwind `sm` breakpoint (the point at
+    // which the panel switches from a floating box to fullscreen), driven by
+    // matchMedia rather than a hand-rolled innerWidth comparison so it stays in
+    // lockstep with the CSS and updates on rotate/resize without a resize storm.
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 639.98px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
   }, []);
 
   useEffect(() => {
@@ -1535,43 +1541,57 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // already pinned above the keyboard (the panel is sized to the visual
   // viewport), so this only handles fields that live higher up in the thread —
   // hub mini-forms, the lead-capture / handoff forms, and the sample form.
-  // We re-center on the actual viewport reflow (the resize the keyboard
-  // triggers) rather than a blind timeout, so the field never jumps before
-  // the keyboard has settled, and a short fallback covers field-to-field
-  // switches where the keyboard is already open and no resize fires.
+  //
+  // The keyboard fires a burst of visualViewport resize events as it animates.
+  // Reacting to each one restarts a smooth scroll every frame and makes the
+  // thread jitter, so we DEBOUNCE to a single scroll once the viewport has
+  // settled, and no-op when the field is already fully visible — that guard is
+  // what keeps the common case (field already above the keyboard) perfectly
+  // still instead of nudging it on every event.
   useEffect(() => {
     if (!isMobile || !isOpen) return;
     let pending: HTMLElement | null = null;
-    let fallbackTimer: number | undefined;
+    let settleTimer: number | undefined;
 
     const isEditable = (el: EventTarget | null): el is HTMLElement =>
       el instanceof HTMLElement && el.matches('input, textarea, select');
 
+    const isFullyVisible = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      return r.top >= 8 && r.bottom <= vh - 8;
+    };
+
     const bringIntoView = (el: HTMLElement | null) => {
-      if (!el || el === inputRef.current) return; // composer stays put
+      if (!el || el === inputRef.current) return;   // composer stays put
+      if (isFullyVisible(el)) return;               // already in view → no nudge
       try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
       catch { el.scrollIntoView(); }
+    };
+
+    const schedule = () => {
+      if (!pending) return;
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => bringIntoView(pending), 150);
     };
 
     const onFocusIn = (e: FocusEvent) => {
       if (!isEditable(e.target) || e.target === inputRef.current) { pending = null; return; }
       pending = e.target;
-      window.clearTimeout(fallbackTimer);
-      fallbackTimer = window.setTimeout(() => { if (pending) bringIntoView(pending); }, 350);
+      schedule();
     };
-    const onFocusOut = () => { pending = null; window.clearTimeout(fallbackTimer); };
-    const onReflow = () => { if (pending) bringIntoView(pending); };
+    const onFocusOut = () => { pending = null; window.clearTimeout(settleTimer); };
 
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', onFocusOut);
-    window.addEventListener('resize', onReflow);
-    window.visualViewport?.addEventListener('resize', onReflow);
+    // Only the visual viewport reflow matters (keyboard show/hide); listening to
+    // window 'resize' too would double-fire and re-introduce jitter.
+    window.visualViewport?.addEventListener('resize', schedule);
     return () => {
       document.removeEventListener('focusin', onFocusIn);
       document.removeEventListener('focusout', onFocusOut);
-      window.removeEventListener('resize', onReflow);
-      window.visualViewport?.removeEventListener('resize', onReflow);
-      window.clearTimeout(fallbackTimer);
+      window.visualViewport?.removeEventListener('resize', schedule);
+      window.clearTimeout(settleTimer);
     };
   }, [isMobile, isOpen]);
 

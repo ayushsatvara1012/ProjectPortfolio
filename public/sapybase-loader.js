@@ -168,6 +168,22 @@
     return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
   }
 
+  // Floating-panel geometry (desktop). The widget switches to fullscreen when
+  // the viewport can no longer hold this box plus breathing room — so the
+  // "mobile" threshold is DERIVED from the panel size, not a hardcoded pixel
+  // breakpoint. Change the box and the switch point follows automatically.
+  var PANEL = { width: 420, height: 650, gutter: 16 };
+  // Widest viewport that still can't comfortably float the panel → below this
+  // we go fullscreen. gutter on both sides + the panel's own width.
+  var FULLSCREEN_MAX_W = PANEL.width + PANEL.gutter * 3; // 468
+  // Same idea for height: a short (e.g. landscape-phone) viewport that can't
+  // fit the panel goes fullscreen too, so the keyboard logic still engages.
+  var FULLSCREEN_MAX_H = Math.round(PANEL.height * 0.72); // ~468
+  // Single source of truth for the media query, shared by the injected CSS and
+  // the JS viewport tracking so the two can never drift out of sync.
+  var FULLSCREEN_MQ =
+    '(max-width: ' + FULLSCREEN_MAX_W + 'px), (max-height: ' + FULLSCREEN_MAX_H + 'px)';
+
   class SapybaseWidget extends HTMLElement {
     constructor() {
       super();
@@ -389,7 +405,7 @@
         '.iframe-wrap {',
         '  position: fixed; z-index: 2147483646;',
         '  ' + (isLeft ? 'left: 16px;' : 'right: 16px;'),
-        '  bottom: 80px; width: 420px; height: 650px;',
+        '  bottom: 80px; width: ' + PANEL.width + 'px; height: ' + PANEL.height + 'px;',
         '  max-height: calc(100vh - 110px); max-width: calc(100vw - 40px);',
         '  border-radius: 16px; overflow: hidden;',
         '  box-shadow: 0 12px 48px rgba(0,0,0,.15);',
@@ -407,7 +423,10 @@
         // and since that lags the keyboard's own show/hide animation, host
         // page background flashes through as a white gap for that duration.
         '.iframe-wrap.vv-tracking { transition: none; }',
-        '@media (min-width: 481px) {',
+        // The expand button only applies while the panel is floating (i.e. NOT
+        // fullscreen). Gated to the complement of FULLSCREEN_MAX_W so it can
+        // never fight the fullscreen rules below.
+        '@media (min-width: ' + (FULLSCREEN_MAX_W + 1) + 'px) {',
         '  .iframe-wrap.expanded { width: 500px; height: 85vh; max-height: calc(100vh - 40px); }',
         '}',
         '.iframe-wrap iframe {',
@@ -432,7 +451,11 @@
         '  border-top-color: ' + themeColor + ';',
         '  animation: sb-spin .7s linear infinite;',
         '}',
-        '@media (max-width: 480px) {',
+        // Fullscreen breakpoint — DERIVED from the panel geometry above
+        // (FULLSCREEN_MQ), not a hardcoded device width. Covers both narrow
+        // (portrait phone) and short (landscape phone) viewports so the
+        // keyboard tracking engages in either orientation.
+        '@media ' + FULLSCREEN_MQ + ' {',
         '  :host {',
         '    ' + (isLeft ? 'left: 12px !important;' : 'right: 12px !important;'),
         '    bottom: 12px !important;',
@@ -496,46 +519,42 @@
     // the layout viewport unchanged — so a 100dvh wrap shows the host page
     // between the chat input and the keyboard. Track visualViewport.height +
     // offsetTop while open and pin the wrap to the visible region.
-    // overflow:hidden alone does not stop iOS Safari's rubber-band scroll —
-    // the page can still shift under the fixed overlay while the keyboard
-    // animates, which is what shows up as a white gap. Pinning body with
-    // position:fixed at its current scroll offset is the standard fix.
+    //
+    // The wrap is pinned to the live visual viewport (see _attachViewport
+    // tracking), which is what actually closes the gap. We additionally lock
+    // the host page with overflow:hidden so it can't scroll behind the fixed
+    // overlay. We deliberately do NOT reposition <body> with position:fixed —
+    // that shifts the host's own content by the scroll offset, which on iOS
+    // reads as the whole overlay "wiggling" as the keyboard animates. overflow
+    // lock is enough here because the overlay is a separate fixed layer.
     _lockScroll() {
+      // Idempotent: sync() may call this on every viewport event while
+      // fullscreen. Bail if already locked so we never save the locked
+      // (overflow:hidden) values as the "original" ones to restore.
+      if (this._savedScrollStyles) return;
       var de = document.documentElement;
       var body = document.body;
-      var scrollY = window.scrollY || window.pageYOffset || 0;
-      this._savedScrollY = scrollY;
       this._savedScrollStyles = {
         deOverflow: de.style.overflow,
-        bodyPosition: body.style.position,
-        bodyTop: body.style.top,
-        bodyLeft: body.style.left,
-        bodyRight: body.style.right,
-        bodyWidth: body.style.width,
+        deOverscroll: de.style.overscrollBehavior,
         bodyOverflow: body.style.overflow,
+        bodyOverscroll: body.style.overscrollBehavior,
       };
       de.style.overflow = 'hidden';
-      body.style.position = 'fixed';
-      body.style.top = (-scrollY) + 'px';
-      body.style.left = '0';
-      body.style.right = '0';
-      body.style.width = '100%';
+      de.style.overscrollBehavior = 'none';
       body.style.overflow = 'hidden';
+      body.style.overscrollBehavior = 'none';
     }
 
     _unlockScroll() {
       if (!this._savedScrollStyles) return;
       var s = this._savedScrollStyles;
+      var de = document.documentElement;
       var body = document.body;
-      document.documentElement.style.overflow = s.deOverflow;
-      body.style.position = s.bodyPosition;
-      body.style.top = s.bodyTop;
-      body.style.left = s.bodyLeft;
-      body.style.right = s.bodyRight;
-      body.style.width = s.bodyWidth;
+      de.style.overflow = s.deOverflow;
+      de.style.overscrollBehavior = s.deOverscroll;
       body.style.overflow = s.bodyOverflow;
-      window.scrollTo(0, this._savedScrollY || 0);
-      this._savedScrollY = 0;
+      body.style.overscrollBehavior = s.bodyOverscroll;
       this._savedScrollStyles = null;
     }
 
@@ -544,10 +563,15 @@
       var vv = window.visualViewport;
       var wrap = this._wrap;
       if (!wrap) return;
-      var mq = window.matchMedia && window.matchMedia('(max-width: 480px)');
+      var self = this;
+      // Same DERIVED breakpoint the fullscreen CSS uses — one source of truth,
+      // so JS pinning and CSS layout can never disagree about "is fullscreen".
+      var mq = window.matchMedia && window.matchMedia(FULLSCREEN_MQ);
       var sync = function () {
-        var isMobile = !!(mq && mq.matches);
-        if (!isMobile) {
+        var fullscreen = !!(mq && mq.matches);
+        if (!fullscreen) {
+          // Floating panel — hand sizing back to CSS and release any lock
+          // (e.g. after a rotate from portrait phone to a wide layout).
           wrap.classList.remove('vv-tracking');
           wrap.style.height = '';
           wrap.style.top = '';
@@ -555,8 +579,10 @@
           wrap.style.width = '';
           wrap.style.right = '';
           wrap.style.bottom = '';
+          self._unlockScroll();
           return;
         }
+        self._lockScroll();
         // Suppress the CSS width/height transition while pinning to the
         // live visual viewport — see the .vv-tracking rule above.
         wrap.classList.add('vv-tracking');
@@ -573,7 +599,6 @@
       this._onVvSync = sync;
       vv.addEventListener('resize', sync);
       vv.addEventListener('scroll', sync);
-      if (mq && mq.matches) this._lockScroll();
       sync();
     }
 
