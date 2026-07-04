@@ -6,8 +6,21 @@
 // field list + the data destination, persisted as companies.pack_overrides and
 // merged over the pack default at runtime. Only mounted for a vertical (pack) bot.
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { SampleFormField } from '@/src/lib/context/BotSettingsContext';
+
+// Copy-paste Google Apps Script that turns a bound Sheet into a working sink: it
+// appends one row per submission, flattening the `fields` object into columns.
+const APPS_SCRIPT_TEMPLATE = `function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  var fields = data.fields || {};
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['submitted_at'].concat(Object.keys(fields)));
+  }
+  sheet.appendRow([data.submitted_at].concat(Object.values(fields)));
+  return ContentService.createTextOutput('ok');
+}`;
 
 // Mirrors packs/overrides.ALLOWED_FIELD_TYPES (the server is the source of truth;
 // this is the friendly UI label for each).
@@ -59,6 +72,8 @@ export function validateSampleForm(fields: SampleFormField[]): FormValidation {
 
 const inputCls = 'w-full text-sm font-google px-3 py-2 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-slate-900 dark:text-slate-200 transition-colors rounded-lg';
 
+type SinkStatus = { ok: boolean; detail?: string; at?: string } | null;
+
 interface Props {
   fields: SampleFormField[];
   onChange: (fields: SampleFormField[]) => void;
@@ -66,11 +81,52 @@ interface Props {
   onSinkUrlChange: (v: string) => void;
   sinkSecret: string;
   onSinkSecretChange: (v: string) => void;
+  // Phase 3.4 sink onboarding — optional so non-vertical callers can omit them.
+  botId?: string;
+  authFetch?: (url: string, init?: RequestInit) => Promise<any>;
+  sinkStatus?: SinkStatus;
 }
 
-const SampleFormEditor = ({ fields, onChange, sinkUrl, onSinkUrlChange, sinkSecret, onSinkSecretChange }: Props) => {
+function fmtWhen(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+const SampleFormEditor = ({ fields, onChange, sinkUrl, onSinkUrlChange, sinkSecret, onSinkSecretChange, botId, authFetch, sinkStatus }: Props) => {
   const validation = validateSampleForm(fields);
   const sinkUrlInvalid = sinkUrl.trim() !== '' && !sinkUrl.trim().toLowerCase().startsWith('https://');
+
+  // "Send test row" state. `result` overrides the persisted `sinkStatus` once the
+  // owner runs a fresh test this session.
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<SinkStatus>(null);
+  const [showTemplate, setShowTemplate] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const status = result ?? sinkStatus ?? null;
+
+  const sendTestRow = async () => {
+    if (!botId || !authFetch) return;
+    setTesting(true);
+    setResult(null);
+    try {
+      const res = await authFetch(`/api/companies/${botId}/sample-sink/test`, { method: 'POST' });
+      setResult({ ok: !!res?.ok, detail: res?.detail, at: res?.at });
+    } catch (e: any) {
+      const msg = e?.body?.detail?.message || e?.message || 'Test failed — check the URL and try again.';
+      setResult({ ok: false, detail: msg });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const copyTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(APPS_SCRIPT_TEMPLATE);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable — no-op */ }
+  };
 
   const update = (idx: number, patch: Partial<SampleFormField>) => {
     const next = fields.map((f, i) => (i === idx ? { ...f, ...patch } : f));
@@ -221,6 +277,59 @@ const SampleFormEditor = ({ fields, onChange, sinkUrl, onSinkUrlChange, sinkSecr
           spellCheck={false}
           autoComplete="off"
         />
+
+        {/* Test + status (Phase 3.4). Tests the SAVED sink, so nudge a save first. */}
+        {botId && authFetch && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={sendTestRow}
+              disabled={testing}
+              className="inline-flex items-center gap-1.5 text-[12px] font-google font-medium px-2.5 py-1.5 rounded-lg bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 disabled:opacity-50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[15px]">{testing ? 'progress_activity' : 'send'}</span>
+              {testing ? 'Sending…' : 'Send test row'}
+            </button>
+            {status && (
+              <span
+                className={
+                  'inline-flex items-center gap-1 text-[11.5px] font-google ' +
+                  (status.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')
+                }
+              >
+                <span className="material-symbols-outlined text-[14px]">{status.ok ? 'check_circle' : 'error'}</span>
+                {status.ok ? 'Delivered' : 'Failed'}
+                {status.detail ? ` · ${status.detail}` : ''}
+                {status.at ? ` · ${fmtWhen(status.at)}` : ''}
+              </span>
+            )}
+            <span className="text-[11px] font-google text-slate-400 dark:text-slate-500">Save your changes before testing.</span>
+          </div>
+        )}
+
+        {/* Google Apps Script starter — the error-prone part of onboarding. */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowTemplate((v) => !v)}
+            className="inline-flex items-center gap-1 text-[11.5px] font-google font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            <span className="material-symbols-outlined text-[14px]">{showTemplate ? 'expand_less' : 'code'}</span>
+            {showTemplate ? 'Hide' : 'Show'} Google Apps Script template
+          </button>
+          {showTemplate && (
+            <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-[11px] font-google text-slate-500 dark:text-slate-400">
+                <span>Extensions → Apps Script → paste → Deploy as Web app (Anyone)</span>
+                <button type="button" onClick={copyTemplate} className="inline-flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
+                  <span className="material-symbols-outlined text-[13px]">{copied ? 'check' : 'content_copy'}</span>
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <pre className="px-3 py-2 text-[11px] leading-relaxed overflow-x-auto bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-mono">{APPS_SCRIPT_TEMPLATE}</pre>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

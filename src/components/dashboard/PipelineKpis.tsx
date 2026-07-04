@@ -1,9 +1,9 @@
 'use client';
 
 // Phase 5a (Analyze) — the chemical Pipeline tab's headline strip. It reuses the
-// SAME react-query cache keys as QuoteRequestsPanel + AgentRequestsPanel, so it
-// adds ZERO extra network calls — the KPIs are derived client-side from records
-// the panels below already fetched. Read-only: no status mutation in 5a.
+// SAME react-query cache keys as RequestsInboxPanel (quote-requests /
+// agent-requests), so it adds ZERO extra network calls — the KPIs are derived
+// client-side from records the inbox below already fetched.
 //
 // Only rendered for chemical (vertical) bots; a generic bot never mounts this.
 

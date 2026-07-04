@@ -519,6 +519,9 @@ export default function CustomizePage() {
                     onSinkUrlChange={(v) => updateSetting('sampleSinkUrl', v)}
                     sinkSecret={botSettings.sampleSinkSecret || ''}
                     onSinkSecretChange={(v) => updateSetting('sampleSinkSecret', v)}
+                    botId={selectedBotId}
+                    authFetch={authFetch}
+                    sinkStatus={botSettings.sinkStatus}
                   />
                 </Section>
               )}

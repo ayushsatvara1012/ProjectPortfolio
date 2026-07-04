@@ -51,9 +51,9 @@ per unit of effort; each phase ships independently with the suite green.
 
 | Phase | Status | Notes |
 |---|---|---|
-| 1 — Security & correctness hotfixes | **DONE (uncommitted)** 2026-07-04 | All 6 items landed on `agentic-ai`. Backend suite green (1262 passed / 124 skipped, +14 tests); `tsc` clean. See per-item notes below. No migrations. NOT committed. |
-| 2 — Input validation & anti-abuse | **DONE (uncommitted)** 2026-07-04 | All 5 items landed on `agentic-ai` (product calls confirmed with user: drop env sink; block-private-ranges SSRF; 50/company/day cap). **2.5 now COMPLETE incl. the widget contact-echo.** Backend green (1287 passed / 124 skipped); `tsc` clean; frontend all-mine green (1 pre-existing unrelated failure). No migrations. NOT committed. |
-| 3 — Owner workflow | not started | |
+| 1 — Security & correctness hotfixes | **DONE (committed `bd11333f`)** 2026-07-04 | All 6 items landed on `agentic-ai`. Backend suite green (1287 passed / 124 skipped); `tsc` clean. See per-item notes below. No migrations. Committed with Phase 2 in `bd11333f` (SetupStrip.tsx marketing UI redesign deliberately left OUT of this commit — unrelated). |
+| 2 — Input validation & anti-abuse | **DONE (committed `bd11333f`)** 2026-07-04 | All 5 items landed on `agentic-ai` (product calls confirmed with user: drop env sink; block-private-ranges SSRF; 50/company/day cap). **2.5 COMPLETE incl. the widget contact-echo.** Backend green (1287 passed / 124 skipped); `tsc` clean; frontend all-mine green (1 pre-existing unrelated `insights-panels` failure). No migrations. |
+| 3 — Owner workflow | **DONE (uncommitted, 3.1–3.4)** 2026-07-04 | 3.1 PATCH status endpoints (per-table vocab, ownership-checked) + 3.2 merged `RequestsInboxPanel` (kind filter, status selects, "View chat" → conversations focus; old two panels deleted; `session_id` added to GET payloads) + 3.3 notification tiering (`_handoff_meets_tier` POR-with-email/sample only; `_handoff_dedup_ok` 1/session/kind/hr, degrade-open) + POR email gate in `request_quote` + 3.4 sink onboarding (`POST /api/companies/{id}/sample-sink/test`, `_fire_sheet_sink`→`(ok,detail)`, Apps Script template + status in `SampleFormEditor`, `channel_delivery_status` surfaced in settings GET). **Migration 0029** `companies.channel_delivery_status JSONB` (additive/idempotent) — ⚠️ settings GET now SELECTs this column → must be applied to the control DB or the endpoint 500s. Backend 1311 pass / 124 skip; frontend +15 mine green (1 pre-existing `insights-panels` fail); tsc clean. |
 | 4 — Quote link + modal | not started | |
 | 5 — Autonomous qualification | not started | |
 | 6 — Cost caching | not started | |
@@ -192,18 +192,37 @@ the widget input this can't happen; low-severity data-quality edge, not a hole.
 
 ## Phase 3 — Owner workflow (dashboard operability)
 
-1. **Status management**: `PATCH /api/companies/{id}/agent-requests/{rid}`
-   (and same for quote-requests) with `status: new|handled|won|lost`,
-   ownership-checked. Buttons in the panels.
-2. **Unified requests inbox**: one panel, kind filter (quote/sample), replacing
-   the separate QuoteRequestsPanel/AgentRequestsPanel views. Click-through to
-   the session transcript (enabled by Phase 1.2).
-3. **Notification tiering**: instant Slack/email only for POR quotes, quotes
-   with contact captured, and sample submits; bare price-checks go to the
-   dashboard + weekly digest only. Per-session dedup (one ping per session per
-   kind per hour).
-4. **Sink onboarding**: copy-paste Google Apps Script template + "Send test
-   row" button next to the sink URL field; store and display
+**Product decisions confirmed with the user (2026-07-04):**
+- **Instant-alert tier** = **POR quotes (with the visitor's email captured first)**
+  + **sample submits** (already carry contact). Priced quotes and bare
+  price-checks are **dashboard-only** — no instant ping. Per-session dedup: one
+  ping per session per kind per hour.
+- **POR contact gate**: when a quote resolves to POR, the agent should capture
+  the visitor's **email before finalizing the POR** so every POR owner-alert
+  arrives with a contact. (Solicit-then-notify, don't hard-block an answer.)
+- **Weekly digest** → **PARKED** (defer the cron + digest email to a later slice).
+- **Inbox** → **MERGE** QuoteRequestsPanel + AgentRequestsPanel into ONE Requests
+  panel with a quote/sample kind filter.
+- **Sink onboarding (3.4)** → **deferred to the tail** of this phase (adds a
+  `last_delivery_status` migration).
+- **Status vocab discrepancy noted:** `quote_requests.status` today is
+  `new|sent|won|lost`; `agent_requests.status` is `new|handled`. Keep each
+  table's own vocab in the PATCH validator (per-kind allowed sets) — do NOT
+  force a single unified set that would allow invalid states.
+
+1. **Status management** (slice 3.1): `PATCH /api/companies/{id}/quote-requests/{rid}`
+   and `PATCH /api/companies/{id}/agent-requests/{rid}` with a per-table
+   allowed-status set, ownership-checked (`WHERE company_id = %s AND user_id`).
+   Buttons in the panel.
+2. **Unified requests inbox** (slice 3.2): one panel, kind filter (quote/sample),
+   replacing the separate QuoteRequestsPanel/AgentRequestsPanel views.
+   Click-through to the session transcript (enabled by Phase 1.2 `session_id`).
+3. **Notification tiering** (slice 3.3): instant Slack/email only for POR quotes
+   (email captured) + sample submits; priced/bare price-checks → dashboard only.
+   Per-session dedup (one ping per session per kind per hour). Includes the POR
+   contact-capture gate in the agent's quote path.
+4. **Sink onboarding** (slice 3.4, tail): copy-paste Google Apps Script template
+   + "Send test row" button next to the sink URL field; store and display
    `last_delivery_status` per channel (Slack/email/sink) in settings.
 
 ## Phase 4 — Shareable quote link + structured modal

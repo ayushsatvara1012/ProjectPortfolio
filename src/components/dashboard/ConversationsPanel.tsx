@@ -11,9 +11,14 @@ interface ConversationsPanelProps {
     selectedBotId: string;
     authFetch: any;
     isAuthorized: boolean;
+    // Phase 3.2: when set (via "View chat" in the Requests inbox), jump to and
+    // expand this session. Best-effort — only auto-expands if it's on the
+    // currently loaded page. onFocusHandled clears it after one attempt.
+    focusSessionId?: string | null;
+    onFocusHandled?: () => void;
 }
 
-const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: ConversationsPanelProps) => {
+const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized, focusSessionId, onFocusHandled }: ConversationsPanelProps) => {
     const [page, setPage] = useState(1);
     const [filter, setFilter] = useState('all');
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
@@ -26,6 +31,26 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
         enabled: !!selectedBotId && isAuthorized,
         staleTime: 60_000,
     });
+
+    // Focus jump (from the Requests inbox): reset to an unfiltered page 1 and
+    // pre-open the target, then — once that page has loaded — scroll to it and
+    // release the focus so it fires only once.
+    React.useEffect(() => {
+        if (!focusSessionId) return;
+        setPage(1);
+        setFilter('all');
+        setSelectedQueryFilter(null);
+        setExpandedSession(focusSessionId);
+    }, [focusSessionId]);
+
+    React.useEffect(() => {
+        if (!focusSessionId || isLoading) return;
+        const ss = (data as any)?.sessions || [];
+        if (ss.some((s: any) => s.session_id === focusSessionId)) {
+            document.getElementById(`session-${focusSessionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        onFocusHandled?.();
+    }, [focusSessionId, data, isLoading]);
 
     if (!isAuthorized) {
         return <Card className="p-6"><UpgradePrompt code="DEFAULT" tier="" mode="inline" /></Card>;
@@ -98,7 +123,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized }: Conversa
                         const isExpanded = expandedSession === session.session_id;
                         const preview = session.messages[0]?.user_query || '';
                         return (
-                            <div key={session.session_id} className="flex flex-col">
+                            <div key={session.session_id} id={`session-${session.session_id}`} className="flex flex-col">
                                 <button
                                     onClick={() => setExpandedSession(isExpanded ? null : session.session_id)}
                                     aria-expanded={isExpanded}

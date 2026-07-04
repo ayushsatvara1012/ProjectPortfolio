@@ -2049,7 +2049,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url, vertical, pack_overrides
+                       booking_url, vertical, pack_overrides, channel_delivery_status
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -2061,7 +2061,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url, vertical, pack_overrides
+                       booking_url, vertical, pack_overrides, channel_delivery_status
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -2111,6 +2111,9 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             result["sample_form"] = effective_sample_form(pack, _overrides)
             result["hub_cards"] = pack.hub_cards_payload()
             result["sample_sink"] = _overrides.get("sample_sink") if isinstance(_overrides.get("sample_sink"), dict) else {}
+            # Phase 3.4: last "Send test row" outcome per channel, so the customise
+            # tab can show a green/red status instead of leaving the owner guessing.
+            result["channel_delivery_status"] = company_row[25] if isinstance(company_row[25], dict) else {}
         return result
     finally:
         release_db_connection(conn)
@@ -3380,10 +3383,11 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         chat_req.session_id,
                     )
 
-            # Real-time owner handoff (Phase 4b): any priced/POR quote pings the
-            # owner on Slack + email so a warm lead doesn't wait for a dashboard
-            # visit. (Sample handoff fires on FORM SUBMIT, not here.) Best-effort +
-            # non-blocking — the reply is computed; an outage can't affect the visitor.
+            # Real-time owner handoff (Phase 4b): a warm quote lead pings the owner
+            # on Slack + email so it doesn't wait for a dashboard visit. Phase 3.3
+            # tiering (inside _fire_agent_handoff) keeps this to POR-with-email only;
+            # priced/bare price-checks stay in the dashboard. (Sample handoff fires
+            # on FORM SUBMIT, not here.) Best-effort + non-blocking.
             if agent_handoff:
                 slack_url = company.get("slack_webhook_url")
                 owner_to = company.get("alert_email") or company.get("owner_email")
@@ -3394,6 +3398,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         owner_to,
                         company.get("bot_name", ""),
                         agent_handoff,
+                        company["id"],
+                        chat_req.session_id,
                     )
 
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
@@ -3669,14 +3675,46 @@ def _captured_contact_echo(args: dict) -> Optional[dict]:
     return {"name": name, "email": email, "phone": phone}
 
 
-async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict):
+def _handoff_meets_tier(req: dict) -> bool:
+    """Phase 3.3 notification tiering — which transactional events are hot enough
+    to interrupt the owner in real time. Sample submits always are. For quotes,
+    ONLY a price-on-request that captured a valid email: priced quotes and bare
+    price-checks live in the dashboard, not on the owner's phone. The dashboard
+    record is written regardless of this decision."""
+    if req.get("kind") == "quote":
+        return bool(req.get("is_por")) and _valid_reply_to(req.get("contact_email")) is not None
+    return True  # sample (and any future kind): notify.
+
+
+async def _handoff_dedup_ok(company_id, session_id, kind) -> bool:
+    """One owner ping per session per kind per hour (Phase 3.3). Degrades OPEN:
+    without Redis or a session_id we always notify (never silently drop a lead)."""
+    if not (r and company_id and session_id):
+        return True
+    try:
+        key = f"handoff_dedup:{company_id}:{session_id}:{kind or 'x'}"
+        return bool(await r.set(key, "1", ex=3600, nx=True))
+    except Exception:
+        return True
+
+
+async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict,
+                              company_id=None, session_id=None):
     """Notify the owner of a transactional agent action (sample / quote) in real time.
 
     Best-effort and never raises: the visitor's reply has already gone out, so a
     Slack or email outage must not affect the request path. Slack and email are
     attempted independently — one failing does not skip the other. The Slack host
     is re-validated as an SSRF guard, identical to ``_fire_slack``. The contact
-    email is validated for shape before it becomes the ``reply_to`` (Phase 2.5)."""
+    email is validated for shape before it becomes the ``reply_to`` (Phase 2.5).
+
+    Phase 3.3: gated by notification tiering + per-session dedup — only high-intent
+    events ping (POR quotes with an email, sample submits), at most once per
+    session/kind/hour. The dashboard always holds the full record either way."""
+    if not _handoff_meets_tier(req):
+        return
+    if not await _handoff_dedup_ok(company_id, session_id, req.get("kind")):
+        return
     if is_valid_slack_webhook(slack_url):
         try:
             payload = build_agent_request_slack_payload(bot_name, req)
@@ -3713,18 +3751,22 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
 
     SSRF guard (Phase 2.3): the URL is owner-configured and fetched server-side, so
     we block hosts that resolve to private/internal ranges and disable redirects so
-    a public host can't 3xx into an internal one."""
+    a public host can't 3xx into an internal one.
+
+    Returns a ``(ok, detail)`` tuple so a synchronous caller (the Phase 3.4 "Send
+    test row" endpoint) can report the outcome; background callers ignore it."""
     if not url:
-        return  # sink not configured yet — dormant, not an error
+        return (False, "not configured")  # sink not configured yet — dormant, not an error
     if not _url_resolves_to_public_ip(url):
         logger.warning("SAMPLE SINK blocked (non-public/unresolvable host): %s", url[:120])
-        return
+        return (False, "blocked: non-public or unresolvable host")
     body = json.dumps(payload, separators=(",", ":")).encode()
     headers = {"Content-Type": "application/json"}
     if secret:
         headers["X-Sapybase-Signature"] = hmac.new(
             secret.encode(), body, hashlib.sha256).hexdigest()
 
+    detail = "no response"
     for attempt, delay in enumerate((0, 2), start=1):
         if delay:
             await asyncio.sleep(delay)
@@ -3732,11 +3774,14 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
             async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
                 resp = await client.post(url, content=body, headers=headers)
             if resp.is_success:
-                return
+                return (True, f"HTTP {resp.status_code}")
+            detail = f"HTTP {resp.status_code}"
             logger.warning("SAMPLE SINK attempt %s non-2xx: %s", attempt, resp.status_code)
         except Exception as exc:
+            detail = str(exc)[:120]
             logger.warning("SAMPLE SINK attempt %s error: %s", attempt, str(exc)[:200])
     logger.error("SAMPLE SINK FAILED after retries.")
+    return (False, detail)
 
 
 # ── Instant HOT-lead alert (speed-to-lead) — pure builders in lead_alerts.py ──
@@ -4682,6 +4727,188 @@ def update_lead_outcome(
         release_db_connection(conn)
 
 
+# Phase 3.1 — per-table lifecycle vocabularies. Kept distinct on purpose: a
+# quote is "sent" once the owner replies with a price; a sample/agent request is
+# "handled" once actioned. Both share won/lost so the owner can track conversion.
+QUOTE_REQUEST_STATUSES = frozenset({"new", "sent", "won", "lost"})
+AGENT_REQUEST_STATUSES = frozenset({"new", "handled", "won", "lost"})
+
+
+class RequestStatusUpdate(BaseModel):
+    """Owner moves a quote / agent request through its lifecycle (Phase 3.1).
+
+    The allowed status set depends on which table the request lives in — validated
+    per-endpoint against QUOTE_REQUEST_STATUSES / AGENT_REQUEST_STATUSES."""
+    status: str = Field(..., description="Lifecycle state (allowed set is table-specific)")
+    model_config = ConfigDict(extra="forbid")
+
+
+def _assert_owns_company(cursor, company_id: str, user_id: str) -> None:
+    """Raise 404 unless `user_id` owns the active bot `company_id`. Mirrors the
+    ownership check every request endpoint uses (§tenant scoping)."""
+    cursor.execute(
+        "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+        (company_id, user_id),
+    )
+    if not cursor.fetchone():
+        raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+
+@app.patch("/api/companies/{company_id}/quote-requests/{request_id}")
+def update_quote_request_status(
+    company_id: str,
+    request_id: str,
+    payload: RequestStatusUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Owner dashboard: move a quote through its lifecycle (new→sent→won/lost).
+    Ownership-checked and tenant-scoped; control-DB vertical data."""
+    if payload.status not in QUOTE_REQUEST_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of: {', '.join(sorted(QUOTE_REQUEST_STATUSES))}",
+        )
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        _assert_owns_company(cursor, company_id, user["id"])
+        cursor.execute(
+            """
+            UPDATE quote_requests
+            SET status = %s, updated_at = NOW()
+            WHERE id = %s AND company_id = %s
+            RETURNING id, status, updated_at
+            """,
+            (payload.status, request_id, company_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Quote request not found.")
+        conn.commit()
+        return {
+            "status": "success",
+            "request": {
+                "id": str(row[0]), "status": row[1],
+                "updated_at": row[2].isoformat() if hasattr(row[2], "isoformat") else str(row[2]),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        logger.error(f"update_quote_request_status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.patch("/api/companies/{company_id}/agent-requests/{request_id}")
+def update_agent_request_status(
+    company_id: str,
+    request_id: str,
+    payload: RequestStatusUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Owner dashboard: move an agent request (sample, …) through its lifecycle
+    (new→handled→won/lost). Ownership-checked and tenant-scoped."""
+    if payload.status not in AGENT_REQUEST_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of: {', '.join(sorted(AGENT_REQUEST_STATUSES))}",
+        )
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        _assert_owns_company(cursor, company_id, user["id"])
+        cursor.execute(
+            """
+            UPDATE agent_requests
+            SET status = %s, updated_at = NOW()
+            WHERE id = %s AND company_id = %s
+            RETURNING id, status, updated_at
+            """,
+            (payload.status, request_id, company_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Agent request not found.")
+        conn.commit()
+        return {
+            "status": "success",
+            "request": {
+                "id": str(row[0]), "status": row[1],
+                "updated_at": row[2].isoformat() if hasattr(row[2], "isoformat") else str(row[2]),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        logger.error(f"update_agent_request_status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/companies/{company_id}/sample-sink/test")
+async def test_sample_sink(
+    company_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Phase 3.4 (sink onboarding): fire a clearly-marked test row at the bot's
+    configured spreadsheet sink and record the outcome, so the owner can confirm
+    their Apps Script / Zapier / Power Automate hook actually appends a row.
+    Ownership-checked; tests the PERSISTED sink (owner must save the URL first)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT pack_overrides FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+        sink_url, sink_secret = effective_sample_sink(coerce_overrides(row[0]))
+        if not sink_url:
+            raise HTTPException(status_code=400, detail={
+                "code": "NO_SINK",
+                "message": "No data destination is configured. Add a webhook URL and save first."})
+
+        ok, detail = await _fire_sheet_sink(sink_url, sink_secret, {
+            "event": "sample_request_test",
+            "company_id": str(company_id),
+            "submitted_at": datetime.now(timezone.utc).isoformat(),
+            "test": True,
+            "fields": {
+                "product": "Test row", "contact_name": "Sapybase test",
+                "notes": "Test row from your dashboard — safe to delete.",
+            },
+        })
+        status = {"ok": bool(ok), "detail": detail,
+                  "at": datetime.now(timezone.utc).isoformat()}
+        # Merge the outcome into the per-channel JSONB (store), tenant-scoped.
+        cursor.execute(
+            """
+            UPDATE companies
+            SET channel_delivery_status =
+                COALESCE(channel_delivery_status, '{}'::jsonb) || %s::jsonb
+            WHERE id = %s AND user_id = %s
+            """,
+            (json.dumps({"sink": status}), company_id, user["id"]),
+        )
+        conn.commit()
+        return {"status": "ok", "channel": "sink", **status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn: conn.rollback()
+        logger.error(f"test_sample_sink error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/companies/{company_id}/quote-requests")
 def list_quote_requests(
     company_id: str,
@@ -4711,7 +4938,7 @@ def list_quote_requests(
             f"""
             SELECT id, product_name, grade, pack_size, quantity, unit_price, subtotal,
                    gst_rate, currency, is_por, contact_name, contact_email,
-                   contact_phone, status, created_at
+                   contact_phone, status, created_at, session_id
             FROM quote_requests
             WHERE company_id = %s {status_clause}
             ORDER BY created_at DESC
@@ -4731,6 +4958,7 @@ def list_quote_requests(
                 "contact_name": r[10], "contact_email": r[11], "contact_phone": r[12],
                 "status": r[13],
                 "created_at": r[14].isoformat() if hasattr(r[14], "isoformat") else str(r[14]),
+                "session_id": r[15],
             }
             for r in rows
         ]
@@ -4780,7 +5008,8 @@ def list_agent_requests(
         cursor.execute(
             f"""
             SELECT id, kind, product_name, cas_number, grade, pack_size, quantity,
-                   contact_name, contact_email, contact_phone, note, status, created_at
+                   contact_name, contact_email, contact_phone, note, status, created_at,
+                   session_id
             FROM agent_requests
             WHERE {' AND '.join(clauses)}
             ORDER BY created_at DESC
@@ -4796,6 +5025,7 @@ def list_agent_requests(
                 "contact_name": r[7], "contact_email": r[8], "contact_phone": r[9],
                 "note": r[10], "status": r[11],
                 "created_at": r[12].isoformat() if hasattr(r[12], "isoformat") else str(r[12]),
+                "session_id": r[13],
             }
             for r in rows
         ]
@@ -4999,7 +5229,8 @@ async def submit_sample_request(
 
     if slack_url or owner_to:
         background_tasks.add_task(_fire_agent_handoff, slack_url, owner_to,
-                                 company.get("bot_name", ""), handoff)
+                                 company.get("bot_name", ""), handoff,
+                                 company["id"], payload.session_id)
     # Per-bot sheet sink only (the owner's own Google Sheet / Zapier / Power Automate
     # webhook). No global env fallback (Phase 2.4) — dormant until the owner sets one.
     _sink_url, _sink_secret = effective_sample_sink(_overrides)

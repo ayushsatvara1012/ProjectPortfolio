@@ -532,6 +532,21 @@ class TestRequestQuote:
         assert out2["status"] == "price_on_request"
         assert len(cur2.inserts) == 1 and cur2.committed
 
+    def test_por_requires_email_not_phone_only(self):
+        # Phase 3.3 gate: a phone number alone can't finalize a POR — every POR
+        # ping must carry a reachable email. Ask for it, do NOT record.
+        cur = FakeSkuCursor(name_exact=[_sku(pack="25 Ltr", price=None, por=True)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="25 Ltr", contact_phone="9998887777")
+        assert out["status"] == "needs_contact"
+        assert cur.inserts == []
+        # A malformed email is likewise not good enough.
+        cur2 = FakeSkuCursor(name_exact=[_sku(pack="25 Ltr", price=None, por=True)])
+        out2 = request_quote(cur2, CID, product_name="acetone", grade="AR",
+                             pack_size="25 Ltr", contact_email="not-an-email")
+        assert out2["status"] == "needs_contact"
+        assert cur2.inserts == []
+
     def test_zero_price_treated_as_por_not_free(self):
         cur = FakeSkuCursor(name_exact=[_sku(price=0)])
         out = request_quote(cur, CID, product_name="acetone", grade="AR",

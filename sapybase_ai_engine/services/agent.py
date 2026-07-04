@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Callable, Dict, List, Optional
 
 from langchain_core.messages import ToolMessage
@@ -437,6 +438,16 @@ def _parse_qty(v: object) -> int:
     return qty
 
 
+# A permissive shape check (not deliverability) — mirrors main._valid_reply_to so
+# the POR contact gate and the owner-notification tier agree on what counts as an
+# email. Phone alone is not enough to finalize a POR (Phase 3.3).
+_EMAIL_SHAPE = re.compile(r"\A[^@\s]+@[^@\s]+\.[^@\s]+\Z")
+
+
+def _looks_like_email(v: object) -> bool:
+    return bool(v and _EMAIL_SHAPE.match(str(v).strip()))
+
+
 def _quote_rows(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
     """Fetch the SKU rows for ONE product, or a terminal status.
 
@@ -592,14 +603,17 @@ def request_quote(
                 "message": ("The quantity isn't clear. Ask the visitor how many packs "
                             "they need as a whole number before quoting — do NOT assume "
                             "a number or produce a quote yet.")}
-    has_contact = any([(contact_email or "").strip(), (contact_phone or "").strip()])
-
     if is_por:
-        if not has_contact:
+        # POR contact gate (Phase 3.3): finalize only with a valid EMAIL — that is
+        # the channel the owner alert replies to, and every POR ping must carry a
+        # reachable lead. A phone number alone is not enough. Solicit, don't block
+        # the conversation: we return a directive to ask, not an error.
+        if not _looks_like_email(contact_email):
             return {"status": "needs_contact", "product": product, "grade": grade_sel,
                     "pack_size": pack_sel,
                     "message": ("This pack is priced on request. Ask for the visitor's "
-                                "name and email (or phone) so the team can send a quote.")}
+                                "name and email so the team can send a quote — an email "
+                                "address is required (a phone number alone isn't enough).")}
         _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
                       pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=None,
                       subtotal=None, gst_rate=gst_rate, currency=currency, is_por=True,
