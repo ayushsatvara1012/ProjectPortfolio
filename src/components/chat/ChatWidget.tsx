@@ -507,6 +507,7 @@ type Message = {
     product?: string; grade?: string; pack_size?: string; quantity?: number;
     unit_price?: number | null; subtotal?: number | null;
     gst_rate?: number | null; currency?: string; gst_note?: string | null;
+    captured_contact?: { name?: string | null; email?: string | null; phone?: string | null } | null;
   };
   sample?: {
     product?: string; grade?: string; packaging?: string; quantity?: number;
@@ -1106,6 +1107,18 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
       </div>
 
       <form onSubmit={submit} className="flex-1 overflow-y-auto px-3.5 py-3 flex flex-col gap-3 scrollbar-thin">
+        {/* Honeypot (anti-spam): hidden from humans, only bots auto-fill it. The
+            backend drops any submission where `website` is non-empty. */}
+        <input
+          type="text"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          value={values.website || ''}
+          onChange={(e) => set('website', e.target.value)}
+          style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+        />
         {schema.map((f) => (
           <label key={f.name} className="flex flex-col gap-1">
             <span className="text-[12px] font-google font-medium text-slate-600 dark:text-slate-300">
@@ -2407,6 +2420,21 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                           </>
                                         ) : (
                                           <div className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">This pack is priced on request — our team will get back to you with a price.</div>
+                                        )}
+                                        {msg.quote.captured_contact && (msg.quote.captured_contact.email || msg.quote.captured_contact.phone) && (
+                                          // Phase 2.5: echo the contact the agent parsed from
+                                          // chat so the visitor can catch a mis-read before the
+                                          // team follows up.
+                                          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            <MIcon name="mark_email_read" className="text-[14px] leading-none mt-px shrink-0" />
+                                            <span>
+                                              We'll reach you at{' '}
+                                              <span className="font-medium text-slate-600 dark:text-slate-300">
+                                                {msg.quote.captured_contact.email || msg.quote.captured_contact.phone}
+                                              </span>
+                                              . Not right? Just send the correct one.
+                                            </span>
+                                          </div>
                                         )}
                                       </div>
                                     </div>

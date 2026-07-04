@@ -150,6 +150,37 @@ def validate_safe_url(url: str):
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="Could not resolve the provided URL.")
 
+
+def _url_resolves_to_public_ip(url: str) -> bool:
+    """SSRF guard for owner-configured, server-side-fetched webhooks (Phase 2.3).
+
+    Non-raising sibling of ``validate_safe_url`` for best-effort background tasks:
+    the host must be http/https AND every address it resolves to must be a PUBLIC
+    IP. Returns ``False`` for private/loopback/link-local/reserved ranges or an
+    unresolvable host. All resolved addresses (IPv4 + IPv6) are checked, so a host
+    that resolves to even one internal address is blocked. Callers must also set
+    ``follow_redirects=False`` so a public URL can't 3xx into an internal one.
+
+    (One-shot check — not a defence against active DNS-rebinding between resolve
+    and connect; acceptable here as the URL is OWNER-configured, not visitor-set.)
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        infos = socket.getaddrinfo(parsed.hostname, None)
+        if not infos:
+            return False
+        for info in infos:
+            ip = ipaddress.ip_address(info[4][0])
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+                return False
+        return True
+    except Exception:
+        return False
+
+
 _URL_TRACKING_PARAMS = frozenset({
     "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
     "ref", "fbclid", "gclid", "msclkid", "mc_cid", "mc_eid",
@@ -941,6 +972,12 @@ async def enforce_tier_chat_limit(company_id: str, tier: str) -> None:
         _alert_redis_down("enforce_tier_chat_limit", e)
 
 
+# Global async redis client. Assigned in startup_event; declared here so it always
+# exists as a module attribute (endpoints guard on ``r is not None``, and the app
+# may serve a request before startup completes / in tests where startup never runs).
+r = None
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initializes external services on app start."""
@@ -1395,6 +1432,7 @@ from packs import (
     effective_sample_form,
     effective_required_fields,
     effective_sample_sink,
+    sanitize_visitor_fields,
 )
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
@@ -1410,13 +1448,17 @@ from services import sales_funnel    # Phase 2 — funnel stage + next-best-acti
 AGENT_PRECOMPUTE_TIMEOUT_S = 30
 
 # Phase 4b form — the spreadsheet sink for sample-request submissions. The widget
-# form POST is recorded locally AND pushed to this outbound webhook, which the
-# owner points at a Google Apps Script (bound to their Sheet) / Zapier / Power
-# Automate flow that appends a row. One fixed destination for now (MVP); the
-# customise section makes it per-company later. Empty url => push is dormant (we
-# still record locally + notify), so nothing breaks before it's configured.
-SAMPLE_SINK_WEBHOOK_URL = os.getenv("SAMPLE_SINK_WEBHOOK_URL", "").strip()
-SAMPLE_SINK_SECRET = os.getenv("SAMPLE_SINK_SECRET", "").strip()
+# form POST is recorded locally AND pushed to the owner's PER-BOT outbound webhook
+# (a Google Apps Script bound to their Sheet / Zapier / Power Automate flow that
+# appends a row). Resolved per-company via ``effective_sample_sink`` (no global env
+# fallback — Phase 2.4). Empty url => push is dormant (we still record locally +
+# notify), so nothing breaks before it's configured.
+
+# Anti-abuse for the public /api/widget/sample-request endpoint (Phase 2.2). These
+# sit on top of the 20/min IP rate limit already on the route.
+SAMPLE_HONEYPOT_FIELD = "website"          # hidden field; only bots fill it in
+SAMPLE_DAILY_CAP_PER_COMPANY = 50          # per-company/day submit backstop
+SAMPLE_DEDUP_WINDOW_S = 600                # (contact_email, product) dedup window
 
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
@@ -3149,7 +3191,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
             _captured = {}
 
             def _tool_executor(tool_name, tool_args):
-                obs = execute_tool(tool_name, tool_args, cursor, company["id"])
+                obs = execute_tool(tool_name, tool_args, cursor, company["id"],
+                                   session_id=chat_req.session_id)
                 # When get_sds resolves a real sheet, surface it as a deterministic
                 # button payload — the model is told NOT to paste the link itself.
                 if (tool_name == "get_sds" and isinstance(obs, dict)
@@ -3175,6 +3218,9 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         "gst_rate": obs.get("gst_rate"),
                         "currency": obs.get("currency") or "INR",
                         "gst_note": obs.get("gst_note"),
+                        # Echo the model-parsed contact so the widget can confirm it
+                        # back to the visitor (Phase 2.5); None when none captured.
+                        "captured_contact": _captured_contact_echo(tool_args),
                     }
                     # Every priced/POR quote is a warm lead → notify the owner in
                     # real time (Phase 4b). Contact came in via the tool args.
@@ -3558,36 +3604,69 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
     if not owner_email:
         return
 
+    import html as _html
+
+    bot_name_esc = _html.escape(bot_name or "")
     rows = []
     for msg in transcript:
         role = msg.get("role", "unknown")
-        content = msg.get("content", "")
+        content = _html.escape(msg.get("content", "") or "")
         if role == "user":
             rows.append(f"<tr><td style='padding:8px 12px;background:#f1f5f9;border-radius:8px;max-width:360px'><b>Visitor:</b> {content}</td></tr>")
         elif role == "bot":
-            rows.append(f"<tr><td style='padding:8px 12px;background:#eff6ff;border-radius:8px;max-width:360px'><b>{bot_name}:</b> {content}</td></tr>")
+            rows.append(f"<tr><td style='padding:8px 12px;background:#eff6ff;border-radius:8px;max-width:360px'><b>{bot_name_esc}:</b> {content}</td></tr>")
 
     transcript_html = "<table style='border-collapse:separate;border-spacing:0 6px;width:100%'>" + "".join(rows) + "</table>"
 
-    visitor_label = visitor_name or visitor_email or "Anonymous visitor"
-    reply_note = f"Reply directly to this email to reach <b>{visitor_label}</b> at <b>{visitor_email}</b>." if visitor_email else "The visitor did not share their email. Use your bot's lead capture or contact page to follow up."
+    visitor_label = _html.escape(visitor_name or visitor_email or "Anonymous visitor")
+    visitor_email_esc = _html.escape(visitor_email or "")
+    reply_note = f"Reply directly to this email to reach <b>{visitor_label}</b> at <b>{visitor_email_esc}</b>." if visitor_email else "The visitor did not share their email. Use your bot's lead capture or contact page to follow up."
 
     html = f"""
     <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1e293b">
       <h2 style="margin:0 0 4px">🙋 Human Handoff Request</h2>
-      <p style="color:#64748b;margin:0 0 8px"><b>{visitor_label}</b> on <b>{bot_name}</b> has requested to speak with a human.</p>
+      <p style="color:#64748b;margin:0 0 8px"><b>{visitor_label}</b> on <b>{bot_name_esc}</b> has requested to speak with a human.</p>
       <p style="color:#64748b;margin:0 0 20px">{reply_note}</p>
       {transcript_html}
       <p style="color:#94a3b8;font-size:12px;margin-top:24px">Sent by Sapybase</p>
     </div>
     """
 
-    subject = f"[{bot_name}] {visitor_label} requested human support"
+    subject_label = visitor_name or visitor_email or "Anonymous visitor"
+    subject = f"[{bot_name}] {subject_label} requested human support"
     send_transactional_email(owner_email, subject, html, reply_to=visitor_email or None)
 
 
 # ── Real-time owner handoff for transactional agent actions (Phase 4b) ────────
 from services.agent_handoff import build_agent_request_slack_payload, build_agent_request_email
+
+
+_REPLY_TO_EMAIL_RE = re.compile(r"\A[^@\s]+@[^@\s]+\.[^@\s]+\Z")
+
+
+def _valid_reply_to(email) -> Optional[str]:
+    """Return a trimmed email only if it's well-shaped, else None (Phase 2.5).
+
+    The quote-handoff contact is model-supplied (the LLM parsed it from chat), so
+    it can't be trusted to be a real address before it becomes the email ``reply_to``
+    header. A malformed value is dropped rather than injected into the header."""
+    if not isinstance(email, str):
+        return None
+    e = email.strip()
+    return e if (e and len(e) <= 254 and _REPLY_TO_EMAIL_RE.match(e)) else None
+
+
+def _captured_contact_echo(args: dict) -> Optional[dict]:
+    """The contact the model captured, cleaned, for the widget to confirm back to
+    the visitor (Phase 2.5). The model parsed it from free-text chat, so echoing it
+    lets the visitor catch a mis-read before the lead goes out. Returns None when
+    nothing usable was captured."""
+    email = _valid_reply_to(args.get("contact_email"))
+    phone = (str(args.get("contact_phone") or "")).strip()[:32] or None
+    name = (str(args.get("contact_name") or "")).strip()[:120] or None
+    if not (email or phone):
+        return None
+    return {"name": name, "email": email, "phone": phone}
 
 
 async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict):
@@ -3596,7 +3675,8 @@ async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict):
     Best-effort and never raises: the visitor's reply has already gone out, so a
     Slack or email outage must not affect the request path. Slack and email are
     attempted independently — one failing does not skip the other. The Slack host
-    is re-validated as an SSRF guard, identical to ``_fire_slack``."""
+    is re-validated as an SSRF guard, identical to ``_fire_slack``. The contact
+    email is validated for shape before it becomes the ``reply_to`` (Phase 2.5)."""
     if is_valid_slack_webhook(slack_url):
         try:
             payload = build_agent_request_slack_payload(bot_name, req)
@@ -3614,7 +3694,7 @@ async def _fire_agent_handoff(slack_url, owner_email, bot_name, req: dict):
         try:
             subject, html = build_agent_request_email(bot_name, req)
             send_transactional_email(
-                owner_email, subject, html, reply_to=(req.get("contact_email") or None)
+                owner_email, subject, html, reply_to=_valid_reply_to(req.get("contact_email"))
             )
         except Exception as exc:
             logger.warning("AGENT HANDOFF email error: %s", str(exc)[:200])
@@ -3629,9 +3709,16 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
     the request locally, so a sink outage can't affect the request path. Signs the
     body with HMAC-SHA256 (like ``_fire_webhook``) so the receiver can verify it,
     and retries once on transient failure. The body carries an ``idempotency_key``
-    so the receiver can drop a duplicate row if a retry double-delivers."""
+    so the receiver can drop a duplicate row if a retry double-delivers.
+
+    SSRF guard (Phase 2.3): the URL is owner-configured and fetched server-side, so
+    we block hosts that resolve to private/internal ranges and disable redirects so
+    a public host can't 3xx into an internal one."""
     if not url:
         return  # sink not configured yet — dormant, not an error
+    if not _url_resolves_to_public_ip(url):
+        logger.warning("SAMPLE SINK blocked (non-public/unresolvable host): %s", url[:120])
+        return
     body = json.dumps(payload, separators=(",", ":")).encode()
     headers = {"Content-Type": "application/json"}
     if secret:
@@ -3642,7 +3729,7 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
         if delay:
             await asyncio.sleep(delay)
         try:
-            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
                 resp = await client.post(url, content=body, headers=headers)
             if resp.is_success:
                 return
@@ -4769,7 +4856,21 @@ async def submit_sample_request(
     # Phase 5 — validate against the EFFECTIVE form (the owner's per-bot override if
     # they customised the fields, else the pack default), not the bare pack.
     _overrides = company.get("pack_overrides")
-    fields = payload.fields if isinstance(payload.fields, dict) else {}
+    eff_form = effective_sample_form(pack, _overrides)
+    raw_fields = payload.fields if isinstance(payload.fields, dict) else {}
+
+    # Honeypot (Phase 2.2): a hidden field real users never see. If it arrives
+    # filled, this is almost certainly a bot — pretend success (never tip off the
+    # spammer) and drop the submission (no record, no notify, no sink).
+    if str(raw_fields.get(SAMPLE_HONEYPOT_FIELD, "") or "").strip():
+        logger.info("sample-request honeypot tripped company=%s", company["id"])
+        return {"status": "ok",
+                "confirmation": _sample_confirmation(sanitize_visitor_fields(raw_fields, eff_form))}
+
+    # Phase 2.1 — never trust the raw payload: validate/clip every value against the
+    # effective form and drop unknown keys (junk, honeypot, injection) BEFORE use.
+    fields = sanitize_visitor_fields(raw_fields, eff_form)
+
     missing = [f for f in effective_required_fields(pack, _overrides) if not str(fields.get(f, "") or "").strip()]
     if missing:
         raise HTTPException(status_code=422,
@@ -4788,11 +4889,46 @@ async def submit_sample_request(
         except Exception:
             pass  # redis hiccup must not block a real submission
 
+    # Anti-spam (Phase 2.2), all best-effort and degrade OPEN if redis is down:
+    #  1) dedup a (contact_email, product) pair inside a short window — an impatient
+    #     double-submit becomes a friendly no-op, not a second lead;
+    #  2) a per-company daily cap as the backstop against sustained abuse.
+    if r is not None:
+        _email = (fields.get("contact_email") or "").strip().lower()
+        _prod = (fields.get("product") or "").strip().lower()
+        if _email and _prod:
+            try:
+                _dk = hashlib.sha1(f"{_email}|{_prod}".encode()).hexdigest()
+                first = await r.set(f"sample_dedup:{company['id']}:{_dk}", b"1",
+                                    ex=SAMPLE_DEDUP_WINDOW_S, nx=True)
+                if not first:
+                    return {"status": "ok", "duplicate": True,
+                            "confirmation": _sample_confirmation(fields)}
+            except Exception:
+                pass
+        try:
+            _day = datetime.now(timezone.utc).strftime("%Y%m%d")
+            _cap_key = f"sample_cap:{company['id']}:{_day}"
+            _count = await r.incr(_cap_key)
+            if _count == 1:
+                await r.expire(_cap_key, 86400)
+            if _count > SAMPLE_DAILY_CAP_PER_COMPANY:
+                raise HTTPException(
+                    status_code=429,
+                    detail={"code": "RATE_LIMITED",
+                            "message": "Too many sample requests right now. Please try "
+                                       "again later or contact the team directly."})
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # redis hiccup must not block a real submission
+
     # Record (best-effort persistence inside _insert_agent_request; never raises).
     conn = get_db_connection()
+    persisted = False
     try:
         cursor = conn.cursor()
-        _insert_agent_request(
+        persisted = _insert_agent_request(
             cursor, company["id"], kind="sample",
             product=fields.get("product"), cas=fields.get("cas_number"),
             grade=fields.get("grade"), pack_size=None, qty=qty,
@@ -4850,12 +4986,23 @@ async def submit_sample_request(
     }
     slack_url = company.get("slack_webhook_url")
     owner_to = company.get("alert_email") or company.get("owner_email")
+
+    # Honesty gate (Phase 1.5): the DB row is the only capture we can confirm
+    # synchronously. If it failed AND there's no owner-notification channel to fall
+    # back on, the lead is genuinely lost — never tell the visitor we've got it.
+    if not persisted and not (slack_url or owner_to):
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "CAPTURE_FAILED",
+                    "message": "We couldn't record your request. Please try again shortly."},
+        )
+
     if slack_url or owner_to:
         background_tasks.add_task(_fire_agent_handoff, slack_url, owner_to,
                                  company.get("bot_name", ""), handoff)
-    # Per-bot sheet sink (the owner's own Google Sheet / Zapier / Power Automate
-    # webhook) wins; we fall back to the global env sink only if they haven't set one.
-    _sink_url, _sink_secret = effective_sample_sink(_overrides, SAMPLE_SINK_WEBHOOK_URL, SAMPLE_SINK_SECRET)
+    # Per-bot sheet sink only (the owner's own Google Sheet / Zapier / Power Automate
+    # webhook). No global env fallback (Phase 2.4) — dormant until the owner sets one.
+    _sink_url, _sink_secret = effective_sample_sink(_overrides)
     background_tasks.add_task(
         _fire_sheet_sink, _sink_url, _sink_secret,
         {"event": "sample_request", "company_id": str(company["id"]),

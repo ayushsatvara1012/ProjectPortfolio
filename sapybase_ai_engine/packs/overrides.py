@@ -15,6 +15,7 @@ never raise — a bad stored value cannot be allowed to 500 a live widget.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 # Mirror FormField.type (packs/schema.py). A field whose type isn't here is coerced
@@ -106,6 +107,88 @@ def sanitize_form_fields(raw: Any) -> List[Dict[str, Any]]:
     return out
 
 
+# ── Visitor-side submission sanitiser (Phase 2.1) ────────────────────────────
+#
+# The OWNER-side sanitisers above harden the FORM DEFINITION. This hardens the
+# VISITOR-submitted VALUES on the public /api/widget/sample-request endpoint: it
+# is untrusted input, so we validate every value against the effective form and
+# drop anything not declared (unknown junk, a honeypot, injection attempts).
+
+# Per-type length caps — generous for real submissions, tight enough to stop a
+# public endpoint being used to store megabytes of junk. A type not listed uses
+# the default.
+_VISITOR_MAX_LEN = {
+    "email": 254,       # RFC 5321 max address length
+    "tel": 32,
+    "number": 32,
+    "text": 200,
+    "product": 200,
+    "grade": 120,
+    "textarea": 2000,
+}
+_VISITOR_DEFAULT_MAX = 200
+
+# Keys the widget legitimately submits that are NOT visible form fields: hidden
+# prefill carried from the request_sample tool. Kept (as text), everything else
+# not in the effective form is dropped.
+_VISITOR_EXTRA_KEYS = {"cas_number": "text"}
+
+# Deliberately permissive: reject only clearly-malformed addresses (no @, no dot
+# in the domain, whitespace). Full RFC validation is neither useful nor kind here.
+_EMAIL_RE = re.compile(r"\A[^@\s]+@[^@\s]+\.[^@\s]+\Z")
+
+
+def _sanitize_tel(s: str) -> str:
+    """Keep digits and a single leading ``+`` — drop spaces, dashes, brackets."""
+    plus = s.lstrip().startswith("+")
+    digits = "".join(ch for ch in s if ch.isdigit())
+    if not digits:
+        return ""
+    return ("+" + digits if plus else digits)[:_VISITOR_MAX_LEN["tel"]]
+
+
+def sanitize_visitor_fields(raw: Any, effective_form: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Sanitise a visitor-submitted sample-form payload against the EFFECTIVE form.
+
+    Public-endpoint hardening: the submit endpoint must never trust the raw
+    ``fields`` dict. For each field DECLARED in the effective form (plus the small
+    allowlist of hidden prefill keys):
+      - coerce to a trimmed string and cap its length by type;
+      - ``email`` type: keep only a well-formed address, else drop the value (the
+        caller's required-field check then reports it as missing);
+      - ``tel`` type: keep digits and a single leading ``+`` only.
+    Keys NOT in the effective form (unknown junk, a honeypot, injection attempts)
+    are dropped entirely. Returns a clean ``{name: str}`` dict; empties are omitted.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    allowed: Dict[str, str] = {
+        f["name"]: (f.get("type") or "text")
+        for f in effective_form if isinstance(f, dict) and f.get("name")
+    }
+    allowed.update(_VISITOR_EXTRA_KEYS)
+    out: Dict[str, str] = {}
+    for name, ftype in allowed.items():
+        if name not in raw:
+            continue
+        val = raw.get(name)
+        if val is None:
+            continue
+        s = str(val).strip()
+        if not s:
+            continue
+        s = s[: _VISITOR_MAX_LEN.get(ftype, _VISITOR_DEFAULT_MAX)]
+        if ftype == "email":
+            if not _EMAIL_RE.match(s):
+                continue  # invalid email dropped → required check catches it
+        elif ftype == "tel":
+            s = _sanitize_tel(s)
+            if not s:
+                continue
+        out[name] = s
+    return out
+
+
 def sanitize_sample_sink(raw: Any) -> Dict[str, str]:
     """Validate a ``sample_sink`` override → ``{"url", "secret"}`` (https-only url).
 
@@ -161,13 +244,14 @@ def effective_required_fields(pack: Any, overrides: Any) -> Tuple[str, ...]:
     return tuple(f["name"] for f in effective_sample_form(pack, overrides) if f.get("required"))
 
 
-def effective_sample_sink(overrides: Any, env_url: str, env_secret: str) -> Tuple[str, str]:
-    """Resolve the spreadsheet sink: per-bot override wins, else the global env sink.
+def effective_sample_sink(overrides: Any) -> Tuple[str, str]:
+    """Resolve the spreadsheet sink from the PER-BOT override only (Phase 2.4).
 
-    Returns ``(url, secret)``; ``("", "")`` when neither is configured (the caller's
-    fire-and-forget sink then no-ops).
+    There is deliberately no global/env fallback: a platform-wide sink would push
+    one tenant's submissions to a shared webhook (a cross-tenant leak), and the DB
+    record + owner email/Slack already capture every lead. Returns ``(url, secret)``;
+    ``("", "")`` when the bot has no sink configured (the caller's fire-and-forget
+    sink then no-ops).
     """
     sink = sanitize_sample_sink(coerce_overrides(overrides).get("sample_sink"))
-    if sink.get("url"):
-        return sink["url"], sink.get("secret", "")
-    return (env_url or "").strip(), (env_secret or "").strip()
+    return sink.get("url", ""), sink.get("secret", "")

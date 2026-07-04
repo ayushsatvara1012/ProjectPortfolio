@@ -78,3 +78,51 @@ class TestValidateSafeUrl:
         fn = _import_fn()
         with patch("socket.gethostbyname", make_gethostbyname("8.8.8.8")):
             fn("http://dns.google/")
+
+
+def _make_getaddrinfo(*ips):
+    """Fake socket.getaddrinfo returning the given IPs as AF_INET sockaddrs."""
+    return lambda host, port, *a, **k: [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0)) for ip in ips
+    ]
+
+
+class TestUrlResolvesToPublicIp:
+    """Phase 2.3 — non-raising SSRF guard for the owner-configured sheet sink."""
+
+    def _fn(self):
+        from main import _url_resolves_to_public_ip
+        return _url_resolves_to_public_ip
+
+    def test_rejects_non_http_scheme(self):
+        assert self._fn()("ftp://example.com/x") is False
+        assert self._fn()("file:///etc/passwd") is False
+
+    def test_rejects_empty_host(self):
+        assert self._fn()("https://") is False
+
+    def test_rejects_loopback(self):
+        with patch("socket.getaddrinfo", _make_getaddrinfo("127.0.0.1")):
+            assert self._fn()("http://localhost/hook") is False
+
+    def test_rejects_private_ranges(self):
+        for ip in ("10.0.0.1", "192.168.1.5", "172.16.0.9"):
+            with patch("socket.getaddrinfo", _make_getaddrinfo(ip)):
+                assert self._fn()(f"https://internal.example/hook") is False
+
+    def test_rejects_link_local_metadata_ip(self):
+        with patch("socket.getaddrinfo", _make_getaddrinfo("169.254.169.254")):
+            assert self._fn()("http://169.254.169.254/latest/meta-data/") is False
+
+    def test_rejects_if_any_resolved_ip_is_private(self):
+        # DNS returning a mix (public + private) must be blocked — the private one wins.
+        with patch("socket.getaddrinfo", _make_getaddrinfo("8.8.8.8", "10.0.0.1")):
+            assert self._fn()("https://rebind.example/hook") is False
+
+    def test_rejects_unresolvable(self):
+        with patch("socket.getaddrinfo", side_effect=socket.gaierror("nope")):
+            assert self._fn()("https://does-not-exist-xyz.example/hook") is False
+
+    def test_accepts_public_host(self):
+        with patch("socket.getaddrinfo", _make_getaddrinfo("93.184.216.34")):
+            assert self._fn()("https://script.google.com/macros/s/xxx/exec") is True

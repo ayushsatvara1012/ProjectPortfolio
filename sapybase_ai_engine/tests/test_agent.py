@@ -266,6 +266,25 @@ class TestGetProductSpec:
         assert out["status"] == "ambiguous"
         assert {c["grade"] for c in out["candidates"]} == {"Battery", "Technical"}
 
+    def test_same_product_many_grades_flattens_to_grade_chips(self):
+        # One product in several grades → enrich with a grade list for chips.
+        rows = [_row(grade="Battery"), _row(grade="Technical")]
+        out = get_product_spec(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["grades"] == ["Battery", "Technical"]
+        assert out["product"] == "Sulphuric Acid"
+        assert "products" not in out
+
+    def test_mixed_products_surface_products_not_grades(self):
+        # Phase 1.6: a CAS/name that maps to DIFFERENT products must not flatten
+        # their grades under the first product's name — surface the products.
+        rows = [_row(name="Sulphuric Acid", grade="Battery"),
+                _row(name="Rust Remover", grade="Industrial")]
+        out = get_product_spec(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "ambiguous"
+        assert "grades" not in out          # never a mislabeled grade chip list
+        assert "product" not in out          # never a single wrong product label
+        assert out["products"] == ["Sulphuric Acid", "Rust Remover"]
+
     def test_partial_name_single_match_still_confirms(self):
         # Same discipline as get_sds: a fuzzy match never auto-serves a spec.
         out = get_product_spec(FakeCursor(partial=[_row()]), CID, product_name="acid")
@@ -318,6 +337,20 @@ class TestExecuteTool:
         )
         assert out["status"] == "open_form"   # form launcher, no DB write
         assert cur.inserts == []
+
+    def test_request_quote_persists_session_id(self):
+        # Phase 1.2: the quote record must be tied to the conversation, not NULL,
+        # so funnel/BI joins on quote_requests.session_id work.
+        cur = FakeSkuCursor(name_exact=[_sku()])
+        out = execute_tool(
+            "request_quote",
+            {"product_name": "acetone", "grade": "AR", "pack_size": "2.5 Ltr", "quantity": "2"},
+            cur, CID, session_id="sess-abc-123",
+        )
+        assert out["status"] == "quoted"
+        assert len(cur.inserts) == 1
+        # INSERT params: (company_id, session_id, product_name, ...)
+        assert cur.inserts[0][1] == "sess-abc-123"
 
 
 # ── request_quote (Phase 4a) ─────────────────────────────────────────────────
@@ -458,13 +491,32 @@ class TestRequestQuote:
         assert out["status"] == "quoted"
         assert out["unit_price"] == 950.0
 
-    def test_quantity_defaults_to_one_when_missing_or_invalid(self):
-        for qty in (None, "0", "-5", "abc"):
+    def test_quantity_defaults_to_one_when_missing(self):
+        # A truly-absent quantity is a single-pack default — quote proceeds.
+        for qty in (None, "", "   "):
             cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
             out = request_quote(cur, CID, product_name="acetone", grade="AR",
                                 pack_size="2.5 Ltr", quantity=qty)
             assert out["status"] == "quoted"
             assert out["quantity"] == 1 and out["subtotal"] == 1894.0
+
+    def test_unparseable_or_nonpositive_quantity_asks_to_confirm(self):
+        # Phase 1.4: a quantity the buyer WROTE but we can't read ("10-20") — or a
+        # nonsensical 0/-5 — must never be silently coerced to 1 and quoted.
+        for qty in ("10-20", "a few", "abc", "0", "-5"):
+            cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
+            out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                                pack_size="2.5 Ltr", quantity=qty)
+            assert out["status"] == "confirm_quantity"
+            assert cur.inserts == []   # nothing recorded until the count is confirmed
+
+    def test_quantity_is_capped(self):
+        # Absurd counts clamp to the cap rather than compute a runaway subtotal.
+        cur = FakeSkuCursor(name_exact=[_sku(price=10)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="99999999")
+        assert out["status"] == "quoted"
+        assert out["quantity"] == 10000 and out["subtotal"] == 100000.0
 
     def test_por_needs_contact_then_records(self):
         # Price-on-request pack with no contact -> ask for it, do NOT record.
@@ -494,6 +546,29 @@ class TestRequestQuote:
                             pack_size="2.5 Ltr")
         assert out["status"] == "ambiguous_price"
         assert cur.inserts == []   # never persist/quote a guessed number
+
+    def test_priced_and_por_dup_rows_escalate_not_arbitrary(self):
+        # Same product/grade/pack, one priced row and one price-on-request row.
+        # DB order must not decide the answer: a priced row winning would quote a
+        # possibly-stale number; a POR row winning would hide a real price. Escalate.
+        for rows in (
+            [_sku(price=1894, code="A"), _sku(price=None, por=True, code="B")],
+            [_sku(price=None, por=True, code="B"), _sku(price=1894, code="A")],
+        ):
+            cur = FakeSkuCursor(name_exact=rows)
+            out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                                pack_size="2.5 Ltr", contact_email="buyer@acme.com")
+            assert out["status"] == "ambiguous_price"
+            assert cur.inserts == []   # never quote nor log a guessed reading
+
+    def test_agreeing_priced_dup_rows_still_quote(self):
+        # Two dup rows with the SAME price are not a conflict — quote normally.
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894, code="A"),
+                                        _sku(price=1894, code="B")])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr")
+        assert out["status"] == "quoted"
+        assert out["unit_price"] == 1894.0
 
     def test_ambiguous_product_when_cas_maps_to_many(self):
         # CAS is NOT unique in this catalog (e.g. an acid AND a rust remover).
@@ -599,10 +674,11 @@ class TestInsertAgentRequest:
 
     def test_records_form_data_tenant_scoped_and_commits(self):
         cur = FakeProductCursor()
-        agent._insert_agent_request(
+        ok = agent._insert_agent_request(
             cur, CID, kind="sample", product="Acetone", cas="67-64-1", grade="AR",
             pack_size=None, qty=2, note="urgent", name="Asha", email="a@b.com",
             phone=None, session_id="s1", form_data={"product": "Acetone", "company": "Acme"})
+        assert ok is True   # Phase 1.5: signals successful capture to the caller
         assert len(cur.inserts) == 1 and cur.committed
         params = cur.inserts[0]
         assert params[0] == CID and "sample" in params   # tenant-scoped, kind recorded
@@ -611,11 +687,24 @@ class TestInsertAgentRequest:
 
     def test_null_form_data_is_allowed(self):
         cur = FakeProductCursor()
-        agent._insert_agent_request(
+        ok = agent._insert_agent_request(
             cur, CID, kind="sample", product="X", cas=None, grade=None,
             pack_size=None, qty=1, note=None, name=None, email="a@b.com",
             phone=None, session_id=None, form_data=None)
+        assert ok is True
         assert len(cur.inserts) == 1 and cur.committed
+
+    def test_returns_false_when_insert_fails(self):
+        # Phase 1.5: a failed persist must be reported, not swallowed, so the
+        # endpoint can decide whether to tell the visitor "we've got it".
+        class BoomCursor(FakeProductCursor):
+            def execute(self, sql, params=None):
+                raise RuntimeError("db down")
+        ok = agent._insert_agent_request(
+            BoomCursor(), CID, kind="sample", product="X", cas=None, grade=None,
+            pack_size=None, qty=1, note=None, name=None, email="a@b.com",
+            phone=None, session_id=None, form_data=None)
+        assert ok is False
 
 
 # ── pack -> schema + directive ───────────────────────────────────────────────

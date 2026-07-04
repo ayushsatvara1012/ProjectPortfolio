@@ -293,19 +293,29 @@ def get_product_spec(
         (grade or "").strip(),
     )
     if "row" not in resolved:
-        # Ambiguous (several grades share the name): enrich with a flat grade list
-        # + the product name so the widget can render selectable grade chips for a
-        # product-discovery question — same interactive UI as the quote flow.
+        # Ambiguous. Only enrich into a flat grade list (→ selectable grade chips)
+        # when EVERY candidate is the SAME product sold in several grades. When the
+        # candidates are DIFFERENT products (a CAS or fuzzy name that maps to more
+        # than one product), flattening their grades under the first product's name
+        # would mislabel them — so surface the product candidates instead and let
+        # the agent ask which product (Phase 1.6).
         if resolved.get("status") == "ambiguous":
             cands = resolved.get("candidates") or []
-            grades = []
-            for c in cands:
-                g = (c.get("grade") or "").strip()
-                if g and g not in grades:
-                    grades.append(g)
-            if grades:
-                resolved["grades"] = grades
-                resolved["product"] = cands[0].get("name") if cands else None
+            names = {(c.get("name") or "").strip().lower() for c in cands if c.get("name")}
+            if len(names) == 1:
+                grades = []
+                for c in cands:
+                    g = (c.get("grade") or "").strip()
+                    if g and g not in grades:
+                        grades.append(g)
+                if grades:
+                    resolved["grades"] = grades
+                    resolved["product"] = cands[0].get("name")
+            elif len(names) > 1:
+                # Distinct product names to choose between — the disambiguation is
+                # by product, not grade. No grade chips are emitted; the agent asks
+                # which product from the ``candidates``/``products`` in the message.
+                resolved["products"] = [c.get("name") for c in cands if c.get("name")]
         return resolved
 
     name_, cas_, grade_, packaging_, sds_ref_, _updated_ = resolved["row"]
@@ -392,14 +402,39 @@ def _norm_pack(s: object) -> str:
     return f"{base}{u}"
 
 
-def _parse_qty(v: object) -> int:
-    """Quantity = number of packs. Missing/invalid/≤0 degrades to 1 (the agent is
-    told to confirm the count), never an error — a quote should still render."""
+QTY_MAX = 10_000
+
+
+def _classify_qty(v: object) -> tuple[int, bool]:
+    """Classify a raw model/form quantity into ``(qty, needs_confirm)`` (Phase 1.4).
+
+    - missing / blank            → ``(1, False)``  a single-pack default; safe to use
+    - a clean count ``1..QTY_MAX`` → ``(n, False)`` (counts above the cap clamp to it)
+    - anything else *present*    → ``(1, True)``   unparseable (``"10-20"``, ``"a few"``)
+                                                    or ``≤0`` — never silently assume 1;
+                                                    the caller confirms the count instead.
+    """
+    if v is None:
+        return 1, False
+    s = str(v).strip()
+    if not s:
+        return 1, False
     try:
-        q = int(float(str(v).strip()))
-        return q if q > 0 else 1
+        q = int(float(s))
     except (TypeError, ValueError):
-        return 1
+        return 1, True
+    if q <= 0:
+        return 1, True
+    return min(q, QTY_MAX), False
+
+
+def _parse_qty(v: object) -> int:
+    """Quantity = number of packs, clamped to ``1..QTY_MAX``. Missing/invalid/≤0
+    degrades to 1, never an error — a quote/record should still render. Use
+    :func:`_classify_qty` when you need to distinguish an unparseable input (to
+    confirm it) from a legitimately-absent one (to default)."""
+    qty, _ = _classify_qty(v)
+    return qty
 
 
 def _quote_rows(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
@@ -527,20 +562,36 @@ def request_quote(
                 "message": (f"No '{pack_in}' pack for {product} ({grade_sel}). Offer the "
                             "available pack sizes or connect them to the team.")}
 
-    # 3. Resolve to one priced SKU. Dup rows with DIFFERENT prices = ambiguous data
-    #    → escalate, never pick. POR (or NULL/0 price) = route-to-human.
-    priced = {(r[6] is None or bool(r[8]), None if r[6] is None else float(r[6])) for r in prows}
-    if len({p for _, p in priced if p is not None}) > 1:
+    # 3. Resolve to one priced SKU. Dup rows for this exact pack must agree, or we
+    #    escalate rather than pick arbitrarily by DB order (Phase 1.3). A row is POR
+    #    when flagged, or its price is missing/zero (a 0 list price is never "free").
+    #    Two kinds of conflict escalate to ambiguous_price:
+    #      - rows disagree on POR-ness (some priced, some price-on-request), or
+    #      - the priced rows disagree on the number.
+    #    Only rows that agree on both are safe to quote / route.
+    def _row_is_por(r) -> bool:
+        return bool(r[8]) or r[6] is None or float(r[6]) == 0
+
+    por_flags = {_row_is_por(r) for r in prows}
+    priced_values = {float(r[6]) for r in prows if not _row_is_por(r)}
+    if len(por_flags) > 1 or len(priced_values) > 1:
         return {"status": "ambiguous_price", "product": product, "grade": grade_sel,
-                "message": ("More than one price is on file for this exact pack — do NOT "
+                "message": ("Conflicting prices are on file for this exact pack — do NOT "
                             "quote a number. Tell the visitor you'll confirm with the team.")}
     sku = prows[0]
     pack_sel, pack_code = sku[3], sku[5]
-    # POR if flagged, or the price is missing/zero (a 0 list price is never "free").
-    is_por = bool(sku[8]) or sku[6] is None or float(sku[6]) == 0
+    is_por = _row_is_por(sku)
     gst_rate = float(sku[7]) if sku[7] is not None else None
     currency = sku[9] or "INR"
-    qty = _parse_qty(quantity)
+    qty, qty_needs_confirm = _classify_qty(quantity)
+    if qty_needs_confirm:
+        # The buyer wrote a quantity we can't turn into a pack count ("10-20",
+        # "a few", 0). Never quote or record a fabricated 1 — ask them to confirm.
+        return {"status": "confirm_quantity", "product": product, "grade": grade_sel,
+                "pack_size": pack_sel,
+                "message": ("The quantity isn't clear. Ask the visitor how many packs "
+                            "they need as a whole number before quoting — do NOT assume "
+                            "a number or produce a quote yet.")}
     has_contact = any([(contact_email or "").strip(), (contact_phone or "").strip()])
 
     if is_por:
@@ -655,14 +706,16 @@ def request_sample(
 
 def _insert_agent_request(cursor, company_id, *, kind, product, cas, grade,
                           pack_size, qty, note, name, email, phone,
-                          session_id, form_data=None) -> None:
+                          session_id, form_data=None) -> bool:
     """Persist a record-and-route request as the owner's lead, tenant-scoped, committed.
 
     Used by the form-submit endpoint (the typed columns power the dashboard panel;
     ``form_data`` JSONB carries the FULL customizable submission so the spreadsheet
     columns can match the client's form exactly). Mirrors ``_insert_quote``: a
     logged insert error degrades gracefully — capturing the lead must never break
-    the request. Returns nothing; raises nothing."""
+    the request. Never raises; returns ``True`` if the row was persisted, ``False``
+    if the insert failed (so the caller can decide whether the lead was actually
+    captured before telling the visitor "we've got it")."""
     try:
         cursor.execute(
             """
@@ -679,16 +732,23 @@ def _insert_agent_request(cursor, company_id, *, kind, product, cas, grade,
         conn = getattr(cursor, "connection", None)
         if conn is not None:
             conn.commit()
+        return True
     except Exception:
         logger.exception("request_sample: failed to persist agent_requests record")
+        return False
 
 
-def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[str, Any]:
+def execute_tool(name: str, args: Dict[str, Any], cursor, company_id,
+                 session_id: Optional[str] = None) -> Dict[str, Any]:
     """Dispatch a model-requested tool to its deterministic implementation.
 
     An unknown tool name (a hallucinated tool, or one not wired yet) returns a
     benign error observation rather than raising — the model recovers and answers
     normally or escalates.
+
+    ``session_id`` ties side-effecting tools (``request_quote``) to the visitor's
+    conversation so ``quote_requests.session_id`` is populated for funnel/BI joins
+    (Phase 1.2); it is threaded through from the chat handler.
     """
     if name == "get_sds":
         return get_sds(
@@ -718,6 +778,7 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
             contact_name=args.get("contact_name"),
             contact_email=args.get("contact_email"),
             contact_phone=args.get("contact_phone"),
+            session_id=session_id,
         )
     if name == "request_sample":
         return request_sample(

@@ -14,6 +14,7 @@ from packs.overrides import (
     effective_sample_form,
     effective_sample_sink,
     sanitize_overrides,
+    sanitize_visitor_fields,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "effective_sample_form",
     "effective_required_fields",
     "effective_sample_sink",
+    "sanitize_visitor_fields",
 ]
