@@ -60,8 +60,8 @@ const ACCENT_STYLES = {
     border:   'border-blue-100 dark:border-blue-900/30',
     icon:     'text-blue-600 dark:text-blue-400',
     iconBg:   'bg-blue-100/50 dark:bg-blue-900/40',
-    btn:      'bg-linear-to-r from-blue-600 to-emerald-500 hover:from-blue-700 hover:to-emerald-600 transition-all shadow-lg shadow-blue-500/10',
-    progress: 'bg-linear-to-r from-blue-500 to-emerald-400',
+    btn:      'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm shadow-blue-600/20',
+    progress: 'bg-blue-500',
   },
   amber: {
     bg:       'bg-amber-50 dark:bg-amber-900/20',
@@ -112,43 +112,43 @@ export default function UpgradePrompt({
     : null;
 
   const inner = (
-    <div className={`${accent.bg} border ${accent.border} p-5 transition-colors`}>
+    <div className={`${accent.bg} border ${accent.border} rounded-2xl p-5 transition-colors`}>
       <div className="flex items-start gap-4">
-        <div className={`w-10 h-10 shrink-0 flex items-center justify-center ${accent.iconBg} rounded-none`}>
+        <div className={`w-10 h-10 shrink-0 flex items-center justify-center ${accent.iconBg} rounded-xl`}>
           <Icon className={`w-5 h-5 ${accent.icon}`} />
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-display font-bold ${accent.icon} mb-0.5`}>{config.title}</p>
-          <p className="text-sm text-slate-600 dark:text-slate-400 font-display leading-relaxed">
+          <p className={`text-[14px] font-semibold ${accent.icon} mb-0.5 tracking-[-0.01em]`}>{config.title}</p>
+          <p className="text-[13px] text-slate-600 dark:text-slate-400 leading-relaxed">
             {config.tip(tier, limit)}
           </p>
 
           {pct !== null && (
             <div className="mt-3">
-              <div className="flex justify-between text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 font-sans mb-1">
+              <div className="flex justify-between text-[11px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500 mb-1">
                 <span>{current?.toLocaleString()} used</span>
                 <span>{limit?.toLocaleString()} limit</span>
               </div>
-              <div className="h-1.5 bg-white dark:bg-slate-800 w-full">
-                <div className={`h-full ${accent.progress} transition-all`} style={{ width: `${pct}%` }} />
+              <div className="h-1.5 bg-white dark:bg-slate-800 w-full rounded-full overflow-hidden">
+                <div className={`h-full ${accent.progress} rounded-full transition-all`} style={{ width: `${pct}%` }} />
               </div>
             </div>
           )}
 
-          <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <div className="mt-4 flex items-center gap-4 flex-wrap">
             <button
               onClick={() => router.push('/dashboard/pricing')}
-              className={`flex items-center gap-1.5 px-5 py-2 text-[10px] uppercase tracking-widest font-bold font-sans text-white ${accent.btn} transition-colors active:scale-95`}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white ${accent.btn} transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40`}
             >
-              <Zap className="w-3 h-3" />
-              Upgrade Plan
-              <ArrowUpRight className="w-3 h-3" />
+              <Zap className="w-3.5 h-3.5" />
+              Upgrade plan
+              <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
             {onDismiss && (
               <button
                 onClick={onDismiss}
-                className="text-[10px] uppercase tracking-widest font-bold font-sans text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                className="text-[13px] font-semibold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
               >
                 Dismiss
               </button>
@@ -167,11 +167,11 @@ export default function UpgradePrompt({
 
   if (mode === 'widget') {
     return (
-      <div className={`${accent.bg} border ${accent.border} px-4 py-3 flex items-center gap-3`}>
+      <div className={`${accent.bg} border ${accent.border} rounded-xl px-4 py-3 flex items-center gap-3`}>
         <Icon className={`w-4 h-4 shrink-0 ${accent.icon}`} />
-        <p className="text-sm text-slate-700 dark:text-slate-300 font-medium flex-1 leading-snug">
+        <p className="text-[13px] text-slate-700 dark:text-slate-300 font-medium flex-1 leading-snug">
           {config.title} —{' '}
-          <button onClick={() => router.push('/dashboard/pricing')} className={`font-bold underline ${accent.icon}`}>
+          <button onClick={() => router.push('/dashboard/pricing')} className={`font-semibold underline ${accent.icon}`}>
             Upgrade
           </button>
         </p>
@@ -191,7 +191,7 @@ export default function UpgradePrompt({
             initial={{ opacity: 0, scale: 0.95, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 8 }}
-            className="w-full max-w-md bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 shadow-2xl"
+            className="w-full max-w-md bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-800 rounded-2xl shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800">

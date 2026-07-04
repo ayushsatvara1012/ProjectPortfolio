@@ -2431,7 +2431,21 @@ async def update_company_details(
         # Invalidate exact-match cache — shape/logo change renders cached widget configs stale
         cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (target_company_id,))
 
+        # Invalidate the /api/config response cache (5-minute TTL, keyed by the
+        # hashed api_key — see _config_cache_key_builder) so branding changes
+        # like theme_color show up in the widget immediately instead of after
+        # up to 5 minutes of a stale cached response.
+        cursor.execute("SELECT api_key FROM companies WHERE id = %s", (target_company_id,))
+        _key_row = cursor.fetchone()
+
         conn.commit()
+
+        if _key_row and _key_row[0] and r is not None:
+            try:
+                await FastAPICache.clear(key=f"{FastAPICache.get_prefix()}::get_config:{_key_row[0]}")
+            except Exception as e:
+                logger.warning(f"Failed to invalidate /api/config cache for company {target_company_id}: {e}")
+
         return {"status": "success", "updated_id": target_company_id}
 
     except HTTPException:
@@ -7659,10 +7673,16 @@ def delete_knowledge_chunks(
 def _config_cache_key_builder(func, namespace: str = "", *, request: Request = None, response=None, **kwargs):
     """Cache key for /api/config that includes the API key header. The default
     fastapi-cache key builder keys only on URL/method, which would cause every
-    bot to receive the first cached response. We must partition by api key."""
+    bot to receive the first cached response. We must partition by api key.
+
+    Hashed (not raw) so it matches `companies.api_key` at rest — this lets
+    `update_company_details` recompute the same key from the DB and invalidate
+    it directly after a settings save (see PATCH /api/company)."""
     api_key = ""
     if request is not None:
-        api_key = request.headers.get("x-api-key", "")
+        raw = request.headers.get("x-api-key", "")
+        if raw:
+            api_key = hashlib.sha256(raw.encode()).hexdigest()
     return f"{namespace}:get_config:{api_key}"
 
 

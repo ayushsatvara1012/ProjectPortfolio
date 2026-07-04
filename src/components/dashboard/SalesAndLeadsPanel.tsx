@@ -19,6 +19,23 @@ export default function SalesAndLeadsPanel({ selectedBotId, authFetch, entitleme
     const canAnalytics = entitlements.canUseAnalytics;
     const canLeadCapture = entitlements.canUseLeadCapture;
 
+    // Both features locked → render a SINGLE upgrade prompt for the whole tab.
+    // Previously ROIPanel (analytics gate) and the lead-capture card each rendered
+    // their own identical "Plan Limit Reached" prompt, so the user saw two.
+    if (!canAnalytics && !canLeadCapture) {
+        return (
+            <div className="flex flex-col gap-6 w-full min-w-0">
+                <Card className="p-5 sm:p-6">
+                    <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Sales &amp; leads</p>
+                    <p className="text-[13.5px] text-slate-600 dark:text-slate-300 mb-4 leading-relaxed max-w-prose">
+                        Track the ROI of your assistant, capture contact details from hot website conversations, score customer intent, and draft AI follow-ups — all in one place.
+                    </p>
+                    <UpgradePrompt code="DEFAULT" mode="inline" />
+                </Card>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-6 w-full min-w-0">
             {/* ROI scorecard — visible to all analytics users */}
