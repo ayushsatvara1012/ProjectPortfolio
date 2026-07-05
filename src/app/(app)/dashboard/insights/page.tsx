@@ -30,8 +30,7 @@ const PanelSkeleton = () => (
     </div>
 );
 const SalesAndLeadsPanel = dynamic(() => import('@/src/components/dashboard/SalesAndLeadsPanel'), { loading: PanelSkeleton });
-const QuoteRequestsPanel = dynamic(() => import('@/src/components/dashboard/QuoteRequestsPanel'), { loading: PanelSkeleton });
-const AgentRequestsPanel = dynamic(() => import('@/src/components/dashboard/AgentRequestsPanel'), { loading: PanelSkeleton });
+const RequestsInboxPanel = dynamic(() => import('@/src/components/dashboard/RequestsInboxPanel'), { loading: PanelSkeleton });
 const ConversationsPanel = dynamic(() => import('@/src/components/dashboard/ConversationsPanel'), { loading: PanelSkeleton });
 const FunnelPanel = dynamic(() => import('@/src/components/dashboard/FunnelPanel'), { loading: PanelSkeleton });
 const PipelineKpisStrip = dynamic(() => import('@/src/components/dashboard/PipelineKpis'), { loading: PanelSkeleton });
@@ -324,6 +323,10 @@ export default function AppInsights() {
     const [isGhostTown, setIsGhostTown] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('sales');
+    // Phase 3.2: "View chat" on a request jumps to the Conversations tab focused
+    // on the originating session (best-effort — expands it if on the loaded page).
+    const [focusSessionId, setFocusSessionId] = useState<string | null>(null);
+    const viewSession = (sessionId: string) => { setFocusSessionId(sessionId); setActiveTab('conversations'); };
 
     useEffect(() => {
         if (selectedBotId && canAnalytics) handleGenerate(true);
@@ -466,10 +469,7 @@ export default function AppInsights() {
                             <PipelineKpisStrip selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
                         )}
                         {isChemical && (
-                            <>
-                                <QuoteRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
-                                <AgentRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
-                            </>
+                            <RequestsInboxPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} onViewSession={viewSession} />
                         )}
                         <SalesAndLeadsPanel
                             selectedBotId={selectedBotId}
@@ -477,18 +477,15 @@ export default function AppInsights() {
                             entitlements={{ canUseAnalytics: canAnalytics, canUseLeadCapture: canLeadCapture }}
                             selectedBot={selectedBot}
                         />
-                        {/* Generic bots: panels self-hide unless quote/sample records exist. */}
+                        {/* Generic bots: panel self-hides unless quote/sample records exist. */}
                         {!isChemical && (
-                            <>
-                                <QuoteRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
-                                <AgentRequestsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
-                            </>
+                            <RequestsInboxPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} onViewSession={viewSession} />
                         )}
                     </div>
                 )}
 
                 {activeTab === 'conversations' && (
-                    <ConversationsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} />
+                    <ConversationsPanel selectedBotId={selectedBotId} authFetch={authFetch} isAuthorized={canAnalytics} focusSessionId={focusSessionId} onFocusHandled={() => setFocusSessionId(null)} />
                 )}
 
                 {activeTab === 'funnel' && (

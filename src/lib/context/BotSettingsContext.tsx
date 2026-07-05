@@ -42,6 +42,7 @@ type BotSettings = {
   sampleForm: SampleFormField[];     // editable per-client sample form fields
   sampleSinkUrl: string;             // owner's own sheet/Zapier webhook
   sampleSinkSecret: string;          // HMAC secret paired with the sink
+  sinkStatus: { ok: boolean; detail?: string; at?: string } | null;  // last "Send test row" outcome
 };
 
 type BotSettingsContextValue = {
@@ -83,6 +84,7 @@ const DEFAULT_SETTINGS: BotSettings = {
   sampleForm: [],
   sampleSinkUrl: '',
   sampleSinkSecret: '',
+  sinkStatus: null,
 };
 
 const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
@@ -123,6 +125,7 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     sampleForm: Array.isArray(company.sample_form) ? company.sample_form : [],
     sampleSinkUrl: company.sample_sink?.url || '',
     sampleSinkSecret: company.sample_sink?.secret || '',
+    sinkStatus: company.channel_delivery_status?.sink || null,
   };
 };
 

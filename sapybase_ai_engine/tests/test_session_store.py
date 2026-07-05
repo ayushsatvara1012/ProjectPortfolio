@@ -115,7 +115,7 @@ class TestLoadHybridContext:
     def test_returns_summary_and_messages(self):
         cur = FakeCursor(
             fetchone_results=[("a rolling summary",)],
-            fetchall_results=[[("user", "hi"), ("assistant", "hello")]],
+            fetchall_results=[[("user", "hi", None), ("assistant", "hello", None)]],
         )
         summary, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
         assert summary == "a rolling summary"
@@ -133,10 +133,108 @@ class TestLoadHybridContext:
     def test_null_content_becomes_empty_string(self):
         cur = FakeCursor(
             fetchone_results=[(None,)],
-            fetchall_results=[[("user", None)]],
+            fetchall_results=[[("user", None, None)]],
         )
         _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
         assert messages == [{"role": "user", "content": ""}]
+
+    # ── cost-control follow-up: reattaching the quote state note ────────────
+
+    def test_assistant_message_with_quote_action_gets_state_note(self):
+        actions = {"quote": {"status": "quoted", "product": "Acetone", "grade": "AR",
+                              "pack_size": "2.5 Ltr", "quantity": 2,
+                              "unit_price": 1894.0, "subtotal": 3788.0, "currency": "INR"}}
+        cur = FakeCursor(
+            fetchone_results=[(None,)],
+            fetchall_results=[[("assistant", "Here's your quote.", actions)]],
+        )
+        _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
+        assert messages[0]["content"] == (
+            "Here's your quote.\n"
+            "[State: Acetone AR 2.5 Ltr × 2 quoted at INR 1894.0 each, subtotal INR 3788.0]"
+        )
+
+    def test_actions_as_json_string_is_parsed(self):
+        # Some DB drivers may hand back the jsonb column as a raw string.
+        actions_json = '{"quote": {"status": "price_on_request", "product": "Toluene"}}'
+        cur = FakeCursor(
+            fetchone_results=[(None,)],
+            fetchall_results=[[("assistant", "Logged.", actions_json)]],
+        )
+        _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
+        assert "[State: Toluene — price on request, contact captured]" in messages[0]["content"]
+
+    def test_user_message_never_gets_a_state_note(self):
+        actions = {"quote": {"status": "quoted", "product": "Acetone", "unit_price": 1}}
+        cur = FakeCursor(
+            fetchone_results=[(None,)],
+            fetchall_results=[[("user", "how much for acetone?", actions)]],
+        )
+        _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
+        assert messages[0]["content"] == "how much for acetone?"
+
+    def test_no_actions_leaves_content_untouched(self):
+        cur = FakeCursor(
+            fetchone_results=[(None,)],
+            fetchall_results=[[("assistant", "hi there", None)]],
+        )
+        _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
+        assert messages[0]["content"] == "hi there"
+
+    def test_non_quote_action_leaves_content_untouched(self):
+        # e.g. an SDS-only turn — no quote to restate, nothing to append.
+        cur = FakeCursor(
+            fetchone_results=[(None,)],
+            fetchall_results=[[("assistant", "Here's the SDS.", {"sds": {"product": "Acetone"}})]],
+        )
+        _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
+        assert messages[0]["content"] == "Here's the SDS."
+
+    def test_malformed_actions_never_crashes_context_load(self):
+        # Defensive: a corrupted/unexpected actions blob must degrade to
+        # untouched content, never break the whole /api/chat turn.
+        cur = FakeCursor(
+            fetchone_results=[(None,)],
+            fetchall_results=[[
+                ("assistant", "not json {{{", "not json {{{"),
+                ("assistant", "quote is a list", {"quote": ["oops", "not-a-dict"]}),
+                ("assistant", "actions is a list", [1, 2, 3]),
+            ]],
+        )
+        _, messages = session_store.load_hybrid_context(cur, "sess-1", "comp-1")
+        assert [m["content"] for m in messages] == [
+            "not json {{{", "quote is a list", "actions is a list",
+        ]
+
+
+# ── quote_state_note ────────────────────────────────────────────────────────
+
+class TestQuoteStateNote:
+    def test_quoted_status(self):
+        note = session_store.quote_state_note({
+            "status": "quoted", "product": "Acetone", "grade": "AR",
+            "pack_size": "2.5 Ltr", "quantity": 2,
+            "unit_price": 1894.0, "subtotal": 3788.0, "currency": "INR",
+        })
+        assert note == "[State: Acetone AR 2.5 Ltr × 2 quoted at INR 1894.0 each, subtotal INR 3788.0]"
+
+    def test_price_on_request_status(self):
+        note = session_store.quote_state_note({
+            "status": "price_on_request", "product": "Toluene", "quantity": 5,
+        })
+        assert note == "[State: Toluene × 5 — price on request, contact captured]"
+
+    def test_missing_product_returns_none(self):
+        assert session_store.quote_state_note({"status": "quoted", "unit_price": 1}) is None
+
+    def test_unrecognized_status_returns_none(self):
+        # e.g. needs_grade/needs_pack/confirm_quantity never get persisted as a
+        # completed "quote" action in the first place, but stay defensive anyway.
+        assert session_store.quote_state_note({"status": "needs_grade", "product": "Acetone"}) is None
+
+    def test_non_dict_input_returns_none(self):
+        assert session_store.quote_state_note(["not", "a", "dict"]) is None
+        assert session_store.quote_state_note("also not a dict") is None
 
 
 # ── count_messages ────────────────────────────────────────────────────────────

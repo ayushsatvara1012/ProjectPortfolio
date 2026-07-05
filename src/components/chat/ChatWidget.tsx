@@ -507,6 +507,8 @@ type Message = {
     product?: string; grade?: string; pack_size?: string; quantity?: number;
     unit_price?: number | null; subtotal?: number | null;
     gst_rate?: number | null; currency?: string; gst_note?: string | null;
+    captured_contact?: { name?: string | null; email?: string | null; phone?: string | null } | null;
+    quote_url?: string | null;
   };
   sample?: {
     product?: string; grade?: string; packaging?: string; quantity?: number;
@@ -634,6 +636,7 @@ const ICON_PATHS: Record<string, { d: string; fill?: boolean; vb?: string }> = {
   calendar_month: { d: 'M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z', fill: true },
   description: { d: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z', fill: true },
   arrow_outward: { d: 'M6 6v2h8.59L5 17.59 6.41 19 16 9.41V18h2V6z', fill: true },
+  content_copy: { d: 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z', fill: true },
   receipt_long: { d: 'M19.5 3.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5zM19 19.09H5V4.91h14v14.18zM6 15h12v2H6zm0-4h12v2H6zm0-4h12v2H6z', fill: true },
   package_2: { d: 'M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H4V4h16v16zM14.5 5.5h-5L7 8v2h10V8l-2.5-2.5zM7 12v6h10v-6H7zm8 4H9v-2h6v2z', fill: true },
   bolt: { d: 'M11 21h-1l1-7H7.5c-.88 0-.33-.75-.31-.78C8.48 10.94 10.42 7.54 13.01 3h1l-1 7h3.51c.4 0 .62.19.4.66C12.97 17.55 11 21 11 21z', fill: true },
@@ -1106,6 +1109,18 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
       </div>
 
       <form onSubmit={submit} className="flex-1 overflow-y-auto px-3.5 py-3 flex flex-col gap-3 scrollbar-thin">
+        {/* Honeypot (anti-spam): hidden from humans, only bots auto-fill it. The
+            backend drops any submission where `website` is non-empty. */}
+        <input
+          type="text"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          value={values.website || ''}
+          onChange={(e) => set('website', e.target.value)}
+          style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+        />
         {schema.map((f) => (
           <label key={f.name} className="flex flex-col gap-1">
             <span className="text-[12px] font-google font-medium text-slate-600 dark:text-slate-300">
@@ -1381,6 +1396,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [sampleFormPrefill, setSampleFormPrefill] = useState<Record<string, string>>({});
   const [sampleSubmitting, setSampleSubmitting] = useState(false);
   const [sampleError, setSampleError] = useState<string | null>(null);
+  // Phase 4 — the "View & share quote" modal opened from a quote card's
+  // deterministic button (same pattern as the SDS button: the model never
+  // fabricates the link, the widget renders it from the structured payload).
+  const [shareQuote, setShareQuote] = useState<Message['quote'] | null>(null);
+  const [quoteLinkCopied, setQuoteLinkCopied] = useState(false);
   // Hybrid hub: which screen is showing. A vertical (pack) bot opens on 'home' (the
   // action-card grid + bottom Home/Chat tabs) per the chemical Figma; the header
   // back-arrow returns there from 'chat'. A generic bot has no hub → always 'chat'.
@@ -1835,12 +1855,18 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         let content = m.content!;
         if (m.role === 'bot') {
           if (m.quote) {
+            // Kept in lockstep with services/session_store.quote_state_note (backend) —
+            // same '[State: ...]' shape either way, so the directive's "restate an
+            // unchanged repeat ask" instruction recognizes it regardless of whether
+            // this turn came from the client fallback or a resumed server session.
             const q = m.quote;
             const parts = [q.product, q.grade, q.pack_size].filter(Boolean).join(' ');
+            const qtyNote = q.quantity != null ? ` × ${q.quantity}` : '';
             if (q.status === 'quoted' && q.unit_price != null) {
-              content += `\n[State: ${parts} quoted at ${q.currency ?? 'INR'} ${q.unit_price}]`;
+              const subtotalNote = q.subtotal != null ? `, subtotal ${q.currency ?? 'INR'} ${q.subtotal}` : '';
+              content += `\n[State: ${parts}${qtyNote} quoted at ${q.currency ?? 'INR'} ${q.unit_price} each${subtotalNote}]`;
             } else if (q.status === 'price_on_request') {
-              content += `\n[State: ${parts} — price on request, contact captured]`;
+              content += `\n[State: ${parts}${qtyNote} — price on request, contact captured]`;
             }
           }
           if (m.sds) {
@@ -2408,6 +2434,35 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                         ) : (
                                           <div className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">This pack is priced on request — our team will get back to you with a price.</div>
                                         )}
+                                        {msg.quote.captured_contact && (msg.quote.captured_contact.email || msg.quote.captured_contact.phone) && (
+                                          // Phase 2.5: echo the contact the agent parsed from
+                                          // chat so the visitor can catch a mis-read before the
+                                          // team follows up.
+                                          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            <MIcon name="mark_email_read" className="text-[14px] leading-none mt-px shrink-0" />
+                                            <span>
+                                              We'll reach you at{' '}
+                                              <span className="font-medium text-slate-600 dark:text-slate-300">
+                                                {msg.quote.captured_contact.email || msg.quote.captured_contact.phone}
+                                              </span>
+                                              . Not right? Just send the correct one.
+                                            </span>
+                                          </div>
+                                        )}
+                                        {msg.quote.quote_url && (
+                                          // Phase 4: deterministic "View & share quote" action — same
+                                          // pattern as the SDS button (the model only mentions this
+                                          // exists, the URL always comes from the structured payload).
+                                          <button
+                                            type="button"
+                                            onClick={() => setShareQuote(msg.quote!)}
+                                            className="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                            style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}
+                                          >
+                                            <MIcon name="arrow_outward" className="text-[14px] leading-none" />
+                                            View & share quote
+                                          </button>
+                                        )}
                                       </div>
                                     </div>
                                   )}
@@ -2647,6 +2702,97 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               isOpen={isOpen}
               onClick={() => setIsOpen(prev => !prev)}
             />
+          </div>
+        </div>
+      )}
+
+      {shareQuote && (
+        // Phase 4: the quote card's "View & share quote" modal — a read-only
+        // recap of the same structured figures plus a copy-link action. The URL
+        // itself only ever comes from the {quote:{...}} payload, never typed here.
+        <div
+          className="fixed inset-0 z-2147483647 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 pointer-events-auto"
+          role="dialog" aria-modal="true" aria-label="Share quote"
+          onClick={() => { setShareQuote(null); setQuoteLinkCopied(false); }}
+        >
+          <div
+            className="w-full max-w-[320px] rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 text-white" style={{ backgroundColor: THEME_COLOR }}>
+              <div className="flex items-center gap-2 text-[13px] font-google font-bold">
+                <MIcon name="receipt_long" className="text-[16px] leading-none" />
+                {shareQuote.status === 'quoted' ? 'Quote' : 'Quote requested'}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShareQuote(null); setQuoteLinkCopied(false); }}
+                aria-label="Close"
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <CrossIcon size={18} />
+              </button>
+            </div>
+
+            <div className="px-4 py-3.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
+              <div className="font-bold">{shareQuote.product}</div>
+              <div className="text-[12px] text-slate-500 dark:text-slate-400">
+                {[shareQuote.grade, shareQuote.pack_size].filter(Boolean).join(' · ')}
+              </div>
+              {shareQuote.status === 'quoted' ? (
+                <>
+                  <div className="mt-2 flex justify-between"><span>Unit price</span><span>{fmtINR(shareQuote.unit_price, shareQuote.currency)}</span></div>
+                  <div className="flex justify-between"><span>Quantity</span><span>× {shareQuote.quantity}</span></div>
+                  <div className="mt-1 pt-1.5 border-t border-slate-200 dark:border-slate-700 flex justify-between font-bold"><span>Subtotal</span><span>{fmtINR(shareQuote.subtotal, shareQuote.currency)}</span></div>
+                  <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{shareQuote.gst_note || 'GST extra as applicable'} · subject to confirmation</div>
+                </>
+              ) : (
+                <div className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">This pack is priced on request — our team will get back to you with a price.</div>
+              )}
+
+              {shareQuote.quote_url && (
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = shareQuote.quote_url!;
+                      const markCopied = () => {
+                        setQuoteLinkCopied(true);
+                        setTimeout(() => setQuoteLinkCopied(false), 2000);
+                      };
+                      navigator.clipboard.writeText(url).then(markCopied).catch(() => {
+                        // The widget is often embedded in a third-party iframe without
+                        // clipboard-write permission delegated, so the Clipboard API can
+                        // reject — fall back to the classic execCommand copy rather than
+                        // leaving an unhandled rejection and a dead button.
+                        const ta = document.createElement('textarea');
+                        ta.value = url;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        try { document.execCommand('copy'); } catch { /* give up silently */ }
+                        document.body.removeChild(ta);
+                        markCopied();
+                      });
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full text-[12px] font-bold text-white px-3 py-1.5 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: THEME_COLOR }}
+                  >
+                    <MIcon name="content_copy" className="text-[13px] leading-none" />
+                    {quoteLinkCopied ? 'Copied!' : 'Copy link'}
+                  </button>
+                  <a
+                    href={shareQuote.quote_url}
+                    target="_blank" rel="noopener noreferrer"
+                    aria-label="Open quote in a new tab"
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 w-8 h-8 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shrink-0"
+                  >
+                    <MIcon name="arrow_outward" className="text-[14px] leading-none" />
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

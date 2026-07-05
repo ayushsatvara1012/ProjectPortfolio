@@ -63,12 +63,29 @@ interface LeadQuality {
     bands: QualityBand[];
 }
 
+// Phase 6 — token cost metering (the "measure before you optimize" readout).
+interface TokenMetrics {
+    turns: number;
+    metered_turns: number;
+    cache_hits: number;
+    cache_hit_rate: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    avg_tokens_per_turn: number;
+    conversations: number;
+    avg_tokens_per_conversation: number;
+    cached_tokens: number;
+    prompt_cache_hit_rate: number;
+}
+
 interface SessionBiData {
     window_days: number;
     product_demand: DemandItem[];
     stage_funnel: StageItem[];
     lost_sales: LostSales;
     lead_quality: LeadQuality;
+    token_metrics?: TokenMetrics;
 }
 
 function toPct(num: number, den: number): number {
@@ -156,6 +173,7 @@ export default function SessionBiPanel({
     const demandBars = toDemandBars(data?.product_demand ?? []);
     const qualityDonuts = toQualityDonuts(data?.lead_quality ?? { total_scored: 0, bands: [] });
     const lost = data?.lost_sales ?? { total: 0, por_escalations: 0, quoted_not_captured: 0 };
+    const tm = data?.token_metrics;
 
     return (
         <div className="flex flex-col gap-6">
@@ -290,6 +308,46 @@ export default function SessionBiPanel({
                         </Card>
                     </div>
                 </>
+            )}
+
+            {/* Agent cost (Phase 6 metering) — the base for caching ROI. Shown
+                once at least one turn has reported token usage. */}
+            {!isLoading && tm && tm.metered_turns > 0 && (
+                <Card className="p-4 sm:p-5">
+                    <SectionHeader
+                        title="Agent cost"
+                        subtitle="Gemini token usage — the base for measuring caching ROI"
+                        icon="paid"
+                        className="mb-4"
+                    />
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <MetricCard
+                            label="Tokens / conversation"
+                            value={fmtNum(Math.round(tm.avg_tokens_per_conversation))}
+                            hint={`${fmtNum(tm.conversations)} conversation${tm.conversations !== 1 ? 's' : ''}`}
+                        />
+                        <MetricCard
+                            label="Tokens / message"
+                            value={fmtNum(Math.round(tm.avg_tokens_per_turn))}
+                            hint={`${fmtNum(tm.metered_turns)} metered message${tm.metered_turns !== 1 ? 's' : ''}`}
+                        />
+                        <MetricCard
+                            label="Cache hit rate"
+                            value={`${Math.round(tm.cache_hit_rate * 100)}%`}
+                            hint={`${fmtNum(tm.cache_hits)} of ${fmtNum(tm.turns)} turns`}
+                        />
+                        <MetricCard
+                            label="Total tokens"
+                            value={fmtNum(tm.total_tokens)}
+                            hint={`${fmtNum(tm.input_tokens)} in · ${fmtNum(tm.output_tokens)} out`}
+                        />
+                        <MetricCard
+                            label="Prompt cache reads"
+                            value={`${Math.round(tm.prompt_cache_hit_rate * 100)}%`}
+                            hint={`${fmtNum(tm.cached_tokens)} of ${fmtNum(tm.input_tokens)} prompt tokens (Gemini implicit cache)`}
+                        />
+                    </div>
+                </Card>
             )}
         </div>
     );

@@ -151,3 +151,55 @@ def build_lead_quality(band_counts: Dict[str, Any]) -> Dict[str, Any]:
             for b in QUALITY_BANDS
         ],
     }
+
+
+# ── Token cost metering (Phase 6, Slice A) ────────────────────────────────────
+
+def build_token_metrics(
+    turns: Any,
+    cache_hits: Any,
+    input_tokens: Any,
+    output_tokens: Any,
+    metered_turns: Any,
+    conversations: Any,
+    cached_tokens: Any = 0,
+) -> Dict[str, Any]:
+    """Shape raw chat_logs aggregates into the owner-facing cost readout.
+
+    Pure — the caller runs the SUM/COUNT query and passes the scalars. This is
+    the "measure before you optimize" surface (Phase 6): it tells us the real token
+    spend, the cache-hit rate, and cost-per-conversation so we can decide which
+    cache tier is worth building. Averages are over METERED turns/conversations
+    only (rows that actually reported usage — cache hits and legacy rows are NULL),
+    so a partially-metered window isn't diluted toward zero.
+
+    ``cached_tokens`` (Phase 6 Slice B) is the subset of ``input_tokens`` billed
+    at Gemini's implicit context-cache discount — distinct from ``cache_hits``,
+    which counts the older app-level exact-answer cache (always 0 for the
+    vertical agent, since that cache is bypassed for it). ``prompt_cache_hit_rate``
+    is the fraction of prompt tokens served from Gemini's cache — the number that
+    tells us whether explicit caching would add anything on top of the automatic
+    implicit cache.
+    """
+    turns = _safe_int(turns)
+    cache_hits = _safe_int(cache_hits)
+    in_tok = _safe_int(input_tokens)
+    out_tok = _safe_int(output_tokens)
+    metered = _safe_int(metered_turns)
+    convos = _safe_int(conversations)
+    cached_tok = _safe_int(cached_tokens)
+    total = in_tok + out_tok
+    return {
+        "turns": turns,
+        "metered_turns": metered,
+        "cache_hits": cache_hits,
+        "cache_hit_rate": round(cache_hits / turns, 4) if turns > 0 else 0.0,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "total_tokens": total,
+        "avg_tokens_per_turn": round(total / metered, 1) if metered > 0 else 0.0,
+        "conversations": convos,
+        "avg_tokens_per_conversation": round(total / convos, 1) if convos > 0 else 0.0,
+        "cached_tokens": cached_tok,
+        "prompt_cache_hit_rate": round(cached_tok / in_tok, 4) if in_tok > 0 else 0.0,
+    }

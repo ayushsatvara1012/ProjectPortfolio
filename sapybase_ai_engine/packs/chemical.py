@@ -12,7 +12,15 @@ guardrail eval gate that enforces it.
 """
 from __future__ import annotations
 
-from packs.schema import CatalogTable, FormField, HubCard, Pack, Slot, ToolSpec
+from packs.schema import (
+    CatalogTable,
+    FormField,
+    HubCard,
+    Pack,
+    QualificationSlot,
+    Slot,
+    ToolSpec,
+)
 
 CHEMICAL_VERTICAL = "chemical"
 
@@ -198,6 +206,34 @@ _SAMPLE_FORM = (
     FormField("notes", "Additional notes", type="textarea", required=False),
 )
 
+# Phase 5 — qualification slots: the buyer facts the agent tries to learn over a
+# chat so a lead reaches the owner already qualified. CONFIG, not code — the
+# deterministic extractor (services/qualification.py) is keyed by these names, and
+# the directive surfaces whichever are still UNKNOWN so the model can weave in AT
+# MOST one natural discovery question. Order = rough priority to ask.
+_QUALIFICATION_SLOTS = (
+    QualificationSlot(
+        "application", "Application / intended use",
+        "What will you be using it for?",
+    ),
+    QualificationSlot(
+        "monthly_volume", "Monthly volume",
+        "Roughly how much do you need per month?",
+    ),
+    QualificationSlot(
+        "industry", "Industry",
+        "What industry are you in?",
+    ),
+    QualificationSlot(
+        "delivery_city", "Delivery city",
+        "Which city should we deliver to?",
+    ),
+    QualificationSlot(
+        "timeline", "Purchase timeline",
+        "When are you looking to buy?",
+    ),
+)
+
 _CATALOG_TABLES = (
     CatalogTable(
         table_name="products",
@@ -247,5 +283,6 @@ CHEMICAL_PACK = Pack(
     sample_form=_SAMPLE_FORM,
     knowledge_kinds=("catalog", "sds"),
     catalog_tables=_CATALOG_TABLES,
+    qualification_slots=_QUALIFICATION_SLOTS,
     version=1,
 )

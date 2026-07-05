@@ -20,9 +20,56 @@ from packs import (
 from packs.overrides import (
     sanitize_form_fields,
     sanitize_sample_sink,
+    sanitize_visitor_fields,
     ALLOWED_FIELD_TYPES,
     MAX_FIELDS,
+    _VISITOR_MAX_LEN,
 )
+
+
+# ── sanitize_visitor_fields (Phase 2.1) ──────────────────────────────────────
+class TestSanitizeVisitorFields:
+    def _form(self):
+        return load_pack("chemical").sample_form_payload()
+
+    def test_drops_keys_not_in_effective_form(self):
+        out = sanitize_visitor_fields(
+            {"product": "Acetone", "evil": "<script>", "website": "http://spam"},
+            self._form())
+        assert "evil" not in out and "website" not in out
+        assert out["product"] == "Acetone"
+
+    def test_keeps_hidden_prefill_cas_number(self):
+        out = sanitize_visitor_fields({"cas_number": "67-64-1"}, self._form())
+        assert out["cas_number"] == "67-64-1"
+
+    def test_invalid_email_is_dropped(self):
+        out = sanitize_visitor_fields({"contact_email": "not-an-email"}, self._form())
+        assert "contact_email" not in out
+
+    def test_valid_email_kept(self):
+        out = sanitize_visitor_fields({"contact_email": "a@b.com"}, self._form())
+        assert out["contact_email"] == "a@b.com"
+
+    def test_tel_keeps_digits_and_leading_plus(self):
+        out = sanitize_visitor_fields({"contact_phone": "+91 (98765) 43-210"}, self._form())
+        assert out["contact_phone"] == "+919876543210"
+
+    def test_tel_without_digits_dropped(self):
+        out = sanitize_visitor_fields({"contact_phone": "call me"}, self._form())
+        assert "contact_phone" not in out
+
+    def test_length_capped_by_type(self):
+        out = sanitize_visitor_fields({"address": "x" * 5000}, self._form())
+        assert len(out["address"]) == _VISITOR_MAX_LEN["textarea"]
+
+    def test_blank_and_whitespace_omitted(self):
+        out = sanitize_visitor_fields({"company": "   ", "product": "Acetone"}, self._form())
+        assert "company" not in out and out["product"] == "Acetone"
+
+    def test_non_dict_input_is_empty(self):
+        assert sanitize_visitor_fields("nope", self._form()) == {}
+        assert sanitize_visitor_fields(None, self._form()) == {}
 
 CHEM = load_pack("chemical")
 
@@ -163,19 +210,17 @@ class TestEffectiveRequiredFields:
 
 
 class TestEffectiveSampleSink:
+    # Phase 2.4: per-bot sink only — no global/env fallback (cross-tenant safety).
     def test_per_bot_override_wins(self):
         ov = {"sample_sink": {"url": "https://owner.example/hook", "secret": "k"}}
-        assert effective_sample_sink(ov, "https://env.example/hook", "envsecret") == (
-            "https://owner.example/hook", "k")
+        assert effective_sample_sink(ov) == ("https://owner.example/hook", "k")
 
-    def test_falls_back_to_env_when_no_override(self):
-        assert effective_sample_sink(None, "https://env.example/hook", "envsecret") == (
-            "https://env.example/hook", "envsecret")
+    def test_no_override_returns_empty(self):
+        assert effective_sample_sink(None) == ("", "")
 
-    def test_invalid_override_falls_back_to_env(self):
-        ov = {"sample_sink": {"url": "http://insecure"}}
-        assert effective_sample_sink(ov, "https://env.example/hook", "envsecret") == (
-            "https://env.example/hook", "envsecret")
+    def test_invalid_override_returns_empty(self):
+        # An http:// (non-https) sink is rejected → no sink, NOT a silent fallback.
+        assert effective_sample_sink({"sample_sink": {"url": "http://insecure"}}) == ("", "")
 
     def test_nothing_configured_returns_empty(self):
-        assert effective_sample_sink(None, "", "") == ("", "")
+        assert effective_sample_sink({}) == ("", "")

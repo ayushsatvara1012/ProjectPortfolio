@@ -27,6 +27,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
+import secrets
 from typing import Any, Callable, Dict, List, Optional
 
 from langchain_core.messages import ToolMessage
@@ -36,7 +39,10 @@ logger = logging.getLogger(__name__)
 # Bounds: a vertical answer is at most this many Reason→Act rounds, and we never
 # run more than this many tool calls in a single round. Prevents an LLM that keeps
 # requesting tools from looping forever or draining the budget.
-MAX_TOOL_ROUNDS = 3
+# Phase 5 raised rounds 3→4: qualification means the model both answers a product
+# question AND reasons about weaving in a discovery question, which can need one
+# extra tool round (e.g. spec → quote) within a single turn.
+MAX_TOOL_ROUNDS = 4
 MAX_CALLS_PER_ROUND = 4
 
 # Shown when the agent cannot produce a grounded answer (LLM error, exhausted
@@ -293,19 +299,29 @@ def get_product_spec(
         (grade or "").strip(),
     )
     if "row" not in resolved:
-        # Ambiguous (several grades share the name): enrich with a flat grade list
-        # + the product name so the widget can render selectable grade chips for a
-        # product-discovery question — same interactive UI as the quote flow.
+        # Ambiguous. Only enrich into a flat grade list (→ selectable grade chips)
+        # when EVERY candidate is the SAME product sold in several grades. When the
+        # candidates are DIFFERENT products (a CAS or fuzzy name that maps to more
+        # than one product), flattening their grades under the first product's name
+        # would mislabel them — so surface the product candidates instead and let
+        # the agent ask which product (Phase 1.6).
         if resolved.get("status") == "ambiguous":
             cands = resolved.get("candidates") or []
-            grades = []
-            for c in cands:
-                g = (c.get("grade") or "").strip()
-                if g and g not in grades:
-                    grades.append(g)
-            if grades:
-                resolved["grades"] = grades
-                resolved["product"] = cands[0].get("name") if cands else None
+            names = {(c.get("name") or "").strip().lower() for c in cands if c.get("name")}
+            if len(names) == 1:
+                grades = []
+                for c in cands:
+                    g = (c.get("grade") or "").strip()
+                    if g and g not in grades:
+                        grades.append(g)
+                if grades:
+                    resolved["grades"] = grades
+                    resolved["product"] = cands[0].get("name")
+            elif len(names) > 1:
+                # Distinct product names to choose between — the disambiguation is
+                # by product, not grade. No grade chips are emitted; the agent asks
+                # which product from the ``candidates``/``products`` in the message.
+                resolved["products"] = [c.get("name") for c in cands if c.get("name")]
         return resolved
 
     name_, cas_, grade_, packaging_, sds_ref_, _updated_ = resolved["row"]
@@ -392,14 +408,49 @@ def _norm_pack(s: object) -> str:
     return f"{base}{u}"
 
 
-def _parse_qty(v: object) -> int:
-    """Quantity = number of packs. Missing/invalid/≤0 degrades to 1 (the agent is
-    told to confirm the count), never an error — a quote should still render."""
+QTY_MAX = 10_000
+
+
+def _classify_qty(v: object) -> tuple[int, bool]:
+    """Classify a raw model/form quantity into ``(qty, needs_confirm)`` (Phase 1.4).
+
+    - missing / blank            → ``(1, False)``  a single-pack default; safe to use
+    - a clean count ``1..QTY_MAX`` → ``(n, False)`` (counts above the cap clamp to it)
+    - anything else *present*    → ``(1, True)``   unparseable (``"10-20"``, ``"a few"``)
+                                                    or ``≤0`` — never silently assume 1;
+                                                    the caller confirms the count instead.
+    """
+    if v is None:
+        return 1, False
+    s = str(v).strip()
+    if not s:
+        return 1, False
     try:
-        q = int(float(str(v).strip()))
-        return q if q > 0 else 1
+        q = int(float(s))
     except (TypeError, ValueError):
-        return 1
+        return 1, True
+    if q <= 0:
+        return 1, True
+    return min(q, QTY_MAX), False
+
+
+def _parse_qty(v: object) -> int:
+    """Quantity = number of packs, clamped to ``1..QTY_MAX``. Missing/invalid/≤0
+    degrades to 1, never an error — a quote/record should still render. Use
+    :func:`_classify_qty` when you need to distinguish an unparseable input (to
+    confirm it) from a legitimately-absent one (to default)."""
+    qty, _ = _classify_qty(v)
+    return qty
+
+
+# A permissive shape check (not deliverability) — mirrors main._valid_reply_to so
+# the POR contact gate and the owner-notification tier agree on what counts as an
+# email. Phone alone is not enough to finalize a POR (Phase 3.3).
+_EMAIL_SHAPE = re.compile(r"\A[^@\s]+@[^@\s]+\.[^@\s]+\Z")
+
+
+def _looks_like_email(v: object) -> bool:
+    return bool(v and _EMAIL_SHAPE.match(str(v).strip()))
 
 
 def _quote_rows(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
@@ -527,46 +578,74 @@ def request_quote(
                 "message": (f"No '{pack_in}' pack for {product} ({grade_sel}). Offer the "
                             "available pack sizes or connect them to the team.")}
 
-    # 3. Resolve to one priced SKU. Dup rows with DIFFERENT prices = ambiguous data
-    #    → escalate, never pick. POR (or NULL/0 price) = route-to-human.
-    priced = {(r[6] is None or bool(r[8]), None if r[6] is None else float(r[6])) for r in prows}
-    if len({p for _, p in priced if p is not None}) > 1:
+    # 3. Resolve to one priced SKU. Dup rows for this exact pack must agree, or we
+    #    escalate rather than pick arbitrarily by DB order (Phase 1.3). A row is POR
+    #    when flagged, or its price is missing/zero (a 0 list price is never "free").
+    #    Two kinds of conflict escalate to ambiguous_price:
+    #      - rows disagree on POR-ness (some priced, some price-on-request), or
+    #      - the priced rows disagree on the number.
+    #    Only rows that agree on both are safe to quote / route.
+    def _row_is_por(r) -> bool:
+        return bool(r[8]) or r[6] is None or float(r[6]) == 0
+
+    por_flags = {_row_is_por(r) for r in prows}
+    priced_values = {float(r[6]) for r in prows if not _row_is_por(r)}
+    if len(por_flags) > 1 or len(priced_values) > 1:
         return {"status": "ambiguous_price", "product": product, "grade": grade_sel,
-                "message": ("More than one price is on file for this exact pack — do NOT "
+                "message": ("Conflicting prices are on file for this exact pack — do NOT "
                             "quote a number. Tell the visitor you'll confirm with the team.")}
     sku = prows[0]
     pack_sel, pack_code = sku[3], sku[5]
-    # POR if flagged, or the price is missing/zero (a 0 list price is never "free").
-    is_por = bool(sku[8]) or sku[6] is None or float(sku[6]) == 0
+    is_por = _row_is_por(sku)
     gst_rate = float(sku[7]) if sku[7] is not None else None
     currency = sku[9] or "INR"
-    qty = _parse_qty(quantity)
-    has_contact = any([(contact_email or "").strip(), (contact_phone or "").strip()])
-
+    qty, qty_needs_confirm = _classify_qty(quantity)
+    if qty_needs_confirm:
+        # The buyer wrote a quantity we can't turn into a pack count ("10-20",
+        # "a few", 0). Never quote or record a fabricated 1 — ask them to confirm.
+        return {"status": "confirm_quantity", "product": product, "grade": grade_sel,
+                "pack_size": pack_sel,
+                "message": ("The quantity isn't clear. Ask the visitor how many packs "
+                            "they need as a whole number before quoting — do NOT assume "
+                            "a number or produce a quote yet.")}
     if is_por:
-        if not has_contact:
+        # POR contact gate (Phase 3.3): finalize only with a valid EMAIL — that is
+        # the channel the owner alert replies to, and every POR ping must carry a
+        # reachable lead. A phone number alone is not enough. Solicit, don't block
+        # the conversation: we return a directive to ask, not an error.
+        if not _looks_like_email(contact_email):
             return {"status": "needs_contact", "product": product, "grade": grade_sel,
                     "pack_size": pack_sel,
                     "message": ("This pack is priced on request. Ask for the visitor's "
-                                "name and email (or phone) so the team can send a quote.")}
-        _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
-                      pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=None,
-                      subtotal=None, gst_rate=gst_rate, currency=currency, is_por=True,
-                      name=contact_name, email=contact_email, phone=contact_phone,
-                      session_id=session_id)
-        return {"status": "price_on_request", "product": product, "grade": grade_sel,
-                "pack_size": pack_sel, "quantity": qty, "currency": currency,
-                "message": ("Confirm you've logged the request and the team will send a "
-                            "price shortly. Do NOT invent a number.")}
+                                "name and email so the team can send a quote — an email "
+                                "address is required (a phone number alone isn't enough).")}
+        token = _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
+                              pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=None,
+                              subtotal=None, gst_rate=gst_rate, currency=currency, is_por=True,
+                              name=contact_name, email=contact_email, phone=contact_phone,
+                              session_id=session_id)
+        obs = {"status": "price_on_request", "product": product, "grade": grade_sel,
+               "pack_size": pack_sel, "quantity": qty, "currency": currency,
+               "message": ("Confirm you've logged the request and the team will send a "
+                           "price shortly. Do NOT invent a number.")}
+        if token:
+            # Phase 4: a shareable, read-only quote page was minted. The widget shows
+            # the link as a deterministic button; the model may mention it exists but
+            # must NEVER fabricate or alter the URL.
+            obs["quote_url"] = _public_quote_url(token)
+            obs["message"] += (" A shareable quote link has been created and shown to "
+                               "the visitor as a button — you may mention it, but never "
+                               "type out or invent a link yourself.")
+        return obs
 
     unit_price = float(sku[6])
     subtotal = round(unit_price * qty, 2)
-    _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
-                  pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=unit_price,
-                  subtotal=subtotal, gst_rate=gst_rate, currency=currency, is_por=False,
-                  name=contact_name, email=contact_email, phone=contact_phone,
-                  session_id=session_id)
-    return {
+    token = _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
+                          pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=unit_price,
+                          subtotal=subtotal, gst_rate=gst_rate, currency=currency, is_por=False,
+                          name=contact_name, email=contact_email, phone=contact_phone,
+                          session_id=session_id)
+    obs = {
         "status": "quoted", "product": product, "grade": grade_sel,
         "pack_size": pack_sel, "quantity": qty, "unit_price": unit_price,
         "subtotal": subtotal, "gst_rate": gst_rate, "currency": currency,
@@ -576,34 +655,97 @@ def request_quote(
                     "applicable; the quote is subject to confirmation. Do NOT make up any "
                     "figure beyond what is given here."),
     }
+    if token:
+        # Phase 4: shareable read-only quote page. Widget renders the link button
+        # deterministically; the model may mention it but must never fabricate a URL.
+        obs["quote_url"] = _public_quote_url(token)
+        obs["message"] += (" A shareable quote link has been created and shown to the "
+                           "visitor as a button — you may mention it, but never type out "
+                           "or invent a link yourself.")
+    return obs
+
+
+# Base URL of the public site that serves /q/<token>. Read from the same env the
+# backend uses elsewhere (main._super_admin email builder) so links point at the
+# real deployment; the www default matches production.
+_QUOTE_LINK_BASE = os.getenv("APP_BASE_URL", "https://www.sapybase.com").rstrip("/")
+
+# Validity horizon for a shareable quote link (Phase 4). Kept as a plain constant
+# (not env-configurable) — the SQL sets expires_at = created_at + this interval.
+QUOTE_LINK_TTL_DAYS = 30
+
+# Repeat-ask dedup window (cost-control follow-up to Phase 4): a visitor asking
+# for the SAME product/grade/pack/quantity again within this window reuses the
+# earlier row's public_token instead of minting a new one and inserting a new
+# quote_requests record. Mirrors the 10-min sample-request dedup (Phase 2.2).
+QUOTE_DEDUP_WINDOW_MINUTES = 10
+
+
+def _public_quote_url(token: str) -> str:
+    """Absolute URL of the branded, read-only quote page for a minted token."""
+    return f"{_QUOTE_LINK_BASE}/q/{token}"
 
 
 def _insert_quote(cursor, company_id, *, product, cas, grade, pack_size, pack_code,
                   qty, unit_price, subtotal, gst_rate, currency, is_por,
-                  name, email, phone, session_id) -> None:
+                  name, email, phone, session_id) -> Optional[str]:
     """Persist the quote/POR as the owner's lead record, tenant-scoped, committed.
 
-    Failure must never break the conversation: a logged insert error degrades to a
-    still-valid quote on screen (the record is the owner's nicety, not the visitor's
-    answer)."""
+    Returns the minted ``public_token`` (Phase 4 shareable link) on success, or
+    ``None`` if the insert failed. Failure must never break the conversation: a
+    logged insert error degrades to a still-valid quote on screen (the record is
+    the owner's nicety, not the visitor's answer) — the caller simply omits the
+    share link when there is no token.
+
+    Dedup: a repeat ask for the exact same (session, product, grade, pack,
+    quantity, POR-ness) within ``QUOTE_DEDUP_WINDOW_MINUTES`` reuses the earlier
+    row's token instead of minting a new one — stops a spammed/re-asked price
+    from growing quote_requests or the token count unboundedly. Scoped to a
+    session (never bare company_id) so it can't merge two different visitors'
+    asks; skipped entirely when session_id is absent (can't safely scope it)."""
+    if session_id:
+        try:
+            cursor.execute(
+                """
+                SELECT public_token FROM quote_requests
+                WHERE company_id = %s AND session_id = %s AND product_name = %s
+                  AND grade = %s AND pack_size = %s AND quantity = %s AND is_por = %s
+                  AND public_token IS NOT NULL
+                  AND created_at > NOW() - (%s || ' minutes')::interval
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (company_id, session_id, product, grade, pack_size, qty, is_por,
+                 str(QUOTE_DEDUP_WINDOW_MINUTES)),
+            )
+            existing = cursor.fetchone()
+            if existing and existing[0]:
+                return existing[0]
+        except Exception:
+            logger.exception("request_quote: dedup lookup failed, proceeding to insert")
+    token = secrets.token_urlsafe(16)
     try:
         cursor.execute(
             """
             INSERT INTO quote_requests
                 (company_id, session_id, product_name, cas_number, grade, pack_size,
                  pack_code, quantity, unit_price, subtotal, gst_rate, currency, is_por,
-                 contact_name, contact_email, contact_phone, status)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'new')
+                 contact_name, contact_email, contact_phone, status,
+                 public_token, expires_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'new',
+                    %s, NOW() + (%s || ' days')::interval)
             """,
             (company_id, session_id, product, cas, grade, pack_size, pack_code, qty,
              unit_price, subtotal, gst_rate, currency, is_por,
-             (name or None), (email or None), (phone or None)),
+             (name or None), (email or None), (phone or None),
+             token, str(QUOTE_LINK_TTL_DAYS)),
         )
         conn = getattr(cursor, "connection", None)
         if conn is not None:
             conn.commit()
+        return token
     except Exception:
         logger.exception("request_quote: failed to persist quote_requests record")
+        return None
 
 
 # ── request_sample: opens the structured sample FORM (Phase 4b, §10) ──────────
@@ -655,14 +797,16 @@ def request_sample(
 
 def _insert_agent_request(cursor, company_id, *, kind, product, cas, grade,
                           pack_size, qty, note, name, email, phone,
-                          session_id, form_data=None) -> None:
+                          session_id, form_data=None) -> bool:
     """Persist a record-and-route request as the owner's lead, tenant-scoped, committed.
 
     Used by the form-submit endpoint (the typed columns power the dashboard panel;
     ``form_data`` JSONB carries the FULL customizable submission so the spreadsheet
     columns can match the client's form exactly). Mirrors ``_insert_quote``: a
     logged insert error degrades gracefully — capturing the lead must never break
-    the request. Returns nothing; raises nothing."""
+    the request. Never raises; returns ``True`` if the row was persisted, ``False``
+    if the insert failed (so the caller can decide whether the lead was actually
+    captured before telling the visitor "we've got it")."""
     try:
         cursor.execute(
             """
@@ -679,16 +823,23 @@ def _insert_agent_request(cursor, company_id, *, kind, product, cas, grade,
         conn = getattr(cursor, "connection", None)
         if conn is not None:
             conn.commit()
+        return True
     except Exception:
         logger.exception("request_sample: failed to persist agent_requests record")
+        return False
 
 
-def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[str, Any]:
+def execute_tool(name: str, args: Dict[str, Any], cursor, company_id,
+                 session_id: Optional[str] = None) -> Dict[str, Any]:
     """Dispatch a model-requested tool to its deterministic implementation.
 
     An unknown tool name (a hallucinated tool, or one not wired yet) returns a
     benign error observation rather than raising — the model recovers and answers
     normally or escalates.
+
+    ``session_id`` ties side-effecting tools (``request_quote``) to the visitor's
+    conversation so ``quote_requests.session_id`` is populated for funnel/BI joins
+    (Phase 1.2); it is threaded through from the chat handler.
     """
     if name == "get_sds":
         return get_sds(
@@ -718,6 +869,7 @@ def execute_tool(name: str, args: Dict[str, Any], cursor, company_id) -> Dict[st
             contact_name=args.get("contact_name"),
             contact_email=args.get("contact_email"),
             contact_phone=args.get("contact_phone"),
+            session_id=session_id,
         )
     if name == "request_sample":
         return request_sample(
@@ -804,7 +956,13 @@ def build_agent_directive(pack) -> str:
         "estimate, or round a price yourself — quote ONLY the figures request_quote "
         "returns. If it returns needs_contact (price-on-request only), THEN ask for "
         "name and email. If ambiguous_price, say you'll confirm with the team. "
-        "Pricing is not safety: a hazard question still goes to get_sds.\n\n"
+        "Pricing is not safety: a hazard question still goes to get_sds. BEFORE "
+        "calling request_quote, check the conversation for a `[State: ... quoted "
+        "at ...]` or `[State: ... price on request ...]` note for the EXACT same "
+        "product, grade, pack size, AND quantity — if one exists, just restate that "
+        "same figure; do NOT call request_quote again for an unchanged repeat ask. "
+        "Call it again if the product, grade, pack size, or quantity differs at "
+        "all, or the visitor explicitly asks you to recheck/update the price.\n\n"
         "When the visitor wants a free SAMPLE of a product, call request_sample. It "
         "opens a short sample request FORM for them to fill in — do NOT collect the "
         "product, grade, contact, or address yourself. If you know the product (and "
@@ -846,6 +1004,37 @@ def _content_to_text(content: object) -> str:
     return str(content) if content is not None else ""
 
 
+def _accumulate_usage(usage_out: Optional[Dict[str, int]], response) -> None:
+    """Fold one model response's token usage into ``usage_out`` (Phase 6 metering).
+
+    LangChain surfaces per-call counts on ``AIMessage.usage_metadata`` as
+    ``{input_tokens, output_tokens, total_tokens}``. We SUM across the agent's
+    tool-loop rounds so the caller sees the whole turn's cost. Best-effort: a model
+    that doesn't report usage (or a malformed blob) simply contributes nothing —
+    metering must never affect the answer or raise.
+
+    Phase 6 Slice B: also captures ``cached_tokens`` — the ``cache_read`` count
+    LangChain nests under ``usage_metadata["input_token_details"]``. This is how
+    Gemini reports an IMPLICIT context-cache hit (automatic on 2.x models, no
+    ``cached_content`` wiring needed on our side); explicit caching turned out
+    to require a 32,768-token static prefix we don't have, so this is the only
+    caching signal currently reachable — surfaced purely for visibility.
+    """
+    if usage_out is None:
+        return
+    try:
+        meta = getattr(response, "usage_metadata", None) or {}
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            val = meta.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                usage_out[key] = usage_out.get(key, 0) + int(val)
+        cache_read = (meta.get("input_token_details") or {}).get("cache_read")
+        if isinstance(cache_read, (int, float)) and cache_read > 0:
+            usage_out["cached_tokens"] = usage_out.get("cached_tokens", 0) + int(cache_read)
+    except Exception:
+        pass
+
+
 async def run_agent_loop(
     model,
     messages: List[Any],
@@ -853,6 +1042,7 @@ async def run_agent_loop(
     *,
     max_rounds: int = MAX_TOOL_ROUNDS,
     max_calls_per_round: int = MAX_CALLS_PER_ROUND,
+    usage_out: Optional[Dict[str, int]] = None,
 ) -> str:
     """Run Reason → Act → Observe until the model returns text, bounded.
 
@@ -861,6 +1051,10 @@ async def run_agent_loop(
     text. Any failure (LLM error, tool error, exhausted rounds without a text
     answer) degrades to ``AGENT_FALLBACK_TEXT`` — the loop never raises and never
     leaves the caller without a safe, human-routing reply.
+
+    ``usage_out`` (Phase 6): when a dict is passed, per-turn Gemini token counts are
+    accumulated into it (``input_tokens``/``output_tokens``/``total_tokens``, summed
+    across rounds) for cost metering. Omitting it is byte-for-byte the old behavior.
     """
     convo = list(messages)
     for _round in range(max_rounds):
@@ -870,6 +1064,7 @@ async def run_agent_loop(
             logger.exception("agent loop: model.ainvoke failed")
             return AGENT_FALLBACK_TEXT
 
+        _accumulate_usage(usage_out, response)
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
             return _content_to_text(getattr(response, "content", "")) or AGENT_FALLBACK_TEXT

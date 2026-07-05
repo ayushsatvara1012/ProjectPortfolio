@@ -107,6 +107,29 @@ class Slot:
 
 
 @dataclass(frozen=True)
+class QualificationSlot:
+    """One buyer fact the agent should try to learn over a conversation (Phase 5).
+
+    Qualification is *goal-based, not scripted*: the pack declares WHAT is worth
+    knowing (application, volume, industry, …) and the engine surfaces the
+    still-UNKNOWN slots to the model, which weaves at most one natural discovery
+    question into a reply when it fits — it never interrogates and never blocks an
+    answer on collecting a fact. The extraction that fills these deterministically
+    lives in ``services/qualification.py`` (keyed by ``name``), kept out of this
+    frozen value so the regexes stay unit-testable and the pack stays pure config.
+
+      name      — stable key, also the ``lead_profile['qualification']`` sub-key.
+      label     — owner-facing display (request panels) + the fact's human name.
+      question  — an EXAMPLE discovery question, guidance only; the model phrases
+                  its own in context and is told never to ask more than one.
+    """
+
+    name: str
+    label: str
+    question: str = ""
+
+
+@dataclass(frozen=True)
 class ToolSpec:
     """Declaration of an agent tool the pack enables.
 
@@ -140,10 +163,20 @@ class Pack:
     sample_form: Tuple[FormField, ...] = ()    # Phase 4b — structured sample intake form
     knowledge_kinds: Tuple[str, ...] = ()      # what doc kinds feed RAG/tools
     catalog_tables: Tuple[CatalogTable, ...] = ()  # structured tables for auto-import
+    qualification_slots: Tuple[QualificationSlot, ...] = ()  # Phase 5 — buyer facts to learn
     version: int = 1
 
     def tool_names(self) -> Tuple[str, ...]:
         return tuple(t.name for t in self.tools)
+
+    def qualification_slot_names(self) -> Tuple[str, ...]:
+        return tuple(s.name for s in self.qualification_slots)
+
+    def get_qualification_slot(self, name: str) -> Optional[QualificationSlot]:
+        for s in self.qualification_slots:
+            if s.name == name:
+                return s
+        return None
 
     def get_tool(self, name: str) -> Optional[ToolSpec]:
         for t in self.tools:
