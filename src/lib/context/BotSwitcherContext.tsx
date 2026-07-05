@@ -2,12 +2,23 @@
 
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 
-// Minimal bot shape the breadcrumb switcher needs. The customize page owns the
-// fetch (via /api/companies) and pushes the list here so the GLOBAL breadcrumb
-// (TopNav, a shared component) can render a Vercel-style bot switcher without
-// re-fetching or coupling to the page. Selection lives here too so both the
-// breadcrumb and the page read/write a single source of truth.
-export type SwitcherBot = { id: string; bot_name?: string; company_name?: string };
+// The GLOBAL bot switcher: AppLayout fetches the bot list once and publishes it
+// here so every dashboard page (Pipeline, Customize, Conversations, ...) reads
+// and writes the SAME selected bot — no more per-page selection that resets on
+// navigation. Persisted to localStorage so a returning user lands back on the
+// bot they were last working on instead of re-picking every time.
+export type SwitcherBot = { id: string; bot_name?: string; company_name?: string; vertical?: string | null };
+
+const STORAGE_KEY = 'sapybase:selectedBotId';
+
+function readStoredBotId(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
 
 type BotSwitcherContextValue = {
   bots: SwitcherBot[];
@@ -22,14 +33,26 @@ const BotSwitcherContext = createContext<BotSwitcherContextValue | null>(null);
 
 export function BotSwitcherProvider({ children }: { children: React.ReactNode }) {
   const [bots, setBotsState] = useState<SwitcherBot[]>([]);
-  const [selectedBotId, setSelectedBotId] = useState('');
+  const [selectedBotId, setSelectedBotIdState] = useState(readStoredBotId);
   const [showPreview, setShowPreview] = useState(false);
 
   const setBots = useCallback((next: SwitcherBot[]) => setBotsState(next), []);
 
+  const setSelectedBotId = useCallback((id: string) => {
+    setSelectedBotIdState(id);
+    if (typeof window !== 'undefined') {
+      try {
+        if (id) window.localStorage.setItem(STORAGE_KEY, id);
+        else window.localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // localStorage unavailable (private mode, etc.) — selection just won't persist.
+      }
+    }
+  }, []);
+
   const value = useMemo(
     () => ({ bots, setBots, selectedBotId, setSelectedBotId, showPreview, setShowPreview }),
-    [bots, setBots, selectedBotId, showPreview]
+    [bots, setBots, selectedBotId, setSelectedBotId, showPreview]
   );
 
   return <BotSwitcherContext.Provider value={value}>{children}</BotSwitcherContext.Provider>;

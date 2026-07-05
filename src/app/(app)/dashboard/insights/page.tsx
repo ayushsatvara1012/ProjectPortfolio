@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
 import { useUserRole } from '@/src/lib/context/UserContext';
-import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { useBotSwitcher } from '@/src/lib/context/BotSwitcherContext';
+import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 import UpgradePrompt from '@/src/components/features/UpgradePrompt';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -297,25 +297,17 @@ export default function AppInsights() {
     const canAnalytics = entitlements.canUseAnalytics;
     const canLeadCapture = entitlements.canUseLeadCapture;
     const authFetch = useAuthenticatedFetch();
-    const isAuthReady = useIsAuthReady();
 
-    const { data: botsData, isLoading: botsLoading } = useQuery({
-        queryKey: ['bots'],
-        queryFn: () => authFetch('/api/companies'),
-        enabled: isAuthReady && !ctxLoading,
-    });
-
-    const bots = (botsData as any)?.bots || [];
-    const [selectedBotId, setSelectedBotId] = useState('');
-    const selectedBot = bots.find((b: any) => b.id === selectedBotId);
+    // Bot list + selection are global (AppLayout fetches once; every dashboard
+    // page — Pipeline, Customize, ... — shares the same selectedBotId via the
+    // breadcrumb switcher, persisted across visits).
+    const { bots, selectedBotId, setSelectedBotId } = useBotSwitcher();
+    const botsLoading = bots.length === 0;
+    const selectedBot = bots.find((b) => b.id === selectedBotId);
     // Phase 5a — the pack vertical drives this page. A chemical bot relabels the
     // tabs (Pipeline / Operations) and leads its Pipeline with a quote+sample KPI
     // strip. A generic (vertical=NULL) bot is byte-for-byte unchanged.
     const isChemical = selectedBot?.vertical === 'chemical';
-
-    useEffect(() => {
-        if (bots.length > 0 && !selectedBotId) setSelectedBotId(bots[0].id);
-    }, [bots, selectedBotId]);
 
     const [reportData, setReportData] = useState<any>(null);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -329,6 +321,9 @@ export default function AppInsights() {
     const viewSession = (sessionId: string) => { setFocusSessionId(sessionId); setActiveTab('conversations'); };
 
     useEffect(() => {
+        // The bot can now change from the global breadcrumb switcher (not just a
+        // control on this page), so clear the stale report the moment it does.
+        setReportData(null);
         if (selectedBotId && canAnalytics) handleGenerate(true);
     }, [selectedBotId, userTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -371,20 +366,6 @@ export default function AppInsights() {
         ];
 
     const isLoaded = !ctxLoading && !botsLoading;
-
-    const botSelector = canAnalytics && bots.length > 1 && (
-        <div className="relative">
-            <select
-                value={selectedBotId}
-                onChange={(e) => { setSelectedBotId(e.target.value); setReportData(null); }}
-                aria-label="Select bot"
-                className="appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-            >
-                {bots.map((b: any) => <option key={b.id} value={b.id}>{b.bot_name}</option>)}
-            </select>
-            <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
-        </div>
-    );
 
     const generateBtn = activeTab === 'funnel' && canAnalytics && (
         <button
@@ -429,7 +410,6 @@ export default function AppInsights() {
                     })}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 py-1.5 sm:py-2">
-                    {botSelector}
                     {generateBtn}
                 </div>
             </div>

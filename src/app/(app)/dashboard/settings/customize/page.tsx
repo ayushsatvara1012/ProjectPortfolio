@@ -4,11 +4,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import { useBotSettings } from '@/src/lib/context/BotSettingsContext';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useBotSwitcher } from '@/src/lib/context/BotSwitcherContext';
-import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
+import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
 import LogoCustomizer from '@/src/components/features/LogoCustomizer';
 import ChatWidget from '@/src/components/chat/ChatWidget';
 import Alert from '@/src/components/ui/Alert';
@@ -93,41 +92,20 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 export default function CustomizePage() {
   const { botSettings, updateSetting, saveSettings, fetchSettings, isSaving, isLoading, isDirty } = useBotSettings();
   const { userTier, userRole, entitlements, isLoading: userLoading } = useUserRole();
-  const { setBots: setSwitcherBots, selectedBotId, setSelectedBotId } = useBotSwitcher();
+  // Bot list + selection are global (AppLayout fetches once and every dashboard
+  // page shares the same selectedBotId) — this page only overlays the `?edit=`
+  // deep-link from "My Bots" onto that shared selection.
+  const { bots, selectedBotId, setSelectedBotId, showPreview } = useBotSwitcher();
   const authFetch = useAuthenticatedFetch();
-  const isAuthReady = useIsAuthReady();
   const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'warning', msg: '' });
   const [activeTab, setActiveTab] = useState<Tab>('appearance');
-  const { showPreview } = useBotSwitcher();
 
   const searchParams = useSearchParams();
   const editBotId = searchParams.get('edit');
 
-  const { data: botsData } = useQuery({
-    queryKey: ['bots'],
-    queryFn: () => authFetch('/api/companies') as Promise<any>,
-    enabled: isAuthReady,
-  });
-  const bots = botsData?.bots || [];
-
-  // Publish the bot list to the global breadcrumb switcher; clear it on unmount so
-  // other dashboard pages don't show a stale switcher.
   useEffect(() => {
-    setSwitcherBots(botsData?.bots || []);
-  }, [botsData, setSwitcherBots]);
-  useEffect(() => () => setSwitcherBots([]), [setSwitcherBots]);
-
-  useEffect(() => {
-    if (bots.length > 0 && !selectedBotId) {
-      if (editBotId && bots.some((b: any) => b.id === editBotId)) {
-        setSelectedBotId(editBotId);
-      } else {
-        setSelectedBotId(bots[0].id);
-      }
-    } else if (bots.length > 0 && selectedBotId && editBotId && selectedBotId !== editBotId) {
-      if (bots.some((b: any) => b.id === editBotId)) {
-        setSelectedBotId(editBotId);
-      }
+    if (editBotId && editBotId !== selectedBotId && bots.some((b) => b.id === editBotId)) {
+      setSelectedBotId(editBotId);
     }
   }, [bots, selectedBotId, editBotId, setSelectedBotId]);
 

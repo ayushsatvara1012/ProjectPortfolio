@@ -41,10 +41,12 @@ class DashboardErrorBoundary extends Component<
 import { usePathname } from 'next/navigation';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import VaayuLogo from '../ui/VaayuLogo';
 import { BotSettingsProvider } from '@/src/lib/context/BotSettingsContext';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useBotSwitcher } from '@/src/lib/context/BotSwitcherContext';
+import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
 import NavigationProgress from './NavigationProgress';
 
 
@@ -344,6 +346,7 @@ const BotSwitcher = () => {
 const TopNav = ({ user, onMenuClick }: TopNavProps) => {
   const pathname = usePathname();
   const { userTier } = useUserRole();
+  const { bots } = useBotSwitcher();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -353,6 +356,10 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
   const pageLabel = (pathname && PATH_LABELS[pathname]) || 'Dashboard';
   const tierLabel = userTier ? (TIER_LABEL[userTier] ?? userTier) : null;
   const isCustomize = pathname === '/dashboard/settings/customize';
+  // The bot switcher pill is global (every dashboard page reads/writes the same
+  // selection); the widget-preview toggle stays Customize-only, it has nothing
+  // to preview elsewhere.
+  const showBotSwitcher = pathname !== '/dashboard/bots' && bots.length > 0;
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-[#f8f9fa] dark:bg-slate-950 flex items-center px-4 gap-2 z-60 transition-colors duration-500">
@@ -384,7 +391,7 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
           <span className="material-symbols-outlined text-[16px] shrink-0 text-slate-400 dark:text-slate-600">chevron_right</span>
         </div>
         <span className="truncate text-slate-800 dark:text-slate-200 font-google text-[13px] font-medium transition-colors">{pageLabel}</span>
-        {isCustomize && <BotSwitcher />}
+        {showBotSwitcher && <BotSwitcher />}
       </div>
       {isCustomize && (
         <div className="shrink-0">
@@ -397,6 +404,35 @@ const TopNav = ({ user, onMenuClick }: TopNavProps) => {
 
 // ── AppLayout shell (wraps dashboard children) ────────────────────────────────
 
+// Fetches the bot list once for the whole dashboard shell and publishes it to
+// the global switcher context, defaulting selection to whatever was persisted
+// from a previous visit (falling back to the first bot). Every page — Pipeline,
+// Customize, Conversations, ... — then reads the SAME selectedBotId instead of
+// each picking its own.
+function useGlobalBotSync() {
+  const authFetch = useAuthenticatedFetch();
+  const isAuthReady = useIsAuthReady();
+  const { setBots, selectedBotId, setSelectedBotId } = useBotSwitcher();
+
+  const { data: botsData } = useQuery({
+    queryKey: ['bots'],
+    queryFn: () => authFetch('/api/companies') as Promise<{ bots?: Array<{ id: string; bot_name?: string; company_name?: string; vertical?: string | null }> }>,
+    enabled: isAuthReady,
+  });
+
+  useEffect(() => {
+    setBots(botsData?.bots || []);
+  }, [botsData, setBots]);
+
+  useEffect(() => {
+    const bots = botsData?.bots || [];
+    if (bots.length === 0) return;
+    if (!selectedBotId || !bots.some((b) => b.id === selectedBotId)) {
+      setSelectedBotId(bots[0].id);
+    }
+  }, [botsData, selectedBotId, setSelectedBotId]);
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -405,6 +441,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const desktopAsideRef = useRef<HTMLElement>(null);
   const isFullHeightPane = pathname === '/dashboard/settings/customize' || pathname === '/dashboard/insights';
 
+  useGlobalBotSync();
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
