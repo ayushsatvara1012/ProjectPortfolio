@@ -45,6 +45,21 @@ class TestBuildTokenMetrics:
         m = build_token_metrics(None, None, None, None, None, None)
         assert m["turns"] == 0 and m["total_tokens"] == 0
 
+    def test_cached_tokens_defaults_to_zero(self):
+        # cached_tokens omitted (older call site / no data yet) → 0, no crash.
+        m = build_token_metrics(
+            turns=10, cache_hits=0, input_tokens=1000, output_tokens=100,
+            metered_turns=10, conversations=2)
+        assert m["cached_tokens"] == 0
+        assert m["prompt_cache_hit_rate"] == 0.0
+
+    def test_prompt_cache_hit_rate_computed_from_input_tokens(self):
+        m = build_token_metrics(
+            turns=10, cache_hits=0, input_tokens=1000, output_tokens=100,
+            metered_turns=10, conversations=2, cached_tokens=250)
+        assert m["cached_tokens"] == 250
+        assert m["prompt_cache_hit_rate"] == 0.25
+
 
 # ── build_demand_signal ───────────────────────────────────────────────────────
 

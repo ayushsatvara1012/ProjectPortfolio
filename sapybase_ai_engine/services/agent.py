@@ -1012,6 +1012,13 @@ def _accumulate_usage(usage_out: Optional[Dict[str, int]], response) -> None:
     tool-loop rounds so the caller sees the whole turn's cost. Best-effort: a model
     that doesn't report usage (or a malformed blob) simply contributes nothing —
     metering must never affect the answer or raise.
+
+    Phase 6 Slice B: also captures ``cached_tokens`` — the ``cache_read`` count
+    LangChain nests under ``usage_metadata["input_token_details"]``. This is how
+    Gemini reports an IMPLICIT context-cache hit (automatic on 2.x models, no
+    ``cached_content`` wiring needed on our side); explicit caching turned out
+    to require a 32,768-token static prefix we don't have, so this is the only
+    caching signal currently reachable — surfaced purely for visibility.
     """
     if usage_out is None:
         return
@@ -1021,6 +1028,9 @@ def _accumulate_usage(usage_out: Optional[Dict[str, int]], response) -> None:
             val = meta.get(key)
             if isinstance(val, (int, float)) and val > 0:
                 usage_out[key] = usage_out.get(key, 0) + int(val)
+        cache_read = (meta.get("input_token_details") or {}).get("cache_read")
+        if isinstance(cache_read, (int, float)) and cache_read > 0:
+            usage_out["cached_tokens"] = usage_out.get("cached_tokens", 0) + int(cache_read)
     except Exception:
         pass
 

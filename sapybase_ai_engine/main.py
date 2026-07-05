@@ -2575,12 +2575,14 @@ def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: floa
         return round(min(max(rerank_top_score / 10.0, 0.0), 1.0), 2)
     return None
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None):
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed.
     `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit).
     `input_tokens`/`output_tokens` (Phase 6) are the per-turn Gemini token counts
-    (None = cache hit or a path that doesn't surface usage)."""
+    (None = cache hit or a path that doesn't surface usage). `cached_tokens`
+    (Phase 6 Slice B) is the subset of `input_tokens` billed at Gemini's implicit
+    context-cache discount (0 = no cache hit that turn, None = usage not surfaced)."""
     # BYOD tenants store chat_logs on their OWN database (Phase 3.2, dark by
     # default — data-plane write via get_tenant_db / vaayu_runtime). Degrades
     # soft on failure (§16.9): a tenant analytics-write hiccup never breaks chat.
@@ -2595,9 +2597,9 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens)
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens)
         )
         conn.commit()
     except Exception as e:
@@ -3525,6 +3527,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             # empty dict → None for the generic bot, unchanged).
                             _agent_usage.get("input_tokens"),
                             _agent_usage.get("output_tokens"),
+                            _agent_usage.get("cached_tokens"),
                         )
 
                         # 3. Usage Tracking (Background Task)
@@ -5948,13 +5951,14 @@ def get_session_bi(
                 COALESCE(SUM(input_tokens), 0)                             AS input_tokens,
                 COALESCE(SUM(output_tokens), 0)                            AS output_tokens,
                 COUNT(*) FILTER (WHERE input_tokens IS NOT NULL)           AS metered_turns,
-                COUNT(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL) AS conversations
+                COUNT(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL) AS conversations,
+                COALESCE(SUM(cached_tokens), 0)                            AS cached_tokens
             FROM chat_logs
             WHERE company_id = %s {cl_ts}
             """,
             (company_id,),
         )
-        tm = cursor.fetchone() or (0, 0, 0, 0, 0, 0)
+        tm = cursor.fetchone() or (0, 0, 0, 0, 0, 0, 0)
 
         return {
             "window_days": window_days,
@@ -5962,7 +5966,7 @@ def get_session_bi(
             "stage_funnel": build_stage_funnel(stage_counts),
             "lost_sales": build_lost_sales(por_count, quoted_not_captured),
             "lead_quality": build_lead_quality(band_counts),
-            "token_metrics": build_token_metrics(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]),
+            "token_metrics": build_token_metrics(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5], tm[6]),
         }
 
     except HTTPException:

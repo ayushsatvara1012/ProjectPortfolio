@@ -75,6 +75,8 @@ interface TokenMetrics {
     avg_tokens_per_turn: number;
     conversations: number;
     avg_tokens_per_conversation: number;
+    cached_tokens: number;
+    prompt_cache_hit_rate: number;
 }
 
 interface SessionBiData {
@@ -338,6 +340,11 @@ export default function SessionBiPanel({
                             label="Total tokens"
                             value={fmtNum(tm.total_tokens)}
                             hint={`${fmtNum(tm.input_tokens)} in · ${fmtNum(tm.output_tokens)} out`}
+                        />
+                        <MetricCard
+                            label="Prompt cache reads"
+                            value={`${Math.round(tm.prompt_cache_hit_rate * 100)}%`}
+                            hint={`${fmtNum(tm.cached_tokens)} of ${fmtNum(tm.input_tokens)} prompt tokens (Gemini implicit cache)`}
                         />
                     </div>
                 </Card>

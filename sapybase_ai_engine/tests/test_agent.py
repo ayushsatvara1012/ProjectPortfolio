@@ -934,3 +934,26 @@ class TestRunAgentLoop:
         usage2 = {}
         _run(run_agent_loop(model2, [], lambda n, a: {}, usage_out=usage2))
         assert usage2 == {}
+
+    # ── Phase 6 Slice B: implicit cache-read visibility ───────────────────────
+    def test_usage_out_captures_cache_read_tokens(self):
+        model = FakeModel([FakeResp(
+            content="Here you go.",
+            usage_metadata={
+                "input_tokens": 2500, "output_tokens": 40, "total_tokens": 2540,
+                "input_token_details": {"cache_read": 2286},
+            },
+        )])
+        usage = {}
+        _run(run_agent_loop(model, [], lambda n, a: {}, usage_out=usage))
+        assert usage["cached_tokens"] == 2286
+
+    def test_usage_out_no_cache_read_key_when_absent_or_zero(self):
+        model = FakeModel([FakeResp(
+            content="Hi.",
+            usage_metadata={"input_tokens": 10, "output_tokens": 2,
+                             "input_token_details": {"cache_read": 0}},
+        )])
+        usage = {}
+        _run(run_agent_loop(model, [], lambda n, a: {}, usage_out=usage))
+        assert "cached_tokens" not in usage
