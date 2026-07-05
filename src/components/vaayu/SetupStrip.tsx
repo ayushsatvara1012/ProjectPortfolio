@@ -1,79 +1,114 @@
 import React from 'react';
 
 /**
- * SetupStrip — slim 3-step "how you set it up" reassurance row for /vaayu.
- * Three bespoke outlined icons (ingest / embed / live), each drawn uniquely so
- * none repeats another illustration on the site. Connected by a dashed rail.
+ * SetupStrip — 3-step "how you set it up" reassurance row for /vaayu.
+ * Minimal 24px-grid stroke icons, numbered step cards connected by a rail.
  */
 
-function IngestIcon() {
-  // Stacked sources (PDF / URL / text) flowing down into a tray.
+const ICON_STROKE = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.5,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
+
+function TrainIcon() {
+  // Document with content flowing in (upload arrow).
   return (
-    <svg viewBox="0 0 56 56" className="w-7 h-7" aria-hidden="true">
-      <rect x="10" y="6" width="24" height="13" rx="3" className="fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.6" />
-      <rect x="16" y="11" width="13" height="2" rx="1" className="fill-slate-300 dark:fill-slate-600" />
-      <rect x="14" y="14" width="34" height="13" rx="3" fill="#004DE8" opacity="0.1" />
-      <rect x="14" y="14" width="34" height="13" rx="3" fill="none" stroke="#004DE8" strokeWidth="1.6" />
-      <text x="19" y="23" fill="#004DE8" fontSize="6.5" fontWeight="700" fontFamily="sans-serif">PDF · URL</text>
-      <path d="M28 30 v8" stroke="#004DE8" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="2 3" />
-      <path d="M24 35 l4 4 l4 -4" fill="none" stroke="#004DE8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 42 h32 a3 3 0 0 1 3 3 v4 a3 3 0 0 1 -3 3 H12 a3 3 0 0 1 -3 -3 v-4 a3 3 0 0 1 3 -3 Z"
-        className="fill-slate-50 dark:fill-slate-800 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.6" />
-      <circle cx="40" cy="48" r="2" fill="#004DE8" />
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true" {...ICON_STROKE}>
+      <path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-6-6Z" />
+      <path d="M13 3v4a2 2 0 0 0 2 2h4" />
+      <path d="M12 17.5V12M9.5 14.5 12 12l2.5 2.5" />
     </svg>
   );
 }
 
 function EmbedIcon() {
-  // A code snippet card with a single highlighted <script> line.
+  // Code brackets with a slash — one line of code.
   return (
-    <svg viewBox="0 0 56 56" className="w-7 h-7" aria-hidden="true">
-      <rect x="6" y="11" width="44" height="34" rx="5" className="fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.6" />
-      <line x1="6" y1="20" x2="50" y2="20" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1.4" />
-      <circle cx="11" cy="15.5" r="1.6" className="fill-slate-300 dark:fill-slate-600" />
-      <circle cx="16" cy="15.5" r="1.6" className="fill-slate-300 dark:fill-slate-600" />
-      <rect x="11" y="25" width="14" height="2.4" rx="1.2" className="fill-slate-300 dark:fill-slate-600" />
-      <rect x="11" y="31" width="32" height="3.2" rx="1.6" fill="#004DE8" opacity="0.14" />
-      <path d="M14 38 l-3 2.5 l3 2.5 M42 38 l3 2.5 l-3 2.5 M27 36 l-4 9"
-        fill="none" stroke="#004DE8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true" {...ICON_STROKE}>
+      <path d="m8.5 8-4 4 4 4" />
+      <path d="m15.5 8 4 4-4 4" />
+      <path d="m13.5 5.5-3 13" />
     </svg>
   );
 }
 
 function LiveIcon() {
-  // A chat bubble going live with broadcast waves.
+  // Chat bubble with a check — answering from minute one.
   return (
-    <svg viewBox="0 0 56 56" className="w-7 h-7" aria-hidden="true">
-      <path d="M14 14 h22 a6 6 0 0 1 6 6 v10 a6 6 0 0 1 -6 6 H26 l-7 6 v-6 h-5 a6 6 0 0 1 -6 -6 V20 a6 6 0 0 1 6 -6 Z"
-        className="fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.6" />
-      <circle cx="20" cy="25" r="2" fill="#004DE8" />
-      <circle cx="28" cy="25" r="2" className="fill-slate-300 dark:fill-slate-600" />
-      <circle cx="36" cy="25" r="2" className="fill-slate-300 dark:fill-slate-600" />
-      <path d="M42 18 a8 8 0 0 1 0 18 M46 14 a14 14 0 0 1 0 26"
-        fill="none" stroke="#004DE8" strokeWidth="1.6" strokeLinecap="round" opacity="0.65" />
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true" {...ICON_STROKE}>
+      <path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5 8.5 8.5 0 0 1-8.5 8.5c-1.4 0-2.72-.34-3.89-.94L3.5 20.5l1.44-4.11A8.46 8.46 0 0 1 3.5 12 8.5 8.5 0 0 1 12 3.5Z" />
+      <path d="m9 12.2 2.1 2.1L15.3 10" />
     </svg>
   );
 }
 
 const STEPS = [
-  { n: '01', Icon: IngestIcon, title: 'Train on your content', desc: 'Drop in PDFs, paste URLs or text — Vaayu learns your business.' },
-  { n: '02', Icon: EmbedIcon, title: 'Embed one line', desc: 'Copy a single script tag into any site — WordPress, Shopify, anything.' },
-  { n: '03', Icon: LiveIcon, title: 'Goes live instantly', desc: 'Vaayu starts answering, capturing and scoring — from minute one.' },
+  {
+    n: '1',
+    Icon: TrainIcon,
+    title: 'Add your content',
+    desc: 'Upload PDFs, paste URLs, or type it in. Vaayu learns your products, pricing, and policies automatically.',
+    meta: 'Takes about 5 minutes',
+  },
+  {
+    n: '2',
+    Icon: EmbedIcon,
+    title: 'Paste one line of code',
+    desc: 'Drop a single script tag into your site — WordPress, Shopify, Webflow, or fully custom.',
+    meta: 'No developer needed',
+  },
+  {
+    n: '3',
+    Icon: LiveIcon,
+    title: 'Go live instantly',
+    desc: 'Vaayu starts answering visitors, capturing leads, and scoring them from the very first chat.',
+    meta: 'Answering 24/7',
+  },
 ];
 
 export default function SetupStrip({ className = '' }: { className?: string }) {
   return (
-    <div className={`relative grid gap-6 sm:grid-cols-3 ${className}`}>
+    <div className={`relative grid gap-4 lg:gap-6 sm:grid-cols-3 ${className}`}>
       {/* connecting rail (desktop) */}
-      <div className="hidden sm:block absolute top-9 left-[16%] right-[16%] h-px border-t border-dashed border-slate-200 dark:border-slate-800" aria-hidden="true" />
-      {STEPS.map(({ n, Icon, title, desc }) => (
-        <div key={n} className="relative flex flex-col items-start gap-3 rounded-2xl bg-white/60 dark:bg-slate-900/40 sm:bg-transparent sm:dark:bg-transparent p-4 sm:p-0">
-          <div className="relative flex h-[72px] w-[72px] items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm">
-            <Icon />
-            <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#004DE8] text-[10px] font-semibold text-white font-google">{n}</span>
+      <div
+        className="hidden sm:block absolute top-10 left-[18%] right-[18%] h-px bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-700 to-transparent"
+        aria-hidden="true"
+      />
+      {STEPS.map(({ n, Icon, title, desc, meta }) => (
+        <div
+          key={n}
+          className="group relative flex flex-col rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-sm transition-shadow hover:shadow-md hover:shadow-slate-900/5 dark:hover:shadow-black/20"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#004DE8]/[0.07] text-[#004DE8] ring-1 ring-inset ring-[#004DE8]/10">
+              <Icon />
+            </div>
+            <span className="font-google text-xs font-medium tracking-wide text-slate-400 dark:text-slate-500">
+              Step {n} of 3
+            </span>
           </div>
-          <h3 className="font-google text-base font-medium text-slate-900 dark:text-white">{title}</h3>
-          <p className="font-google text-sm leading-relaxed text-slate-500 dark:text-slate-400">{desc}</p>
+          <h3 className="mt-5 font-google text-base font-semibold text-slate-900 dark:text-white">
+            {title}
+          </h3>
+          <p className="mt-2 font-google text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            {desc}
+          </p>
+          <p className="mt-4 flex items-center gap-1.5 font-google text-xs font-medium text-[#004DE8]">
+            <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+              <path
+                d="M2.5 6.5 5 9l4.5-5.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {meta}
+          </p>
         </div>
       ))}
     </div>
