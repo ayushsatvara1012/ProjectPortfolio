@@ -5,7 +5,14 @@ two Phase 0 guarantees — (1) a vertical resolves to its pack, and (2) any
 absent/unknown/malformed vertical safely degrades to None (the generic-bot path,
 so existing NULL-vertical customers are never affected).
 """
-from packs import Pack, ToolSpec, known_verticals, load_pack, normalize_vertical
+from packs import (
+    Pack,
+    QualificationSlot,
+    ToolSpec,
+    known_verticals,
+    load_pack,
+    normalize_vertical,
+)
 from packs.chemical import CHEMICAL_PACK, CHEMICAL_VERTICAL
 
 
@@ -76,6 +83,32 @@ class TestChemicalPack:
         tool = CHEMICAL_PACK.get_tool("request_sample")
         slot_names = {s.name for s in tool.slots}
         assert slot_names == {"product_name", "cas_number", "grade"}
+
+
+class TestQualificationSlots:
+    """Phase 5 — qualification slots are declared as pack config, not code."""
+
+    def test_chemical_declares_the_five_slots(self):
+        assert CHEMICAL_PACK.qualification_slot_names() == (
+            "application", "monthly_volume", "industry", "delivery_city", "timeline")
+
+    def test_every_slot_has_a_label_and_example_question(self):
+        for slot in CHEMICAL_PACK.qualification_slots:
+            assert isinstance(slot, QualificationSlot)
+            assert slot.label.strip()
+            assert slot.question.strip()
+
+    def test_get_qualification_slot_by_name(self):
+        slot = CHEMICAL_PACK.get_qualification_slot("monthly_volume")
+        assert slot is not None and slot.label == "Monthly volume"
+        assert CHEMICAL_PACK.get_qualification_slot("nope") is None
+
+    def test_generic_pack_has_no_qualification_slots(self):
+        # A pack that declares none must degrade cleanly (empty tuple, no None).
+        empty = Pack(vertical="x", persona_prompt="p")
+        assert empty.qualification_slots == ()
+        assert empty.qualification_slot_names() == ()
+        assert empty.get_qualification_slot("application") is None
 
     def test_sample_form_fields_and_required(self):
         names = [f["name"] for f in CHEMICAL_PACK.sample_form_payload()]

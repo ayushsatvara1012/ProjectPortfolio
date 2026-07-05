@@ -14,12 +14,15 @@ import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Card } from '@/src/components/dashboard/insights/ui';
 
+// Phase 5 — buyer facts the agent qualified over the chat, keyed by pack slot name.
+type Qualification = Record<string, string>;
+
 type QuoteRequest = {
   id: string; product?: string; grade?: string; pack_size?: string;
   quantity?: number; subtotal?: number | null; currency?: string;
   is_por?: boolean; contact_name?: string | null; contact_email?: string | null;
   contact_phone?: string | null; status?: string; created_at?: string;
-  session_id?: string | null;
+  session_id?: string | null; qualification?: Qualification;
 };
 
 type AgentRequest = {
@@ -27,7 +30,7 @@ type AgentRequest = {
   pack_size?: string | null; quantity?: number | null; note?: string | null;
   contact_name?: string | null; contact_email?: string | null;
   contact_phone?: string | null; status?: string; created_at?: string;
-  session_id?: string | null;
+  session_id?: string | null; qualification?: Qualification;
 };
 
 type Row = {
@@ -45,6 +48,13 @@ type Row = {
   status: string;
   created_at?: string;
   session_id?: string | null;
+  qualification?: Qualification;
+};
+
+// Slot key -> short label shown on hover; the chip itself shows the value.
+const QUAL_LABELS: Record<string, string> = {
+  application: 'Application', monthly_volume: 'Monthly volume', industry: 'Industry',
+  delivery_city: 'Delivery city', timeline: 'Timeline',
 };
 
 // Per-source status vocab — MUST mirror the backend allowed sets
@@ -114,6 +124,7 @@ const RequestsInboxPanel = ({ selectedBotId, authFetch, isAuthorized, onViewSess
         : fmtINR(q.subtotal, q.currency),
       contact_name: q.contact_name, contact_email: q.contact_email, contact_phone: q.contact_phone,
       status: q.status || 'new', created_at: q.created_at, session_id: q.session_id,
+      qualification: q.qualification,
     }));
     const agents: Row[] = (agentQ.data?.items ?? []).map((r) => ({
       id: r.id, source: 'agent', kind: r.kind || 'request',
@@ -121,6 +132,7 @@ const RequestsInboxPanel = ({ selectedBotId, authFetch, isAuthorized, onViewSess
       value: <span className="text-slate-300 dark:text-slate-600">—</span>,
       contact_name: r.contact_name, contact_email: r.contact_email, contact_phone: r.contact_phone,
       status: r.status || 'new', created_at: r.created_at, session_id: r.session_id,
+      qualification: r.qualification,
     }));
     return [...quotes, ...agents].sort((a, b) =>
       (b.created_at || '').localeCompare(a.created_at || ''));
@@ -193,6 +205,19 @@ const RequestsInboxPanel = ({ selectedBotId, authFetch, isAuthorized, onViewSess
                   <td className="py-2.5 px-2">
                     <div className="font-medium">{r.product || '—'}</div>
                     {r.grade && <div className="text-[11px] text-slate-400">{r.grade}</div>}
+                    {r.qualification && Object.keys(r.qualification).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {Object.entries(r.qualification).map(([k, v]) => (
+                          <span
+                            key={k}
+                            title={QUAL_LABELS[k] || k}
+                            className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-slate-400"
+                          >
+                            {v}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2.5 px-2">{r.pack_size || '—'}</td>
                   <td className="py-2.5 px-2 text-right">{r.quantity ?? '—'}</td>

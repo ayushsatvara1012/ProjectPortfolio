@@ -65,9 +65,12 @@ def _row(name="Sulphuric Acid", cas="7664-93-9", grade="Battery",
 
 
 class FakeResp:
-    def __init__(self, content="", tool_calls=None):
+    def __init__(self, content="", tool_calls=None, usage_metadata=None):
         self.content = content
         self.tool_calls = tool_calls or []
+        # Phase 6 metering: LangChain attaches per-call token usage here.
+        if usage_metadata is not None:
+            self.usage_metadata = usage_metadata
 
 
 class FakeModel:
@@ -899,3 +902,35 @@ class TestRunAgentLoop:
         model = FakeModel([FakeResp(content="")])
         out = _run(run_agent_loop(model, [], lambda n, a: {}))
         assert out == AGENT_FALLBACK_TEXT
+
+    # ── Phase 6 metering: usage_out accumulation ──────────────────────────────
+    def test_usage_out_accumulates_across_rounds(self):
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}],
+                     usage_metadata={"input_tokens": 100, "output_tokens": 10, "total_tokens": 110}),
+            FakeResp(content="Here you go.",
+                     usage_metadata={"input_tokens": 120, "output_tokens": 30, "total_tokens": 150}),
+        ])
+        usage = {}
+        out = _run(run_agent_loop(model, [], lambda n, a: {"status": "found"}, usage_out=usage))
+        assert out == "Here you go."
+        assert usage == {"input_tokens": 220, "output_tokens": 40, "total_tokens": 260}
+
+    def test_usage_out_omitted_is_unchanged_behavior(self):
+        # No usage_out passed → loop behaves exactly as before, no error.
+        model = FakeModel([FakeResp(content="Hi.",
+                                    usage_metadata={"input_tokens": 5, "output_tokens": 1})])
+        assert _run(run_agent_loop(model, [], lambda n, a: {})) == "Hi."
+
+    def test_usage_out_tolerates_missing_or_malformed_metadata(self):
+        # A model that reports no usage contributes nothing; never raises.
+        model = FakeModel([FakeResp(content="Hi.")])          # no usage_metadata attr
+        usage = {}
+        assert _run(run_agent_loop(model, [], lambda n, a: {}, usage_out=usage)) == "Hi."
+        assert usage == {}
+        # Malformed values (None / non-numeric) are ignored, not summed.
+        model2 = FakeModel([FakeResp(content="Hi.",
+                                     usage_metadata={"input_tokens": None, "output_tokens": "x"})])
+        usage2 = {}
+        _run(run_agent_loop(model2, [], lambda n, a: {}, usage_out=usage2))
+        assert usage2 == {}

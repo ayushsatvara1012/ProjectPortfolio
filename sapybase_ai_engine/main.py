@@ -1441,6 +1441,7 @@ from services.agent import _insert_agent_request as _insert_agent_request, _pars
 from services import catalog_import as catalog_import
 from services import session_store  # Phase 1b — persistent session memory
 from services import sales_funnel    # Phase 2 — funnel stage + next-best-action
+from services import qualification   # Phase 5 — deterministic buyer-fact extraction
 
 # Hard ceiling on the blocking vertical-agent precompute (Gemini tool-loop) so a
 # slow/overloaded model degrades to the fallback instead of hanging /api/chat
@@ -2574,13 +2575,17 @@ def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: floa
         return round(min(max(rerank_top_score / 10.0, 0.0), 1.0), 2)
     return None
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None):
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed.
-    `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit)."""
+    `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit).
+    `input_tokens`/`output_tokens` (Phase 6) are the per-turn Gemini token counts
+    (None = cache hit or a path that doesn't surface usage)."""
     # BYOD tenants store chat_logs on their OWN database (Phase 3.2, dark by
     # default — data-plane write via get_tenant_db / vaayu_runtime). Degrades
     # soft on failure (§16.9): a tenant analytics-write hiccup never breaks chat.
+    # Token metering is control-plane only for now (the vertical agent is not on
+    # BYOD); the tenant logger keeps its existing signature.
     if byod_engine.routing_active(company_id):
         byod_engine.tenant_log_chat(
             company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence
@@ -2590,9 +2595,9 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence)
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens)
         )
         conn.commit()
     except Exception as e:
@@ -3156,6 +3161,13 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
 
+            # ── LEAD QUALIFICATION (Phase 5): goal-based discovery ────────────────
+            # Surface known/unknown buyer facts so the model can weave in at most one
+            # natural discovery question. Empty string for packs with no slots.
+            if pack is not None:
+                system_message = system_message + qualification.qualification_block(
+                    pack, _prior_lead_profile)
+
         messages = [SystemMessage(content=system_message)]
 
         if _session_active and _prior_session_messages:
@@ -3188,6 +3200,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         agent_quote = None  # structured quote card surfaced as a widget card
         agent_form = None  # "open a structured form" action (Phase 4b sample form)
         agent_handoff = None  # real-time owner notification (Slack/email) payload
+        _agent_usage: dict = {}  # Phase 6 — per-turn Gemini token counts (metering)
         if pack is not None:
             agent_model = chat_model.bind_tools(build_tool_schemas(pack))
 
@@ -3312,7 +3325,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
             # other agent failure — never leave the request hanging.
             try:
                 precomputed_answer = await asyncio.wait_for(
-                    run_agent_loop(agent_model, messages, _tool_executor),
+                    run_agent_loop(agent_model, messages, _tool_executor,
+                                   usage_out=_agent_usage),
                     timeout=AGENT_PRECOMPUTE_TIMEOUT_S,
                 )
             except asyncio.TimeoutError:
@@ -3363,6 +3377,15 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                                     (_prior_lead_profile or {}).get("email"),
                                     (_prior_lead_profile or {}).get("name")),
                     )
+                    # Phase 5 — fold deterministically-extracted qualification facts
+                    # (application/volume/industry/city/timeline) from THIS turn into
+                    # the profile. LLM-free; only high-confidence matches persist.
+                    if pack is not None and pack.qualification_slots:
+                        _lp = qualification.merge_qualification(
+                            _lp,
+                            qualification.extract_facts(
+                                chat_req.message, pack.qualification_slot_names()),
+                        )
                     _new_state = sales_funnel.derive_state(_prior_state, _captured, _lp)
                     session_store.update_session_state(
                         cursor, chat_req.session_id, company["id"], _new_state
@@ -3497,7 +3520,11 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     else:
                         background_tasks.add_task(
                             log_chat_to_db, company["id"], chat_req.message,
-                            full_reply, False, is_un_final, chat_req.session_id, confidence
+                            full_reply, False, is_un_final, chat_req.session_id, confidence,
+                            # Phase 6 — token metering (vertical agent path only;
+                            # empty dict → None for the generic bot, unchanged).
+                            _agent_usage.get("input_tokens"),
+                            _agent_usage.get("output_tokens"),
                         )
 
                         # 3. Usage Tracking (Background Task)
@@ -4913,6 +4940,22 @@ async def test_sample_sink(
         release_db_connection(conn)
 
 
+def _coerce_qualification(v) -> dict:
+    """Phase 5 — a session's `lead_profile->'qualification'` JSONB → a clean
+    ``{label-safe str: str}`` dict for the owner request panels. Tolerates a dict,
+    a JSON string, or NULL (legacy/unqualified rows); never raises."""
+    if v is None:
+        return {}
+    if isinstance(v, str):
+        try:
+            v = json.loads(v)
+        except Exception:
+            return {}
+    if not isinstance(v, dict):
+        return {}
+    return {str(k): str(val) for k, val in v.items() if val not in (None, "")}
+
+
 @app.get("/api/companies/{company_id}/quote-requests")
 def list_quote_requests(
     company_id: str,
@@ -4936,16 +4979,19 @@ def list_quote_requests(
 
         limit = max(1, min(int(limit or 50), 200))
         status_filter = status if status in ("new", "sent", "won", "lost") else None
-        status_clause = "AND status = %s" if status_filter else ""
+        status_clause = "AND q.status = %s" if status_filter else ""
         params = [company_id] + ([status_filter] if status_filter else []) + [limit]
         cursor.execute(
             f"""
-            SELECT id, product_name, grade, pack_size, quantity, unit_price, subtotal,
-                   gst_rate, currency, is_por, contact_name, contact_email,
-                   contact_phone, status, created_at, session_id
-            FROM quote_requests
-            WHERE company_id = %s {status_clause}
-            ORDER BY created_at DESC
+            SELECT q.id, q.product_name, q.grade, q.pack_size, q.quantity, q.unit_price,
+                   q.subtotal, q.gst_rate, q.currency, q.is_por, q.contact_name,
+                   q.contact_email, q.contact_phone, q.status, q.created_at, q.session_id,
+                   s.lead_profile -> 'qualification'
+            FROM quote_requests q
+            LEFT JOIN agent_sessions s
+                   ON s.session_id = q.session_id AND s.company_id = q.company_id
+            WHERE q.company_id = %s {status_clause}
+            ORDER BY q.created_at DESC
             LIMIT %s
             """,
             params,
@@ -4963,6 +5009,7 @@ def list_quote_requests(
                 "status": r[13],
                 "created_at": r[14].isoformat() if hasattr(r[14], "isoformat") else str(r[14]),
                 "session_id": r[15],
+                "qualification": _coerce_qualification(r[16]),
             }
             for r in rows
         ]
@@ -5065,23 +5112,26 @@ def list_agent_requests(
             raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
 
         limit = max(1, min(int(limit or 50), 200))
-        clauses = ["company_id = %s"]
+        clauses = ["a.company_id = %s"]
         params: list = [company_id]
         if kind and kind != "all":
-            clauses.append("kind = %s")
+            clauses.append("a.kind = %s")
             params.append(kind)
         if status and status != "all":
-            clauses.append("status = %s")
+            clauses.append("a.status = %s")
             params.append(status)
         params.append(limit)
         cursor.execute(
             f"""
-            SELECT id, kind, product_name, cas_number, grade, pack_size, quantity,
-                   contact_name, contact_email, contact_phone, note, status, created_at,
-                   session_id
-            FROM agent_requests
+            SELECT a.id, a.kind, a.product_name, a.cas_number, a.grade, a.pack_size,
+                   a.quantity, a.contact_name, a.contact_email, a.contact_phone, a.note,
+                   a.status, a.created_at, a.session_id,
+                   s.lead_profile -> 'qualification'
+            FROM agent_requests a
+            LEFT JOIN agent_sessions s
+                   ON s.session_id = a.session_id AND s.company_id = a.company_id
             WHERE {' AND '.join(clauses)}
-            ORDER BY created_at DESC
+            ORDER BY a.created_at DESC
             LIMIT %s
             """,
             params,
@@ -5095,6 +5145,7 @@ def list_agent_requests(
                 "note": r[10], "status": r[11],
                 "created_at": r[12].isoformat() if hasattr(r[12], "isoformat") else str(r[12]),
                 "session_id": r[13],
+                "qualification": _coerce_qualification(r[14]),
             }
             for r in rows
         ]
@@ -5264,6 +5315,17 @@ async def submit_sample_request(
                 }
                 _new_state = sales_funnel.derive_state(_prior_state, _captured, _prior_lead_profile)
                 _new_profile = sales_funnel.build_lead_profile(_prior_lead_profile, _captured)
+                # Phase 5 — the sample form is the most reliable qualification source
+                # (structured): the `application` field answers "intended use" directly,
+                # and its free-text fields may also reveal volume/industry/timeline.
+                if pack is not None and pack.qualification_slots:
+                    _qtext = " ".join(
+                        str(fields.get(k) or "") for k in ("application", "notes", "company"))
+                    _qfacts = qualification.extract_facts(_qtext, pack.qualification_slot_names())
+                    _app = str(fields.get("application") or "").strip()
+                    if _app:
+                        _qfacts["application"] = _app[:120]
+                    _new_profile = qualification.merge_qualification(_new_profile, _qfacts)
                 session_store.update_session_state(cursor, payload.session_id, company["id"], _new_state)
                 session_store.update_lead_profile(cursor, payload.session_id, company["id"], _new_profile)
                 conn.commit()
@@ -5744,6 +5806,7 @@ from services.session_bi import (
     build_stage_funnel,
     build_lost_sales,
     build_lead_quality,
+    build_token_metrics,
 )
 
 
@@ -5871,12 +5934,35 @@ def get_session_bi(
         )
         band_counts = {r[0]: r[1] for r in cursor.fetchall() if r[0]}
 
+        # 5. Token cost metering (Phase 6) — from chat_logs. Averages count only
+        # rows that reported usage (input_tokens NOT NULL); cache hits/legacy = NULL.
+        cl_ts = (
+            "AND created_at >= NOW() - INTERVAL '%s days'" % window_days
+            if window_days > 0 else ""
+        )
+        cursor.execute(
+            f"""
+            SELECT
+                COUNT(*)                                                   AS turns,
+                COUNT(*) FILTER (WHERE was_cache_hit)                       AS cache_hits,
+                COALESCE(SUM(input_tokens), 0)                             AS input_tokens,
+                COALESCE(SUM(output_tokens), 0)                            AS output_tokens,
+                COUNT(*) FILTER (WHERE input_tokens IS NOT NULL)           AS metered_turns,
+                COUNT(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL) AS conversations
+            FROM chat_logs
+            WHERE company_id = %s {cl_ts}
+            """,
+            (company_id,),
+        )
+        tm = cursor.fetchone() or (0, 0, 0, 0, 0, 0)
+
         return {
             "window_days": window_days,
             "product_demand": build_demand_signal(demand_rows),
             "stage_funnel": build_stage_funnel(stage_counts),
             "lost_sales": build_lost_sales(por_count, quoted_not_captured),
             "lead_quality": build_lead_quality(band_counts),
+            "token_metrics": build_token_metrics(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5]),
         }
 
     except HTTPException:

@@ -6,8 +6,44 @@ from services.session_bi import (
     build_stage_funnel,
     build_lost_sales,
     build_lead_quality,
+    build_token_metrics,
     STAGE_ORDER,
 )
+
+
+# ── build_token_metrics (Phase 6 metering) ────────────────────────────────────
+
+class TestBuildTokenMetrics:
+    def test_typical_window(self):
+        # 10 turns, 3 cache hits, 7 metered turns, 4 conversations.
+        m = build_token_metrics(
+            turns=10, cache_hits=3, input_tokens=7000, output_tokens=700,
+            metered_turns=7, conversations=4)
+        assert m["turns"] == 10
+        assert m["cache_hits"] == 3
+        assert m["cache_hit_rate"] == 0.3
+        assert m["input_tokens"] == 7000 and m["output_tokens"] == 700
+        assert m["total_tokens"] == 7700
+        assert m["avg_tokens_per_turn"] == round(7700 / 7, 1)
+        assert m["avg_tokens_per_conversation"] == round(7700 / 4, 1)
+
+    def test_empty_window_no_division_by_zero(self):
+        m = build_token_metrics(0, 0, 0, 0, 0, 0)
+        assert m["cache_hit_rate"] == 0.0
+        assert m["avg_tokens_per_turn"] == 0.0
+        assert m["avg_tokens_per_conversation"] == 0.0
+        assert m["total_tokens"] == 0
+
+    def test_averages_use_metered_turns_not_all_turns(self):
+        # 5 turns but only 2 reported usage → average is over the 2, not diluted.
+        m = build_token_metrics(
+            turns=5, cache_hits=3, input_tokens=1000, output_tokens=0,
+            metered_turns=2, conversations=1)
+        assert m["avg_tokens_per_turn"] == 500.0
+
+    def test_none_and_string_inputs_coerce_safely(self):
+        m = build_token_metrics(None, None, None, None, None, None)
+        assert m["turns"] == 0 and m["total_tokens"] == 0
 
 
 # ── build_demand_signal ───────────────────────────────────────────────────────

@@ -39,7 +39,10 @@ logger = logging.getLogger(__name__)
 # Bounds: a vertical answer is at most this many Reason→Act rounds, and we never
 # run more than this many tool calls in a single round. Prevents an LLM that keeps
 # requesting tools from looping forever or draining the budget.
-MAX_TOOL_ROUNDS = 3
+# Phase 5 raised rounds 3→4: qualification means the model both answers a product
+# question AND reasons about weaving in a discovery question, which can need one
+# extra tool round (e.g. spec → quote) within a single turn.
+MAX_TOOL_ROUNDS = 4
 MAX_CALLS_PER_ROUND = 4
 
 # Shown when the agent cannot produce a grounded answer (LLM error, exhausted
@@ -1001,6 +1004,27 @@ def _content_to_text(content: object) -> str:
     return str(content) if content is not None else ""
 
 
+def _accumulate_usage(usage_out: Optional[Dict[str, int]], response) -> None:
+    """Fold one model response's token usage into ``usage_out`` (Phase 6 metering).
+
+    LangChain surfaces per-call counts on ``AIMessage.usage_metadata`` as
+    ``{input_tokens, output_tokens, total_tokens}``. We SUM across the agent's
+    tool-loop rounds so the caller sees the whole turn's cost. Best-effort: a model
+    that doesn't report usage (or a malformed blob) simply contributes nothing —
+    metering must never affect the answer or raise.
+    """
+    if usage_out is None:
+        return
+    try:
+        meta = getattr(response, "usage_metadata", None) or {}
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            val = meta.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                usage_out[key] = usage_out.get(key, 0) + int(val)
+    except Exception:
+        pass
+
+
 async def run_agent_loop(
     model,
     messages: List[Any],
@@ -1008,6 +1032,7 @@ async def run_agent_loop(
     *,
     max_rounds: int = MAX_TOOL_ROUNDS,
     max_calls_per_round: int = MAX_CALLS_PER_ROUND,
+    usage_out: Optional[Dict[str, int]] = None,
 ) -> str:
     """Run Reason → Act → Observe until the model returns text, bounded.
 
@@ -1016,6 +1041,10 @@ async def run_agent_loop(
     text. Any failure (LLM error, tool error, exhausted rounds without a text
     answer) degrades to ``AGENT_FALLBACK_TEXT`` — the loop never raises and never
     leaves the caller without a safe, human-routing reply.
+
+    ``usage_out`` (Phase 6): when a dict is passed, per-turn Gemini token counts are
+    accumulated into it (``input_tokens``/``output_tokens``/``total_tokens``, summed
+    across rounds) for cost metering. Omitting it is byte-for-byte the old behavior.
     """
     convo = list(messages)
     for _round in range(max_rounds):
@@ -1025,6 +1054,7 @@ async def run_agent_loop(
             logger.exception("agent loop: model.ainvoke failed")
             return AGENT_FALLBACK_TEXT
 
+        _accumulate_usage(usage_out, response)
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
             return _content_to_text(getattr(response, "content", "")) or AGENT_FALLBACK_TEXT

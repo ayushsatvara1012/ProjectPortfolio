@@ -11,6 +11,7 @@ const QUOTE_ITEMS = [
     subtotal: 1000, currency: 'INR', is_por: false, contact_name: 'Asha',
     contact_email: 'asha@acme.com', status: 'new',
     created_at: '2026-07-04T10:00:00Z', session_id: 'sess-Q',
+    qualification: { industry: 'pharmaceutical', timeline: 'urgent' },
   },
 ];
 const AGENT_ITEMS = [
@@ -86,6 +87,13 @@ describe('RequestsInboxPanel (Phase 3.2 merged inbox)', () => {
       '/api/companies/bot-1/agent-requests/a1',
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ status: 'handled' }) })
     );
+  });
+
+  it('surfaces qualification facts as chips on the request row', () => {
+    renderPanel();
+    // The captured buyer facts render as value chips (label on hover title).
+    expect(screen.getByText('pharmaceutical')).toBeInTheDocument();
+    expect(screen.getByText('urgent')).toBeInTheDocument();
   });
 
   it('View chat calls onViewSession with the request session id', () => {
