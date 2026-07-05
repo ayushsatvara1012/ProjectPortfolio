@@ -388,18 +388,23 @@ class FakeSkuCursor:
     commit so quote tests can assert persistence and tenant scoping. Acts as its
     own ``connection`` so ``cursor.connection.commit()`` works."""
 
-    def __init__(self, *, cas=None, name_exact=None, partial=None):
+    def __init__(self, *, cas=None, name_exact=None, partial=None, existing_quote_token=None):
         self._cas = cas or []
         self._name = name_exact or []
         self._partial = partial or []
         self._last = ""
+        self._last_params = None
         self.calls = []        # (sql, params)
         self.inserts = []      # params of INSERTs
         self.committed = False
         self.connection = self
+        # Phase 4 cost-control: what the dedup SELECT on quote_requests should
+        # find, if anything (None = no prior identical quote in the window).
+        self.existing_quote_token = existing_quote_token
 
     def execute(self, sql, params=None):
         self._last = sql
+        self._last_params = params
         self.calls.append((sql, params))
         if sql.strip().upper().startswith("INSERT"):
             self.inserts.append(params)
@@ -415,6 +420,11 @@ class FakeSkuCursor:
         if "ILIKE" in s:
             return list(self._partial)
         return []
+
+    def fetchone(self):
+        if "FROM quote_requests" in self._last and "public_token" in self._last:
+            return (self.existing_quote_token,) if self.existing_quote_token else None
+        return None
 
     def commit(self):
         self.committed = True
@@ -458,6 +468,75 @@ class TestRequestQuote:
         assert out["subtotal"] == 5682.0       # 1894 * 3, code never trusts the model
         assert out["gst_note"] == "GST extra as applicable"
         assert len(cur.inserts) == 1 and cur.committed   # owner lead recorded + committed
+
+    def test_quoted_mints_shareable_link_and_persists_token(self):
+        # Phase 4: a successful quote mints an unguessable public token, persists it
+        # (with an expiry) and returns the /q/<token> URL for the widget to render.
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="2")
+        assert out["status"] == "quoted"
+        assert out.get("quote_url", "").startswith("http") and "/q/" in out["quote_url"]
+        token = out["quote_url"].rsplit("/q/", 1)[1]
+        assert token and len(token) >= 16       # secrets.token_urlsafe(16)
+        assert token in cur.inserts[0]          # same token was stored on the row
+
+    def test_por_link_is_shareable_too(self):
+        # Phase 4 product decision: POR quotes also get a shareable page (it renders
+        # "price on request" rather than a number), so they carry a quote_url too.
+        cur = FakeSkuCursor(name_exact=[_sku(pack="25 Ltr", price=None, por=True)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="25 Ltr", contact_email="buyer@acme.com")
+        assert out["status"] == "price_on_request"
+        assert "/q/" in out.get("quote_url", "")
+
+    def test_link_omitted_when_record_fails_to_persist(self):
+        # A failed INSERT must not break the conversation: the quote still shows on
+        # screen, but with no shareable link (no token was minted).
+        class _RaisingCursor(FakeSkuCursor):
+            def execute(self, sql, params=None):
+                if sql.strip().upper().startswith("INSERT"):
+                    raise RuntimeError("db down")
+                super().execute(sql, params)
+        cur = _RaisingCursor(name_exact=[_sku(price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="2")
+        assert out["status"] == "quoted"
+        assert "quote_url" not in out
+
+    def test_repeat_ask_in_same_session_reuses_token_no_new_insert(self):
+        # Cost-control follow-up: asking the SAME product/grade/pack/quantity
+        # again in the same session must not mint a new token or insert another
+        # row — reuse the earlier one. existing_quote_token simulates the dedup
+        # SELECT finding a row from moments ago.
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894)], existing_quote_token="tok-existing")
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="2", session_id="sess-1")
+        assert out["status"] == "quoted"
+        assert out["quote_url"].endswith("/q/tok-existing")
+        assert cur.inserts == []          # no new quote_requests row
+        assert not cur.committed          # nothing written, nothing to commit
+
+    def test_repeat_ask_without_session_id_is_not_deduped(self):
+        # No session to scope the dedup safely against -> always insert fresh
+        # (matches pre-dedup behavior; never risk merging two visitors' asks).
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894)], existing_quote_token="tok-existing")
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="2")
+        assert out["status"] == "quoted"
+        assert not out["quote_url"].endswith("/q/tok-existing")
+        assert len(cur.inserts) == 1
+
+    def test_no_existing_match_inserts_normally(self):
+        # existing_quote_token=None simulates the dedup SELECT finding nothing
+        # (first ask, or a prior ask outside the window/for a different pack).
+        cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
+        out = request_quote(cur, CID, product_name="acetone", grade="AR",
+                            pack_size="2.5 Ltr", quantity="2", session_id="sess-1")
+        assert out["status"] == "quoted"
+        assert len(cur.inserts) == 1
+        token = out["quote_url"].rsplit("/q/", 1)[1]
+        assert token in cur.inserts[0]
 
     def test_quote_pack_match_is_tolerant(self):
         cur = FakeSkuCursor(name_exact=[_sku(pack="2.5 Ltr", price=1894)])
@@ -757,6 +836,9 @@ class TestSchemasAndDirective:
         assert "safety-class question still goes to get_sds" in directive
         # Pricing guardrail: the model must never compute a price itself.
         assert "NEVER state, compute" in directive
+        # Cost-control follow-up: a repeat ask for the SAME product/grade/pack/
+        # quantity must restate the visible [State: ...] note, not re-call the tool.
+        assert "do NOT call request_quote again for an unchanged repeat ask" in directive
 
 
 # ── run_agent_loop ───────────────────────────────────────────────────────────

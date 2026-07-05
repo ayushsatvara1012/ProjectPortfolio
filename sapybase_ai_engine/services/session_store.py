@@ -185,9 +185,9 @@ def load_hybrid_context(
 
     cursor.execute(
         """
-        SELECT role, content
+        SELECT role, content, actions
           FROM (
-              SELECT role, content, ts
+              SELECT role, content, actions, ts
                 FROM agent_messages
                WHERE session_id = %s AND company_id = %s
                ORDER BY ts DESC
@@ -197,10 +197,23 @@ def load_hybrid_context(
         """,
         (session_id, company_id, verbatim_limit),
     )
-    messages = [
-        {"role": r[0], "content": r[1] or ""}
-        for r in cursor.fetchall()
-    ]
+    messages = []
+    for r in cursor.fetchall():
+        role, content, actions = r[0], r[1] or "", r[2]
+        # Reattach the same '[State: ... quoted at ...]' hint the client sends on
+        # a fresh chat, so a resumed session gives the model the same signal to
+        # restate an unchanged price instead of re-calling request_quote. Never
+        # let a malformed actions blob break context loading for the whole turn.
+        if role == "assistant" and actions:
+            try:
+                actions_dict = actions if isinstance(actions, dict) else json.loads(actions)
+                quote = actions_dict.get("quote") if isinstance(actions_dict, dict) else None
+                note = quote_state_note(quote) if quote else None
+                if note:
+                    content = f"{content}\n{note}"
+            except Exception:
+                logger.exception("load_hybrid_context: failed to parse actions for state note")
+        messages.append({"role": role, "content": content})
     return summary, messages
 
 
@@ -258,6 +271,35 @@ def update_lead_profile(cursor, session_id: str, company_id: str, profile: Dict[
         """,
         (json.dumps(profile), session_id, company_id),
     )
+
+
+# ── Repeat-quote state note (cost-control follow-up to Phase 4) ────────────────
+
+def quote_state_note(quote: Dict[str, Any]) -> Optional[str]:
+    """Render the compact '[State: ... quoted at ...]' hint from a stored
+    ``actions["quote"]`` dict, so a RESUMED session (server-side memory) carries
+    the same repeat-detection signal the client appends on a fresh chat
+    (ChatWidget.tsx). Without this, the directive's "reuse an already-quoted
+    price" instruction only works in the client's history-fallback path, never
+    once server-side session memory takes over. Returns None for a dict that
+    doesn't look like a real quote (defensive — never crash context loading)."""
+    if not isinstance(quote, dict):
+        return None
+    product = (quote.get("product") or "").strip()
+    if not product:
+        return None
+    parts = " ".join(p for p in (product, quote.get("grade"), quote.get("pack_size")) if p)
+    qty = quote.get("quantity")
+    qty_note = f" × {qty}" if qty is not None else ""
+    currency = quote.get("currency") or "INR"
+    status = quote.get("status")
+    if status == "quoted" and quote.get("unit_price") is not None:
+        subtotal = quote.get("subtotal")
+        subtotal_note = f", subtotal {currency} {subtotal}" if subtotal is not None else ""
+        return f"[State: {parts}{qty_note} quoted at {currency} {quote['unit_price']} each{subtotal_note}]"
+    if status == "price_on_request":
+        return f"[State: {parts}{qty_note} — price on request, contact captured]"
+    return None
 
 
 # ── Auto-title derivation ─────────────────────────────────────────────────────

@@ -27,7 +27,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import secrets
 from typing import Any, Callable, Dict, List, Optional
 
 from langchain_core.messages import ToolMessage
@@ -614,24 +616,33 @@ def request_quote(
                     "message": ("This pack is priced on request. Ask for the visitor's "
                                 "name and email so the team can send a quote — an email "
                                 "address is required (a phone number alone isn't enough).")}
-        _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
-                      pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=None,
-                      subtotal=None, gst_rate=gst_rate, currency=currency, is_por=True,
-                      name=contact_name, email=contact_email, phone=contact_phone,
-                      session_id=session_id)
-        return {"status": "price_on_request", "product": product, "grade": grade_sel,
-                "pack_size": pack_sel, "quantity": qty, "currency": currency,
-                "message": ("Confirm you've logged the request and the team will send a "
-                            "price shortly. Do NOT invent a number.")}
+        token = _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
+                              pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=None,
+                              subtotal=None, gst_rate=gst_rate, currency=currency, is_por=True,
+                              name=contact_name, email=contact_email, phone=contact_phone,
+                              session_id=session_id)
+        obs = {"status": "price_on_request", "product": product, "grade": grade_sel,
+               "pack_size": pack_sel, "quantity": qty, "currency": currency,
+               "message": ("Confirm you've logged the request and the team will send a "
+                           "price shortly. Do NOT invent a number.")}
+        if token:
+            # Phase 4: a shareable, read-only quote page was minted. The widget shows
+            # the link as a deterministic button; the model may mention it exists but
+            # must NEVER fabricate or alter the URL.
+            obs["quote_url"] = _public_quote_url(token)
+            obs["message"] += (" A shareable quote link has been created and shown to "
+                               "the visitor as a button — you may mention it, but never "
+                               "type out or invent a link yourself.")
+        return obs
 
     unit_price = float(sku[6])
     subtotal = round(unit_price * qty, 2)
-    _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
-                  pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=unit_price,
-                  subtotal=subtotal, gst_rate=gst_rate, currency=currency, is_por=False,
-                  name=contact_name, email=contact_email, phone=contact_phone,
-                  session_id=session_id)
-    return {
+    token = _insert_quote(cursor, company_id, product=product, cas=sku[1], grade=grade_sel,
+                          pack_size=pack_sel, pack_code=pack_code, qty=qty, unit_price=unit_price,
+                          subtotal=subtotal, gst_rate=gst_rate, currency=currency, is_por=False,
+                          name=contact_name, email=contact_email, phone=contact_phone,
+                          session_id=session_id)
+    obs = {
         "status": "quoted", "product": product, "grade": grade_sel,
         "pack_size": pack_sel, "quantity": qty, "unit_price": unit_price,
         "subtotal": subtotal, "gst_rate": gst_rate, "currency": currency,
@@ -641,34 +652,97 @@ def request_quote(
                     "applicable; the quote is subject to confirmation. Do NOT make up any "
                     "figure beyond what is given here."),
     }
+    if token:
+        # Phase 4: shareable read-only quote page. Widget renders the link button
+        # deterministically; the model may mention it but must never fabricate a URL.
+        obs["quote_url"] = _public_quote_url(token)
+        obs["message"] += (" A shareable quote link has been created and shown to the "
+                           "visitor as a button — you may mention it, but never type out "
+                           "or invent a link yourself.")
+    return obs
+
+
+# Base URL of the public site that serves /q/<token>. Read from the same env the
+# backend uses elsewhere (main._super_admin email builder) so links point at the
+# real deployment; the www default matches production.
+_QUOTE_LINK_BASE = os.getenv("APP_BASE_URL", "https://www.sapybase.com").rstrip("/")
+
+# Validity horizon for a shareable quote link (Phase 4). Kept as a plain constant
+# (not env-configurable) — the SQL sets expires_at = created_at + this interval.
+QUOTE_LINK_TTL_DAYS = 30
+
+# Repeat-ask dedup window (cost-control follow-up to Phase 4): a visitor asking
+# for the SAME product/grade/pack/quantity again within this window reuses the
+# earlier row's public_token instead of minting a new one and inserting a new
+# quote_requests record. Mirrors the 10-min sample-request dedup (Phase 2.2).
+QUOTE_DEDUP_WINDOW_MINUTES = 10
+
+
+def _public_quote_url(token: str) -> str:
+    """Absolute URL of the branded, read-only quote page for a minted token."""
+    return f"{_QUOTE_LINK_BASE}/q/{token}"
 
 
 def _insert_quote(cursor, company_id, *, product, cas, grade, pack_size, pack_code,
                   qty, unit_price, subtotal, gst_rate, currency, is_por,
-                  name, email, phone, session_id) -> None:
+                  name, email, phone, session_id) -> Optional[str]:
     """Persist the quote/POR as the owner's lead record, tenant-scoped, committed.
 
-    Failure must never break the conversation: a logged insert error degrades to a
-    still-valid quote on screen (the record is the owner's nicety, not the visitor's
-    answer)."""
+    Returns the minted ``public_token`` (Phase 4 shareable link) on success, or
+    ``None`` if the insert failed. Failure must never break the conversation: a
+    logged insert error degrades to a still-valid quote on screen (the record is
+    the owner's nicety, not the visitor's answer) — the caller simply omits the
+    share link when there is no token.
+
+    Dedup: a repeat ask for the exact same (session, product, grade, pack,
+    quantity, POR-ness) within ``QUOTE_DEDUP_WINDOW_MINUTES`` reuses the earlier
+    row's token instead of minting a new one — stops a spammed/re-asked price
+    from growing quote_requests or the token count unboundedly. Scoped to a
+    session (never bare company_id) so it can't merge two different visitors'
+    asks; skipped entirely when session_id is absent (can't safely scope it)."""
+    if session_id:
+        try:
+            cursor.execute(
+                """
+                SELECT public_token FROM quote_requests
+                WHERE company_id = %s AND session_id = %s AND product_name = %s
+                  AND grade = %s AND pack_size = %s AND quantity = %s AND is_por = %s
+                  AND public_token IS NOT NULL
+                  AND created_at > NOW() - (%s || ' minutes')::interval
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (company_id, session_id, product, grade, pack_size, qty, is_por,
+                 str(QUOTE_DEDUP_WINDOW_MINUTES)),
+            )
+            existing = cursor.fetchone()
+            if existing and existing[0]:
+                return existing[0]
+        except Exception:
+            logger.exception("request_quote: dedup lookup failed, proceeding to insert")
+    token = secrets.token_urlsafe(16)
     try:
         cursor.execute(
             """
             INSERT INTO quote_requests
                 (company_id, session_id, product_name, cas_number, grade, pack_size,
                  pack_code, quantity, unit_price, subtotal, gst_rate, currency, is_por,
-                 contact_name, contact_email, contact_phone, status)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'new')
+                 contact_name, contact_email, contact_phone, status,
+                 public_token, expires_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'new',
+                    %s, NOW() + (%s || ' days')::interval)
             """,
             (company_id, session_id, product, cas, grade, pack_size, pack_code, qty,
              unit_price, subtotal, gst_rate, currency, is_por,
-             (name or None), (email or None), (phone or None)),
+             (name or None), (email or None), (phone or None),
+             token, str(QUOTE_LINK_TTL_DAYS)),
         )
         conn = getattr(cursor, "connection", None)
         if conn is not None:
             conn.commit()
+        return token
     except Exception:
         logger.exception("request_quote: failed to persist quote_requests record")
+        return None
 
 
 # ── request_sample: opens the structured sample FORM (Phase 4b, §10) ──────────
@@ -879,7 +953,13 @@ def build_agent_directive(pack) -> str:
         "estimate, or round a price yourself — quote ONLY the figures request_quote "
         "returns. If it returns needs_contact (price-on-request only), THEN ask for "
         "name and email. If ambiguous_price, say you'll confirm with the team. "
-        "Pricing is not safety: a hazard question still goes to get_sds.\n\n"
+        "Pricing is not safety: a hazard question still goes to get_sds. BEFORE "
+        "calling request_quote, check the conversation for a `[State: ... quoted "
+        "at ...]` or `[State: ... price on request ...]` note for the EXACT same "
+        "product, grade, pack size, AND quantity — if one exists, just restate that "
+        "same figure; do NOT call request_quote again for an unchanged repeat ask. "
+        "Call it again if the product, grade, pack size, or quantity differs at "
+        "all, or the visitor explicitly asks you to recheck/update the price.\n\n"
         "When the visitor wants a free SAMPLE of a product, call request_sample. It "
         "opens a short sample request FORM for them to fill in — do NOT collect the "
         "product, grade, contact, or address yourself. If you know the product (and "

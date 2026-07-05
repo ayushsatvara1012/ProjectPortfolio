@@ -3224,6 +3224,10 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         # Echo the model-parsed contact so the widget can confirm it
                         # back to the visitor (Phase 2.5); None when none captured.
                         "captured_contact": _captured_contact_echo(tool_args),
+                        # Phase 4: shareable, read-only quote page URL (None if the
+                        # record failed to persist). Drives the deterministic
+                        # "View & share quote" button + modal in the widget.
+                        "quote_url": obs.get("quote_url"),
                     }
                     # Every priced/POR quote is a warm lead → notify the owner in
                     # real time (Phase 4b). Contact came in via the tool args.
@@ -4967,6 +4971,71 @@ def list_quote_requests(
         raise
     except Exception as e:
         logger.error(f"list_quote_requests error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/public/quote/{token}")
+@limiter.limit("30/minute", key_func=get_remote_address)
+def get_public_quote(request: Request, token: str):
+    """Public, unauthenticated: the branded read-only page a buyer opens from a
+    shared quote link (Phase 4). Token-gated (unguessable ``secrets.token_urlsafe``
+    capability key — no company_id needed in the URL), rate-limited per IP against
+    scanning, 404 on an unknown token, 410 once past ``expires_at``.
+
+    Never leaks anything beyond what the visitor's own quote already contains:
+    no session_id, no cross-tenant data (the token IS the scope)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT q.product_name, q.grade, q.pack_size, q.quantity, q.unit_price,
+                   q.subtotal, q.gst_rate, q.currency, q.is_por, q.created_at,
+                   q.expires_at, c.company_name, c.logo_url, c.theme_color,
+                   c.bot_name, c.alert_email, u.email
+            FROM quote_requests q
+            JOIN companies c ON c.id = q.company_id
+            JOIN users u ON u.id = c.user_id
+            WHERE q.public_token = %s
+            """,
+            (token,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Quote not found.")
+
+        expires_at = row[10]
+        if expires_at and isinstance(expires_at, datetime):
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at < datetime.now(timezone.utc):
+                raise HTTPException(status_code=410, detail="This quote link has expired.")
+
+        is_por = bool(row[8])
+        return {
+            "status": "price_on_request" if is_por else "quoted",
+            "product": row[0], "grade": row[1], "pack_size": row[2], "quantity": row[3],
+            "unit_price": float(row[4]) if row[4] is not None else None,
+            "subtotal": float(row[5]) if row[5] is not None else None,
+            "gst_rate": float(row[6]) if row[6] is not None else None,
+            "currency": row[7] or "INR",
+            "gst_note": "GST extra as applicable",
+            "created_at": row[9].isoformat() if hasattr(row[9], "isoformat") else str(row[9]),
+            "expires_at": expires_at.isoformat() if hasattr(expires_at, "isoformat") else expires_at,
+            "company": {
+                "name": row[11] or "our company",
+                "logo_url": row[12] or None,
+                "theme_color": row[13] or "#5730F5",
+                "bot_name": row[14] or "Sapy AI",
+                "contact_email": row[15] or row[16] or None,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"get_public_quote error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         release_db_connection(conn)

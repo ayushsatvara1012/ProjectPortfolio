@@ -53,8 +53,8 @@ per unit of effort; each phase ships independently with the suite green.
 |---|---|---|
 | 1 — Security & correctness hotfixes | **DONE (committed `bd11333f`)** 2026-07-04 | All 6 items landed on `agentic-ai`. Backend suite green (1287 passed / 124 skipped); `tsc` clean. See per-item notes below. No migrations. Committed with Phase 2 in `bd11333f` (SetupStrip.tsx marketing UI redesign deliberately left OUT of this commit — unrelated). |
 | 2 — Input validation & anti-abuse | **DONE (committed `bd11333f`)** 2026-07-04 | All 5 items landed on `agentic-ai` (product calls confirmed with user: drop env sink; block-private-ranges SSRF; 50/company/day cap). **2.5 COMPLETE incl. the widget contact-echo.** Backend green (1287 passed / 124 skipped); `tsc` clean; frontend all-mine green (1 pre-existing unrelated `insights-panels` failure). No migrations. |
-| 3 — Owner workflow | **DONE (uncommitted, 3.1–3.4)** 2026-07-04 | 3.1 PATCH status endpoints (per-table vocab, ownership-checked) + 3.2 merged `RequestsInboxPanel` (kind filter, status selects, "View chat" → conversations focus; old two panels deleted; `session_id` added to GET payloads) + 3.3 notification tiering (`_handoff_meets_tier` POR-with-email/sample only; `_handoff_dedup_ok` 1/session/kind/hr, degrade-open) + POR email gate in `request_quote` + 3.4 sink onboarding (`POST /api/companies/{id}/sample-sink/test`, `_fire_sheet_sink`→`(ok,detail)`, Apps Script template + status in `SampleFormEditor`, `channel_delivery_status` surfaced in settings GET). **Migration 0029** `companies.channel_delivery_status JSONB` (additive/idempotent) — ⚠️ settings GET now SELECTs this column → must be applied to the control DB or the endpoint 500s. Backend 1311 pass / 124 skip; frontend +15 mine green (1 pre-existing `insights-panels` fail); tsc clean. |
-| 4 — Quote link + modal | not started | |
+| 3 — Owner workflow | **DONE (committed `ada6bd2b`)** 2026-07-04 | Migration 0029 applied dark to control DB `tticllabbbqwnhsmggfo` (verified column present). 3.1 PATCH status endpoints (per-table vocab, ownership-checked) + 3.2 merged `RequestsInboxPanel` (kind filter, status selects, "View chat" → conversations focus; old two panels deleted; `session_id` added to GET payloads) + 3.3 notification tiering (`_handoff_meets_tier` POR-with-email/sample only; `_handoff_dedup_ok` 1/session/kind/hr, degrade-open) + POR email gate in `request_quote` + 3.4 sink onboarding (`POST /api/companies/{id}/sample-sink/test`, `_fire_sheet_sink`→`(ok,detail)`, Apps Script template + status in `SampleFormEditor`, `channel_delivery_status` surfaced in settings GET). **Migration 0029** `companies.channel_delivery_status JSONB` (additive/idempotent) — ⚠️ settings GET now SELECTs this column → must be applied to the control DB or the endpoint 500s. Backend 1311 pass / 124 skip; frontend +15 mine green (1 pre-existing `insights-panels` fail); tsc clean. |
+| 4 — Quote link + modal | **DONE (uncommitted)** 2026-07-05 | Product calls confirmed with user: 30-day expiry; POR quotes get a shareable link too (renders "price on request"); public page CTA = owner contact email only (no company phone column exists). Migration **0030** `quote_requests.public_token TEXT UNIQUE` + `expires_at TIMESTAMPTZ` (additive/idempotent) — confirmed 0029 was head before adding. `_insert_quote` now mints `secrets.token_urlsafe(16)`, returns it (was `None`); both quoted + POR paths in `request_quote` attach `quote_url` to the observation when the insert succeeded (omitted on insert failure — never breaks the conversation). `GET /api/public/quote/{token}` (main.py): unauthenticated, rate-limited 30/min/IP, 404 unknown token, 410 past `expires_at`, returns structured quote + company branding + `alert_email or owner_email` contact. Next.js `/q/[token]` page (Server Component, `cache: 'no-store'`, `robots: noindex`): branded card, quoted/POR states, validity date, mailto CTA; unknown token → `notFound()`. Widget: quote-card gains a "View & share quote" button (same deterministic pattern as the SDS button) → modal recapping the quote + "Copy link" (clipboard API with an `execCommand` fallback — **found and fixed a real bug in verification**: the widget is commonly iframe-embedded without `clipboard-write` permission delegated, so a bare `navigator.clipboard.writeText` throws an unhandled rejection there) + "Open in new tab". Verified live: backend endpoint via pytest (7 new tests), public page via a temporary local mock backend + curl against the real Next.js dev server (quoted/POR/expired/unknown-token all correct), and the widget button+modal+copy via preview browser automation against a temporary mock `/api/chat` SSE stream. Backend 1321 pass / 124 skip; frontend 351 pass (1 pre-existing unrelated `insights-panels` failure); tsc clean. No prod DB changes made — 0030 is NOT YET applied to the control DB (planned for phase-tail like 0029, pending go-ahead). |
 | 5 — Autonomous qualification | not started | |
 | 6 — Cost caching | not started | |
 
@@ -239,6 +239,44 @@ the widget input this can't happen; low-severity data-quality edge, not a hole.
    the model is told to mention (never fabricate) the link; the widget renders
    the button deterministically, same pattern as the SDS button.
 5. Later (parked): PDF download of the quote page.
+
+### Phase 4 addendum — repeat-ask cost control (2026-07-05)
+
+Raised post-implementation: a visitor (or spammer) re-asking the same product's
+price repeatedly re-runs the full Gemini round-trip AND inserts a fresh
+`quote_requests` row + mints a fresh token every time — unbounded DB growth and
+wasted tokens for a literal repeat. Two independent fixes, both DONE (uncommitted):
+
+1. **DB/token dedup** (`agent.py::_insert_quote`): before inserting, look up an
+   existing non-expired row for the same `(company_id, session_id, product,
+   grade, pack_size, quantity, is_por)` created in the last
+   `QUOTE_DEDUP_WINDOW_MINUTES` (10, matches the Phase 2.2 sample dedup) and
+   reuse its `public_token` instead of minting a new one. Session-scoped only —
+   skipped when `session_id` is absent (never merges two visitors). Degrades
+   open (proceeds to insert) if the lookup itself errors.
+2. **Gemini-call avoidance** (the actual token-cost fix): the widget already
+   appended a client-side `[State: ... quoted at ...]` hint to chat history, but
+   it (a) never covered the session-memory-active path (server-side history
+   reload never carried it — `session_store.load_hybrid_context` only selected
+   `role, content`, not the `actions` JSONB that has the quote data) and (b) the
+   directive never told the model to look for it before re-calling
+   `request_quote`. Fixed: `session_store.quote_state_note()` renders the same
+   note format from a stored `actions["quote"]` dict; `load_hybrid_context` now
+   reattaches it to resumed assistant messages carrying a quote action (matches
+   the client's own annotation format exactly, extended to include quantity +
+   subtotal so the model can tell a *quantity change* apart from a true repeat —
+   without quantity in the note, a repeat-at-different-quantity could be
+   mis-restated with the wrong subtotal). `build_agent_directive`'s pricing
+   paragraph now instructs: restate a `[State: ...]` note found for the exact
+   same product/grade/pack/**quantity**, only re-call the tool if any of those
+   differ or the visitor explicitly asks to recheck.
+
+Both `quote_state_note` and the `load_hybrid_context` reattachment are wrapped
+defensively (never crash context loading on a malformed/legacy `actions` blob).
+Tests: `test_agent.py` (3 dedup cases + 1 directive-text assertion),
+`test_session_store.py` (9 new: state-note rendering, reattachment, JSON-string
+actions, non-quote actions, malformed-actions defensiveness). Backend 1335
+pass / 124 skip; tsc clean. No migrations, no commit yet.
 
 ## Phase 5 — Autonomous qualification (goal-based questioning)
 
