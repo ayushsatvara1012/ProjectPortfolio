@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
 import { Card, SectionHeader, Badge, cx, card } from '@/src/components/dashboard/insights/ui';
-import BotIntegrationDocs from '@/src/components/features/BotIntegrationDocs';
+import BotInstallGuide from '@/src/components/features/BotInstallGuide';
 
 // Mirrors the production CreateBotFlow look (bordered inputs, slim labels) so the
 // demo register screen is visually identical to /dashboard/register. The logic is
@@ -58,8 +58,6 @@ export default function DemoCreateBotPage() {
         setRegistrationData(null);
         setFormData({ companyName: '', allowedOrigin: '', themeColor: '#5730F5', companyTone: 'Professional and helpful' });
     };
-
-    const frontendUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     return (
         <div className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
@@ -188,46 +186,25 @@ export default function DemoCreateBotPage() {
                                         </div>
                                     </Card>
 
-                                    {/* Credentials grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Demo session ID */}
-                                        <Card className="p-5">
-                                            <div className="flex items-center gap-2 mb-3.5">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">vpn_key</span>
-                                                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Demo session ID</p>
-                                            </div>
-                                            <div className="flex items-center gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 px-3.5 py-3">
-                                                <span className="flex-1 truncate text-[12.5px] font-mono text-slate-900 dark:text-slate-100">{registrationData.apiKey}</span>
-                                                <button onClick={() => handleCopy(registrationData.apiKey, 'key')}
-                                                    aria-label="Copy session ID"
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
-                                                    <span className="material-symbols-outlined text-[16px]">{copied === 'key' ? 'check' : 'content_copy'}</span>
-                                                </button>
-                                            </div>
-                                        </Card>
+                                    {/* Demo session ID */}
+                                    <Card className="p-5">
+                                        <div className="flex items-center gap-2 mb-3.5">
+                                            <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">vpn_key</span>
+                                            <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Demo session ID</p>
+                                        </div>
+                                        <div className="flex items-center gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 px-3.5 py-3">
+                                            <span className="flex-1 truncate text-[12.5px] font-mono text-slate-900 dark:text-slate-100">{registrationData.apiKey}</span>
+                                            <button onClick={() => handleCopy(registrationData.apiKey, 'key')}
+                                                aria-label="Copy session ID"
+                                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+                                                <span className="material-symbols-outlined text-[16px]">{copied === 'key' ? 'check' : 'content_copy'}</span>
+                                            </button>
+                                        </div>
+                                    </Card>
 
-                                        {/* Quick embed */}
-                                        <Card className="p-5">
-                                            <div className="flex items-center justify-between mb-3.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">code</span>
-                                                    <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Quick embed</p>
-                                                </div>
-                                                <button onClick={() => handleCopy(`<script src="${frontendUrl}/widget.js" data-api-key="${registrationData.apiKey}" defer></script>`, 'snippet')}
-                                                    aria-label="Copy embed snippet"
-                                                    className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                                    <span className="material-symbols-outlined text-[15px]">{copied === 'snippet' ? 'check' : 'content_copy'}</span>
-                                                </button>
-                                            </div>
-                                            <pre className="rounded-lg bg-slate-900 dark:bg-slate-950 p-3.5 text-[11.5px] font-mono text-blue-300 overflow-x-auto leading-relaxed">
-                                                <code>{`<script src="${frontendUrl}/widget.js"\n  data-api-key="${registrationData.apiKey}"\n  defer></script>`}</code>
-                                            </pre>
-                                        </Card>
-                                    </div>
-
-                                    {/* Integration docs */}
+                                    {/* Stack-aware install guide */}
                                     <Card>
-                                        <BotIntegrationDocs apiKey={registrationData.apiKey} apiUrl="" />
+                                        <BotInstallGuide apiKey={registrationData.apiKey} />
                                     </Card>
 
                                     {/* Demo-only CTAs */}

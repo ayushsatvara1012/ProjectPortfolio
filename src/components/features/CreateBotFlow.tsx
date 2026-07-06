@@ -19,7 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import Alert from '@/src/components/ui/Alert';
 import UpgradePrompt from '@/src/components/features/UpgradePrompt';
-import BotIntegrationDocs from '@/src/components/features/BotIntegrationDocs';
+import BotInstallGuide from '@/src/components/features/BotInstallGuide';
 import { useUserRole } from '@/src/lib/context/UserContext';
 import { useAuthenticatedFetch, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 import { Card, SectionHeader, Badge, cx, card } from '@/src/components/dashboard/insights/ui';
@@ -106,7 +106,6 @@ export default function CreateBotFlow({
 
     const isLoading = registerMutation.isPending;
     const isModal = variant === 'modal';
-    const frontendUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     const goTrain = () => {
         const id = registrationData?.botId;
@@ -260,46 +259,25 @@ export default function CreateBotFlow({
                             </div>
                         </Card>
 
-                        {/* Credentials grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* API key */}
-                            <Card className="p-5">
-                                <div className="flex items-center gap-2 mb-3.5">
-                                    <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">vpn_key</span>
-                                    <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Secure API key</p>
-                                </div>
-                                <div className="flex items-center gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 px-3.5 py-3">
-                                    <span className="flex-1 truncate text-[12.5px] font-mono text-slate-900 dark:text-slate-100">{registrationData.apiKey}</span>
-                                    <button onClick={() => handleCopy(registrationData.apiKey, 'key')}
-                                        aria-label="Copy API key"
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
-                                        <span className="material-symbols-outlined text-[16px]">{copied === 'key' ? 'check' : 'content_copy'}</span>
-                                    </button>
-                                </div>
-                            </Card>
+                        {/* API key */}
+                        <Card className="p-5">
+                            <div className="flex items-center gap-2 mb-3.5">
+                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">vpn_key</span>
+                                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Secure API key</p>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 px-3.5 py-3">
+                                <span className="flex-1 truncate text-[12.5px] font-mono text-slate-900 dark:text-slate-100">{registrationData.apiKey}</span>
+                                <button onClick={() => handleCopy(registrationData.apiKey, 'key')}
+                                    aria-label="Copy API key"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+                                    <span className="material-symbols-outlined text-[16px]">{copied === 'key' ? 'check' : 'content_copy'}</span>
+                                </button>
+                            </div>
+                        </Card>
 
-                            {/* Quick embed */}
-                            <Card className="p-5">
-                                <div className="flex items-center justify-between mb-3.5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">code</span>
-                                        <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Quick embed</p>
-                                    </div>
-                                    <button onClick={() => handleCopy(`<script src="${frontendUrl}/widget.js" data-api-key="${registrationData.apiKey}" defer></script>`, 'snippet')}
-                                        aria-label="Copy embed snippet"
-                                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                        <span className="material-symbols-outlined text-[15px]">{copied === 'snippet' ? 'check' : 'content_copy'}</span>
-                                    </button>
-                                </div>
-                                <pre className="rounded-lg bg-slate-900 dark:bg-slate-950 p-3.5 text-[11.5px] font-mono text-blue-300 overflow-x-auto leading-relaxed">
-                                    <code>{`<script src="${frontendUrl}/widget.js"\n  data-api-key="${registrationData.apiKey}"\n  defer></script>`}</code>
-                                </pre>
-                            </Card>
-                        </div>
-
-                        {/* Integration docs */}
+                        {/* Stack-aware install guide */}
                         <Card>
-                            <BotIntegrationDocs apiKey={registrationData.apiKey} apiUrl="" />
+                            <BotInstallGuide apiKey={registrationData.apiKey} />
                         </Card>
                     </motion.div>
                 )}
