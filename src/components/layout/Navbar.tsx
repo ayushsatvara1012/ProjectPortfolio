@@ -226,7 +226,7 @@ export default function Navbar() {
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
-                className="relative text-base font-google font-normal antialiased tracking-wider text-slate-800 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
+                className="relative text-[15px] font-google font-normal antialiased text-slate-300 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
               >
                 {link.dropdown && link.dropdownType ? (() => {
                   const cfg = dropdownConfig[link.dropdownType];
@@ -234,7 +234,7 @@ export default function Navbar() {
                   return (
                   <button
                     onClick={() => setActiveDropdown(isActive ? null : link.dropdownType!)}
-                    className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
+                    className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
                   >
                     {link.name}
                     <span
@@ -321,7 +321,7 @@ export default function Navbar() {
                   <Link
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
+                    className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors py-2 relative group"
                   >
                     {link.name}
                     <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
@@ -336,14 +336,14 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="redirect">
-                  <button className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
+                  <button className="text-[15px] font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full flex items-center transition-colors duration-500">
                 <SignUpButton mode="redirect">
-                  <button className=" text-slate-600 dark:text-slate-200 text-base font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
+                  <button className=" text-slate-600 dark:text-slate-200 text-[15px] font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-400 to-blue-500 transition-all duration-500">
                       Get Started
                     </span>
@@ -355,7 +355,7 @@ export default function Navbar() {
               <div className="h-full flex items-center px-3 lg:px-6 gap-6 transition-[background-color] duration-500 bg-transparent">
                 <Link
                   href="/dashboard"
-                  className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2"
+                  className="text-[15px] font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2"
                 >
                   <span className="material-symbols-outlined ">dashboard</span>
                   Dashboard
