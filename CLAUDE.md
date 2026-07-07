@@ -171,11 +171,63 @@ Project-scoped skills in `.claude/skills/`. Invoke via `Skill` tool when matched
 | `vertical-pack-scaffold` | Creating new vertical pack with config pattern, rejecting hardcoded `if vertical` logic |
 | `pre-push-check` | Before pushing to MainV2: verify suite green, migration safety, graphify freshness |
 | `plan-memory-sync` | Creating feature plan: scaffold docs + memory stub + index entry in one shot |
-| `graphify-refresh` | After large merges to keep architecture graph fresh |
+| `graphify` | Query pre-generated knowledge graph (zero API cost) — see "Graphify Knowledge Graph" below |
 | `run-backend-tests` | Fast iteration on backend: activate venv, run pytest with coverage |
 
-## Architecture queries
+## Graphify Knowledge Graph (Scan-Only, Zero Cost)
 
-Use `/graphify` skill for deep codebase exploration.
-Use `/graphify query "<your question>"` to search architecture relationships.
-For quick semantic overview, refer to "Project structure" section above.
+### Setup (One-Time)
+
+User runs manually in terminal:
+
+```bash
+graphify update .
+```
+
+This generates `graphify-out/` cache. Claude queries this cache (zero API cost).
+
+### Daily Usage
+
+Ask architecture questions; Claude queries cached graph:
+
+```bash
+/graphify query "what modules use pgvector?"
+/graphify query "dependency path from ChatWidget to FastAPI"
+/graphify query "who calls run_agent_loop?"
+
+/graphify analyze                    # Hotspots, dead code, cycles
+/graphify analyze --scope services/  # Specific directory
+
+/graphify impact "file.ts"          # What breaks if I change this?
+```
+
+### Refresh Graph
+
+After major merges/refactors:
+
+```bash
+graphify update .  # ~$0.01-0.05, user runs manually
+```
+
+### Cost Model
+
+| Operation | Cost | Frequency |
+|-----------|------|-----------|
+| Graph generation (manual) | $0.01-0.05 per run | User controls (weekly) |
+| Query/analyze (Claude) | $0.00 | Unlimited |
+| **Monthly total** | ~$0.10 | — |
+
+**Key rule:** Generation is manual (you control cost), queries are free (unlimited). ~98% savings vs per-query generation.
+
+### When to Generate
+
+- ✅ After merging large features
+- ✅ Major refactor (>50 files changed)
+- ✅ Before architecture review
+- ✅ Monthly sync (keep graph fresh)
+
+### When NOT to Generate
+
+- ❌ Small bug fixes (1-3 files)
+- ❌ Comment-only changes
+- ❌ Tests (unless new test patterns matter)
