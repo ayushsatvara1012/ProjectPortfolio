@@ -64,7 +64,7 @@ public/widget.js
 tsconfig.tsbuildinfo
 graphify-out/
 tmp_home/
-.claude/
+.claude/settings.local.json
 coverage/
 *.db
 **/*.db

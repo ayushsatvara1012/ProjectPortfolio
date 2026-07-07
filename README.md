@@ -2,16 +2,13 @@
 
 Sapybase is an autonomous AI chatbot platform built for modern businesses. This repository contains the Next.js frontend web application and the Python (FastAPI) backend AI engine.
 
-## Architecture
+## Stack
 
-- **Frontend (`/src`)**: A native Next.js App Router application containing the marketing site, SaaS dashboard, and embeddable widget routes.
-- **Backend (`/sapybase_ai_engine`)**: A FastAPI application powering the RAG pipeline, AI agent orchestration, and database management.
-
-### Enterprise Embed Architecture
-The chatbot widget is optimized for global performance and zero-dependency integration:
-- **Edge Runtime**: The `/embed` route is powered by the Vercel Edge Runtime for sub-second global delivery.
-- **API Proxying**: All client-side requests are proxied via Next.js rewrites to the FastAPI backend, obfuscating internal infrastructure and simplifying CSP whitelisting for customers.
-- **Dependency Isolation**: The widget is decoupled from the main dashboard dependencies (Clerk, React Query), resulting in a minimal initial JavaScript payload.
+- **Frontend**: Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS
+- **Backend**: Python 3.12 FastAPI + Uvicorn
+- **Database**: Supabase Postgres (pgvector for embeddings)
+- **Auth**: Clerk
+- **Billing**: Polar
 
 ## Getting Started
 
