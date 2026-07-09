@@ -4052,7 +4052,7 @@ async def submit_explore_enquiry(
     handles the gmail.com-style case: record the enquiry as 'pending' so an admin
     can approve it (Phase C). Disposable/invalid emails are rejected, not stored.
     """
-    from email_routing import classify_email_domain, DISPOSABLE, INVALID
+    from services.email_routing import classify_email_domain, DISPOSABLE, INVALID
 
     # Honeypot: bots fill the hidden `website` field. Silently accept + drop so
     # the bot believes it succeeded and doesn't retry with a different vector.
@@ -4140,7 +4140,7 @@ async def explore_route_for_user(request: Request, user: dict = Depends(get_curr
     Keeps the business-vs-personal domain classification server-side (single
     source of truth). The frontend builds the actual Polar checkout URL.
     """
-    from email_routing import classify_email_domain
+    from services.email_routing import classify_email_domain
     email = user.get("email") or ""
     return {
         "route": explore_cta_route(
