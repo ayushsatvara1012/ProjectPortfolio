@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { getBotConfig, saveBotConfig } from '@/src/lib/demo/demoStorage';
 import { SHAPE_CLASS_MAP, AVATAR_GRADIENTS, FAB_SHAPES } from '@/src/components/ui/avatar/AvatarShared';
 import BotPreview from '@/src/components/chat/BotPreview';

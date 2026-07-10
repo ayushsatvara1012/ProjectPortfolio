@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useMemo, useEffect, Component, useState, type ReactNode } from 'react';
+import React, { useRef, useMemo, useEffect, Component, type ReactNode } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 

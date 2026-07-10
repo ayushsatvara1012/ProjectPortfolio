@@ -35,7 +35,7 @@ const LIMIT_CONFIG: Record<string, LimitEntry> = {
     icon: Database,
     title: 'Knowledge Base Full',
     accent: 'rose',
-    tip: (tier, limit) =>
+    tip: (tier, _limit) =>
       `Your ${tier} plan's knowledge storage is full. Upgrade to train on more content.`,
   },
   CHUNK_QUOTA_OVERFLOW: {

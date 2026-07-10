@@ -65,7 +65,6 @@ type BotAvatarProps = {
 export function BotAvatar({
   shapeId = 'circle',
   logoUrl = '',
-  botName = 'S',
   size = 'md',
   themeColor = '#5730F5',
   bgStyle = 'none',
@@ -107,7 +106,6 @@ export function BotAvatar({
 
   // EC2: sizes in SVG coordinate units (viewBox is 0 0 100 100)
   const sizePx = { sm: 28, md: 40, lg: 56 }[size] ?? 40;
-  const fontSize = { sm: 10, md: 15, lg: 21 }[size] ?? 15;
 
   return (
     <svg
@@ -181,7 +179,6 @@ export function BotAvatar({
 
 // ── FabWidgetPreview (used in the customizer live preview strip) ───────────────
 export const FabWidgetPreview = ({
-  shapeId,
   logoUrl,
   botName,
   themeColor,

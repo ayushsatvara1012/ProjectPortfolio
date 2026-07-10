@@ -84,7 +84,7 @@ type BotAvatarProps = {
   bgStyle?: string;
 };
 
-function BotAvatar({ shapeId, logoUrl, botName, themeColor, sizeClass, hasShadow = true, transparentBgImage = false, isCustom = false, bgStyle = 'none' }: BotAvatarProps) {
+function BotAvatar({ shapeId, logoUrl, sizeClass, hasShadow = true, transparentBgImage = false, isCustom = false, bgStyle = 'none' }: BotAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
 
@@ -186,7 +186,7 @@ type FabButtonProps = {
   onClick: () => void;
 };
 
-function FabButton({ fabPath, fabGradient, fabSolid = null, logoUrl, botName, themeColor, isCustomLogo, fabShapeX, fabShapeY, isOpen, onClick }: FabButtonProps) {
+function FabButton({ fabPath, fabGradient, fabSolid = null, logoUrl, themeColor, isCustomLogo, fabShapeX, fabShapeY, isOpen, onClick }: FabButtonProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const prevUrlRef = useRef(logoUrl);
 
@@ -1466,7 +1466,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     }
   }, [isOpen, isEmbed]);
 
-  const [isTabletUp, setIsTabletUp] = useState(false);
+  const [, setIsTabletUp] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;

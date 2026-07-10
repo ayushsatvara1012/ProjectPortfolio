@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -108,7 +108,7 @@ export default function DemoChatPage() {
             const relevant = retrieveChunks(chunks, trimmed);
             const answer = await askGemini(trimmed, relevant, botConfig, userMsgCount + 1);
             setMessages(prev => [...prev, { role: 'bot', content: answer }]);
-        } catch (err) {
+        } catch {
             setMessages(prev => [...prev, { role: 'bot', content: "Error occurred." }]);
         } finally {
             setIsLoading(false);

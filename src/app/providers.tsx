@@ -36,13 +36,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return;
     const originalFetch = window.fetch.bind(window);
     const patched: typeof window.fetch = async (...args) => {
-      let response: Response;
-      try {
-        response = await originalFetch(...args);
-      } catch (err) {
-        // Network error (e.g. backend unreachable) — let caller handle
-        throw err;
-      }
+      // Network error (e.g. backend unreachable) propagates to the caller.
+      const response = await originalFetch(...args);
       if (response.status === 402) {
         response.clone()
           .json()

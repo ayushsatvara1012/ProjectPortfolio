@@ -564,7 +564,7 @@ export default function DemoInsightsPage() {
     const [showEmailProviders, setShowEmailProviders] = useState(false);
 
     // Leads CRM table filters & states
-    const [leadsPage, setLeadsPage] = useState(1);
+    const [, setLeadsPage] = useState(1);
     const [leadsSort, setLeadsSort] = useState('recent');
     const [leadsBandFilter, setLeadsBandFilter] = useState('all');
     const [leadsStatusFilter, setLeadsStatusFilter] = useState('all');
@@ -573,7 +573,7 @@ export default function DemoInsightsPage() {
 
     // Conversations state
     const [sessions, setSessions] = useState(INITIAL_DEMO_SESSIONS);
-    const [conversationsPage, setConversationsPage] = useState(1);
+    const [, setConversationsPage] = useState(1);
     const [conversationsFilter, setConversationsFilter] = useState('all'); // all, unanswered
     const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
     const [selectedQueryFilter, setSelectedQueryFilter] = useState<string | null>(null);
@@ -584,7 +584,6 @@ export default function DemoInsightsPage() {
 
     // Funnel state & Simulated Insights
     const [windowDays, setWindowDays] = useState<number>(30);
-    const [activeBand, setActiveBand] = useState<string | null>(null);
     const [reportData, setReportData] = useState<any>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);

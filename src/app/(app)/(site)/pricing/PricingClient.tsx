@@ -19,7 +19,6 @@ import {
   CheckMark,
   CellValue,
   FaqItem,
-  accentMap,
   ExploreComingSoon
 } from './components';
 import ByodSection from './ByodSection';
@@ -94,7 +93,6 @@ export default function PricingClient() {
   const heroInView = useInView(heroRef, { once: true, margin: '-60px' });
   const cardsInView = useInView(cardsRef, { once: true, margin: '-60px' });
   const tableInView = useInView(tableRef, { once: true, margin: '-80px' });
-  const faqInView = useInView(faqRef, { once: true, margin: '-60px' });
 
   useEffect(() => {
     const detect = async () => {

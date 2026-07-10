@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { retrieveChunks } from '@/src/lib/demo/demoRag';
 
 // retrieveChunks is the exported pure function we can test without network

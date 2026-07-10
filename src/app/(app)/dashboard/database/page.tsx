@@ -15,7 +15,7 @@
  * or to leave; both are admin-run (no mutation from this page).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthenticatedFetch, useIsAuthReady } from '@/src/lib/hooks/useAuthenticatedFetch';
@@ -255,7 +255,7 @@ function CopyableIp({ value }: { value: string }) {
   );
 }
 
-function Requirements({ requirements }: { requirements: Requirements }) {
+function RequirementsCard({ requirements }: { requirements: Requirements }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <h3 className="text-sm font-display font-semibold text-slate-900 dark:text-slate-100">Before you start</h3>
@@ -347,7 +347,7 @@ function OnboardingWizard({ view, onSubmitted }: { view: MeView; onSubmitted: ()
 
   return (
     <div className="mt-6 space-y-6">
-      <Requirements requirements={view.requirements} />
+      <RequirementsCard requirements={view.requirements} />
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="text-sm font-display font-semibold text-slate-900 dark:text-slate-100">

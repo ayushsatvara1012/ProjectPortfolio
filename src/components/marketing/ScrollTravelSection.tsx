@@ -33,7 +33,6 @@ export default function ScrollTravelSection() {
     if (!isDesktop) return;
 
     const spring = { p: 0, vp: 0 };
-    let rafId: number;
 
     const tick = () => {
       const wrapper = wrapperRef.current;

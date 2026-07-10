@@ -7,7 +7,6 @@ import ActionCenterPanel from '@/src/components/dashboard/ActionCenterPanel';
 
 // Mock react-query
 vi.mock('@tanstack/react-query', () => {
-  const queryFn = vi.fn();
   const mutateFn = vi.fn();
   return {
     useQuery: vi.fn(() => ({
