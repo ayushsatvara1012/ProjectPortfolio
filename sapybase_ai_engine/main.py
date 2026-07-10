@@ -65,6 +65,9 @@ load_dotenv()               # Standard .env as fallback
 ENV = os.getenv("ENV", "production")
 DB_URL = os.getenv("DATABASE_URL")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+# Optional r.jina.ai Reader token for URL training. Keyless works but is heavily
+# rate-limited; a key raises limits and improves reliability. Unset = keyless.
+JINA_API_KEY = os.getenv("JINA_API_KEY", "").strip()
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER")
 CLERK_WEBHOOK_SECRET = os.getenv("CLERK_WEBHOOK_SECRET")
 POLAR_WEBHOOK_SECRET = os.getenv("POLAR_WEBHOOK_SECRET", "").strip()
@@ -7422,7 +7425,30 @@ async def train_chatbot(
         validate_safe_url(url.strip())
         try:
             jina_url = f"https://r.jina.ai/{url.strip()}"
-            response = await asyncio.to_thread(requests.get, jina_url, headers={"User-Agent": "SapybaseBot/1.0"}, timeout=15)
+            headers = {"User-Agent": "SapybaseBot/1.0"}
+            if JINA_API_KEY:
+                headers["Authorization"] = f"Bearer {JINA_API_KEY}"
+
+            # Retry transient Jina failures (429/5xx/network) with backoff; a
+            # single free-tier hiccup shouldn't fail an otherwise valid job.
+            response = None
+            last_err: Exception | None = None
+            for attempt in range(3):
+                try:
+                    response = await asyncio.to_thread(
+                        requests.get, jina_url, headers=headers, timeout=20
+                    )
+                    if response.status_code == 200:
+                        break
+                    if response.status_code not in (429, 500, 502, 503, 504):
+                        break  # non-retryable (e.g. 4xx) — stop early
+                except requests.RequestException as exc:
+                    last_err = exc
+                if attempt < 2:
+                    await asyncio.sleep(1.5 * (attempt + 1))
+
+            if response is None:
+                raise HTTPException(status_code=502, detail=f"Failed to reach the URL extractor: {last_err}")
             if response.status_code != 200 or len(response.text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
             # Store with the normalised URL so metadata.source matches source_name.
