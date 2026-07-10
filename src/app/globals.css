@@ -374,10 +374,14 @@ body.mobile-menu-open .sapy-chat-root {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
+/* App-wide guard: pin every form control to 16px on phones so no focused field
+   (auth, dashboard training, settings, etc.) triggers iOS zoom-and-stay. Design
+   keeps its smaller sizes on desktop (≥641px). Covers the widget too, so its
+   old scoped rule is folded into this one. */
 @media (max-width: 640px) {
-  .sapy-chat-root input:not([type="checkbox"]):not([type="radio"]),
-  .sapy-chat-root textarea,
-  .sapy-chat-root select {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
     font-size: 16px !important;
   }
 }
