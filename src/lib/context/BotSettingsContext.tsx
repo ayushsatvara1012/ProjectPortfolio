@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthenticatedFetch } from '@/src/lib/hooks/useAuthenticatedFetch';
@@ -138,11 +138,11 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const savedSnapshotRef = useRef<string>('');
+  const [savedSnapshot, setSavedSnapshot] = useState<string>('');
 
   const isDirty = useMemo(
-    () => savedSnapshotRef.current !== '' && JSON.stringify(botSettings) !== savedSnapshotRef.current,
-    [botSettings],
+    () => savedSnapshot !== '' && JSON.stringify(botSettings) !== savedSnapshot,
+    [botSettings, savedSnapshot],
   );
 
   const fetchSettings = useCallback(async (botId: string | null = null) => {
@@ -166,7 +166,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
       if (data?.company) {
         const mapped = mapCompanyToSettings(data.company);
         setBotSettings(mapped);
-        savedSnapshotRef.current = JSON.stringify(mapped);
+        setSavedSnapshot(JSON.stringify(mapped));
       }
     } catch (err) {
       console.error('Failed to fetch bot settings:', err);
@@ -219,7 +219,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
       // Invalidate cached company details so the next read fetches fresh data.
       queryClient.invalidateQueries({ queryKey: COMPANY_DETAILS_KEY(botId) });
       queryClient.invalidateQueries({ queryKey: ['bots'] });
-      savedSnapshotRef.current = JSON.stringify(botSettings);
+      setSavedSnapshot(JSON.stringify(botSettings));
       return { success: true };
     } catch (err: any) {
       console.error('Failed to save bot settings:', err);

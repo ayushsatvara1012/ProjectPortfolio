@@ -154,6 +154,25 @@ def validate_safe_url(url: str):
         raise HTTPException(status_code=400, detail="Could not resolve the provided URL.")
 
 
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_BLANK_LINES_RE = re.compile(r"\n{3,}")
+
+
+def _strip_markdown_images(markdown: str) -> str:
+    """Drop markdown image syntax (``![alt](url)``) from Jina Reader output.
+
+    Pages with heavy logo/brand-strip galleries (e.g. partner sections) can
+    yield chunks that are almost entirely image links carrying no retrievable
+    text, silently burning the tenant's chunk quota. Stripping images before
+    chunking keeps every stored segment text-bearing, since the chat has no
+    image rendering module yet anyway.
+    """
+    text = _MD_IMAGE_RE.sub("", markdown)
+    # Collapse the blank-line runs left behind by removed image blocks.
+    text = _BLANK_LINES_RE.sub("\n\n", text)
+    return text.strip()
+
+
 def _url_resolves_to_public_ip(url: str) -> bool:
     """SSRF guard for owner-configured, server-side-fetched webhooks (Phase 2.3).
 
@@ -7451,8 +7470,11 @@ async def train_chatbot(
                 raise HTTPException(status_code=502, detail=f"Failed to reach the URL extractor: {last_err}")
             if response.status_code != 200 or len(response.text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
+            cleaned_text = _strip_markdown_images(response.text)
+            if len(cleaned_text) < 50:
+                raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
             # Store with the normalised URL so metadata.source matches source_name.
-            docs = [Document(page_content=response.text, metadata={"source": pending_source_name})]
+            docs = [Document(page_content=cleaned_text, metadata={"source": pending_source_name})]
         except HTTPException:
             if r and lock_acquired:
                 await r.delete(lock_key)
