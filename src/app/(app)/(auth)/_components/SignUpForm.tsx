@@ -17,6 +17,7 @@ import {
   inputCls,
   labelCls,
   linkCls,
+  PasswordInput,
 } from './auth-ui';
 
 const AFTER_SIGN_UP = process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL || '/dashboard';
@@ -171,15 +172,13 @@ export default function SignUpForm() {
 
         <div className="space-y-1.5">
           <label htmlFor="su-password" className={labelCls}>Password</label>
-          <input
+          <PasswordInput
             id="su-password"
-            type="password"
             autoComplete="new-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className={inputCls}
           />
         </div>
 

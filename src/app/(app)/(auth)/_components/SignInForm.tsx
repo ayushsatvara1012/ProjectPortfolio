@@ -17,6 +17,7 @@ import {
   inputCls,
   labelCls,
   linkCls,
+  PasswordInput,
 } from './auth-ui';
 
 const AFTER_SIGN_IN = process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL || '/dashboard';
@@ -183,15 +184,13 @@ export default function SignInForm() {
           </div>
           <div className="space-y-1.5">
             <label htmlFor="reset-new-pw" className={labelCls}>New password</label>
-            <input
+            <PasswordInput
               id="reset-new-pw"
-              type="password"
               autoComplete="new-password"
               required
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className={inputCls}
             />
           </div>
           <button type="submit" className={btnPrimary} disabled={busy || !isLoaded}>
@@ -242,15 +241,13 @@ export default function SignInForm() {
               Forgot password?
             </button>
           </div>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className={inputCls}
           />
         </div>
 
