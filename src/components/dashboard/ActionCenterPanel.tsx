@@ -165,7 +165,7 @@ const ActionCenterPanel = ({ selectedBotId, authFetch, isAuthorized, selectedBot
                                             <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1">
                                                 <span className="text-[12px] text-slate-400">$</span>
                                                 <input
-                                                    type="number" placeholder="Value" value={dealValueInput}
+                                                    type="number" placeholder="Deal Value" value={dealValueInput}
                                                     onChange={(e) => setDealValueInput(e.target.value)}
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter') {
