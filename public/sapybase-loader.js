@@ -6,7 +6,7 @@
   // and a duplicate chat panel.
   try {
     if (window.self !== window.top) return;
-  } catch (e) {
+  } catch {
     // Cross-origin access threw — we are framed. Bail out.
     return;
   }
@@ -26,7 +26,7 @@
   // Fix #2: double-mount guard — if script is loaded twice, bail out early
   try {
     if (customElements.get('sapybase-widget')) return;
-  } catch (e) {
+  } catch {
     // Some legacy polyfills throw on .get(); treat as already-defined.
     return;
   }
@@ -44,7 +44,7 @@
         loaderOrigin = 'http://localhost:3000';
       }
     }
-  } catch (e) {
+  } catch {
     if (typeof window !== 'undefined') {
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         loaderOrigin = 'http://localhost:3000';
@@ -273,7 +273,7 @@
             console.warn('[Sapybase] /api/config fetch failed:', err);
             return null;
           });
-      } catch (e) {
+      } catch {
         return Promise.resolve(null);
       }
     }
@@ -353,7 +353,7 @@
             document.head.appendChild(faqScript);
           })
           .catch(function () { /* noop */ });
-      } catch (e) { /* noop */ }
+      } catch { /* noop */ }
     }
 
     _render(position, cfg) {
@@ -703,7 +703,7 @@
 
   try {
     customElements.define('sapybase-widget', SapybaseWidget);
-  } catch (e) {
+  } catch {
     // Already defined by another script copy — abort.
     return;
   }
@@ -734,10 +734,10 @@
 
     try {
       document.body.appendChild(el);
-    } catch (e) {
+    } catch {
       // SPA frameworks may replace body during hydration; retry once.
       setTimeout(function () {
-        try { document.body.appendChild(el); } catch (err) { }
+        try { document.body.appendChild(el); } catch { /* ignore */ }
       }, 500);
       return;
     }
@@ -748,7 +748,7 @@
     var reseat = function () {
       try {
         if (el.parentNode === document.body) document.body.appendChild(el);
-      } catch (e) { }
+      } catch { /* ignore */ }
     };
     if (document.readyState === 'complete') setTimeout(reseat, 1500);
     else window.addEventListener('load', function () { setTimeout(reseat, 1500); });

@@ -87,6 +87,21 @@ interface Props {
   onViewSession?: (sessionId: string) => void;
 }
 
+const FilterBtn = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={
+      'px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors ' +
+      (active
+        ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800')
+    }
+  >
+    {label}
+  </button>
+);
+
 const RequestsInboxPanel = ({ selectedBotId, authFetch, isAuthorized, onViewSession }: Props) => {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'quote' | 'sample'>('all');
@@ -147,21 +162,6 @@ const RequestsInboxPanel = ({ selectedBotId, authFetch, isAuthorized, onViewSess
   const visible = rows.filter((r) =>
     filter === 'all' ? true : filter === 'quote' ? r.source === 'quote' : r.source === 'agent');
 
-  const FilterBtn = ({ id, label }: { id: 'all' | 'quote' | 'sample'; label: string }) => (
-    <button
-      type="button"
-      onClick={() => setFilter(id)}
-      className={
-        'px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors ' +
-        (filter === id
-          ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-          : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800')
-      }
-    >
-      {label}
-    </button>
-  );
-
   return (
     <Card className="p-5 md:p-6 w-full min-w-0">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
@@ -172,9 +172,9 @@ const RequestsInboxPanel = ({ selectedBotId, authFetch, isAuthorized, onViewSess
         <div className="flex items-center gap-1.5">
           {(hasQuotes && hasSamples) && (
             <div className="flex items-center gap-0.5">
-              <FilterBtn id="all" label="All" />
-              <FilterBtn id="quote" label="Quotes" />
-              <FilterBtn id="sample" label="Samples" />
+              <FilterBtn active={filter === 'all'} onClick={() => setFilter('all')} label="All" />
+              <FilterBtn active={filter === 'quote'} onClick={() => setFilter('quote')} label="Quotes" />
+              <FilterBtn active={filter === 'sample'} onClick={() => setFilter('sample')} label="Samples" />
             </div>
           )}
           <Badge tone="neutral">{visible.length}</Badge>

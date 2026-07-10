@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -107,30 +107,199 @@ const SHOTS: Record<string, { w: number; h: number }> = {
   'byod-manage': { w: 2880, h: 1400 },
 };
 
+const copyText = (text: string): Promise<boolean> => {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta); return ok;
+  };
+  return new Promise((resolve) => {
+    try {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => resolve(true)).catch(() => resolve(fallback()));
+      } else { resolve(fallback()); }
+    } catch { resolve(fallback()); }
+  });
+};
+
+// ── Browser-framed screenshot ────────────────────────────────────────────────
+
+const Figure = ({ name, alt, caption }: { name: keyof typeof SHOTS | string; alt: string; caption?: string }) => {
+  const dim = SHOTS[name] ?? { w: 2880, h: 1600 };
+  return (
+    <figure className="my-6">
+      <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.07] bg-slate-50 dark:bg-white/[0.02] shadow-sm">
+        <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-white/[0.03]">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <span className="ml-3 text-[11px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">app.sapybase.com</span>
+        </div>
+        <Image
+          src={`/docs/${name}.webp`}
+          alt={alt}
+          width={dim.w}
+          height={dim.h}
+          sizes="(max-width: 1024px) 100vw, 760px"
+          className="w-full h-auto block"
+        />
+      </div>
+      {caption && (
+        <figcaption className="mt-2.5 text-xs lg:text-sm text-slate-400 dark:text-slate-500 text-center px-4 leading-relaxed">
+          {caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+};
+
+// ── Screenshot placeholder ───────────────────────────────────────────────────
+// Same browser-frame chrome as <Figure>, but with an empty dashed drop-zone that
+// names the exact file to add. Drop `public/docs/<name>.webp` into place, then
+// swap <FigurePlaceholder …/> for <Figure …/> (identical props) to go live.
+
+const FigurePlaceholder = ({ name, alt, caption }: { name: keyof typeof SHOTS | string; alt: string; caption?: string }) => (
+  <figure className="my-6">
+    <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.07] bg-slate-50 dark:bg-white/[0.02] shadow-sm">
+      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-white/[0.03]">
+        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+        <span className="ml-3 text-[11px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">app.sapybase.com</span>
+      </div>
+      <div className="aspect-[16/9] w-full flex flex-col items-center justify-center gap-2 p-6 text-center bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(100,116,139,0.04)_10px,rgba(100,116,139,0.04)_20px)]">
+        <span className="material-symbols-outlined text-[34px] text-slate-300 dark:text-slate-600">add_photo_alternate</span>
+        <p className="text-sm font-medium text-slate-400 dark:text-slate-500">Screenshot placeholder</p>
+        <code className="px-2 py-1 rounded-md bg-slate-100 dark:bg-white/[0.05] text-[11px] font-mono text-slate-500 dark:text-slate-400">/docs/{name}.webp</code>
+        <p className="sr-only">{alt}</p>
+      </div>
+    </div>
+    {caption && (
+      <figcaption className="mt-2.5 text-xs lg:text-sm text-slate-400 dark:text-slate-500 text-center px-4 leading-relaxed">
+        {caption}
+      </figcaption>
+    )}
+  </figure>
+);
+
+// ── Syntax-highlighted code block ────────────────────────────────────────────
+
+const CodeBlock = ({ code }: { code: string }) => {
+  const tokens = [
+    { regex: /(&lt;!--[\s\S]*?--&gt;|\{\/\*[\s\S]*?\*\/\}|\/\/.*)/g, color: 'text-slate-500 italic' },
+    { regex: /(&quot;.*?&quot;|&#39;.*?&#39;|".*?"|'.*?'|`[\s\S]*?`)/g, color: 'text-emerald-400' },
+    { regex: /(&lt;\/?[a-zA-Z0-9]+)/g, color: 'text-rose-400' },
+    { regex: /\b(lang|src|defer|href|rel|target|id|strategy|type|data-bot-id|className|key|value|source|headers)\b(?==|:|\s|&gt;)/g, color: 'text-amber-300' },
+    { regex: /\b(window|document|Script|import|export|default|function|return|const|let|var|from|async|await)\b/g, color: 'text-blue-400' },
+    { regex: /(&lt;!DOCTYPE html&gt;)/gi, color: 'text-blue-300' },
+  ];
+  let segments: { text: string; raw: boolean }[] = [{ text: code.replace(/</g, '&lt;').replace(/>/g, '&gt;'), raw: true }];
+  tokens.forEach((tk) => {
+    const next: typeof segments = [];
+    segments.forEach((seg) => {
+      if (!seg.raw) { next.push(seg); return; }
+      let last = 0; let m; tk.regex.lastIndex = 0;
+      while ((m = tk.regex.exec(seg.text)) !== null) {
+        if (m.index > last) next.push({ text: seg.text.slice(last, m.index), raw: true });
+        next.push({ text: `<span class="${tk.color}">${m[0]}</span>`, raw: false });
+        last = tk.regex.lastIndex;
+      }
+      if (last < seg.text.length) next.push({ text: seg.text.slice(last), raw: true });
+    });
+    segments = next;
+  });
+  const html = segments.map((s) => s.text).join('');
+  const [isCopied, setIsCopied] = useState(false);
+  const onCopy = () => { copyText(code).then((ok) => { if (ok) { setIsCopied(true); setTimeout(() => setIsCopied(false), 2000); } }); };
+  return (
+    <div className="relative mt-4">
+      <div className="rounded-2xl overflow-hidden bg-slate-900 dark:bg-slate-950 border border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+          </div>
+          <button
+            onClick={onCopy}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium tracking-wider uppercase text-slate-400 hover:text-slate-200 bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors"
+          >
+            <span className="material-symbols-outlined text-[13px]">{isCopied ? 'check' : 'content_copy'}</span>
+            {isCopied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <div className="p-4 overflow-x-auto custom-scrollbar">
+          <pre className="m-0 text-[12px] sm:text-[13px] leading-relaxed font-mono text-slate-300">
+            <code dangerouslySetInnerHTML={{ __html: html }} />
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Small presentational helpers ─────────────────────────────────────────────
+
+const StepBadge = ({ n, icon }: { n?: number | string; icon?: string }) => (
+  <span className="shrink-0 w-7 h-7 bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-semibold font-google rounded-xl select-none">
+    {icon ? <span className="material-symbols-outlined text-[14px]">{icon}</span> : n}
+  </span>
+);
+
+const H2 = ({ children, badge, icon }: { children: React.ReactNode; badge?: number | string; icon?: string }) => (
+  <div className="flex items-center gap-3">
+    {(badge !== undefined || icon) && <StepBadge n={badge} icon={icon} />}
+    <h2 className="text-xl md:text-2xl lg:text-[1.7rem] font-medium tracking-tight text-slate-900 dark:text-slate-100">{children}</h2>
+  </div>
+);
+
+const Lead = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-[15px] lg:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{children}</p>
+);
+
+const Bullet = ({ icon = 'check_circle', children }: { icon?: string; children: React.ReactNode }) => (
+  <li className="flex items-start gap-2.5">
+    <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 mt-0.5 shrink-0">{icon}</span>
+    <span className="text-[15px] lg:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{children}</span>
+  </li>
+);
+
+const Strong = ({ children }: { children: React.ReactNode }) => (
+  <strong className="font-semibold text-slate-800 dark:text-slate-100">{children}</strong>
+);
+
+type CalloutTone = 'tip' | 'info' | 'warn' | 'danger';
+const Callout = ({ tone = 'tip', title, children }: { tone?: CalloutTone; title?: string; children: React.ReactNode }) => {
+  const map: Record<CalloutTone, { box: string; icon: string; ic: string; tx: string }> = {
+    tip: { box: 'bg-slate-50 dark:bg-white/[0.03] border-slate-200 dark:border-white/[0.06]', icon: 'lightbulb', ic: 'text-slate-500 dark:text-slate-400', tx: 'text-slate-600 dark:text-slate-300' },
+    info: { box: 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/30', icon: 'info', ic: 'text-blue-600 dark:text-blue-400', tx: 'text-blue-800 dark:text-blue-300' },
+    warn: { box: 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30', icon: 'warning', ic: 'text-amber-600 dark:text-amber-400', tx: 'text-amber-800 dark:text-amber-300' },
+    danger: { box: 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/20', icon: 'report', ic: 'text-red-500 dark:text-red-400', tx: 'text-red-700 dark:text-red-400' },
+  };
+  const c = map[tone];
+  return (
+    <div className={`flex items-start gap-3 p-4 rounded-2xl border ${c.box}`}>
+      <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${c.ic}`}>{c.icon}</span>
+      <div className={`text-[14px] lg:text-[15px] leading-relaxed ${c.tx}`}>
+        {title && <p className="font-semibold mb-1">{title}</p>}
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const Pill = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-block ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 align-middle">{children}</span>
+);
+
 const VaayuDocs = () => {
   const [activeId, setActiveId] = useState<string>('introduction');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
   const [installTab, setInstallTab] = useState('html');
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // ── Copy helper ────────────────────────────────────────────────────────────
-
-  const handleCopy = useCallback((text: string, id: string) => {
-    const done = () => { setCopied(id); setTimeout(() => setCopied(null), 2000); };
-    const fallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta); return ok;
-    };
-    try {
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(done).catch(() => { if (fallback()) done(); });
-      } else if (fallback()) done();
-    } catch { fallback(); }
-  }, []);
 
   // ── Scroll-spy ───────────────────────────────────────────────────────────────
 
@@ -167,174 +336,6 @@ const VaayuDocs = () => {
 
   const activeLabel = FLAT.find((s) => s.id === activeId)?.label ?? 'Contents';
 
-  // ── Browser-framed screenshot ────────────────────────────────────────────────
-
-  const Figure = ({ name, alt, caption }: { name: keyof typeof SHOTS | string; alt: string; caption?: string }) => {
-    const dim = SHOTS[name] ?? { w: 2880, h: 1600 };
-    return (
-      <figure className="my-6">
-        <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.07] bg-slate-50 dark:bg-white/[0.02] shadow-sm">
-          <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-white/[0.03]">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-            <span className="ml-3 text-[11px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">app.sapybase.com</span>
-          </div>
-          <Image
-            src={`/docs/${name}.webp`}
-            alt={alt}
-            width={dim.w}
-            height={dim.h}
-            sizes="(max-width: 1024px) 100vw, 760px"
-            className="w-full h-auto block"
-          />
-        </div>
-        {caption && (
-          <figcaption className="mt-2.5 text-xs lg:text-sm text-slate-400 dark:text-slate-500 text-center px-4 leading-relaxed">
-            {caption}
-          </figcaption>
-        )}
-      </figure>
-    );
-  };
-
-  // ── Screenshot placeholder ───────────────────────────────────────────────────
-  // Same browser-frame chrome as <Figure>, but with an empty dashed drop-zone that
-  // names the exact file to add. Drop `public/docs/<name>.webp` into place, then
-  // swap <FigurePlaceholder …/> for <Figure …/> (identical props) to go live.
-
-  const FigurePlaceholder = ({ name, alt, caption }: { name: keyof typeof SHOTS | string; alt: string; caption?: string }) => (
-    <figure className="my-6">
-      <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.07] bg-slate-50 dark:bg-white/[0.02] shadow-sm">
-        <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-white/[0.03]">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <span className="ml-3 text-[11px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">app.sapybase.com</span>
-        </div>
-        <div className="aspect-[16/9] w-full flex flex-col items-center justify-center gap-2 p-6 text-center bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(100,116,139,0.04)_10px,rgba(100,116,139,0.04)_20px)]">
-          <span className="material-symbols-outlined text-[34px] text-slate-300 dark:text-slate-600">add_photo_alternate</span>
-          <p className="text-sm font-medium text-slate-400 dark:text-slate-500">Screenshot placeholder</p>
-          <code className="px-2 py-1 rounded-md bg-slate-100 dark:bg-white/[0.05] text-[11px] font-mono text-slate-500 dark:text-slate-400">/docs/{name}.webp</code>
-          <p className="sr-only">{alt}</p>
-        </div>
-      </div>
-      {caption && (
-        <figcaption className="mt-2.5 text-xs lg:text-sm text-slate-400 dark:text-slate-500 text-center px-4 leading-relaxed">
-          {caption}
-        </figcaption>
-      )}
-    </figure>
-  );
-
-  // ── Syntax-highlighted code block ────────────────────────────────────────────
-
-  const CodeBlock = ({ code, id }: { code: string; id: string }) => {
-    const tokens = [
-      { regex: /(&lt;!--[\s\S]*?--&gt;|\{\/\*[\s\S]*?\*\/\}|\/\/.*)/g, color: 'text-slate-500 italic' },
-      { regex: /(&quot;.*?&quot;|&#39;.*?&#39;|".*?"|'.*?'|`[\s\S]*?`)/g, color: 'text-emerald-400' },
-      { regex: /(&lt;\/?[a-zA-Z0-9]+)/g, color: 'text-rose-400' },
-      { regex: /\b(lang|src|defer|href|rel|target|id|strategy|type|data-bot-id|className|key|value|source|headers)\b(?==|:|\s|&gt;)/g, color: 'text-amber-300' },
-      { regex: /\b(window|document|Script|import|export|default|function|return|const|let|var|from|async|await)\b/g, color: 'text-blue-400' },
-      { regex: /(&lt;!DOCTYPE html&gt;)/gi, color: 'text-blue-300' },
-    ];
-    let segments: { text: string; raw: boolean }[] = [{ text: code.replace(/</g, '&lt;').replace(/>/g, '&gt;'), raw: true }];
-    tokens.forEach((tk) => {
-      const next: typeof segments = [];
-      segments.forEach((seg) => {
-        if (!seg.raw) { next.push(seg); return; }
-        let last = 0; let m; tk.regex.lastIndex = 0;
-        while ((m = tk.regex.exec(seg.text)) !== null) {
-          if (m.index > last) next.push({ text: seg.text.slice(last, m.index), raw: true });
-          next.push({ text: `<span class="${tk.color}">${m[0]}</span>`, raw: false });
-          last = tk.regex.lastIndex;
-        }
-        if (last < seg.text.length) next.push({ text: seg.text.slice(last), raw: true });
-      });
-      segments = next;
-    });
-    const html = segments.map((s) => s.text).join('');
-    const isCopied = copied === id;
-    return (
-      <div className="relative mt-4">
-        <div className="rounded-2xl overflow-hidden bg-slate-900 dark:bg-slate-950 border border-white/[0.06]">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-            </div>
-            <button
-              onClick={() => handleCopy(code, id)}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium tracking-wider uppercase text-slate-400 hover:text-slate-200 bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors"
-            >
-              <span className="material-symbols-outlined text-[13px]">{isCopied ? 'check' : 'content_copy'}</span>
-              {isCopied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <div className="p-4 overflow-x-auto custom-scrollbar">
-            <pre className="m-0 text-[12px] sm:text-[13px] leading-relaxed font-mono text-slate-300">
-              <code dangerouslySetInnerHTML={{ __html: html }} />
-            </pre>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Small presentational helpers ─────────────────────────────────────────────
-
-  const StepBadge = ({ n, icon }: { n?: number | string; icon?: string }) => (
-    <span className="shrink-0 w-7 h-7 bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-semibold font-google rounded-xl select-none">
-      {icon ? <span className="material-symbols-outlined text-[14px]">{icon}</span> : n}
-    </span>
-  );
-
-  const H2 = ({ children, badge, icon }: { children: React.ReactNode; badge?: number | string; icon?: string }) => (
-    <div className="flex items-center gap-3">
-      {(badge !== undefined || icon) && <StepBadge n={badge} icon={icon} />}
-      <h2 className="text-xl md:text-2xl lg:text-[1.7rem] font-medium tracking-tight text-slate-900 dark:text-slate-100">{children}</h2>
-    </div>
-  );
-
-  const Lead = ({ children }: { children: React.ReactNode }) => (
-    <p className="text-[15px] lg:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{children}</p>
-  );
-
-  const Bullet = ({ icon = 'check_circle', children }: { icon?: string; children: React.ReactNode }) => (
-    <li className="flex items-start gap-2.5">
-      <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 mt-0.5 shrink-0">{icon}</span>
-      <span className="text-[15px] lg:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{children}</span>
-    </li>
-  );
-
-  const Strong = ({ children }: { children: React.ReactNode }) => (
-    <strong className="font-semibold text-slate-800 dark:text-slate-100">{children}</strong>
-  );
-
-  type CalloutTone = 'tip' | 'info' | 'warn' | 'danger';
-  const Callout = ({ tone = 'tip', title, children }: { tone?: CalloutTone; title?: string; children: React.ReactNode }) => {
-    const map: Record<CalloutTone, { box: string; icon: string; ic: string; tx: string }> = {
-      tip: { box: 'bg-slate-50 dark:bg-white/[0.03] border-slate-200 dark:border-white/[0.06]', icon: 'lightbulb', ic: 'text-slate-500 dark:text-slate-400', tx: 'text-slate-600 dark:text-slate-300' },
-      info: { box: 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/30', icon: 'info', ic: 'text-blue-600 dark:text-blue-400', tx: 'text-blue-800 dark:text-blue-300' },
-      warn: { box: 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30', icon: 'warning', ic: 'text-amber-600 dark:text-amber-400', tx: 'text-amber-800 dark:text-amber-300' },
-      danger: { box: 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/20', icon: 'report', ic: 'text-red-500 dark:text-red-400', tx: 'text-red-700 dark:text-red-400' },
-    };
-    const c = map[tone];
-    return (
-      <div className={`flex items-start gap-3 p-4 rounded-2xl border ${c.box}`}>
-        <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${c.ic}`}>{c.icon}</span>
-        <div className={`text-[14px] lg:text-[15px] leading-relaxed ${c.tx}`}>
-          {title && <p className="font-semibold mb-1">{title}</p>}
-          {children}
-        </div>
-      </div>
-    );
-  };
-
-  const Pill = ({ children }: { children: React.ReactNode }) => (
-    <span className="inline-block ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 align-middle">{children}</span>
-  );
 
   const installTabs = [
     { id: 'html', label: 'HTML' },
@@ -582,33 +583,33 @@ const VaayuDocs = () => {
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Plain HTML / static websites</p>
                       <p className="text-sm text-slate-500 dark:text-slate-400">Paste this just before <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-white/[0.04] rounded text-xs font-mono">&lt;/body&gt;</code>:</p>
-                      <CodeBlock id="i-html" code={`<!DOCTYPE html>\n<html lang="en">\n<body>\n    <!-- Vaayu AI Chat Widget -->\n    <script src="https://www.sapybase.com/sapybase-loader@1.js"\n            data-bot-id="YOUR_BOT_ID"\n            defer></script>\n</body>\n</html>`} />
+                      <CodeBlock code={`<!DOCTYPE html>\n<html lang="en">\n<body>\n    <!-- Vaayu AI Chat Widget -->\n    <script src="https://www.sapybase.com/sapybase-loader@1.js"\n            data-bot-id="YOUR_BOT_ID"\n            defer></script>\n</body>\n</html>`} />
                     </div>
                   )}
                   {installTab === 'react' && (
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">React (Vite or Create React App)</p>
-                      <CodeBlock id="i-react" code={`<body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n\n    <!-- Vaayu AI Chat Widget -->\n    <script src="https://www.sapybase.com/sapybase-loader@1.js"\n            data-bot-id="YOUR_BOT_ID"\n            defer></script>\n</body>`} />
+                      <CodeBlock code={`<body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.jsx"></script>\n\n    <!-- Vaayu AI Chat Widget -->\n    <script src="https://www.sapybase.com/sapybase-loader@1.js"\n            data-bot-id="YOUR_BOT_ID"\n            defer></script>\n</body>`} />
                     </div>
                   )}
                   {installTab === 'nextjs' && (
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Next.js (App Router)</p>
-                      <CodeBlock id="i-next" code={`import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        {/* Vaayu AI Chat Widget */}\n        <Script\n          src="https://www.sapybase.com/sapybase-loader@1.js"\n          data-bot-id="YOUR_BOT_ID"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`} />
+                      <CodeBlock code={`import Script from 'next/script';\n\nexport default function RootLayout({ children }) {\n  return (\n    <html lang="en">\n      <body>\n        {children}\n        {/* Vaayu AI Chat Widget */}\n        <Script\n          src="https://www.sapybase.com/sapybase-loader@1.js"\n          data-bot-id="YOUR_BOT_ID"\n          strategy="lazyOnload"\n        />\n      </body>\n    </html>\n  );\n}`} />
                     </div>
                   )}
                   {installTab === 'wordpress' && (
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">WordPress</p>
                       <p className="text-sm text-slate-500 dark:text-slate-400">Appearance → Theme File Editor → <span className="font-mono">footer.php</span>, just before <code className="px-1 py-0.5 bg-slate-100 dark:bg-white/[0.04] rounded text-xs font-mono">&lt;/body&gt;</code>. Or use any “insert header/footer code” plugin.</p>
-                      <CodeBlock id="i-wp" code={`<!-- Before </body> in footer.php -->\n<script src="https://www.sapybase.com/sapybase-loader@1.js"\n        data-bot-id="YOUR_BOT_ID"\n        defer></script>`} />
+                      <CodeBlock code={`<!-- Before </body> in footer.php -->\n<script src="https://www.sapybase.com/sapybase-loader@1.js"\n        data-bot-id="YOUR_BOT_ID"\n        defer></script>`} />
                     </div>
                   )}
                   {installTab === 'shopify' && (
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Shopify</p>
                       <p className="text-sm text-slate-500 dark:text-slate-400">Online Store → Themes → Edit code → <span className="font-mono">theme.liquid</span>, just before <code className="px-1 py-0.5 bg-slate-100 dark:bg-white/[0.04] rounded text-xs font-mono">&lt;/body&gt;</code>.</p>
-                      <CodeBlock id="i-shopify" code={`<!-- Before </body> in theme.liquid -->\n<script src="https://www.sapybase.com/sapybase-loader@1.js"\n        data-bot-id="YOUR_BOT_ID"\n        defer></script>`} />
+                      <CodeBlock code={`<!-- Before </body> in theme.liquid -->\n<script src="https://www.sapybase.com/sapybase-loader@1.js"\n        data-bot-id="YOUR_BOT_ID"\n        defer></script>`} />
                     </div>
                   )}
                 </div>
@@ -626,9 +627,9 @@ const VaayuDocs = () => {
                   <code className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 rounded text-xs font-mono">Content-Security-Policy</code> header — a stricter security setting some developers add.
                 </Callout>
                 <Lead>If you do use a CSP, add Sapybase to the following rules so the widget can load and connect. Extend your existing policy — don’t replace it.</Lead>
-                <CodeBlock id="csp-min" code={`Content-Security-Policy:\n  script-src   'self' https://www.sapybase.com;\n  frame-src    https://www.sapybase.com;\n  connect-src  'self' https://www.sapybase.com;\n  img-src      'self' data: blob: https://www.sapybase.com;`} />
+                <CodeBlock code={`Content-Security-Policy:\n  script-src   'self' https://www.sapybase.com;\n  frame-src    https://www.sapybase.com;\n  connect-src  'self' https://www.sapybase.com;\n  img-src      'self' data: blob: https://www.sapybase.com;`} />
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 pt-1">Next.js — next.config.mjs</p>
-                <CodeBlock id="csp-next" code={`async headers() {\n  return [{\n    source: '/:path*',\n    headers: [{\n      key: 'Content-Security-Policy',\n      value: [\n        "default-src 'self'",\n        "script-src 'self' 'unsafe-inline' https://www.sapybase.com",\n        "frame-src https://www.sapybase.com",\n        "connect-src 'self' https://www.sapybase.com",\n        "img-src 'self' data: blob: https://www.sapybase.com",\n      ].join('; '),\n    }],\n  }];\n}`} />
+                <CodeBlock code={`async headers() {\n  return [{\n    source: '/:path*',\n    headers: [{\n      key: 'Content-Security-Policy',\n      value: [\n        "default-src 'self'",\n        "script-src 'self' 'unsafe-inline' https://www.sapybase.com",\n        "frame-src https://www.sapybase.com",\n        "connect-src 'self' https://www.sapybase.com",\n        "img-src 'self' data: blob: https://www.sapybase.com",\n      ].join('; '),\n    }],\n  }];\n}`} />
               </section>
 
               {/* ════════ TRAIN & CUSTOMIZE ════════ */}
@@ -824,7 +825,7 @@ const VaayuDocs = () => {
                   It’s a masked password field — what you type is hidden, stored encrypted, and only ever shown masked afterwards.
                 </Lead>
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 pt-1">Connection string format</p>
-                <CodeBlock id="byod-dsn" code={`postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require`} />
+                <CodeBlock code={`postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require`} />
                 <FigurePlaceholder name="byod-connect" alt="The Connect your database card with a masked connection-string input, a Test connection button and a disabled Submit for review button" caption="Connect your database — paste your DSN, then run a test before you can submit." />
                 <Lead>
                   Click <Strong>Test connection</Strong>. Vaayu runs a live, read-only probe that checks reachability, TLS, the pgvector

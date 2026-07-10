@@ -442,7 +442,7 @@ describe('FAB_SHAPES dynamic path system', () => {
     });
 
     it('each shape has path, logoSize, x, and y', () => {
-        for (const [id, shape] of Object.entries(FAB_SHAPES)) {
+        for (const shape of Object.values(FAB_SHAPES)) {
             expect(shape).toHaveProperty('path');
             expect(shape).toHaveProperty('logoSize');
             expect(shape).toHaveProperty('x');
@@ -453,7 +453,7 @@ describe('FAB_SHAPES dynamic path system', () => {
     });
 
     it('each path starts with M and ends with Z (closed path)', () => {
-        for (const [id, shape] of Object.entries(FAB_SHAPES)) {
+        for (const shape of Object.values(FAB_SHAPES)) {
             expect(shape.path.trim().startsWith('M')).toBe(true);
             expect(shape.path.trim().endsWith('Z')).toBe(true);
         }
@@ -462,7 +462,7 @@ describe('FAB_SHAPES dynamic path system', () => {
     it('all numeric coordinates stay within reasonable viewBox bounds', () => {
         // bento uses 39.5/60.5 coordinates outside a strict 0-100 integer range
         // but all values must be non-negative and under 200
-        for (const [id, shape] of Object.entries(FAB_SHAPES)) {
+        for (const shape of Object.values(FAB_SHAPES)) {
             const numbers = shape.path.match(/[0-9]+\.?[0-9]*/g).map(Number);
             for (const n of numbers) {
                 expect(n).toBeGreaterThanOrEqual(0);

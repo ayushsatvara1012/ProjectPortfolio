@@ -14,7 +14,7 @@
  * 6. Quick question normalization
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // ── Pure functions mirrored from ChatWidget.tsx ───────────────────────────────
 // These are extracted for isolated testing. When ChatWidget changes, update here.
@@ -176,7 +176,7 @@ describe('AVATAR_GRADIENTS catalog', () => {
 
   it('all non-null entries are 2-element tuples of CSS hex colors', () => {
     const hexPattern = /^#[0-9a-f]{6}$/i;
-    for (const [key, val] of Object.entries(AVATAR_GRADIENTS)) {
+    for (const val of Object.values(AVATAR_GRADIENTS)) {
       if (val === null) continue;
       expect(val).toHaveLength(2);
       expect(val[0]).toMatch(hexPattern);

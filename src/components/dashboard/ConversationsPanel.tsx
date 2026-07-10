@@ -18,6 +18,20 @@ interface ConversationsPanelProps {
     onFocusHandled?: () => void;
 }
 
+const FilterBtn = ({ active, onClick, children, dot }: { active: boolean; onClick: () => void; children: React.ReactNode; dot?: string }) => (
+    <button
+        onClick={onClick}
+        aria-pressed={active}
+        className={cx(
+            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+            active ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
+        )}
+    >
+        {dot && <span className={cx('h-1.5 w-1.5 rounded-full', dot)} />}
+        {children}
+    </button>
+);
+
 const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized, focusSessionId, onFocusHandled }: ConversationsPanelProps) => {
     const [page, setPage] = useState(1);
     const [filter, setFilter] = useState('all');
@@ -70,23 +84,6 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized, focusSessi
         ? sessions.filter((s: any) => s.messages.some((m: any) => m.user_query.toLowerCase().includes(selectedQueryFilter.toLowerCase())))
         : sessions;
 
-    const FilterBtn = ({ id, children, dot }: { id: string; children: React.ReactNode; dot?: string }) => {
-        const active = filter === id && !selectedQueryFilter;
-        return (
-            <button
-                onClick={() => { setFilter(id); setSelectedQueryFilter(null); setPage(1); }}
-                aria-pressed={active}
-                className={cx(
-                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
-                    active ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800',
-                )}
-            >
-                {dot && <span className={cx('h-1.5 w-1.5 rounded-full', dot)} />}
-                {children}
-            </button>
-        );
-    };
-
     const list = (
         <Card className="flex-1 min-w-0 flex flex-col overflow-hidden">
             {/* Header */}
@@ -96,8 +93,8 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized, focusSessi
                     <h3 className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">{fmtNum(total)} conversation{total !== 1 ? 's' : ''}</h3>
                 </div>
                 <div className="flex items-center gap-1.5">
-                    <FilterBtn id="all">All</FilterBtn>
-                    <FilterBtn id="unanswered" dot="bg-amber-500">Has gaps</FilterBtn>
+                    <FilterBtn active={filter === 'all' && !selectedQueryFilter} onClick={() => { setFilter('all'); setSelectedQueryFilter(null); setPage(1); }}>All</FilterBtn>
+                    <FilterBtn active={filter === 'unanswered' && !selectedQueryFilter} onClick={() => { setFilter('unanswered'); setSelectedQueryFilter(null); setPage(1); }} dot="bg-amber-500">Has gaps</FilterBtn>
                 </div>
             </div>
 

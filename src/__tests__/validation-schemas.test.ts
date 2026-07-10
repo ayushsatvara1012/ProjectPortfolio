@@ -4,7 +4,6 @@ import {
   urlSchema,
   leadCaptureSchema,
   handoffSchema,
-  trainUrlSchema,
   trainTextSchema,
   customPlanConfigSchema,
   firstIssue,

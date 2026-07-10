@@ -113,6 +113,125 @@ const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove
     </div>
 );
 
+// ── Source browser — mirrors the dashboard "Manage knowledge" panel ─────────
+const DemoSourceBrowser = ({ chunks, setChunks, showAlert }: {
+    chunks: string[];
+    setChunks: (c: string[]) => void;
+    showAlert: (type: 'success' | 'error' | 'warning', msg: string) => void;
+}) => {
+    const allChunks = chunks;
+    const [selectedChunks, setSelectedChunks] = useState(new Set<number>());
+
+    const toggleChunk = (i: number) =>
+        setSelectedChunks(prev => {
+            const next = new Set(prev);
+            if (next.has(i)) next.delete(i); else next.add(i);
+            return next;
+        });
+
+    const toggleAll = () => {
+        if (selectedChunks.size === allChunks.length) setSelectedChunks(new Set());
+        else setSelectedChunks(new Set(allChunks.map((_: string, i: number) => i)));
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedChunks.size === 0) return;
+        if (!window.confirm(`Delete ${selectedChunks.size} selected segment(s)? This cannot be undone.`)) return;
+        const remaining = allChunks.filter((_: string, i: number) => !selectedChunks.has(i));
+        saveKnowledge(remaining);
+        setChunks(remaining);
+        setSelectedChunks(new Set());
+        showAlert('success', `${selectedChunks.size} segment(s) deleted successfully.`);
+    };
+
+    const allSelected = selectedChunks.size === allChunks.length && allChunks.length > 0;
+
+    if (allChunks.length === 0) {
+        return (
+            <EmptyState
+                icon="auto_stories"
+                title="No knowledge sources yet"
+                hint="Add a PDF, CSV, or paste text above to start training this bot."
+            />
+        );
+    }
+
+    return (
+        <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+            <div className="flex flex-col gap-3 bg-slate-50/70 dark:bg-slate-800/30 p-4 transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                        <span className="material-symbols-outlined text-[17px]">notes</span>
+                    </span>
+                    <span className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 truncate flex-1 min-w-0">
+                        demo-knowledge
+                    </span>
+                    <Badge tone="neutral" dot={false}>{allChunks.length} segments</Badge>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-200/70 dark:border-slate-700/60 pt-2.5">
+                    <button
+                        onClick={toggleAll}
+                        disabled={allChunks.length === 0}
+                        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40"
+                    >
+                        <span className="material-symbols-outlined text-[17px]">
+                            {allSelected ? 'check_box' : 'check_box_outline_blank'}
+                        </span>
+                        {allSelected ? 'Deselect all' : 'Select all'}
+                    </button>
+                    {selectedChunks.size > 0 && (
+                        <span className="text-[12px] font-semibold tabular-nums text-blue-600 dark:text-blue-400">
+                            {selectedChunks.size} selected
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70" data-lenis-prevent>
+                {allChunks.map((chunk: string, i: number) => {
+                    const checked = selectedChunks.has(i);
+                    return (
+                        <label
+                            key={i}
+                            className={cx(
+                                'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors',
+                                checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
+                            )}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleChunk(i)}
+                                className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 dark:accent-blue-500"
+                            />
+                            <span className="text-[11px] font-bold tabular-nums text-slate-300 dark:text-slate-600 mt-0.5 shrink-0 w-6">
+                                {String(i + 1).padStart(2, '0')}
+                            </span>
+                            <p className="text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 transition-colors">
+                                {chunk || '(empty segment)'}
+                            </p>
+                        </label>
+                    );
+                })}
+            </div>
+
+            {allChunks.length > 0 && (
+                <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+                    <button
+                        onClick={handleDeleteSelected}
+                        disabled={selectedChunks.size === 0}
+                        className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                    >
+                        <span className="material-symbols-outlined text-[17px]">delete_sweep</span>
+                        Delete selected ({selectedChunks.size})
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function DemoTrainAIPage() {
     const [botConfig, setBotConfig] = useState<any>(null);
     const [chunks, setChunks] = useState<string[]>([]);
@@ -192,120 +311,6 @@ export default function DemoTrainAIPage() {
         showAlert('success', 'Knowledge purged successfully.');
     };
 
-    // ── Source browser — mirrors the dashboard "Manage knowledge" panel ─────────
-    const DemoSourceBrowser = () => {
-        const allChunks = chunks;
-        const [selectedChunks, setSelectedChunks] = useState(new Set<number>());
-
-        const toggleChunk = (i: number) =>
-            setSelectedChunks(prev => {
-                const next = new Set(prev);
-                if (next.has(i)) next.delete(i); else next.add(i);
-                return next;
-            });
-
-        const toggleAll = () => {
-            if (selectedChunks.size === allChunks.length) setSelectedChunks(new Set());
-            else setSelectedChunks(new Set(allChunks.map((_: string, i: number) => i)));
-        };
-
-        const handleDeleteSelected = () => {
-            if (selectedChunks.size === 0) return;
-            if (!window.confirm(`Delete ${selectedChunks.size} selected segment(s)? This cannot be undone.`)) return;
-            const remaining = allChunks.filter((_: string, i: number) => !selectedChunks.has(i));
-            saveKnowledge(remaining);
-            setChunks(remaining);
-            setSelectedChunks(new Set());
-            showAlert('success', `${selectedChunks.size} segment(s) deleted successfully.`);
-        };
-
-        const allSelected = selectedChunks.size === allChunks.length && allChunks.length > 0;
-
-        if (allChunks.length === 0) {
-            return (
-                <EmptyState
-                    icon="auto_stories"
-                    title="No knowledge sources yet"
-                    hint="Add a PDF, CSV, or paste text above to start training this bot."
-                />
-            );
-        }
-
-        return (
-            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-                <div className="flex flex-col gap-3 bg-slate-50/70 dark:bg-slate-800/30 p-4 transition-colors">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                            <span className="material-symbols-outlined text-[17px]">notes</span>
-                        </span>
-                        <span className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 truncate flex-1 min-w-0">
-                            demo-knowledge
-                        </span>
-                        <Badge tone="neutral" dot={false}>{allChunks.length} segments</Badge>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-slate-200/70 dark:border-slate-700/60 pt-2.5">
-                        <button
-                            onClick={toggleAll}
-                            disabled={allChunks.length === 0}
-                            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40"
-                        >
-                            <span className="material-symbols-outlined text-[17px]">
-                                {allSelected ? 'check_box' : 'check_box_outline_blank'}
-                            </span>
-                            {allSelected ? 'Deselect all' : 'Select all'}
-                        </button>
-                        {selectedChunks.size > 0 && (
-                            <span className="text-[12px] font-semibold tabular-nums text-blue-600 dark:text-blue-400">
-                                {selectedChunks.size} selected
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                <div className="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70" data-lenis-prevent>
-                    {allChunks.map((chunk: string, i: number) => {
-                        const checked = selectedChunks.has(i);
-                        return (
-                            <label
-                                key={i}
-                                className={cx(
-                                    'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors',
-                                    checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
-                                )}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => toggleChunk(i)}
-                                    className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 dark:accent-blue-500"
-                                />
-                                <span className="text-[11px] font-bold tabular-nums text-slate-300 dark:text-slate-600 mt-0.5 shrink-0 w-6">
-                                    {String(i + 1).padStart(2, '0')}
-                                </span>
-                                <p className="text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 transition-colors">
-                                    {chunk || '(empty segment)'}
-                                </p>
-                            </label>
-                        );
-                    })}
-                </div>
-
-                {allChunks.length > 0 && (
-                    <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
-                        <button
-                            onClick={handleDeleteSelected}
-                            disabled={selectedChunks.size === 0}
-                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
-                        >
-                            <span className="material-symbols-outlined text-[17px]">delete_sweep</span>
-                            Delete selected ({selectedChunks.size})
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     return (
         <div className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
@@ -519,7 +524,7 @@ export default function DemoTrainAIPage() {
                         className="mb-4"
                     />
 
-                    <DemoSourceBrowser />
+                    <DemoSourceBrowser chunks={chunks} setChunks={setChunks} showAlert={showAlert} />
 
                     {/* Danger zone */}
                     <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 transition-colors">

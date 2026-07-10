@@ -209,7 +209,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         payload.sample_sink_url = botSettings.sampleSinkUrl.trim();
         payload.sample_sink_secret = botSettings.sampleSinkSecret.trim();
       }
-      const data = await authFetch<any>('/api/company', {
+      await authFetch<any>('/api/company', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

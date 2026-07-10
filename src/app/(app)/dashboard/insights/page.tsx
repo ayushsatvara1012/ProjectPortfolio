@@ -93,7 +93,6 @@ const HEAT_STEPS = [
     'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900',
 ];
 
-const monthOf = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString(undefined, { month: 'short' });
 
 function ActivityHeatmap({ series, selected, onSelect }: { series: DayDatum[]; selected: string | null; onSelect: (d: DayDatum) => void }) {
     const max = series.reduce((m, d) => Math.max(m, d.total), 0) || 1;
@@ -301,7 +300,7 @@ export default function AppInsights() {
     // Bot list + selection are global (AppLayout fetches once; every dashboard
     // page — Pipeline, Customize, ... — shares the same selectedBotId via the
     // breadcrumb switcher, persisted across visits).
-    const { bots, selectedBotId, setSelectedBotId } = useBotSwitcher();
+    const { bots, selectedBotId } = useBotSwitcher();
     const botsLoading = bots.length === 0;
     const selectedBot = bots.find((b) => b.id === selectedBotId);
     // Phase 5a — the pack vertical drives this page. A chemical bot relabels the

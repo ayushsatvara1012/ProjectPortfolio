@@ -17,7 +17,6 @@ interface InlineTrainingWidgetProps {
 export default function InlineTrainingWidget({
     selectedBotId,
     query,
-    authFetch,
     onSuccess,
     onCancel
 }: InlineTrainingWidgetProps) {
@@ -73,7 +72,7 @@ export default function InlineTrainingWidget({
                 setJobStatus(data.status || 'processing');
                 pollTimerRef.current = setTimeout(() => pollJobStatus(jId), 3000);
             }
-        } catch (err) {
+        } catch {
             setJobId(null);
             setJobStatus('');
             setError('Failed to fetch training status.');

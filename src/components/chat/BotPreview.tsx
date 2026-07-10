@@ -31,7 +31,6 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
     name,
     primaryColor,
     greeting,
-    logoShape,
     customLogoUrl,
     avatarBgStyle,
     quickQuestions,
