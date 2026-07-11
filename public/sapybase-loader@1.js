@@ -65,10 +65,10 @@
   // Each entry includes per-shape offsets to nudge logo/text into the visual
   // center of asymmetric shapes.
   var FAB_SHAPES = {
-    circle:   { path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z', x: 0, y: 0 },
+    circle: { path: 'M 50 4 C 75.5 4 96 24.5 96 50 C 96 75.5 75.5 96 50 96 C 24.5 96 4 75.5 4 50 C 4 24.5 24.5 4 50 4 Z', x: 0, y: 0 },
     squircle: { path: 'M 22 4 H 78 Q 96 4 96 22 V 62 Q 96 80 78 80 H 36 L 18 96 L 22 80 H 22 Q 4 80 4 62 V 22 Q 4 4 22 4 Z', x: 0, y: -8 },
-    bento:    { path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z', x: 0, y: -10.5 },
-    sharp:    { path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z', x: 0, y: 0 },
+    bento: { path: 'M39.5 0H60.5A39.5 39.5 0 0160.5 79H46Q40 79 27 90 35 79 32 78A39.5 39.5 0 0139.5 0Z', x: 0, y: -10.5 },
+    sharp: { path: 'M50 3C77 3 97 23 97 50 97 77 77 97 50 97 35 97 26 90 26 90L9 97 15 83C6 71 3 61 3 50 3 23 23 3 50 3Z', x: 0, y: 0 },
     'rounded-square': { path: 'M20 0H80A20 20 0 0 1 100 20V80A20 20 0 0 1 80 100H20A20 20 0 0 1 0 80V20A20 20 0 0 1 20 0Z', x: 0, y: 0 },
   };
 
@@ -268,7 +268,6 @@
       this._teaser = null;
       this._teaserTimer = null;
       this._teaserPendingRuleId = null;
-      this._teaserTheme = null;
       this._teaserMem = {};
       // Contextual teaser (Phase 2) — page-aware rules
       this._teaserCfg = null;
@@ -383,14 +382,7 @@
       }
 
       // Contextual teaser (Phase 1): schedule the launcher bubble from the
-      // same config payload. Theme details are captured for the avatar.
-      this._teaserTheme = {
-        color: themeColor,
-        dark: _shadeColor(themeColor, -20),
-        logoUrl: logoUrl,
-        isCustom: isCustom,
-        botName: botName,
-      };
+      // same config payload.
       this._maybeScheduleTeaser(cfg);
     }
 
@@ -644,7 +636,6 @@
     _showTeaser(t) {
       if (this._open || this._teaser || !this._fabWrap) return;
       var self = this;
-      var theme = this._teaserTheme || {};
 
       var resolved = this._resolveTeaser(t);
       if (!resolved.title || !resolved.title.trim()) return;
@@ -666,25 +657,6 @@
       x.type = 'button';
       x.setAttribute('aria-label', 'Dismiss message');
       x.textContent = '✕';
-
-      var avatar = document.createElement('div');
-      avatar.className = 'sb-teaser-avatar';
-      avatar.setAttribute('aria-hidden', 'true');
-      var initial = (theme.botName || 'S').charAt(0).toUpperCase();
-      avatar.style.background =
-        'linear-gradient(135deg,' + (theme.color || '#004DE8') + ',' + (theme.dark || theme.color || '#004DE8') + ')';
-      if (theme.isCustom && theme.logoUrl) {
-        var img = document.createElement('img');
-        img.alt = '';
-        img.onerror = function () {
-          if (img.parentNode) img.parentNode.removeChild(img);
-          avatar.textContent = initial;
-        };
-        img.src = theme.logoUrl;
-        avatar.appendChild(img);
-      } else {
-        avatar.textContent = initial;
-      }
 
       // SECURITY: teaser copy is owner-authored text — always injected via
       // textContent, never interpolated into an HTML string.
@@ -711,7 +683,6 @@
       }
 
       card.appendChild(x);
-      card.appendChild(avatar);
       card.appendChild(body);
       // Refs for in-place copy swap on SPA route change (Phase 2).
       this._teaserBody = body;
@@ -968,11 +939,11 @@
         '  position: absolute; bottom: calc(100% + 12px);',
         '  ' + (isLeft ? 'left: 0;' : 'right: 0;'),
         '  width: 250px; box-sizing: border-box;',
-        '  display: flex; align-items: flex-start; gap: 10px;',
+        '  display: flex; align-items: flex-start;',
         '  padding: 12px 14px;',
-        '  background: #ffffff; color: #0f172a;',
-        '  border: 0.5px solid rgba(15,23,42,0.16); border-radius: 16px;',
-        '  box-shadow: 0 10px 32px rgba(2,6,23,0.16);',
+        '  background: #f9f9f9; color: #0f172a;',
+        '  border: 0.5px solid #0f172a29; border-radius: 16px;',
+        '  box-shadow: inset -2px -2px 2px #dadada, inset 2px 2px 2px #ffffff;',
         '  cursor: pointer; pointer-events: auto;',
         '  text-align: start;',
         '  opacity: 0; transform: translateY(6px) scale(0.96);',
@@ -982,8 +953,8 @@
         '@media (prefers-reduced-motion: reduce) { .sb-teaser { transition: none; } }',
         '.sb-teaser::after {',
         '  content: ""; position: absolute; top: 100%;',
-        '  ' + (isLeft ? 'left: 26px;' : 'right: 26px;'),
-        '  border: 7px solid transparent; border-top-color: #ffffff;',
+        '  ' + (isLeft ? 'left: 26px;' : 'right: 22px;'),
+        '  border: 7px solid transparent; border-top-color: #dcdcdc;',
         '}',
         '.sb-teaser:focus-visible { outline: 2px solid ' + themeColor + '; outline-offset: 2px; }',
         '.sb-teaser-x {',
@@ -992,21 +963,14 @@
         '  display: flex; align-items: center; justify-content: center;',
         '  background: #ffffff; color: #475569;',
         '  border: 0.5px solid rgba(15,23,42,0.16);',
-        '  box-shadow: 0 2px 8px rgba(2,6,23,0.14);',
         '  font-size: 11px; line-height: 1; cursor: pointer; padding: 0;',
         '}',
         '.sb-teaser-x:hover { color: #0f172a; }',
         '.sb-teaser-x:focus-visible { outline: 2px solid ' + themeColor + '; outline-offset: 2px; }',
-        '.sb-teaser-avatar {',
-        '  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;',
-        '  display: flex; align-items: center; justify-content: center;',
-        '  color: #ffffff; font-size: 13px; font-weight: 700; overflow: hidden;',
-        '}',
-        '.sb-teaser-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }',
         '.sb-teaser-body { min-width: 0; flex: 1 1 auto; }',
         '.sb-teaser-line { overflow: hidden; }',
         '.sb-teaser-line-inner { display: inline-block; white-space: inherit; will-change: transform; }',
-        '.sb-teaser-title { font-size: 13px; font-weight: 700; line-height: 1.35; }',
+        '.sb-teaser-title { font-size: 13px; font-weight: 500; line-height: 1.35; color: #020617; }',
         '.sb-teaser-sub { font-size: 12px; line-height: 1.4; color: #64748b; margin-top: 2px; }',
         '.sb-teaser-clip { white-space: nowrap; text-overflow: ellipsis; }',
         '.sb-teaser-fade {',
@@ -1014,8 +978,9 @@
         '  mask-image: linear-gradient(to right, #000 0%, #000 82%, transparent 100%);',
         '}',
         '@media (prefers-color-scheme: dark) {',
-        '  .sb-teaser { background: #1e293b; color: #f1f5f9; border-color: rgba(255,255,255,0.14); box-shadow: 0 10px 32px rgba(0,0,0,0.5); }',
-        '  .sb-teaser::after { border-top-color: #1e293b; }',
+        '  .sb-teaser { background: #1e293b; color: #f1f5f9; border-color: rgba(255,255,255,0.14); box-shadow: inset -2px -2px 2px #dadada, inset 2px 2px 2px #ffffff; }',
+        '  .sb-teaser::after { border-top-color: #131a28; }',
+        '  .sb-teaser-title { color: #f1f5f9; }',
         '  .sb-teaser-sub { color: #94a3b8; }',
         '  .sb-teaser-x { background: #1e293b; color: #cbd5e1; border-color: rgba(255,255,255,0.14); }',
         '}',
@@ -1042,7 +1007,6 @@
         '  }',
         '  .sb-teaser::after { display: none; }',
         '  .sb-teaser-sub { display: none; }',
-        '  .sb-teaser-avatar { width: 22px; height: 22px; font-size: 11px; }',
         '  .sb-teaser-title { white-space: nowrap; }',
         '}',
       ].join('\n');
