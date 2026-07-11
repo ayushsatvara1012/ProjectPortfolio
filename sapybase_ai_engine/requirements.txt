@@ -31,6 +31,9 @@ jinja2
 python-multipart
 polar-sdk
 pandas
+# Direct dependency: Explore-plan billing anchor (usage_period.next_explore_billing_anchor).
+# Already pulled transitively by pandas; declared explicitly since we now use it directly.
+python-dateutil
 openpyxl
 alembic
 # Observability — BYOD metrics emission (RFC §11 / Phase 8.4)

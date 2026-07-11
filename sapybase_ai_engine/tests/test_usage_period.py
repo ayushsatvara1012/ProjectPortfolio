@@ -158,3 +158,39 @@ class TestNextPeriodForSubscription:
     def test_equal_to_now_falls_back(self):
         f = self._f()
         assert f(NOW, NOW) == (NOW, NOW + timedelta(days=30))
+
+
+class TestNextExploreBillingAnchor:
+    """Calendar-month renewal anchor for the $0 Explore plan, keyed off signup day."""
+
+    def _f(self):
+        from usage_period import next_explore_billing_anchor
+        return next_explore_billing_anchor
+
+    def test_advances_one_calendar_month_from_created_at(self):
+        f = self._f()
+        created = datetime(2026, 5, 12, 9, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 5, 20, 0, 0, 0, tzinfo=timezone.utc)
+        assert f(created, now) == datetime(2026, 6, 12, 9, 0, 0, tzinfo=timezone.utc)
+
+    def test_rolls_forward_multiple_months_when_overdue(self):
+        # Account created months ago and never read since — must land on the
+        # next FUTURE anniversary, not just one month past created_at.
+        f = self._f()
+        created = datetime(2026, 1, 12, 9, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 9, 12, 0, 0, tzinfo=timezone.utc)
+        result = f(created, now)
+        assert result == datetime(2026, 6, 12, 9, 0, 0, tzinfo=timezone.utc)
+        assert result > now
+
+    def test_month_end_clamps_instead_of_drifting_earlier(self):
+        # Jan 31 -> Feb 28 (2026 is not a leap year) -> Mar 28, never Mar 31 or Mar 3.
+        f = self._f()
+        created = datetime(2026, 1, 31, 0, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 2, 15, 0, 0, 0, tzinfo=timezone.utc)
+        assert f(created, now) == datetime(2026, 2, 28, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_result_always_strictly_future(self):
+        f = self._f()
+        created = datetime(2026, 6, 9, 12, 0, 0, tzinfo=timezone.utc)
+        assert f(created, NOW) > NOW

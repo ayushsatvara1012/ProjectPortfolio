@@ -589,7 +589,7 @@ from core.config import PLAN_LIMITS, MODEL_MAPPING, VALID_MODELS, UNLIMITED_PLAN
 # Pure decision logic lives in usage_period.py; the DB write is below. Reset is
 # applied "self-healing on read" (no cron), the same pattern as the grace-period
 # downgrade in get_current_user.
-from usage_period import should_reset_usage, fresh_period, next_period_for_subscription
+from usage_period import should_reset_usage, fresh_period, next_period_for_subscription, next_explore_billing_anchor
 
 # ── Dashboard access gate (Explore D3 + D5) ──────────────────────────────────
 # Pure decision logic (single source of truth, mirrored on the frontend).
@@ -1897,7 +1897,7 @@ async def get_current_user(request: Request):
                         print(f"RECONCILIATION: Merged pending data into existing real account.")
 
             # Now fetch the final consolidated state
-            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config FROM users WHERE clerk_id = %s", (clerk_id,))
+            cursor.execute("SELECT id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config, created_at FROM users WHERE clerk_id = %s", (clerk_id,))
             row = cursor.fetchone()
 
             if not row and email != "unknown@email.com":
@@ -1912,14 +1912,14 @@ async def get_current_user(request: Request):
                 # billing period comes from Polar's clock, §A0).
                 _new_tier, _new_status = signup_provisioning(email)
                 cursor.execute(
-                    "INSERT INTO users (clerk_id, email, tier, subscription_status) VALUES (%s, %s, %s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config",
+                    "INSERT INTO users (clerk_id, email, tier, subscription_status) VALUES (%s, %s, %s, %s) ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email WHERE users.email = 'unknown@email.com' RETURNING id, role, email, tier, subscription_status, trial_end_date, polar_customer_id, billing_period_end, custom_plan_config, created_at",
                     (clerk_id, email, _new_tier, _new_status)
                 )
                 row = cursor.fetchone()
             # Ensure usage tracking exists even for existing users (e.g. after DB cleanup)
             if row:
                 # Assign variables correctly from the expanded query before use
-                user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
+                user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw, created_at = row
                 
                 # 4. Role Sync & "Only 1 Super Admin" Enforcement
                 # CRITICAL: Ensures no one else can EVER have the SUPER_ADMIN role.
@@ -1953,10 +1953,12 @@ async def get_current_user(request: Request):
         
         if not row: raise HTTPException(status_code=500, detail="User profile auto-provisioning failed")
 
-        user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw = row
+        user_id, role, user_email, tier, subscription_status, trial_end_date, polar_cust_id, billing_end, custom_plan_config_raw, created_at = row
         # Ensure timezone-aware datetime for comparisons (database may return naive datetimes)
         if billing_end and isinstance(billing_end, datetime) and billing_end.tzinfo is None:
             billing_end = billing_end.replace(tzinfo=timezone.utc)
+        if created_at and isinstance(created_at, datetime) and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
         if trial_end_date and isinstance(trial_end_date, datetime) and trial_end_date.tzinfo is None:
             trial_end_date = trial_end_date.replace(tzinfo=timezone.utc)
         if isinstance(custom_plan_config_raw, dict):
@@ -1998,6 +2000,41 @@ async def get_current_user(request: Request):
                 # Don't block auth on a downgrade failure — log and continue
                 # with the stale tier; next request will retry the downgrade.
                 print(f"GRACE-PERIOD DOWNGRADE ERROR for user {user_id}: {e}")
+
+        # Explore billing-anchor self-heal: the $0 Explore product still goes
+        # through Polar checkout, but a $0 order does not reliably keep firing
+        # the subscription.updated webhooks a paid renewal would, so
+        # billing_period_end can be left NULL forever or go stale. Anchor it to
+        # the account's signup day and roll it forward one calendar month at a
+        # time on read — same self-healing-on-read pattern as the grace-period
+        # downgrade above, just for the field instead of the tier. Stops the
+        # moment subscription_status leaves ACTIVE (cancellation/suspension
+        # freezes the last valid date instead of continuing to roll it forward).
+        if (
+            tier == "EXPLORE"
+            and subscription_status == "ACTIVE"
+            and created_at is not None
+            and (billing_end is None or billing_end <= datetime.now(timezone.utc))
+        ):
+            try:
+                new_billing_end = next_explore_billing_anchor(created_at, datetime.now(timezone.utc))
+                conn3 = get_db_connection()
+                try:
+                    c3 = conn3.cursor()
+                    c3.execute(
+                        "UPDATE users SET billing_period_end = %s WHERE id = %s",
+                        (new_billing_end, user_id)
+                    )
+                    conn3.commit()
+                    c3.close()
+                    billing_end = new_billing_end
+                    print(f"EXPLORE BILLING ANCHOR: user {user_id} billing_period_end set to {new_billing_end}")
+                finally:
+                    release_db_connection(conn3)
+            except Exception as e:
+                # Don't block auth on an anchor-write failure — log and continue
+                # with the stale/missing value; next request will retry.
+                print(f"EXPLORE BILLING ANCHOR ERROR for user {user_id}: {e}")
 
         # Custom plan access gate (Phase A). SUPER_ADMIN bypasses (tier forced to PRO above).
         if tier == "CUSTOM" and role != "SUPER_ADMIN":
@@ -8516,6 +8553,22 @@ def get_my_profile(
         latest_usage_period_end = usage[1] if usage else None
         bot_count = usage[2] if usage else 0
 
+        # Lifetime message count across all of the user's bots, for the "AI
+        # memory" stat — distinct from total_used (current-period usage_tracking,
+        # which resets every billing cycle). chat_logs is a data-plane table, so
+        # a BYOD-routed company's rows live in its own tenant DB and must be
+        # counted there via _byod_dataplane_cursor, not the control connection.
+        cursor.execute(
+            "SELECT id FROM companies WHERE user_id = %s AND is_active = true",
+            (current_user["id"],)
+        )
+        company_ids = [r[0] for r in cursor.fetchall()]
+        total_messages = 0
+        for cid in company_ids:
+            with _byod_dataplane_cursor(cid, conn) as (dcur, _dconn):
+                dcur.execute("SELECT COUNT(*) FROM chat_logs WHERE company_id = %s", (cid,))
+                total_messages += dcur.fetchone()[0] or 0
+
         plan = get_plan(
             current_user.get("tier"),
             role=current_user.get("role"),
@@ -8544,6 +8597,8 @@ def get_my_profile(
             "messages_used": total_used,
             # Total budget across all bots (per-bot × num_bots)
             "message_limit": total_limit,
+            # Lifetime messages across all bots (never resets) — Train AI's "AI memory" card
+            "total_messages": total_messages,
             # Per-bot semantics (new in Step 3.0) — UI should prefer these
             "per_bot_message_limit": per_bot_limit,
             "active_bot_count": bot_count,

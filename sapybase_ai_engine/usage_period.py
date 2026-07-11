@@ -31,6 +31,8 @@ and acceptable; a future refinement could pin it to the subscription start day.
 
 from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
+
 # One usage period. "month" == 30 days, matching the existing
 # `period_end = now() + interval '30 days'` convention already in the schema.
 USAGE_PERIOD = timedelta(days=30)
@@ -86,3 +88,25 @@ def next_period_for_subscription(
     if billing_period_end is not None and now < billing_period_end <= now + max_anchor:
         return now, billing_period_end
     return fresh_period(now, period)
+
+
+def next_explore_billing_anchor(created_at: datetime, now: datetime) -> datetime:
+    """Next calendar-month renewal date for the $0 Explore plan, anchored to the
+    day-of-month the account was created (e.g. created May 12 -> renews June 12
+    -> July 12, ...).
+
+    Explore's $0 Polar checkout does not reliably keep ``users.billing_period_end``
+    current the way a paid subscription's renewal webhooks do — it can be left
+    NULL from signup, or simply never advance. This computes the same "renews on"
+    date a real monthly Polar cycle would have produced, so it can be written back
+    self-healing-on-read (see main.get_current_user), same pattern as the
+    grace-period downgrade and _reset_elapsed_usage_periods.
+
+    ``relativedelta`` clamps month-end overflow (Jan 31 + 1 month -> Feb 28/29),
+    so the anchor day only shifts in months too short to contain it — it never
+    drifts earlier the way repeated fixed-day timedelta arithmetic would.
+    """
+    anchor = created_at
+    while anchor <= now:
+        anchor = anchor + relativedelta(months=1)
+    return anchor
