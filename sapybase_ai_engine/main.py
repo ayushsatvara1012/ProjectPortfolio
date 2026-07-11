@@ -1216,7 +1216,7 @@ from db.models import (
     RegisterRequest, ChatMessage, ChatRequest, ChatResponse, LeadCaptureRequest,
     ExploreEnquiryRequest, EnquiryDeclineRequest,
     SubscriptionRequest, HandoffMessage, HandoffRequest, UserRole, UserTier,
-    CustomPlanConfig, AdminUpdateUserRequest, CompanyUpdate, RoiBenchmarkUpdate,
+    CustomPlanConfig, AdminUpdateUserRequest, AdminUpdateVerticalRequest, CompanyUpdate, RoiBenchmarkUpdate,
     DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
@@ -1444,7 +1444,7 @@ from utils.parsing_utils import safe_json_loads, normalize_quick_questions
 # canonicalizes the raw companies.vertical value (NULL/garbage -> None = generic bot);
 # load_pack resolves it to a Pack. Phase 0 only carries `vertical` on the company
 # dict so Phase 1 can read it — no behaviour change here.
-from packs import normalize_vertical, load_pack
+from packs import normalize_vertical, load_pack, known_verticals
 # Phase 5 (customise) — merge a bot's per-company overrides over the pack defaults
 # (sample-form fields + the spreadsheet sink). Pure helpers; the source of truth for
 # both the runtime read paths and the customise-tab write path.
@@ -2464,12 +2464,38 @@ async def update_company_details(
             updates.append("pack_overrides = %s::jsonb")
             params.append(json.dumps(_merged) if _merged else None)
 
+        _old_vertical = None
+        _new_vertical = None
+        _vertical_changed = False
         for field, value in _ov_sent.items():
             if field == "company_id" or field in _ov_keys:
                 continue
             if field == "vertical":
+                # Structural field — drives pack/tool/RAG selection, not cosmetic.
+                # Locked to SUPER_ADMIN per docs/vertical-lock-plan.md; reject
+                # rather than silently drop so misuse attempts surface as errors.
+                if role != "SUPER_ADMIN":
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Only a super admin can change a bot's vertical.",
+                    )
                 value = value.strip().lower() if value else None
                 value = value or None
+                if value is not None and value not in known_verticals():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Unknown vertical '{value}'. Valid values: "
+                            f"{', '.join(known_verticals())}, or null/empty for generic."
+                        ),
+                    )
+                cursor.execute(
+                    "SELECT vertical FROM companies WHERE id = %s", (target_company_id,)
+                )
+                _row = cursor.fetchone()
+                _old_vertical = normalize_vertical(_row[0]) if _row else None
+                _new_vertical = value
+                _vertical_changed = True
             if field == "quick_questions" and value is not None:
                 # Normalise to plain string list before storing
                 normalised = []
@@ -2507,6 +2533,14 @@ async def update_company_details(
         _key_row = cursor.fetchone()
 
         conn.commit()
+
+        if _vertical_changed:
+            log_admin_action(
+                admin_id=user["id"],
+                action="UPDATE_COMPANY_VERTICAL",
+                target_id=target_company_id,
+                changes={"old": _old_vertical, "new": _new_vertical},
+            )
 
         if _key_row and _key_row[0] and r is not None:
             try:
@@ -8966,7 +9000,8 @@ def get_all_users(request: Request, admin: dict = Depends(get_admin_user)):
                                 'company_name',   c.company_name,
                                 'allowed_origin', c.allowed_origin,
                                 'is_active',      c.is_active,
-                                'created_at',     c.created_at
+                                'created_at',     c.created_at,
+                                'vertical',       c.vertical
                             ) ORDER BY c.created_at ASC
                         )
                         FROM companies c
@@ -9004,6 +9039,70 @@ def get_all_users(request: Request, admin: dict = Depends(get_admin_user)):
                 "billing_period_end": r[11],
             })
         return result
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/admin/verticals")
+@limiter.limit("30/minute")
+def get_admin_verticals(request: Request, admin: dict = Depends(get_admin_user)):
+    """Admin-only: the allowlist of verticals a company can be assigned to.
+
+    Single source of truth for both the backend validation gate (see
+    PATCH /api/company and the endpoint below) and the admin panel's
+    vertical-editor dropdown."""
+    return {"verticals": list(known_verticals())}
+
+@app.patch("/api/admin/companies/{company_id}/vertical")
+@limiter.limit("30/minute")
+def update_company_vertical_admin(
+    request: Request,
+    company_id: str,
+    req: AdminUpdateVerticalRequest,
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),  # Issue #16: Step-Up Auth
+):
+    """Super Admin: reassign a company's vertical pack (structural, not cosmetic —
+    see docs/vertical-lock-plan.md). Unlike PATCH /api/company, this isn't scoped
+    to the caller's own companies since an admin edits any tenant's bot."""
+    new_vertical = normalize_vertical(req.vertical)
+    if new_vertical is not None and new_vertical not in known_verticals():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unknown vertical '{new_vertical}'. Valid values: "
+                f"{', '.join(known_verticals())}, or null/empty for generic."
+            ),
+        )
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT vertical FROM companies WHERE id = %s", (company_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Company not found.")
+        old_vertical = normalize_vertical(row[0])
+
+        cursor.execute("UPDATE companies SET vertical = %s WHERE id = %s", (new_vertical, company_id))
+        # Best-effort: drop any cached exact-match answers, which were computed
+        # under the old pack's tools/prompts and are now stale.
+        cursor.execute("DELETE FROM exact_query_cache WHERE company_id = %s", (company_id,))
+        conn.commit()
+
+        log_admin_action(
+            admin_id=admin["clerk_id"],
+            action="UPDATE_COMPANY_VERTICAL",
+            target_id=company_id,
+            changes={"old": old_vertical, "new": new_vertical},
+        )
+
+        return {"status": "success", "vertical": new_vertical}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update vertical: {str(e)}")
     finally:
         release_db_connection(conn)
 

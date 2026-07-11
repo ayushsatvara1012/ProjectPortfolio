@@ -288,8 +288,76 @@ const QuickActionModal = ({
   );
 };
 
+// ── Vertical editor (per-bot, admin-only) ────────────────────────────────────
+// Locked to SUPER_ADMIN per docs/vertical-lock-plan.md — this is the only place
+// a bot's vertical can be changed. Dropdown is sourced from the same registry
+// allowlist the backend validates against (GET /api/admin/verticals), so there
+// is no second hardcoded list of verticals to drift out of sync.
+const VERTICAL_LABELS: Record<string, string> = { chemical: 'Chemical industry' };
+
+const VerticalEditor = ({
+  bot, verticals, onChange, isPending,
+}: {
+  bot: any; verticals: string[]; onChange: (companyId: string, vertical: string | null) => void; isPending: boolean;
+}) => {
+  const current: string = bot.vertical || '';
+  const [draft, setDraft] = useState(current);
+  const [confirming, setConfirming] = useState(false);
+
+  const label = (v: string) => (v ? (VERTICAL_LABELS[v] || v) : 'Generic');
+
+  if (confirming) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+        <span className="material-symbols-outlined text-[14px] text-amber-600 dark:text-amber-400 shrink-0">warning</span>
+        <p className="text-xs font-google text-amber-800 dark:text-amber-300 flex-1 min-w-[140px]">
+          Change vertical from <strong>{label(current)}</strong> to <strong>{label(draft)}</strong>?
+          This immediately changes the live bot&rsquo;s tools, prompts, and RAG scope.
+        </p>
+        <div className="flex gap-2 shrink-0">
+          <button type="button" onClick={() => setConfirming(false)} disabled={isPending}
+            className="px-3 py-1.5 text-xs font-semibold font-google rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 disabled:opacity-50">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => { onChange(bot.id, draft || null); setConfirming(false); }}
+            disabled={isPending}
+            className="px-3 py-1.5 text-xs font-semibold font-google rounded-lg bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {isPending && <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>}
+            Confirm change
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <select
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        disabled={isPending}
+        className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-xs font-google text-slate-700 dark:text-slate-300 rounded-lg outline-none disabled:opacity-50"
+      >
+        <option value="">Generic (no vertical)</option>
+        {verticals.map(v => <option key={v} value={v}>{label(v)}</option>)}
+      </select>
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        disabled={isPending || draft === current}
+        className="px-3 py-1.5 text-xs font-semibold font-google rounded-lg bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Save
+      </button>
+    </div>
+  );
+};
+
 // ── Manage Slide-Over ─────────────────────────────────────────────────────────
-const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClose: () => void; onSave: (p: any) => void; isSaving: boolean }) => {
+const ManageSlideOver = ({ user, onClose, onSave, isSaving, verticals, onChangeVertical, isVerticalPending }: { user: any; onClose: () => void; onSave: (p: any) => void; isSaving: boolean; verticals: string[]; onChangeVertical: (companyId: string, vertical: string | null) => void; isVerticalPending: boolean }) => {
   const authFetch = useAuthenticatedFetch();
   const queryClient = useQueryClient();
   const existingCfg = user.custom_plan_config || {};
@@ -652,14 +720,17 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving }: { user: any; onClo
             ) : (
               <div className="space-y-2">
                 {companies.map((bot: any, i: number) => (
-                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl flex justify-between items-center gap-2">
-                    <div className="min-w-0">
-                      <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
-                      <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-xs font-mono text-blue-500 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
+                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
+                        <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-xs font-mono text-blue-500 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
+                      </div>
+                      <span className={`shrink-0 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {bot.is_active !== false ? 'Active' : 'Inactive'}
+                      </span>
                     </div>
-                    <span className={`shrink-0 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {bot.is_active !== false ? 'Active' : 'Inactive'}
-                    </span>
+                    <VerticalEditor bot={bot} verticals={verticals} onChange={onChangeVertical} isPending={isVerticalPending} />
                   </div>
                 ))}
               </div>
@@ -912,6 +983,15 @@ export default function AdminPage() {
   });
   const pendingEnquiries = enquiriesQuery.data?.pending_count || 0;
 
+  // Vertical-lock plan: allowlist sourced from the pack registry, single
+  // source of truth shared with the PATCH /api/company backend validation.
+  const verticalsQuery = useQuery({
+    queryKey: ['admin', 'verticals'],
+    queryFn: () => authFetch('/api/admin/verticals') as Promise<any>,
+    enabled: isAdmin,
+  });
+  const verticals: string[] = verticalsQuery.data?.verticals || [];
+
   const users = usersQuery.data || [];
   const stats = statsQuery.data || { total_users: 0, total_companies: 0, active_bots: 0, total_messages: 0, custom_plan_count: 0 };
   const isLoading = usersQuery.isLoading || statsQuery.isLoading;
@@ -927,6 +1007,22 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
       window.dispatchEvent(new CustomEvent('Sapybase:toast', { detail: { kind: 'success', message: 'Plan config saved.' } }));
+    },
+  });
+
+  const verticalMutation = useMutation({
+    mutationFn: ({ companyId, vertical }: { companyId: string; vertical: string | null }) =>
+      authFetch(`/api/admin/companies/${companyId}/vertical`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vertical }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      window.dispatchEvent(new CustomEvent('Sapybase:toast', { detail: { kind: 'success', message: 'Vertical updated.' } }));
+    },
+    onError: (err: any) => {
+      window.dispatchEvent(new CustomEvent('Sapybase:toast', { detail: { kind: 'error', message: err?.message || 'Failed to update vertical.' } }));
     },
   });
 
@@ -1378,6 +1474,9 @@ export default function AdminPage() {
             onClose={() => setSelectedUser(null)}
             isSaving={limitsMutation.isPending}
             onSave={(payload) => limitsMutation.mutate({ clerkId: selectedUser.clerk_id, payload })}
+            verticals={verticals}
+            isVerticalPending={verticalMutation.isPending}
+            onChangeVertical={(companyId, vertical) => verticalMutation.mutate({ companyId, vertical })}
           />
         )}
       </AnimatePresence>

@@ -213,6 +213,15 @@ class AdminUpdateUserRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class AdminUpdateVerticalRequest(BaseModel):
+    """Super-admin-only reassignment of a company's vertical pack.
+
+    ``vertical=None``/``""`` reverts the company to the generic bot path."""
+    vertical: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CompanyUpdate(BaseModel):
     company_id:       Optional[str]  = None
     company_name:     Optional[str]  = None

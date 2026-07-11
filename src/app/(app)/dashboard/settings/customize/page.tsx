@@ -372,18 +372,11 @@ export default function CustomizePage() {
                   <span className="material-symbols-outlined text-[15px] text-slate-400">category</span>
                   Industry vertical
                 </p>
-                <p className={sectionDescCls}>Activates industry-specific tools, hub cards, and dashboard views.</p>
-                <div className="relative sm:max-w-xs">
-                  <select
-                    value={botSettings.vertical || ''}
-                    onChange={e => updateSetting('vertical', e.target.value)}
-                    className={inputCls + ' appearance-none pr-10'}
-                  >
-                    <option value="">Generic (no vertical)</option>
-                    <option value="chemical">Chemical industry</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
-                </div>
+                <p className={sectionDescCls}>Activates industry-specific tools, hub cards, and dashboard views.
+                  Assigned by a super admin - contact support to change it.</p>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {botSettings.vertical ? (VERTICAL_LABEL[botSettings.vertical] || botSettings.vertical) : 'Generic'}
+                </span>
               </Section>
 
               <Section className="relative">
