@@ -168,6 +168,74 @@
     return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
   }
 
+  // ── Contextual teaser matcher (Phase 2) ─────────────────────────────────────
+  // Pure ES5, no DOM/closure deps, so it is unit-tested directly by extracting
+  // this delimited block (src/__tests__/teaser-match.test.js). Precedence:
+  // explicit page tag (SapybaseConfig.page) → URL rule (first match) → null
+  // (caller falls back to the default teaser). Kept in sync with the backend
+  // sanitizer services/teaser.py (leading-slash, segment-aware substring).
+  // TEASER-MATCHER-START
+  function normalizeTeaserPath(loc) {
+    // loc: a Location-like { pathname, search, hash } or a raw URL string.
+    var pathname = '', hash = '';
+    if (loc && typeof loc === 'object') {
+      pathname = loc.pathname || '';
+      hash = loc.hash || '';
+    } else if (typeof loc === 'string') {
+      var s = loc.split('#'); hash = s[1] ? '#' + s[1] : '';
+      pathname = s[0].split('?')[0];
+    }
+    // Hash-router paths ("#/products") describe the real page — prefer them.
+    var path;
+    if (hash && hash.indexOf('#/') === 0) {
+      path = hash.slice(1);
+    } else {
+      path = pathname || '/';
+    }
+    path = path.split('?')[0].split('#')[0].toLowerCase();
+    if (!path) path = '/';
+    if (path.charAt(0) !== '/') path = '/' + path;
+    if (path.length > 1) path = '/' + path.replace(/^\/+|\/+$/g, '');
+    return path;
+  }
+
+  function teaserRuleMatchesPath(rule, path) {
+    var m = rule && typeof rule.match === 'string' ? rule.match : '';
+    if (!m) return false;
+    // Segment-aware substring: the match must land on a "/"-or-end boundary. m's
+    // own leading slash guards the left edge ("/products" ∌ "/myproducts"); this
+    // guards the right edge ("/products" ∌ "/productsxyz") while still firing on
+    // "/en/products" (locale prefix) and "/products/123" (sub-path).
+    var idx = path.indexOf(m);
+    while (idx !== -1) {
+      var after = path.charAt(idx + m.length);
+      if (after === '' || after === '/') return true;
+      idx = path.indexOf(m, idx + 1);
+    }
+    return false;
+  }
+
+  function matchTeaserRule(rules, loc, pageHint) {
+    if (!rules || !rules.length) return null;
+    var i, r;
+    // 1. Explicit page tag wins regardless of URL.
+    if (pageHint) {
+      var hint = String(pageHint).toLowerCase();
+      for (i = 0; i < rules.length; i++) {
+        r = rules[i];
+        if (r && r.page && String(r.page).toLowerCase() === hint) return r;
+      }
+    }
+    // 2. First URL rule that matches the normalized path.
+    var path = normalizeTeaserPath(loc);
+    for (i = 0; i < rules.length; i++) {
+      r = rules[i];
+      if (teaserRuleMatchesPath(r, path)) return r;
+    }
+    return null;
+  }
+  // TEASER-MATCHER-END
+
   // Floating-panel geometry (desktop). The widget switches to fullscreen when
   // the viewport can no longer hold this box plus breathing room — so the
   // "mobile" threshold is DERIVED from the panel size, not a hardcoded pixel
@@ -196,7 +264,18 @@
       this._fab = null;
       this._label = null;
       this._revealed = false;
-      this._revealed = false;
+      // Contextual teaser (Phase 1) state
+      this._teaser = null;
+      this._teaserTimer = null;
+      this._teaserScheduled = false;
+      this._teaserTheme = null;
+      this._teaserMem = {};
+      // Contextual teaser (Phase 2) — page-aware rules
+      this._teaserCfg = null;
+      this._teaserRules = null;
+      this._teaserActiveRuleId = 'default';
+      this._teaserSpaBound = false;
+      this._onTeaserRoute = null;
     }
 
     connectedCallback() {
@@ -302,6 +381,388 @@
         this._fab.style.overflow = 'visible';
         this._fab.innerHTML = _buildFabSvg(shape, themeColor, dark, logoUrl, isCustom, botName, hasCustomColor);
       }
+
+      // Contextual teaser (Phase 1): schedule the launcher bubble from the
+      // same config payload. Theme details are captured for the avatar.
+      this._teaserTheme = {
+        color: themeColor,
+        dark: _shadeColor(themeColor, -20),
+        logoUrl: logoUrl,
+        isCustom: isCustom,
+        botName: botName,
+      };
+      this._maybeScheduleTeaser(cfg);
+    }
+
+    // ── Contextual teaser (Phase 1) ──────────────────────────────────────────
+    // The bubble lives HERE (host-page shadow DOM), not in ChatWidget: the
+    // iframe is display:none while closed and cannot see the host URL. See
+    // docs/contextual-teaser-plan.md.
+
+    // Storage wrapper: sessionStorage = "shown once this visit", localStorage
+    // = "hard-suppressed forever" (opened chat or dismissed). Both are the
+    // HOST site's first-party storage; Safari private mode / consent gating
+    // may throw, so every access falls back to an in-memory map (degrades to
+    // show-once-per-page-load).
+    _teaserFlagGet(scope, kind) {
+      var key = 'sb-teaser-' + kind + ':' + this._botId;
+      if (this._teaserMem[key]) return true;
+      try {
+        var store = scope === 'local' ? window.localStorage : window.sessionStorage;
+        return store.getItem(key) === '1';
+      } catch {
+        return false;
+      }
+    }
+
+    _teaserFlagSet(scope, kind) {
+      var key = 'sb-teaser-' + kind + ':' + this._botId;
+      this._teaserMem[key] = true;
+      try {
+        var store = scope === 'local' ? window.localStorage : window.sessionStorage;
+        store.setItem(key, '1');
+      } catch { /* in-memory fallback already recorded */ }
+    }
+
+    _maybeScheduleTeaser(cfg) {
+      if (this._teaserScheduled) return;
+      var t = cfg && cfg.teaser;
+      if (!t || t.enabled === false) return;
+      var title = typeof t.title === 'string' ? t.title.trim() : '';
+      var rules = (t.rules && t.rules.length) ? t.rules : null;
+      if (!title && !rules) return;
+      this._teaserCfg = t;
+      this._teaserRules = rules || [];
+      if (this._open) return;                          // chat already open
+      if (this._teaserFlagGet('local', 'off')) return; // opened/dismissed before
+      if (this._teaserFlagGet('session', 'seen')) return; // once per visit
+      this._teaserScheduled = true;
+      // Re-evaluate the page rule on SPA route changes while the bubble is up.
+      this._bindTeaserSpa();
+      var delay = typeof t.delay_ms === 'number' && isFinite(t.delay_ms)
+        ? Math.min(Math.max(t.delay_ms, 1000), 60000)
+        : 5000;
+      var self = this;
+      this._teaserTimer = setTimeout(function () {
+        self._teaserTimer = null;
+        self._showTeaser(t);
+      }, delay);
+    }
+
+    // Cancel any pending teaser, remove a visible one, and never show again
+    // on this device (localStorage). Called on dismiss AND on chat open.
+    _suppressTeaser() {
+      if (this._teaserTimer) {
+        clearTimeout(this._teaserTimer);
+        this._teaserTimer = null;
+      }
+      this._removeTeaser();
+      this._unbindTeaserSpa();
+      this._teaserFlagSet('local', 'off');
+    }
+
+    _removeTeaser() {
+      var el = this._teaser;
+      this._teaserTitleLine = null;
+      this._teaserSubLine = null;
+      this._teaserBody = null;
+      if (!el) return;
+      this._teaser = null;
+      el.classList.remove('show');
+      setTimeout(function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 250);
+    }
+
+    // ── Contextual teaser SPA re-evaluation (Phase 2) ───────────────────────────
+    // Host SPAs change route without a full reload. While the bubble is up we
+    // re-run the URL matcher and swap the copy in place. We patch history once so
+    // pushState/replaceState navigations (which don't fire popstate) are caught.
+    _bindTeaserSpa() {
+      if (this._teaserSpaBound) return;
+      this._teaserSpaBound = true;
+      var self = this;
+      this._onTeaserRoute = function () { self._onTeaserRouteChange(); };
+      try {
+        window.addEventListener('popstate', this._onTeaserRoute);
+        window.addEventListener('hashchange', this._onTeaserRoute);
+        if (!history.__sbTeaserPatched) {
+          history.__sbTeaserPatched = true;
+          ['pushState', 'replaceState'].forEach(function (name) {
+            var orig = history[name];
+            if (typeof orig !== 'function') return;
+            history[name] = function () {
+              var ret = orig.apply(this, arguments);
+              try { window.dispatchEvent(new Event('sb:locationchange')); } catch { /* noop */ }
+              return ret;
+            };
+          });
+        }
+        window.addEventListener('sb:locationchange', this._onTeaserRoute);
+      } catch { /* noop */ }
+    }
+
+    _unbindTeaserSpa() {
+      if (!this._teaserSpaBound || !this._onTeaserRoute) return;
+      this._teaserSpaBound = false;
+      try {
+        window.removeEventListener('popstate', this._onTeaserRoute);
+        window.removeEventListener('hashchange', this._onTeaserRoute);
+        window.removeEventListener('sb:locationchange', this._onTeaserRoute);
+      } catch { /* noop */ }
+      this._onTeaserRoute = null;
+    }
+
+    _onTeaserRouteChange() {
+      // Only while the bubble is actually visible and not suppressed. A dismissed
+      // or opened teaser stays silent for the whole visit (plan: dismiss scope).
+      if (!this._teaser || this._open) return;
+      if (this._teaserFlagGet('local', 'off')) return;
+      var resolved = this._resolveTeaser(this._teaserCfg || {});
+      if (!resolved.title || !resolved.title.trim()) return;
+      this._teaserActiveRuleId = resolved.ruleId;
+      this._updateTeaserText(resolved);
+    }
+
+    _resetTeaserLine(line) {
+      if (!line) return;
+      line.classList.remove('sb-teaser-clip', 'sb-teaser-fade');
+      var inner = line.firstChild;
+      if (inner && typeof inner.getAnimations === 'function') {
+        try {
+          inner.getAnimations().forEach(function (a) { a.cancel(); });
+        } catch { /* noop */ }
+      }
+      if (inner) inner.style.transform = '';
+    }
+
+    // Swap the copy of a live bubble in place (SPA route change) without re-firing
+    // the impression event or re-animating the pop-in.
+    _updateTeaserText(resolved) {
+      var titleLine = this._teaserTitleLine;
+      if (!titleLine || !titleLine.firstChild) return;
+      var self = this;
+      this._resetTeaserLine(titleLine);
+      titleLine.firstChild.textContent = resolved.title;
+      var sub = typeof resolved.subtext === 'string' ? resolved.subtext.trim() : '';
+      if (sub) {
+        if (!this._teaserSubLine) {
+          var subLine = document.createElement('div');
+          subLine.className = 'sb-teaser-line sb-teaser-sub';
+          var subInner = document.createElement('span');
+          subInner.className = 'sb-teaser-line-inner';
+          subLine.appendChild(subInner);
+          if (this._teaserBody) this._teaserBody.appendChild(subLine);
+          this._teaserSubLine = subLine;
+        } else {
+          this._resetTeaserLine(this._teaserSubLine);
+        }
+        this._teaserSubLine.firstChild.textContent = sub;
+      } else if (this._teaserSubLine) {
+        if (this._teaserSubLine.parentNode) {
+          this._teaserSubLine.parentNode.removeChild(this._teaserSubLine);
+        }
+        this._teaserSubLine = null;
+      }
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          self._teaserAutoScroll(titleLine);
+          if (self._teaserSubLine) self._teaserAutoScroll(self._teaserSubLine);
+        });
+      });
+    }
+
+    // Resolve the copy to show RIGHT NOW: page-tag → URL rule → default teaser.
+    // Returns { title, subtext, ruleId }; ruleId feeds analytics ("default" or
+    // the matched rule's id). Never throws — a bad rule degrades to the default.
+    _resolveTeaser(t) {
+      var rule = null;
+      try {
+        var hint = window.SapybaseConfig && window.SapybaseConfig.page;
+        rule = matchTeaserRule(this._teaserRules, window.location, hint);
+      } catch { rule = null; }
+      if (rule && rule.title) {
+        return {
+          title: rule.title,
+          subtext: typeof rule.subtext === 'string' ? rule.subtext : '',
+          ruleId: rule.id || 'rule',
+        };
+      }
+      return {
+        title: t && typeof t.title === 'string' ? t.title : '',
+        subtext: t && typeof t.subtext === 'string' ? t.subtext : '',
+        ruleId: 'default',
+      };
+    }
+
+    _showTeaser(t) {
+      if (this._open || this._teaser || !this._fabWrap) return;
+      var self = this;
+      var theme = this._teaserTheme || {};
+
+      var resolved = this._resolveTeaser(t);
+      if (!resolved.title || !resolved.title.trim()) return;
+      this._teaserActiveRuleId = resolved.ruleId;
+
+      var card = document.createElement('div');
+      card.className = 'sb-teaser';
+      // Non-modal invite: focusable + activatable, but focus is never stolen.
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', 'Open chat: ' + resolved.title);
+      try {
+        var dir = document.documentElement.getAttribute('dir');
+        if (dir) card.setAttribute('dir', dir);
+      } catch { /* noop */ }
+
+      var x = document.createElement('button');
+      x.className = 'sb-teaser-x';
+      x.type = 'button';
+      x.setAttribute('aria-label', 'Dismiss message');
+      x.textContent = '✕';
+
+      var avatar = document.createElement('div');
+      avatar.className = 'sb-teaser-avatar';
+      avatar.setAttribute('aria-hidden', 'true');
+      var initial = (theme.botName || 'S').charAt(0).toUpperCase();
+      avatar.style.background =
+        'linear-gradient(135deg,' + (theme.color || '#004DE8') + ',' + (theme.dark || theme.color || '#004DE8') + ')';
+      if (theme.isCustom && theme.logoUrl) {
+        var img = document.createElement('img');
+        img.alt = '';
+        img.onerror = function () {
+          if (img.parentNode) img.parentNode.removeChild(img);
+          avatar.textContent = initial;
+        };
+        img.src = theme.logoUrl;
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = initial;
+      }
+
+      // SECURITY: teaser copy is owner-authored text — always injected via
+      // textContent, never interpolated into an HTML string.
+      var body = document.createElement('div');
+      body.className = 'sb-teaser-body';
+      body.setAttribute('role', 'status'); // polite live region, never assertive
+      var titleLine = document.createElement('div');
+      titleLine.className = 'sb-teaser-line sb-teaser-title';
+      var titleInner = document.createElement('span');
+      titleInner.className = 'sb-teaser-line-inner';
+      titleInner.textContent = resolved.title;
+      titleLine.appendChild(titleInner);
+      body.appendChild(titleLine);
+      var subLine = null;
+      var subtext = typeof resolved.subtext === 'string' ? resolved.subtext.trim() : '';
+      if (subtext) {
+        subLine = document.createElement('div');
+        subLine.className = 'sb-teaser-line sb-teaser-sub';
+        var subInner = document.createElement('span');
+        subInner.className = 'sb-teaser-line-inner';
+        subInner.textContent = subtext;
+        subLine.appendChild(subInner);
+        body.appendChild(subLine);
+      }
+
+      card.appendChild(x);
+      card.appendChild(avatar);
+      card.appendChild(body);
+      // Refs for in-place copy swap on SPA route change (Phase 2).
+      this._teaserBody = body;
+      this._teaserTitleLine = titleLine;
+      this._teaserSubLine = subLine;
+
+      var openChat = function () {
+        self._teaserEvent('click');
+        self._suppressTeaser();
+        if (!self._open) self._toggle();
+      };
+      card.addEventListener('click', function (e) {
+        if (e.target === x || x.contains(e.target)) return;
+        openChat();
+      });
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+          e.stopPropagation();
+          self._teaserEvent('dismiss');
+          self._suppressTeaser();
+        } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          openChat();
+        }
+      });
+      x.addEventListener('click', function (e) {
+        e.stopPropagation();
+        self._teaserEvent('dismiss');
+        self._suppressTeaser();
+      });
+
+      this._fabWrap.appendChild(card);
+      this._teaser = card;
+      this._teaserFlagSet('session', 'seen');
+      this._teaserEvent('impression');
+
+      // Reveal + measure overflow after layout has settled.
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          card.classList.add('show');
+          self._teaserAutoScroll(titleLine);
+          if (subLine) self._teaserAutoScroll(subLine);
+        });
+      });
+    }
+
+    // Overflow behavior (decided 2026-07-11): a line wider than its container
+    // ping-pong auto-scrolls (slide, pause, slide back) via the Web Animations
+    // API. Only engages on REAL overflow — desktop card lines wrap, so this
+    // effectively applies to the mobile pill's nowrap title. Reduced motion
+    // (or no WAAPI) falls back to a static ellipsis.
+    _teaserAutoScroll(line) {
+      if (!line || !line.firstChild) return;
+      var inner = line.firstChild;
+      var overflow = inner.scrollWidth - line.clientWidth;
+      if (overflow <= 4) return;
+      var reduced = false;
+      try {
+        reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      } catch { /* noop */ }
+      if (reduced || typeof inner.animate !== 'function') {
+        line.classList.add('sb-teaser-clip');
+        return;
+      }
+      line.classList.add('sb-teaser-fade');
+      // Gentle: travel time scales with how far the text has to move.
+      var travel = 2000 + overflow * 35;
+      inner.animate(
+        [
+          { transform: 'translateX(0)', offset: 0 },
+          { transform: 'translateX(0)', offset: 0.1 },
+          { transform: 'translateX(' + -overflow + 'px)', offset: 0.45 },
+          { transform: 'translateX(' + -overflow + 'px)', offset: 0.6 },
+          { transform: 'translateX(0)', offset: 0.95 },
+          { transform: 'translateX(0)', offset: 1 },
+        ],
+        { duration: travel * 2, iterations: Infinity }
+      );
+    }
+
+    // Fire-and-forget analytics beacon (impression / dismiss / click).
+    // fetch+keepalive instead of sendBeacon because the endpoint authenticates
+    // via the x-api-key header. Failures are swallowed — analytics must never
+    // affect the host page.
+    _teaserEvent(name) {
+      try {
+        fetch(IFRAME_ORIGIN + '/api/widget/teaser-event', {
+          method: 'POST',
+          keepalive: true,
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': this._botId,
+            'x-Sapybase-parent-origin': window.location.origin,
+          },
+          body: JSON.stringify({ event: name, rule_id: this._teaserActiveRuleId || 'default' }),
+        }).catch(function () { /* noop */ });
+      } catch { /* noop */ }
     }
 
     // SEO injection: emits two ld+json blocks into the host <head>.
@@ -455,6 +916,64 @@
         // (FULLSCREEN_MQ), not a hardcoded device width. Covers both narrow
         // (portrait phone) and short (landscape phone) viewports so the
         // keyboard tracking engages in either orientation.
+        // ── Contextual teaser bubble (Phase 1) — hangs off .fab-wrap so it
+        // inherits the fullscreen ":host(.chat-open) .fab-wrap{display:none}"
+        // rule and can never overlap an open chat. ──
+        '.sb-teaser {',
+        '  position: absolute; bottom: calc(100% + 12px);',
+        '  ' + (isLeft ? 'left: 0;' : 'right: 0;'),
+        '  width: 250px; box-sizing: border-box;',
+        '  display: flex; align-items: flex-start; gap: 10px;',
+        '  padding: 12px 14px;',
+        '  background: #ffffff; color: #0f172a;',
+        '  border: 0.5px solid rgba(15,23,42,0.16); border-radius: 16px;',
+        '  box-shadow: 0 10px 32px rgba(2,6,23,0.16);',
+        '  cursor: pointer; pointer-events: auto;',
+        '  text-align: start;',
+        '  opacity: 0; transform: translateY(6px) scale(0.96);',
+        '  transition: opacity 0.25s ease, transform 0.25s ease;',
+        '}',
+        '.sb-teaser.show { opacity: 1; transform: none; }',
+        '@media (prefers-reduced-motion: reduce) { .sb-teaser { transition: none; } }',
+        '.sb-teaser::after {',
+        '  content: ""; position: absolute; top: 100%;',
+        '  ' + (isLeft ? 'left: 26px;' : 'right: 26px;'),
+        '  border: 7px solid transparent; border-top-color: #ffffff;',
+        '}',
+        '.sb-teaser:focus-visible { outline: 2px solid ' + themeColor + '; outline-offset: 2px; }',
+        '.sb-teaser-x {',
+        '  position: absolute; top: -10px; ' + (isLeft ? 'left: -10px;' : 'right: -10px;'),
+        '  width: 24px; height: 24px; border-radius: 50%;',
+        '  display: flex; align-items: center; justify-content: center;',
+        '  background: #ffffff; color: #475569;',
+        '  border: 0.5px solid rgba(15,23,42,0.16);',
+        '  box-shadow: 0 2px 8px rgba(2,6,23,0.14);',
+        '  font-size: 11px; line-height: 1; cursor: pointer; padding: 0;',
+        '}',
+        '.sb-teaser-x:hover { color: #0f172a; }',
+        '.sb-teaser-x:focus-visible { outline: 2px solid ' + themeColor + '; outline-offset: 2px; }',
+        '.sb-teaser-avatar {',
+        '  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;',
+        '  display: flex; align-items: center; justify-content: center;',
+        '  color: #ffffff; font-size: 13px; font-weight: 700; overflow: hidden;',
+        '}',
+        '.sb-teaser-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }',
+        '.sb-teaser-body { min-width: 0; flex: 1 1 auto; }',
+        '.sb-teaser-line { overflow: hidden; }',
+        '.sb-teaser-line-inner { display: inline-block; white-space: inherit; will-change: transform; }',
+        '.sb-teaser-title { font-size: 13px; font-weight: 700; line-height: 1.35; }',
+        '.sb-teaser-sub { font-size: 12px; line-height: 1.4; color: #64748b; margin-top: 2px; }',
+        '.sb-teaser-clip { white-space: nowrap; text-overflow: ellipsis; }',
+        '.sb-teaser-fade {',
+        '  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 82%, transparent 100%);',
+        '  mask-image: linear-gradient(to right, #000 0%, #000 82%, transparent 100%);',
+        '}',
+        '@media (prefers-color-scheme: dark) {',
+        '  .sb-teaser { background: #1e293b; color: #f1f5f9; border-color: rgba(255,255,255,0.14); box-shadow: 0 10px 32px rgba(0,0,0,0.5); }',
+        '  .sb-teaser::after { border-top-color: #1e293b; }',
+        '  .sb-teaser-sub { color: #94a3b8; }',
+        '  .sb-teaser-x { background: #1e293b; color: #cbd5e1; border-color: rgba(255,255,255,0.14); }',
+        '}',
         '@media ' + FULLSCREEN_MQ + ' {',
         '  :host {',
         '    ' + (isLeft ? 'left: 12px !important;' : 'right: 12px !important;'),
@@ -468,6 +987,18 @@
         '  .fab-wrap { width: 48px; height: 48px; }',
         '  .fab { width: 48px; height: 48px; }',
         '  :host(.chat-open) .fab-wrap { display: none; }',
+        // Mobile / fullscreen breakpoints: collapse the card to a slim
+        // one-line pill (title only), capped so it never runs past the
+        // viewport edge; iOS safe-area keeps it clear of the home indicator.
+        '  .sb-teaser {',
+        '    width: max-content; max-width: calc(100vw - 32px);',
+        '    align-items: center; padding: 8px 14px; border-radius: 999px;',
+        '    margin-bottom: env(safe-area-inset-bottom, 0px);',
+        '  }',
+        '  .sb-teaser::after { display: none; }',
+        '  .sb-teaser-sub { display: none; }',
+        '  .sb-teaser-avatar { width: 22px; height: 22px; font-size: 11px; }',
+        '  .sb-teaser-title { white-space: nowrap; }',
         '}',
       ].join('\n');
       this.shadow.appendChild(style);
@@ -499,6 +1030,9 @@
     _toggle() {
       this._open = !this._open;
       if (this._open) {
+        // Opening the chat cancels any pending teaser and hard-suppresses it
+        // for good — an engaged visitor is never nagged again.
+        this._suppressTeaser();
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
         this.classList.add('chat-open');

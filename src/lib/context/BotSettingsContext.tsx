@@ -43,6 +43,10 @@ type BotSettings = {
   sampleSinkUrl: string;             // owner's own sheet/Zapier webhook
   sampleSinkSecret: string;          // HMAC secret paired with the sink
   sinkStatus: { ok: boolean; detail?: string; at?: string } | null;  // last "Send test row" outcome
+  // ── Contextual teaser (Phase 1): launcher bubble copy ──
+  teaserEnabled: boolean;
+  teaserTitle: string;               // '' = default copy ("Hi, I'm {botName}")
+  teaserSubtext: string;             // '' = default copy
 };
 
 type BotSettingsContextValue = {
@@ -85,6 +89,9 @@ const DEFAULT_SETTINGS: BotSettings = {
   sampleSinkUrl: '',
   sampleSinkSecret: '',
   sinkStatus: null,
+  teaserEnabled: true,
+  teaserTitle: '',
+  teaserSubtext: '',
 };
 
 const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
@@ -126,6 +133,11 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     sampleSinkUrl: company.sample_sink?.url || '',
     sampleSinkSecret: company.sample_sink?.secret || '',
     sinkStatus: company.channel_delivery_status?.sink || null,
+    // Contextual teaser (Phase 1) — enabled defaults to true; empty text means
+    // "using the default copy" (shown as placeholder in the editor).
+    teaserEnabled: company.teaser?.enabled !== false,
+    teaserTitle: company.teaser?.title || '',
+    teaserSubtext: company.teaser?.subtext || '',
   };
 };
 
@@ -202,6 +214,10 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         weekly_digest_enabled: botSettings.weeklyDigestEnabled,
         slack_webhook_url: botSettings.slackWebhookUrl.trim() || null,
         booking_url: botSettings.bookingUrl.trim() || null,
+        // Contextual teaser (Phase 1) — blank text resets to the default copy.
+        teaser_enabled: botSettings.teaserEnabled,
+        teaser_title: botSettings.teaserTitle.trim(),
+        teaser_subtext: botSettings.teaserSubtext.trim(),
       };
       // Phase 5 — only a vertical (pack) bot carries pack_overrides; a generic bot
       // never sends these, so it can never accidentally grow a pack_overrides row.

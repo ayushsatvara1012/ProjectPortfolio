@@ -19,6 +19,7 @@ from packs.schema import (
     Pack,
     QualificationSlot,
     Slot,
+    TeaserRule,
     ToolSpec,
 )
 
@@ -286,6 +287,33 @@ _CATALOG_TABLES = (
     ),
 )
 
+# Phase 2 — seeded, page-aware teaser copy. Ordered: first URL match wins, so
+# the most specific / highest-intent pages come first. Owner-editable later
+# (Phase 3); until then these give a chemical bot contextual copy with zero setup.
+_TEASER_RULES = (
+    TeaserRule(
+        id="pricing",
+        match="/pricing",
+        page="pricing",
+        title="Want the best price?",
+        subtext="Tell me your quantity and grade — I'll check for you.",
+    ),
+    TeaserRule(
+        id="products",
+        match="/products",
+        page="products",
+        title="Looking for a product?",
+        subtext="Ask me for grades, pack sizes, SDS or a quote.",
+    ),
+    TeaserRule(
+        id="contact",
+        match="/contact",
+        page="contact",
+        title="Prefer to talk?",
+        subtext="I can take your details right here.",
+    ),
+)
+
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
@@ -295,5 +323,6 @@ CHEMICAL_PACK = Pack(
     knowledge_kinds=("catalog", "sds"),
     catalog_tables=_CATALOG_TABLES,
     qualification_slots=_QUALIFICATION_SLOTS,
+    teaser_rules=_TEASER_RULES,
     version=1,
 )

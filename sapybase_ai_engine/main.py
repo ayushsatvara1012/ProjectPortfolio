@@ -1220,8 +1220,9 @@ from db.models import (
     DeleteChunksRequest, DeleteSourceRequest, DeleteCatalogRowsRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
-    ByodRequestChangeRequest,
+    ByodRequestChangeRequest, TeaserEventRequest,
 )
+from services import teaser as teaser_service  # Contextual teaser (Phase 1)
 
 # ── BYOD super-admin config logic (RFC Phase 2.1–2.3, §3.1) — dark until enabled ──
 from api.routers import byod_admin
@@ -1517,7 +1518,7 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
                    u.email, c.handoff_redirect_url, c.hide_branding,
                    u.id, u.subscription_status, u.billing_period_end,
                    c.hot_lead_alerts_enabled, c.alert_email, c.slack_webhook_url,
-                   c.booking_url, c.vertical, c.pack_overrides
+                   c.booking_url, c.vertical, c.pack_overrides, c.teaser_config
             FROM companies c
             JOIN users u ON c.user_id = u.id
             WHERE c.api_key = %s
@@ -1665,6 +1666,8 @@ def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_
         # Phase 5 — per-company pack overrides (sample form + sheet sink). Raw value
         # (dict | JSON str | None); coerced where used. Drives the customizable form.
         "pack_overrides": company_data[27],
+        # Contextual teaser (Phase 1) — raw JSONB; sanitized where used.
+        "teaser_config": company_data[28],
         # Carry the resolved custom plan config so the chat handler's get_plan()
         # applies the CUSTOM tier's real message/chunk limits + features. Without it,
         # get_plan() falls back to the FREE plan (0 messages) and blocks the chat.
@@ -2109,7 +2112,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url, vertical, pack_overrides, channel_delivery_status
+                       booking_url, vertical, pack_overrides, channel_delivery_status, teaser_config
                 FROM companies WHERE user_id = %s AND id = %s
                 """,
                 (user_uuid, company_id)
@@ -2121,7 +2124,7 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                        api_key, bot_name, logo_url, initial_message, quick_questions, system_prompt, ai_model,
                        logo_shape, custom_logo_url, avatar_bg_style, webhook_url, handoff_redirect_url, hide_branding,
                        hot_lead_alerts_enabled, alert_email, weekly_digest_enabled, slack_webhook_url,
-                       booking_url, vertical, pack_overrides, channel_delivery_status
+                       booking_url, vertical, pack_overrides, channel_delivery_status, teaser_config
                 FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1
                 """,
                 (user_uuid,)
@@ -2160,6 +2163,9 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "booking_url": company_row[22],
             # Vertical-pack selector (Phase 0); normalized to a slug or None.
             "vertical": _vertical,
+            # Contextual teaser (Phase 1) — editable view: raw overrides with the
+            # {botName} placeholder intact; empty string = "using the default".
+            "teaser": teaser_service.owner_teaser_view(company_row[26]),
         }
         # Phase 5 — for a vertical bot, hand the customise tab everything it edits:
         # the EFFECTIVE sample form (the owner's override if any, else the pack
@@ -2501,11 +2507,34 @@ async def update_company_details(
             updates.append("pack_overrides = %s::jsonb")
             params.append(json.dumps(_merged) if _merged else None)
 
+        # ── Contextual teaser (Phase 1): fold teaser fields into the JSONB column ──
+        # teaser_enabled/title/subtext aren't plain columns; merge them over the
+        # bot's existing teaser_config (sanitized + length-capped in the service).
+        _teaser_keys = {"teaser_enabled", "teaser_title", "teaser_subtext"}
+        if _teaser_keys & set(_ov_sent.keys()):
+            cursor.execute(
+                "SELECT teaser_config FROM companies WHERE id = %s AND user_id = %s",
+                (target_company_id, user["id"]),
+            )
+            _trow = cursor.fetchone()
+            _tupdates = {}
+            if "teaser_enabled" in _ov_sent:
+                _tupdates["enabled"] = _ov_sent["teaser_enabled"]
+            if "teaser_title" in _ov_sent:
+                _tupdates["title"] = _ov_sent["teaser_title"]
+            if "teaser_subtext" in _ov_sent:
+                _tupdates["subtext"] = _ov_sent["teaser_subtext"]
+            _tmerged = teaser_service.merge_teaser_update(
+                _trow[0] if _trow else None, _tupdates
+            )
+            updates.append("teaser_config = %s::jsonb")
+            params.append(json.dumps(_tmerged) if _tmerged else None)
+
         _old_vertical = None
         _new_vertical = None
         _vertical_changed = False
         for field, value in _ov_sent.items():
-            if field == "company_id" or field in _ov_keys:
+            if field == "company_id" or field in _ov_keys or field in _teaser_keys:
                 continue
             if field == "vertical":
                 # Structural field — drives pack/tool/RAG selection, not cosmetic.
@@ -2782,6 +2811,43 @@ async def widget_session_endpoint(
                      or request.headers.get("origin") or "")
     minted = _mint_widget_session(company["id"], parent_origin)
     return {"token": minted["token"], "expires_in": WIDGET_SESSION_TTL}
+
+
+@app.post("/api/widget/teaser-event")
+@limiter.limit("30/minute", key_func=get_remote_address)  # per-IP: a visitor fires ≤3/session
+@limiter.limit("300/minute")                               # per-API-key ceiling (many visitors)
+async def widget_teaser_event(
+    request: Request,
+    body: TeaserEventRequest,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Analytics sink for the loader's teaser bubble (Phase 1).
+
+    Fire-and-forget from the widget's perspective; one row per impression /
+    dismiss / click so the owner can later see whether the teaser converts
+    and (Phase 2) which URL rule fired. No visitor PII is accepted or stored.
+    """
+    try:
+        event, rule_id = teaser_service.normalize_event(body.event, body.rule_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO teaser_events (company_id, event, rule_id) VALUES (%s, %s, %s)",
+            (company["id"], event, rule_id),
+        )
+        conn.commit()
+        cursor.close()
+    except Exception as e:
+        conn.rollback()
+        # Analytics must never break the widget — log and swallow.
+        logger.warning(f"teaser-event insert failed for company {company['id']}: {e}")
+    finally:
+        release_db_connection(conn)
+    return {"status": "ok"}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -8520,6 +8586,15 @@ def get_config(
                 # Fallback: convert to string representation
                 safe_company[key] = str(value)
 
+        # Contextual teaser (Phase 1) — replace the raw stored config with the
+        # sanitized, {botName}-substituted payload the loader renders. Never
+        # ship the raw column: it is owner input and the loader must be able to
+        # trust lengths/types without re-validating.
+        _teaser_raw = safe_company.pop("teaser_config", None)
+        safe_company["teaser"] = teaser_service.build_teaser_payload(
+            _teaser_raw, safe_company.get("bot_name")
+        )
+
         # Phase 3 — pack-driven hub. A company whose `vertical` resolves to a pack
         # ships its action cards to the widget; everyone else gets an empty list,
         # so the widget renders no hub and opens straight to chat (unchanged).
@@ -8527,6 +8602,14 @@ def get_config(
         # widget; we only expose the resolved sample_form below.
         _overrides = safe_company.pop("pack_overrides", None)
         pack = load_pack(safe_company.get("vertical"))
+        # Contextual teaser (Phase 2) — page-aware rules. Owner-authored rules win;
+        # a bot with none inherits the pack's seeded per-vertical defaults. Empty
+        # list for generic (no-pack) bots → loader shows only the default teaser.
+        safe_company["teaser"]["rules"] = teaser_service.build_teaser_rules(
+            _teaser_raw,
+            pack.teaser_rules_payload() if pack else None,
+            safe_company.get("bot_name"),
+        )
         if pack:
             safe_company["hub_cards"] = pack.hub_cards_payload()
             # Phase 4b/5 — the structured sample form: the owner's per-bot override

@@ -119,6 +119,33 @@ class CatalogTable:
 
 
 @dataclass(frozen=True)
+class TeaserRule:
+    """One page-aware teaser line for the launcher bubble (Phase 2, plan §Content).
+
+    A pack ships an ORDERED default rule set so contextual copy works with zero
+    owner setup. The loader picks the first rule that matches the visitor's page
+    (precedence: explicit ``page`` tag from ``SapybaseConfig.page`` -> URL
+    ``match`` -> the always-present default teaser). Rules are pure config; the
+    matching runs client-side in the loader, so there is no runtime model cost.
+
+      id       — stable slug for analytics (which rule converted); unique per pack.
+      match    — URL path token, first-match-wins, segment-aware substring
+                 (``/products`` also fires on ``/en/products``). Empty = page-tag
+                 only.
+      page     — optional ``SapybaseConfig.page`` value that force-selects this
+                 rule regardless of URL (for installs whose URLs hide page type).
+      title    — bold line; ``{botName}`` is substituted server-side.
+      subtext  — muted second line; optional.
+    """
+
+    id: str
+    match: str
+    title: str
+    subtext: str = ""
+    page: str = ""
+
+
+@dataclass(frozen=True)
 class Slot:
     """A single field a tool needs to collect before it can run.
 
@@ -189,6 +216,7 @@ class Pack:
     knowledge_kinds: Tuple[str, ...] = ()      # what doc kinds feed RAG/tools
     catalog_tables: Tuple[CatalogTable, ...] = ()  # structured tables for auto-import
     qualification_slots: Tuple[QualificationSlot, ...] = ()  # Phase 5 — buyer facts to learn
+    teaser_rules: Tuple[TeaserRule, ...] = ()  # Phase 2 — seeded page-aware teaser copy
     version: int = 1
 
     def tool_names(self) -> Tuple[str, ...]:
@@ -229,6 +257,14 @@ class Pack:
         """Names of the form fields that must be present on submit (server-side
         validation source of truth — the widget mirrors this)."""
         return tuple(f.name for f in self.sample_form if f.required)
+
+    def teaser_rules_payload(self) -> List[dict]:
+        """JSON-serializable seeded teaser rules for the widget config.
+
+        Empty when the pack defines none — the loader then shows only the always-
+        present default teaser. Sanitized + ``{botName}``-substituted downstream
+        in ``services/teaser.py`` before it reaches the loader."""
+        return [asdict(rule) for rule in self.teaser_rules]
 
 
 def normalize_vertical(value: object) -> Optional[str]:

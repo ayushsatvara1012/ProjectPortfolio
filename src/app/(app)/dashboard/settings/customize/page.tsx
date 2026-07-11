@@ -344,6 +344,99 @@ export default function CustomizePage() {
                 </div>
               </Section>
 
+              {/* ── Contextual teaser (Phase 1): launcher bubble copy ── */}
+              <Section>
+                <p className={sectionHeadingCls}>
+                  <span className="material-symbols-outlined text-[15px] text-slate-400">chat_bubble</span>
+                  Teaser bubble
+                </p>
+                <p className={sectionDescCls}>
+                  A small invite that pops above the chat launcher a few seconds after your page loads.
+                  It shows once per visit and stays silent after a visitor opens the chat or dismisses it.
+                </p>
+
+                <div className={toggleRowCls}>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-medium font-google text-slate-900 dark:text-slate-100">Show teaser bubble</p>
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      Nudges visitors to start a conversation.
+                    </p>
+                  </div>
+                  <Toggle
+                    label="Show teaser bubble"
+                    checked={botSettings.teaserEnabled}
+                    onChange={(v) => updateSetting('teaserEnabled', v)}
+                  />
+                </div>
+
+                {botSettings.teaserEnabled && (
+                  <>
+                    <div className={gridCls + ' mt-4'}>
+                      <div>
+                        <label className={labelCls} htmlFor="teaser-title">Title</label>
+                        <input
+                          id="teaser-title"
+                          type="text"
+                          maxLength={80}
+                          value={botSettings.teaserTitle}
+                          onChange={e => updateSetting('teaserTitle', e.target.value)}
+                          className={inputCls}
+                          placeholder={"Hi, I'm {botName}"}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls} htmlFor="teaser-subtext">Subtext</label>
+                        <input
+                          id="teaser-subtext"
+                          type="text"
+                          maxLength={140}
+                          value={botSettings.teaserSubtext}
+                          onChange={e => updateSetting('teaserSubtext', e.target.value)}
+                          className={inputCls}
+                          placeholder="Need help getting started?"
+                        />
+                      </div>
+                    </div>
+                    <p className={helpCls}>
+                      Leave blank to use the default copy. <code className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px]">{'{botName}'}</code> inserts your bot&rsquo;s name.
+                    </p>
+
+                    {/* Inline preview — mirrors the loader bubble (the live widget
+                        preview opens the chat, where the teaser never shows). */}
+                    <div className="mt-4 flex justify-end rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-5 pt-5 pb-4">
+                      <div className="relative w-[250px] flex items-start gap-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-3 shadow-lg shadow-slate-900/10">
+                        <button
+                          type="button"
+                          aria-hidden="true"
+                          tabIndex={-1}
+                          className="absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow flex items-center justify-center text-[10px] text-slate-500 dark:text-slate-300 cursor-default"
+                        >
+                          ✕
+                        </button>
+                        <div
+                          className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-[13px] font-bold overflow-hidden"
+                          style={{ background: `linear-gradient(135deg, ${botSettings.primaryColor || '#5730F5'}, ${botSettings.primaryColor || '#5730F5'})` }}
+                          aria-hidden="true"
+                        >
+                          {botSettings.customLogoUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={botSettings.customLogoUrl} alt="" className="w-full h-full object-cover" />
+                            : (botSettings.name || 'S').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-bold font-google text-slate-900 dark:text-slate-100 leading-snug">
+                            {(botSettings.teaserTitle || "Hi, I'm {botName}").replaceAll('{botName}', botSettings.name || 'Sapy AI')}
+                          </p>
+                          <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                            {botSettings.teaserSubtext || 'Need help getting started?'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </Section>
+
               <Section>
                 <p className={sectionHeadingCls}>
                   <span className="material-symbols-outlined text-[15px] text-slate-400">image</span>

@@ -213,6 +213,18 @@ class AdminUpdateUserRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class TeaserEventRequest(BaseModel):
+    """Widget analytics beacon for the contextual teaser bubble (Phase 1).
+
+    ``event`` ∈ {impression, dismiss, click}; ``rule_id`` names the matched
+    rule (always 'default' until Phase 2 ships URL rules). Both are validated
+    server-side in services.teaser.normalize_event."""
+    event: str
+    rule_id: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class AdminUpdateVerticalRequest(BaseModel):
     """Super-admin-only reassignment of a company's vertical pack.
 
@@ -256,6 +268,10 @@ class CompanyUpdate(BaseModel):
     sample_form:        Optional[list] = None  # full replacement field list; [] = reset to pack default
     sample_sink_url:    Optional[str]  = None  # owner's own sheet/Zapier webhook (HTTPS); "" = clear
     sample_sink_secret: Optional[str]  = None  # HMAC secret paired with the sink url
+    # ── Contextual teaser (Phase 1): folded into companies.teaser_config JSONB ──
+    teaser_enabled:  Optional[bool] = None  # False hides the launcher teaser bubble
+    teaser_title:    Optional[str]  = None  # bold line; "" = reset to default copy
+    teaser_subtext:  Optional[str]  = None  # muted line; "" = reset to default copy
 
     @validator('booking_url')
     def validate_booking_url(cls, v):
