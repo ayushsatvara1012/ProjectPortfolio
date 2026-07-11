@@ -267,7 +267,7 @@
       // Contextual teaser (Phase 1) state
       this._teaser = null;
       this._teaserTimer = null;
-      this._teaserScheduled = false;
+      this._teaserPendingRuleId = null;
       this._teaserTheme = null;
       this._teaserMem = {};
       // Contextual teaser (Phase 2) — page-aware rules
@@ -399,33 +399,38 @@
     // iframe is display:none while closed and cannot see the host URL. See
     // docs/contextual-teaser-plan.md.
 
-    // Storage wrapper: sessionStorage = "shown once this visit", localStorage
-    // = "hard-suppressed forever" (opened chat or dismissed). Both are the
-    // HOST site's first-party storage; Safari private mode / consent gating
+    // Storage: sessionStorage only — a NEW browser session (new tab, or the
+    // same tab after the browser was fully closed and reopened) always
+    // starts fresh. Two independent per-bot flags, both session-scoped:
+    //  - "chat": set the moment the visitor opens the chat — an engaged
+    //    visitor is never nagged again, on ANY page, for the rest of this
+    //    session.
+    //  - "off:<ruleId>": set when that SPECIFIC teaser (page/rule) is
+    //    dismissed via ✕ or Esc — only silences that page's message; a
+    //    different page (a different rule, or the default) is still
+    //    eligible to show, with its own delay.
+    // First-party host-site storage; Safari private mode / consent gating
     // may throw, so every access falls back to an in-memory map (degrades to
-    // show-once-per-page-load).
-    _teaserFlagGet(scope, kind) {
+    // "resets on the next full page load").
+    _teaserFlagGet(kind) {
       var key = 'sb-teaser-' + kind + ':' + this._botId;
       if (this._teaserMem[key]) return true;
       try {
-        var store = scope === 'local' ? window.localStorage : window.sessionStorage;
-        return store.getItem(key) === '1';
+        return window.sessionStorage.getItem(key) === '1';
       } catch {
         return false;
       }
     }
 
-    _teaserFlagSet(scope, kind) {
+    _teaserFlagSet(kind) {
       var key = 'sb-teaser-' + kind + ':' + this._botId;
       this._teaserMem[key] = true;
       try {
-        var store = scope === 'local' ? window.localStorage : window.sessionStorage;
-        store.setItem(key, '1');
+        window.sessionStorage.setItem(key, '1');
       } catch { /* in-memory fallback already recorded */ }
     }
 
     _maybeScheduleTeaser(cfg) {
-      if (this._teaserScheduled) return;
       var t = cfg && cfg.teaser;
       if (!t || t.enabled === false) return;
       var title = typeof t.title === 'string' ? t.title.trim() : '';
@@ -433,32 +438,76 @@
       if (!title && !rules) return;
       this._teaserCfg = t;
       this._teaserRules = rules || [];
-      if (this._open) return;                          // chat already open
-      if (this._teaserFlagGet('local', 'off')) return; // opened/dismissed before
-      if (this._teaserFlagGet('session', 'seen')) return; // once per visit
-      this._teaserScheduled = true;
-      // Re-evaluate the page rule on SPA route changes while the bubble is up.
+      // Re-evaluate the page rule on SPA route changes for as long as the
+      // visitor hasn't opened the chat this session.
       this._bindTeaserSpa();
+      this._tryShowTeaserForCurrentPage();
+    }
+
+    _cancelPendingTeaserTimer() {
+      if (this._teaserTimer) {
+        clearTimeout(this._teaserTimer);
+        this._teaserTimer = null;
+      }
+      this._teaserPendingRuleId = null;
+    }
+
+    // The single decision point for "should a teaser appear right now" — run
+    // on initial load AND on every SPA route change (_onTeaserRouteChange).
+    // A page whose rule was already dismissed this session stays silent; a
+    // page whose rule was never dismissed gets its own fresh delay, even if
+    // a DIFFERENT rule was dismissed on an earlier page this same session.
+    _tryShowTeaserForCurrentPage() {
+      if (this._open) { this._cancelPendingTeaserTimer(); return; }
+      if (this._teaserFlagGet('chat')) { this._cancelPendingTeaserTimer(); return; } // engaged this session
+
+      var resolved = this._resolveTeaser(this._teaserCfg || {});
+      if (!resolved.title || !resolved.title.trim()) { this._cancelPendingTeaserTimer(); return; }
+
+      if (this._teaser) {
+        // Already visible — swap the copy in place if the page/rule changed;
+        // no re-delay and no re-fired impression for the SAME bubble.
+        if (resolved.ruleId !== this._teaserActiveRuleId) {
+          this._teaserActiveRuleId = resolved.ruleId;
+          this._updateTeaserText(resolved);
+        }
+        return;
+      }
+
+      if (this._teaserFlagGet('off:' + resolved.ruleId)) { this._cancelPendingTeaserTimer(); return; } // dismissed on this page before
+      if (this._teaserTimer && this._teaserPendingRuleId === resolved.ruleId) return; // already counting down for this page
+
+      this._cancelPendingTeaserTimer();
+      this._teaserPendingRuleId = resolved.ruleId;
+      var t = this._teaserCfg;
       var delay = typeof t.delay_ms === 'number' && isFinite(t.delay_ms)
         ? Math.min(Math.max(t.delay_ms, 1000), 60000)
         : 5000;
       var self = this;
       this._teaserTimer = setTimeout(function () {
         self._teaserTimer = null;
+        self._teaserPendingRuleId = null;
         self._showTeaser(t);
       }, delay);
     }
 
-    // Cancel any pending teaser, remove a visible one, and never show again
-    // on this device (localStorage). Called on dismiss AND on chat open.
-    _suppressTeaser() {
-      if (this._teaserTimer) {
-        clearTimeout(this._teaserTimer);
-        this._teaserTimer = null;
-      }
+    // Chat opened (FAB or teaser-card click): full suppression, every page,
+    // rest of this session — an engaged visitor is never nagged again.
+    _engageTeaser() {
+      this._cancelPendingTeaserTimer();
       this._removeTeaser();
       this._unbindTeaserSpa();
-      this._teaserFlagSet('local', 'off');
+      this._teaserFlagSet('chat');
+    }
+
+    // Visitor explicitly closed THIS teaser (✕ or Esc): only silences the
+    // rule that was showing. A different page's rule (or the default) can
+    // still appear later this session; the SPA listener stays bound so a
+    // later route change gets a fresh chance.
+    _dismissTeaser(ruleId) {
+      this._cancelPendingTeaserTimer();
+      this._removeTeaser();
+      this._teaserFlagSet('off:' + (ruleId || 'default'));
     }
 
     _removeTeaser() {
@@ -514,14 +563,11 @@
     }
 
     _onTeaserRouteChange() {
-      // Only while the bubble is actually visible and not suppressed. A dismissed
-      // or opened teaser stays silent for the whole visit (plan: dismiss scope).
-      if (!this._teaser || this._open) return;
-      if (this._teaserFlagGet('local', 'off')) return;
-      var resolved = this._resolveTeaser(this._teaserCfg || {});
-      if (!resolved.title || !resolved.title.trim()) return;
-      this._teaserActiveRuleId = resolved.ruleId;
-      this._updateTeaserText(resolved);
+      // A new page may have a rule that was never dismissed this session,
+      // even if the previous page's was — re-run the full decision, not just
+      // an in-place text swap (that's still handled inside, when a bubble is
+      // already up).
+      this._tryShowTeaserForCurrentPage();
     }
 
     _resetTeaserLine(line) {
@@ -674,7 +720,7 @@
 
       var openChat = function () {
         self._teaserEvent('click');
-        self._suppressTeaser();
+        self._engageTeaser();
         if (!self._open) self._toggle();
       };
       card.addEventListener('click', function (e) {
@@ -685,7 +731,7 @@
         if (e.key === 'Escape' || e.key === 'Esc') {
           e.stopPropagation();
           self._teaserEvent('dismiss');
-          self._suppressTeaser();
+          self._dismissTeaser(self._teaserActiveRuleId);
         } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
           e.preventDefault();
           openChat();
@@ -694,12 +740,11 @@
       x.addEventListener('click', function (e) {
         e.stopPropagation();
         self._teaserEvent('dismiss');
-        self._suppressTeaser();
+        self._dismissTeaser(self._teaserActiveRuleId);
       });
 
       this._fabWrap.appendChild(card);
       this._teaser = card;
-      this._teaserFlagSet('session', 'seen');
       this._teaserEvent('impression');
 
       // Reveal + measure overflow after layout has settled.
@@ -1030,9 +1075,9 @@
     _toggle() {
       this._open = !this._open;
       if (this._open) {
-        // Opening the chat cancels any pending teaser and hard-suppresses it
-        // for good — an engaged visitor is never nagged again.
-        this._suppressTeaser();
+        // Opening the chat cancels any pending teaser and suppresses it for
+        // the rest of this session — an engaged visitor is never nagged again.
+        this._engageTeaser();
         if (!this._iframeLoaded) this._loadIframe();
         this._wrap.classList.add('open');
         this.classList.add('chat-open');

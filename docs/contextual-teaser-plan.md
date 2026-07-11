@@ -29,10 +29,10 @@ An avatar + two-line contextual teaser bubble that appears above the launcher ~5
 - Time delay only: appears ~5s after page load. Configurable.
 - No scroll-depth / exit-intent / idle triggers in v1 (edge cases, low marginal value).
 
-### Frequency
-- Shows **once per session** (`sessionStorage`).
-- **Hard-suppressed** the moment the visitor opens the chat OR clicks `✕` (`localStorage`) — stays silent afterwards.
-- A returning visitor on a later visit sees it again; an engaged visitor never gets nagged.
+### Frequency (REVISED 2026-07-11 — see "Dismiss scope" below for the full rationale)
+- Everything is **session-scoped** (`sessionStorage`), never permanent. A new browser session (new visit, or the same tab after the browser was fully closed and reopened) always starts fresh — nothing persists via `localStorage` anymore.
+- **Opening the chat** suppresses the teaser on **every page, for the rest of that session** — an engaged visitor is never nagged again.
+- **Dismissing (✕ / Esc)** only suppresses the **specific page/rule** that was showing — a different page (a different rule, or the default) is still eligible to show, with its own delay.
 
 ### Content model
 - One always-present **default** teaser (owner-editable single string, reuses the bot name).
@@ -55,9 +55,13 @@ An avatar + two-line contextual teaser bubble that appears above the launcher ~5
 - Expose the rules as an **editable list on the Customize page** so owners can tune wording, add pages, reorder.
 - Not defaults-only (too rigid) and not owner-only (most owners never configure — empty teaser wastes the feature).
 
-### Dismiss scope — silent for the whole visit
-- Once dismissed, silent for the **entire visit**. Do **not** re-surface on a higher-intent page.
-- Re-surfacing after an explicit close is the fastest way to feel spammy; conversion upside is marginal. Start conservative; revisit only if data shows dismiss-then-convert-elsewhere.
+### Dismiss scope — per-page, per-session (REVISED 2026-07-11, was "silent for the whole visit" / permanent-via-localStorage)
+- Original decision: once dismissed OR chat opened, silent **forever on that device** (`localStorage`, no expiry) — "start conservative, revisit only if data shows dismiss-then-convert-elsewhere." Nobody had that data yet; the owner asked to revisit it directly instead, because a dismiss on one page (e.g. an accidental close, or "not now" on the homepage) was silencing the bubble on every other page too, including pages the visitor hadn't seen yet.
+- **New behavior:**
+  - **Dismiss (✕/Esc)** = "not interested in *this* message" → suppresses only the rule/page that was showing, for the rest of the session. A different page's rule (or the default) still gets its normal delay.
+  - **Opening the chat** = "already engaged" → suppresses everywhere, for the rest of the session (this one stayed a strong, blanket signal — no reason to keep nagging someone who's already talking to the bot).
+  - **New session** (next visit, or the same tab after a full browser restart) = full reset either way; `sessionStorage` never persists across that boundary, unlike the old `localStorage` flag.
+- Implementation: `_tryShowTeaserForCurrentPage()` in `public/sapybase-loader.js` is now the single decision point, run on initial load AND on every SPA route change (previously the SPA handler only ever swapped copy on an *already-visible* bubble; it now re-evaluates from scratch, so navigating to an un-dismissed page after dismissing a different one gets a fresh delay). `_engageTeaser()` (chat opened) sets a global `chat` session flag; `_dismissTeaser(ruleId)` (✕/Esc) sets a `off:<ruleId>` session flag scoped to that rule only. Covered by `src/__tests__/teaser-suppress.test.js` (13 tests) — extracts the exact shipped methods out of `public/sapybase-loader.js` and runs them against a stub instance, same "test the shipped code" principle as `teaser-match.test.js`.
 
 ### Mobile
 - Collapse the `250px` card to a **slim one-line pill** (title only) above the launcher, so the contextual value survives on phones without crowding the screen.
@@ -102,7 +106,7 @@ Positioning / device:
 Navigation / state:
 - **SPA route change** on host (`pushState` / `popstate`): re-evaluate the URL rule; update text if still showing; do NOT re-trigger if dismissed.
 - **Chat opened before the 5s delay**: cancel the pending teaser.
-- **Storage blocked** (Safari private, consent gating): wrap `sessionStorage`/`localStorage` in try/catch with in-memory fallback (show-once-per-page-load). Note: this is the HOST site's first-party storage (loader runs in host context).
+- **Storage blocked** (Safari private, consent gating): wrap `sessionStorage` in try/catch with in-memory fallback (degrades to resetting on the next full page load). Note: this is the HOST site's first-party storage (loader runs in host context). (No `localStorage` use anymore as of the 2026-07-11 dismiss-scope revision — everything is session-scoped.)
 - URL normalization: handle trailing slash, case, query string, hash-router paths (`#/products`), and locale prefixes (`/en/products`).
 
 Security / content:
@@ -163,3 +167,15 @@ Owner rule editor on the Customize page, plus an AI "Suggest copy" authoring ass
 - Frontend: `TeaserRuleEditor.tsx` (new, modeled on `SampleFormEditor.tsx`) — add/remove/reorder rows (title, subtext, URL match, page tag), inline validation mirroring the backend's drop rules (needs a title; needs a match or page tag to fire), capped at `RULES_MAX=40`. Exports `TeaserSuggestButton`, reused both per-rule and next to the default title/subtext fields. `BotSettingsContext.tsx` gained `teaserRules: TeaserRuleField[]`, mapped from `company.teaser.rules` and sent as `teaser_rules` on every save (not gated to vertical bots — generic bots can author rules too). Mounted in the Customize page's existing "Teaser bubble" section as a new "Page rules" subsection; save is blocked with an inline error if any rule fails validation. Suite green (backend 1472, frontend 394, tsc 0, lint clean — 0 errors).
 - Deviation from the draft: rule ids are preserved across edits (not just derived fresh each save) so an owner tweaking a rule's copy or URL match doesn't silently orphan its `teaser_events` analytics history.
 - Gap found + fixed during self-review: a vertical bot's editor initially showed an EMPTY rule list even though the pack's seeded rules (e.g. chemical's pricing/products/contact) were already live on the widget — the owner had no way to see or tune them, only to add net-new rules that would wholesale replace the seeds on save. Fixed with `services/teaser.py::effective_teaser_rules(raw, pack_rules)` (owner rules if any, else pack seeds — no `{botName}` substitution, this is the raw editable form), wired into `get_company_by_clerk_id`'s existing pack-aware block in `main.py` right alongside `effective_sample_form`, which already does exactly this for the sample-request form. Same accepted tradeoff as `sample_form`: because the Customize page always sends `teaser_rules` on save, the first save after opening the editor freezes the pack's current seed wording into a permanent owner override (future pack-seed wording changes won't reach that bot). 4 new tests.
+
+## Dismiss-scope revision — BUILT 2026-07-11
+
+Owner-requested change to the "Frequency"/"Dismiss scope" decisions above (see those sections for the full before/after). Loader-only change — no backend, no migration, no Customize-page change.
+
+- `public/sapybase-loader.js` (+ `@1` mirror, regenerated and re-synced): dropped `localStorage` entirely. Replaced the old single "opened or dismissed → permanent `local:off` flag, checked once at schedule time" model with a session-scoped, per-rule model:
+  - `_tryShowTeaserForCurrentPage()` (new) — the single scheduling decision point, called on initial load AND on every SPA route change (`_onTeaserRouteChange` now just delegates to it, instead of only ever swapping copy on an already-visible bubble). Checks the global `chat` session flag, resolves the current page's rule, and either swaps an already-visible bubble's copy in place, skips if that specific rule was dismissed this session, or schedules a fresh delay timer for it.
+  - `_engageTeaser()` (renamed/narrowed from the old `_suppressTeaser`) — chat opened (FAB or teaser-card click): sets the global `chat` session flag, unbinds the SPA listener (nothing left to watch for this session).
+  - `_dismissTeaser(ruleId)` (new, split out of the old `_suppressTeaser`) — ✕/Esc: sets a `off:<ruleId>` session flag scoped to just that rule; SPA listener stays bound so a later page/rule still gets evaluated.
+  - Dropped the old blanket "shown once per visit" `session:seen` flag — no longer needed now that re-triggering is decided per-rule.
+  - 13 new tests in `src/__tests__/teaser-suppress.test.js`, extracting the exact shipped methods (not a reimplementation) and running them against a stub instance with fake timers + jsdom's real `sessionStorage`.
+- Suite green: frontend 407 (was 394), tsc 0, lint 0 errors. Backend untouched (still 1472).
