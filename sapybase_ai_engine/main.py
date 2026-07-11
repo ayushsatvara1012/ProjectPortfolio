@@ -8231,6 +8231,53 @@ def get_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user
         release_db_connection(conn)
 
 
+@app.delete("/api/knowledge/catalog/{company_id}")
+def delete_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user)):
+    """Clear every structured catalog row (products / product_skus) for a bot.
+
+    Catalog uploads replace-all into the pack's structured tables, so this is the
+    owner-facing "start over" for the catalog — it wipes all catalog tables for
+    this company in one transaction. Table identifiers come only from pack config
+    (never client text) and every delete is scoped by company_id, mirroring the
+    replace-all import in ``catalog_import.apply_catalog_import``.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT vertical FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        pack = load_pack(row[0])
+        catalog_tables = pack.catalog_tables if pack else ()
+        if not catalog_tables:
+            raise HTTPException(status_code=400, detail="This bot has no product catalog.")
+
+        deleted = 0
+        for ct in catalog_tables:
+            cursor.execute(
+                f"DELETE FROM {ct.table_name} WHERE company_id = %s",
+                (company_id,),
+            )
+            deleted += cursor.rowcount
+
+        conn.commit()
+        return {"status": "success", "deleted": deleted, "message": f"Product catalog cleared. {deleted} rows deleted."}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        print(f"DELETE CATALOG ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear catalog.")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/knowledge/chunks/{company_id}")
 def get_knowledge_chunks(
     company_id: str,

@@ -412,7 +412,7 @@ const formatCatalogCell = (col: string, val: any): React.ReactNode => {
     return String(val);
 };
 
-const CatalogBrowser = ({ selectedBotId, authFetch }: any) => {
+const CatalogBrowser = ({ selectedBotId, authFetch, queryClient, showAlert }: any) => {
     const { data, isLoading } = useQuery({
         queryKey: ['knowledge-catalog', selectedBotId],
         queryFn: () => authFetch(`/api/knowledge/catalog/${selectedBotId}`),
@@ -420,11 +420,29 @@ const CatalogBrowser = ({ selectedBotId, authFetch }: any) => {
         staleTime: 30_000,
     });
 
+    const clearMutation = useMutation({
+        mutationFn: () => authFetch(`/api/knowledge/catalog/${selectedBotId}`, { method: 'DELETE' }),
+        onSuccess: (res: any) => {
+            queryClient.invalidateQueries({ queryKey: ['knowledge-catalog', selectedBotId] });
+            showAlert('success', res?.message || 'Product catalog cleared.');
+        },
+        onError: (err: any) => showAlert('error', err?.message || 'Failed to clear catalog.'),
+    });
+
     const tables = (data as any)?.tables || [];
     const nonEmpty = tables.filter((t: any) => (t.rows?.length || 0) > 0);
 
     // Nothing to show for non-vertical bots or empty catalogs — hide entirely.
     if (isLoading || nonEmpty.length === 0) return null;
+
+    const totalRows = nonEmpty.reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+
+    const handleClear = () => {
+        if (!window.confirm(
+            `Permanently clear the ENTIRE product catalog (${fmtNum(totalRows)} rows across ${nonEmpty.length} table${nonEmpty.length > 1 ? 's' : ''})? This cannot be undone. Re-upload a catalog spreadsheet to repopulate it.`
+        )) return;
+        clearMutation.mutate();
+    };
 
     return (
         <Card className="p-4 sm:p-5">
@@ -491,6 +509,22 @@ const CatalogBrowser = ({ selectedBotId, authFetch }: any) => {
                         )}
                     </div>
                 ))}
+            </div>
+            <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-slate-800 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Clearing the catalog removes every row above. Re-upload a catalog spreadsheet to repopulate it.
+                </p>
+                <button
+                    onClick={handleClear}
+                    disabled={clearMutation.isPending || !selectedBotId}
+                    className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-[12.5px] font-semibold text-rose-700 dark:text-rose-300 ring-1 ring-inset ring-rose-200 dark:ring-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                >
+                    {clearMutation.isPending ? (
+                        <><div className="w-3.5 h-3.5 border-2 border-rose-400/30 border-t-rose-500 animate-spin rounded-full motion-reduce:hidden" /> Clearing…</>
+                    ) : (
+                        <><span className="material-symbols-outlined text-[16px]">delete_sweep</span> Clear catalog</>
+                    )}
+                </button>
             </div>
         </Card>
     );
@@ -1048,7 +1082,7 @@ export default function TrainPage() {
                 </Card>
 
                 {/* Product catalog (vertical bots only — self-hides otherwise) */}
-                <CatalogBrowser selectedBotId={selectedBotId} authFetch={authFetch} />
+                <CatalogBrowser selectedBotId={selectedBotId} authFetch={authFetch} queryClient={queryClient} showAlert={showAlert} />
 
                 {/* Manage knowledge */}
                 <Card className="p-4 sm:p-5">
