@@ -15,6 +15,16 @@ export type SampleFormField = {
 };
 // Phase 5 — a pack hub card (read-only here; drives the bot PREVIEW's hub render).
 export type PreviewHubCard = { id: string; label: string; icon: string; subtitle?: string; action?: string };
+// Contextual teaser (Phase 3) — one owner-authored URL rule. `id` is server-derived
+// once saved (kept stable across edits so analytics stay attributed to the same
+// rule); `match`/`page` are the target (at least one needed for the rule to fire).
+export type TeaserRuleField = {
+  id?: string;
+  match: string;
+  page: string;
+  title: string;
+  subtext: string;
+};
 
 type BotSettings = {
   name: string;
@@ -47,6 +57,8 @@ type BotSettings = {
   teaserEnabled: boolean;
   teaserTitle: string;               // '' = default copy ("Hi, I'm {botName}")
   teaserSubtext: string;             // '' = default copy
+  // ── Contextual teaser (Phase 3): owner-authored page rules ──
+  teaserRules: TeaserRuleField[];    // [] = no owner rules; falls back to pack seeds
 };
 
 type BotSettingsContextValue = {
@@ -92,6 +104,7 @@ const DEFAULT_SETTINGS: BotSettings = {
   teaserEnabled: true,
   teaserTitle: '',
   teaserSubtext: '',
+  teaserRules: [],
 };
 
 const COMPANY_DETAILS_KEY = (botId: string | null) => ['company-details', botId ?? 'default'] as const;
@@ -138,6 +151,17 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     teaserEnabled: company.teaser?.enabled !== false,
     teaserTitle: company.teaser?.title || '',
     teaserSubtext: company.teaser?.subtext || '',
+    // Contextual teaser (Phase 3) — owner's own rules only; [] falls back to
+    // the pack's seeded rules (not shown here — those live server-side).
+    teaserRules: Array.isArray(company.teaser?.rules)
+      ? company.teaser.rules.map((r: any) => ({
+          id: typeof r?.id === 'string' ? r.id : undefined,
+          match: r?.match || '',
+          page: r?.page || '',
+          title: r?.title || '',
+          subtext: r?.subtext || '',
+        }))
+      : [],
   };
 };
 
@@ -218,6 +242,16 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         teaser_enabled: botSettings.teaserEnabled,
         teaser_title: botSettings.teaserTitle.trim(),
         teaser_subtext: botSettings.teaserSubtext.trim(),
+        // Contextual teaser (Phase 3) — full replacement; the backend drops any
+        // row missing a title or a target (match/page) rather than erroring, so
+        // a half-filled draft row just silently doesn't fire yet.
+        teaser_rules: botSettings.teaserRules.map((r) => ({
+          ...(r.id ? { id: r.id } : {}),
+          match: r.match.trim(),
+          page: r.page.trim(),
+          title: r.title.trim(),
+          subtext: r.subtext.trim(),
+        })),
       };
       // Phase 5 — only a vertical (pack) bot carries pack_overrides; a generic bot
       // never sends these, so it can never accidentally grow a pack_overrides row.

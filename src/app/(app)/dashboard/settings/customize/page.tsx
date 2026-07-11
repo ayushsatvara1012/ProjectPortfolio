@@ -12,6 +12,7 @@ import LogoCustomizer from '@/src/components/features/LogoCustomizer';
 import ChatWidget from '@/src/components/chat/ChatWidget';
 import Alert from '@/src/components/ui/Alert';
 import SampleFormEditor, { validateSampleForm } from '@/src/components/dashboard/SampleFormEditor';
+import TeaserRuleEditor, { TeaserSuggestButton, validateTeaserRules } from '@/src/components/dashboard/TeaserRuleEditor';
 
 // Friendly heading per vertical pack (kept tiny; grows as packs are added).
 const VERTICAL_LABEL: Record<string, string> = { chemical: 'Chemical agent' };
@@ -159,6 +160,10 @@ export default function CustomizePage() {
     !(botSettings.sampleSinkUrl || '').trim().toLowerCase().startsWith('https://');
   const packConfigInvalid = isVerticalBot && (!sampleFormValidation.valid || sampleSinkInvalid);
 
+  // ── Contextual teaser (Phase 3): rule editor validity ──
+  const teaserRulesValidation = validateTeaserRules(botSettings.teaserRules || []);
+  const teaserRulesInvalid = botSettings.teaserEnabled && !teaserRulesValidation.valid;
+
   const gridCls = `grid grid-cols-1 sm:grid-cols-2 ${showPreview ? '' : 'xl:grid-cols-3'} gap-x-4 gap-y-4`;
 
   const handleSave = useCallback(async () => {
@@ -188,13 +193,21 @@ export default function CustomizePage() {
       });
       return;
     }
+    if (teaserRulesInvalid) {
+      setAlert({
+        open: true,
+        type: 'error',
+        msg: 'Fix the teaser rules: every rule needs a title and a URL path or page tag.',
+      });
+      return;
+    }
     const res = await saveSettings(selectedBotId);
     if (res.success) {
       setAlert({ open: true, type: 'success', msg: 'Settings saved successfully.' });
     } else {
       setAlert({ open: true, type: 'error', msg: res.message ?? 'Failed to save settings.' });
     }
-  }, [showFullOverlay, leadAlertsInvalid, alertEmailInvalid, slackUrlInvalid, packConfigInvalid, sampleSinkInvalid, selectedBotId, saveSettings]);
+  }, [showFullOverlay, leadAlertsInvalid, alertEmailInvalid, slackUrlInvalid, packConfigInvalid, sampleSinkInvalid, teaserRulesInvalid, selectedBotId, saveSettings]);
 
   // ── Phase 4: Cmd+S / Ctrl+S keyboard shortcut ──
   useEffect(() => {
@@ -373,7 +386,17 @@ export default function CustomizePage() {
                   <>
                     <div className={gridCls + ' mt-4'}>
                       <div>
-                        <label className={labelCls} htmlFor="teaser-title">Title</label>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <label className={labelCls + ' mb-0'} htmlFor="teaser-title">Title</label>
+                          <TeaserSuggestButton
+                            botId={selectedBotId || undefined}
+                            authFetch={authFetch}
+                            onApply={({ title, subtext }) => {
+                              updateSetting('teaserTitle', title);
+                              updateSetting('teaserSubtext', subtext);
+                            }}
+                          />
+                        </div>
                         <input
                           id="teaser-title"
                           type="text"
@@ -432,6 +455,23 @@ export default function CustomizePage() {
                           </p>
                         </div>
                       </div>
+                    </div>
+
+                    {/* ── Page rules (Phase 3): show different copy per URL/page ── */}
+                    <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <p className="text-[13px] font-semibold font-google text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px] text-slate-400">rule</span>
+                        Page rules
+                      </p>
+                      <p className={sectionDescCls}>
+                        Show different copy on specific pages (pricing, products, contact…). Falls back to the default above when nothing matches.
+                      </p>
+                      <TeaserRuleEditor
+                        rules={botSettings.teaserRules}
+                        onChange={(next) => updateSetting('teaserRules', next)}
+                        botId={selectedBotId || undefined}
+                        authFetch={authFetch}
+                      />
                     </div>
                   </>
                 )}

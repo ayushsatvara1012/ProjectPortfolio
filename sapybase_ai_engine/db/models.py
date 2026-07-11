@@ -225,6 +225,19 @@ class TeaserEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class TeaserSuggestRequest(BaseModel):
+    """Dashboard "Suggest copy" assist for the teaser rule editor (Phase 3).
+
+    Authoring-time only — the owner reviews/edits the suggestion before
+    saving; it never runs on the visitor's page. ``match``/``page`` give the
+    model the page context the rule targets; both optional (default teaser)."""
+    company_id: Optional[str] = None
+    match: Optional[str] = None
+    page: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class AdminUpdateVerticalRequest(BaseModel):
     """Super-admin-only reassignment of a company's vertical pack.
 
@@ -272,6 +285,8 @@ class CompanyUpdate(BaseModel):
     teaser_enabled:  Optional[bool] = None  # False hides the launcher teaser bubble
     teaser_title:    Optional[str]  = None  # bold line; "" = reset to default copy
     teaser_subtext:  Optional[str]  = None  # muted line; "" = reset to default copy
+    # ── Contextual teaser (Phase 3): owner rule editor ──
+    teaser_rules:    Optional[list] = None  # full replacement rule list; [] = reset to pack defaults
 
     @validator('booking_url')
     def validate_booking_url(cls, v):

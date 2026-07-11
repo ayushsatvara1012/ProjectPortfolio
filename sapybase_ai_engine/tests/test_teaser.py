@@ -1,4 +1,7 @@
-"""Contextual teaser (Phase 1) — config sanitization, payload, event validation."""
+"""Contextual teaser — config sanitization, payload, event validation, and the
+Phase 3 owner rule editor + AI "Suggest copy" authoring assist."""
+import json
+
 import pytest
 
 from services import teaser
@@ -105,8 +108,41 @@ def test_payload_substitution_cannot_exceed_cap():
 
 def test_owner_view_keeps_placeholder_and_empty_means_default():
     v = teaser.owner_teaser_view({"title": "Hi, I'm {botName}", "enabled": True})
-    assert v == {"enabled": True, "title": "Hi, I'm {botName}", "subtext": ""}
-    assert teaser.owner_teaser_view(None) == {"enabled": True, "title": "", "subtext": ""}
+    assert v == {"enabled": True, "title": "Hi, I'm {botName}", "subtext": "", "rules": []}
+    assert teaser.owner_teaser_view(None) == {
+        "enabled": True, "title": "", "subtext": "", "rules": [],
+    }
+
+
+def test_owner_view_surfaces_owner_rules():
+    v = teaser.owner_teaser_view({"rules": [{"match": "/pricing", "title": "Price?"}]})
+    assert v["rules"] == [{"id": "pricing", "title": "Price?", "match": "/pricing"}]
+
+
+# ── effective_teaser_rules (Phase 3 — pre-fill the editor) ───────────────────
+
+def test_effective_rules_prefills_pack_seeds_when_owner_has_none():
+    pack_rules = [{"id": "pricing", "match": "/pricing", "title": "Want the best price?"}]
+    out = teaser.effective_teaser_rules(None, pack_rules)
+    assert out == [{"id": "pricing", "title": "Want the best price?", "match": "/pricing"}]
+
+
+def test_effective_rules_owner_rules_win_over_pack_seeds():
+    owner_cfg = {"rules": [{"id": "own", "match": "/o", "title": "Mine"}]}
+    pack_rules = [{"id": "seed", "match": "/p", "title": "Seed"}]
+    out = teaser.effective_teaser_rules(owner_cfg, pack_rules)
+    assert [r["id"] for r in out] == ["own"]
+
+
+def test_effective_rules_empty_when_neither_owner_nor_pack():
+    assert teaser.effective_teaser_rules(None, None) == []
+    assert teaser.effective_teaser_rules({"enabled": True}, []) == []
+
+
+def test_effective_rules_does_not_substitute_bot_name():
+    pack_rules = [{"id": "hi", "match": "/p", "title": "Ask {botName}"}]
+    out = teaser.effective_teaser_rules(None, pack_rules)
+    assert out[0]["title"] == "Ask {botName}"
 
 
 # ── normalize_event ───────────────────────────────────────────────────────────
@@ -188,3 +224,90 @@ def test_build_rules_owner_rules_win_over_pack_seeds():
 def test_build_rules_empty_when_no_owner_and_no_pack():
     assert teaser.build_teaser_rules(None, None, "Bot") == []
     assert teaser.build_teaser_rules({"enabled": True}, [], "Bot") == []
+
+
+# ── merge_teaser_update rules (Phase 3) ───────────────────────────────────────
+
+def test_merge_sets_rules():
+    merged = teaser.merge_teaser_update(
+        None, {"rules": [{"match": "/pricing", "title": "Price?"}]}
+    )
+    assert merged == {
+        "rules": [{"id": "pricing", "title": "Price?", "match": "/pricing"}]
+    }
+
+
+def test_merge_replaces_rules_wholesale():
+    existing = {"rules": [{"id": "old", "match": "/old", "title": "Old"}]}
+    merged = teaser.merge_teaser_update(
+        existing, {"rules": [{"match": "/new", "title": "New"}]}
+    )
+    assert [r["id"] for r in merged["rules"]] == ["new"]
+
+
+def test_merge_empty_rules_list_clears_override():
+    existing = {"enabled": False, "rules": [{"id": "x", "match": "/x", "title": "X"}]}
+    merged = teaser.merge_teaser_update(existing, {"rules": []})
+    assert merged == {"enabled": False}
+
+
+def test_merge_all_invalid_rules_clears_override():
+    existing = {"rules": [{"id": "x", "match": "/x", "title": "X"}]}
+    merged = teaser.merge_teaser_update(existing, {"rules": [{"title": "orphan"}]})
+    assert "rules" not in merged
+
+
+def test_merge_untouched_rules_key_survives_other_updates():
+    existing = {"rules": [{"id": "x", "match": "/x", "title": "X"}]}
+    merged = teaser.merge_teaser_update(existing, {"title": "New title"})
+    assert merged["rules"] == existing["rules"]
+    assert merged["title"] == "New title"
+
+
+# ── build_suggest_prompt / parse_suggested_copy (Phase 3) ────────────────────
+
+def test_build_suggest_prompt_includes_context():
+    prompt = teaser.build_suggest_prompt(
+        "ChemBot", vertical="chemical", match="/pricing", page="pricing"
+    )
+    assert "ChemBot" in prompt
+    assert "/pricing" in prompt
+    assert "pricing" in prompt
+    assert "chemical" in prompt
+    assert str(teaser.TITLE_MAX) in prompt
+    assert str(teaser.SUBTEXT_MAX) in prompt
+
+
+def test_build_suggest_prompt_defaults_without_context():
+    prompt = teaser.build_suggest_prompt(None)
+    assert "Sapy AI" in prompt
+    assert "default/home page" in prompt
+
+
+def test_parse_suggested_copy_accepts_clean_json():
+    out = teaser.parse_suggested_copy('{"title": "Want a quote?", "subtext": "Ask away"}')
+    assert out == {"title": "Want a quote?", "subtext": "Ask away"}
+
+
+def test_parse_suggested_copy_strips_markdown_fences():
+    out = teaser.parse_suggested_copy('```json\n{"title": "Hi"}\n```')
+    assert out == {"title": "Hi"}
+
+
+def test_parse_suggested_copy_caps_lengths():
+    out = teaser.parse_suggested_copy(json.dumps({"title": "x" * 500, "subtext": "y" * 500}))
+    assert len(out["title"]) == teaser.TITLE_MAX
+    assert len(out["subtext"]) == teaser.SUBTEXT_MAX
+
+
+@pytest.mark.parametrize("raw", [
+    "not json",
+    "[]",
+    "5",
+    '{"subtext": "no title"}',
+    '{"title": ""}',
+    None,
+    123,
+])
+def test_parse_suggested_copy_rejects_junk(raw):
+    assert teaser.parse_suggested_copy(raw) is None

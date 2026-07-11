@@ -7,7 +7,8 @@ and the strings it carries end up on third-party pages — so they are cleaned
 and length-capped on every read AND every write. The loader injects them via
 ``textContent`` only; the caps here are defense-in-depth, not the XSS gate.
 
-See docs/contextual-teaser-plan.md (Phase 1 — static teaser).
+See docs/contextual-teaser-plan.md (Phase 1 — static teaser, Phase 2 — contextual
+URL rules, Phase 3 — owner rule editor + AI "Suggest copy" authoring assist).
 """
 import json
 import re
@@ -153,7 +154,10 @@ def merge_teaser_update(existing_raw, updates):
 
     ``updates`` holds only the keys the owner actually sent (exclude_unset):
     ``enabled`` (bool), ``title`` / ``subtext`` (str; blank clears the
-    override so the copy falls back to the default)."""
+    override so the copy falls back to the default), ``rules`` (list; a full
+    replacement of the owner's rule set — [] or all-invalid clears it and the
+    bot falls back to the pack's seeded rules, mirroring how ``sample_form``
+    is replaced wholesale in packs/overrides.py)."""
     cfg = coerce_teaser_config(existing_raw)
     if "enabled" in updates and isinstance(updates["enabled"], bool):
         cfg["enabled"] = updates["enabled"]
@@ -164,6 +168,12 @@ def merge_teaser_update(existing_raw, updates):
                 cfg[key] = cleaned
             else:
                 cfg.pop(key, None)
+    if "rules" in updates:
+        rules = coerce_rules(updates["rules"])
+        if rules:
+            cfg["rules"] = rules
+        else:
+            cfg.pop("rules", None)
     return cfg
 
 
@@ -211,13 +221,88 @@ def build_teaser_rules(raw, pack_rules, bot_name):
 
 def owner_teaser_view(raw):
     """The editable view for the dashboard Customize page: raw overrides with
-    the ``{botName}`` placeholder intact, empty string = "using the default"."""
+    the ``{botName}`` placeholder intact, empty string = "using the default".
+    ``rules`` (Phase 3) is the owner's own rule list only — an empty list here
+    means "no owner rules yet", not "no rules at all" (the pack's seeded
+    rules may still apply; see build_teaser_rules). Callers that also have a
+    pack should overlay ``effective_teaser_rules`` so the editor pre-fills the
+    pack's seeds instead of starting blank."""
     cfg = coerce_teaser_config(raw)
     return {
         "enabled": cfg.get("enabled", True),
         "title": cfg.get("title", ""),
         "subtext": cfg.get("subtext", ""),
+        "rules": cfg.get("rules", []),
     }
+
+
+def effective_teaser_rules(raw, pack_rules):
+    """Rules the owner sees in the Customize-page editor: their own overrides
+    if any, else the pack's seeded rules pre-filled — mirrors
+    packs/overrides.effective_sample_form so the owner tunes existing wording
+    rather than starting from a blank list. Same precedence as
+    build_teaser_rules, but without the {botName} substitution (this is the
+    raw editable form, not the widget payload)."""
+    cfg = coerce_teaser_config(raw)
+    owner_rules = cfg.get("rules")
+    if owner_rules:
+        return owner_rules
+    return coerce_rules(pack_rules)
+
+
+def build_suggest_prompt(bot_name, vertical=None, match=None, page=None):
+    """Build the authoring-time prompt for the "Suggest copy" assist (Phase 3).
+
+    Pure and testable — the actual Gemini call lives in main.py so this module
+    stays free of network I/O. AI only assists here: the owner reviews and
+    edits the suggestion before it is ever saved, and it never runs on the
+    visitor's page (see docs/contextual-teaser-plan.md)."""
+    name = (bot_name or "").strip() or "Sapy AI"
+    context_bits = []
+    if page:
+        context_bits.append(f'page type "{page}"')
+    if match:
+        context_bits.append(f'URL path "{match}"')
+    context = (" for the " + " / ".join(context_bits)) if context_bits else " for the site's default/home page"
+    vertical_bit = f" The business is in the {vertical} industry." if vertical else ""
+    return (
+        f'You are writing a short teaser bubble that invites a website visitor to open '
+        f'a chat widget named "{name}"{context}.{vertical_bit}\n'
+        f"Write a bold one-line title (max {TITLE_MAX} characters) and a muted one-line "
+        f"subtext (max {SUBTEXT_MAX} characters) that hooks that visitor's likely intent. "
+        f"Be specific to the page context, not generic. You may use the literal placeholder "
+        f"{{botName}} in the title if it reads naturally.\n"
+        f'Respond with ONLY a JSON object, no markdown fences: {{"title": "...", "subtext": "..."}}'
+    )
+
+
+def parse_suggested_copy(raw_text):
+    """Parse + sanitize the model's JSON reply into a safe {title, subtext} dict.
+
+    Returns None if the reply isn't usable so the caller can surface an error
+    instead of saving junk — this is authoring-time only, so failing loud and
+    letting the owner retry beats silently falling back to placeholder text."""
+    if not isinstance(raw_text, str):
+        return None
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3].strip()
+    try:
+        data = json.loads(cleaned)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    title = _clean_text(data.get("title"), TITLE_MAX)
+    if not title:
+        return None
+    out = {"title": title}
+    subtext = _clean_text(data.get("subtext"), SUBTEXT_MAX)
+    if subtext:
+        out["subtext"] = subtext
+    return out
 
 
 def normalize_event(event, rule_id):

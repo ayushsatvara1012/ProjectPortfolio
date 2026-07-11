@@ -1220,7 +1220,7 @@ from db.models import (
     DeleteChunksRequest, DeleteSourceRequest, DeleteCatalogRowsRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
-    ByodRequestChangeRequest, TeaserEventRequest,
+    ByodRequestChangeRequest, TeaserEventRequest, TeaserSuggestRequest,
 )
 from services import teaser as teaser_service  # Contextual teaser (Phase 1)
 
@@ -2163,8 +2163,9 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             "booking_url": company_row[22],
             # Vertical-pack selector (Phase 0); normalized to a slug or None.
             "vertical": _vertical,
-            # Contextual teaser (Phase 1) — editable view: raw overrides with the
-            # {botName} placeholder intact; empty string = "using the default".
+            # Contextual teaser — editable view: raw overrides with the {botName}
+            # placeholder intact; empty string = "using the default"; "rules" is
+            # the owner's own rule list (Phase 3), [] if none authored yet.
             "teaser": teaser_service.owner_teaser_view(company_row[26]),
         }
         # Phase 5 — for a vertical bot, hand the customise tab everything it edits:
@@ -2180,6 +2181,12 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             # Phase 3.4: last "Send test row" outcome per channel, so the customise
             # tab can show a green/red status instead of leaving the owner guessing.
             result["channel_delivery_status"] = company_row[25] if isinstance(company_row[25], dict) else {}
+            # Contextual teaser (Phase 3): pre-fill the rule editor with the pack's
+            # seeded rules (same "tune, don't build from scratch" UX as sample_form
+            # above) — overwrites the owner-only view set in owner_teaser_view().
+            result["teaser"]["rules"] = teaser_service.effective_teaser_rules(
+                company_row[26], pack.teaser_rules_payload()
+            )
         return result
     finally:
         release_db_connection(conn)
@@ -2510,7 +2517,7 @@ async def update_company_details(
         # ── Contextual teaser (Phase 1): fold teaser fields into the JSONB column ──
         # teaser_enabled/title/subtext aren't plain columns; merge them over the
         # bot's existing teaser_config (sanitized + length-capped in the service).
-        _teaser_keys = {"teaser_enabled", "teaser_title", "teaser_subtext"}
+        _teaser_keys = {"teaser_enabled", "teaser_title", "teaser_subtext", "teaser_rules"}
         if _teaser_keys & set(_ov_sent.keys()):
             cursor.execute(
                 "SELECT teaser_config FROM companies WHERE id = %s AND user_id = %s",
@@ -2524,6 +2531,8 @@ async def update_company_details(
                 _tupdates["title"] = _ov_sent["teaser_title"]
             if "teaser_subtext" in _ov_sent:
                 _tupdates["subtext"] = _ov_sent["teaser_subtext"]
+            if "teaser_rules" in _ov_sent:
+                _tupdates["rules"] = _ov_sent["teaser_rules"]
             _tmerged = teaser_service.merge_teaser_update(
                 _trow[0] if _trow else None, _tupdates
             )
@@ -2624,6 +2633,64 @@ async def update_company_details(
         raise HTTPException(status_code=500, detail=f"Failed to update company: {str(e)}")
     finally:
         release_db_connection(conn)
+
+
+@app.post("/api/company/teaser/suggest-copy")
+@limiter.limit("20/minute")
+async def suggest_teaser_copy(
+    request: Request,
+    body: TeaserSuggestRequest,
+    user: dict = Depends(require_premium_tier),
+):
+    """AI authoring assist for the teaser rule editor (Phase 3) — "Suggest copy".
+
+    Generates a title/subtext suggestion for one rule; the owner reviews and
+    edits it before saving. Never called from the visitor's page — this is a
+    dashboard-only, explicitly-triggered action, so a fast/cheap model with a
+    tight token cap is enough and a failure just means "try again"."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        target_company_id = body.company_id
+        if not target_company_id:
+            cursor.execute(
+                "SELECT id FROM companies WHERE user_id = %s ORDER BY created_at ASC LIMIT 1",
+                (user["id"],),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="No bot found.")
+            target_company_id = row[0]
+        cursor.execute(
+            "SELECT bot_name, vertical FROM companies WHERE id = %s AND user_id = %s",
+            (target_company_id, user["id"]),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=403, detail="Unauthorized or bot does not exist.")
+        bot_name, vertical = row[0], row[1]
+    finally:
+        release_db_connection(conn)
+
+    prompt = teaser_service.build_suggest_prompt(
+        bot_name, vertical=vertical, match=body.match, page=body.page
+    )
+    try:
+        suggest_model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=GEMINI_KEY,
+            max_output_tokens=150,
+            temperature=0.8,
+        )
+        response = await suggest_model.ainvoke([HumanMessage(content=prompt)])
+        suggestion = teaser_service.parse_suggested_copy(response.content)
+    except Exception as e:
+        logger.warning(f"[teaser suggest-copy] Gemini call failed: {e}")
+        suggestion = None
+
+    if not suggestion:
+        raise HTTPException(status_code=502, detail="Couldn't generate a suggestion — try again.")
+    return {"status": "success", "suggestion": suggestion}
 
 
 # ── EXACT-MATCH QUERY CACHE HELPERS ───────────────────────────────────────────
