@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { resolveEntitlements, type Entitlements } from '@/src/lib/auth/entitlements';
 
 type UserData = {
@@ -70,10 +70,15 @@ export const UserProvider = ({
   initialUser?: InitialUserSeed;
 }) => {
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
-  const queryClient = useQueryClient();
 
-  // SSR seed for role/tier: rendered into the cache so first paint matches the
-  // dashboard nav (tier badge, role gate) without a client /api/me round-trip.
+  // SSR seed for role/tier: gives the dashboard nav (tier badge, role gate) an
+  // instant first paint without waiting on the client /api/me round-trip.
+  // Deliberately NOT written into the ['me'] query cache (see hydrateFromServer
+  // below) — it only carries role/tier, not real usage numbers, and writing it
+  // into the cache used to make `data` look "loaded" the instant it landed,
+  // which made `isLoading` go false before the real fetch resolved. Consumers
+  // (e.g. the Train AI stat cards) would then render messagesUsed/messageLimit/
+  // totalMessages/billingPeriodEnd straight from this seed's INITIAL zeros.
   const [seed, setSeed] = useState<UserData | null>(() =>
     initialUser
       ? { ...INITIAL, role: initialUser.role ?? null, tier: initialUser.tier ?? null }
@@ -106,14 +111,8 @@ export const UserProvider = ({
         tier: s.tier ?? prev?.tier ?? null,
         customPlanFeatures: s.customPlanFeatures !== undefined ? s.customPlanFeatures : prev?.customPlanFeatures ?? null,
       }));
-      queryClient.setQueryData<UserData>(ME_QUERY_KEY, (prev) => ({
-        ...(prev ?? INITIAL),
-        role: s.role ?? prev?.role ?? null,
-        tier: s.tier ?? prev?.tier ?? null,
-        customPlanFeatures: s.customPlanFeatures !== undefined ? s.customPlanFeatures : prev?.customPlanFeatures ?? null,
-      }));
     },
-    [queryClient]
+    []
   );
 
   const refreshUser = useCallback(async () => {
@@ -148,7 +147,13 @@ export const UserProvider = ({
     })();
   }, [isAuthLoaded, isSignedIn, getToken, refetch]);
 
-  const isLoading = !isAuthLoaded || (isSignedIn && queryLoading && !seed);
+  // Gate on the REAL /api/me payload (`data`), not on `seed` — the seed only
+  // carries role/tier for the instant-badge fast path, not usage numbers.
+  // Gating on `!seed` here used to flip isLoading false the moment the seed
+  // landed, before the numeric fields (messagesUsed/messageLimit/totalMessages/
+  // billingPeriodEnd) had actually been fetched, so consumers rendered their
+  // INITIAL zeros as if they were real values.
+  const isLoading = !isAuthLoaded || (isSignedIn && queryLoading && data === undefined);
 
   const entitlements = useMemo(
     () => resolveEntitlements(userData.role, userData.tier, userData.customPlanFeatures),

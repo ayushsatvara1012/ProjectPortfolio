@@ -8549,8 +8549,11 @@ def get_my_profile(
             "active_bot_count": bot_count,
             # Step 3.2-fix: prefer Polar's billing_period_end (true billing date)
             # over usage_tracking.period_end (a 30-day-from-row-creation window).
-            # Fall back to the latter only for never-subscribed users.
-            "next_billing_date": current_user.get("billing_period_end") or latest_usage_period_end,
+            # Fall back to the latter only for never-subscribed users. Key name
+            # must match UserContext.tsx's mapMe (data.billing_period_end) —
+            # a prior "next_billing_date" key here never matched the frontend
+            # reader, so the reset date silently never populated.
+            "billing_period_end": current_user.get("billing_period_end") or latest_usage_period_end,
             "trial_days_left": trial_days_left,
             "trial_end_date": current_user.get("trial_end_date"),
             "max_bots": plan["max_bots"],

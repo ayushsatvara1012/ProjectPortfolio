@@ -648,6 +648,10 @@ export default function TrainPage() {
     const chunkPct = chunkLimit > 0 && !chunkUnlimited ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
 
     const msgUnlimited = (messageLimit ?? 0) >= 999999;
+    // A real zero-cap plan (e.g. FREE: messages=0) is NOT the same as "unlimited" —
+    // both leave usagePct null, so the footer must tell them apart explicitly
+    // instead of defaulting to "Unlimited requests this period" for both.
+    const msgZeroCap = !msgUnlimited && (messageLimit ?? 0) <= 0;
     const usagePct = !msgUnlimited && (messageLimit ?? 0) > 0
         ? Math.min(((messagesUsed ?? 0) / (messageLimit ?? 1)) * 100, 100) : null;
     const speedTier = (botsData as any)?.plan?.speed_tier as string | undefined;
@@ -752,7 +756,9 @@ export default function TrainPage() {
                                                 renews {periodEndStr}
                                             </span>
                                         </span>
-                                    ) : 'Unlimited requests this period'
+                                    ) : msgZeroCap
+                                        ? 'No request quota on your current plan'
+                                        : 'Unlimited requests this period'
                                 }
                             />
                         </>

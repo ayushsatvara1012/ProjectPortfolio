@@ -241,7 +241,7 @@ export default function CustomizePage() {
         </div>
 
         {/* Scrollable body */}
-        <div data-lenis-prevent className={`px-5 md:px-6 pb-6 relative flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar ${showFullOverlay ? 'overflow-hidden select-none' : ''}`}>
+        <div data-lenis-prevent className={`px-5 md:px-6 pt-5 md:pt-6 pb-6 relative flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar ${showFullOverlay ? 'overflow-hidden select-none' : ''}`}>
 
           {/* Full upgrade overlay */}
           {showFullOverlay && (
