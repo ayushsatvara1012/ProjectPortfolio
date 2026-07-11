@@ -240,7 +240,7 @@ export default function SessionBiPanel({
                             <SectionHeader
                                 title="Session funnel"
                                 subtitle="How far conversations advance stage by stage"
-                                icon="funnel"
+                                icon="filter_alt"
                                 className="mb-4"
                             />
                             {funnelStages.some((s) => s.count > 0) ? (
