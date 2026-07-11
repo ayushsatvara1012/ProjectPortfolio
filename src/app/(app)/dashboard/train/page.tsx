@@ -393,6 +393,109 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
     );
 };
 
+// ── Catalog viewer ──────────────────────────────────────────────────────────
+// Vertical bots (chemical, …) route catalog-shaped uploads into structured
+// tables (product_skus / products) instead of RAG, so those rows never appear
+// in "Manage knowledge". This read-only viewer surfaces them. It self-hides for
+// non-vertical bots (the API returns no tables) and for empty catalogs.
+
+const humanizeColumn = (col: string) =>
+    col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bcas\b/i, 'CAS').replace(/\bhsn\b/i, 'HSN').replace(/\bgst\b/i, 'GST').replace(/\bsds\b/i, 'SDS');
+
+const NUMERIC_COLS = new Set(['list_price', 'price', 'gst_rate', 'total']);
+
+const formatCatalogCell = (col: string, val: any): React.ReactNode => {
+    if (val === null || val === undefined || String(val).trim() === '') {
+        return <span className="text-slate-300 dark:text-slate-600">—</span>;
+    }
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    return String(val);
+};
+
+const CatalogBrowser = ({ selectedBotId, authFetch }: any) => {
+    const { data, isLoading } = useQuery({
+        queryKey: ['knowledge-catalog', selectedBotId],
+        queryFn: () => authFetch(`/api/knowledge/catalog/${selectedBotId}`),
+        enabled: !!selectedBotId,
+        staleTime: 30_000,
+    });
+
+    const tables = (data as any)?.tables || [];
+    const nonEmpty = tables.filter((t: any) => (t.rows?.length || 0) > 0);
+
+    // Nothing to show for non-vertical bots or empty catalogs — hide entirely.
+    if (isLoading || nonEmpty.length === 0) return null;
+
+    return (
+        <Card className="p-4 sm:p-5">
+            <SectionHeader
+                title="Product catalog"
+                subtitle="Structured rows your bot reads for quotes, specs, and SDS lookups — imported from catalog spreadsheets."
+                icon="inventory_2"
+                className="mb-4"
+            />
+            <div className="space-y-5">
+                {nonEmpty.map((t: any) => (
+                    <div key={t.table_name} className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                        <div className="flex items-center gap-2.5 bg-slate-50/70 dark:bg-slate-800/30 px-4 py-3 transition-colors">
+                            <span className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 capitalize flex-1 min-w-0 truncate">
+                                {humanizeColumn(t.table_name)}
+                            </span>
+                            <Badge tone="neutral" dot={false}>
+                                {t.total > t.showing ? `${t.showing}/${t.total}` : t.total} rows
+                            </Badge>
+                        </div>
+                        <div className="max-h-[320px] overflow-auto custom-scrollbar">
+                            <table className="w-full border-collapse text-[12.5px]">
+                                <thead className="sticky top-0 z-10">
+                                    <tr className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800">
+                                        {t.columns.map((c: string) => (
+                                            <th
+                                                key={c}
+                                                className={cx(
+                                                    'px-3 py-2 font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap',
+                                                    NUMERIC_COLS.has(c) ? 'text-right' : 'text-left',
+                                                )}
+                                            >
+                                                {humanizeColumn(c)}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                                    {t.rows.map((row: any[], ri: number) => (
+                                        <tr key={ri} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                            {row.map((cell: any, ci: number) => {
+                                                const col = t.columns[ci];
+                                                return (
+                                                    <td
+                                                        key={ci}
+                                                        className={cx(
+                                                            'px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap',
+                                                            NUMERIC_COLS.has(col) ? 'text-right tabular-nums' : 'text-left',
+                                                        )}
+                                                    >
+                                                        {formatCatalogCell(col, cell)}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {t.total > t.showing && (
+                            <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-[11.5px] text-slate-400 dark:text-slate-500">
+                                Showing the first {t.showing} of {fmtNum(t.total)} rows.
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
+};
+
 export default function TrainPage() {
     const { getToken } = useAuth();
     const queryClient = useQueryClient();
@@ -545,6 +648,7 @@ export default function TrainPage() {
                             queryClient.invalidateQueries({ queryKey: ['bots'] });
                             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
                             queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId] });
+                            queryClient.invalidateQueries({ queryKey: ['knowledge-catalog', selectedBotId] });
                             refreshUser();
                             const action = status.is_upsert ? 'Source updated!' : 'Training complete!';
                             const msg = status.truncated
@@ -578,6 +682,7 @@ export default function TrainPage() {
             queryClient.invalidateQueries({ queryKey: ['bots'] });
             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
             queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge-catalog', selectedBotId] });
             refreshUser();
             showAlert(data.warning ? 'warning' : 'success', data.warning || data.message || 'Training successful!');
             setUrl(''); setTrainingText(''); setFile(null); setCsvFile(null);
@@ -941,6 +1046,9 @@ export default function TrainPage() {
                         </button>
                     </form>
                 </Card>
+
+                {/* Product catalog (vertical bots only — self-hides otherwise) */}
+                <CatalogBrowser selectedBotId={selectedBotId} authFetch={authFetch} />
 
                 {/* Manage knowledge */}
                 <Card className="p-4 sm:p-5">

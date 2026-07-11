@@ -8150,6 +8150,87 @@ def get_knowledge_sources(company_id: str, user: dict = Depends(get_current_user
         release_db_connection(conn)
 
 
+# Columns present on every catalog table that are internal plumbing, not content.
+_CATALOG_INTERNAL_COLUMNS = ("id", "company_id", "created_at", "updated_at")
+# Cap rows returned to the viewer so a huge price list can't crash the browser.
+_CATALOG_ROW_CAP = 500
+
+
+@app.get("/api/knowledge/catalog/{company_id}")
+def get_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user)):
+    """Structured catalog rows (products / product_skus) for a vertical bot.
+
+    Catalog-shaped uploads are routed into the pack's structured tables rather
+    than RAG, so they never surface in the knowledge browser. This returns those
+    rows so owners can see exactly what the bot's tools read from. Table and
+    column identifiers come only from pack config + information_schema — never
+    raw client text — and every read is scoped by company_id.
+
+    Non-vertical bots (packs without ``catalog_tables``) return ``{"tables": []}``.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Ownership guard + fetch the bot's vertical in one round-trip.
+        cursor.execute(
+            "SELECT vertical FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        pack = load_pack(row[0])
+        catalog_tables = pack.catalog_tables if pack else ()
+        if not catalog_tables:
+            return {"tables": []}
+
+        tables: list[dict] = []
+        for ct in catalog_tables:
+            # 1. Resolve the table's real content columns from information_schema.
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = %s AND column_name NOT IN %s "
+                "ORDER BY ordinal_position",
+                (ct.table_name, _CATALOG_INTERNAL_COLUMNS),
+            )
+            columns = [r[0] for r in cursor.fetchall()]
+            if not columns:
+                continue
+
+            # 2. Read the rows. Identifiers are pack-config + schema validated.
+            order_col = ct.required_columns[0] if ct.required_columns else columns[0]
+            col_list = ", ".join(columns)
+            cursor.execute(
+                f"SELECT {col_list} FROM {ct.table_name} "
+                f"WHERE company_id = %s ORDER BY {order_col} LIMIT %s",
+                (company_id, _CATALOG_ROW_CAP),
+            )
+            rows = [list(r) for r in cursor.fetchall()]
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {ct.table_name} WHERE company_id = %s",
+                (company_id,),
+            )
+            total = cursor.fetchone()[0]
+
+            tables.append({
+                "table_name": ct.table_name,
+                "columns": columns,
+                "rows": rows,
+                "total": total,
+                "showing": len(rows),
+            })
+
+        return {"tables": tables}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"KNOWLEDGE CATALOG ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve catalog.")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/knowledge/chunks/{company_id}")
 def get_knowledge_chunks(
     company_id: str,
