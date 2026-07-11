@@ -429,6 +429,29 @@ const CatalogBrowser = ({ selectedBotId, authFetch, queryClient, showAlert }: an
         onError: (err: any) => showAlert('error', err?.message || 'Failed to clear catalog.'),
     });
 
+    // Which single row is being deleted (table_name + id), so only its spinner shows.
+    const [deletingRow, setDeletingRow] = useState<string | null>(null);
+    const rowDeleteMutation = useMutation({
+        mutationFn: (vars: { table_name: string; id: string }) =>
+            authFetch(`/api/knowledge/catalog/${selectedBotId}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ table_name: vars.table_name, row_ids: [vars.id] }),
+            }),
+        onSuccess: (res: any) => {
+            queryClient.invalidateQueries({ queryKey: ['knowledge-catalog', selectedBotId] });
+            showAlert('success', res?.message || 'Catalog row deleted.');
+        },
+        onError: (err: any) => showAlert('error', err?.message || 'Failed to delete row.'),
+        onSettled: () => setDeletingRow(null),
+    });
+
+    const handleRowDelete = (table_name: string, id: string) => {
+        if (rowDeleteMutation.isPending) return;
+        if (!window.confirm('Delete this catalog row? This cannot be undone. (A future catalog re-upload replaces all rows.)')) return;
+        setDeletingRow(id);
+        rowDeleteMutation.mutate({ table_name, id });
+    };
+
     const tables = (data as any)?.tables || [];
     const nonEmpty = tables.filter((t: any) => (t.rows?.length || 0) > 0);
 
@@ -478,27 +501,49 @@ const CatalogBrowser = ({ selectedBotId, authFetch, queryClient, showAlert }: an
                                                 {humanizeColumn(c)}
                                             </th>
                                         ))}
+                                        <th className="w-9 px-2 py-2" aria-label="Actions" />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                                    {t.rows.map((row: any[], ri: number) => (
-                                        <tr key={ri} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                            {row.map((cell: any, ci: number) => {
-                                                const col = t.columns[ci];
-                                                return (
-                                                    <td
-                                                        key={ci}
-                                                        className={cx(
-                                                            'px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap',
-                                                            NUMERIC_COLS.has(col) ? 'text-right tabular-nums' : 'text-left',
-                                                        )}
-                                                    >
-                                                        {formatCatalogCell(col, cell)}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))}
+                                    {t.rows.map((row: any[], ri: number) => {
+                                        const rowId = t.ids?.[ri];
+                                        const isDeleting = deletingRow === rowId;
+                                        return (
+                                            <tr key={rowId ?? ri} className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                {row.map((cell: any, ci: number) => {
+                                                    const col = t.columns[ci];
+                                                    return (
+                                                        <td
+                                                            key={ci}
+                                                            className={cx(
+                                                                'px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap',
+                                                                NUMERIC_COLS.has(col) ? 'text-right tabular-nums' : 'text-left',
+                                                            )}
+                                                        >
+                                                            {formatCatalogCell(col, cell)}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="w-9 px-2 py-2 text-right">
+                                                    {rowId && (
+                                                        <button
+                                                            onClick={() => handleRowDelete(t.table_name, rowId)}
+                                                            disabled={rowDeleteMutation.isPending}
+                                                            title="Delete this row"
+                                                            aria-label="Delete this catalog row"
+                                                            className="inline-flex items-center justify-center h-6 w-6 rounded-md text-slate-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+                                                        >
+                                                            {isDeleting ? (
+                                                                <div className="w-3 h-3 border-2 border-rose-400/30 border-t-rose-500 animate-spin rounded-full motion-reduce:hidden" />
+                                                            ) : (
+                                                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

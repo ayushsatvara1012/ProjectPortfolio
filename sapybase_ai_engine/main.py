@@ -29,7 +29,7 @@ try:
     from pdf2image import convert_from_path
 except ImportError:
     convert_from_path = None
-from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks, Response
+from fastapi import FastAPI, HTTPException, Request, Depends, Security, File, UploadFile, Form, Header, BackgroundTasks, Response, Body
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
@@ -1217,7 +1217,7 @@ from db.models import (
     ExploreEnquiryRequest, EnquiryDeclineRequest,
     SubscriptionRequest, HandoffMessage, HandoffRequest, UserRole, UserTier,
     CustomPlanConfig, AdminUpdateUserRequest, AdminUpdateVerticalRequest, CompanyUpdate, RoiBenchmarkUpdate,
-    DeleteChunksRequest, DeleteSourceRequest, TrialExtensionRequest,
+    DeleteChunksRequest, DeleteSourceRequest, DeleteCatalogRowsRequest, TrialExtensionRequest,
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
     ByodRequestChangeRequest,
@@ -8199,14 +8199,18 @@ def get_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user
                 continue
 
             # 2. Read the rows. Identifiers are pack-config + schema validated.
+            #    The row's id is selected as a stable handle for per-row deletion
+            #    but kept out of `columns`/`rows` so it never renders in the table.
             order_col = ct.required_columns[0] if ct.required_columns else columns[0]
             col_list = ", ".join(columns)
             cursor.execute(
-                f"SELECT {col_list} FROM {ct.table_name} "
+                f"SELECT id, {col_list} FROM {ct.table_name} "
                 f"WHERE company_id = %s ORDER BY {order_col} LIMIT %s",
                 (company_id, _CATALOG_ROW_CAP),
             )
-            rows = [list(r) for r in cursor.fetchall()]
+            fetched = cursor.fetchall()
+            ids = [str(r[0]) for r in fetched]
+            rows = [list(r[1:]) for r in fetched]
             cursor.execute(
                 f"SELECT COUNT(*) FROM {ct.table_name} WHERE company_id = %s",
                 (company_id,),
@@ -8216,6 +8220,7 @@ def get_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user
             tables.append({
                 "table_name": ct.table_name,
                 "columns": columns,
+                "ids": ids,
                 "rows": rows,
                 "total": total,
                 "showing": len(rows),
@@ -8232,14 +8237,22 @@ def get_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user
 
 
 @app.delete("/api/knowledge/catalog/{company_id}")
-def delete_knowledge_catalog(company_id: str, user: dict = Depends(get_current_user)):
-    """Clear every structured catalog row (products / product_skus) for a bot.
+def delete_knowledge_catalog(
+    company_id: str,
+    body: Optional[DeleteCatalogRowsRequest] = Body(None),
+    user: dict = Depends(get_current_user),
+):
+    """Delete catalog rows (products / product_skus) for a bot.
 
-    Catalog uploads replace-all into the pack's structured tables, so this is the
-    owner-facing "start over" for the catalog — it wipes all catalog tables for
-    this company in one transaction. Table identifiers come only from pack config
-    (never client text) and every delete is scoped by company_id, mirroring the
-    replace-all import in ``catalog_import.apply_catalog_import``.
+    Two modes, one transaction, both scoped by company_id:
+      - No body: clear every catalog table (owner-facing "start over").
+      - Body {table_name, row_ids}: delete just those rows from one table, for
+        pruning an inappropriate product/SKU without re-uploading the whole sheet.
+
+    Table identifiers come only from pack config (``table_name`` must match one of
+    the pack's ``catalog_tables`` — never trusted from the request), mirroring the
+    replace-all import in ``catalog_import.apply_catalog_import``. Note: a later
+    catalog upload is replace-all, so per-row deletes only persist until re-import.
     """
     conn = get_db_connection()
     try:
@@ -8257,6 +8270,21 @@ def delete_knowledge_catalog(company_id: str, user: dict = Depends(get_current_u
         if not catalog_tables:
             raise HTTPException(status_code=400, detail="This bot has no product catalog.")
 
+        # Per-row prune: validate the target table against pack config so the
+        # identifier interpolated below can never come from client text.
+        if body is not None:
+            target = next((ct for ct in catalog_tables if ct.table_name == body.table_name), None)
+            if target is None:
+                raise HTTPException(status_code=400, detail="Unknown catalog table.")
+            cursor.execute(
+                f"DELETE FROM {target.table_name} WHERE company_id = %s AND id = ANY(%s::uuid[])",
+                (company_id, body.row_ids),
+            )
+            deleted = cursor.rowcount
+            conn.commit()
+            return {"status": "success", "deleted": deleted, "message": f"{deleted} catalog row(s) deleted."}
+
+        # Clear-all: wipe every catalog table for this company.
         deleted = 0
         for ct in catalog_tables:
             cursor.execute(
@@ -8273,7 +8301,7 @@ def delete_knowledge_catalog(company_id: str, user: dict = Depends(get_current_u
     except Exception as e:
         conn.rollback()
         print(f"DELETE CATALOG ERROR: {e}")
-        raise HTTPException(status_code=500, detail="Failed to clear catalog.")
+        raise HTTPException(status_code=500, detail="Failed to delete catalog rows.")
     finally:
         release_db_connection(conn)
 

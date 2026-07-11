@@ -349,6 +349,11 @@ class DeleteSourceRequest(BaseModel):
     source_name: str = Field(..., description="The exact filename/URL source to delete fully.")
 
 
+class DeleteCatalogRowsRequest(BaseModel):
+    table_name: str = Field(..., description="Catalog table the rows belong to; validated against pack config.")
+    row_ids: list[str] = Field(..., min_length=1, max_length=500, description="Catalog row UUIDs to delete (max 500).")
+
+
 class TrialExtensionRequest(BaseModel):
     days: int = Field(..., ge=1, le=180, description="Number of days to extend the trial (1-180)")
     reason: Optional[str] = Field(None, max_length=500, description="Internal reason for the extension (audit log)")
