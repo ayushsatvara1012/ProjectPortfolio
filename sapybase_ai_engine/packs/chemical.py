@@ -239,6 +239,13 @@ _CATALOG_TABLES = (
         table_name="products",
         required_columns=("name", "cas_number"),
         not_null_columns=("name",),
+        # Coarser than product_skus (product+grade, not per-pack). A combined
+        # price+SDS sheet fans out here only when it carries an SDS column
+        # (secondary_requires), collapsed to one row per product+grade with all
+        # pack sizes gathered into `packaging`.
+        grain=("name", "cas_number", "grade"),
+        aggregate_columns=("packaging",),
+        secondary_requires=("sds_ref",),
         synonyms={
             "name": ("product", "product_name", "chemical", "chemical_name",
                      "item", "item_name", "material"),
@@ -256,6 +263,10 @@ _CATALOG_TABLES = (
         required_columns=("product_name", "cas_number", "grade", "pack_size", "list_price"),
         boolean_columns=("is_por",),
         not_null_columns=("product_name",),
+        # A "POR" in the price column means price-on-request, not a missing price:
+        # flag it so the agent routes to a human quote instead of treating it as
+        # "no price on file".
+        por_flag_from=("list_price", "is_por"),
         synonyms={
             "product_name": ("product", "product_name", "name", "chemical",
                              "chemical_name", "item", "material"),

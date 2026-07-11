@@ -43,6 +43,11 @@ HEADER_SCAN_ROWS = 15
 _NULLISH = {"", "-", "—", "–", "n/a", "na", "n.a", "n.a.", "nil", "none",
             "por", "p.o.r", "price on request", "on request", "tbd", "—/—"}
 _TRUTHY = {"true", "t", "yes", "y", "1", "por", "price on request", "on request"}
+# The subset of nullish price tokens that specifically mean "price on request"
+# (a deliberate no-list-price), as opposed to a merely blank/missing price. A POR
+# price sets the table's POR flag (see CatalogTable.por_flag_from); "-", "n/a",
+# blank, etc. do NOT — they stay "price simply missing".
+_POR_TOKENS = {"por", "p.o.r", "price on request", "on request"}
 
 
 # ── Header normalization & detection ─────────────────────────────────────────
@@ -201,10 +206,21 @@ class CatalogImportError(ValueError):
     rows after cleaning → refusing to wipe existing data)."""
 
 
+def _cell_str(raw, pd) -> str:
+    """Normalize a raw cell to a trimmed string ('' for null/NaN)."""
+    s = "" if (raw is None or (isinstance(raw, float) and pd.isna(raw))) else str(raw).strip()
+    return "" if s.lower() == "nan" else s
+
+
 def _clean_rows_for_table(df, resolved, catalog_table, db_types, sheet_name):
     """Yield cleaned value-lists for a table, plus per-row skip reasons.
 
     Returns (db_columns_order, rows, skipped_reasons).
+
+    POR inference (config-driven via ``CatalogTable.por_flag_from``): when the
+    configured price column reads a price-on-request token, the flag column is set
+    TRUE — synthesized into the write even if the sheet has no explicit flag
+    column — so the agent can tell POR apart from a merely missing price.
     """
     import pandas as pd
 
@@ -212,6 +228,15 @@ def _clean_rows_for_table(df, resolved, catalog_table, db_types, sheet_name):
     bool_cols = set(getattr(catalog_table, "boolean_columns", ()) or ())
     notnull = set(getattr(catalog_table, "not_null_columns", ()) or ())
     inv_resolved: Dict[str, Any] = {v: k for k, v in resolved.items()}
+
+    # POR flag from the price cell (see _POR_TOKENS). Active only when the price
+    # column is actually present in this sheet; the flag column is added to the
+    # write set when the sheet doesn't carry its own.
+    por_pair = getattr(catalog_table, "por_flag_from", ()) or ()
+    por_price_col, por_flag_col = por_pair if len(por_pair) == 2 else (None, None)
+    por_active = bool(por_price_col and por_flag_col and por_price_col in db_cols)
+    if por_active and por_flag_col not in db_cols:
+        db_cols.append(por_flag_col)
 
     rows: List[List[Any]] = []
     skipped: List[str] = []
@@ -221,14 +246,26 @@ def _clean_rows_for_table(df, resolved, catalog_table, db_types, sheet_name):
                for sc in resolved):
             continue
 
+        price_is_por = (
+            por_active
+            and _cell_str(row[inv_resolved[por_price_col]], pd).lower() in _POR_TOKENS
+        )
+
         values: List[Any] = []
         skip_reason: Optional[str] = None
         for db_col in db_cols:
-            sheet_col = inv_resolved[db_col]
-            raw = row[sheet_col]
-            sval = "" if (raw is None or (isinstance(raw, float) and pd.isna(raw))) else str(raw).strip()
-            if sval.lower() == "nan":
-                sval = ""
+            if db_col == por_flag_col:
+                # TRUE if the sheet's own flag cell is truthy OR the price reads
+                # price-on-request. Handled here so a synthesized flag column
+                # (no sheet source) still gets a value.
+                explicit = (
+                    db_col in inv_resolved
+                    and clean_bool(_cell_str(row[inv_resolved[db_col]], pd))
+                )
+                values.append(bool(explicit or price_is_por))
+                continue
+
+            sval = _cell_str(row[inv_resolved[db_col]], pd)
 
             if db_col in bool_cols:
                 values.append(clean_bool(sval))
@@ -278,36 +315,66 @@ def plan_catalog_import(
         df = reheader(raw_df)
         sheet_cols = list(df.columns)
 
-        # Find the best-matching table for this sheet. A FULL match (every
-        # required column resolves) always beats a higher partial hit count —
-        # otherwise a clean `products` sheet loses to `product_skus`, which
-        # shares more synonyms. Among full matches, the more specific table (more
-        # required columns) wins; among partials, the higher hit count wins.
-        best = None        # (table, resolved, hit, total)
-        best_key = None    # (is_full, tiebreak, hit)
+        # Resolve every table against this sheet. A FULL match (every required
+        # column resolves) beats any partial. One wide sheet can feed SEVERAL
+        # tables (fan-out): the most-specific full match is the PRIMARY target;
+        # other full matches join only if they opt in via `secondary_requires`
+        # and the sheet carries those columns (e.g. `products` fans out from a
+        # price sheet only when an SDS column is present). Partials are handled
+        # as near-misses / RAG using the best partial for the warning.
+        full_matches: List[Tuple[Any, Dict[Any, str]]] = []
+        best_partial = None        # (ct, resolved, hit)
         for ct in catalog_tables:
             db_cols = tuple(db_schema.get(ct.table_name, {}).keys())
             if not db_cols:
                 continue
             resolved = resolve_columns(sheet_cols, ct, db_cols)
             hit, total = _required_hits(resolved, ct)
-            is_full = total > 0 and hit == total
-            key = (1 if is_full else 0, total if is_full else 0, hit)
-            if best_key is None or key > best_key:
-                best_key = key
-                best = (ct, resolved, hit, total)
+            if total > 0 and hit == total:
+                full_matches.append((ct, resolved))
+            elif hit > 0 and (best_partial is None or hit > best_partial[2]):
+                best_partial = (ct, resolved, hit)
 
-        if best is None:
+        if not full_matches:
+            if best_partial is not None:
+                # Near-miss: looked like a catalog but missing required columns.
+                ct, resolved, _hit = best_partial
+                missing = [rc for rc in ct.required_columns
+                           if rc not in set(resolved.values())]
+                plan.warnings.append(
+                    f"Sheet '{sheet_name}' looks like the {ct.table_name} catalog but "
+                    f"is missing column(s): {', '.join(missing)}. It was added as "
+                    f"general knowledge instead — rename those columns and re-upload to "
+                    f"make it searchable by the bot's tools."
+                )
+            # else: no catalog signal at all → genuine knowledge content.
             plan.rag_sheets.append((sheet_name, df))
             continue
 
-        ct, resolved, hit, total = best
-        if total > 0 and hit == total:
-            # Full match → import into the structured table.
+        # Primary = most specific full match (most required columns).
+        primary = max(full_matches, key=lambda cr: len(cr[0].required_columns))
+        targets = [primary]
+        for cr in full_matches:
+            if cr is primary:
+                continue
+            ct, resolved = cr
+            targets_present = set(resolved.values())
+            if ct.secondary_requires and all(
+                col in targets_present for col in ct.secondary_requires
+            ):
+                targets.append(cr)
+
+        for ct, resolved in targets:
             db_types = db_schema.get(ct.table_name, {})
             db_cols, rows, skipped = _clean_rows_for_table(
                 df, resolved, ct, db_types, sheet_name,
             )
+            if ct.grain:
+                # Coarse table: collapse to one row per grain-tuple, aggregating
+                # the pack-size-style columns across the group.
+                db_cols, rows = _dedupe_by_grain(
+                    db_cols, rows, ct.grain, ct.aggregate_columns,
+                )
             if not rows:
                 # Safety gate: never wipe a catalog with an empty/invalid sheet.
                 raise CatalogImportError(
@@ -336,22 +403,47 @@ def plan_catalog_import(
                     f"'{sheet_name}' — {skipped[0]}"
                     + (f" (+{len(skipped) - 1} more)" if len(skipped) > 1 else "")
                 )
-        elif hit > 0:
-            # Near-miss: looked like a catalog but missing required columns.
-            missing = [rc for rc in ct.required_columns
-                       if rc not in set(resolved.values())]
-            plan.warnings.append(
-                f"Sheet '{sheet_name}' looks like the {ct.table_name} catalog but "
-                f"is missing column(s): {', '.join(missing)}. It was added as "
-                f"general knowledge instead — rename those columns and re-upload to "
-                f"make it searchable by the bot's tools."
-            )
-            plan.rag_sheets.append((sheet_name, df))
-        else:
-            # No catalog signal at all → genuine knowledge content.
-            plan.rag_sheets.append((sheet_name, df))
 
     return plan
+
+
+def _dedupe_by_grain(db_cols, rows, grain, aggregate_columns):
+    """Collapse rows to one per distinct grain-tuple.
+
+    ``grain`` and ``aggregate_columns`` are canonical DB columns; any not present
+    in ``db_cols`` are ignored (a sheet may not carry every column). The first row
+    of each group seeds it; aggregate columns become the ", "-joined distinct
+    truthy values seen in the group (first-seen order); other columns keep the
+    seed's value. Returns (db_cols, deduped_rows) — db_cols is unchanged.
+    """
+    grain_idx = [db_cols.index(c) for c in grain if c in db_cols]
+    if not grain_idx:
+        return db_cols, rows
+    agg_idx = [db_cols.index(c) for c in aggregate_columns if c in db_cols]
+
+    groups: Dict[Tuple, List[Any]] = {}
+    agg_seen: Dict[Tuple, List[set]] = {}
+    for row in rows:
+        key = tuple(
+            (str(row[i]).strip().lower() if row[i] is not None else "")
+            for i in grain_idx
+        )
+        if key not in groups:
+            groups[key] = list(row)
+            agg_seen[key] = [[] for _ in agg_idx]
+        seed = groups[key]
+        for slot, i in enumerate(agg_idx):
+            val = row[i]
+            if val is not None and str(val).strip() and str(val) not in agg_seen[key][slot]:
+                agg_seen[key][slot].append(str(val))
+
+    out = []
+    for key, seed in groups.items():
+        for slot, i in enumerate(agg_idx):
+            joined = ", ".join(agg_seen[key][slot])
+            seed[i] = joined or None
+        out.append(seed)
+    return db_cols, out
 
 
 def _realign(src_cols, rows, dst_cols):

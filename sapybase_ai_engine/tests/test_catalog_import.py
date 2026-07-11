@@ -281,3 +281,116 @@ def test_apply_does_delete_then_insert_scoped_by_company():
     assert len(inserts) == 1
     assert inserts[0][1][0] == "company-123"   # company_id is first value
     assert any("products: 1 rows" in s for s in summary)
+
+
+# ── Single-sheet fan-out (one wide sheet → both tables) ──────────────────────
+
+def _rows_as_dicts(tp):
+    return [dict(zip(tp.db_columns, row)) for row in tp.rows]
+
+
+def test_combined_sheet_fans_out_to_both_tables():
+    # A wide sheet with price columns AND an SDS column feeds product_skus
+    # (every row) and, because sds_ref resolves, products (one row per grade).
+    raw = _raw([
+        ["Product Name", "CAS No.", "Grade", "Pack Size", "List Price", "SDS"],
+        ["Acetone", "67-64-1", "LR", "500 ml", "413", "https://x/acetone.pdf"],
+        ["Acetone", "67-64-1", "LR", "2.5 Ltr", "1660", "https://x/acetone.pdf"],
+        ["Benzene", "71-43-2", "HPLC", "1 Ltr", "1349", "https://x/benzene.pdf"],
+    ])
+    plan = ci.plan_catalog_import([("", raw)], CATALOG_TABLES, DB_SCHEMA)
+
+    assert set(plan.tables) == {"product_skus", "products"}
+    # product_skus keeps every SKU row.
+    assert len(plan.tables["product_skus"].rows) == 3
+    # products collapses to one row per (name, cas, grade) with packaging joined.
+    prods = _rows_as_dicts(plan.tables["products"])
+    assert len(prods) == 2
+    acetone = next(p for p in prods if p["name"] == "Acetone")
+    assert acetone["grade"] == "LR"
+    assert acetone["packaging"] == "500 ml, 2.5 Ltr"
+    assert acetone["sds_ref"] == "https://x/acetone.pdf"
+    benzene = next(p for p in prods if p["name"] == "Benzene")
+    assert benzene["packaging"] == "1 Ltr"
+
+
+def test_price_only_sheet_does_not_fan_out_to_products():
+    # No SDS column → secondary_requires unmet → products is NOT written, so a
+    # later price re-upload can never clobber previously loaded SDS rows.
+    raw = _raw([
+        ["Product Name", "CAS No.", "Grade", "Pack Size", "List Price"],
+        ["Acetone", "67-64-1", "LR", "500 ml", "413"],
+    ])
+    plan = ci.plan_catalog_import([("", raw)], CATALOG_TABLES, DB_SCHEMA)
+    assert set(plan.tables) == {"product_skus"}
+
+
+def test_dedicated_sds_sheet_targets_products_only():
+    # Name + CAS + grade + packaging + SDS, no price/pack → only products fully
+    # matches; grain dedup is a no-op on already-coarse rows.
+    raw = _raw([
+        ["Product Name", "CAS No.", "Grade", "Packaging", "SDS"],
+        ["Acetone", "67-64-1", "LR", "500 ml, 25 Ltr", "https://x/acetone.pdf"],
+        ["Benzene", "71-43-2", "HPLC", "1 Ltr", "https://x/benzene.pdf"],
+    ])
+    plan = ci.plan_catalog_import([("", raw)], CATALOG_TABLES, DB_SCHEMA)
+    assert set(plan.tables) == {"products"}
+    assert len(plan.tables["products"].rows) == 2
+
+
+def test_dedupe_by_grain_aggregates_and_keeps_first():
+    db_cols = ["name", "cas_number", "grade", "packaging", "sds_ref"]
+    rows = [
+        ["Acetone", "67-64-1", "LR", "500 ml", "https://a.pdf"],
+        ["Acetone", "67-64-1", "LR", "2.5 Ltr", "https://a.pdf"],
+        ["acetone", "67-64-1", "LR", "500 ml", None],       # dup pack + case-insensitive key
+        ["Benzene", "71-43-2", "HPLC", "1 Ltr", "https://b.pdf"],
+    ]
+    out_cols, out = ci._dedupe_by_grain(
+        db_cols, rows, ("name", "cas_number", "grade"), ("packaging",),
+    )
+    assert out_cols == db_cols
+    assert len(out) == 2
+    ace = next(r for r in out if r[0] == "Acetone")
+    assert ace[3] == "500 ml, 2.5 Ltr"     # distinct, first-seen order, no dup
+    assert ace[4] == "https://a.pdf"       # seed's sds kept
+
+
+# ── POR (price-on-request) flag inference from the price column ──────────────
+
+def test_por_in_price_column_sets_is_por_true_and_price_null():
+    # "POR" in List Price → list_price NULL AND is_por TRUE, even though the sheet
+    # has no is_por column (it's synthesized into the write). A blank price is
+    # "missing", NOT POR, so is_por stays FALSE.
+    raw = _raw([
+        ["Product Name", "CAS No.", "Grade", "Pack Size", "List Price"],
+        ["Acetone", "67-64-1", "LR", "500 ml", "413"],     # priced
+        ["Acetone", "67-64-1", "LR", "25 Ltr", "POR"],     # price-on-request
+        ["Acetone", "67-64-1", "LR", "160 Kg", ""],        # simply missing
+    ])
+    plan = ci.plan_catalog_import([("", raw)], CATALOG_TABLES, DB_SCHEMA)
+    tp = plan.tables["product_skus"]
+    assert "is_por" in tp.db_columns
+    by_pack = {r["pack_size"]: r for r in _rows_as_dicts(tp)}
+
+    assert by_pack["500 ml"]["list_price"] == 413.0
+    assert by_pack["500 ml"]["is_por"] is False
+
+    assert by_pack["25 Ltr"]["list_price"] is None
+    assert by_pack["25 Ltr"]["is_por"] is True         # POR → flagged
+
+    assert by_pack["160 Kg"]["list_price"] is None
+    assert by_pack["160 Kg"]["is_por"] is False        # blank ≠ POR
+
+
+def test_explicit_is_por_column_ors_with_price_token():
+    # An explicit POR/is_por column still works and ORs with a POR price cell.
+    raw = _raw([
+        ["Product Name", "CAS No.", "Grade", "Pack Size", "List Price", "POR"],
+        ["Acetone", "67-64-1", "LR", "500 ml", "413", "yes"],   # flagged by column
+        ["Acetone", "67-64-1", "LR", "25 Ltr", "POR", "no"],    # flagged by price token
+    ])
+    plan = ci.plan_catalog_import([("", raw)], CATALOG_TABLES, DB_SCHEMA)
+    by_pack = {r["pack_size"]: r for r in _rows_as_dicts(plan.tables["product_skus"])}
+    assert by_pack["500 ml"]["is_por"] is True
+    assert by_pack["25 Ltr"]["is_por"] is True

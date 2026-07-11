@@ -83,6 +83,27 @@ class CatalogTable:
 
     ``column_map`` is the legacy direct ``normalized_header → db_col`` escape hatch;
     ``synonyms`` is the preferred, readable form.
+
+    Fan-out (one wide sheet → several tables):
+      - ``grain`` collapses cleaned rows to one row per distinct grain-tuple, for a
+        table that sits at a coarser level than the sheet (e.g. ``products`` is
+        keyed product+grade while a price sheet is one row per pack). Empty = keep
+        every row.
+      - ``aggregate_columns`` are, within a grain group, set to the distinct-joined
+        (", ") set of the group's values (e.g. ``packaging`` = every pack size for
+        that product+grade). Non-grain, non-aggregate columns take the group's
+        first non-null value.
+      - ``secondary_requires`` gates fan-out: when this table is NOT the most
+        specific full match for a sheet, it is imported only if ALL of these
+        canonical columns resolved from the sheet (so a price-only sheet with no
+        SDS column never touches ``products`` and can't clobber it). Empty = never
+        imported as a secondary target (it must be the primary match).
+
+    ``por_flag_from = (price_col, flag_col)`` records a "price on request" signal:
+    a row whose ``price_col`` cell reads POR / "on request" sets ``flag_col`` TRUE
+    (even when the sheet has no explicit flag column), while a merely blank/missing
+    price does not. Lets the agent tell "price on request" apart from "no price on
+    file". Empty = no POR inference.
     """
 
     table_name: str
@@ -91,6 +112,10 @@ class CatalogTable:
     boolean_columns: Tuple[str, ...] = ()
     synonyms: dict = field(default_factory=dict)        # db_col -> (alias, ...)
     not_null_columns: Tuple[str, ...] = ()
+    grain: Tuple[str, ...] = ()                          # dedup key for a coarse table
+    aggregate_columns: Tuple[str, ...] = ()             # distinct-joined within a grain group
+    secondary_requires: Tuple[str, ...] = ()            # fan-out gate for a non-primary target
+    por_flag_from: Tuple[str, str] = ()                 # (price_col, flag_col): POR price -> flag TRUE
 
 
 @dataclass(frozen=True)
