@@ -978,7 +978,7 @@
         '  mask-image: linear-gradient(to right, #000 0%, #000 82%, transparent 100%);',
         '}',
         '@media (prefers-color-scheme: dark) {',
-        '  .sb-teaser { background: #1e293b; color: #f1f5f9; border-color: rgba(255,255,255,0.14); box-shadow: inset -2px -2px 2px #dadada, inset 2px 2px 2px #ffffff; }',
+        '  .sb-teaser { background: #1e293b; color: #f1f5f9; border-color: rgb(30 41 60); box-shadow: inset -2px -2px 2px #141b28, inset 2px 2px 2px #293954; }',
         '  .sb-teaser::after { border-top-color: #131a28; }',
         '  .sb-teaser-title { color: #f1f5f9; }',
         '  .sb-teaser-sub { color: #94a3b8; }',
