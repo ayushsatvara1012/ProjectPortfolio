@@ -25,6 +25,7 @@ from services.agent import (
     get_product_spec,
     get_sds,
     run_agent_loop,
+    stream_agent_loop,
 )
 from packs import load_pack
 
@@ -957,3 +958,87 @@ class TestRunAgentLoop:
         usage = {}
         _run(run_agent_loop(model, [], lambda n, a: {}, usage_out=usage))
         assert "cached_tokens" not in usage
+
+
+# ── stream_agent_loop (Phase 1 streaming) ─────────────────────────────────────
+
+async def _drain(agen):
+    """Collect all events an async generator yields into a list."""
+    return [ev async for ev in agen]
+
+
+class TestStreamAgentLoop:
+    def test_direct_answer_emits_single_final_no_status(self):
+        model = FakeModel([FakeResp(content="Hello there.")])
+        events = _run(_drain(stream_agent_loop(model, [], lambda n, a: {})))
+        assert events == [{"type": "final", "text": "Hello there."}]
+
+    def test_tool_round_emits_status_before_final(self):
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c1"}]),
+            FakeResp(content="Here is the SDS."),
+        ])
+        events = _run(_drain(
+            stream_agent_loop(model, [], lambda n, a: {"status": "found"})
+        ))
+        # A status event (with a friendly, non-raw label) precedes the final answer.
+        assert events[0]["type"] == "status"
+        assert events[0]["tool"] == "get_sds"
+        assert events[0]["label"] == "Looking up the safety data sheet…"
+        assert events[-1] == {"type": "final", "text": "Here is the SDS."}
+        assert sum(1 for e in events if e["type"] == "final") == 1
+
+    def test_unknown_tool_gets_generic_label(self):
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "mystery_tool", "args": {}, "id": "c1"}]),
+            FakeResp(content="Done."),
+        ])
+        events = _run(_drain(
+            stream_agent_loop(model, [], lambda n, a: {"status": "ok"})
+        ))
+        status = [e for e in events if e["type"] == "status"][0]
+        assert status["label"] == "Working on it…"
+
+    def test_exhausted_rounds_emit_fallback_final(self):
+        loop_resp = FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}])
+        model = FakeModel([loop_resp, loop_resp, loop_resp, loop_resp])
+        events = _run(_drain(
+            stream_agent_loop(model, [], lambda n, a: {"status": "not_found"})
+        ))
+        assert events[-1] == {"type": "final", "text": AGENT_FALLBACK_TEXT}
+
+    def test_llm_failure_emits_fallback_final(self):
+        model = FakeModel([FakeResp(content="never reached")], raise_on=0)
+        events = _run(_drain(stream_agent_loop(model, [], lambda n, a: {})))
+        assert events == [{"type": "final", "text": AGENT_FALLBACK_TEXT}]
+
+    def test_wrapper_returns_same_text_as_final_event(self):
+        # run_agent_loop must equal the generator's final-event text (contract parity).
+        model_a = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}]),
+            FakeResp(content="Parity answer."),
+        ])
+        wrapped = _run(run_agent_loop(model_a, [], lambda n, a: {"status": "found"}))
+        model_b = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}]),
+            FakeResp(content="Parity answer."),
+        ])
+        events = _run(_drain(
+            stream_agent_loop(model_b, [], lambda n, a: {"status": "found"})
+        ))
+        final = [e for e in events if e["type"] == "final"][0]
+        assert wrapped == final["text"] == "Parity answer."
+
+    def test_usage_metering_matches_wrapper(self):
+        # Metering through the generator is identical to the wrapper path.
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}],
+                     usage_metadata={"input_tokens": 100, "output_tokens": 10, "total_tokens": 110}),
+            FakeResp(content="Here you go.",
+                     usage_metadata={"input_tokens": 120, "output_tokens": 30, "total_tokens": 150}),
+        ])
+        usage = {}
+        _run(_drain(
+            stream_agent_loop(model, [], lambda n, a: {"status": "found"}, usage_out=usage)
+        ))
+        assert usage == {"input_tokens": 220, "output_tokens": 40, "total_tokens": 260}

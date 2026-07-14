@@ -93,7 +93,7 @@ def _get_pool():
             raise RuntimeError("DATABASE_URL not set")
         _db_pool = pool.ThreadedConnectionPool(
             minconn=2,
-            maxconn=8,   # Stay within Supabase pgBouncer limits (4 workers x 2)
+            maxconn=8,   # Per-worker pool; 2 workers x 8 = 16 conns/instance within Supabase pgBouncer limits
             dsn=DB_URL
         )
     return _db_pool
@@ -708,6 +708,14 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
     # per-request timeout) instead of riding LangChain's default 6-retry backoff
     # past the precompute budget. Generic path keeps the library defaults.
     extra = {"max_retries": 2, "timeout": 20} if for_agent else {}
+
+    if for_agent:
+        # Own output ceiling, independent of the plain-chat tier cap (a quote/
+        # GST/qualification answer needs more headroom than a simple RAG reply),
+        # unless a CUSTOM plan explicitly overrides it above.
+        if not (tier == "CUSTOM" and custom_plan_config and custom_plan_config.get("max_output_tokens")):
+            max_tokens = AGENT_MAX_OUTPUT_TOKENS
+        extra["thinking_budget"] = AGENT_THINKING_BUDGET
 
     return ChatGoogleGenerativeAI(
         model=model_name,
@@ -1459,7 +1467,7 @@ from packs import (
 )
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
-from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, AGENT_FALLBACK_TEXT
+from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
 from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
 from services import catalog_import as catalog_import
 from services import session_store  # Phase 1b — persistent session memory
@@ -1470,6 +1478,16 @@ from services import qualification   # Phase 5 — deterministic buyer-fact extr
 # slow/overloaded model degrades to the fallback instead of hanging /api/chat
 # until the dev proxy / client resets the socket.
 AGENT_PRECOMPUTE_TIMEOUT_S = 30
+
+# gemini-2.5-flash is a thinking model whose reasoning tokens draw from the same
+# max_output_tokens pool as the visible reply. Left unbounded, a turn that reasons
+# a bit harder (tool-call planning, grade/pack disambiguation, qualification
+# directives) can burn the whole budget on invisible thinking and return empty
+# content or get cut off mid-answer. Cap thinking to a small fixed budget and give
+# the agent its own generous, tier-independent output ceiling so the visible
+# answer always has room after thinking.
+AGENT_THINKING_BUDGET = 200
+AGENT_MAX_OUTPUT_TOKENS = 2048
 
 # Phase 4b form — the spreadsheet sink for sample-request submissions. The widget
 # form POST is recorded locally AND pushed to the owner's PER-BOT outbound webhook
@@ -3416,256 +3434,185 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
         messages.append(HumanMessage(content=delimited_user_message))
 
-        # ── VERTICAL AGENT: bounded ReAct loop (Phase 1, §9) ──────────────────
-        # Run the whole Reason→Act→Observe loop HERE, in the handler body, while
-        # the DB connection is still open — the SSE generator below is consumed by
-        # Starlette only AFTER this function (and its `finally: release_db_connection`)
-        # returns, so a tool can never touch `cursor` from inside the generator.
-        # The result is precomputed; the generator just emits it. Generic
-        # (vertical=NULL) companies skip this entirely and stream live as before.
-        precomputed_answer = None
-        agent_sds = None  # structured "Open SDS" action surfaced as a widget button
-        agent_quote = None  # structured quote card surfaced as a widget card
-        agent_form = None  # "open a structured form" action (Phase 4b sample form)
-        agent_handoff = None  # real-time owner notification (Slack/email) payload
-        _agent_usage: dict = {}  # Phase 6 — per-turn Gemini token counts (metering)
-        if pack is not None:
-            agent_model = chat_model.bind_tools(build_tool_schemas(pack))
-
-            _captured = {}
-
-            def _tool_executor(tool_name, tool_args):
-                obs = execute_tool(tool_name, tool_args, cursor, company["id"],
-                                   session_id=chat_req.session_id)
-                # When get_sds resolves a real sheet, surface it as a deterministic
-                # button payload — the model is told NOT to paste the link itself.
-                if (tool_name == "get_sds" and isinstance(obs, dict)
-                        and obs.get("status") == "found" and obs.get("sds_url")):
-                    _captured["sds"] = {
-                        "url": obs["sds_url"],
-                        "product": (obs.get("product") or {}).get("name"),
-                        "label": "Open SDS",
-                    }
-                # When request_quote prices a SKU (or logs a price-on-request),
-                # surface the deterministic figures as a structured quote card — the
-                # model is told to describe, not re-derive, these numbers.
-                if (tool_name == "request_quote" and isinstance(obs, dict)
-                        and obs.get("status") in ("quoted", "price_on_request")):
-                    _captured["quote"] = {
-                        "status": obs["status"],
-                        "product": obs.get("product"),
-                        "grade": obs.get("grade"),
-                        "pack_size": obs.get("pack_size"),
-                        "quantity": obs.get("quantity"),
-                        "unit_price": obs.get("unit_price"),
-                        "subtotal": obs.get("subtotal"),
-                        "gst_rate": obs.get("gst_rate"),
-                        "currency": obs.get("currency") or "INR",
-                        "gst_note": obs.get("gst_note"),
-                        # Echo the model-parsed contact so the widget can confirm it
-                        # back to the visitor (Phase 2.5); None when none captured.
-                        "captured_contact": _captured_contact_echo(tool_args),
-                        # Phase 4: shareable, read-only quote page URL (None if the
-                        # record failed to persist). Drives the deterministic
-                        # "View & share quote" button + modal in the widget.
-                        "quote_url": obs.get("quote_url"),
-                    }
-                    # Every priced/POR quote is a warm lead → notify the owner in
-                    # real time (Phase 4b). Contact came in via the tool args.
-                    _captured["handoff"] = {
-                        "kind": "quote",
-                        "status": obs["status"],
-                        "product": obs.get("product"),
-                        "grade": obs.get("grade"),
-                        "pack_size": obs.get("pack_size"),
-                        "quantity": obs.get("quantity"),
-                        "unit_price": obs.get("unit_price"),
-                        "subtotal": obs.get("subtotal"),
-                        "gst_rate": obs.get("gst_rate"),
-                        "currency": obs.get("currency") or "INR",
-                        "is_por": obs["status"] == "price_on_request",
-                        "contact_name": tool_args.get("contact_name"),
-                        "contact_email": tool_args.get("contact_email"),
-                        "contact_phone": tool_args.get("contact_phone"),
-                    }
-                # request_sample opens the structured form (Phase 4b form): surface a
-                # {form} action so the widget renders it inline (prefilled with any
-                # product/grade the model parsed). The record + spreadsheet push +
-                # owner handoff happen on FORM SUBMIT (submit_sample_request), not here.
-                if (tool_name == "request_sample" and isinstance(obs, dict)
-                        and obs.get("status") == "open_form"):
-                    _captured["form"] = {
-                        "form_id": obs.get("form_id") or "sample",
-                        "prefill": obs.get("prefill") or {},
-                    }
-                # Phase 0a: when request_quote needs a grade, surface the options as
-                # interactive pill chips in the widget — no typing, no spelling errors.
-                if (tool_name == "request_quote" and isinstance(obs, dict)
-                        and obs.get("status") == "needs_grade"
-                        and obs.get("grades")):
-                    _captured["grade_selector"] = {
-                        "product": obs.get("product"),
-                        "grades": obs.get("grades", []),
-                        "grade_pack_map": obs.get("grade_pack_map", {}),
-                    }
-                # Phase 0a: when request_quote needs a pack size, surface the options
-                # as a dropdown + confirm button — ordered as returned by the catalog.
-                if (tool_name == "request_quote" and isinstance(obs, dict)
-                        and obs.get("status") == "needs_pack"
-                        and obs.get("pack_sizes")):
-                    _captured["pack_selector"] = {
-                        "product": obs.get("product"),
-                        "grade": obs.get("grade"),
-                        "pack_sizes": obs.get("pack_sizes", []),
-                    }
-                # Phase 2: product-discovery questions go through get_product_spec
-                # (commercial spec), NOT request_quote — so without this they'd never
-                # surface selection chips nor advance the funnel. Mirror the quote
-                # flow: emit chips when there's a choice, and record the resolved
-                # product into state so the stage moves browsing → qualifying/recommended.
-                if tool_name == "get_product_spec" and isinstance(obs, dict):
-                    if obs.get("status") == "ambiguous" and obs.get("grades"):
-                        _captured["grade_selector"] = {
-                            "product": obs.get("product"),
-                            "grades": obs.get("grades", []),
-                            "grade_pack_map": {},
-                        }
-                    elif obs.get("status") == "found":
-                        _prod = obs.get("product") or {}
-                        _packs = obs.get("pack_sizes") or []
-                        _captured["spec"] = {
-                            "product": _prod.get("name"),
-                            "grade": _prod.get("grade"),
-                            "packaging": _prod.get("packaging"),
-                        }
-                        if len(_packs) > 1:
-                            _captured["pack_selector"] = {
-                                "product": _prod.get("name"),
-                                "grade": _prod.get("grade"),
-                                "pack_sizes": _packs,
-                            }
-                return obs
-
-            # Bound the whole precompute: the agent makes BLOCKING Gemini calls here
-            # (before streaming), so an overloaded/slow Gemini (503 retry storms)
-            # would otherwise hang /api/chat until the proxy resets the socket. On
-            # timeout we degrade to the safe human-routing fallback, same as any
-            # other agent failure — never leave the request hanging.
-            try:
-                precomputed_answer = await asyncio.wait_for(
-                    run_agent_loop(agent_model, messages, _tool_executor,
-                                   usage_out=_agent_usage),
-                    timeout=AGENT_PRECOMPUTE_TIMEOUT_S,
-                )
-            except asyncio.TimeoutError:
-                logger.warning("agent precompute timed out (Gemini slow/overloaded); using fallback")
-                precomputed_answer = AGENT_FALLBACK_TEXT
-            agent_sds = _captured.get("sds")
-            agent_quote = _captured.get("quote")
-            agent_form = _captured.get("form")
-            agent_handoff = _captured.get("handoff")
-            agent_grade_selector = _captured.get("grade_selector")
-            agent_pack_selector = _captured.get("pack_selector")
-
-            # ── SESSION MEMORY: persist this turn (Phase 1b) ──────────────────
-            # Both user message and bot reply are written here, while the DB conn
-            # is still alive (before stream_generator / finally: release_db_connection).
-            # Wrapped in try/except so a store failure never breaks the visitor reply.
-            if _session_active and precomputed_answer is not None:
-                try:
-                    _actions = {
-                        k: _captured[k]
-                        for k in ("sds", "quote", "form", "handoff",
-                                  "grade_selector", "pack_selector")
-                        if k in _captured
-                    } or None
-                    session_store.append_message(
-                        cursor, chat_req.session_id, company["id"],
-                        "user", chat_req.message,
-                    )
-                    session_store.append_message(
-                        cursor, chat_req.session_id, company["id"],
-                        "assistant", precomputed_answer,
-                        actions=_actions,
-                    )
-                    _title = session_store.derive_title(_captured)
-                    if _title:
-                        session_store.set_session_title(
-                            cursor, chat_req.session_id, _title
-                        )
-
-                    # ── SALES ORCHESTRATION: persist funnel state + lead profile ──
-                    # Score the lead deterministically (reuse lead_scoring) so the
-                    # band drives next-turn booking/handoff offers. Context = the
-                    # rolling summary + this turn's message (cheap, no LLM).
-                    _ctx = " ".join(filter(None, [_session_summary, chat_req.message]))
-                    _lp = sales_funnel.build_lead_profile(
-                        _prior_lead_profile, _captured,
-                        _score_lead(_ctx,
-                                    (_prior_lead_profile or {}).get("email"),
-                                    (_prior_lead_profile or {}).get("name")),
-                    )
-                    # Phase 5 — fold deterministically-extracted qualification facts
-                    # (application/volume/industry/city/timeline) from THIS turn into
-                    # the profile. LLM-free; only high-confidence matches persist.
-                    if pack is not None and pack.qualification_slots:
-                        _lp = qualification.merge_qualification(
-                            _lp,
-                            qualification.extract_facts(
-                                chat_req.message, pack.qualification_slot_names()),
-                        )
-                    _new_state = sales_funnel.derive_state(_prior_state, _captured, _lp)
-                    session_store.update_session_state(
-                        cursor, chat_req.session_id, company["id"], _new_state
-                    )
-                    session_store.update_lead_profile(
-                        cursor, chat_req.session_id, company["id"], _lp
-                    )
-
-                    conn.commit()
-                    _msg_count = session_store.count_messages(
-                        cursor, chat_req.session_id, company["id"]
-                    )
-                    if _msg_count > session_store.SUMMARY_THRESHOLD:
-                        background_tasks.add_task(
-                            session_store.maybe_summarize_session,
-                            chat_req.session_id, company["id"],
-                            get_db_connection, release_db_connection,
-                        )
-                except Exception:
-                    logger.exception(
-                        "session_store: failed to persist turn session=%s",
-                        chat_req.session_id,
-                    )
-
-            # Real-time owner handoff (Phase 4b): a warm quote lead pings the owner
-            # on Slack + email so it doesn't wait for a dashboard visit. Phase 3.3
-            # tiering (inside _fire_agent_handoff) keeps this to POR-with-email only;
-            # priced/bare price-checks stay in the dashboard. (Sample handoff fires
-            # on FORM SUBMIT, not here.) Best-effort + non-blocking.
-            if agent_handoff:
-                slack_url = company.get("slack_webhook_url")
-                owner_to = company.get("alert_email") or company.get("owner_email")
-                if slack_url or owner_to:
-                    background_tasks.add_task(
-                        _fire_agent_handoff,
-                        slack_url,
-                        owner_to,
-                        company.get("bot_name", ""),
-                        agent_handoff,
-                        company["id"],
-                        chat_req.session_id,
-                    )
+        # ── VERTICAL AGENT + STREAMING ────────────────────────────────────
+        # The vertical ReAct loop now runs INSIDE stream_generator on a
+        # generator-owned DB connection (the handler conn is already released
+        # by the time the SSE body is consumed), so tool rounds emit live
+        # status events. Generic (vertical=NULL) companies stream as before.
 
         # ── STREAMING RESPONSE ENGINE (SSE) ──────────────────────────────────
         async def stream_generator():
             full_reply = ""
+            _agent_usage: dict = {}  # Phase 6 metering; populated by the agent path below
+            agent_gen_conn = None    # generator-owned conn for the vertical-agent path
             try:
                 # Vertical-agent path: the answer is already computed (see above);
                 # emit it as a single token, then DONE. Persistence/metering still
                 # runs in the shared `finally` below, exactly like the live path.
-                if precomputed_answer is not None:
-                    full_reply = precomputed_answer
+                if pack is not None:
+                    # ── VERTICAL AGENT PATH (runs live inside the stream) ─────
+                    # Own DB connection: the handler conn is gone by now. Tools +
+                    # session persistence use agent_cursor / agent_gen_conn.
+                    agent_gen_conn = get_db_connection()
+                    agent_cursor = agent_gen_conn.cursor()
+                    _captured = {}
+
+                    def _tool_executor(tool_name, tool_args):
+                        obs = execute_tool(tool_name, tool_args, agent_cursor, company["id"],
+                                           session_id=chat_req.session_id)
+                        # When get_sds resolves a real sheet, surface it as a deterministic
+                        # button payload — the model is told NOT to paste the link itself.
+                        if (tool_name == "get_sds" and isinstance(obs, dict)
+                                and obs.get("status") == "found" and obs.get("sds_url")):
+                            _captured["sds"] = {
+                                "url": obs["sds_url"],
+                                "product": (obs.get("product") or {}).get("name"),
+                                "label": "Open SDS",
+                            }
+                        # When request_quote prices a SKU (or logs a price-on-request),
+                        # surface the deterministic figures as a structured quote card — the
+                        # model is told to describe, not re-derive, these numbers.
+                        if (tool_name == "request_quote" and isinstance(obs, dict)
+                                and obs.get("status") in ("quoted", "price_on_request")):
+                            _captured["quote"] = {
+                                "status": obs["status"],
+                                "product": obs.get("product"),
+                                "grade": obs.get("grade"),
+                                "pack_size": obs.get("pack_size"),
+                                "quantity": obs.get("quantity"),
+                                "unit_price": obs.get("unit_price"),
+                                "subtotal": obs.get("subtotal"),
+                                "gst_rate": obs.get("gst_rate"),
+                                "currency": obs.get("currency") or "INR",
+                                "gst_note": obs.get("gst_note"),
+                                # Echo the model-parsed contact so the widget can confirm it
+                                # back to the visitor (Phase 2.5); None when none captured.
+                                "captured_contact": _captured_contact_echo(tool_args),
+                                # Phase 4: shareable, read-only quote page URL (None if the
+                                # record failed to persist). Drives the deterministic
+                                # "View & share quote" button + modal in the widget.
+                                "quote_url": obs.get("quote_url"),
+                            }
+                            # Every priced/POR quote is a warm lead → notify the owner in
+                            # real time (Phase 4b). Contact came in via the tool args.
+                            _captured["handoff"] = {
+                                "kind": "quote",
+                                "status": obs["status"],
+                                "product": obs.get("product"),
+                                "grade": obs.get("grade"),
+                                "pack_size": obs.get("pack_size"),
+                                "quantity": obs.get("quantity"),
+                                "unit_price": obs.get("unit_price"),
+                                "subtotal": obs.get("subtotal"),
+                                "gst_rate": obs.get("gst_rate"),
+                                "currency": obs.get("currency") or "INR",
+                                "is_por": obs["status"] == "price_on_request",
+                                "contact_name": tool_args.get("contact_name"),
+                                "contact_email": tool_args.get("contact_email"),
+                                "contact_phone": tool_args.get("contact_phone"),
+                            }
+                        # request_sample opens the structured form (Phase 4b form): surface a
+                        # {form} action so the widget renders it inline (prefilled with any
+                        # product/grade the model parsed). The record + spreadsheet push +
+                        # owner handoff happen on FORM SUBMIT (submit_sample_request), not here.
+                        if (tool_name == "request_sample" and isinstance(obs, dict)
+                                and obs.get("status") == "open_form"):
+                            _captured["form"] = {
+                                "form_id": obs.get("form_id") or "sample",
+                                "prefill": obs.get("prefill") or {},
+                            }
+                        # Phase 0a: when request_quote needs a grade, surface the options as
+                        # interactive pill chips in the widget — no typing, no spelling errors.
+                        if (tool_name == "request_quote" and isinstance(obs, dict)
+                                and obs.get("status") == "needs_grade"
+                                and obs.get("grades")):
+                            _captured["grade_selector"] = {
+                                "product": obs.get("product"),
+                                "grades": obs.get("grades", []),
+                                "grade_pack_map": obs.get("grade_pack_map", {}),
+                            }
+                        # Phase 0a: when request_quote needs a pack size, surface the options
+                        # as a dropdown + confirm button — ordered as returned by the catalog.
+                        if (tool_name == "request_quote" and isinstance(obs, dict)
+                                and obs.get("status") == "needs_pack"
+                                and obs.get("pack_sizes")):
+                            _captured["pack_selector"] = {
+                                "product": obs.get("product"),
+                                "grade": obs.get("grade"),
+                                "pack_sizes": obs.get("pack_sizes", []),
+                            }
+                        # Phase 2: product-discovery questions go through get_product_spec
+                        # (commercial spec), NOT request_quote — so without this they'd never
+                        # surface selection chips nor advance the funnel. Mirror the quote
+                        # flow: emit chips when there's a choice, and record the resolved
+                        # product into state so the stage moves browsing → qualifying/recommended.
+                        if tool_name == "get_product_spec" and isinstance(obs, dict):
+                            if obs.get("status") == "ambiguous" and obs.get("grades"):
+                                _captured["grade_selector"] = {
+                                    "product": obs.get("product"),
+                                    "grades": obs.get("grades", []),
+                                    "grade_pack_map": {},
+                                }
+                            elif obs.get("status") == "found":
+                                _prod = obs.get("product") or {}
+                                _packs = obs.get("pack_sizes") or []
+                                _captured["spec"] = {
+                                    "product": _prod.get("name"),
+                                    "grade": _prod.get("grade"),
+                                    "packaging": _prod.get("packaging"),
+                                }
+                                if len(_packs) > 1:
+                                    _captured["pack_selector"] = {
+                                        "product": _prod.get("name"),
+                                        "grade": _prod.get("grade"),
+                                        "pack_sizes": _packs,
+                                    }
+                        return obs
+
+                    agent_model = chat_model.bind_tools(build_tool_schemas(pack))
+                    full_reply = AGENT_FALLBACK_TEXT
+                    HEARTBEAT_SECONDS = 15
+                    _rl = asyncio.get_running_loop()
+                    _deadline = _rl.time() + AGENT_PRECOMPUTE_TIMEOUT_S
+                    _agent_iter = stream_agent_loop(
+                        agent_model, messages, _tool_executor, usage_out=_agent_usage
+                    ).__aiter__()
+                    try:
+                        while True:
+                            _remaining = _deadline - _rl.time()
+                            if _remaining <= 0:
+                                logger.warning(
+                                    "agent stream exceeded %ss budget; using fallback",
+                                    AGENT_PRECOMPUTE_TIMEOUT_S,
+                                )
+                                full_reply = AGENT_FALLBACK_TEXT
+                                break
+                            try:
+                                _ev = await asyncio.wait_for(
+                                    _agent_iter.__anext__(),
+                                    timeout=min(HEARTBEAT_SECONDS, _remaining),
+                                )
+                            except asyncio.TimeoutError:
+                                # Nothing yet this window: keep proxies alive, keep waiting.
+                                yield ": ping\n\n"
+                                continue
+                            except StopAsyncIteration:
+                                break
+                            if _ev.get("type") == "status":
+                                yield f"data: {json.dumps({'status': _ev.get('label')})}\n\n"
+                            elif _ev.get("type") == "final":
+                                full_reply = _ev.get("text") or AGENT_FALLBACK_TEXT
+                    except Exception:
+                        logger.exception("agent stream failed; using fallback")
+                        full_reply = AGENT_FALLBACK_TEXT
+
+                    agent_sds = _captured.get("sds")
+                    agent_quote = _captured.get("quote")
+                    agent_form = _captured.get("form")
+                    agent_handoff = _captured.get("handoff")
+                    agent_grade_selector = _captured.get("grade_selector")
+                    agent_pack_selector = _captured.get("pack_selector")
+
                     if full_reply:
                         yield f"data: {json.dumps({'token': full_reply})}\n\n"
                     if agent_sds:
@@ -3678,6 +3625,88 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'grade_selector': agent_grade_selector})}\n\n"
                     if agent_pack_selector:
                         yield f"data: {json.dumps({'pack_selector': agent_pack_selector})}\n\n"
+
+                    # ── SESSION MEMORY: persist this turn on the gen-owned conn ──
+                    if _session_active and full_reply:
+                        try:
+                            _actions = {
+                                k: _captured[k]
+                                for k in ("sds", "quote", "form", "handoff",
+                                          "grade_selector", "pack_selector")
+                                if k in _captured
+                            } or None
+                            session_store.append_message(
+                                agent_cursor, chat_req.session_id, company["id"],
+                                "user", chat_req.message,
+                            )
+                            session_store.append_message(
+                                agent_cursor, chat_req.session_id, company["id"],
+                                "assistant", full_reply, actions=_actions,
+                            )
+                            _title = session_store.derive_title(_captured)
+                            if _title:
+                                session_store.set_session_title(
+                                    agent_cursor, chat_req.session_id, _title
+                                )
+                            # Score the lead deterministically (reuse lead_scoring) so the
+                            # band drives next-turn booking/handoff offers.
+                            _ctx = " ".join(filter(None, [_session_summary, chat_req.message]))
+                            _lp = sales_funnel.build_lead_profile(
+                                _prior_lead_profile, _captured,
+                                _score_lead(_ctx,
+                                            (_prior_lead_profile or {}).get("email"),
+                                            (_prior_lead_profile or {}).get("name")),
+                            )
+                            # Phase 5 — fold deterministically-extracted qualification facts.
+                            if pack is not None and pack.qualification_slots:
+                                _lp = qualification.merge_qualification(
+                                    _lp,
+                                    qualification.extract_facts(
+                                        chat_req.message, pack.qualification_slot_names()),
+                                )
+                            _new_state = sales_funnel.derive_state(_prior_state, _captured, _lp)
+                            session_store.update_session_state(
+                                agent_cursor, chat_req.session_id, company["id"], _new_state
+                            )
+                            session_store.update_lead_profile(
+                                agent_cursor, chat_req.session_id, company["id"], _lp
+                            )
+                            agent_gen_conn.commit()
+                            _msg_count = session_store.count_messages(
+                                agent_cursor, chat_req.session_id, company["id"]
+                            )
+                            if _msg_count > session_store.SUMMARY_THRESHOLD:
+                                background_tasks.add_task(
+                                    session_store.maybe_summarize_session,
+                                    chat_req.session_id, company["id"],
+                                    get_db_connection, release_db_connection,
+                                )
+                        except Exception:
+                            try:
+                                agent_gen_conn.rollback()
+                            except Exception:
+                                pass
+                            logger.exception(
+                                "session_store: failed to persist turn session=%s",
+                                chat_req.session_id,
+                            )
+
+                    # Real-time owner handoff (Phase 4b): warm quote lead pings the owner
+                    # on Slack + email. Best-effort + non-blocking (tiering inside).
+                    if agent_handoff:
+                        slack_url = company.get("slack_webhook_url")
+                        owner_to = company.get("alert_email") or company.get("owner_email")
+                        if slack_url or owner_to:
+                            background_tasks.add_task(
+                                _fire_agent_handoff,
+                                slack_url,
+                                owner_to,
+                                company.get("bot_name", ""),
+                                agent_handoff,
+                                company["id"],
+                                chat_req.session_id,
+                            )
+
                     yield "data: [DONE]\n\n"
                     return
 
@@ -3717,10 +3746,13 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                 yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
             
             finally:
+                # Release the generator-owned agent connection (vertical path only).
+                if agent_gen_conn is not None:
+                    release_db_connection(agent_gen_conn)
                 # ── ROBUST POST-STREAM PERSISTENCE ──
                 # This block runs even if the client disconnects (tab closed) mid-stream.
                 # We save whatever was generated up to the disconnection point.
-                
+
                 if full_reply.strip():
                     # 1. Async Cache Save (only for significant responses)
                     if query_hash and len(full_reply) > 10:

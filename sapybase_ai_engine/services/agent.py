@@ -30,7 +30,7 @@ import logging
 import os
 import re
 import secrets
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 from langchain_core.messages import ToolMessage
 
@@ -1035,7 +1035,35 @@ def _accumulate_usage(usage_out: Optional[Dict[str, int]], response) -> None:
         pass
 
 
-async def run_agent_loop(
+def _finish_reason(response) -> Optional[str]:
+    """Best-effort read of Gemini's per-call finish reason (STOP/MAX_TOKENS/...).
+
+    Surfaced so a fallback caused by hitting the token cap mid-thought is
+    distinguishable in logs from a real API error or an exhausted round budget —
+    previously all three looked identical.
+    """
+    try:
+        return (getattr(response, "response_metadata", None) or {}).get("finish_reason")
+    except Exception:
+        return None
+
+
+# Friendly, visitor-safe phrases for the streaming status ticker (Phase 1). The
+# widget shows these while a tool round runs; raw tool identifiers are never sent.
+_TOOL_STATUS_PHRASES = {
+    "get_sds": "Looking up the safety data sheet…",
+    "request_quote": "Checking pricing…",
+    "request_sample": "Preparing the sample request…",
+    "get_product_spec": "Finding the product…",
+}
+
+
+def _tool_status_phrase(tool_name: Optional[str]) -> str:
+    """Map a tool name to a visitor-safe status phrase (generic for unknown tools)."""
+    return _TOOL_STATUS_PHRASES.get(tool_name or "", "Working on it…")
+
+
+async def stream_agent_loop(
     model,
     messages: List[Any],
     tool_executor: Callable[[str, Dict[str, Any]], Dict[str, Any]],
@@ -1043,18 +1071,21 @@ async def run_agent_loop(
     max_rounds: int = MAX_TOOL_ROUNDS,
     max_calls_per_round: int = MAX_CALLS_PER_ROUND,
     usage_out: Optional[Dict[str, int]] = None,
-) -> str:
-    """Run Reason → Act → Observe until the model returns text, bounded.
+) -> AsyncIterator[Dict[str, Any]]:
+    """Async-generator form of :func:`run_agent_loop` (Phase 1 streaming).
 
-    ``model`` is a tool-bound chat model (``.bind_tools(...)``). ``tool_executor``
-    runs a tool by name and returns its observation dict. Returns the final answer
-    text. Any failure (LLM error, tool error, exhausted rounds without a text
-    answer) degrades to ``AGENT_FALLBACK_TEXT`` — the loop never raises and never
-    leaves the caller without a safe, human-routing reply.
+    Yields progress events so the SSE layer can show motion during the blocking
+    tool rounds instead of a dead spinner:
+      * ``{"type": "status", "tool": <name>, "label": <friendly phrase>}`` — emitted
+        just before each tool call executes.
+      * ``{"type": "final", "text": <answer>}`` — emitted exactly once at the end,
+        carrying the settled answer (or ``AGENT_FALLBACK_TEXT``).
 
-    ``usage_out`` (Phase 6): when a dict is passed, per-turn Gemini token counts are
-    accumulated into it (``input_tokens``/``output_tokens``/``total_tokens``, summed
-    across rounds) for cost metering. Omitting it is byte-for-byte the old behavior.
+    Round budget, empty-response retry, MAX_TOKENS logging and ``usage_out`` metering
+    are byte-for-byte identical to the old ``run_agent_loop`` (now a thin drain of
+    this generator). The final answer is still produced by a blocking ``ainvoke`` —
+    token-level streaming of the compose is a later slice, since it entangles with
+    the empty-retry guard that fixed the truncation bug.
     """
     convo = list(messages)
     for _round in range(max_rounds):
@@ -1062,17 +1093,57 @@ async def run_agent_loop(
             response = await model.ainvoke(convo)
         except Exception:
             logger.exception("agent loop: model.ainvoke failed")
-            return AGENT_FALLBACK_TEXT
+            yield {"type": "final", "text": AGENT_FALLBACK_TEXT}
+            return
 
         _accumulate_usage(usage_out, response)
+        finish_reason = _finish_reason(response)
+        if finish_reason == "MAX_TOKENS":
+            logger.warning("agent loop: round %d hit MAX_TOKENS", _round)
+
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
-            return _content_to_text(getattr(response, "content", "")) or AGENT_FALLBACK_TEXT
+            text = _content_to_text(getattr(response, "content", ""))
+            if text:
+                yield {"type": "final", "text": text}
+                return
+            # Empty content + no tool call is usually a one-off token-budget roll
+            # (thinking consumed the round) rather than a real failure — screenshot
+            # evidence showed the very next turn often succeeds unprompted. Retry
+            # once before giving up on the whole turn.
+            logger.warning(
+                "agent loop: empty response (finish_reason=%s), retrying once", finish_reason
+            )
+            try:
+                retry_response = await model.ainvoke(convo)
+            except Exception:
+                logger.exception("agent loop: retry model.ainvoke failed")
+                yield {"type": "final", "text": AGENT_FALLBACK_TEXT}
+                return
+            _accumulate_usage(usage_out, retry_response)
+            retry_finish_reason = _finish_reason(retry_response)
+            if retry_finish_reason == "MAX_TOKENS":
+                logger.warning("agent loop: retry hit MAX_TOKENS")
+            retry_tool_calls = getattr(retry_response, "tool_calls", None) or []
+            if retry_tool_calls:
+                response, tool_calls = retry_response, retry_tool_calls
+            else:
+                yield {
+                    "type": "final",
+                    "text": _content_to_text(getattr(retry_response, "content", ""))
+                    or AGENT_FALLBACK_TEXT,
+                }
+                return
 
         # Reason produced tool calls → Act + Observe, then loop to let the model
         # read the results and (usually) answer on the next round.
         convo.append(response)
         for call in tool_calls[:max_calls_per_round]:
+            yield {
+                "type": "status",
+                "tool": call.get("name"),
+                "label": _tool_status_phrase(call.get("name")),
+            }
             try:
                 observation = tool_executor(call.get("name"), call.get("args") or {})
             except Exception:
@@ -1090,4 +1161,31 @@ async def run_agent_loop(
 
     # Ran the round budget without the model settling on a text answer.
     logger.warning("agent loop: exhausted %d rounds without a text answer", max_rounds)
-    return AGENT_FALLBACK_TEXT
+    yield {"type": "final", "text": AGENT_FALLBACK_TEXT}
+
+
+async def run_agent_loop(
+    model,
+    messages: List[Any],
+    tool_executor: Callable[[str, Dict[str, Any]], Dict[str, Any]],
+    *,
+    max_rounds: int = MAX_TOOL_ROUNDS,
+    max_calls_per_round: int = MAX_CALLS_PER_ROUND,
+    usage_out: Optional[Dict[str, int]] = None,
+) -> str:
+    """Run Reason → Act → Observe until the model returns text, bounded.
+
+    Thin drain of :func:`stream_agent_loop`: returns only the final answer text and
+    discards the progress events, preserving the exact prior contract (including the
+    ``AGENT_FALLBACK_TEXT`` degrade path and ``usage_out`` metering) for callers that
+    do not stream.
+    """
+    final_text = AGENT_FALLBACK_TEXT
+    async for event in stream_agent_loop(
+        model, messages, tool_executor,
+        max_rounds=max_rounds, max_calls_per_round=max_calls_per_round,
+        usage_out=usage_out,
+    ):
+        if event.get("type") == "final":
+            final_text = event.get("text") or AGENT_FALLBACK_TEXT
+    return final_text
