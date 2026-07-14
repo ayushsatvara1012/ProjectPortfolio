@@ -843,6 +843,9 @@ class TestSchemasAndDirective:
         # Cost-control follow-up: a repeat ask for the SAME product/grade/pack/
         # quantity must restate the visible [State: ...] note, not re-call the tool.
         assert "do NOT call request_quote again for an unchanged repeat ask" in directive
+        # Same discipline for SDS: an unchanged repeat ask points back to the
+        # [State: SDS provided for ...] note instead of re-calling get_sds.
+        assert "calling get_sds again for an unchanged repeat ask" in directive
 
 
 # ── run_agent_loop ───────────────────────────────────────────────────────────

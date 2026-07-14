@@ -516,6 +516,10 @@ type Message = {
   grade_selector?: { product?: string; grades: string[]; grade_pack_map?: Record<string, string[]> };
   pack_selector?: { product?: string; grade?: string; pack_sizes: string[] };
   ts?: number;
+  // Vertical intelligence plan, Phase 2a: thumbs up/down on this reply. `id`
+  // doubles as the `client_message_id` sent on the originating /api/chat call
+  // so POST /api/feedback can attach the rating to the right chat_logs row.
+  feedback?: 1 | -1;
 };
 
 type SessionRow = {
@@ -1692,6 +1696,29 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     }
   };
 
+  // Thumbs up/down on a bot reply (vertical intelligence plan, Phase 2a).
+  // Optimistic — flips the local state immediately (a visitor tapping the
+  // wrong thumb corrects it by tapping the other one) and fires the POST in
+  // the background; this is non-critical telemetry, not worth blocking or
+  // showing an error toast over.
+  const submitFeedback = (messageId: string, rating: 1 | -1) => {
+    setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, feedback: rating } : m)));
+    if (!activeApiKey) return;
+    const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+    getSessionToken().then(sessionToken => {
+      fetch(`${activeApiUrl}/api/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': activeApiKey!,
+          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+          ...(sessionToken ? { 'x-Sapybase-session': sessionToken } : {}),
+        },
+        body: JSON.stringify({ client_message_id: messageId, rating }),
+      }).catch(() => { /* best-effort — a dropped rating isn't worth retrying */ });
+    });
+  };
+
   // Home-screen card tap: jump to the Chat screen, then run the card (opens its
   // mini-form for tool cards, or focuses the input for the "Ask" card).
   const openCardFromHome = (card: HubCard) => {
@@ -1821,9 +1848,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     const userMessage = overrideText || input.trim();
     userMessageCountRef.current += 1;
     const now = Date.now();
+    // Generated up front (not after the reply lands) so it can ride on the
+    // /api/chat request itself — the backend logs chat_logs rows keyed on it,
+    // and POST /api/feedback later attaches a rating to this exact row.
+    const clientMessageId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID() : `${sessionId}-${now}`;
     setMessages(prev => appendBounded(prev,
       { role: 'user', content: userMessage, ts: now },
-      { role: 'bot', content: '', isStreaming: true, ts: now },
+      { role: 'bot', content: '', isStreaming: true, ts: now, id: clientMessageId },
     ));
     setInput('');
     setIsLoading(true);
@@ -1906,7 +1938,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           ...(parentOriginChat ? { 'x-Sapybase-parent-origin': parentOriginChat } : {}),
           ...(sessionToken ? { 'x-Sapybase-session': sessionToken } : {}),
         },
-        body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId, visitor_id: visitorIdRef.current }),
+        body: JSON.stringify({ message: userMessage, history: recentHistory, session_id: sessionId, visitor_id: visitorIdRef.current, client_message_id: clientMessageId }),
         signal: ctrl.signal,
         openWhenHidden: true,
         async onopen(response) {
@@ -1918,7 +1950,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               if (last?.role === 'bot' && last.isStreaming) {
                 updated[updated.length - 1] = { ...last, content: data.reply, isStreaming: false };
               } else {
-                updated.push({ role: 'bot', content: data.reply, ts: Date.now() });
+                updated.push({ role: 'bot', content: data.reply, ts: Date.now(), id: clientMessageId });
               }
               return updated;
             });
@@ -2504,7 +2536,25 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                       onSelect={pack => handleSend(null, pack)}
                                     />
                                   )}
-                                  {metaLabel && !msg.isStreaming && <span suppressHydrationWarning className="text-[11px] font-google text-slate-400 dark:text-slate-500 mt-1 px-1 leading-none">{metaLabel}</span>}
+                                  {!msg.isStreaming && (metaLabel || (msg.role === 'bot' && msg.id)) && (
+                                    <div className="flex items-center gap-2 mt-1 px-1">
+                                      {metaLabel && <span suppressHydrationWarning className="text-[11px] font-google text-slate-400 dark:text-slate-500 leading-none">{metaLabel}</span>}
+                                      {msg.role === 'bot' && msg.id && (
+                                        <div className="flex items-center gap-0.5">
+                                          <button type="button" aria-label="Good response" aria-pressed={msg.feedback === 1}
+                                            onClick={() => submitFeedback(msg.id!, 1)}
+                                            className={`flex items-center justify-center w-5 h-5 rounded transition-colors ${msg.feedback === 1 ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400'}`}>
+                                            <MIcon name="thumb_up" className="text-[13px] leading-none" />
+                                          </button>
+                                          <button type="button" aria-label="Bad response" aria-pressed={msg.feedback === -1}
+                                            onClick={() => submitFeedback(msg.id!, -1)}
+                                            className={`flex items-center justify-center w-5 h-5 rounded transition-colors ${msg.feedback === -1 ? 'text-rose-500' : 'text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400'}`}>
+                                            <MIcon name="thumb_down" className="text-[13px] leading-none" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </motion.div>

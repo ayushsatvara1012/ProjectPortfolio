@@ -598,6 +598,11 @@ export default function TrainPage() {
     const [upgradeError, setUpgradeError] = useState<UpgradeError | null>(null);
     const [trainingJobId, setTrainingJobId] = useState<string | null>(null);
     const [trainingProgress, setTrainingProgress] = useState<any>(null);
+    // Catalog cleaning report from the last upload (vertical bots only) — the
+    // importer's warnings (near-miss columns, skipped rows) are too detailed
+    // for the 400px auto-dismiss toast, so they persist here until the next
+    // upload or an explicit dismiss.
+    const [catalogWarnings, setCatalogWarnings] = useState<string[] | null>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
     const pollAbortRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -683,6 +688,12 @@ export default function TrainPage() {
             return data;
         },
         onSuccess: async (data) => {
+            // Catalog cleaning warnings (near-miss columns, skipped rows) are
+            // computed synchronously before the chunking job is even queued —
+            // they live on this immediate response, not on the job-status poll.
+            const warnings: string[] = Array.isArray(data.catalog_warnings) ? data.catalog_warnings : [];
+            setCatalogWarnings(warnings.length > 0 ? warnings : null);
+
             if (data.job_id) {
                 setTrainingJobId(data.job_id);
                 setTrainingProgress({ status: 'queued', progress: 0, total: 0 });
@@ -730,10 +741,11 @@ export default function TrainPage() {
                             queryClient.invalidateQueries({ queryKey: ['knowledge-catalog', selectedBotId] });
                             refreshUser();
                             const action = status.is_upsert ? 'Source updated!' : 'Training complete!';
+                            const attention = warnings.length > 0 ? ` ${warnings.length} sheet issue(s) need attention — see below.` : '';
                             const msg = status.truncated
-                                ? `${action} ${status.chunks_added} chunks added (plan limit reached).`
-                                : `${action} ${status.chunks_added} chunks committed to your bot's knowledge base.`;
-                            showAlert('success', msg);
+                                ? `${action} ${status.chunks_added} chunks added (plan limit reached).${attention}`
+                                : `${action} ${status.chunks_added} chunks committed to your bot's knowledge base.${attention}`;
+                            showAlert(warnings.length > 0 ? 'warning' : 'success', msg);
                             return;
                         }
                         if (status.status === 'error') {
@@ -1125,6 +1137,41 @@ export default function TrainPage() {
                         </button>
                     </form>
                 </Card>
+
+                {/* Catalog cleaning report — near-miss columns / skipped rows from the
+                    last upload. Persists until dismissed or the next upload, since the
+                    detail here is too long for the auto-dismiss toast. */}
+                {catalogWarnings && catalogWarnings.length > 0 && (
+                    <Card className="p-4 sm:p-5">
+                        <div className="flex flex-col gap-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 ring-1 ring-inset ring-amber-100 dark:ring-amber-900/40 p-4">
+                            <div className="flex items-start justify-between gap-2.5">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                    <span className="material-symbols-outlined text-[18px] text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">warning</span>
+                                    <div className="min-w-0">
+                                        <p className="text-[13px] font-semibold text-amber-700 dark:text-amber-300">
+                                            Your last upload needs attention
+                                        </p>
+                                        <p className="text-[12px] text-amber-600/90 dark:text-amber-400/90 leading-relaxed mt-0.5">
+                                            The rest of your sheet imported fine — these rows or sheets were skipped or need a column rename.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setCatalogWarnings(null)}
+                                    aria-label="Dismiss catalog warnings"
+                                    className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">close</span>
+                                </button>
+                            </div>
+                            <ul className="list-disc pl-9 space-y-1.5">
+                                {catalogWarnings.map((w, i) => (
+                                    <li key={i} className="text-[12px] text-amber-700/90 dark:text-amber-300/90 leading-relaxed">{w}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </Card>
+                )}
 
                 {/* Product catalog (vertical bots only — self-hides otherwise) */}
                 <CatalogBrowser selectedBotId={selectedBotId} authFetch={authFetch} queryClient={queryClient} showAlert={showAlert} />

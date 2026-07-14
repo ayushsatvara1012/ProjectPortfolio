@@ -1229,6 +1229,7 @@ from db.models import (
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
     ByodRequestChangeRequest, TeaserEventRequest, TeaserSuggestRequest,
+    FeedbackRequest,
 )
 from services import teaser as teaser_service  # Contextual teaser (Phase 1)
 
@@ -2782,19 +2783,22 @@ def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: floa
         return round(min(max(rerank_top_score / 10.0, 0.0), 1.0), 2)
     return None
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None):
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None, client_message_id: Optional[str] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed.
     `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit).
     `input_tokens`/`output_tokens` (Phase 6) are the per-turn Gemini token counts
     (None = cache hit or a path that doesn't surface usage). `cached_tokens`
     (Phase 6 Slice B) is the subset of `input_tokens` billed at Gemini's implicit
-    context-cache discount (0 = no cache hit that turn, None = usage not surfaced)."""
+    context-cache discount (0 = no cache hit that turn, None = usage not surfaced).
+    `client_message_id` (Phase 2a, vertical intelligence plan) is the widget-
+    generated id a later POST /api/feedback attaches a thumbs up/down to —
+    control-plane only for now, same precedent as token metering above."""
     # BYOD tenants store chat_logs on their OWN database (Phase 3.2, dark by
     # default — data-plane write via get_tenant_db / vaayu_runtime). Degrades
     # soft on failure (§16.9): a tenant analytics-write hiccup never breaks chat.
-    # Token metering is control-plane only for now (the vertical agent is not on
-    # BYOD); the tenant logger keeps its existing signature.
+    # Token metering and feedback are control-plane only for now (the vertical
+    # agent is not on BYOD); the tenant logger keeps its existing signature.
     if byod_engine.routing_active(company_id):
         byod_engine.tenant_log_chat(
             company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence
@@ -2804,9 +2808,9 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens)
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id)
         )
         conn.commit()
     except Exception as e:
@@ -3148,7 +3152,8 @@ async def chat_endpoint(
                     # ── ASYNC ANALYTICS LOG (cache hit) ──────────────────────────
                     background_tasks.add_task(
                         log_chat_to_db, company["id"], chat_req.message,
-                        cached_response, True, False, chat_req.session_id
+                        cached_response, True, False, chat_req.session_id,
+                        client_message_id=chat_req.client_message_id,
                     )
 
                 return ChatResponse(
@@ -3807,6 +3812,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             _agent_usage.get("input_tokens"),
                             _agent_usage.get("output_tokens"),
                             _agent_usage.get("cached_tokens"),
+                            client_message_id=chat_req.client_message_id,
                         )
 
                         # 3. Usage Tracking (Background Task)
@@ -6082,6 +6088,41 @@ def delete_visitor_sessions(
         release_db_connection(conn)
 
 
+# ── VISITOR FEEDBACK (vertical intelligence plan, Phase 2a) ──────────────────
+
+@app.post("/api/feedback")
+@limiter.limit("30/minute", key_func=get_remote_address)  # per-IP burst guard
+@limiter.limit("60/minute")                                 # per-API-key ceiling
+def submit_message_feedback(
+    request: Request,
+    body: FeedbackRequest,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Thumbs up/down on a bot reply (widget-authenticated, tenant-scoped).
+
+    Attaches to the chat_logs row the widget's `client_message_id` was sent on
+    (see ChatRequest.client_message_id) — idempotent, so a visitor changing
+    their mind just overwrites the prior rating. Control-plane only for now
+    (same precedent as token metering, main.py:log_chat_to_db): BYOD-routed
+    companies degrade soft — the call still returns success (feedback is
+    non-critical telemetry, never worth surfacing an error to the visitor)
+    but there is no chat_logs row on the control plane to attach it to.
+    """
+    if byod_engine.routing_active(company["id"]):
+        return {"status": "ok"}
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE chat_logs SET feedback = %s WHERE company_id = %s AND client_message_id = %s",
+            (body.rating, company["id"], body.client_message_id),
+        )
+        conn.commit()
+        return {"status": "ok", "updated": cursor.rowcount > 0}
+    finally:
+        release_db_connection(conn)
+
+
 # ── SESSION BI: owner-facing demand/funnel/lost-sales analytics (Phase 3) ────
 from services.session_bi import (
     build_demand_signal,
@@ -6334,13 +6375,41 @@ def list_fixes_needed(
                  float(r[3]) if r[3] is not None else None, bool(r[4]))
                 for r in dcur.fetchall()
             ]
+
+        # Phase 2b (vertical intelligence plan): fold in explicit thumbs-down
+        # feedback as a signal. Control-plane only for now — chat_logs.feedback
+        # doesn't exist on the BYOD data-plane schema yet (same precedent as
+        # token metering) — `conn` is always the control-plane connection
+        # regardless of routing, so this is skipped rather than querying a
+        # column that isn't there.
+        downvoted_queries: set = set()
+        if not routed:
+            dv_ts = "AND created_at >= NOW() - INTERVAL '%s days'" % window_days
+            dvcur = conn.cursor()
+            try:
+                dvcur.execute(
+                    f"""
+                    SELECT DISTINCT lower(btrim(user_query))
+                    FROM chat_logs
+                    WHERE company_id = %s
+                      AND feedback = -1
+                      {dv_ts}
+                      AND btrim(COALESCE(user_query, '')) <> ''
+                    """,
+                    (company_id,),
+                )
+                downvoted_queries = {r[0] for r in dvcur.fetchall() if r[0]}
+            finally:
+                dvcur.close()
     finally:
         release_db_connection(conn)
 
-    fixes = _build_fixes_list(raw, min_confidence=min_confidence, limit=limit)
+    fixes = _build_fixes_list(raw, min_confidence=min_confidence, limit=limit,
+                              downvoted_queries=downvoted_queries)
     result = {
         "fixes": fixes,
         "total": len(fixes),
+        "downvoted_count": sum(1 for f in fixes if f["category"] == "downvoted"),
         "unanswered_count": sum(1 for f in fixes if f["category"] == "unanswered"),
         "low_confidence_count": sum(1 for f in fixes if f["category"] == "low_confidence"),
         "window_days": window_days,
@@ -8780,6 +8849,40 @@ def get_config(
         raise HTTPException(status_code=500, detail=f"Config serialization error: {str(e)}")
 
 
+def _dedupe_ranked_qa(rows: list, limit: int, answer_max_len: Optional[int] = 300) -> list[dict]:
+    """Rank (question, answer, ask_count) rows and drop near-identical questions.
+
+    Shared by the public FAQ miner (get_bot_faqs) and the owner-facing "needs
+    attention" queue (Phase 2b, vertical intelligence plan) — both aggregate
+    chat_logs the same way, just filtered to a different slice (answered vs.
+    downvoted/unanswered). `rows` must already be ORDER BY ask_count DESC (or
+    equivalent) so the first-seen representative of each near-duplicate
+    cluster is the most-asked one. De-dup is a cheap normalised-prefix
+    proxy for near-duplication (lowercase, collapsed whitespace, first 40
+    chars) — good enough for visitor phrasing variance, not a similarity model.
+    """
+    import re as _re
+
+    def _norm(q: str) -> str:
+        return _re.sub(r'\s+', ' ', q.lower().strip())
+
+    seen_prefixes: list[str] = []
+    out: list[dict] = []
+    for user_query, bot_response, ask_count in rows:
+        if len(out) >= limit:
+            break
+        norm = _norm(user_query)
+        prefix = norm[:40]
+        if any(prefix == s for s in seen_prefixes):
+            continue
+        seen_prefixes.append(prefix)
+        answer = (bot_response or "").strip()
+        if answer_max_len and len(answer) > answer_max_len:
+            answer = answer[:answer_max_len - 3].rstrip() + "..."
+        out.append({"question": user_query.strip(), "answer": answer, "ask_count": ask_count})
+    return out
+
+
 @app.get("/api/bots/{bot_id}/faqs")
 @limiter.limit("120/minute", key_func=get_remote_address)  # Per-IP; cache absorbs warm hits, this protects cold-cache deploy spikes
 @cache(expire=86400)
@@ -8839,33 +8942,14 @@ def get_bot_faqs(request: Request, bot_id: str):
         rows = cursor.fetchall()
         cursor.close()
 
-        # Step 2: de-duplicate in Python using simple normalisation.
-        # pg_trgm similarity requires the extension to be enabled and a
-        # cross-join — doing it in Python avoids an extra DB round-trip and
-        # keeps the query simple. Normalise: lowercase + collapse whitespace,
-        # then skip any candidate whose normalised form shares a 6-gram prefix
-        # with an already-accepted question (cheap proxy for near-duplication).
-        def _norm(q: str) -> str:
-            import re as _re
-            return _re.sub(r'\s+', ' ', q.lower().strip())
-
-        seen_prefixes: list[str] = []
-        faqs: list[dict] = []
-
-        for user_query, bot_response, _ in rows:
-            if len(faqs) >= 10:
-                break
-            norm = _norm(user_query)
-            # Skip if the first 40 normalised chars match an accepted question
-            prefix = norm[:40]
-            if any(prefix == s for s in seen_prefixes):
-                continue
-            seen_prefixes.append(prefix)
-            # Truncate answer to 300 chars for JSON-LD (schema.org recommends concise)
-            answer = bot_response.strip()
-            if len(answer) > 300:
-                answer = answer[:297].rstrip() + "..."
-            faqs.append({"question": user_query.strip(), "answer": answer})
+        # Step 2: de-duplicate near-identical questions and rank by ask
+        # frequency (pg_trgm similarity would need the extension enabled and
+        # a cross-join — doing it in Python avoids an extra DB round-trip).
+        # 300-char truncation matches schema.org's FAQPage guidance (concise).
+        faqs = [
+            {"question": qa["question"], "answer": qa["answer"]}
+            for qa in _dedupe_ranked_qa(rows, limit=10, answer_max_len=300)
+        ]
 
         # Step 3: fall back to generic FAQ for bots with no history yet
         if not faqs:
