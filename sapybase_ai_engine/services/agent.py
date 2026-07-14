@@ -181,7 +181,10 @@ def _resolve_product(cursor, company_id, cas: str, name: str, grade: str = "") -
         }
 
     # Multiple exact matches = several grades share a name/CAS. A supplied grade
-    # picks the exact one; otherwise ask which grade.
+    # picks the exact one; otherwise ask which grade. `rows` is included alongside
+    # `candidates` (which only carries name/cas/grade) so a caller that needs a
+    # field candidates don't expose — e.g. get_sds checking whether every grade
+    # actually points to the SAME sds_ref — doesn't need a second query.
     if len(rows) > 1:
         if grade:
             g = grade.strip().lower()
@@ -196,6 +199,7 @@ def _resolve_product(cursor, company_id, cas: str, name: str, grade: str = "") -
                 return {
                     "status": "ambiguous",
                     "candidates": [_candidate(r) for r in rows[:8]],
+                    "rows": rows,
                     "message": (
                         f"No '{grade}' grade is on file for this product. Available "
                         f"grades: {', '.join(available)}. Ask the visitor to pick one."
@@ -204,6 +208,7 @@ def _resolve_product(cursor, company_id, cas: str, name: str, grade: str = "") -
         return {
             "status": "ambiguous",
             "candidates": [_candidate(r) for r in rows[:8]],
+            "rows": rows,
             "message": "Several grades match. Ask the visitor which grade they need.",
         }
 
@@ -234,6 +239,24 @@ def get_sds(
         cursor, company_id, (cas_number or "").strip(), (product_name or "").strip(),
         (grade or "").strip(),
     )
+
+    if resolved.get("status") == "ambiguous":
+        # A Safety Data Sheet is tied to the PRODUCT (its CAS number), not to
+        # grade or pack size — unlike price or spec, which genuinely vary per
+        # grade. So "several grades match" is only a REAL ambiguity for this
+        # tool if those grades actually carry different SDS documents. `rows`
+        # (added alongside `candidates` for exactly this) lets us check: if
+        # every matched row shares the same https sds_ref, there's nothing to
+        # ask — serve it directly instead of stopping to ask which grade.
+        amb_rows = resolved.get("rows") or []
+        shared_refs = {r[4].strip() for r in amb_rows if _is_https(r[4])}
+        if len(shared_refs) == 1:
+            base = amb_rows[0]
+            # Blank the grade — this sheet applies across every grade that
+            # matched, so naming just the first one would misleadingly imply
+            # it's grade-specific.
+            resolved = {"row": (base[0], base[1], None, base[3], base[4], base[5])}
+
     if "row" not in resolved:
         return resolved
 

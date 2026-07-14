@@ -137,8 +137,26 @@ class TestGetSdsResolution:
                       CID, cas_number="7664-93-9")
         assert out["status"] == "no_sheet_on_file"
 
-    def test_multiple_exact_matches_are_ambiguous(self):
+    def test_multiple_exact_matches_same_sds_resolves_directly(self):
+        # An SDS is tied to the PRODUCT (CAS), not the grade or pack size — the
+        # common case is every grade sharing one sheet, so there's nothing to
+        # ask about; unlike price/spec, grade doesn't change the answer here.
         rows = [_row(grade="Battery"), _row(grade="Technical")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+        assert out["sds_url"] == "https://sds.example.com/h2so4.pdf"
+        # Grade is blanked, not just "whichever row happened to be first" —
+        # the sheet applies to every grade that matched.
+        assert out["product"]["grade"] is None
+
+    def test_multiple_exact_matches_different_sds_still_ambiguous(self):
+        # The rare real case: grades genuinely carry different SDS documents
+        # (e.g. a supplier publishes a separate sheet per purity) — THIS is a
+        # real ambiguity, so still ask which grade.
+        rows = [
+            _row(grade="Battery", sds_ref="https://sds.example.com/h2so4-battery.pdf"),
+            _row(grade="Technical", sds_ref="https://sds.example.com/h2so4-technical.pdf"),
+        ]
         out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
         assert out["status"] == "ambiguous"
         assert {c["grade"] for c in out["candidates"]} == {"Battery", "Technical"}
@@ -179,15 +197,34 @@ class TestGetSdsGradeDisambiguation:
         assert out["status"] == "found"
         assert out["product"]["grade"] == "AR"
 
-    def test_unstocked_grade_lists_available_grades(self):
+    def test_unstocked_grade_but_same_sds_resolves_directly(self):
+        # Visitor asked for a grade we don't stock (HPLC), but LR/AR share one
+        # sheet — the requested grade doesn't matter, so just serve it rather
+        # than bouncing them on a grade name that was never the real question.
         rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="HPLC")
+        assert out["status"] == "found"
+
+    def test_unstocked_grade_with_different_sds_lists_available_grades(self):
+        rows = [
+            _row(grade="LR", sds_ref="https://sds.example.com/h2so4-lr.pdf"),
+            _row(grade="AR", sds_ref="https://sds.example.com/h2so4-ar.pdf"),
+        ]
         out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="HPLC")
         assert out["status"] == "ambiguous"
         assert "HPLC" in out["message"]
         assert "LR" in out["message"] and "AR" in out["message"]
 
-    def test_no_grade_still_ambiguous(self):
+    def test_no_grade_same_sds_resolves_directly(self):
         rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+
+    def test_no_grade_different_sds_still_ambiguous(self):
+        rows = [
+            _row(grade="LR", sds_ref="https://sds.example.com/h2so4-lr.pdf"),
+            _row(grade="AR", sds_ref="https://sds.example.com/h2so4-ar.pdf"),
+        ]
         out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
         assert out["status"] == "ambiguous"
 

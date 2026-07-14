@@ -121,3 +121,22 @@ a tool for the same slot within a session.
       unchanged repeat ask — the same discipline `request_quote` already had.
       `get_product_spec` has no equivalent state note today, so it was left
       alone rather than adding an instruction with nothing to check against.
+- [x] **Bug fix (2026-07-14, reported by maintainer)** — `get_sds` was asking
+      "which grade?" for ANY product with more than one catalog row (grade or
+      pack-size variants), even when every row pointed to the identical SDS
+      document. An SDS is tied to the product (CAS number), not grade or pack
+      size, so that question was always unnecessary in the common case.
+      `_resolve_product` (`services/agent.py`) now also returns the raw
+      matched `rows` alongside its trimmed `candidates` on an "ambiguous" CAS/
+      name match; `get_sds` checks whether every matching row shares the same
+      `https` `sds_ref` and, if so, serves it directly (grade blanked in the
+      response, since it applies across all of them) instead of asking. Only
+      genuinely asks for a grade now when grades really do carry *different*
+      SDS documents (catalogs that upload one SDS link per grade, per
+      `chemical-catalog-upload-guide.md`'s "two separate sheets" option still
+      work correctly). `get_product_spec`/`request_quote` are untouched —
+      grade still matters there. 6 tests updated/added in `test_agent.py`
+      (3 pre-existing tests were asserting the old, incorrect behavior via a
+      same-`sds_ref`-by-default test fixture — split each into a same-SDS
+      case (now resolves directly) and a different-SDS case (still asks)).
+      Suite green (1498 backend tests, up from 1495).
