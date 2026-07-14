@@ -56,7 +56,20 @@ Pure refactor in `services/agent.py`, zero live-behavior change, suite green.
 - 7 new tests (`TestStreamAgentLoop`); full `test_agent.py` 95 passed, handoff + guardrail green.
 - Final answer still uses blocking `ainvoke`; token-level compose streaming deferred (it entangles with the empty-retry guard that fixed the truncation bug).
 
-#### Slice 1b - wire into the generator  [PENDING - touches the live endpoint]
+#### Slice 1b - wire into the generator  [DONE 2026-07-13, committed `9b374558`, PUSH PENDING]
+
+Committed (with the held quoting-bug fixes, per decision to ship both together).
+Suite green: backend 1479 passed, 125 skipped.
+Push to `origin/MainV2` (the deploy trigger) was blocked by the Claude Code permission classifier - the user must run `git push origin MainV2` (or approve it) to deploy.
+No integration test covers the SSE HTTP layer (the endpoint is too heavy to drive in tests).
+
+Heartbeat hardening + local smoke test [DONE 2026-07-13, second commit, PUSH PENDING]:
+- The driving loop first used `asyncio.wait_for(__anext__())`, which cancels the in-flight round on a heartbeat timeout and tears down this plain async generator (unlike LangChain's queued astream). Rewrote it to pull each event as its own task and race it against the heartbeat with `asyncio.wait`; a ping no longer cancels the round, only the total 30s deadline does, and a `finally` drains any cancelled task.
+- Local smoke test against REAL Gemini (stubbed tool executor, no prod-DB writes): chemical pack + tools loaded, status event streamed before the tool, then a full non-truncated answer (output 210 tokens, well under the 2048 ceiling - confirms the thinking-budget fix), usage metered. SMOKE PASS.
+- Deterministic hardening proof: a fake slow round with a tiny heartbeat fired 5 pings yet the final answer survived (old version would have torn it down). PASS.
+- Still unverified: the SSE HTTP formatting + gen-owned DB connection + session persistence on that conn - only the live deploy exercises those. Smoke-test via Render logs after push.
+
+Implemented exactly as specified below:
 
 1. Run the agent path inside `stream_generator()` using a generator-owned connection (`get_db_connection()` opened in the generator, released in its `finally`), because the outer conn is gone by then.
 2. Consume `stream_agent_loop`: forward `status` -> `data: {"status": label}` SSE, accumulate the `final` text and emit it (as today, one block; token streaming is a later slice).

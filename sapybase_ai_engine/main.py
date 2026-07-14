@@ -3577,6 +3577,13 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     _agent_iter = stream_agent_loop(
                         agent_model, messages, _tool_executor, usage_out=_agent_usage
                     ).__aiter__()
+                    # Pull each event as its own task so a heartbeat timeout does NOT
+                    # cancel the in-flight round: on timeout we ping and keep awaiting
+                    # the SAME task. Only the total AGENT_PRECOMPUTE_TIMEOUT_S deadline
+                    # cancels it. (asyncio.wait_for would tear the generator down — this
+                    # plain async generator, unlike LangChain's queued astream, can't
+                    # survive a mid-round cancellation.)
+                    _pending = None
                     try:
                         while True:
                             _remaining = _deadline - _rl.time()
@@ -3587,17 +3594,22 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                                 )
                                 full_reply = AGENT_FALLBACK_TEXT
                                 break
-                            try:
-                                _ev = await asyncio.wait_for(
-                                    _agent_iter.__anext__(),
-                                    timeout=min(HEARTBEAT_SECONDS, _remaining),
-                                )
-                            except asyncio.TimeoutError:
-                                # Nothing yet this window: keep proxies alive, keep waiting.
+                            if _pending is None:
+                                _pending = asyncio.ensure_future(_agent_iter.__anext__())
+                            _done, _ = await asyncio.wait(
+                                {_pending}, timeout=min(HEARTBEAT_SECONDS, _remaining)
+                            )
+                            if not _done:
+                                # Nothing yet this window: keep proxies alive, keep the
+                                # same round running.
                                 yield ": ping\n\n"
                                 continue
+                            try:
+                                _ev = _pending.result()
                             except StopAsyncIteration:
+                                _pending = None
                                 break
+                            _pending = None
                             if _ev.get("type") == "status":
                                 yield f"data: {json.dumps({'status': _ev.get('label')})}\n\n"
                             elif _ev.get("type") == "final":
@@ -3605,6 +3617,15 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     except Exception:
                         logger.exception("agent stream failed; using fallback")
                         full_reply = AGENT_FALLBACK_TEXT
+                    finally:
+                        # Deadline hit or error mid-round: cancel the in-flight task and
+                        # drain it so it never leaks or logs "Task was destroyed".
+                        if _pending is not None and not _pending.done():
+                            _pending.cancel()
+                            try:
+                                await _pending
+                            except BaseException:
+                                pass
 
                     agent_sds = _captured.get("sds")
                     agent_quote = _captured.get("quote")
