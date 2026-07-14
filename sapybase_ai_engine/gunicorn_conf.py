@@ -13,7 +13,7 @@ This config keeps those files correct across the worker lifecycle:
     double-counts.
 
 Start command (Render):
-    gunicorn -c gunicorn_conf.py -w 4 -k uvicorn.workers.UvicornWorker --timeout 120 main:app
+    gunicorn -c gunicorn_conf.py -w 2 -k uvicorn.workers.UvicornWorker --timeout 120 main:app
 
 If PROMETHEUS_MULTIPROC_DIR is unset, both hooks are no-ops, so this config is safe
 to use even before multiprocess mode is enabled.
