@@ -30,6 +30,9 @@ import {
   ConnectIcon,
   ForumIcon,
   PlusIcon,
+  MarkEmailReadIcon,
+  ThumbsUpIcon,
+  ThumbsDownIcon,
 } from '@/src/components/icons';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -668,6 +671,9 @@ const ICON_COMPONENTS: Record<string, React.ComponentType<any>> = {
   science: ExperimentIcon,
   arrow_outward: ExternalLinkIcon,
   forum: ForumIcon,
+  mark_email_read: MarkEmailReadIcon,
+  thumb_up: ThumbsUpIcon,
+  thumb_down: ThumbsDownIcon,
 };
 
 function MIcon({ name, className }: { name: string; className?: string }) {
@@ -2537,19 +2543,19 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                     />
                                   )}
                                   {!msg.isStreaming && (metaLabel || (msg.role === 'bot' && msg.id)) && (
-                                    <div className="flex items-center gap-2 mt-1 px-1">
+                                    <div className="flex items-center gap-2 mt-2 px-1">
                                       {metaLabel && <span suppressHydrationWarning className="text-[11px] font-google text-slate-400 dark:text-slate-500 leading-none">{metaLabel}</span>}
                                       {msg.role === 'bot' && msg.id && (
                                         <div className="flex items-center gap-0.5">
                                           <button type="button" aria-label="Good response" aria-pressed={msg.feedback === 1}
                                             onClick={() => submitFeedback(msg.id!, 1)}
-                                            className={`flex items-center justify-center w-5 h-5 rounded transition-colors ${msg.feedback === 1 ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400'}`}>
-                                            <MIcon name="thumb_up" className="text-[13px] leading-none" />
+                                            className={`flex items-center justify-center w-5 h-5 rounded ${msg.feedback === 1 ? 'text-emerald-600' : 'text-slate-600 dark:text-slate-300'}`}>
+                                            <ThumbsUpIcon size={14} />
                                           </button>
                                           <button type="button" aria-label="Bad response" aria-pressed={msg.feedback === -1}
                                             onClick={() => submitFeedback(msg.id!, -1)}
-                                            className={`flex items-center justify-center w-5 h-5 rounded transition-colors ${msg.feedback === -1 ? 'text-rose-500' : 'text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400'}`}>
-                                            <MIcon name="thumb_down" className="text-[13px] leading-none" />
+                                            className={`flex items-center justify-center w-5 h-5 rounded ${msg.feedback === -1 ? 'text-rose-600' : 'text-slate-600 dark:text-slate-300'}`}>
+                                            <ThumbsDownIcon size={14} />
                                           </button>
                                         </div>
                                       )}

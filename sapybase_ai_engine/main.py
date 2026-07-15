@@ -1176,6 +1176,15 @@ ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173"
 }
 
+# Local-dev-only fallback for the Origin check in verify_api_key_and_origin
+# (Section 3.4 below). ALLOWED_ORIGINS above is the production/preview
+# allowlist; this covers other localhost/127.0.0.1 ports a developer might run
+# the widget's host app on. Only consulted when ENV=development.
+_DEV_PORTS = (3000, 3001, 4200, 5000, 5173, 5174, 5175, 5176, 5177, 5178, 5179, 5180, 8000, 8080)
+ALLOWED_DEV_ORIGINS = {
+    f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in _DEV_PORTS
+}
+
 # Sync middleware with our strict allowlist
 combined_origins = list(ALLOWED_ORIGINS)
 
