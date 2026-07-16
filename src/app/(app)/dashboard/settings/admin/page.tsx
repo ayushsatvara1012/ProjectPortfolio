@@ -357,7 +357,7 @@ const VerticalEditor = ({
 };
 
 // ── Manage Slide-Over ─────────────────────────────────────────────────────────
-const ManageSlideOver = ({ user, onClose, onSave, isSaving, verticals, onChangeVertical, isVerticalPending }: { user: any; onClose: () => void; onSave: (p: any) => void; isSaving: boolean; verticals: string[]; onChangeVertical: (companyId: string, vertical: string | null) => void; isVerticalPending: boolean }) => {
+const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVertical, isVerticalPending }: { user: any; onClose: () => void; onSave: (p: any) => void; isSaving: boolean; verticals: string[]; onChangeVertical: (companyId: string, vertical: string | null) => void; isVerticalPending: boolean }) => {
   const authFetch = useAuthenticatedFetch();
   const queryClient = useQueryClient();
   const existingCfg = user.custom_plan_config || {};
@@ -511,16 +511,16 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving, verticals, onChangeV
   const companies = Array.isArray(user.companies) ? user.companies : [];
 
   return (
-    <div className="fixed inset-0 z-[100] flex" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 lg:p-8" role="dialog" aria-modal="true">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/40 dark:bg-slate-950/80 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/40 dark:bg-slate-950/80 backdrop-blur-md"
         onClick={onClose}
       />
       <motion.div
-        initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+        initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="ml-auto relative z-[110] flex flex-col w-full sm:max-w-xl md:w-1/2 lg:w-1/2 h-full bg-white dark:bg-slate-950 shadow-2xl overflow-y-auto sm:rounded-l-2xl"
+        className="relative z-[110] flex flex-col w-full h-full bg-white dark:bg-slate-950 shadow-2xl overflow-y-auto rounded-2xl"
         data-lenis-prevent
       >
         {/* Header */}
@@ -627,7 +627,7 @@ const ManageSlideOver = ({ user, onClose, onSave, isSaving, verticals, onChangeV
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <NumInput label="Max bots" value={draft.cfg.max_bots} onChange={v => setCfg('max_bots', v)} placeholder="10" disabled={isSaving} />
                         <NumInput label="Messages / mo" value={draft.cfg.max_messages} onChange={v => setCfg('max_messages', v)} placeholder="5000" disabled={isSaving} />
-                        <NumInput label="Storage (chunks)" value={draft.cfg.max_chunks} onChange={v => setCfg('max_chunks', v)} placeholder="1000" disabled={isSaving} />
+                        <NumInput label="Knowledge base chunks" value={draft.cfg.max_chunks} onChange={v => setCfg('max_chunks', v)} placeholder="1000" disabled={isSaving} hint="RAG vector chunks — unrelated to the BYOD database toggle below" />
                       </div>
                     </div>
 
@@ -1466,10 +1466,10 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── Slide-over ── */}
+      {/* ── Manage modal ── */}
       <AnimatePresence>
         {selectedUser && (
-          <ManageSlideOver
+          <ManageModal
             user={selectedUser}
             onClose={() => setSelectedUser(null)}
             isSaving={limitsMutation.isPending}
