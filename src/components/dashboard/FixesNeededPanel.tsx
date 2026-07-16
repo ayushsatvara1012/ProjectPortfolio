@@ -20,7 +20,7 @@ interface FixItem {
     ask_count: number;
     last_asked: string | null;
     confidence: number | null;
-    category: 'unanswered' | 'low_confidence';
+    category: 'downvoted' | 'unanswered' | 'low_confidence';
 }
 
 const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized, mode = 'full', onSelectQuery, activeQuery }: FixesNeededPanelProps) => {
@@ -37,6 +37,7 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized, mode = 'full
 
     const fixes: FixItem[] = (data as any)?.fixes || [];
     const total = (data as any)?.total || 0;
+    const downvotedCount = (data as any)?.downvoted_count || 0;
     const unansweredCount = (data as any)?.unanswered_count || 0;
     const lowConfCount = (data as any)?.low_confidence_count || 0;
 
@@ -75,6 +76,7 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized, mode = 'full
                 </div>
                 {total > 0 && (
                     <div className="flex items-center gap-1.5 shrink-0">
+                        {downvotedCount > 0 && <Badge tone="hot" title="Thumbs-downed answers">{downvotedCount}</Badge>}
                         {unansweredCount > 0 && <Badge tone="alert" title="Unanswered questions">{unansweredCount}</Badge>}
                         {lowConfCount > 0 && <Badge tone="warm" title="Low-confidence answers">{lowConfCount}</Badge>}
                     </div>
@@ -86,6 +88,7 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized, mode = 'full
             ) : (
                 <ul className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/60">
                     {fixes.map((fix, idx) => {
+                        const isDownvoted = fix.category === 'downvoted';
                         const isUnanswered = fix.category === 'unanswered';
                         const isActive = activeQuery === fix.query;
                         const Wrapper: any = isSidebar ? 'button' : 'div';
@@ -105,15 +108,15 @@ const FixesNeededPanel = ({ selectedBotId, authFetch, isAuthorized, mode = 'full
                                         isSidebar && (isActive ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : 'border-l-transparent'),
                                     )}
                                 >
-                                    <span className={cx('h-2 w-2 rounded-full mt-1.5 shrink-0', isUnanswered ? 'bg-amber-500' : 'bg-orange-400')} />
+                                    <span className={cx('h-2 w-2 rounded-full mt-1.5 shrink-0', isDownvoted ? 'bg-rose-500' : isUnanswered ? 'bg-amber-500' : 'bg-orange-400')} />
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug break-words">{fix.query}</p>
                                         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5 text-[11.5px] text-slate-500 dark:text-slate-400">
-                                            <span className={cx('font-semibold', isUnanswered ? 'text-amber-600 dark:text-amber-400' : 'text-orange-600 dark:text-orange-400')}>
-                                                {isUnanswered ? 'Unanswered' : 'Low confidence'}
+                                            <span className={cx('font-semibold', isDownvoted ? 'text-rose-600 dark:text-rose-400' : isUnanswered ? 'text-amber-600 dark:text-amber-400' : 'text-orange-600 dark:text-orange-400')}>
+                                                {isDownvoted ? 'Thumbs down' : isUnanswered ? 'Unanswered' : 'Low confidence'}
                                             </span>
                                             <span className="tabular-nums">Asked {fmtNum(fix.ask_count)}×</span>
-                                            {!isUnanswered && fix.confidence !== null && <span className="tabular-nums">{Math.round(fix.confidence * 100)}% grounded</span>}
+                                            {!isDownvoted && !isUnanswered && fix.confidence !== null && <span className="tabular-nums">{Math.round(fix.confidence * 100)}% grounded</span>}
                                             {fix.last_asked && <span className="tabular-nums">{fmtDate(fix.last_asked)}</span>}
                                         </div>
                                     </div>

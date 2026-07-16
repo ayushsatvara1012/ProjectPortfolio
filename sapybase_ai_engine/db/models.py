@@ -46,6 +46,10 @@ class ChatRequest(BaseModel):
     )
     session_id: Optional[str] = Field(None, max_length=128, description="Client-side session tracking id")
     visitor_id: Optional[str] = Field(None, max_length=128, description="Device-local visitor id (localStorage UUID) — scopes the Phase 1d history list")
+    client_message_id: Optional[str] = Field(
+        None, max_length=64,
+        description="Widget-generated id for the bot reply this turn produces — lets a later POST /api/feedback attach a rating to this exact message",
+    )
 
     @validator('message')
     def sanitize_jailbreak_patterns(cls, v):
@@ -58,6 +62,11 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     sources: list[str]
+
+
+class FeedbackRequest(BaseModel):
+    client_message_id: str = Field(..., max_length=64, description="The client_message_id sent on the originating /api/chat call")
+    rating: Literal[1, -1] = Field(..., description="1 = thumbs up, -1 = thumbs down")
 
 
 class LeadCaptureRequest(BaseModel):

@@ -127,6 +127,41 @@ class TestOrdering:
 
 # ── Limit & shape ────────────────────────────────────────────────────────────
 
+class TestDownvoted:
+    """Phase 2b (vertical intelligence plan): explicit thumbs-down feedback,
+    passed in as a set of normalized queries — a stronger, direct signal than
+    the implicit is_unanswered/confidence heuristics."""
+
+    def test_downvoted_query_is_flagged(self):
+        out = main._build_fixes_list(
+            [_row("store hours", 5, "2026-06-01", 0.9, False)],
+            downvoted_queries={"store hours"},
+        )
+        assert len(out) == 1
+        assert out[0]["category"] == "downvoted"
+
+    def test_downvoted_outranks_unanswered_and_low_confidence(self):
+        rows = [
+            _row("low conf", 99, "2026-06-01", 0.1, False),
+            _row("unanswered", 50, "2026-06-01", None, True),
+            _row("downvoted", 1, "2026-01-01", 0.9, False),  # would be excluded otherwise
+        ]
+        out = main._build_fixes_list(rows, downvoted_queries={"downvoted"})
+        assert [it["category"] for it in out] == ["downvoted", "unanswered", "low_confidence"]
+
+    def test_downvoted_match_is_case_and_whitespace_insensitive(self):
+        # The endpoint lowercases + btrims both sides before building the set.
+        out = main._build_fixes_list(
+            [_row("  Store Hours  ", 1, "2026-06-01", 0.9, False)],
+            downvoted_queries={"store hours"},
+        )
+        assert out[0]["category"] == "downvoted"
+
+    def test_no_downvotes_behaves_like_before(self):
+        out = main._build_fixes_list([_row("store hours", 5, "2026-06-01", 0.9, False)])
+        assert out == []
+
+
 class TestLimitAndShape:
     def test_limit_is_applied(self):
         rows = [_row(f"q{i}", i, "2026-06-01", None, True) for i in range(100)]
