@@ -9113,6 +9113,73 @@ def get_admin_stats(request: Request, admin: dict = Depends(get_admin_user)):
     finally:
         release_db_connection(conn)
 
+@app.get("/api/admin/token-usage")
+@limiter.limit("30/minute")
+def get_admin_token_usage(request: Request, window_days: int = 30, admin: dict = Depends(get_admin_user)):
+    """Cross-tenant Gemini token-spend rollup (docs/admin-panel-sync-plan.md Phase D) —
+    the fleet-wide counterpart to the per-company token_metrics block in
+    GET /api/sessions/bi/{company_id} (services/session_bi.build_token_metrics).
+    Same source and scope as that endpoint: control-plane `chat_logs` only.
+    BYOD-routed tenants store chat_logs in their OWN database and are not reflected
+    here or in the per-company endpoint — a pre-existing scope, not new to this
+    rollup. Aggregate counts only, no visitor PII, so this only needs the standard
+    admin gate (matches /api/admin/stats), not the step-up dependency used where a
+    fleet view exposes contact details."""
+    window_days = max(0, min(int(window_days or 30), 365))
+    ts_filter = "AND created_at >= NOW() - INTERVAL '%s days'" % window_days if window_days > 0 else ""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT
+                COUNT(*)                                                   AS turns,
+                COUNT(*) FILTER (WHERE was_cache_hit)                       AS cache_hits,
+                COALESCE(SUM(input_tokens), 0)                             AS input_tokens,
+                COALESCE(SUM(output_tokens), 0)                            AS output_tokens,
+                COUNT(*) FILTER (WHERE input_tokens IS NOT NULL)           AS metered_turns,
+                COUNT(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL) AS conversations,
+                COALESCE(SUM(cached_tokens), 0)                            AS cached_tokens
+            FROM chat_logs
+            WHERE 1 = 1 {ts_filter}
+            """
+        )
+        tm = cursor.fetchone() or (0, 0, 0, 0, 0, 0, 0)
+
+        cursor.execute(
+            f"""
+            SELECT c.id, c.company_name,
+                   COALESCE(SUM(cl.input_tokens), 0)  AS input_tokens,
+                   COALESCE(SUM(cl.output_tokens), 0) AS output_tokens,
+                   COUNT(*) FILTER (WHERE cl.input_tokens IS NOT NULL) AS metered_turns
+            FROM chat_logs cl
+            JOIN companies c ON c.id = cl.company_id
+            WHERE cl.input_tokens IS NOT NULL {ts_filter.replace('created_at', 'cl.created_at')}
+            GROUP BY c.id, c.company_name
+            ORDER BY (COALESCE(SUM(cl.input_tokens), 0) + COALESCE(SUM(cl.output_tokens), 0)) DESC
+            LIMIT 20
+            """
+        )
+        by_company = [
+            {
+                "company_id": str(r[0]),
+                "company_name": r[1],
+                "input_tokens": int(r[2] or 0),
+                "output_tokens": int(r[3] or 0),
+                "total_tokens": int(r[2] or 0) + int(r[3] or 0),
+                "metered_turns": int(r[4] or 0),
+            }
+            for r in cursor.fetchall()
+        ]
+
+        return {
+            "window_days": window_days,
+            "fleet": build_token_metrics(tm[0], tm[1], tm[2], tm[3], tm[4], tm[5], tm[6]),
+            "top_companies": by_company,
+        }
+    finally:
+        release_db_connection(conn)
+
 @app.post("/api/admin/reload-jailbreak")
 def reload_jailbreak_patterns(request: Request, x_admin_key: str = Header(None)):
     """Reload jailbreak patterns from disk without a redeploy. Requires x-admin-key header."""

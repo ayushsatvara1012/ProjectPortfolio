@@ -974,6 +974,12 @@ export default function AdminPage() {
     enabled: isAdmin && activeTab === 'metrics',
   });
 
+  const tokenUsageQuery = useQuery({
+    queryKey: ['admin', 'token-usage'],
+    queryFn: () => authFetch('/api/admin/token-usage?window_days=30') as Promise<any>,
+    enabled: isAdmin && activeTab === 'metrics',
+  });
+
   // Explore enquiries — fetched always (not just on the tab) so the pending
   // badge is live on every tab. Shares its cache key with ExploreEnquiriesTab.
   const enquiriesQuery = useQuery({
@@ -1447,6 +1453,71 @@ export default function AdminPage() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Token spend (Phase D) */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 transition-colors duration-500">
+                  <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">token</span>
+                    Gemini token spend (last 30 days)
+                  </p>
+                  <p className="text-xs font-google text-slate-400 dark:text-slate-500 mb-5">
+                    Control-plane chat_logs only — BYOD-routed tenants store logs in their own database and aren&apos;t reflected here.
+                  </p>
+                  {tokenUsageQuery.isLoading ? (
+                    <p className="text-base font-google text-slate-400 py-6 text-center">Loading…</p>
+                  ) : tokenUsageQuery.isError ? (
+                    <p className="text-base font-google text-red-500 py-6 text-center">Failed to load token usage.</p>
+                  ) : (() => {
+                    const fleet = tokenUsageQuery.data?.fleet || {};
+                    const topCompanies: any[] = tokenUsageQuery.data?.top_companies || [];
+                    const compact = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n || 0);
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+                          {[
+                            { label: 'Total tokens', value: compact(fleet.total_tokens) },
+                            { label: 'Metered turns', value: compact(fleet.metered_turns) },
+                            { label: 'Avg / conversation', value: compact(fleet.avg_tokens_per_conversation) },
+                            { label: 'Prompt cache hit rate', value: `${Math.round((fleet.prompt_cache_hit_rate || 0) * 100)}%` },
+                          ].map((s, i) => (
+                            <div key={i} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4">
+                              <p className="text-xs font-medium font-google text-slate-400 dark:text-slate-500 mb-1">{s.label}</p>
+                              <p className="text-lg font-semibold font-google text-slate-900 dark:text-slate-100">{s.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {topCompanies.length === 0 ? (
+                          <p className="text-base font-google text-slate-400 py-4 text-center">No metered token usage in this window.</p>
+                        ) : (
+                          <div className="overflow-x-auto -mx-1">
+                            <table className="w-full min-w-[520px] text-sm">
+                              <thead>
+                                <tr className="text-left text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                  <th className="py-2 px-2 font-medium">Company</th>
+                                  <th className="py-2 px-2 font-medium text-right">Input</th>
+                                  <th className="py-2 px-2 font-medium text-right">Output</th>
+                                  <th className="py-2 px-2 font-medium text-right">Total</th>
+                                  <th className="py-2 px-2 font-medium text-right">Turns</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {topCompanies.map(c => (
+                                  <tr key={c.company_id} className="border-t border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-200">
+                                    <td className="py-2.5 px-2 truncate max-w-[220px]">{c.company_name || 'Unnamed'}</td>
+                                    <td className="py-2.5 px-2 text-right">{compact(c.input_tokens)}</td>
+                                    <td className="py-2.5 px-2 text-right">{compact(c.output_tokens)}</td>
+                                    <td className="py-2.5 px-2 text-right font-medium">{compact(c.total_tokens)}</td>
+                                    <td className="py-2.5 px-2 text-right">{c.metered_turns}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             );

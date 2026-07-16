@@ -68,10 +68,27 @@ but several gaps and one UX request from the user.
   column exists on `agent_requests` today (confirmed via migration 0023), so there's
   nothing to show yet; would need a new column + write path first.
 
-### Phase D — Cross-tenant cost rollup (backlog, not yet started)
+### Phase D — Cross-tenant cost rollup (DONE 2026-07-16)
 
-- Extend admin Metrics tab (or new tab) with a Gemini token-spend rollup sourced from
-  `chat_logs` token columns / `build_token_metrics`, alongside existing Polar metrics.
+- Backend: `GET /api/admin/token-usage` (`main.py`, right after `get_admin_stats`) reuses
+  `services.session_bi.build_token_metrics` (same pure shaping function the per-company
+  `GET /api/sessions/bi/{company_id}` endpoint already uses) for a fleet-wide summary,
+  plus a per-company breakdown (`top_companies`, top 20 by total tokens, 30-day default
+  window via `window_days`, clamped to 365). Guarded by `get_admin_user` only — matches
+  `/api/admin/stats`'s precedent (aggregate counts, no visitor PII, unlike the agent-requests
+  fleet view which needed step-up).
+- **Known scope limit, documented not silently swallowed**: this reads control-plane
+  `chat_logs` only. BYOD-routed tenants store `chat_logs` in their OWN database (per
+  `tests/byod/test_byod_offboard.py`'s `_TENANT_TABLES`), so their token spend is NOT
+  reflected here — the SAME pre-existing scope the per-company Session BI endpoint already
+  has (it doesn't route through `byod_engine` either). Not fixed as part of Phase D; flagged
+  in both the endpoint docstring and the admin UI copy so it doesn't read as a bug.
+- Frontend: new "Gemini token spend" card in the admin Metrics tab (`page.tsx`) — 4 stat
+  tiles (total tokens, metered turns, avg/conversation, prompt cache hit rate) + a
+  top-companies table, fetched via its own `tokenUsageQuery` scoped to `activeTab === 'metrics'`.
+- Tests: `tests/test_admin_token_usage.py` (4 new tests — fleet shape via
+  `build_token_metrics`, per-company join/ordering, window_days clamping, 403 for
+  non-admins). Suite green: frontend 407, backend 1488 (up from 1484), tsc 0, lint 0 errors.
 
 ### Phase E — Dead endpoint decision (backlog, not yet started)
 
@@ -79,7 +96,8 @@ but several gaps and one UX request from the user.
 
 ## Status
 
-Phase A (fullscreen modal), Phase B (label fix), and Phase C (fleet agent-requests view)
-are done. A and B are UI-only; C adds one new read-only backend endpoint (no migration).
-Phases D-E are documented backlog — no code written yet, no commitment on order until
-the user prioritizes.
+Phase A (fullscreen modal), Phase B (label fix), Phase C (fleet agent-requests view), and
+Phase D (cross-tenant cost rollup) are done. A and B are UI-only; C and D each add one
+new read-only backend endpoint (no migrations).
+Phase E is documented backlog — no code written yet, no commitment on timing until the
+user prioritizes.
