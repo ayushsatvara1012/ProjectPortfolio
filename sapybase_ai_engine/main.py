@@ -9524,19 +9524,6 @@ def run_session_retention(request: Request, x_cron_secret: str = Header(None)):
         release_db_connection(conn)
 
 
-@app.get("/api/admin/companies")
-@limiter.limit("30/minute")
-def get_all_companies(request: Request, admin: dict = Depends(get_admin_user)):
-    """Admin-only view of all registered companies."""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, company_name, allowed_origin, created_at FROM companies ORDER BY created_at DESC")
-        companies = cursor.fetchall()
-        return [{"id": c[0], "name": c[1], "origin": c[2], "created_at": c[3]} for c in companies]
-    finally:
-        release_db_connection(conn)
-
 @app.get("/api/admin/agent-requests")
 @limiter.limit("30/minute")
 def list_agent_requests_fleet(

@@ -90,14 +90,20 @@ but several gaps and one UX request from the user.
   `build_token_metrics`, per-company join/ordering, window_days clamping, 403 for
   non-admins). Suite green: frontend 407, backend 1488 (up from 1484), tsc 0, lint 0 errors.
 
-### Phase E — Dead endpoint decision (backlog, not yet started)
+### Phase E — Dead endpoint decision (DONE 2026-07-16)
 
-- Decide: wire `GET /api/admin/companies` into a UI surface, or delete it. Not urgent.
+- Deleted `GET /api/admin/companies` (`get_all_companies`) from `main.py`. Re-confirmed
+  zero callers (frontend, tests, or elsewhere in the backend) before removing — the only
+  other match anywhere for "admin/companies" was the unrelated
+  `PATCH /api/admin/companies/{company_id}/vertical` route, and one docstring mention in
+  `tests/byod/test_byod_offboard.py` referring to a hypothetical DELETE endpoint, not this
+  GET. `GET /api/admin/users` already returns each user's companies nested, so there was
+  no gap to fill by wiring it up instead. Backend suite unchanged at 1488 passed, confirming
+  nothing depended on it.
 
 ## Status
 
-Phase A (fullscreen modal), Phase B (label fix), Phase C (fleet agent-requests view), and
-Phase D (cross-tenant cost rollup) are done. A and B are UI-only; C and D each add one
-new read-only backend endpoint (no migrations).
-Phase E is documented backlog — no code written yet, no commitment on timing until the
-user prioritizes.
+All five phases are done. A and B are UI-only; C and D each add one new read-only backend
+endpoint (no migrations); E removes one unused endpoint. No migrations touched anywhere
+in this plan. Everything is committed to `MainV2` locally, not yet pushed to
+`origin/MainV2`.
