@@ -9470,6 +9470,75 @@ def get_all_companies(request: Request, admin: dict = Depends(get_admin_user)):
     finally:
         release_db_connection(conn)
 
+@app.get("/api/admin/agent-requests")
+@limiter.limit("30/minute")
+def list_agent_requests_fleet(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    kind: str = "all",
+    status: str = "all",
+    admin: dict = Depends(get_admin_user),
+    _fresh: dict = Depends(require_fresh_admin),
+):
+    """Fleet-wide counterpart to /api/companies/{company_id}/agent-requests: every
+    chemical-agent handoff request (quote/sample/consult) across every tenant, with
+    the owning company joined on. Read-only. Step-up gated like the BYOD fleet list
+    since a row carries visitor contact PII (name/email/phone) and this view spans
+    every company at once rather than one owner's own bot."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        limit = max(1, min(int(limit or 50), 200))
+        offset = max(0, int(offset or 0))
+        clauses = ["1 = 1"]
+        params: list = []
+        if kind and kind != "all":
+            clauses.append("a.kind = %s")
+            params.append(kind)
+        if status and status != "all":
+            clauses.append("a.status = %s")
+            params.append(status)
+        count_params = list(params)
+        params.extend([limit, offset])
+        cursor.execute(
+            f"""
+            SELECT a.id, a.kind, a.product_name, a.cas_number, a.grade, a.pack_size,
+                   a.quantity, a.contact_name, a.contact_email, a.contact_phone, a.note,
+                   a.status, a.created_at, a.session_id,
+                   a.company_id, c.company_name, c.bot_name
+            FROM agent_requests a
+            JOIN companies c ON c.id = a.company_id
+            WHERE {' AND '.join(clauses)}
+            ORDER BY a.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            params,
+        )
+        rows = cursor.fetchall() or []
+        items = [
+            {
+                "id": str(r[0]), "kind": r[1], "product": r[2], "cas_number": r[3],
+                "grade": r[4], "pack_size": r[5], "quantity": r[6],
+                "contact_name": r[7], "contact_email": r[8], "contact_phone": r[9],
+                "note": r[10], "status": r[11],
+                "created_at": r[12].isoformat() if hasattr(r[12], "isoformat") else str(r[12]),
+                "session_id": r[13],
+                "company_id": str(r[14]),
+                "company_name": r[15],
+                "bot_name": r[16],
+            }
+            for r in rows
+        ]
+        cursor.execute(
+            f"SELECT COUNT(*) FROM agent_requests a WHERE {' AND '.join(clauses)}",
+            count_params,
+        )
+        total = cursor.fetchone()[0]
+        return {"items": items, "count": total}
+    finally:
+        release_db_connection(conn)
+
 @app.post("/api/user/subscription")
 def update_subscription(request: SubscriptionRequest, user: dict = Depends(get_current_user)):
     """Self-serve subscription update."""

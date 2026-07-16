@@ -10,6 +10,7 @@ import SkeletonLoader from '@/src/components/ui/SkeletonLoader';
 import { customPlanConfigSchema } from '@/src/lib/validation/schemas';
 import ExploreEnquiriesTab from './ExploreEnquiriesTab';
 import ByodTab from './ByodTab';
+import AgentRequestsTab from './AgentRequestsTab';
 
 // ── Tier config ───────────────────────────────────────────────────────────────
 const TIERS = ['FREE', 'EXPLORE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE', 'CUSTOM'];
@@ -936,7 +937,7 @@ export default function AdminPage() {
   const { userRole } = useUserRole();
   const authFetch = useAuthenticatedFetch();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics' | 'enquiries' | 'byod'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'metrics' | 'enquiries' | 'byod' | 'agent_requests'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -1112,6 +1113,7 @@ export default function AdminPage() {
             { key: 'metrics', label: 'Metrics', icon: 'bar_chart' },
             { key: 'enquiries', label: 'Enquiries', icon: 'inbox' },
             { key: 'byod', label: 'BYOD', icon: 'database' },
+            { key: 'agent_requests', label: 'Agent requests', icon: 'support_agent' },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -1463,6 +1465,13 @@ export default function AdminPage() {
       {activeTab === 'byod' && (
         <div className="px-6 md:px-8 py-6">
           <ByodTab />
+        </div>
+      )}
+
+      {/* ── Agent requests fleet ── */}
+      {activeTab === 'agent_requests' && (
+        <div className="px-6 md:px-8 py-6">
+          <AgentRequestsTab />
         </div>
       )}
 

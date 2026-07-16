@@ -45,10 +45,28 @@ but several gaps and one UX request from the user.
   from the "Bring Your Own Database" feature flag in the Feature Access section below it.
   No other "Storage" labels found elsewhere in the admin panel (`grep` confirmed).
 
-### Phase C — Fleet-wide chemical agent requests view (backlog, not yet started)
+### Phase C — Fleet-wide chemical agent requests view (DONE 2026-07-16)
 
-- New admin tab or panel aggregating `agent_requests` across companies (volume, kind,
-  Slack/Resend handoff health) — mirrors the BYOD tab's fleet pattern.
+- Backend: `GET /api/admin/agent-requests` (`main.py`, right after `get_all_companies`) —
+  same row shape as the per-company `list_agent_requests`, minus the `company_id` filter,
+  joined with `companies` for `company_name`/`bot_name`. Guarded by `get_admin_user` +
+  `require_fresh_admin` (step-up), matching the BYOD fleet list's caution level since a
+  row carries visitor contact PII across every tenant at once, not just one owner's bot.
+  Supports `kind`/`status` filters + `limit`/`offset` pagination (unlike BYOD's unpaginated
+  list — request volume across the whole fleet can get large). Status changes reuse the
+  existing per-company `PATCH /api/companies/{company_id}/agent-requests/{id}` — no new
+  mutation route needed since the fleet row already carries `company_id`.
+- Frontend: new `AgentRequestsTab.tsx`, wired into the admin panel as an "Agent requests"
+  tab (`page.tsx`), mirroring `ByodTab.tsx`'s filter-pill + desktop-table/mobile-card
+  pattern and `useFreshAdminFetch` (step-up token minting) for both the read and the
+  status-change mutation.
+- Tests: `tests/test_admin_agent_requests.py` (5 new backend tests — response shape +
+  company join, fleet query has no `company_id` predicate, kind/status filter pass-through,
+  limit clamping, 403 for non-admins). Slice green: frontend 407, backend 1484
+  (up from 1479), tsc 0, lint 0 errors.
+- Deliberately out of scope: Slack/Resend handoff delivery-status surfacing — no such
+  column exists on `agent_requests` today (confirmed via migration 0023), so there's
+  nothing to show yet; would need a new column + write path first.
 
 ### Phase D — Cross-tenant cost rollup (backlog, not yet started)
 
@@ -61,7 +79,7 @@ but several gaps and one UX request from the user.
 
 ## Status
 
-Phase A (fullscreen modal) and Phase B (label fix) are done — both UI-only, no
-backend/migration changes.
-Phases C-E are documented backlog — no code written yet, no commitment on order until
+Phase A (fullscreen modal), Phase B (label fix), and Phase C (fleet agent-requests view)
+are done. A and B are UI-only; C adds one new read-only backend endpoint (no migration).
+Phases D-E are documented backlog — no code written yet, no commitment on order until
 the user prioritizes.
