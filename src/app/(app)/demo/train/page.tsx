@@ -11,76 +11,15 @@ import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from 
 /* strip is visually identical to /dashboard/train.                             */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-type Tone = 'default' | 'accent' | 'info' | 'warn' | 'positive';
+import SourceBrowser from '@/src/components/dashboard/SourceBrowser';
+import { StatCard, TONE, NOISE_BG } from '@/src/components/dashboard/TrainStatCard';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { createMockAuthFetch } from '@/src/lib/demo/mockBackend';
 
-const TONE: Record<Tone, { grad: string; ring: string; bar: string }> = {
-    default: { grad: 'from-slate-100 via-slate-50 to-white dark:from-slate-700/40 dark:via-slate-800/30 dark:to-slate-900', ring: 'ring-slate-200/70 dark:ring-slate-700/60', bar: 'bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500' },
-    accent: { grad: 'from-blue-100 via-blue-50 to-white dark:from-blue-900/40 dark:via-blue-950/20 dark:to-slate-900', ring: 'ring-blue-200/70 dark:ring-blue-900/50', bar: 'bg-gradient-to-r from-blue-600 to-blue-400' },
-    info: { grad: 'from-sky-100 via-sky-50 to-white dark:from-sky-900/40 dark:via-sky-950/20 dark:to-slate-900', ring: 'ring-sky-200/70 dark:ring-sky-900/50', bar: 'bg-gradient-to-r from-sky-500 to-sky-400' },
-    warn: { grad: 'from-amber-100 via-amber-50 to-white dark:from-amber-900/40 dark:via-amber-950/20 dark:to-slate-900', ring: 'ring-amber-200/70 dark:ring-amber-900/50', bar: 'bg-gradient-to-r from-amber-500 to-amber-400' },
-    positive: { grad: 'from-emerald-100 via-emerald-50 to-white dark:from-emerald-900/40 dark:via-emerald-950/20 dark:to-slate-900', ring: 'ring-emerald-200/70 dark:ring-emerald-900/50', bar: 'bg-gradient-to-r from-emerald-500 to-emerald-400' },
-};
-
-const NOISE_BG =
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='tnNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23tnNoise)'/%3E%3C/svg%3E\")";
-
-function StatCard({
-    label, icon, tone = 'default', value, limit, unit, progress, progressTone, footer, badge,
-}: {
-    label: React.ReactNode;
-    icon?: string;
-    tone?: Tone;
-    value: React.ReactNode;
-    limit?: React.ReactNode;
-    unit?: React.ReactNode;
-    progress?: number | null;
-    progressTone?: string;
-    footer?: React.ReactNode;
-    badge?: React.ReactNode;
-}) {
-    const t = TONE[tone];
-    return (
-        <div
-            className={cx(
-                'relative flex flex-col gap-3 p-4 sm:p-5 overflow-hidden rounded-2xl',
-                'bg-gradient-to-br ring-1 ring-inset shadow-sm shadow-slate-900/[0.03] transition-colors duration-300',
-                t.grad,
-                t.ring,
-            )}
-        >
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.20] mix-blend-soft-light"
-                style={{ backgroundImage: NOISE_BG, backgroundSize: '140px 140px' }}
-            />
-            <div className="relative z-10 flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 leading-tight">
-                    {icon && <span className="material-symbols-outlined text-[16px] text-slate-400/90 dark:text-slate-500">{icon}</span>}
-                    {label}
-                </span>
-                {badge}
-            </div>
-
-            <div className="relative z-10 flex items-end gap-1.5 flex-wrap">
-                <span className="text-[26px] sm:text-[28px] font-bold tabular-nums leading-none tracking-[-0.02em] text-slate-900 dark:text-slate-100">
-                    {value}
-                </span>
-                {limit && <span className="text-[15px] font-semibold tabular-nums text-slate-400 dark:text-slate-500 leading-none mb-0.5">/ {limit}</span>}
-                {unit && <span className="text-[12.5px] font-medium text-slate-500 dark:text-slate-400 leading-none mb-0.5">{unit}</span>}
-            </div>
-
-            {typeof progress === 'number' && (
-                <div className="relative z-10">
-                    <ProgressBar pct={progress} tone={progressTone || t.bar} height="h-1.5" />
-                </div>
-            )}
-
-            {footer && <div className="relative z-10 text-[12px] text-slate-500 dark:text-slate-400 leading-tight">{footer}</div>}
-        </div>
-    );
-}
+const queryClientProvider = new QueryClient();
 
 const TABS = [
+    { id: 'url', label: 'URL', icon: 'public' },
     { id: 'pdf', label: 'PDF Upload', icon: 'description' },
     { id: 'csv', label: 'CSV / Excel', icon: 'table_chart' },
     { id: 'text', label: 'Text', icon: 'notes' },
@@ -113,126 +52,10 @@ const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove
     </div>
 );
 
-// ── Source browser — mirrors the dashboard "Manage knowledge" panel ─────────
-const DemoSourceBrowser = ({ chunks, setChunks, showAlert }: {
-    chunks: string[];
-    setChunks: (c: string[]) => void;
-    showAlert: (type: 'success' | 'error' | 'warning', msg: string) => void;
-}) => {
-    const allChunks = chunks;
-    const [selectedChunks, setSelectedChunks] = useState(new Set<number>());
 
-    const toggleChunk = (i: number) =>
-        setSelectedChunks(prev => {
-            const next = new Set(prev);
-            if (next.has(i)) next.delete(i); else next.add(i);
-            return next;
-        });
 
-    const toggleAll = () => {
-        if (selectedChunks.size === allChunks.length) setSelectedChunks(new Set());
-        else setSelectedChunks(new Set(allChunks.map((_: string, i: number) => i)));
-    };
-
-    const handleDeleteSelected = () => {
-        if (selectedChunks.size === 0) return;
-        if (!window.confirm(`Delete ${selectedChunks.size} selected segment(s)? This cannot be undone.`)) return;
-        const remaining = allChunks.filter((_: string, i: number) => !selectedChunks.has(i));
-        saveKnowledge(remaining);
-        setChunks(remaining);
-        setSelectedChunks(new Set());
-        showAlert('success', `${selectedChunks.size} segment(s) deleted successfully.`);
-    };
-
-    const allSelected = selectedChunks.size === allChunks.length && allChunks.length > 0;
-
-    if (allChunks.length === 0) {
-        return (
-            <EmptyState
-                icon="auto_stories"
-                title="No knowledge sources yet"
-                hint="Add a PDF, CSV, or paste text above to start training this bot."
-            />
-        );
-    }
-
-    return (
-        <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-            <div className="flex flex-col gap-3 bg-slate-50/70 dark:bg-slate-800/30 p-4 transition-colors">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                        <span className="material-symbols-outlined text-[17px]">notes</span>
-                    </span>
-                    <span className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 truncate flex-1 min-w-0">
-                        demo-knowledge
-                    </span>
-                    <Badge tone="neutral" dot={false}>{allChunks.length} segments</Badge>
-                </div>
-
-                <div className="flex items-center justify-between border-t border-slate-200/70 dark:border-slate-700/60 pt-2.5">
-                    <button
-                        onClick={toggleAll}
-                        disabled={allChunks.length === 0}
-                        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40"
-                    >
-                        <span className="material-symbols-outlined text-[17px]">
-                            {allSelected ? 'check_box' : 'check_box_outline_blank'}
-                        </span>
-                        {allSelected ? 'Deselect all' : 'Select all'}
-                    </button>
-                    {selectedChunks.size > 0 && (
-                        <span className="text-[12px] font-semibold tabular-nums text-blue-600 dark:text-blue-400">
-                            {selectedChunks.size} selected
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            <div className="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70" data-lenis-prevent>
-                {allChunks.map((chunk: string, i: number) => {
-                    const checked = selectedChunks.has(i);
-                    return (
-                        <label
-                            key={i}
-                            className={cx(
-                                'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors',
-                                checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
-                            )}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleChunk(i)}
-                                className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 dark:accent-blue-500"
-                            />
-                            <span className="text-[11px] font-bold tabular-nums text-slate-300 dark:text-slate-600 mt-0.5 shrink-0 w-6">
-                                {String(i + 1).padStart(2, '0')}
-                            </span>
-                            <p className="text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 transition-colors">
-                                {chunk || '(empty segment)'}
-                            </p>
-                        </label>
-                    );
-                })}
-            </div>
-
-            {allChunks.length > 0 && (
-                <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
-                    <button
-                        onClick={handleDeleteSelected}
-                        disabled={selectedChunks.size === 0}
-                        className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
-                    >
-                        <span className="material-symbols-outlined text-[17px]">delete_sweep</span>
-                        Delete selected ({selectedChunks.size})
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-};
-
-export default function DemoTrainAIPage() {
+function DemoTrainAIInner() {
+    const queryClient = useQueryClient();
     const [botConfig, setBotConfig] = useState<any>(null);
     const [chunks, setChunks] = useState<string[]>([]);
     const [mounted, setMounted] = useState(false);
@@ -243,7 +66,8 @@ export default function DemoTrainAIPage() {
         setMounted(true);
     }, []);
 
-    const [activeTab, setActiveTab] = useState('pdf');
+    const [activeTab, setActiveTab] = useState('url');
+    const [url, setUrl] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [csvFile, setCsvFile] = useState<File | null>(null);
     const [trainingText, setTrainingText] = useState('');
@@ -251,6 +75,8 @@ export default function DemoTrainAIPage() {
     const [isTraining, setIsTraining] = useState(false);
     const [isPurging, setIsPurging] = useState(false);
     const [alert, setAlert] = useState<{ open: boolean; type: 'success' | 'error' | 'warning'; msg: string }>({ open: false, type: 'success', msg: '' });
+
+    const authFetch = React.useMemo(() => createMockAuthFetch(botConfig?.name || 'Demo Bot'), [botConfig]);
 
     const fileRef = useRef<HTMLInputElement>(null);
     const csvFileRef = useRef<HTMLInputElement>(null);
@@ -268,14 +94,18 @@ export default function DemoTrainAIPage() {
     const barToneFor = (pct: number | null) =>
         pct === null ? undefined : pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : undefined;
 
-    const refresh = () => setChunks(getKnowledge());
-    const showAlert = (type: 'success' | 'error' | 'warning', msg: string) => setAlert({ open: true, type, msg });
+    const refresh = () => {
+        setChunks(getKnowledge());
+        queryClient.invalidateQueries({ queryKey: ['knowledge-sources'] });
+        queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
+    };
+    const showAlert = (type: 'success' | 'error' | 'warning' | 'development', msg: string) => setAlert({ open: true, type: type === 'development' ? 'warning' : type, msg });
 
     const handleTrain = async (e: React.FormEvent) => {
         e.preventDefault();
         const activeFile = file || csvFile;
-        if (!activeFile && !trainingText.trim()) {
-            showAlert('error', 'Provide a PDF file, CSV/Excel file, or manual text.');
+        if (!activeFile && !trainingText.trim() && !url.trim()) {
+            showAlert('error', 'Provide a URL, PDF, CSV, or text.');
             return;
         }
 
@@ -284,6 +114,8 @@ export default function DemoTrainAIPage() {
             let newChunks: string[];
             if (activeFile) {
                 newChunks = await parseFileToChunks(activeFile);
+            } else if (url.trim()) {
+                newChunks = [`Mock extracted content from ${url}`];
             } else {
                 newChunks = trainingText.split(/\n{2,}/).filter(p => p.trim().length > 20);
             }
@@ -291,7 +123,7 @@ export default function DemoTrainAIPage() {
             saveKnowledge(newChunks);
             refresh();
             showAlert('success', `Training complete! ${newChunks.length} segments committed to your bot's knowledge base.`);
-            setFile(null); setCsvFile(null); setTrainingText(''); setTextLabel('');
+            setFile(null); setCsvFile(null); setTrainingText(''); setTextLabel(''); setUrl('');
             if (fileRef.current) fileRef.current.value = '';
             if (csvFileRef.current) csvFileRef.current.value = '';
         } catch (err: any) {
@@ -416,6 +248,25 @@ export default function DemoTrainAIPage() {
                     </div>
 
                     <form onSubmit={handleTrain} className="space-y-4">
+                        {activeTab === 'url' && (
+                            <div>
+                                <label className={labelCls}>Website URL</label>
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="url"
+                                        value={url}
+                                        onChange={e => setUrl(e.target.value)}
+                                        className={inputCls}
+                                        placeholder="https://example.com/docs"
+                                        required={activeTab === 'url'}
+                                    />
+                                </div>
+                                <p className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">
+                                    Enter a single page URL. In demo mode, it mocks extraction.
+                                </p>
+                            </div>
+                        )}
+
                         {activeTab === 'pdf' && (
                             <div>
                                 <label className={labelCls}>PDF document</label>
@@ -525,7 +376,14 @@ export default function DemoTrainAIPage() {
                         className="mb-4"
                     />
 
-                    <DemoSourceBrowser chunks={chunks} setChunks={setChunks} showAlert={showAlert} />
+                    <SourceBrowser 
+                        selectedBotId="demo" 
+                        authFetch={authFetch} 
+                        queryClient={queryClient} 
+                        showAlert={showAlert} 
+                        refreshUser={refresh} 
+                        isFree={false} 
+                    />
 
                     {/* Danger zone */}
                     <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
@@ -557,5 +415,13 @@ export default function DemoTrainAIPage() {
 
             <Alert isOpen={alert.open} type={alert.type} message={alert.msg} onClose={() => setAlert(p => ({ ...p, open: false }))} />
         </div>
+    );
+}
+
+export default function DemoTrainAIPage() {
+    return (
+        <QueryClientProvider client={queryClientProvider}>
+            <DemoTrainAIInner />
+        </QueryClientProvider>
     );
 }
