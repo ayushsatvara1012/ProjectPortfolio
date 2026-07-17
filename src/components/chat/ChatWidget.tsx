@@ -2199,12 +2199,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           <motion.div
             variants={{ hidden: { opacity: 0, scale: 0.8, y: 20, transformOrigin: 'bottom right' }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 350, damping: 25 } }, exit: { opacity: 0, scale: 0.8, y: 20, transition: { duration: 0.2 } } }}
             initial={isEmbed ? "visible" : "hidden"} animate="visible" exit="exit"
-            className={`${isEmbed ? `relative w-full h-full ${hasHub ? 'bg-gray-50 dark:bg-slate-950 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent' : 'bg-white dark:bg-slate-900'}` : `fixed inset-0 sm:inset-auto sm:bottom-22 sm:right-4 w-full h-dvh ${isExpanded ? 'sm:w-[500px] sm:h-[85vh] lg:w-[600px]' : 'sm:w-[450px] sm:h-[650px]'} transition-all duration-300 ease-out backdrop-blur-2xl ${hasHub ? 'bg-gray-50/95 dark:bg-slate-950/95 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent' : 'bg-white/95 dark:bg-slate-900/95'}`} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
+            className={`${isEmbed ? 'relative w-full h-full bg-gray-50 dark:bg-slate-950 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent' : `fixed inset-0 sm:inset-auto sm:bottom-22 sm:right-4 w-full h-dvh ${isExpanded ? 'sm:w-[500px] sm:h-[85vh] lg:w-[600px]' : 'sm:w-[450px] sm:h-[650px]'} transition-all duration-300 ease-out backdrop-blur-2xl bg-gray-50/95 dark:bg-slate-950/95 bg-gradient-to-b from-[var(--sapy-theme)]/[0.12] via-[var(--sapy-theme)]/[0.03] to-transparent`} sm:rounded-2xl shadow-lg shadow-blue-900/20 dark:shadow-black/40 flex flex-col sm:overflow-hidden z-2147483640 pointer-events-auto origin-bottom-right`}
             style={{ ...themeStyleVars, ...(isEmbed ? { height: '100%' } : isMobile ? { height: 'var(--sapy-vh, 100dvh)' } : {}) } as React.CSSProperties}
           >
             {/* Header sits on transparent bg for hub bots so the single gradient
                 painted on the panel root shows through seamlessly behind the nav. */}
-            <div className={`relative shrink-0 ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
+            <div className={`relative shrink-0 bg-transparent`}>
               <div className="text-slate-900 dark:text-slate-100 p-2 pt-[max(env(safe-area-inset-top),0.75rem)] sm:pt-2 flex justify-end items-center relative">
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-2 pl-1">
@@ -2298,7 +2298,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
             {/* Phase 1d — session history screen (returning visitors on vertical bots) */}
             {view === 'history' && (
-              <div className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-slate-100 ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
+              <div className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-slate-100 bg-transparent`}>
                 <div className="px-4 pt-4 pb-2 shrink-0">
                   <p className="text-[11px] font-google font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                     Recent conversations
@@ -2342,7 +2342,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             )}
 
             {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
-              <div className={`flex-1 relative flex flex-col min-h-0 text-slate-900 dark:text-slate-100 ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
+              <div className={`flex-1 relative flex flex-col min-h-0 text-slate-900 dark:text-slate-100 bg-transparent`}>
                 {showJumpPill && (
                   <button
                     type="button"
@@ -2636,7 +2636,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             )}
 
             {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
-              <div className={`shrink-0 z-10 flex flex-col ${hasHub ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-slate-950/50'}`}>
+              <div className={`shrink-0 z-10 flex flex-col bg-transparent`}>
                 {hasHub && (activeHubCard || (messages.length === 1 && !input.trim())) ? (
                   // Phase 3 — pack-driven hub. Card strip on a fresh conversation;
                   // a tool card (here or from Home) swaps in its slot mini-form,
