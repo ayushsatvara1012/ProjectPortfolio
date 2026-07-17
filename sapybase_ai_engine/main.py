@@ -2770,6 +2770,19 @@ def invalidate_cache(conn, company_id: str):
 
 # ── ANALYTICS: SILENT CHAT LOGGER ─────────────────────────────────────────────
 
+_SOURCE_CITATION_RE = re.compile(r"^[ \t]*📎?[ \t]*source\s*:.*$\n?", re.IGNORECASE | re.MULTILINE)
+
+
+def _strip_source_citation(text: str) -> str:
+    """Defense-in-depth: RULE 4 tells the model never to cite a source, but strip
+    any leftover '📎 Source: ...' line server-side too, so a prompt-adherence
+    slip (or an already-cached response saved before this rule existed) can
+    never leak a source label to the visitor."""
+    if not text or "source" not in text.lower():
+        return text
+    return _SOURCE_CITATION_RE.sub("", text).rstrip()
+
+
 FALLBACK_PHRASES = [
     "i don't have specific information about that yet",
     "i don't have that information",
@@ -3130,7 +3143,7 @@ async def chat_endpoint(
 
             if cached:
                 print(f"[CACHE HIT] company={company['id']} hash={query_hash[:12]}... history_len={len(chat_history)}")
-                cached_response = cached[0]
+                cached_response = _strip_source_citation(cached[0])
 
                 if byod_engine.routing_active(company["id"]):
                     # BYOD: cache hits still count toward billing. Store the chat_log
@@ -3304,10 +3317,10 @@ Never say:
   - "I cannot access real-time information..."
 Speak as if you simply know the answer. Confident, direct, professional.
 
-[RULE 4 — SOURCE CITATION]
-If the retrieved knowledge came from a specific URL (not "manual_entry"):
-End your response with a single line: 📎 Source: [url]
-If no URL is available, omit this line entirely.
+[RULE 4 — NO SOURCE CITATION]
+Never reveal, cite, or mention where your knowledge came from — no URLs, filenames,
+document names, or labels like "Manual Entry". Answer as if you simply know the
+information; do not append any "Source:" line to your response, ever.
 
 [RULE 5 — ESCALATION TRIGGERS]
 Escalation ONLY fires when the user is expressing a PROBLEM or DISTRESS — NOT when they are asking for information.
@@ -3641,6 +3654,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             except BaseException:
                                 pass
 
+                    full_reply = _strip_source_citation(full_reply)
                     agent_sds = _captured.get("sds")
                     agent_quote = _captured.get("quote")
                     agent_form = _captured.get("form")
@@ -3787,6 +3801,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                 # ── ROBUST POST-STREAM PERSISTENCE ──
                 # This block runs even if the client disconnects (tab closed) mid-stream.
                 # We save whatever was generated up to the disconnection point.
+                full_reply = _strip_source_citation(full_reply)
 
                 if full_reply.strip():
                     # 1. Async Cache Save (only for significant responses)
