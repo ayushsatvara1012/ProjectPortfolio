@@ -111,11 +111,10 @@ function BotAvatar({ shapeId, logoUrl, sizeClass, hasShadow = true, transparentB
   const useFallback = !showImage || !isCustom;
   const FallbackLogoUrl = `${ASSET_BASE}/logo2.svg`;
 
-  // L1 fill: white backdrop when fallback logo is shown, otherwise gradient,
-  // solid colour, or custom white (transparent when transparentBgImage).
-  const baseFill = useFallback
-    ? '#ffffff'
-    : (gradient ? `url(#${uid}-grad)` : (solid ? solid : (transparentBgImage ? 'transparent' : '#ffffff')));
+  // L1 fill: the fallback Sapybase logo keeps its own blue gradient mark —
+  // only the backdrop behind it follows the owner's avatar background choice
+  // (gradient preset, solid colour, or transparent), same as a custom logo.
+  const baseFill = gradient ? `url(#${uid}-grad)` : (solid ? solid : (transparentBgImage ? 'transparent' : '#ffffff'));
 
   return (
     <div className={`${sizeClass} shrink-0 ${hasShadow ? 'shadow-sm' : ''} relative flex items-center justify-center`}>
