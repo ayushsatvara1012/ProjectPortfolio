@@ -73,11 +73,6 @@ export default function RootLayout({
           {children}
         </SmoothScrollProvider>
         <SpeedInsights />
-        <Script
-          src="https://vaayu.sapybase.com/sapybase-loader.js"
-          data-bot-id="sb_3qJijVbtSJ3zlarjGa8Y7zVVxs2F1V6KTFcAggYZTec"
-          strategy="lazyOnload"
-        />
       </body>
     </html>
   );
