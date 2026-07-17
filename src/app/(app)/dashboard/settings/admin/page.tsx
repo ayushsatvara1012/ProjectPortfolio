@@ -100,7 +100,7 @@ const BLANK_CUSTOM_CONFIG = {
   trial_days: 14,
   max_bots: '',
   max_messages: '',
-  max_chunks: '',
+  max_words: '',
   gemini_model: '',
   max_output_tokens: '',
   advanced_bot: false,
@@ -174,9 +174,9 @@ const Toggle = ({ checked, onChange, label, disabled }: { checked: boolean; onCh
   </button>
 );
 
-const inputCls = "w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-const selectCls = "w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50";
-const labelCls = "block text-base font-medium font-google text-slate-600 dark:text-slate-400 mb-2";
+const inputCls = "w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-[13.5px] font-google text-slate-900 dark:text-slate-200 rounded-lg transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+const selectCls = "w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-[13.5px] font-google text-slate-900 dark:text-slate-200 rounded-lg transition-colors disabled:opacity-50";
+const labelCls = "block text-[12.5px] font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5";
 
 const NumInput = ({ label, value, onChange, placeholder, disabled, hint }: { label: string; value: any; onChange: (v: string) => void; placeholder: string; disabled?: boolean; hint?: string }) => (
   <div>
@@ -260,7 +260,7 @@ const QuickActionModal = ({
               placeholder="Reason for this action..."
               value={reason}
               onChange={e => setReason(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-base font-google text-slate-900 dark:text-slate-200 rounded-xl transition-colors resize-none"
+              className={`${inputCls} resize-none`}
             />
             <p className="text-xs font-google text-slate-400 text-right mt-1">{reason.length}/500</p>
           </div>
@@ -271,14 +271,14 @@ const QuickActionModal = ({
           <button
             onClick={onClose}
             disabled={isPending}
-            className="flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 text-[13.5px] font-semibold font-google rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={isPending || (action === 'extend' && (extendDays < 1 || extendDays > 365))}
-            className={`flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${ACTION_STYLE[action] || 'bg-slate-900 text-white hover:bg-slate-800'}`}
+            className={`flex-1 px-4 py-2.5 text-[13.5px] font-semibold font-google rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${ACTION_STYLE[action] || 'bg-slate-900 text-white hover:bg-slate-800'}`}
           >
             {isPending && <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>}
             {isPending ? 'Applying…' : 'Confirm'}
@@ -376,7 +376,7 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
         trial_days: existingCfg.trial_days ?? 14,
         max_bots: existingCfg.max_bots ?? '',
         max_messages: existingCfg.max_messages ?? '',
-        max_chunks: existingCfg.max_chunks ?? '',
+        max_words: existingCfg.max_words ?? '',
         gemini_model: existingCfg.gemini_model || '',
         max_output_tokens: existingCfg.max_output_tokens ?? '',
         advanced_bot: !!existingCfg.advanced_bot,
@@ -417,7 +417,7 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
       trial_days: c.trial_days === '' ? 14 : Number(c.trial_days),
       max_bots: c.max_bots === '' ? 1 : Number(c.max_bots),
       max_messages: c.max_messages === '' ? 500 : Number(c.max_messages),
-      max_chunks: c.max_chunks === '' ? 100 : Number(c.max_chunks),
+      max_words: c.max_words === '' ? 6000 : Number(c.max_words),
       gemini_model: c.gemini_model || undefined,
       max_output_tokens: c.max_output_tokens === '' ? undefined : Number(c.max_output_tokens),
       advanced_bot: !!c.advanced_bot,
@@ -479,7 +479,7 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
     return (
       (c.max_bots === '' || Number(c.max_bots) >= 0) &&
       (c.max_messages === '' || Number(c.max_messages) >= 0) &&
-      (c.max_chunks === '' || Number(c.max_chunks) >= 0) &&
+      (c.max_words === '' || Number(c.max_words) >= 0) &&
       (c.monthly_price_usd === '' || Number(c.monthly_price_usd) >= 0)
     );
   };
@@ -525,7 +525,8 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
         data-lenis-prevent
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-5 sm:p-6 sticky top-0 bg-white dark:bg-slate-950 z-10 border-b border-slate-100 dark:border-slate-800">
+        <div className="p-5 sm:p-6 sticky top-0 bg-white dark:bg-slate-950 z-10 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-start justify-between w-full max-w-5xl mx-auto">
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <TierBadge tier={draft.custom_plan_enabled ? 'CUSTOM' : draft.tier} />
@@ -538,10 +539,13 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors rounded-lg shrink-0">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
+          </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 p-5 sm:p-6 space-y-5">
+        {/* Body — account controls left, plan builder right on lg+ */}
+        <div className="flex-1 w-full max-w-5xl mx-auto p-5 sm:p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5 items-start">
+          <div className="space-y-5">
 
           {/* Access Tier */}
           <div>
@@ -559,22 +563,49 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
           {/* Account Status */}
           <div>
             <label className={labelCls}>Account status</label>
-            <button
-              type="button"
-              onClick={() => set('status', draft.status === 'suspended' ? 'active' : 'suspended')}
-              disabled={isSaving}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-semibold font-google transition-colors disabled:opacity-50 ${draft.status === 'suspended'
-                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'
-                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'}`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">{draft.status === 'suspended' ? 'block' : 'check_circle'}</span>
-                {draft.status === 'suspended' ? 'Activate account' : 'Suspend account'}
-              </span>
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 rounded-lg">
               <StatusBadge status={draft.status} />
-            </button>
+              <button
+                type="button"
+                onClick={() => set('status', draft.status === 'suspended' ? 'active' : 'suspended')}
+                disabled={isSaving}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold font-google rounded-lg transition-colors disabled:opacity-50 ${draft.status === 'suspended'
+                  ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'}`}
+              >
+                <span className="material-symbols-outlined text-[14px]">{draft.status === 'suspended' ? 'check_circle' : 'block'}</span>
+                {draft.status === 'suspended' ? 'Activate account' : 'Suspend account'}
+              </button>
+            </div>
           </div>
 
+          {/* Deployed Bots */}
+          <div>
+            <p className="text-[12.5px] font-semibold font-google text-slate-500 dark:text-slate-400 mb-2.5">Deployed bots ({companies.length})</p>
+            {companies.length === 0 ? (
+              <p className="text-xs font-google text-slate-400 text-center py-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">No bots deployed.</p>
+            ) : (
+              <div className="space-y-2">
+                {companies.map((bot: any, i: number) => (
+                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[13.5px] font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
+                        <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-xs font-mono text-blue-500 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
+                      </div>
+                      <span className={`shrink-0 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {bot.is_active !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <VerticalEditor bot={bot} verticals={verticals} onChange={onChangeVertical} isPending={isVerticalPending} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          </div>
+
+          <div className="space-y-5">
           {/* Custom Plan Builder */}
           <div className={`bg-slate-50 dark:bg-slate-900 rounded-2xl transition-all ${draft.custom_plan_enabled ? 'ring-2 ring-emerald-400 dark:ring-emerald-600' : ''}`}>
             <div className="flex items-center justify-between p-5">
@@ -583,7 +614,7 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
                   <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">build</span>
                 </div>
                 <div>
-                  <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100">Custom plan builder</p>
+                  <p className="text-[13.5px] font-semibold font-google text-slate-900 dark:text-slate-100">Custom plan builder</p>
                   <p className="text-xs font-google text-slate-400 dark:text-slate-500">Agency / white-glove configuration</p>
                 </div>
               </div>
@@ -622,18 +653,21 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
                     </div>
 
                     <div>
-                      <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                      <p className="text-[12.5px] font-semibold font-google text-slate-500 dark:text-slate-400 mb-2.5 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[14px]">tune</span>Resource limits
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
                         <NumInput label="Max bots" value={draft.cfg.max_bots} onChange={v => setCfg('max_bots', v)} placeholder="10" disabled={isSaving} />
                         <NumInput label="Messages / mo" value={draft.cfg.max_messages} onChange={v => setCfg('max_messages', v)} placeholder="5000" disabled={isSaving} />
-                        <NumInput label="Knowledge base chunks" value={draft.cfg.max_chunks} onChange={v => setCfg('max_chunks', v)} placeholder="1000" disabled={isSaving} hint="RAG vector chunks — unrelated to the BYOD database toggle below" />
+                        <NumInput label="Knowledge words" value={draft.cfg.max_words} onChange={v => setCfg('max_words', v)} placeholder="60000" disabled={isSaving} />
                       </div>
+                      <p className="text-xs font-google text-slate-400 dark:text-slate-500 mt-2">
+                        Knowledge words = total words the bot can learn from — unrelated to the BYOD database toggle below.
+                      </p>
                     </div>
 
                     <div>
-                      <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                      <p className="text-[12.5px] font-semibold font-google text-slate-500 dark:text-slate-400 mb-2.5 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>AI model configuration
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -653,17 +687,17 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
                     </div>
 
                     <div>
-                      <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                      <p className="text-[12.5px] font-semibold font-google text-slate-500 dark:text-slate-400 mb-2.5 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[14px]">toggle_on</span>Feature access
                       </p>
-                      <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
-                        {FEATURE_FLAGS.map((f, i) => (
-                          <div key={f.key} className={`flex items-center justify-between px-4 py-3 ${i < FEATURE_FLAGS.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''}`}>
-                            <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {FEATURE_FLAGS.map(f => (
+                          <div key={f.key} className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white dark:bg-slate-900 rounded-lg">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 shrink-0">{f.icon}</span>
                               <div className="min-w-0">
-                                <p className="text-base font-medium font-google text-slate-900 dark:text-slate-200">{f.label}</p>
-                                <p className="text-xs font-google text-slate-400 dark:text-slate-500 truncate">{f.desc}</p>
+                                <p className="text-[13px] font-medium font-google text-slate-900 dark:text-slate-200">{f.label}</p>
+                                <p className="text-[11.5px] font-google text-slate-400 dark:text-slate-500 truncate">{f.desc}</p>
                               </div>
                             </div>
                             <Toggle checked={!!draft.cfg[f.key]} onChange={v => setCfg(f.key, v)} label={f.label} disabled={isSaving} />
@@ -688,7 +722,7 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
             <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
-                <p className="text-base font-semibold font-google text-emerald-700 dark:text-emerald-400">
+                <p className="text-[13.5px] font-semibold font-google text-emerald-700 dark:text-emerald-400">
                   {checkoutUrl ? 'Polar product created' : 'Already provisioned'}
                 </p>
               </div>
@@ -696,8 +730,8 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
                 <>
                   <label className={labelCls}>Checkout link</label>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <input readOnly value={checkoutUrl || existingCfg.polar_checkout_url || ''} className="flex-1 min-w-0 px-4 py-3 bg-white dark:bg-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 rounded-xl outline-none truncate" />
-                    <button type="button" onClick={handleCopyUrl} className="shrink-0 px-4 py-3 text-base font-semibold font-google bg-emerald-600 text-white hover:bg-emerald-500 rounded-xl transition-colors flex items-center gap-1.5">
+                    <input readOnly value={checkoutUrl || existingCfg.polar_checkout_url || ''} className="flex-1 min-w-0 px-3.5 py-2.5 bg-white dark:bg-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 rounded-lg outline-none truncate" />
+                    <button type="button" onClick={handleCopyUrl} className="shrink-0 px-4 py-2.5 text-[13px] font-semibold font-google bg-emerald-600 text-white hover:bg-emerald-500 rounded-lg transition-colors flex items-center justify-center gap-1.5">
                       <span className="material-symbols-outlined text-[14px]">{copiedUrl ? 'check' : 'content_copy'}</span>
                       {copiedUrl ? 'Copied' : 'Copy'}
                     </button>
@@ -713,54 +747,34 @@ const ManageModal = ({ user, onClose, onSave, isSaving, verticals, onChangeVerti
             </div>
           )}
 
-          {/* Deployed Bots */}
-          <div>
-            <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-3">Deployed bots ({companies.length})</p>
-            {companies.length === 0 ? (
-              <p className="text-xs font-google text-slate-400 text-center py-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">No bots deployed.</p>
-            ) : (
-              <div className="space-y-2">
-                {companies.map((bot: any, i: number) => (
-                  <div key={bot.id || i} className="px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
-                    <div className="flex justify-between items-center gap-2">
-                      <div className="min-w-0">
-                        <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-200 truncate">{bot.bot_name || 'Unnamed'}</p>
-                        <a href={bot.allowed_origin} target="_blank" rel="noreferrer" className="text-xs font-mono text-blue-500 underline truncate block">{bot.allowed_origin || 'No origin'}</a>
-                      </div>
-                      <span className={`shrink-0 px-2.5 py-0.5 text-xs font-medium font-google rounded-full ${bot.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {bot.is_active !== false ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <VerticalEditor bot={bot} verticals={verticals} onChange={onChangeVertical} isPending={isVerticalPending} />
-                  </div>
-                ))}
-              </div>
-            )}
+          </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 p-5 space-y-3">
-          {draft.custom_plan_enabled && !user.custom_plan_polar_product_id && !checkoutUrl && (
-            <button
-              type="button" onClick={handleProvision}
-              disabled={isProvisioning || isSaving || Number(draft.cfg.monthly_price_usd) <= 0}
-              title={Number(draft.cfg.monthly_price_usd) <= 0 ? 'Price must be > $0 to provision' : undefined}
-              className="w-full px-4 py-3 text-base font-semibold font-google rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[16px]">{isProvisioning ? 'hourglass_empty' : 'add_shopping_cart'}</span>
-              {isProvisioning ? 'Creating in Polar…' : 'Create in Polar & generate link'}
-            </button>
-          )}
-          <div className="flex gap-3">
-            <button onClick={onClose} disabled={isSaving || isProvisioning}
-              className="flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
-              Cancel
-            </button>
-            <button onClick={handleSave} disabled={isSaving || isProvisioning || !isValid}
-              className="flex-1 px-4 py-3 text-base font-semibold font-google rounded-xl bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              {isSaving ? 'Saving…' : 'Save config'}
-            </button>
+        <div className="sticky bottom-0 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5">
+          <div className="w-full max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+            {draft.custom_plan_enabled && !user.custom_plan_polar_product_id && !checkoutUrl && (
+              <button
+                type="button" onClick={handleProvision}
+                disabled={isProvisioning || isSaving || Number(draft.cfg.monthly_price_usd) <= 0}
+                title={Number(draft.cfg.monthly_price_usd) <= 0 ? 'Price must be > $0 to provision' : undefined}
+                className="w-full sm:w-auto px-4 py-2.5 text-[13.5px] font-semibold font-google rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">{isProvisioning ? 'hourglass_empty' : 'add_shopping_cart'}</span>
+                {isProvisioning ? 'Creating in Polar…' : 'Create in Polar & generate link'}
+              </button>
+            )}
+            <div className="flex gap-3 sm:ml-auto">
+              <button onClick={onClose} disabled={isSaving || isProvisioning}
+                className="flex-1 sm:flex-none px-5 py-2.5 text-[13.5px] font-semibold font-google rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={isSaving || isProvisioning || !isValid}
+                className="flex-1 sm:flex-none px-5 py-2.5 text-[13.5px] font-semibold font-google rounded-lg bg-slate-900 dark:bg-blue-600 text-white hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {isSaving ? 'Saving…' : 'Save config'}
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -796,7 +810,7 @@ const PlanRowDetail = ({ planUser, onAction }: { planUser: any; onAction: (actio
           ['Trial', cfg.trial_days != null ? `${cfg.trial_days} days` : '—'],
           ['Max bots', cfg.max_bots ?? '—'],
           ['Messages', cfg.max_messages ?? '—'],
-          ['Chunks', cfg.max_chunks ?? '—'],
+          ['Words', cfg.max_words ?? '—'],
         ].map(([k, v]) => (
           <div key={k} className="flex gap-2 text-xs font-google">
             <span className="text-slate-400 w-20 shrink-0">{k}</span>
@@ -844,7 +858,7 @@ const CustomPlanTableRow = ({ planUser, onAction }: { planUser: any; onAction: (
     <>
       <tr className="border-b border-slate-50 dark:border-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
         <td className="py-3.5 px-4 min-w-0">
-          <p className="text-base font-google text-slate-900 dark:text-slate-100 truncate max-w-[120px] sm:max-w-[200px]">{planUser.email}</p>
+          <p className="text-[13.5px] font-google text-slate-900 dark:text-slate-100 truncate max-w-[120px] sm:max-w-[200px]">{planUser.email}</p>
         </td>
         <td className="py-3.5 px-4">
           <SubscriptionStatusBadge status={planUser.subscription_status} />
@@ -1124,7 +1138,7 @@ export default function AdminPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-base font-medium font-google rounded-lg whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-[13.5px] font-medium font-google rounded-lg whitespace-nowrap transition-all ${
                 activeTab === tab.key
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
@@ -1151,7 +1165,7 @@ export default function AdminPage() {
             <input
               type="text" placeholder="Search by email or Clerk ID…" value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="flex-1 max-w-full md:max-w-md px-4 py-3 bg-white dark:bg-slate-900 text-base font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
+              className="flex-1 max-w-full md:max-w-md px-3.5 py-2.5 bg-white dark:bg-slate-900 text-[13.5px] font-google text-slate-900 dark:text-slate-200 rounded-lg outline-none placeholder:text-slate-400 transition-colors duration-500"
             />
             <div className="overflow-x-auto scrollbar-hide">
               <div className="flex gap-1.5 min-w-max bg-white dark:bg-slate-900 rounded-xl p-1">
@@ -1168,7 +1182,7 @@ export default function AdminPage() {
           {isLoading ? <SkeletonLoader.Table /> : (
             <>
               {/* Desktop table */}
-              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl overflow-hidden transition-colors duration-500">
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl overflow-x-auto transition-colors duration-500">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
@@ -1182,7 +1196,7 @@ export default function AdminPage() {
                     {filteredUsers.map((u: any) => (
                       <tr key={u.clerk_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900 transition-colors">
                         <td className="py-4 px-5 min-w-0">
-                          <p className="text-base font-google text-slate-900 dark:text-slate-100 truncate max-w-[140px] md:max-w-[260px]">{u.email}</p>
+                          <p className="text-[13.5px] font-google text-slate-900 dark:text-slate-100 truncate max-w-[140px] md:max-w-[260px]">{u.email}</p>
                           <p className="text-xs font-mono text-slate-400 dark:text-slate-500 truncate max-w-[140px] md:max-w-[260px] mt-0.5">{u.clerk_id}</p>
                         </td>
                         <td className="py-4 px-5 space-y-1.5">
@@ -1194,7 +1208,7 @@ export default function AdminPage() {
                         </td>
                         <td className="py-4 px-5 text-right">
                           <button onClick={() => setSelectedUser(u)}
-                            className="px-4 py-2 text-xs font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 dark:hover:bg-slate-700 transition-colors">
+                            className="px-4 py-2 text-xs font-semibold font-google rounded-lg bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 dark:hover:bg-slate-700 transition-colors">
                             Manage
                           </button>
                         </td>
@@ -1218,7 +1232,7 @@ export default function AdminPage() {
                     </div>
                     <UsageBar used={u.usage_tracking?.messages_used} limit={u.usage_tracking?.message_limit} />
                     <button onClick={() => setSelectedUser(u)}
-                      className="self-start px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors">
+                      className="self-start px-4 py-2.5 text-xs font-semibold font-google rounded-lg bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors">
                       Manage
                     </button>
                   </div>
@@ -1236,7 +1250,7 @@ export default function AdminPage() {
             <input
               type="text" placeholder="Search by email…" value={planSearch}
               onChange={e => setPlanSearch(e.target.value)}
-              className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 text-base font-google text-slate-900 dark:text-slate-200 rounded-xl outline-none placeholder:text-slate-400 transition-colors duration-500"
+              className="flex-1 md:max-w-md px-3.5 py-2.5 bg-white dark:bg-slate-900 text-[13.5px] font-google text-slate-900 dark:text-slate-200 rounded-lg outline-none placeholder:text-slate-400 transition-colors duration-500"
             />
             <div className="overflow-x-auto scrollbar-hide">
               <div className="flex gap-1.5 min-w-max bg-white dark:bg-slate-900 rounded-xl p-1">
@@ -1256,7 +1270,7 @@ export default function AdminPage() {
             <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl">
               <p className="text-base font-google text-red-500 mb-3">Failed to load custom plans.</p>
               <button onClick={() => dashboardQuery.refetch()}
-                className="px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                className="px-4 py-2.5 text-xs font-semibold font-google rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors">
                 Retry
               </button>
             </div>
@@ -1267,7 +1281,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <>
-              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl overflow-hidden transition-colors duration-500">
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl overflow-x-auto transition-colors duration-500">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
@@ -1313,7 +1327,7 @@ export default function AdminPage() {
             <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl">
               <p className="text-base font-google text-red-500 mb-3">Failed to load metrics.</p>
               <button onClick={() => metricsQuery.refetch()}
-                className="px-4 py-2.5 text-xs font-semibold font-google rounded-xl bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                className="px-4 py-2.5 text-xs font-semibold font-google rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors">
                 Retry
               </button>
             </div>
@@ -1337,7 +1351,7 @@ export default function AdminPage() {
               <>
                 {/* Status distribution */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 transition-colors duration-500">
-                  <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-5 flex items-center gap-1.5">
+                  <p className="text-[12.5px] font-semibold font-google text-slate-500 dark:text-slate-400 mb-5 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[14px]">donut_small</span>
                     Subscription status distribution
                   </p>
@@ -1411,7 +1425,7 @@ export default function AdminPage() {
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 transition-colors duration-500">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     <div>
-                      <p className="text-base font-semibold font-google text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <p className="text-[13.5px] font-semibold font-google text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[16px] text-slate-500">sync</span>
                         Manual reconciliation
                       </p>
@@ -1420,7 +1434,7 @@ export default function AdminPage() {
                     <button
                       onClick={handleRunReconcile}
                       disabled={isReconciling}
-                      className="shrink-0 px-5 py-3 text-base font-semibold font-google rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      className="shrink-0 px-5 py-2.5 text-[13.5px] font-semibold font-google rounded-lg bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       {isReconciling
                         ? <><span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>Running…</>
@@ -1457,7 +1471,7 @@ export default function AdminPage() {
 
                 {/* Token spend (Phase D) */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 transition-colors duration-500">
-                  <p className="text-base font-medium font-google text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+                  <p className="text-[12.5px] font-semibold font-google text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[14px]">token</span>
                     Gemini token spend (last 30 days)
                   </p>

@@ -139,6 +139,7 @@ const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove
 const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refreshUser, isFree }: any) => {
     const [selectedSource, setSelectedSource] = useState('');
     const [selectedChunks, setSelectedChunks] = useState(new Set<string>());
+    const [sourceFilter, setSourceFilter] = useState('');
 
     // Fetch distinct sources for this bot
     const { data: sourcesData, isLoading: sourcesLoading } = useQuery({
@@ -208,28 +209,28 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
             showAlert('success', data?.message || 'Chunks deleted successfully.');
         },
         onError: (err: any) => {
-            showAlert('error', err.message || 'Failed to delete chunks.');
+            showAlert('error', err.message || 'Failed to delete segments.');
         },
     });
 
     const handleDeleteSelected = () => {
         if (selectedChunks.size === 0) return;
-        if (!window.confirm(`Delete ${selectedChunks.size} selected chunk(s)? This cannot be undone.`)) return;
+        if (!window.confirm(`Delete ${selectedChunks.size} selected segment(s)? This cannot be undone.`)) return;
         deleteMutation.mutate();
     };
 
     // ── DELETE ENTIRE SOURCE (New Bulk Logic) ───────────────────────────────
     const deleteSourceMutation = useMutation({
-        mutationFn: () => authFetch(`/api/knowledge/source/${selectedBotId}`, {
+        mutationFn: (sourceName: string) => authFetch(`/api/knowledge/source/${selectedBotId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source_name: selectedSource }),
+            body: JSON.stringify({ source_name: sourceName }),
         }),
-        onSuccess: (data: any) => {
+        onSuccess: (data: any, sourceName: string) => {
             queryClient.invalidateQueries({ queryKey: ['knowledge-sources', selectedBotId] });
             queryClient.invalidateQueries({ queryKey: ['bots'] });
             refreshUser();
-            setSelectedSource('');
+            if (sourceName === selectedSource) setSelectedSource('');
             showAlert('success', data?.message || 'Source deleted fully.');
         },
         onError: (err: any) => {
@@ -237,14 +238,19 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
         },
     });
 
-    const handleDeleteSource = () => {
-        if (!selectedSource) return;
-        if (!window.confirm(`Permanently delete the ENTIRE source "${selectedSource}" and all its chunks? This cannot be undone.`)) return;
-        deleteSourceMutation.mutate();
+    const handleDeleteSource = (sourceName: string) => {
+        if (!sourceName) return;
+        if (!window.confirm(`Permanently delete the ENTIRE source "${sourceName}" and all its segments? This cannot be undone.`)) return;
+        deleteSourceMutation.mutate(sourceName);
     };
 
     const isDeleting = deleteMutation.isPending || deleteSourceMutation.isPending;
     const allSelected = selectedChunks.size === chunks.length && chunks.length > 0;
+
+    const filterTerm = sourceFilter.trim().toLowerCase();
+    const visibleSources = filterTerm
+        ? sources.filter((s: any) => (s.source || '').toLowerCase().includes(filterTerm))
+        : sources;
 
     if (isFree || !selectedBotId) {
         return (
@@ -267,37 +273,67 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
             )}
 
             {sources.length > 0 && (
-                <div className="flex gap-2">
-                    <div className="relative flex-1 min-w-0">
-                        <select
-                            value={selectedSource}
-                            onChange={e => setSelectedSource(e.target.value)}
-                            disabled={sourcesLoading || sources.length === 0 || isDeleting}
-                            aria-label="Select a knowledge source"
-                            className={cx(inputCls, 'appearance-none cursor-pointer pr-9 disabled:opacity-60')}
-                        >
-                            {sourcesLoading && <option>Loading sources…</option>}
-                            {!sourcesLoading && sources.length === 0 && <option>No knowledge sources</option>}
-                            {sources.map((s: any) => (
-                                <option key={s.source} value={s.source}>
-                                    {(s.source || 'Unknown').length > 44 ? s.source.substring(0, 41) + '…' : s.source} — {s.chunk_count} segments
-                                </option>
-                            ))}
-                        </select>
-                        <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">expand_more</span>
-                    </div>
-
-                    {selectedSource && (
-                        <button
-                            onClick={handleDeleteSource}
-                            disabled={isDeleting}
-                            title="Delete this entire source (all segments)"
-                            aria-label="Delete this entire source"
-                            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600 dark:hover:bg-rose-600 transition-colors disabled:opacity-50"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                        </button>
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                    {sources.length > 8 && (
+                        <div className="p-2 border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
+                            <input
+                                type="text"
+                                value={sourceFilter}
+                                onChange={e => setSourceFilter(e.target.value)}
+                                placeholder="Filter sources…"
+                                aria-label="Filter knowledge sources"
+                                className={cx(inputCls, 'py-2')}
+                            />
+                        </div>
                     )}
+                    <div role="listbox" aria-label="Knowledge sources" className="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70">
+                        {visibleSources.length === 0 ? (
+                            <p className="px-3.5 py-4 text-[12.5px] text-slate-400 dark:text-slate-500">
+                                No sources match &ldquo;{sourceFilter.trim()}&rdquo;.
+                            </p>
+                        ) : (
+                            visibleSources.map((s: any) => {
+                                const active = s.source === selectedSource;
+                                return (
+                                    <div
+                                        key={s.source}
+                                        className={cx(
+                                            'flex items-center gap-2 pl-1 pr-2 py-1 transition-colors',
+                                            active ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40',
+                                        )}
+                                    >
+                                        <button
+                                            type="button"
+                                            role="option"
+                                            aria-selected={active}
+                                            onClick={() => setSelectedSource(s.source)}
+                                            disabled={isDeleting}
+                                            className="flex flex-1 min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:opacity-60"
+                                        >
+                                            <span className={cx('material-symbols-outlined text-[17px] shrink-0', active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500')}>
+                                                {sourceIconFor(s.source || '')}
+                                            </span>
+                                            <span className={cx('truncate text-[12.5px]', active ? 'font-semibold text-slate-900 dark:text-slate-100' : 'font-medium text-slate-600 dark:text-slate-300')}>
+                                                {s.source || 'Unknown'}
+                                            </span>
+                                            <span className="ml-auto shrink-0 text-[11.5px] font-semibold tabular-nums text-slate-400 dark:text-slate-500">
+                                                {s.chunk_count}
+                                            </span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteSource(s.source)}
+                                            disabled={isDeleting}
+                                            title={`Delete the entire source "${s.source}"`}
+                                            aria-label={`Delete the entire source ${s.source}`}
+                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+                                        >
+                                            <span className="material-symbols-outlined text-[17px]">delete_forever</span>
+                                        </button>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -335,7 +371,7 @@ const SourceBrowser = ({ selectedBotId, authFetch, queryClient, showAlert, refre
                         </div>
                     </div>
 
-                    <div className="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70">
+                    <div className="max-h-[min(48vh,520px)] overflow-y-auto custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800/70">
                         {chunksLoading ? (
                             <div className="flex flex-col items-center justify-center gap-2 py-10">
                                 <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-blue-500 animate-spin rounded-full motion-reduce:hidden" />
@@ -659,6 +695,37 @@ export default function TrainPage() {
         setAlert({ open: true, type, msg });
     };
 
+    // Drag-and-drop for the PDF/CSV dropzones — same validation as the click
+    // path. Only one dropzone is visible at a time, so a single flag suffices.
+    const [dragActive, setDragActive] = useState(false);
+
+    const acceptPdfFile = (f: File | undefined) => {
+        if (!f) return;
+        if (f.type === 'application/pdf') setFile(f);
+        else showAlert('error', 'Please select a valid PDF.');
+    };
+
+    const acceptCsvFile = (f: File | undefined) => {
+        if (!f) return;
+        const ok = ['.csv', '.xlsx', '.xls'].some(ext => f.name.toLowerCase().endsWith(ext));
+        if (!ok) { showAlert('error', 'Please select a .csv, .xlsx, or .xls file.'); return; }
+        if (f.size > 5 * 1024 * 1024) { showAlert('error', 'File exceeds 5 MB limit.'); return; }
+        setCsvFile(f);
+    };
+
+    const dropHandlers = (accept: (f: File | undefined) => void) => ({
+        onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragActive(true); },
+        onDragLeave: () => setDragActive(false),
+        onDrop: (e: React.DragEvent) => { e.preventDefault(); setDragActive(false); accept(e.dataTransfer.files?.[0]); },
+    });
+
+    const dropzoneCls = (active: boolean) => cx(
+        'group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-12 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+        active
+            ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30'
+            : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20',
+    );
+
     const trainMutation = useMutation({
         mutationFn: async () => {
             const token = await getToken();
@@ -680,7 +747,7 @@ export default function TrainPage() {
                     const detail = data?.detail;
                     const errDetail = typeof detail === 'object' && detail?.code
                         ? detail
-                        : { code: 'CHUNK_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Chunk limit reached.', tier: '', current: null, limit: null };
+                        : { code: 'WORD_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Word limit reached.', tier: '', current: null, limit: null };
                     throw new UpgradeError(errDetail);
                 }
                 throw new Error(data.detail?.message || data.detail || 'Training failed.');
@@ -743,8 +810,8 @@ export default function TrainPage() {
                             const action = status.is_upsert ? 'Source updated!' : 'Training complete!';
                             const attention = warnings.length > 0 ? ` ${warnings.length} sheet issue(s) need attention — see below.` : '';
                             const msg = status.truncated
-                                ? `${action} ${status.chunks_added} chunks added (plan limit reached).${attention}`
-                                : `${action} ${status.chunks_added} chunks committed to your bot's knowledge base.${attention}`;
+                                ? `${action} ${status.chunks_added} segments added (plan limit reached).${attention}`
+                                : `${action} ${status.chunks_added} segments committed to your bot's knowledge base.${attention}`;
                             showAlert(warnings.length > 0 ? 'warning' : 'success', msg);
                             return;
                         }
@@ -839,9 +906,10 @@ export default function TrainPage() {
 
     const selectedBot = bots.find((b: any) => b.id === selectedBotId);
     const chunksUsed = selectedBot?.chunks_used ?? 0;
-    const chunkLimit = (botsData as any)?.plan?.chunk_limit ?? 0;
-    const chunkUnlimited = chunkLimit >= 999999;
-    const chunkPct = chunkLimit > 0 && !chunkUnlimited ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
+    const wordsUsed = selectedBot?.words_used ?? 0;
+    const wordLimit = (botsData as any)?.plan?.word_limit ?? 0;
+    const wordUnlimited = wordLimit >= 10000000;
+    const wordPct = wordLimit > 0 && !wordUnlimited ? Math.min((wordsUsed / wordLimit) * 100, 100) : null;
 
     const msgUnlimited = (messageLimit ?? 0) >= 999999;
     // A real zero-cap plan (e.g. FREE: messages=0) is NOT the same as "unlimited" —
@@ -871,18 +939,22 @@ export default function TrainPage() {
                         {speedTier && speedTier !== 'none' && (
                             <Badge tone="cold" dot={false}>{speedTier} speed</Badge>
                         )}
-                        {bots.length > 1 && (
-                            <div className="relative">
-                                <select
-                                    value={selectedBotId}
-                                    onChange={e => setSelectedBotId(e.target.value)}
-                                    aria-label="Select bot to train"
-                                    className="appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                                >
-                                    {bots.map((b: any) => <option key={b.id} value={b.id}>{b.bot_name}</option>)}
-                                </select>
-                                <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
-                            </div>
+                        {bots.length > 0 && (
+                            <label className="flex items-center gap-2 min-w-0">
+                                <span className="text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Training bot</span>
+                                <div className="relative min-w-0">
+                                    <select
+                                        value={selectedBotId}
+                                        onChange={e => setSelectedBotId(e.target.value)}
+                                        aria-label="Select bot to train"
+                                        disabled={bots.length === 1}
+                                        className="w-full max-w-[220px] truncate appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-default"
+                                    >
+                                        {bots.map((b: any) => <option key={b.id} value={b.id}>{b.bot_name}</option>)}
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
+                                </div>
+                            </label>
                         )}
                     </div>
                 </div>
@@ -900,15 +972,15 @@ export default function TrainPage() {
                                 label="Knowledge storage"
                                 icon="database"
                                 tone="accent"
-                                value={fmtNum(chunksUsed * 60)}
-                                limit={chunkUnlimited ? undefined : fmtNum(chunkLimit * 60)}
+                                value={fmtNum(wordsUsed)}
+                                limit={wordUnlimited ? undefined : fmtNum(wordLimit)}
                                 unit="words"
-                                progress={chunkPct}
-                                progressTone={barToneFor(chunkPct)}
-                                badge={chunkUnlimited ? <Badge tone="ok" dot={false}>Unlimited</Badge> : undefined}
+                                progress={wordPct}
+                                progressTone={barToneFor(wordPct)}
+                                badge={wordUnlimited ? <Badge tone="ok" dot={false}>Unlimited</Badge> : undefined}
                                 footer={
-                                    chunkPct !== null
-                                        ? `${Math.round(chunkPct)}% of storage used`
+                                    wordPct !== null
+                                        ? `${Math.round(wordPct)}% of storage used`
                                         : 'Unlimited storage on your plan'
                                 }
                             />
@@ -961,7 +1033,9 @@ export default function TrainPage() {
                     )}
                 </div>
 
-                {/* Add knowledge */}
+                {/* Add + Manage knowledge — the two halves of one workflow, side by
+                    side on lg+ so an upload can be verified without scrolling. */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-5 items-start">
                 <Card className="relative p-4 sm:p-5 overflow-hidden">
                     {isFree && (
                         <div className="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 flex flex-col items-center justify-center gap-5 p-6 md:p-10 rounded-2xl transition-colors">
@@ -1013,7 +1087,7 @@ export default function TrainPage() {
 
                     <form onSubmit={handleTrain} className="space-y-4">
                         {activeTab === 'url' && (
-                            <div>
+                            <div className="max-w-xl">
                                 <label className={labelCls}>Source URL</label>
                                 <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls} placeholder="https://docs.example.com" />
                                 <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -1028,7 +1102,8 @@ export default function TrainPage() {
                                 <button
                                     type="button"
                                     onClick={() => fileRef.current?.click()}
-                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                    {...dropHandlers(acceptPdfFile)}
+                                    className={dropzoneCls(dragActive)}
                                 >
                                     <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                         <span className="material-symbols-outlined text-[24px]">cloud_upload</span>
@@ -1038,7 +1113,7 @@ export default function TrainPage() {
                                         <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">PDF only · up to 10 MB</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
-                                        onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
+                                        onChange={e => acceptPdfFile(e.target.files?.[0])} />
                                 </button>
                                 {file && <FileChip file={file} icon="picture_as_pdf" onRemove={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }} />}
                             </div>
@@ -1050,7 +1125,8 @@ export default function TrainPage() {
                                 <button
                                     type="button"
                                     onClick={() => csvFileRef.current?.click()}
-                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                    {...dropHandlers(acceptCsvFile)}
+                                    className={dropzoneCls(dragActive)}
                                 >
                                     <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                         <span className="material-symbols-outlined text-[24px]">table_chart</span>
@@ -1064,14 +1140,7 @@ export default function TrainPage() {
                                         ref={csvFileRef}
                                         className="hidden"
                                         accept=".csv,.xlsx,.xls"
-                                        onChange={e => {
-                                            const f = e.target.files?.[0];
-                                            if (!f) return;
-                                            const ok = ['.csv', '.xlsx', '.xls'].some(ext => f.name.toLowerCase().endsWith(ext));
-                                            if (!ok) { showAlert('error', 'Please select a .csv, .xlsx, or .xls file.'); return; }
-                                            if (f.size > 5 * 1024 * 1024) { showAlert('error', 'File exceeds 5 MB limit.'); return; }
-                                            setCsvFile(f);
-                                        }}
+                                        onChange={e => acceptCsvFile(e.target.files?.[0])}
                                     />
                                 </button>
                                 {csvFile && <FileChip file={csvFile} icon="table_chart" onRemove={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }} />}
@@ -1088,7 +1157,7 @@ export default function TrainPage() {
 
                         {activeTab === 'text' && (
                             <div className="space-y-4">
-                                <div>
+                                <div className="max-w-xl">
                                     <label className={labelCls}>Source label <span className="font-normal text-slate-400 dark:text-slate-500">(optional)</span></label>
                                     <input
                                         type="text"
@@ -1122,12 +1191,20 @@ export default function TrainPage() {
                             />
                         )}
 
+                        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
+                        <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-snug">
+                            {isLockedOut
+                                ? 'Monthly request quota reached — upgrade to keep training.'
+                                : wordUnlimited
+                                    ? 'Unlimited knowledge storage on your plan.'
+                                    : `${fmtNum(wordsUsed)} / ${fmtNum(wordLimit)} words of storage used.`}
+                        </p>
                         <button type="submit" disabled={isTraining || isLockedOut}
-                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 px-7 py-3 text-[13.5px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 active:scale-[0.99]">
+                            className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 px-7 py-3 text-[13.5px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 active:scale-[0.99]">
                             {trainingJobId ? (
                                 <>
                                     <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:hidden" />
-                                    Training… {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} chunks
+                                    Training… {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} segments
                                 </>
                             ) : trainMutation.isPending ? (
                                 <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Uploading…</>
@@ -1135,8 +1212,29 @@ export default function TrainPage() {
                                 <><span className="material-symbols-outlined text-[18px]">bolt</span> Start training</>
                             )}
                         </button>
+                        </div>
                     </form>
                 </Card>
+
+                {/* Manage knowledge */}
+                <Card className="p-4 sm:p-5">
+                    <SectionHeader
+                        title="Manage knowledge"
+                        subtitle="Review, audit, and prune the exact segments powering this bot."
+                        icon="folder_open"
+                        className="mb-4"
+                    />
+
+                    <SourceBrowser
+                        selectedBotId={selectedBotId}
+                        authFetch={authFetch}
+                        queryClient={queryClient}
+                        showAlert={showAlert}
+                        refreshUser={refreshUser}
+                        isFree={isFree}
+                    />
+                </Card>
+                </div>
 
                 {/* Catalog cleaning report — near-miss columns / skipped rows from the
                     last upload. Persists until dismissed or the next upload, since the
@@ -1176,27 +1274,9 @@ export default function TrainPage() {
                 {/* Product catalog (vertical bots only — self-hides otherwise) */}
                 <CatalogBrowser selectedBotId={selectedBotId} authFetch={authFetch} queryClient={queryClient} showAlert={showAlert} />
 
-                {/* Manage knowledge */}
+                {/* Danger zone */}
                 <Card className="p-4 sm:p-5">
-                    <SectionHeader
-                        title="Manage knowledge"
-                        subtitle="Review, audit, and prune the exact segments powering this bot."
-                        icon="folder_open"
-                        className="mb-4"
-                    />
-
-                    <SourceBrowser
-                        selectedBotId={selectedBotId}
-                        authFetch={authFetch}
-                        queryClient={queryClient}
-                        showAlert={showAlert}
-                        refreshUser={refreshUser}
-                        isFree={isFree}
-                    />
-
-                    {/* Danger zone */}
-                    <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
-                        <div className="flex flex-col gap-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 ring-1 ring-inset ring-rose-100 dark:ring-rose-900/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 ring-1 ring-inset ring-rose-100 dark:ring-rose-900/40 p-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-start gap-2.5 min-w-0">
                                 <span className="material-symbols-outlined text-[18px] text-rose-500 dark:text-rose-400 shrink-0 mt-0.5">delete_forever</span>
                                 <div className="min-w-0">
@@ -1217,7 +1297,6 @@ export default function TrainPage() {
                                     <><span className="material-symbols-outlined text-[17px]">delete</span> Delete all ({fmtNum(chunksUsed)})</>
                                 )}
                             </button>
-                        </div>
                     </div>
                 </Card>
             </div>
