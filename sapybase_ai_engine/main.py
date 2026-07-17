@@ -733,7 +733,7 @@ def get_plan(tier: str, role: str = None, custom_plan_config: dict = None) -> di
         return {
             "max_bots": cfg.get("max_bots") or 1,
             "messages": cfg.get("max_messages") or 500,
-            "chunks": cfg.get("max_chunks") or 100,
+            "words": cfg.get("max_words") or 6000,
             "speed": "dedicated",
             # Feature flags carried through so callers can inspect them
             "advanced_bot": bool(cfg.get("advanced_bot")),
@@ -7154,21 +7154,24 @@ async def get_job_status(job_id: str) -> Optional[dict]:
         return _training_jobs.get(job_id)
 
 
-def _byod_remaining_chunk_quota(company_id: str, source_name: str, limit: int) -> int:
-    """Plan max_chunks remaining for a BYOD tenant, counted on the TENANT DB (the
+def _byod_remaining_word_quota(company_id: str, source_name: str, limit: int) -> int:
+    """Plan max_words remaining for a BYOD tenant, counted on the TENANT DB (the
     quota gate must read the data plane for a BYOD tenant). Re-training a source
-    excludes that source's current children. Fail-soft: an unreachable tenant DB
-    yields 0 (ingest nothing) rather than crashing the job."""
+    excludes that source's current children. Rows with word_count IS NULL
+    (pre-0002 tenant schema, not yet re-ingested) count as 0 — graceful
+    degradation, not an error. Fail-soft: an unreachable tenant DB yields 0
+    (ingest nothing) rather than crashing the job."""
     try:
         with byod_engine.tenant_connection(company_id) as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+                "SELECT COALESCE(SUM(word_count), 0) FROM company_knowledge "
+                "WHERE company_id = %s AND chunk_type = 'child'",
                 (company_id,),
             )
             total = cur.fetchone()[0]
             cur.execute(
-                "SELECT COUNT(*) FROM company_knowledge "
+                "SELECT COALESCE(SUM(word_count), 0) FROM company_knowledge "
                 "WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
                 (company_id, source_name),
             )
@@ -7260,11 +7263,20 @@ async def _byod_run_training_job(
     control plane. Errors are sanitized (E6) into the job status."""
     await set_job_status(job_id, {"status": "processing", "progress": 0, "total": len(chunks)})
     try:
-        # Plan max_chunks quota, counted on the tenant DB.
+        # Plan max_words quota, counted on the tenant DB.
         remaining = await asyncio.to_thread(
-            _byod_remaining_chunk_quota, company_id, source_name, limit
+            _byod_remaining_word_quota, company_id, source_name, limit
         )
-        capped = chunks[:remaining]
+        # Cap by cumulative word budget, not chunk count — a chunk is no longer
+        # an atomic unit of quota.
+        capped = []
+        words_spent = 0
+        for pair in chunks:
+            child_text = pair[1]
+            words_spent += len(child_text.split())
+            if words_spent > remaining:
+                break
+            capped.append(pair)
         was_capped = len(capped) < len(chunks)
 
         result = await byod_ingest.run_tenant_ingest(
@@ -7384,24 +7396,33 @@ async def run_training_job(
             )
             return
 
-        # ── Quota: count only child rows ─────────────────────────────────────────
+        # ── Quota: sum word_count over child rows only ────────────────────────────
         conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+            "SELECT COALESCE(SUM(word_count), 0) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
             (resolved_company_id,)
         )
-        total_child_count = cursor.fetchone()[0]
+        total_child_words = cursor.fetchone()[0]
 
+        cursor.execute(
+            "SELECT COALESCE(SUM(word_count), 0) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+            (resolved_company_id, source_name)
+        )
+        old_child_words = cursor.fetchone()[0]
+
+        # Row count (not word_count) for the >0 upsert-cleanup gate below — a
+        # legacy pre-migration source with NULL word_count still has real rows
+        # to delete, so this must stay row-based.
         cursor.execute(
             "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
             (resolved_company_id, source_name)
         )
         old_child_count = cursor.fetchone()[0]
 
-        effective_child_count = total_child_count - old_child_count
-        remaining = max(0, limit - effective_child_count)
+        effective_child_words = total_child_words - old_child_words
+        remaining = max(0, limit - effective_child_words)
 
         # Flatten child texts for quota cap and progress tracking
         if skip_splitting:
@@ -7413,20 +7434,31 @@ async def run_training_job(
                 for ct in child_texts:
                     all_child_texts_flat.append((parent_text, ct))
 
-        # Cap to remaining quota (child count). The upfront CHUNK_QUOTA_OVERFLOW
-        # check uses a conservative estimate (total_chars / 250); when actual
-        # chunking produces more children than estimated, this cap silently
-        # truncates. Surface that explicitly in the job status so the dashboard
-        # can show "ingested N of M chunks — upgrade for full coverage."
+        def _child_word_count(item) -> int:
+            text = item.page_content if hasattr(item, "page_content") else item
+            return len(text.split())
+
+        # Cap by cumulative word budget, not chunk count — a chunk is no longer
+        # an atomic unit of quota. The upfront WORD_QUOTA_OVERFLOW check is an
+        # exact word count of the source text, so this only truncates when
+        # splitting produces slightly more words than the source estimate
+        # (overlap between chunks). Surface that explicitly in the job status
+        # so the dashboard can show "ingested N of M — upgrade for full coverage."
         unfiltered_total = len(all_child_texts_flat)
-        capped_pairs = all_child_texts_flat[:remaining]
+        capped_pairs = []
+        words_spent = 0
+        for pair in all_child_texts_flat:
+            words_spent += _child_word_count(pair[1])
+            if words_spent > remaining:
+                break
+            capped_pairs.append(pair)
         was_capped = len(capped_pairs) < unfiltered_total
         if was_capped:
             status["was_capped"] = True
             status["capped_at"] = len(capped_pairs)
             status["original_total"] = unfiltered_total
             status["tier"] = current_user.get("tier")
-            status["chunk_limit"] = limit
+            status["word_limit"] = limit
 
         status["total"] = len(capped_pairs)
         await set_job_status(job_id, status)
@@ -7451,9 +7483,9 @@ async def run_training_job(
                         embedding = embedding[:EMBEDDING_DIMENSIONS]
                     cursor.execute(
                         """INSERT INTO company_knowledge
-                               (company_id, content, url, embedding, chunk_type, parent_id)
-                           VALUES (%s, %s, %s, %s, 'child', NULL)""",
-                        (resolved_company_id, doc.page_content, temp_source_name, embedding)
+                               (company_id, content, url, embedding, chunk_type, parent_id, word_count)
+                           VALUES (%s, %s, %s, %s, 'child', NULL, %s)""",
+                        (resolved_company_id, doc.page_content, temp_source_name, embedding, len(doc.page_content.split()))
                     )
 
                 conn.commit()
@@ -7494,9 +7526,9 @@ async def run_training_job(
                         embedding = embedding[:EMBEDDING_DIMENSIONS]
                     cursor.execute(
                         """INSERT INTO company_knowledge
-                               (company_id, content, url, embedding, chunk_type, parent_id)
-                           VALUES (%s, %s, %s, %s, 'child', %s)""",
-                        (resolved_company_id, child_text, temp_source_name, embedding, parent_db_id)
+                               (company_id, content, url, embedding, chunk_type, parent_id, word_count)
+                           VALUES (%s, %s, %s, %s, 'child', %s, %s)""",
+                        (resolved_company_id, child_text, temp_source_name, embedding, parent_db_id, len(child_text.split()))
                     )
                     child_chunks_committed += 1
                     total_rows_committed += 1
@@ -7661,7 +7693,7 @@ async def train_chatbot(
         resolved_vertical = company_row[1] if len(company_row) > 1 else None
 
         plan = get_plan(current_user["tier"], role=current_user.get("role"), custom_plan_config=current_user.get("custom_plan_config"))
-        limit = plan["chunks"]
+        limit = plan["words"]
 
         # Determine source_name early so we can query existing chunk count for it.
         # Normalisation happens here — before any DB or scraping work — so the
@@ -7711,28 +7743,32 @@ async def train_chatbot(
                 pass
 
         try:
-            # Quota counts ONLY child rows — parent rows are free storage.
+            # Quota counts ONLY child rows' word_count — parent rows are free storage.
             # Subtract the child rows belonging to the source being replaced so that
             # a re-upload does not hit a false quota ceiling.
             cursor.execute(
-                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
+                "SELECT COALESCE(SUM(word_count), 0) FROM company_knowledge WHERE company_id = %s AND chunk_type = 'child'",
                 (resolved_company_id,)
             )
             total_count = cursor.fetchone()[0]
 
             cursor.execute(
-                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+                "SELECT COALESCE(SUM(word_count), 0) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
                 (resolved_company_id, pending_source_name)
             )
             existing_source_count = cursor.fetchone()[0]
-            is_upsert = existing_source_count > 0
+            cursor.execute(
+                "SELECT COUNT(*) FROM company_knowledge WHERE company_id = %s AND url = %s AND chunk_type = 'child'",
+                (resolved_company_id, pending_source_name)
+            )
+            is_upsert = cursor.fetchone()[0] > 0
 
-            # Effective child slots in use, excluding the source about to be replaced.
+            # Effective word budget in use, excluding the source about to be replaced.
             effective_count = total_count - existing_source_count
 
             if effective_count >= limit:
                 raise HTTPException(status_code=402, detail={
-                    "code": "CHUNK_LIMIT_EXCEEDED",
+                    "code": "WORD_LIMIT_EXCEEDED",
                     "message": f"Knowledge base limit reached on your {current_user['tier']} plan.",
                     "current": total_count,
                     "limit": limit,
@@ -7962,24 +7998,18 @@ async def train_chatbot(
         }
 
     # ── 4. Quota overflow check against effective (post-replacement) capacity ─
-    # Quota counts child chunks only. With parent-child chunking each parent
-    # (~1500 chars) produces ~5 children (~300 chars each), so the child count
-    # is estimated as total_chars / 300 (conservative — better to allow and cap
-    # inside run_training_job than to reject valid uploads prematurely).
-    if csv_file:
-        estimated_chunks = len(docs)
-    else:
-        total_chars = sum(len(d.page_content) for d in docs)
-        estimated_chunks = max(1, int(total_chars / 250))   # ~300 chars per child, 250 = safe undercount
+    # Word count is exact (the full text is already in memory here) — no
+    # estimation needed, unlike the old chars/250 chunk-count heuristic.
+    estimated_words = sum(len(d.page_content.split()) for d in docs)
     effective_remaining = max(0, limit - effective_count)
 
-    if estimated_chunks > effective_remaining:
+    if estimated_words > effective_remaining:
         if r and lock_acquired:
             await r.delete(lock_key)
         raise HTTPException(status_code=402, detail={
-            "code": "CHUNK_QUOTA_OVERFLOW",
+            "code": "WORD_QUOTA_OVERFLOW",
             "message": (
-                "This source is too large for your remaining chunk quota. "
+                "This source is too large for your remaining storage quota. "
                 "Use a smaller file or upgrade your plan to get more storage."
             ),
             "current": total_count,
@@ -8202,6 +8232,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                       COALESCE(ut.messages_used, 0) as messages_used,
                       COALESCE(ut.period_end, now() + interval '30 days') as period_end,
                       (SELECT COUNT(*) FROM company_knowledge ck WHERE ck.company_id = c.id AND ck.chunk_type = 'child') as chunks_used,
+                      (SELECT COALESCE(SUM(ck.word_count), 0) FROM company_knowledge ck WHERE ck.company_id = c.id AND ck.chunk_type = 'child') as words_used,
                       c.vertical
                FROM companies c
                LEFT JOIN usage_tracking ut ON ut.company_id = c.id
@@ -8229,9 +8260,10 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                     "messages_used": r[11],
                     "period_end": r[12].isoformat() if r[12] else None,
                     "chunks_used": r[13],
+                    "words_used": r[14],
                     # Phase 5a — pack vertical drives the dashboard's tab labels +
                     # Pipeline view. Normalized (NULL/garbage -> None = generic bot).
-                    "vertical": normalize_vertical(r[14]),
+                    "vertical": normalize_vertical(r[15]),
                 }
                 for r in rows
             ],
@@ -8249,7 +8281,7 @@ async def list_my_companies(user: dict = Depends(get_current_user)):
                 "over_limit": len(rows) > plan["max_bots"],
                 "over_limit_by": max(0, len(rows) - plan["max_bots"]),
                 "message_limit": plan["messages"],
-                "chunk_limit": plan["chunks"],
+                "word_limit": plan["words"],
                 "speed_tier": plan["speed"],
             }
         }
@@ -9065,7 +9097,7 @@ def get_my_profile(
             "trial_end_date": current_user.get("trial_end_date"),
             "max_bots": plan["max_bots"],
             "speed_tier": plan["speed"],
-            "chunk_limit": plan["chunks"],
+            "word_limit": plan["words"],
             # Custom plan metadata (only populated when tier == CUSTOM)
             "custom_plan_name": plan.get("plan_name") if tier == "CUSTOM" else None,
             "custom_plan_features": {

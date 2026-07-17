@@ -258,8 +258,9 @@ export default function DemoTrainAIPage() {
     if (!mounted) return null;
 
     const chunksUsed = chunks.length;
-    const chunkLimit = 200;
-    const chunkPct = chunkLimit > 0 ? Math.min((chunksUsed / chunkLimit) * 100, 100) : null;
+    const wordsUsed = chunks.reduce((sum, c) => sum + c.trim().split(/\s+/).filter(Boolean).length, 0);
+    const wordLimit = 12000;
+    const wordPct = wordLimit > 0 ? Math.min((wordsUsed / wordLimit) * 100, 100) : null;
     const sourceCount = chunksUsed > 0 ? 1 : 0;
     const msgUsed = 0;
     const msgLimit = 15;
@@ -334,12 +335,12 @@ export default function DemoTrainAIPage() {
                         label="Knowledge storage"
                         icon="database"
                         tone="accent"
-                        value={fmtNum(chunksUsed * 60)}
-                        limit={fmtNum(chunkLimit * 60)}
+                        value={fmtNum(wordsUsed)}
+                        limit={fmtNum(wordLimit)}
                         unit="words"
-                        progress={chunkPct ?? undefined}
-                        progressTone={barToneFor(chunkPct)}
-                        footer={chunkPct !== null ? `${Math.round(chunkPct)}% of storage used` : undefined}
+                        progress={wordPct ?? undefined}
+                        progressTone={barToneFor(wordPct)}
+                        footer={wordPct !== null ? `${Math.round(wordPct)}% of storage used` : undefined}
                     />
 
                     <StatCard

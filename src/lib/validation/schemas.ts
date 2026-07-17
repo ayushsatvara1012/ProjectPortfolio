@@ -45,7 +45,7 @@ export const customPlanConfigSchema = z.object({
   trial_days: z.coerce.number().int().min(0, 'Trial days must be 0 or more.').max(30, 'Trial days cannot exceed 30.').optional(),
   max_bots: z.coerce.number().int().nonnegative(),
   max_messages: z.coerce.number().int().nonnegative(),
-  max_chunks: z.coerce.number().int().nonnegative(),
+  max_words: z.coerce.number().int().nonnegative(),
   gemini_model: z.string().optional(),
   max_output_tokens: z.union([z.coerce.number().int().positive(), z.literal('').transform(() => undefined)]).optional(),
   advanced_bot: z.boolean().optional(),

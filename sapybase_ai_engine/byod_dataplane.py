@@ -45,7 +45,11 @@ from core.embedding_config import EMBEDDING_DIMENSIONS
 # Bumped whenever the data-plane DDL below changes (expand->migrate->contract,
 # §8.2). Recorded in the control-plane schema_version registry (§8.1) so the
 # engine can version-gate reads of new columns during a rollout (Phase 6).
-DATA_PLANE_SCHEMA_VERSION = "0001"
+# 0002: added company_knowledge.word_count (word-based storage limit plan,
+# docs/word-based-storage-limit-plan.md) — new provisions only; existing
+# tenant DBs are not retrofitted by this bump (no live-tenant migration
+# runner exists yet), same limitation the chunk_type rollout accepted.
+DATA_PLANE_SCHEMA_VERSION = "0002"
 
 # The DML-only role the engine's request path uses (§5.4). One per tenant DB;
 # since every BYOD tenant has its own database, the fixed name never collides.
@@ -90,6 +94,10 @@ CREATE TABLE IF NOT EXISTS company_knowledge (
     -- company_knowledge INSERT (none sets content_tsv).
     content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
 );
+-- Word-based storage limit plan: real word count per row, summed for quota
+-- enforcement instead of counting chunk rows. ADD COLUMN (not part of the
+-- CREATE TABLE) so this also lands on a tenant DB provisioned before 0002.
+ALTER TABLE company_knowledge ADD COLUMN IF NOT EXISTS word_count INTEGER;
 CREATE INDEX IF NOT EXISTS company_knowledge_embedding_hnsw
     ON company_knowledge USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_company_knowledge_company

@@ -34,7 +34,7 @@ export interface BotPlan {
   current_bots: number;
   max_bots: number;
   message_limit: number;
-  chunk_limit: number;
+  word_limit: number;
 }
 
 export interface CompaniesResponse {

@@ -18,9 +18,16 @@ from datetime import timedelta
 # EXPLORE = lifetime-free top-of-funnel (a $0 Polar subscription). Full product ON
 # (analytics, lead capture, WhatsApp/human handoff, webhooks, custom logo, advanced
 # bot) EXCEPT white_label — the permanent "Powered by Vaayu Intelligence" badge is the
-# viral engine. Cost-bearing dimensions are capped: 1 bot, 1000 messages/mo, 200 chunks,
-# `lite` model, 50 owner-emails/mo. white_label is False here and must never be enabled
-# via any self-serve path (super-admin override only, logged).
+# viral engine. Cost-bearing dimensions are capped: 1 bot, 1000 messages/mo, 12000
+# words, `lite` model, 50 owner-emails/mo. white_label is False here and must never be
+# enabled via any self-serve path (super-admin override only, logged).
+#
+# `words` (knowledge-base storage limit, docs/word-based-storage-limit-plan.md):
+# a real word count (len(text.split())) summed over ingested RAG chunks — NOT a
+# chunk-row count. Values below are the pre-existing chunk limits × 60 (the
+# frontend's long-standing chunks-to-words display constant), so commercial
+# parity is exact; the pricing page's "60,000 / 240,000 / 900,000 / 12,000
+# words" copy is these numbers verbatim.
 #
 # `max_owner_emails` (NEW dimension): monthly cap on Resend lead-emails sent to bot owners
 # (the "resting"-state lead email). EXPLORE = 50 (abuse backstop). Paid tiers = 999999
@@ -37,15 +44,15 @@ from datetime import timedelta
 # Caps below are fair-use / anti-abuse on a flat $149/mo LLM-included plan (§3.2/§3.3), all
 # super-admin editable. MUST stay mirrored with src/lib/auth/entitlements.ts (Rule R18).
 PLAN_LIMITS = {
-    "FREE":       {"max_bots": 0,   "messages": 0,      "chunks": 0,     "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 0,      "byo_database": False},
-    "EXPLORE":    {"max_bots": 1,   "messages": 1000,   "chunks": 200,   "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50,     "byo_database": False},
-    "STARTER":    {"max_bots": 1,   "messages": 5000,   "chunks": 1000,  "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999, "byo_database": False},
-    "PRO":        {"max_bots": 3,   "messages": 15000,  "chunks": 4000,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999, "byo_database": False},
-    "BUSINESS":   {"max_bots": 5,   "messages": 50000,  "chunks": 15000, "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": False},
-    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "chunks": 99999, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": False},
+    "FREE":       {"max_bots": 0,   "messages": 0,      "words": 0,       "speed": "none",      "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 0,      "byo_database": False},
+    "EXPLORE":    {"max_bots": 1,   "messages": 1000,   "words": 12000,   "speed": "lite",      "human_handoff": True,  "lead_capture": True,  "white_label": False, "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 50,     "byo_database": False},
+    "STARTER":    {"max_bots": 1,   "messages": 5000,   "words": 60000,   "speed": "standard",  "human_handoff": False, "lead_capture": False, "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999, "byo_database": False},
+    "PRO":        {"max_bots": 3,   "messages": 15000,  "words": 240000,  "speed": "priority",  "human_handoff": False, "lead_capture": True,  "white_label": False, "webhook": False, "analytics": False, "custom_logo": False, "max_owner_emails": 999999, "byo_database": False},
+    "BUSINESS":   {"max_bots": 5,   "messages": 50000,  "words": 900000,  "speed": "ultra",     "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": False},
+    "ENTERPRISE": {"max_bots": 999, "messages": 999999, "words": 5999940, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": False},
     # BYOD template (RFC §3.2): flat $149/mo, LLM included; all features ON incl white_label.
-    # 50k messages, 1 bot, 50k chunks (storage is the client's — only one-time embedding is ours).
-    "BYOD":       {"max_bots": 1,   "messages": 50000,  "chunks": 50000, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": True},
+    # 50k messages, 1 bot, 3M words (storage is the client's — only one-time embedding is ours).
+    "BYOD":       {"max_bots": 1,   "messages": 50000,  "words": 3000000, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": True},
 }
 
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
@@ -64,7 +71,7 @@ VALID_MODELS = set(MODEL_MAPPING.values()) | {
     "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
 }
 
-UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "chunks": 999999999, "speed": "dedicated"}
+UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "words": 999999999, "speed": "dedicated"}
 
 # ── Tier-aware per-minute caps (anti-abuse rate ceilings) ────────────────────
 TIER_RATE_LIMITS = {
@@ -148,7 +155,7 @@ CUSTOM_PLAN_DEFAULTS = {
     "trial_days": 14,
     "max_bots": 1,
     "max_messages": 500,
-    "max_chunks": 100,
+    "max_words": 6000,
     "gemini_model": None,
     "max_output_tokens": None,
     "advanced_bot": False,
@@ -177,7 +184,7 @@ BYOD_PLAN_DEFAULTS = {
     "monthly_price_usd": 149,
     "max_bots": PLAN_LIMITS["BYOD"]["max_bots"],
     "max_messages": PLAN_LIMITS["BYOD"]["messages"],
-    "max_chunks": PLAN_LIMITS["BYOD"]["chunks"],
+    "max_words": PLAN_LIMITS["BYOD"]["words"],
     "gemini_model": MODEL_MAPPING["BYOD"],
     # Every capability ON. advanced_bot isn't a PLAN_LIMITS key (entitlements-only),
     # so it defaults True here; the rest mirror the all-on PLAN_LIMITS["BYOD"] row.

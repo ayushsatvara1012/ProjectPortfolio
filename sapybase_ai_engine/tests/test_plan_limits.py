@@ -31,9 +31,9 @@ class TestPlanLimits:
         assert limits["PRO"]["messages"] < limits["BUSINESS"]["messages"]
         assert limits["BUSINESS"]["messages"] < limits["ENTERPRISE"]["messages"]
 
-    def test_higher_tiers_have_more_chunks(self):
+    def test_higher_tiers_have_more_words(self):
         limits, _, _ = _import()
-        assert limits["STARTER"]["chunks"] < limits["PRO"]["chunks"]
+        assert limits["STARTER"]["words"] < limits["PRO"]["words"]
 
     def test_free_tier_no_lead_capture(self):
         limits, _, _ = _import()
@@ -76,9 +76,11 @@ class TestPlanLimits:
         e = limits["EXPLORE"]
         assert e["max_bots"] == 1
         # Values track config.py PLAN_LIMITS["EXPLORE"] (source of truth): the
-        # 2026-06-12 pricing update raised these to 1000 messages / 200 chunks.
+        # 2026-06-12 pricing update raised these to 1000 messages / 200 chunks
+        # (12,000 words after the word-based storage limit plan's x60 parity
+        # conversion, docs/word-based-storage-limit-plan.md).
         assert e["messages"] == 1000
-        assert e["chunks"] == 200
+        assert e["words"] == 12000
         assert e["speed"] == "lite"
         assert e["max_owner_emails"] == 50
 
@@ -139,12 +141,14 @@ class TestBYODPlanTemplate:
         assert "BYOD" in limits
 
     def test_byod_caps_match_commercial_offer(self):
-        # RFC §3.2: $149/mo flat · 50,000 messages · 1 bot · 50,000 chunks.
+        # RFC §3.2: $149/mo flat · 50,000 messages · 1 bot · 50,000 chunks
+        # (3,000,000 words after the word-based storage limit plan's x60
+        # parity conversion).
         limits, _, _ = _import()
         b = limits["BYOD"]
         assert b["max_bots"] == 1
         assert b["messages"] == 50000
-        assert b["chunks"] == 50000
+        assert b["words"] == 3000000
         assert b["max_owner_emails"] >= 999999
 
     def test_byod_has_every_feature_including_white_label(self):
@@ -188,7 +192,7 @@ class TestBYODPlanTemplate:
         assert BYOD_PLAN_DEFAULTS["plan_name"] == "BYOD"
         assert BYOD_PLAN_DEFAULTS["monthly_price_usd"] == 149
         assert BYOD_PLAN_DEFAULTS["max_messages"] == b["messages"]
-        assert BYOD_PLAN_DEFAULTS["max_chunks"] == b["chunks"]
+        assert BYOD_PLAN_DEFAULTS["max_words"] == b["words"]
         assert BYOD_PLAN_DEFAULTS["max_bots"] == b["max_bots"]
         assert BYOD_PLAN_DEFAULTS["gemini_model"] == mapping["BYOD"]
         # Every capability — including byo_database and advanced_bot — is ON.

@@ -171,7 +171,7 @@ class CustomPlanConfig(BaseModel):
     trial_days: Optional[int] = 14
     max_bots: Optional[int] = None
     max_messages: Optional[int] = None
-    max_chunks: Optional[int] = None
+    max_words: Optional[int] = None
     gemini_model: Optional[str] = None
     max_output_tokens: Optional[int] = None
     advanced_bot: Optional[bool] = False
@@ -205,7 +205,7 @@ class CustomPlanConfig(BaseModel):
             raise ValueError("trial_days must be between 0 and 30")
         return v
 
-    @validator("max_bots", "max_messages", "max_chunks", "max_output_tokens", pre=True)
+    @validator("max_bots", "max_messages", "max_words", "max_output_tokens", pre=True)
     def non_negative(cls, v):
         if v is not None and v < 0:
             raise ValueError("Must be 0 or greater")

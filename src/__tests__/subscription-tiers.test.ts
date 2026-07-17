@@ -3,14 +3,14 @@ import type { Tier, MeResponse, BotPlan } from '@/src/lib/types/api';
 import { UpgradeError } from '@/src/lib/errors';
 
 // Mirrors PLAN_LIMITS from config.py — single frontend source of truth for UI gating
-const PLAN_LIMITS: Record<Tier, { max_bots: number; messages: number; chunks: number }> = {
-  FREE:       { max_bots: 0,   messages: 0,      chunks: 0     },
-  EXPLORE:    { max_bots: 1,   messages: 1000,   chunks: 200   },
-  STARTER:    { max_bots: 1,   messages: 5000,   chunks: 1000  },
-  PRO:        { max_bots: 3,   messages: 15000,  chunks: 4000  },
-  BUSINESS:   { max_bots: 5,   messages: 50000,  chunks: 15000 },
-  ENTERPRISE: { max_bots: 999, messages: 999999, chunks: 99999 },
-  CUSTOM:     { max_bots: 999, messages: 999999, chunks: 99999 },
+const PLAN_LIMITS: Record<Tier, { max_bots: number; messages: number; words: number }> = {
+  FREE:       { max_bots: 0,   messages: 0,      words: 0       },
+  EXPLORE:    { max_bots: 1,   messages: 1000,   words: 12000   },
+  STARTER:    { max_bots: 1,   messages: 5000,   words: 60000   },
+  PRO:        { max_bots: 3,   messages: 15000,  words: 240000  },
+  BUSINESS:   { max_bots: 5,   messages: 50000,  words: 900000  },
+  ENTERPRISE: { max_bots: 999, messages: 999999, words: 5999940 },
+  CUSTOM:     { max_bots: 999, messages: 999999, words: 5999940 },
 };
 
 function canAddBot(plan: BotPlan): boolean {
@@ -64,17 +64,17 @@ describe('Tier hierarchy', () => {
 
 describe('canAddBot', () => {
   it('returns false when can_add_more is false', () => {
-    const plan: BotPlan = { tier: 'STARTER', can_add_more: false, speed_tier: 'standard', current_bots: 0, max_bots: 1, message_limit: 1500, chunk_limit: 300 };
+    const plan: BotPlan = { tier: 'STARTER', can_add_more: false, speed_tier: 'standard', current_bots: 0, max_bots: 1, message_limit: 1500, word_limit: 90000 };
     expect(canAddBot(plan)).toBe(false);
   });
 
   it('returns false when at max_bots', () => {
-    const plan: BotPlan = { tier: 'STARTER', can_add_more: true, speed_tier: 'standard', current_bots: 1, max_bots: 1, message_limit: 1500, chunk_limit: 300 };
+    const plan: BotPlan = { tier: 'STARTER', can_add_more: true, speed_tier: 'standard', current_bots: 1, max_bots: 1, message_limit: 1500, word_limit: 90000 };
     expect(canAddBot(plan)).toBe(false);
   });
 
   it('returns true when under limit', () => {
-    const plan: BotPlan = { tier: 'PRO', can_add_more: true, speed_tier: 'dedicated', current_bots: 2, max_bots: 5, message_limit: 5000, chunk_limit: 2000 };
+    const plan: BotPlan = { tier: 'PRO', can_add_more: true, speed_tier: 'dedicated', current_bots: 2, max_bots: 5, message_limit: 5000, word_limit: 600000 };
     expect(canAddBot(plan)).toBe(true);
   });
 });

@@ -90,7 +90,7 @@ describe('customPlanConfigSchema', () => {
     monthly_price_usd: 99,
     max_bots: 10,
     max_messages: 10000,
-    max_chunks: 5000,
+    max_words: 300000,
   };
 
   it('accepts valid plan config', () => {
@@ -103,7 +103,7 @@ describe('customPlanConfigSchema', () => {
     expect(customPlanConfigSchema.safeParse({ ...base, monthly_price_usd: -1 }).success).toBe(false);
   });
   it('coerces string numbers', () => {
-    const r = customPlanConfigSchema.safeParse({ ...base, max_bots: '5', max_messages: '1000', max_chunks: '500' });
+    const r = customPlanConfigSchema.safeParse({ ...base, max_bots: '5', max_messages: '1000', max_words: '500' });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.max_bots).toBe(5);
   });

@@ -272,10 +272,10 @@ class TestCustomPlanConfig:
         with pytest.raises(ValidationError, match="0 or greater"):
             self.Model(max_messages=-1)
 
-    def test_max_chunks_negative_rejected(self):
+    def test_max_words_negative_rejected(self):
         from pydantic import ValidationError
         with pytest.raises(ValidationError, match="0 or greater"):
-            self.Model(max_chunks=-1)
+            self.Model(max_words=-1)
 
     def test_invalid_gemini_model_rejected(self):
         from pydantic import ValidationError
@@ -315,7 +315,7 @@ class TestCustomPlanDefaults:
     def test_has_all_required_keys(self):
         required = {
             "plan_name", "monthly_price_usd", "trial_days",
-            "max_bots", "max_messages", "max_chunks",
+            "max_bots", "max_messages", "max_words",
             "human_handoff", "lead_capture", "white_label",
             "webhook", "custom_logo", "analytics",
             "polar_checkout_url", "polar_created_at",
@@ -772,7 +772,7 @@ class TestCustomPlanConfigByod:
 
     def test_get_plan_resolves_byo_database_from_custom_config(self):
         from main import get_plan
-        plan = get_plan("CUSTOM", custom_plan_config={"byo_database": True, "max_bots": 1, "max_messages": 50000, "max_chunks": 50000})
+        plan = get_plan("CUSTOM", custom_plan_config={"byo_database": True, "max_bots": 1, "max_messages": 50000, "max_words": 3000000})
         assert plan["byo_database"] is True
 
     def test_get_plan_custom_without_byo_database_defaults_false(self):

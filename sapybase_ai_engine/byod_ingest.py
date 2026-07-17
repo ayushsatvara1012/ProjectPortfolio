@@ -171,7 +171,7 @@ def plan_prune(
     """Ids of stored child chunks that the current re-train no longer contains
     (content fingerprint absent from ``current_fingerprints``) → superseded, safe to
     delete. Without this, re-training changed content only *appends*, so stale chunks
-    linger forever → answer-quality drift + ``max_chunks`` quota creep (§16.7).
+    linger forever → answer-quality drift + ``max_words`` quota creep (§16.7).
 
     ``current_fingerprints`` must be the fingerprints of the *full* intended child
     set for the source — so chunks that survive a re-train unchanged are retained.
@@ -372,9 +372,9 @@ async def run_tenant_ingest(
 
                 cur.execute(
                     "INSERT INTO company_knowledge "
-                    "(company_id, content, url, embedding, chunk_type, parent_id) "
-                    "VALUES (%s, %s, %s, %s, 'child', %s)",
-                    (company_id, child_text, source_name, embedding, parent_id),
+                    "(company_id, content, url, embedding, chunk_type, parent_id, word_count) "
+                    "VALUES (%s, %s, %s, %s, 'child', %s, %s)",
+                    (company_id, child_text, source_name, embedding, parent_id, len(child_text.split())),
                 )
                 added += 1
             conn.commit()  # checkpoint — committed work survives an interruption

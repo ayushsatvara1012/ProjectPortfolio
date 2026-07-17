@@ -28,10 +28,10 @@ export default function DemoMyBotsPage() {
         return null; // Don't paint until hydrated so server/client configs match.
     }
 
-    const chunksUsed = chunks.length;
+    const wordsUsed = chunks.reduce((sum: number, c: string) => sum + (typeof c === 'string' ? c.trim().split(/\s+/).filter(Boolean).length : 0), 0);
     const msgUsed = 0;
     const msgLimit = 15;
-    const chunkLimit = 200;
+    const wordLimit = 12000;
 
     const bot = {
         id: 'demo-bot',
@@ -49,7 +49,7 @@ export default function DemoMyBotsPage() {
         current_bots: 1,
         max_bots: 1,
         message_limit: msgLimit,
-        chunk_limit: chunkLimit,
+        word_limit: wordLimit,
     };
 
     const speedInfo = SPEED_BADGE[plan.speed_tier];
@@ -77,7 +77,7 @@ export default function DemoMyBotsPage() {
                     {[
                         { label: 'Plan', value: plan.tier },
                         { label: 'Messages / bot / mo', value: plan.message_limit.toLocaleString() },
-                        { label: 'Knowledge words', value: (plan.chunk_limit * 60).toLocaleString() },
+                        { label: 'Knowledge words', value: plan.word_limit.toLocaleString() },
                     ].map((s, i) => (
                         <div key={i} className="bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl transition-colors">
                             <p className="text-xs text-slate-400 dark:text-slate-500 font-google mb-1">{s.label}</p>
@@ -122,7 +122,7 @@ export default function DemoMyBotsPage() {
                                     {/* Training status */}
                                     <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium font-google ${trained ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                                         <span className="material-symbols-outlined text-[15px]">{trained ? 'check_circle' : 'radio_button_unchecked'}</span>
-                                        {trained ? `${chunksUsed} chunks trained` : 'Not trained yet'}
+                                        {trained ? `${wordsUsed.toLocaleString()} words trained` : 'Not trained yet'}
                                     </div>
 
                                     {/* Usage bar */}

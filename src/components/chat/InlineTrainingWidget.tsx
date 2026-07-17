@@ -109,7 +109,7 @@ export default function InlineTrainingWidget({
                     throw new UpgradeError(
                         typeof detail === 'object' && detail?.code
                             ? detail
-                            : { code: 'CHUNK_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Storage limit reached.', tier: '', current: null, limit: null }
+                            : { code: 'WORD_LIMIT_EXCEEDED', message: typeof detail === 'string' ? detail : 'Storage limit reached.', tier: '', current: null, limit: null }
                     );
                 }
                 throw new Error(data.detail?.message || data.detail || 'Training failed.');

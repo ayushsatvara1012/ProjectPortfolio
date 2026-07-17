@@ -31,14 +31,14 @@ const LIMIT_CONFIG: Record<string, LimitEntry> = {
     tip: (tier, limit) =>
       `You've used all ${limit?.toLocaleString()} messages on your ${tier} plan this month. Upgrade for more.`,
   },
-  CHUNK_LIMIT_EXCEEDED: {
+  WORD_LIMIT_EXCEEDED: {
     icon: Database,
     title: 'Knowledge Base Full',
     accent: 'rose',
     tip: (tier, _limit) =>
       `Your ${tier} plan's knowledge storage is full. Upgrade to train on more content.`,
   },
-  CHUNK_QUOTA_OVERFLOW: {
+  WORD_QUOTA_OVERFLOW: {
     icon: Database,
     title: 'File Too Large for Plan',
     accent: 'rose',
