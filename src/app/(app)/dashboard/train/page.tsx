@@ -10,6 +10,7 @@ import UpgradePrompt from '@/src/components/features/UpgradePrompt';
 import { useAuthenticatedFetch, useIsAuthReady, UpgradeError } from '@/src/lib/hooks/useAuthenticatedFetch';
 import { trainUrlSchema, trainTextSchema } from '@/src/lib/validation/schemas';
 import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/components/dashboard/insights/ui';
+import { useBotSwitcher } from '@/src/lib/context/BotSwitcherContext';
 
 import SourceBrowser from '@/src/components/dashboard/SourceBrowser';
 import CatalogBrowser from '@/src/components/dashboard/CatalogBrowser';
@@ -87,7 +88,7 @@ export default function TrainPage() {
     const [trainingText, setTrainingText] = useState('');
     const [textLabel, setTextLabel] = useState('');
     const [alert, setAlert] = useState<{ open: boolean; type: 'success' | 'error' | 'warning' | 'development'; msg: string }>({ open: false, type: 'success', msg: '' });
-    const [selectedBotId, setSelectedBotId] = useState('');
+    const { bots, selectedBotId, setSelectedBotId } = useBotSwitcher();
     const [upgradeError, setUpgradeError] = useState<UpgradeError | null>(null);
     const [trainingJobId, setTrainingJobId] = useState<string | null>(null);
     const [trainingProgress, setTrainingProgress] = useState<any>(null);
@@ -106,28 +107,23 @@ export default function TrainPage() {
             setActiveTab('text');
             setTrainingText(queryText);
         }
-        if (botId) {
+        if (botId && botId !== selectedBotId && bots.some((b: any) => b.id === botId)) {
             setSelectedBotId(botId);
         }
-    }, [searchParams]);
+    }, [searchParams, bots, selectedBotId, setSelectedBotId]);
 
     const fileRef = useRef<HTMLInputElement>(null);
     const csvFileRef = useRef<HTMLInputElement>(null);
     const baseUrl = (typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL?.trim() || ''));
 
+    // Same queryKey as AppLayout's bot-list fetch, so this shares its cache
+    // entry instead of double-fetching — only used here for plan-level fields
+    // (word_limit, speed_tier) that BotSwitcherContext doesn't carry.
     const { data: botsData } = useQuery({
         queryKey: ['bots'],
         queryFn: () => authFetch('/api/companies'),
         enabled: isAuthReady,
     });
-
-    const bots = (botsData as any)?.bots || [];
-
-    useEffect(() => {
-        if (bots.length > 0 && !selectedBotId) {
-            setSelectedBotId(bots[0].id);
-        }
-    }, [bots, selectedBotId]);
 
     useEffect(() => () => {
         if (pollRef.current) clearTimeout(pollRef.current);
@@ -361,9 +357,9 @@ export default function TrainPage() {
 
     const isPurging = purgeMutation.isPending;
 
-    const selectedBot = bots.find((b: any) => b.id === selectedBotId);
-    const chunksUsed = selectedBot?.chunks_used ?? 0;
-    const wordsUsed = selectedBot?.words_used ?? 0;
+    const selectedBotUsage = ((botsData as any)?.bots || []).find((b: any) => b.id === selectedBotId);
+    const chunksUsed = selectedBotUsage?.chunks_used ?? 0;
+    const wordsUsed = selectedBotUsage?.words_used ?? 0;
     const wordLimit = (botsData as any)?.plan?.word_limit ?? 0;
     const wordUnlimited = wordLimit >= 10000000;
     const wordPct = wordLimit > 0 && !wordUnlimited ? Math.min((wordsUsed / wordLimit) * 100, 100) : null;
@@ -395,23 +391,6 @@ export default function TrainPage() {
                         {userTier && <Badge tone="ok" dot={false}>{userTier} plan</Badge>}
                         {speedTier && speedTier !== 'none' && (
                             <Badge tone="cold" dot={false}>{speedTier} speed</Badge>
-                        )}
-                        {bots.length > 0 && (
-                            <label className="flex items-center gap-2 min-w-0">
-                                <span className="text-[12.5px] font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Training bot</span>
-                                <div className="relative min-w-0">
-                                    <select
-                                        value={selectedBotId}
-                                        onChange={e => setSelectedBotId(e.target.value)}
-                                        aria-label="Select bot to train"
-                                        disabled={bots.length === 1}
-                                        className="w-full max-w-[220px] truncate appearance-none cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-3 pr-8 py-1.5 text-[12.5px] font-medium text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-default"
-                                    >
-                                        {bots.map((b: any) => <option key={b.id} value={b.id}>{b.bot_name}</option>)}
-                                    </select>
-                                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
-                                </div>
-                            </label>
                         )}
                     </div>
                 </div>
