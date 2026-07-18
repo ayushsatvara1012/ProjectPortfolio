@@ -3219,15 +3219,6 @@ async def chat_endpoint(
         bot_name        = company.get("bot_name") or "Sapy AI"
         company_name    = company.get("company_name") or "Sapybase"
         company_tone    = company.get("company_tone") or "Professional, expert and highly descriptive"
-        contact_email   = company.get("contact_email")
-        contact_website = (company.get("allowed_origin") or "https://Sapybase.com").rstrip("/")
-        
-        contact_info = []
-        if contact_email:
-            contact_info.append(f"  📧 **Email:** {contact_email}")
-        if contact_website:
-            contact_info.append(f"  🌐 **Website:** {contact_website}")
-        contact_block = "\n".join(contact_info)
 
         # ── Custom prompt from DB (tenant-written, stored in system_prompt col) ─
         raw_custom = (company.get("system_prompt") or "").strip()
@@ -3275,14 +3266,24 @@ async def chat_endpoint(
                 "NEVER say \"I don't have specific information about that\" — "
                 "always push through tools or escalate to human."
             )
-        else:
+        elif company.get("lead_capture_enabled"):
+            # Points at the widget's own "Talk to a human" menu action rather than
+            # an external contact detail — that button now connects instantly
+            # (configured WhatsApp link, or the name/email handoff form as fallback).
             _rule_6 = (
                 "[RULE 6 — FALLBACK PROTOCOL]\n"
                 "When the KNOWLEDGE BASE is empty OR contains no relevant answer:\n"
                 "DO NOT guess. Respond with EXACTLY this:\n\n"
                 "  That's a great question — I don't have specific information about that yet.\n\n"
-                f"  For accurate help, please reach out to the {company_name} team directly:\n\n"
-                f"{contact_block}\n\n"
+                "  Tap **Talk to a human** in the menu (⋮) above and our team will help you directly.\n\n"
+                "  I'm happy to help with anything else I have information on!"
+            )
+        else:
+            _rule_6 = (
+                "[RULE 6 — FALLBACK PROTOCOL]\n"
+                "When the KNOWLEDGE BASE is empty OR contains no relevant answer:\n"
+                "DO NOT guess. Respond with EXACTLY this:\n\n"
+                "  That's a great question — I don't have specific information about that yet.\n"
                 "  I'm happy to help with anything else I have information on!"
             )
 

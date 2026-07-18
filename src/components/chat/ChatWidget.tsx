@@ -576,6 +576,7 @@ type ConfigData = {
   hub_cards?: HubCard[];
   products?: ProductOption[];
   sample_form?: FormField[];
+  handoff_redirect_url?: string;
 };
 
 // ── Stream-safe Markdown sanitizer ───────────────────────────────────────────
@@ -1315,6 +1316,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             hub_cards: Array.isArray(data.hub_cards) ? data.hub_cards : [],
             products: Array.isArray(data.products) ? data.products : [],
             sample_form: Array.isArray(data.sample_form) ? data.sample_form : [],
+            handoff_redirect_url: data.human_handoff_enabled ? (data.handoff_redirect_url || '') : '',
           });
           leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
           // A pack-enabled bot is signalled by `vertical` (most precise) or, as a
@@ -2134,6 +2136,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
   const handleHandoff = () => {
     setShowMenu(false);
+    // A configured contact link (e.g. wa.me) skips the name/email form entirely —
+    // straight to instant connection, no backend call for this path.
+    if (configData.handoff_redirect_url) {
+      window.open(configData.handoff_redirect_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
     if (handoffSent) return;
     setMessages(prev => [
       ...prev,
