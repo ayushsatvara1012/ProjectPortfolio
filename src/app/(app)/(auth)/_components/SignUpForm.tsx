@@ -33,10 +33,8 @@ export default function SignUpForm() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
 
-  const [verifying, setVerifying] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,51 +53,24 @@ export default function SignUpForm() {
     }
   }
 
-  /* ── Step 1: create account → send email code ──────────────────────────── */
+  /* ── Create account → session goes live immediately, no email verification ── */
   async function createAccount(e: React.FormEvent) {
     e.preventDefault();
     if (!isLoaded || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await signUp.create({ emailAddress: email, password });
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      setVerifying(true);
-    } catch (err) {
-      setError(clerkMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /* ── Step 2: verify email code ─────────────────────────────────────────── */
-  async function verifyEmail(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isLoaded || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await signUp.attemptEmailAddressVerification({ code });
+      const res = await signUp.create({ emailAddress: email, password });
       if (res.status === 'complete') {
         await setActive({ session: res.createdSessionId });
         router.push(AFTER_SIGN_UP);
       } else {
-        setError('Verification incomplete. Please try again.');
+        setError('Unable to complete sign up. Please try again.');
       }
     } catch (err) {
-      setError(clerkMessage(err, 'Invalid or expired code.'));
+      setError(clerkMessage(err));
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function resendCode() {
-    if (!isLoaded || busy) return;
-    setError(null);
-    try {
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-    } catch (err) {
-      setError(clerkMessage(err));
     }
   }
 
@@ -108,39 +79,6 @@ export default function SignUpForm() {
       {error}
     </div>
   );
-
-  /* ── Verification screen ───────────────────────────────────────────────── */
-  if (verifying) {
-    return (
-      <div className={card}>
-        <BrandHeader title="Verify your email" subtitle="Enter the 6-digit code we just sent you" />
-        {errorBanner}
-        <form onSubmit={verifyEmail} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="code" className={labelCls}>Verification code</label>
-            <input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className={`${inputCls} text-center tracking-[0.4em] font-semibold`}
-              placeholder="······"
-            />
-          </div>
-          <button type="submit" className={btnPrimary} disabled={busy || !isLoaded}>
-            {busy && <Spinner />}
-            Verify email
-          </button>
-        </form>
-        <p className="mt-5 text-center text-[13px] text-slate-500 dark:text-slate-400">
-          Didn&apos;t get a code?{' '}
-          <button type="button" onClick={resendCode} className={linkCls}>Resend</button>
-        </p>
-      </div>
-    );
-  }
 
   /* ── Create-account screen ─────────────────────────────────────────────── */
   return (
