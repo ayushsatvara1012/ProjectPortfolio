@@ -28,11 +28,6 @@ const TABS = [
 const inputCls = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-[13.5px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 transition-colors";
 const labelCls = "block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 transition-colors";
 
-const sourceIconFor = (name: string) =>
-    name.toLowerCase().endsWith('.pdf') ? 'picture_as_pdf'
-        : ['.csv', '.xlsx', '.xls'].some(ext => name.toLowerCase().endsWith(ext)) ? 'table_chart'
-            : 'language';
-
 const prettyBytes = (n: number) => {
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
@@ -92,6 +87,13 @@ export default function TrainPage() {
     const [upgradeError, setUpgradeError] = useState<UpgradeError | null>(null);
     const [trainingJobId, setTrainingJobId] = useState<string | null>(null);
     const [trainingProgress, setTrainingProgress] = useState<any>(null);
+    // Multi-page crawl discovery (Phase 3): candidate same-site pages harvested
+    // from the entry URL, with an estimated word cost. Selection drives the crawl
+    // fan-out; null means no discovery has run for the current URL.
+    type CrawlCandidate = { url: string; label: string; estimated_words: number };
+    const [candidates, setCandidates] = useState<CrawlCandidate[] | null>(null);
+    const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
+    const [entryEstimate, setEntryEstimate] = useState<number>(0);
     // Catalog cleaning report from the last upload (vertical bots only) — the
     // importer's warnings (near-miss columns, skipped rows) are too detailed
     // for the 400px auto-dismiss toast, so they persist here until the next
@@ -179,11 +181,44 @@ export default function TrainPage() {
             : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20',
     );
 
+    const resetDiscovery = () => { setCandidates(null); setSelectedUrls(new Set()); setEntryEstimate(0); };
+
+    const discoverMutation = useMutation({
+        mutationFn: async () => {
+            const token = await getToken();
+            const fd = new FormData();
+            fd.append('url', url.trim());
+            if (selectedBotId) fd.append('company_id', selectedBotId);
+            const res = await fetch(`${baseUrl}/api/train/discover`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Could not scan the page.');
+            return data;
+        },
+        onSuccess: (data) => {
+            const found: CrawlCandidate[] = Array.isArray(data.candidates) ? data.candidates : [];
+            setEntryEstimate(Number(data?.entry?.estimated_words) || 0);
+            setCandidates(found);
+            // Default every discovered page on — the owner opted into finding them.
+            setSelectedUrls(new Set(found.map(c => c.url)));
+            if (found.length === 0) showAlert('warning', 'No extra contact/about/hours pages were found on this site.');
+        },
+        onError: (err: any) => showAlert('error', err.message || 'Could not scan the page.'),
+    });
+
     const trainMutation = useMutation({
         mutationFn: async () => {
             const token = await getToken();
             const fd = new FormData();
-            if (url.trim()) fd.append('url', url.trim());
+            // Crawl fan-out: entry page + selected same-site pages, one job per source.
+            const crawlUrls = candidates && selectedUrls.size > 0
+                ? [url.trim(), ...candidates.filter(c => selectedUrls.has(c.url)).map(c => c.url)]
+                : null;
+            if (crawlUrls) fd.append('urls', JSON.stringify(crawlUrls));
+            else if (url.trim()) fd.append('url', url.trim());
             if (file) fd.append('file', file);
             if (csvFile) fd.append('csv_file', csvFile);
             if (trainingText.trim()) fd.append('text', trainingText.trim());
@@ -216,8 +251,9 @@ export default function TrainPage() {
 
             if (data.job_id) {
                 setTrainingJobId(data.job_id);
-                setTrainingProgress({ status: 'queued', progress: 0, total: 0 });
+                setTrainingProgress({ status: 'queued', progress: 0, total: 0, mode: data.mode });
                 setUrl(''); setTrainingText(''); setFile(null); setCsvFile(null); setTextLabel('');
+                resetDiscovery();
                 if (fileRef.current) fileRef.current.value = '';
                 if (csvFileRef.current) csvFileRef.current.value = '';
 
@@ -260,6 +296,18 @@ export default function TrainPage() {
                             queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedBotId] });
                             queryClient.invalidateQueries({ queryKey: ['knowledge-catalog', selectedBotId] });
                             refreshUser();
+                            // Crawl fan-out reports per-page outcomes rather than a single
+                            // segment count; summarise trained / skipped / failed pages.
+                            if (Array.isArray(status.trained)) {
+                                const trained = status.trained.length;
+                                const skipped = (status.skipped_quota?.length ?? 0);
+                                const failed = (status.failed?.length ?? 0);
+                                const parts = [`${trained} page(s) trained`];
+                                if (skipped) parts.push(`${skipped} skipped (quota full)`);
+                                if (failed) parts.push(`${failed} failed`);
+                                showAlert(skipped || failed ? 'warning' : 'success', `${parts.join(' · ')}.`);
+                                return;
+                            }
                             const action = status.is_upsert ? 'Source updated!' : 'Training complete!';
                             const attention = warnings.length > 0 ? ` ${warnings.length} sheet issue(s) need attention — see below.` : '';
                             const msg = status.truncated
@@ -525,10 +573,53 @@ export default function TrainPage() {
                         {activeTab === 'url' && (
                             <div className="max-w-xl">
                                 <label className={labelCls}>Source URL</label>
-                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} className={inputCls} placeholder="https://docs.example.com" />
-                                <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                                    We'll crawl and index the page's readable content.
-                                </p>
+                                <input type="url" value={url}
+                                    onChange={e => { setUrl(e.target.value); if (candidates) resetDiscovery(); }}
+                                    className={inputCls} placeholder="https://docs.example.com" />
+                                <div className="mt-1.5 flex items-center justify-between gap-3">
+                                    <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        We'll index this page's readable content.
+                                    </p>
+                                    <button type="button"
+                                        onClick={() => { const r = trainUrlSchema.safeParse(url.trim()); if (!r.success) { showAlert('error', r.error.issues[0]?.message || 'Enter a valid URL first.'); return; } discoverMutation.mutate(); }}
+                                        disabled={!url.trim() || discoverMutation.isPending || isTraining}
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200 hover:border-blue-400 dark:hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                        {discoverMutation.isPending
+                                            ? <><div className="w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin motion-reduce:hidden" /> Scanning…</>
+                                            : <><span className="material-symbols-outlined text-[16px]">travel_explore</span> Find more pages</>}
+                                    </button>
+                                </div>
+
+                                {candidates && candidates.length > 0 && (
+                                    <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3.5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-[12.5px] font-semibold text-slate-700 dark:text-slate-200">
+                                                Also add these pages?
+                                            </p>
+                                            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                                                ~{fmtNum(entryEstimate + candidates.filter(c => selectedUrls.has(c.url)).reduce((s, c) => s + c.estimated_words, 0))} words est.
+                                            </span>
+                                        </div>
+                                        <ul className="space-y-1">
+                                            {candidates.map(c => (
+                                                <li key={c.url}>
+                                                    <label className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-white dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                                                        <input type="checkbox" checked={selectedUrls.has(c.url)}
+                                                            onChange={() => setSelectedUrls(prev => { const n = new Set(prev); n.has(c.url) ? n.delete(c.url) : n.add(c.url); return n; })}
+                                                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500/40" />
+                                                        <span className="min-w-0 flex-1 truncate text-[13px] text-slate-700 dark:text-slate-200" title={c.url}>
+                                                            {c.label || c.url}
+                                                        </span>
+                                                        <span className="shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">~{fmtNum(c.estimated_words)}w</span>
+                                                    </label>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                                            Counts are estimates; the real size is measured when each page is trained.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -640,7 +731,7 @@ export default function TrainPage() {
                             {trainingJobId ? (
                                 <>
                                     <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:hidden" />
-                                    Training… {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} segments
+                                    Training… {trainingProgress?.progress ?? 0} / {trainingProgress?.total ?? '?'} {trainingProgress?.mode === 'crawl' ? 'pages' : 'segments'}
                                 </>
                             ) : trainMutation.isPending ? (
                                 <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Uploading…</>
