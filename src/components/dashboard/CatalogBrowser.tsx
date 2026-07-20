@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { EmptyState, Badge, cx, fmtNum, Card, SectionHeader } from "@/src/components/dashboard/insights/ui";
 
-const inputCls = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-[13.5px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 transition-colors";
-
 const humanizeColumn = (col: string) =>
     col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bcas\b/i, 'CAS').replace(/\bhsn\b/i, 'HSN').replace(/\bgst\b/i, 'GST').replace(/\bsds\b/i, 'SDS');
 
