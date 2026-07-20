@@ -121,14 +121,11 @@ Precision comes from three mechanisms, all of which are in scope for Phase 1:
 Measure this: record extracted word count before and after on a fixture set, and confirm the retrieval tests still pass.
 If extracted words balloon without a retrieval gain, tighten the strip list rather than shipping it.
 
-### Phase 2 - Drop Jina entirely (deferred, infra-gated)
+### Phase 2 - Drop Jina entirely (DROPPED 2026-07-20)
 
-Only if Jina's rate limits or availability become a recurring problem.
-Not required for the reported bug.
-
-Requires replacing the rendering tier, which means `crawl4ai`/Playwright on a **separate** Render worker service, not the API instance.
-Costs a new Render service, so it needs an explicit yes on spend.
-Also moves SSRF onto our infrastructure - redirects pinned and re-validated per hop, scheme allowlist, byte cap, IPv6 coverage.
+Decision: keep Jina as the renderer indefinitely.
+Not required for the reported bug, and the new Render worker service + SSRF-onto-our-infra tradeoff isn't worth it while Jina's rate limits/availability aren't an active problem.
+Revisit only if that changes.
 
 ### Phase 3 - Shallow multi-page crawl (in progress)
 
@@ -305,8 +302,10 @@ Note: re-measured later the same day, Jina returned a smaller render of the same
 R6 checked: Explore's limit is 12,000 words (`core/config.py`), so this page moved from 1.3% to 4.7% of quota - roughly 21 such pages still fit, and the 402 copy still reads sensibly.
 
 Not yet done for Phase 1: the E2E retrain of the reported URL through the live dashboard (R7 last item).
+Verification only, no code changes expected.
 
-Phases 2 and 3: deferred, gated on the open decisions above.
+Phase 2: dropped, see above.
+Phase 3: code-complete, see progress above; remaining work is the same kind of live E2E verification (dashboard click-through + retrain), no code changes expected.
 
 Pre-existing bugs found while planning, to fix as separate commits:
 - `url`/`file`/`csv_file` not mutually exclusive, so a combined submission stores the URL doc unsplit (premise correction 4).
