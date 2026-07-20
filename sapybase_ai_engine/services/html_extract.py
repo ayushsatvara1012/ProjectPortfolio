@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Iterable, NamedTuple
+from typing import Any, Callable, Iterable, NamedTuple
 from urllib.parse import urldefrag, urljoin, urlparse
 
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -356,8 +356,10 @@ LINK_INTENT_PATTERNS = (
 
 _LINK_INTENT_RE = re.compile("|".join(LINK_INTENT_PATTERNS), re.I)
 
-# Bounds the discovery fan-out: each candidate costs its own Jina fetch.
-MAX_DISCOVERED_LINKS = 10
+# Bounds the checklist the owner sees. Sitemaps can list thousands of routes;
+# capping keeps the picker usable and stops an accidental "train everything" from
+# blowing a tenant's word quota in one click (full-site-discovery plan D2).
+MAX_DISCOVERED_LINKS = 100
 
 _NON_PAGE_SUFFIXES = (
     ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico",
@@ -370,12 +372,21 @@ class DiscoveredLink(NamedTuple):
     label: str
 
 
-def harvest_links(html: str, base_url: str, limit: int = MAX_DISCOVERED_LINKS) -> list[DiscoveredLink]:
+def harvest_links(
+    html: str,
+    base_url: str,
+    limit: int = MAX_DISCOVERED_LINKS,
+    require_intent_match: bool = True,
+) -> list[DiscoveredLink]:
     """Find depth-1, same-registrable-domain pages worth crawling.
 
     Returns at most ``limit`` links, deduped and in document order. The caller
     still owns SSRF validation of every URL returned here - these hrefs come from
     attacker-controlled markup and must not be fetched unchecked.
+
+    ``require_intent_match`` keeps only links whose path or anchor text hits the
+    intent list (contact/about/hours/...). Full-site discovery sets it False to
+    surface every same-domain page when a sitemap is unavailable.
     """
     if not html:
         return []
@@ -408,7 +419,7 @@ def harvest_links(html: str, base_url: str, limit: int = MAX_DISCOVERED_LINKS) -
             continue
 
         label = _inline_text(anchor)
-        if not _LINK_INTENT_RE.search(parsed.path) and not _LINK_INTENT_RE.search(label):
+        if require_intent_match and not _LINK_INTENT_RE.search(parsed.path) and not _LINK_INTENT_RE.search(label):
             continue
 
         key = _canonical(absolute)
@@ -435,6 +446,144 @@ def _canonical(url: str) -> str:
     query = f"?{parsed.query}" if parsed.query else ""
     return f"{_registrable_host(url)}{path.lower()}{query}"
 
+
+# ── Full-site route discovery: sitemap-first ─────────────────────────────────
+
+# Well-known sitemap locations, tried in order.
+SITEMAP_PATHS = ("/sitemap.xml", "/sitemap_index.xml")
+
+# A <sitemapindex> chains to nested sitemap files; fetch at most this many so a
+# huge index can't fan out into an unbounded number of HTTP requests.
+MAX_NESTED_SITEMAPS = 5
+
+# Hard ceiling on <loc> URLs read from a sitemap (before same-domain filtering),
+# so a sitemap listing tens of thousands of URLs can't be held in memory whole.
+MAX_SITEMAP_URLS = 5000
+
+# Fetches a URL's text body, or returns None on any failure. Injected by the
+# caller so it owns HTTP policy (timeout, SSRF) and this module stays testable.
+SitemapFetcher = Callable[[str], "str | None"]
+
+
+def parse_sitemap(xml: str) -> tuple[list[str], bool]:
+    """Parse sitemap XML into ``(loc_urls, is_index)``.
+
+    ``is_index`` is True for a ``<sitemapindex>`` (the ``loc``s point at nested
+    sitemap files, not pages). Returns ``([], False)`` for empty or non-XML
+    input so the caller falls back to nav-link harvesting.
+    """
+    if not xml:
+        return [], False
+    if len(xml) > MAX_HTML_BYTES:
+        xml = xml[:MAX_HTML_BYTES]
+    try:
+        soup = BeautifulSoup(xml, "xml")
+    except Exception:
+        return [], False
+
+    is_index = soup.find("sitemapindex") is not None
+    locs: list[str] = []
+    for loc in soup.find_all("loc"):
+        text = (loc.get_text() or "").strip()
+        if text:
+            locs.append(text)
+        if len(locs) >= MAX_SITEMAP_URLS:
+            break
+    return locs, is_index
+
+
+def discover_sitemap_urls(origin: str, fetch: SitemapFetcher) -> list[str] | None:
+    """Return a site's sitemap-listed page URLs, or ``None`` if none is usable.
+
+    Tries the well-known sitemap paths under ``origin``; on a ``<sitemapindex>``
+    it follows one level of nesting (bounded by ``MAX_NESTED_SITEMAPS``). Returns
+    raw, unfiltered ``<loc>`` URLs - the caller applies same-domain/suffix
+    filtering and SSRF validation. ``None`` signals "no sitemap" so the caller
+    can fall back to harvesting nav links from the entry HTML.
+    """
+    for path in SITEMAP_PATHS:
+        xml = fetch(urljoin(origin, path))
+        if not xml:
+            continue
+        locs = _collect_sitemap_locs(xml, fetch)
+        if locs:
+            return locs
+    return None
+
+
+def _collect_sitemap_locs(xml: str, fetch: SitemapFetcher) -> list[str]:
+    entries, is_index = parse_sitemap(xml)
+    if not entries:
+        return []
+    if not is_index:
+        return entries[:MAX_SITEMAP_URLS]
+
+    urls: list[str] = []
+    for nested in entries[:MAX_NESTED_SITEMAPS]:
+        nested_xml = fetch(nested)
+        if not nested_xml:
+            continue
+        child, _ = parse_sitemap(nested_xml)
+        urls.extend(child)
+        if len(urls) >= MAX_SITEMAP_URLS:
+            break
+    return urls[:MAX_SITEMAP_URLS]
+
+
+def links_from_sitemap(
+    urls: Iterable[str], base_url: str, limit: int = MAX_DISCOVERED_LINKS
+) -> list[DiscoveredLink]:
+    """Turn raw sitemap ``<loc>`` URLs into filtered, labelled candidates.
+
+    Same same-registrable-domain / non-page-suffix / dedup / entry-drop rules as
+    ``harvest_links``, but sourced from a sitemap (no anchor text), so labels are
+    derived from the URL path. Sitemap order is preserved (often priority-ordered).
+    The caller still owns SSRF validation of every URL returned here.
+    """
+    base_host = _registrable_host(base_url)
+    found: list[DiscoveredLink] = []
+    seen: set[str] = {_canonical(base_url)}
+
+    for raw in urls:
+        href = (raw or "").strip()
+        if not href:
+            continue
+        absolute = urljoin(base_url, href)  # <loc> is usually absolute, but tolerate relative
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        if _registrable_host(absolute) != base_host:
+            continue
+        if parsed.path.lower().endswith(_NON_PAGE_SUFFIXES):
+            continue
+
+        key = _canonical(absolute)
+        if key in seen:
+            continue
+        seen.add(key)
+        clean = urldefrag(absolute)[0]
+        found.append(DiscoveredLink(url=clean, label=_label_from_url(clean)))
+        if len(found) >= limit:
+            break
+
+    return found
+
+
+_LABEL_EXT_RE = re.compile(r"\.[a-z0-9]{1,5}$", re.I)
+_LABEL_SPLIT_RE = re.compile(r"[-_]+")
+
+
+def _label_from_url(url: str) -> str:
+    """Human label for a sitemap URL: ``/about-us`` -> ``About us``."""
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return url
+    slug = _LABEL_EXT_RE.sub("", path.split("/")[-1])
+    words = [w for w in _LABEL_SPLIT_RE.split(slug) if w]
+    label = " ".join(words).strip()
+    if not label:
+        return path
+    return label[:1].upper() + label[1:]
 
 
 def marginal_words(extracted: str) -> int:

@@ -34,12 +34,15 @@ def _premium_user():
 # ── Discovery endpoint ───────────────────────────────────────────────────────
 
 
-def _discover(monkeypatch, html=_ENTRY_HTML, url="https://www.acme.test/"):
+def _discover(monkeypatch, html=_ENTRY_HTML, url="https://www.acme.test/", sitemap=None):
     async def _fake_fetch(page_url):
         return html
 
     monkeypatch.setattr(m, "_fetch_url_html", _fake_fetch)
     monkeypatch.setattr(m, "validate_safe_url", lambda u: None)
+    # Sitemap fetch is a real requests.get; stub it so discovery is offline and
+    # deterministic. Default None = "no sitemap", which exercises the nav fallback.
+    monkeypatch.setattr(m, "_fetch_sitemap_text", lambda u: sitemap(u) if callable(sitemap) else sitemap)
     monkeypatch.setattr(m.limiter, "enabled", False)
     m.app.dependency_overrides[m.get_current_user] = _premium_user
     m.app.dependency_overrides[m.require_premium_tier] = _premium_user
@@ -50,7 +53,9 @@ def _discover(monkeypatch, html=_ENTRY_HTML, url="https://www.acme.test/"):
         m.app.dependency_overrides.clear()
 
 
-def test_discover_returns_entry_and_intent_candidates(monkeypatch):
+def test_discover_fallback_harvests_all_same_domain_pages(monkeypatch):
+    """With no sitemap, discovery drops the intent filter and surfaces every
+    same-domain link (full-site-discovery plan D1)."""
     resp = _discover(monkeypatch)
     assert resp.status_code == 200
     body = resp.json()
@@ -58,7 +63,32 @@ def test_discover_returns_entry_and_intent_candidates(monkeypatch):
     urls = [c["url"] for c in body["candidates"]]
     assert "https://www.acme.test/contact-us" in urls
     assert "https://www.acme.test/about" in urls
+    assert "https://www.acme.test/blog" in urls  # non-intent page now included
+
+
+_SITEMAP_XML = (
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    '<url><loc>https://www.acme.test/</loc></url>'
+    '<url><loc>https://www.acme.test/pricing</loc></url>'
+    '<url><loc>https://www.acme.test/services/design</loc></url>'
+    '</urlset>'
+)
+
+
+def test_discover_prefers_sitemap_over_nav_links(monkeypatch):
+    """A reachable sitemap drives the candidate list; nav-link harvest is skipped."""
+    resp = _discover(
+        monkeypatch,
+        sitemap=lambda u: _SITEMAP_XML if u.endswith("/sitemap.xml") else None,
+    )
+    body = resp.json()
+    urls = [c["url"] for c in body["candidates"]]
+    assert "https://www.acme.test/pricing" in urls
+    assert "https://www.acme.test/services/design" in urls
+    # /blog is a nav link only, not in the sitemap, so it must not appear.
     assert "https://www.acme.test/blog" not in urls
+    labels = {c["label"] for c in body["candidates"]}
+    assert "Pricing" in labels  # sitemap candidates are labelled from the path
 
 
 def test_discover_excludes_offsite_links(monkeypatch):

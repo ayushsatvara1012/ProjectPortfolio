@@ -243,6 +243,30 @@ async def _fetch_url_html(page_url: str) -> str:
     return _decode_response_body(response)
 
 
+def _fetch_sitemap_text(sitemap_url: str) -> str | None:
+    """Fetch a sitemap directly (NOT through Jina), or None on any failure.
+
+    Sitemaps are static XML, so this is a plain ``requests.get`` that never
+    touches the shared Jina quota. SSRF-validated like any other server-side
+    fetch (full-site-discovery plan: sitemap XML is attacker-controlled, R5).
+    """
+    try:
+        validate_safe_url(sitemap_url)
+    except HTTPException:
+        return None
+    try:
+        resp = requests.get(
+            sitemap_url, headers={"User-Agent": "SapybaseBot/1.0"}, timeout=8
+        )
+    except requests.RequestException:
+        return None
+    if resp.status_code != 200 or not resp.content:
+        return None
+    if len(resp.content) > html_extract.MAX_HTML_BYTES:
+        return None
+    return _decode_response_body(resp)
+
+
 def _url_resolves_to_public_ip(url: str) -> bool:
     """SSRF guard for owner-configured, server-side-fetched webhooks (Phase 2.3).
 
@@ -7837,11 +7861,15 @@ async def discover_crawl_links(
 ):
     """Find same-site pages worth adding, with a zero-extra-fetch cost estimate.
 
-    Only the entry page (the URL the owner pasted) is fetched. Candidate links are
-    harvested from that HTML and never fetched here - fetching every candidate is
-    exactly the cost this flow avoids on a free-tier user base (plan D1a). Per-page
-    cost is therefore estimated from the entry page, and the client must present it
-    as an estimate.
+    Discovery is sitemap-first: ``/sitemap.xml`` (and index) are fetched directly
+    (static XML, not through Jina, so no Jina quota is spent), and every listed
+    route becomes a candidate. If there is no usable sitemap, we fall back to
+    harvesting *every* same-domain link from the entry HTML (no intent filter).
+
+    Only the entry page is fetched through Jina. Candidate pages are never fetched
+    here - that is exactly the cost this flow avoids on a free-tier user base
+    (plan D1a). Per-page cost is estimated from the entry page; the client must
+    present it as an estimate.
     """
     entry = url.strip()
     validate_safe_url(entry)
@@ -7849,10 +7877,20 @@ async def discover_crawl_links(
     entry_text = _strip_markdown_images(_extract_page_text(html, entry))
     per_page_estimate = html_extract.marginal_words(entry_text)
 
+    parsed_entry = urlparse(entry)
+    origin = f"{parsed_entry.scheme}://{parsed_entry.netloc}"
+    sitemap_urls = await asyncio.to_thread(
+        html_extract.discover_sitemap_urls, origin, _fetch_sitemap_text
+    )
+    if sitemap_urls:
+        links = html_extract.links_from_sitemap(sitemap_urls, entry)
+    else:
+        links = html_extract.harvest_links(html, entry, require_intent_match=False)
+
     candidates = []
-    for link in html_extract.harvest_links(html, entry):
+    for link in links:
         try:
-            validate_safe_url(link.url)  # every harvested href is attacker-controlled (R5)
+            validate_safe_url(link.url)  # every discovered href is attacker-controlled (R5)
         except HTTPException:
             continue
         candidates.append({

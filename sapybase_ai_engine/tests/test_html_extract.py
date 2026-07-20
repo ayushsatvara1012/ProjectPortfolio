@@ -341,8 +341,24 @@ def test_harvest_excludes_the_entry_url_itself():
 
 
 def test_harvest_respects_the_cap():
-    links = "".join(f'<a href="/contact-{i}">Contact {i}</a>' for i in range(40))
+    links = "".join(f'<a href="/contact-{i}">Contact {i}</a>' for i in range(MAX_DISCOVERED_LINKS + 20))
     assert len(harvest_links(f"<body>{links}</body>", "https://www.example.com/")) == MAX_DISCOVERED_LINKS
+
+
+def test_harvest_without_intent_match_keeps_every_same_domain_page():
+    html = '<body><a href="/pricing">Pricing</a><a href="/blog/x">Blog</a><a href="/anything">Y</a></body>'
+    urls = [l.url for l in harvest_links(html, "https://www.example.com/", require_intent_match=False)]
+    assert urls == [
+        "https://www.example.com/pricing",
+        "https://www.example.com/blog/x",
+        "https://www.example.com/anything",
+    ]
+
+
+def test_harvest_without_intent_still_rejects_offsite_and_assets():
+    html = '<body><a href="https://other.com/x">Off</a><a href="/a.pdf">Asset</a><a href="/keep">Keep</a></body>'
+    urls = [l.url for l in harvest_links(html, "https://www.example.com/", require_intent_match=False)]
+    assert urls == ["https://www.example.com/keep"]
 
 
 def test_harvest_handles_relative_and_absolute_paths():
@@ -451,3 +467,114 @@ def test_marginal_words_equals_total_when_no_structured_data():
 
 def test_marginal_words_on_empty_input():
     assert marginal_words("") == 0
+
+
+# ── Full-site route discovery: sitemap parsing + candidates ──────────────────
+
+from services.html_extract import (
+    discover_sitemap_urls,
+    links_from_sitemap,
+    parse_sitemap,
+    _label_from_url,
+)
+
+_URLSET = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    '<url><loc>https://www.example.com/</loc></url>'
+    '<url><loc>https://www.example.com/about-us</loc></url>'
+    '<url><loc>https://www.example.com/services/roof-repair</loc></url>'
+    '</urlset>'
+)
+
+_INDEX = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    '<sitemap><loc>https://www.example.com/sitemap-pages.xml</loc></sitemap>'
+    '<sitemap><loc>https://www.example.com/sitemap-posts.xml</loc></sitemap>'
+    '</sitemapindex>'
+)
+
+
+def test_parse_sitemap_reads_urlset():
+    locs, is_index = parse_sitemap(_URLSET)
+    assert is_index is False
+    assert locs == [
+        "https://www.example.com/",
+        "https://www.example.com/about-us",
+        "https://www.example.com/services/roof-repair",
+    ]
+
+
+def test_parse_sitemap_flags_an_index():
+    locs, is_index = parse_sitemap(_INDEX)
+    assert is_index is True
+    assert locs[0] == "https://www.example.com/sitemap-pages.xml"
+
+
+def test_parse_sitemap_on_non_xml_returns_empty():
+    assert parse_sitemap("<html><body>not a sitemap</body></html>") == ([], False)
+    assert parse_sitemap("") == ([], False)
+
+
+def test_discover_prefers_first_available_path():
+    def fetch(url):
+        return _URLSET if url.endswith("/sitemap.xml") else None
+    urls = discover_sitemap_urls("https://www.example.com", fetch)
+    assert urls and urls[0] == "https://www.example.com/"
+
+
+def test_discover_falls_through_to_second_path():
+    def fetch(url):
+        return _URLSET if url.endswith("/sitemap_index.xml") else None
+    urls = discover_sitemap_urls("https://www.example.com", fetch)
+    assert urls == parse_sitemap(_URLSET)[0]
+
+
+def test_discover_follows_a_sitemap_index():
+    pages = _URLSET
+    posts = _URLSET.replace("/about-us", "/blog/post-1")
+
+    def fetch(url):
+        if url.endswith("/sitemap.xml"):
+            return _INDEX
+        if url.endswith("sitemap-pages.xml"):
+            return pages
+        if url.endswith("sitemap-posts.xml"):
+            return posts
+        return None
+
+    urls = discover_sitemap_urls("https://www.example.com", fetch)
+    assert "https://www.example.com/about-us" in urls
+    assert "https://www.example.com/blog/post-1" in urls
+
+
+def test_discover_returns_none_when_no_sitemap():
+    assert discover_sitemap_urls("https://www.example.com", lambda u: None) is None
+
+
+def test_links_from_sitemap_filters_and_labels():
+    raw = [
+        "https://www.example.com/",                       # entry, dropped
+        "https://www.example.com/about-us",
+        "https://www.example.com/services/roof-repair",
+        "https://other.com/off",                          # offsite, dropped
+        "https://www.example.com/brochure.pdf",           # asset, dropped
+        "https://www.example.com/about-us#team",          # dup of about-us
+    ]
+    links = links_from_sitemap(raw, "https://www.example.com/")
+    assert [(l.url, l.label) for l in links] == [
+        ("https://www.example.com/about-us", "About us"),
+        ("https://www.example.com/services/roof-repair", "Roof repair"),
+    ]
+
+
+def test_links_from_sitemap_respects_the_cap():
+    raw = [f"https://www.example.com/p-{i}" for i in range(MAX_DISCOVERED_LINKS + 30)]
+    assert len(links_from_sitemap(raw, "https://www.example.com/")) == MAX_DISCOVERED_LINKS
+
+
+def test_label_from_url_humanises_the_slug():
+    assert _label_from_url("https://x.com/about-us") == "About us"
+    assert _label_from_url("https://x.com/services/roof_repair") == "Roof repair"
+    assert _label_from_url("https://x.com/") == "https://x.com/"
