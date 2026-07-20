@@ -22,7 +22,7 @@ const ConversationsPanel = dynamic(() => import('@/src/components/dashboard/Conv
 const FunnelPanel = dynamic(() => import('@/src/components/dashboard/FunnelPanel'), { loading: PanelSkeleton });
 
 export default function DemoInsightsPage() {
-    const [reportData, setReportData] = useState<any>(null);
+    const [, setReportData] = useState<any>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('sales');
