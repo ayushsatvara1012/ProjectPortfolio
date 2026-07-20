@@ -17,6 +17,9 @@ python-jose[cryptography]
 # since we now use it directly.
 cryptography
 requests
+# Direct dependency: in-house URL extraction (services/html_extract.py).
+beautifulsoup4
+lxml
 slowapi
 clerk-backend-api
 fastapi-cache2[redis]

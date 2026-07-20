@@ -82,6 +82,8 @@ METRICS_SCRAPE_TOKEN = os.getenv("METRICS_SCRAPE_TOKEN", "")
 # 1a. Structured Logging
 logger = logging.getLogger(__name__)
 
+from services import html_extract
+
 # 2. Database Connection Pool (singleton ThreadedConnectionPool)
 # Supabase pgBouncer already pools externally; this avoids reconnecting per-request.
 _db_pool = None
@@ -171,6 +173,74 @@ def _strip_markdown_images(markdown: str) -> str:
     # Collapse the blank-line runs left behind by removed image blocks.
     text = _BLANK_LINES_RE.sub("\n\n", text)
     return text.strip()
+
+
+def _decode_response_body(response) -> str:
+    """Decode a Jina response honouring the declared charset.
+
+    ``requests`` falls back to latin-1 for ``text/html`` without a charset, which
+    silently mojibakes addresses and any non-ASCII content, so decode from bytes.
+    """
+    charset = None
+    content_type = response.headers.get("Content-Type", "")
+    match = re.search(r"charset=([\w\-]+)", content_type, re.I)
+    if match:
+        charset = match.group(1)
+    if not charset:
+        head = response.content[:4096]
+        meta = re.search(rb"charset=[\"']?([\w\-]+)", head, re.I)
+        charset = meta.group(1).decode("ascii", "ignore") if meta else "utf-8"
+    try:
+        return response.content.decode(charset, errors="replace")
+    except LookupError:
+        return response.content.decode("utf-8", errors="replace")
+
+
+def _extract_page_text(body: str, source_url: str, seen_blocks: set[str] | None = None) -> str:
+    """Own the extraction stage, degrading to the raw body on any parser error.
+
+    A malformed page must never 500 a training job (see docs/url-scraper-rewrite-plan.md R1/R4).
+    ``seen_blocks`` carries cross-page dedup state through a crawl; omit it for single pages.
+    """
+    try:
+        extracted = html_extract.extract(body, source_url, seen_blocks=seen_blocks)
+    except Exception:
+        logger.exception("HTML extraction failed for %s; falling back to raw body", source_url)
+        return body
+    return extracted if extracted.strip() else body
+
+
+async def _fetch_url_html(page_url: str) -> str:
+    """Fetch a URL through Jina as rendered HTML, with the shared retry/backoff.
+
+    Raises HTTPException on an unreachable or empty response so callers can treat
+    reachability uniformly. Does NOT extract - keeps fetch and parse separable so
+    discovery can harvest links from the same body it estimates cost from.
+    """
+    jina_url = f"https://r.jina.ai/{page_url}"
+    headers = {"User-Agent": "SapybaseBot/1.0", "X-Return-Format": "html"}
+    if JINA_API_KEY:
+        headers["Authorization"] = f"Bearer {JINA_API_KEY}"
+
+    response = None
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            response = await asyncio.to_thread(requests.get, jina_url, headers=headers, timeout=20)
+            if response.status_code == 200:
+                break
+            if response.status_code not in (429, 500, 502, 503, 504):
+                break  # non-retryable (e.g. 4xx)
+        except requests.RequestException as exc:
+            last_err = exc
+        if attempt < 2:
+            await asyncio.sleep(1.5 * (attempt + 1))
+
+    if response is None:
+        raise HTTPException(status_code=502, detail=f"Failed to reach the URL extractor: {last_err}")
+    if response.status_code != 200 or len(response.content) < 50:
+        raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
+    return _decode_response_body(response)
 
 
 def _url_resolves_to_public_ip(url: str) -> bool:
@@ -7137,7 +7207,9 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
         except Exception as e:
             print(f"[PDF] Vision fallback failed: {e}")
 
-    return docs if docs else [Document(page_content="Could not extract text from this PDF.", metadata={"source": "error"})]
+    # "source" is reserved for the job-level source name (see run_training_job);
+    # flag the failure under its own key so it can't masquerade as one.
+    return docs if docs else [Document(page_content="Could not extract text from this PDF.", metadata={"extraction": "failed"})]
 
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 import uuid
@@ -7363,6 +7435,23 @@ async def run_training_job(
     as 'child' rows with no parent.
     """
     temp_source_name = f"__temp_{job_id}_{source_name}"
+
+    # Every row is stored under the job-level source_name; doc.metadata["source"]
+    # never reaches the INSERT. That is load-bearing, not an oversight: the atomic
+    # swap renames by source_name and then deletes by source_name, so a job holding
+    # two logical sources would delete the other one's rows. Fail loudly here rather
+    # than let a future multi-source caller discover it as data loss in production.
+    conflicting = {
+        src for d in docs
+        if (src := d.metadata.get("source")) is not None and src != source_name
+    }
+    if conflicting:
+        raise ValueError(
+            f"run_training_job stores one logical source per job (source_name={source_name!r}), "
+            f"but docs carry conflicting metadata['source']: {sorted(conflicting)!r}. "
+            "Split these into separate jobs."
+        )
+
     status = {"status": "processing", "progress": 0, "total": 0}
     await set_job_status(job_id, status)
 
@@ -7631,12 +7720,165 @@ async def run_training_job(
             except Exception:
                 pass
 
+
+async def run_crawl_training_job(
+    job_id: str,
+    resolved_company_id: str,
+    pages: list[tuple[str, str]],
+    current_user: dict,
+    limit: int,
+):
+    """Train several same-site pages the owner selected, as one polled job.
+
+    ``pages`` is ``[(page_url, source_name)]``. Why one job rather than N (which
+    D3 first proposed): the pages must share cross-page dedup state so a nav/footer/
+    JSON-LD block that repeats site-wide is stored once, not per page - and that
+    state cannot cross independent background tasks. So this fetches sequentially
+    through one ``seen_blocks`` set, then trains each page as its own logical source
+    by delegating to ``run_training_job`` with a throwaway sub-job id. The swap stays
+    exactly as it is (one source per swap), and cumulative quota is automatic: each
+    delegated call re-reads live remaining capacity, which already includes the pages
+    committed before it. When capacity runs out a page simply stores nothing and is
+    reported as skipped.
+
+    Sequential, not concurrent: the fetch order must be deterministic for dedup to be
+    stable, and this runs in the background off the request path where latency is cheap.
+    """
+    total = len(pages)
+    await set_job_status(job_id, {"status": "processing", "stage": "fetching", "progress": 0, "total": total})
+
+    seen_blocks: set[str] = set()
+    extracted: list[tuple[str, str, str]] = []  # (source_name, text, page_url)
+    failed: list[dict] = []
+
+    for index, (page_url, source_name) in enumerate(pages):
+        try:
+            html = await _fetch_url_html(page_url)
+            text = _strip_markdown_images(_extract_page_text(html, page_url, seen_blocks=seen_blocks))
+            if len(text) >= 50:
+                extracted.append((source_name, text, page_url))
+            else:
+                failed.append({"url": page_url, "reason": "No usable content on the page."})
+        except HTTPException as exc:
+            failed.append({"url": page_url, "reason": str(exc.detail)})
+        except Exception as exc:
+            failed.append({"url": page_url, "reason": str(exc)})
+        await set_job_status(job_id, {
+            "status": "processing", "stage": "fetching", "progress": index + 1, "total": total,
+        })
+
+    trained: list[dict] = []
+    skipped_quota: list[dict] = []
+
+    for index, (source_name, text, page_url) in enumerate(extracted):
+        lock_key = f"training_lock:{resolved_company_id}:{source_name}"
+        lock_acquired = False
+        if r:
+            try:
+                lock_acquired = await r.set(lock_key, "1", nx=True, ex=600)
+            except Exception:
+                lock_acquired = False
+            if r and not lock_acquired:
+                failed.append({"url": page_url, "reason": "Already being trained."})
+                continue
+
+        is_upsert = _source_exists(resolved_company_id, source_name)
+        sub_job_id = f"{job_id}::{index}"
+        await run_training_job(
+            sub_job_id, resolved_company_id,
+            [Document(page_content=text, metadata={"source": source_name})],
+            current_user, limit, source_name, is_upsert, lock_key, False,
+        )
+
+        sub = await get_job_status(sub_job_id) or {}
+        if sub.get("status") == "done" and sub.get("chunks_added", 0) == 0:
+            # Quota was already exhausted by earlier pages in this crawl.
+            skipped_quota.append({"url": page_url})
+        elif sub.get("status") == "error":
+            failed.append({"url": page_url, "reason": sub.get("message", "Training failed.")})
+        else:
+            trained.append({"url": page_url, "source_name": source_name, "chunks_added": sub.get("chunks_added", 0)})
+
+        await set_job_status(job_id, {
+            "status": "processing", "stage": "training", "progress": index + 1, "total": len(extracted),
+        })
+
+    await set_job_status(job_id, {
+        "status": "done",
+        "stage": "done",
+        "trained": trained,
+        "failed": failed,
+        "skipped_quota": skipped_quota,
+        "chunks_added": sum(t["chunks_added"] for t in trained),
+    })
+
+
+def _source_exists(resolved_company_id: str, source_name: str) -> bool:
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM company_knowledge WHERE company_id = %s AND url = %s LIMIT 1",
+            (resolved_company_id, source_name),
+        )
+        return cur.fetchone() is not None
+    finally:
+        release_db_connection(conn)
+
+
+@app.post("/api/train/discover")
+@limiter.limit("10/minute")
+async def discover_crawl_links(
+    request: Request,
+    url: str = Form(...),
+    company_id: str = Form(None),
+    current_user: dict = Depends(get_current_user),
+    _premium: dict = Depends(require_premium_tier),
+):
+    """Find same-site pages worth adding, with a zero-extra-fetch cost estimate.
+
+    Only the entry page (the URL the owner pasted) is fetched. Candidate links are
+    harvested from that HTML and never fetched here - fetching every candidate is
+    exactly the cost this flow avoids on a free-tier user base (plan D1a). Per-page
+    cost is therefore estimated from the entry page, and the client must present it
+    as an estimate.
+    """
+    entry = url.strip()
+    validate_safe_url(entry)
+    html = await _fetch_url_html(entry)
+    entry_text = _strip_markdown_images(_extract_page_text(html, entry))
+    per_page_estimate = html_extract.marginal_words(entry_text)
+
+    candidates = []
+    for link in html_extract.harvest_links(html, entry):
+        try:
+            validate_safe_url(link.url)  # every harvested href is attacker-controlled (R5)
+        except HTTPException:
+            continue
+        candidates.append({
+            "url": link.url,
+            "label": link.label,
+            "estimated_words": per_page_estimate,
+        })
+
+    return {
+        "entry": {
+            "url": entry,
+            "source_name": normalize_source_url(entry),
+            "estimated_words": len(entry_text.split()),
+        },
+        "candidates": candidates,
+        "estimate_note": "Per-page counts are estimates; the real size is measured when each page is trained.",
+    }
+
+
 @app.post("/api/train")
 @limiter.limit("5/minute")
 async def train_chatbot(
     request: Request,
     background_tasks: BackgroundTasks,
     url: str = Form(None),
+    urls: str = Form(None),
     file: UploadFile = File(None),
     csv_file: UploadFile = File(None),
     text: str = Form(None),
@@ -7711,9 +7953,75 @@ async def train_chatbot(
         plan = get_plan(current_user["tier"], role=current_user.get("role"), custom_plan_config=current_user.get("custom_plan_config"))
         limit = plan["words"]
 
+        # ── Crawl fan-out: several owner-selected same-site pages in one job ──
+        # No upfront word gate here (unlike the single-source path): the pages are
+        # not fetched yet, and each is quota-capped live inside the crawl job. That
+        # is the point of the owner-picks-with-estimate flow (plan D1a) - fetch only
+        # what was selected, cap per page against real remaining capacity.
+        if urls:
+            if url or file or csv_file or (text and text.strip()):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Provide either a single source or a crawl selection (urls), not both.",
+                )
+            try:
+                url_list = json.loads(urls)
+            except Exception:
+                raise HTTPException(status_code=400, detail="urls must be a JSON array of page URLs.")
+            if not isinstance(url_list, list) or not url_list:
+                raise HTTPException(status_code=400, detail="urls must be a non-empty JSON array.")
+
+            pages: list[tuple[str, str]] = []
+            seen_sources: set[str] = set()
+            for raw in url_list[: html_extract.MAX_DISCOVERED_LINKS + 1]:
+                if not isinstance(raw, str) or not raw.strip():
+                    continue
+                candidate = raw.strip()
+                validate_safe_url(candidate)  # SSRF on every selected page, not just the entry (R5)
+                source_name = normalize_source_url(candidate)
+                if source_name in seen_sources:
+                    continue
+                seen_sources.add(source_name)
+                pages.append((candidate, source_name))
+            if not pages:
+                raise HTTPException(status_code=400, detail="No valid URLs to train.")
+
+            crawl_job_id = str(uuid.uuid4())
+            await set_job_status(crawl_job_id, {"status": "queued", "total": len(pages)})
+            background_tasks.add_task(
+                run_crawl_training_job, crawl_job_id, resolved_company_id, pages, current_user, limit,
+            )
+            return {
+                "status": "queued",
+                "job_id": crawl_job_id,
+                "mode": "crawl",
+                "page_count": len(pages),
+                "message": f"Training {len(pages)} page(s). Poll /api/train/status/{crawl_job_id} to track progress.",
+            }
+
         # Determine source_name early so we can query existing chunk count for it.
         # Normalisation happens here — before any DB or scraping work — so the
         # upsert detection is always comparing apples to apples.
+        # One job stores exactly one logical source: source_name is job-level, and
+        # so is skip_splitting. A combined submission would silently store the
+        # URL/PDF doc under the CSV's splitting mode and the URL's name.
+        provided_inputs = [
+            label for label, value in (
+                ("url", url),
+                ("file", file),
+                ("csv_file", csv_file),
+                ("text", text.strip() if text else None),
+            ) if value
+        ]
+        if len(provided_inputs) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Provide only one source per training job "
+                    f"(got: {', '.join(provided_inputs)}). Submit them separately."
+                ),
+            )
+
         pending_source_name: str
         if url:
             pending_source_name = normalize_source_url(url.strip())
@@ -7830,34 +8138,8 @@ async def train_chatbot(
     if url:
         validate_safe_url(url.strip())
         try:
-            jina_url = f"https://r.jina.ai/{url.strip()}"
-            headers = {"User-Agent": "SapybaseBot/1.0"}
-            if JINA_API_KEY:
-                headers["Authorization"] = f"Bearer {JINA_API_KEY}"
-
-            # Retry transient Jina failures (429/5xx/network) with backoff; a
-            # single free-tier hiccup shouldn't fail an otherwise valid job.
-            response = None
-            last_err: Exception | None = None
-            for attempt in range(3):
-                try:
-                    response = await asyncio.to_thread(
-                        requests.get, jina_url, headers=headers, timeout=20
-                    )
-                    if response.status_code == 200:
-                        break
-                    if response.status_code not in (429, 500, 502, 503, 504):
-                        break  # non-retryable (e.g. 4xx) — stop early
-                except requests.RequestException as exc:
-                    last_err = exc
-                if attempt < 2:
-                    await asyncio.sleep(1.5 * (attempt + 1))
-
-            if response is None:
-                raise HTTPException(status_code=502, detail=f"Failed to reach the URL extractor: {last_err}")
-            if response.status_code != 200 or len(response.text) < 50:
-                raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
-            cleaned_text = _strip_markdown_images(response.text)
+            raw_body = await _fetch_url_html(url.strip())
+            cleaned_text = _strip_markdown_images(_extract_page_text(raw_body, url.strip()))
             if len(cleaned_text) < 50:
                 raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
             # Store with the normalised URL so metadata.source matches source_name.
