@@ -94,6 +94,7 @@ export default function TrainPage() {
     const [candidates, setCandidates] = useState<CrawlCandidate[] | null>(null);
     const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
     const [entryEstimate, setEntryEstimate] = useState<number>(0);
+    const [candidateFilter, setCandidateFilter] = useState('');
     // Catalog cleaning report from the last upload (vertical bots only) — the
     // importer's warnings (near-miss columns, skipped rows) are too detailed
     // for the 400px auto-dismiss toast, so they persist here until the next
@@ -181,7 +182,7 @@ export default function TrainPage() {
             : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20',
     );
 
-    const resetDiscovery = () => { setCandidates(null); setSelectedUrls(new Set()); setEntryEstimate(0); };
+    const resetDiscovery = () => { setCandidates(null); setSelectedUrls(new Set()); setEntryEstimate(0); setCandidateFilter(''); };
 
     const discoverMutation = useMutation({
         mutationFn: async () => {
@@ -202,9 +203,11 @@ export default function TrainPage() {
             const found: CrawlCandidate[] = Array.isArray(data.candidates) ? data.candidates : [];
             setEntryEstimate(Number(data?.entry?.estimated_words) || 0);
             setCandidates(found);
-            // Default every discovered page on — the owner opted into finding them.
-            setSelectedUrls(new Set(found.map(c => c.url)));
-            if (found.length === 0) showAlert('warning', 'No extra contact/about/hours pages were found on this site.');
+            setCandidateFilter('');
+            // Default everything unchecked: the set can be the whole site now, so the
+            // owner opts in per page rather than risk training 100 pages in one click.
+            setSelectedUrls(new Set());
+            if (found.length === 0) showAlert('warning', 'No other pages were found on this site.');
         },
         onError: (err: any) => showAlert('error', err.message || 'Could not scan the page.'),
     });
@@ -590,18 +593,45 @@ export default function TrainPage() {
                                     </button>
                                 </div>
 
-                                {candidates && candidates.length > 0 && (
+                                {candidates && candidates.length > 0 && (() => {
+                                    const q = candidateFilter.trim().toLowerCase();
+                                    const filtered = q
+                                        ? candidates.filter(c => c.url.toLowerCase().includes(q) || (c.label || '').toLowerCase().includes(q))
+                                        : candidates;
+                                    const selectedCount = candidates.filter(c => selectedUrls.has(c.url)).length;
+                                    const totalEst = entryEstimate + candidates.filter(c => selectedUrls.has(c.url)).reduce((s, c) => s + c.estimated_words, 0);
+                                    return (
                                     <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3.5">
-                                        <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center justify-between mb-2 gap-3">
                                             <p className="text-[12.5px] font-semibold text-slate-700 dark:text-slate-200">
                                                 Also add these pages?
+                                                <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">{selectedCount} of {candidates.length} selected</span>
                                             </p>
-                                            <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                                                ~{fmtNum(entryEstimate + candidates.filter(c => selectedUrls.has(c.url)).reduce((s, c) => s + c.estimated_words, 0))} words est.
+                                            <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+                                                ~{fmtNum(totalEst)} words est.
                                             </span>
                                         </div>
-                                        <ul className="space-y-1">
-                                            {candidates.map(c => (
+                                        {candidates.length > 8 && (
+                                            <input type="text" value={candidateFilter}
+                                                onChange={e => setCandidateFilter(e.target.value)}
+                                                placeholder="Filter pages…"
+                                                className="mb-2 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-[12.5px] text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500/40" />
+                                        )}
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <button type="button"
+                                                onClick={() => setSelectedUrls(prev => { const n = new Set(prev); filtered.forEach(c => n.add(c.url)); return n; })}
+                                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                                                Select all{q ? ' shown' : ''}
+                                            </button>
+                                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                                            <button type="button"
+                                                onClick={() => setSelectedUrls(new Set())}
+                                                className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:underline">
+                                                Clear all
+                                            </button>
+                                        </div>
+                                        <ul className="space-y-1 max-h-72 overflow-y-auto">
+                                            {filtered.map(c => (
                                                 <li key={c.url}>
                                                     <label className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-white dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
                                                         <input type="checkbox" checked={selectedUrls.has(c.url)}
@@ -614,12 +644,16 @@ export default function TrainPage() {
                                                     </label>
                                                 </li>
                                             ))}
+                                            {filtered.length === 0 && (
+                                                <li className="px-2 py-1.5 text-[12px] text-slate-400 dark:text-slate-500">No pages match “{candidateFilter.trim()}”.</li>
+                                            )}
                                         </ul>
                                         <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
                                             Counts are estimates; the real size is measured when each page is trained.
                                         </p>
                                     </div>
-                                )}
+                                    );
+                                })()}
                             </div>
                         )}
 
