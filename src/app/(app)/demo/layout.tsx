@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import VaayuLogo from '@/src/components/ui/VaayuLogo';
-import { isTrained, resetDemo } from '@/src/lib/demo/demoStorage';
+import { isTrained, resetDemo, hasSeenOnboarding, markOnboardingSeen } from '@/src/lib/demo/demoStorage';
+import DemoOnboardingModal from '@/src/components/demo/DemoOnboardingModal';
 
 const TOP_NAV = [
     { label: 'My Bots', icon: 'smart_toy', path: '/demo/bots' },
@@ -183,9 +184,21 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarExpanded, setSidebarExpanded] = useState(false);
     const [trained, setTrained] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
     const { openSignUp } = useClerk();
+
+    // First-run tutorial — shown once per demo session (any entry route),
+    // resets alongside the rest of the demo state via "Reset Demo".
+    useEffect(() => {
+        if (!hasSeenOnboarding()) setShowOnboarding(true);
+    }, []);
+
+    const dismissOnboarding = () => {
+        markOnboardingSeen();
+        setShowOnboarding(false);
+    };
 
     const handleSignUp = () => {
         try {
@@ -300,6 +313,8 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
                 {/* Bottom spacer — matches the dashboard shell (footer text removed) */}
                 {!isFullHeightPane && <footer aria-hidden="true" className="bg-[#f8f9fa] dark:bg-slate-950 py-4 mt-auto transition-colors duration-500" />}
             </main>
+
+            {showOnboarding && <DemoOnboardingModal onClose={dismissOnboarding} />}
         </div>
     );
 }

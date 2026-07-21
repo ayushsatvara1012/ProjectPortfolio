@@ -7,13 +7,6 @@ const TOP_K = 4;           // chunks retrieved per question
 const MAX_CELL_CHARS = 500;
 const DEMO_MSG_CAP = 10;   // messages before we soft-cap
 
-declare global {
-    interface Window {
-        pdfjsLib: any;
-        XLSX: any;
-    }
-}
-
 // ── Chunking ──────────────────────────────────────────────────────────────────
 
 function splitIntoChunks(text: string) {
@@ -53,25 +46,20 @@ async function extractTextFromFile(file: File): Promise<string> {
     try { return await file.text(); } catch { return ''; }
 }
 
+// Real PDF text extraction requires a proper parser (font tables, compressed
+// streams) — there's no reliable way to do that from raw bytes in the
+// browser, so this hands the file to the server route backing pdf-parse.
+// (A previous version tried a `window.pdfjsLib` global that was never
+// actually loaded, and silently fell back to reading the file's raw binary
+// as text — which is why a 1-page PDF used to "train" as ~17k words of
+// PDF-internal structure noise instead of its actual content.)
 async function extractPdfText(file: File): Promise<string> {
-    if (typeof window !== 'undefined' && window.pdfjsLib) {
-        try {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            const pages: string[] = [];
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                pages.push(content.items.map((item: any) => item.str).join(' '));
-            }
-            return pages.join('\n\n');
-        } catch { /* fall through */ }
-    }
-    // Fallback: read raw bytes as latin-1 string and strip binary
-    try {
-        const text = await file.text();
-        return text.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s{3,}/g, '\n');
-    } catch { return ''; }
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/demo/extract-file', { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to read this PDF.');
+    return data.text || '';
 }
 
 async function extractCsvText(file: File): Promise<string> {
@@ -141,32 +129,14 @@ function _findHeaderRow(rows2d: any[][], scanLimit = 15): number {
     return bestIdx;
 }
 
-async function extractExcelText(file: File): Promise<string> {
-    if (typeof window !== 'undefined' && window.XLSX) {
-        try {
-            const buf = await file.arrayBuffer();
-            const wb = window.XLSX.read(buf, { type: 'array' });
-            const sheetName = wb.SheetNames[0];
-            const ws = wb.Sheets[sheetName];
-
-            const raw = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false }) as any[][];
-            if (!raw.length) return '';
-
-            const headerIdx = _findHeaderRow(raw);
-            const headers = raw[headerIdx].map(h => String(h).trim());
-            const rows: string[] = [];
-            for (let i = headerIdx + 1; i < raw.length; i++) {
-                const vals = raw[i];
-                const parts = headers.map((h, idx) => {
-                    const val = String(vals[idx] == null ? '' : vals[idx]).trim().slice(0, MAX_CELL_CHARS);
-                    return (h && val) ? `${h}: ${val}` : null;
-                }).filter(Boolean);
-                if (parts.length) rows.push(parts.join(' | '));
-            }
-            return rows.join('\n');
-        } catch { /* fall through */ }
-    }
-    return 'Excel file uploaded. For best results, convert to CSV format.';
+// Excel (.xlsx/.xls) parsing isn't wired up in the demo yet — this used to
+// silently return a placeholder sentence that got "trained" as if it were
+// real content. Failing loudly with an actionable message is better than
+// quietly polluting the bot's knowledge with a sentence that isn't the
+// user's data; CSV (already plain text, no parser needed) covers the
+// spreadsheet case in the meantime.
+async function extractExcelText(_file: File): Promise<string> {
+    throw new Error('Excel files aren\'t supported in the demo yet — please export to CSV instead.');
 }
 
 // ── Retrieval ─────────────────────────────────────────────────────────────────
@@ -239,6 +209,26 @@ export async function parseFileToChunks(file: File): Promise<string[]> {
     }
     const chunks = splitIntoChunks(text);
     if (!chunks.length) throw new Error('File appears to be empty or unreadable.');
+    return chunks;
+}
+
+// ── Main export: parse URL → chunks ──────────────────────────────────────────
+// Fetches and extracts the page server-side (browsers can't cross-origin
+// fetch arbitrary sites) via /api/demo/extract-url, then chunks the result
+// the same way as any other source. Previously this path never fetched
+// anything — it just injected a placeholder sentence ("Extracted content
+// from {url}") as fake knowledge, which is why URL training never answered
+// real questions about the page.
+export async function parseUrlToChunks(url: string): Promise<string[]> {
+    const res = await fetch('/api/demo/extract-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch that URL.');
+    const chunks = splitIntoChunks(data.text || '');
+    if (!chunks.length) throw new Error('No readable text found on that page.');
     return chunks;
 }
 

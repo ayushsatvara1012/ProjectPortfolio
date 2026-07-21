@@ -165,6 +165,15 @@ export const createMockAuthFetch = (botName: string = 'Vaayu AI') => {
             return { queue, counts };
         }
 
+        // Lead source attribution — must be checked BEFORE the generic
+        // `/api/leads` handler below (its URL also contains '/api/leads').
+        if (url.includes('/api/leads') && url.includes('/attribution')) {
+            return {
+                sources: DEMO_FUNNEL_RAW.sources.items,
+                total_leads: DEMO_FUNNEL_RAW.sources.total_leads,
+            };
+        }
+
         if (url.includes('/api/leads')) {
             if (url.includes('/outcome') && method === 'PATCH') {
                 const parts = url.split('/');
@@ -200,6 +209,20 @@ export const createMockAuthFetch = (botName: string = 'Vaayu AI') => {
             };
         }
 
+        // Conversion funnel — FunnelPanel reads funnel.stages / top /
+        // overall_conversion, plus top-level won_value and quality bands.
+        if (url.includes('/api/funnel/')) {
+            return {
+                funnel: {
+                    stages: DEMO_FUNNEL_RAW.stages,
+                    top: DEMO_FUNNEL_RAW.stages[0]?.count ?? 0,
+                    overall_conversion: DEMO_FUNNEL_RAW.overall,
+                },
+                won_value: DEMO_FUNNEL_RAW.wonValue,
+                quality: DEMO_FUNNEL_RAW.quality,
+            };
+        }
+
         if (url.includes('/api/analytics/funnel')) {
             return DEMO_FUNNEL_RAW;
         }
@@ -211,16 +234,54 @@ export const createMockAuthFetch = (botName: string = 'Vaayu AI') => {
             };
         }
 
-        // Mock Knowledge Endpoints for SourceBrowser
+        // Multi-page crawl discovery ("Find more pages") — mirrors POST
+        // /api/train/discover. Returns a realistic set of same-site pages so the
+        // demo shows the exact candidate-picker the live dashboard does.
+        if (url.includes('/api/train/discover')) {
+            let entry = 'https://example.com';
+            try {
+                const fd = options?.body;
+                if (fd && typeof fd.get === 'function') entry = String(fd.get('url') || entry);
+            } catch { /* keep default */ }
+            let origin = entry;
+            try { origin = new URL(entry).origin; } catch { /* keep raw */ }
+            const path = (p: string) => `${origin.replace(/\/$/, '')}${p}`;
+            return {
+                entry: { url: entry, estimated_words: 640 },
+                candidates: [
+                    { url: path('/pricing'), label: 'Pricing', estimated_words: 820 },
+                    { url: path('/features'), label: 'Features', estimated_words: 1140 },
+                    { url: path('/about'), label: 'About us', estimated_words: 560 },
+                    { url: path('/faq'), label: 'FAQ', estimated_words: 970 },
+                    { url: path('/contact'), label: 'Contact', estimated_words: 320 },
+                    { url: path('/blog'), label: 'Blog', estimated_words: 1480 },
+                    { url: path('/docs/getting-started'), label: 'Docs · Getting started', estimated_words: 1320 },
+                    { url: path('/integrations'), label: 'Integrations', estimated_words: 740 },
+                ],
+            };
+        }
+
+        // Mock Knowledge Endpoints for SourceBrowser — read the SAME store the
+        // demo Train page writes to (sessionStorage 'demo_knowledge_chunks' via
+        // demoStorage), so Manage knowledge reflects what was just trained.
+        const DEMO_KNOWLEDGE_KEY = 'demo_knowledge_chunks';
+        const readKnowledge = (): string[] =>
+            typeof window !== 'undefined' ? JSON.parse(sessionStorage.getItem(DEMO_KNOWLEDGE_KEY) || '[]') : [];
+        const writeKnowledge = (chunks: string[]) => {
+            if (typeof window === 'undefined') return;
+            if (chunks.length > 0) sessionStorage.setItem(DEMO_KNOWLEDGE_KEY, JSON.stringify(chunks));
+            else { sessionStorage.removeItem(DEMO_KNOWLEDGE_KEY); sessionStorage.removeItem('demo_trained'); }
+        };
+
         if (url.includes('/api/knowledge/sources')) {
-            const knowledge = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('vaayu_demo_knowledge') || '[]') : [];
+            const knowledge = readKnowledge();
             return {
                 sources: knowledge.length > 0 ? [{ source: 'demo-knowledge', chunk_count: knowledge.length }] : []
             };
         }
 
         if (url.includes('/api/knowledge/chunks') && method === 'GET') {
-            const knowledge = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('vaayu_demo_knowledge') || '[]') : [];
+            const knowledge = readKnowledge();
             return {
                 chunks: knowledge.map((c: string, i: number) => ({ id: String(i), content: c })),
                 total: knowledge.length
@@ -230,14 +291,13 @@ export const createMockAuthFetch = (botName: string = 'Vaayu AI') => {
         if (url.includes('/api/knowledge/chunks') && method === 'DELETE') {
             const body = JSON.parse(options.body);
             const chunkIdsToDelete = new Set(body.chunk_ids);
-            const knowledge = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('vaayu_demo_knowledge') || '[]') : [];
-            const newKnowledge = knowledge.filter((_: any, i: number) => !chunkIdsToDelete.has(String(i)));
-            if (typeof window !== 'undefined') localStorage.setItem('vaayu_demo_knowledge', JSON.stringify(newKnowledge));
+            const knowledge = readKnowledge();
+            writeKnowledge(knowledge.filter((_: any, i: number) => !chunkIdsToDelete.has(String(i))));
             return { success: true, message: 'Chunks deleted.' };
         }
 
         if (url.includes('/api/knowledge/source') && method === 'DELETE') {
-            if (typeof window !== 'undefined') localStorage.removeItem('vaayu_demo_knowledge');
+            writeKnowledge([]);
             return { success: true, message: 'Source deleted.' };
         }
         

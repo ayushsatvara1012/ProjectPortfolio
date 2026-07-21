@@ -8,6 +8,15 @@ import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { getBotConfig, getKnowledge, isTrained, getChatMessages, saveChatMessages } from '@/src/lib/demo/demoStorage';
 import { retrieveChunks, askGemini, DEMO_MSG_CAP } from '@/src/lib/demo/demoRag';
+import VaayuLogo from '@/src/components/ui/VaayuLogo';
+
+// Bot profile image for the demo chat — the bare Vaayu mark, so the demo
+// assistant reads as Vaayu rather than a coloured name-initial.
+const BotAvatar = ({ className, logoSize }: { className: string; logoSize: number }) => (
+    <div className={`${className} flex items-center justify-center`}>
+        <VaayuLogo iconOnly size={logoSize} />
+    </div>
+);
 
 const MD_COMPONENTS = {
     p: ({ children, ...props }: React.ComponentPropsWithoutRef<'p'>) => (
@@ -121,13 +130,11 @@ export default function DemoChatPage() {
         <div className="flex flex-col bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-500 font-google" style={{ height: 'calc(100vh - 5rem)' }}>
             {/* Header */}
             <div className="bg-[#f8f9fa] dark:bg-slate-950 px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 relative z-10">
-                <div className="flex justify-between items-center max-w-3xl mx-auto">
+                <div className="flex justify-between items-center max-w-3xl xl:max-w-4xl mx-auto">
                     <div className="flex items-center gap-3">
                         <div className="relative">
                             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#f8f9fa] dark:border-[#05070a] animate-pulse z-10" />
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-google font-bold shadow-sm" style={{ backgroundColor: THEME_COLOR }}>
-                                {BOT_NAME.charAt(0).toUpperCase()}
-                            </div>
+                            <BotAvatar className="w-10 h-10" logoSize={26} />
                         </div>
                         <div>
                             <h1 className="text-base font-semibold font-google leading-tight text-slate-800 dark:text-slate-200">{BOT_NAME}</h1>
@@ -153,16 +160,14 @@ export default function DemoChatPage() {
                     <span className="text-9xl font-black rotate-[-15deg] font-display">DEMO</span>
                 </div>
 
-                <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full flex-1 flex flex-col">
+                <div className="relative max-w-3xl xl:max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full flex-1 flex flex-col">
                     {showHero ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center py-12 md:py-20 max-w-2xl mx-auto px-4 w-full">
-                            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-3xl font-display font-bold shadow-md mb-6" style={{ backgroundColor: THEME_COLOR }}>
-                                {BOT_NAME.charAt(0).toUpperCase()}
-                            </div>
+                            <BotAvatar className="w-16 h-16 mb-6" logoSize={40} />
                             <h2 className="text-3xl md:text-4xl font-google font-medium text-slate-800 dark:text-slate-200 mb-2">
                                 Hello! I'm {BOT_NAME}.
                             </h2>
-                            <p className="text-base text-slate-500 dark:text-slate-400 mb-8 max-w-md leading-relaxed">
+                            <p className="text-base lg:text-lg text-slate-500 dark:text-slate-400 mb-8 max-w-md leading-relaxed">
                                 {GREETING}
                             </p>
 
@@ -173,7 +178,7 @@ export default function DemoChatPage() {
                                             key={i}
                                             onClick={() => sendMessage(q)}
                                             disabled={isLoading}
-                                            className="p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 transition-all font-google cursor-pointer leading-relaxed hover:border-slate-300 dark:hover:border-slate-700 shadow-sm"
+                                            className="p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm lg:text-base text-slate-700 dark:text-slate-300 transition-all font-google cursor-pointer leading-relaxed hover:border-slate-300 dark:hover:border-slate-700 shadow-sm"
                                         >
                                             {q}
                                         </button>
@@ -186,17 +191,15 @@ export default function DemoChatPage() {
                             {messages.map((msg, i) => (
                                 <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     {msg.role === 'bot' && (
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 mt-1 shadow-sm" style={{ backgroundColor: THEME_COLOR }}>
-                                            {BOT_NAME.charAt(0).toUpperCase()}
-                                        </div>
+                                        <BotAvatar className="w-8 h-8 shrink-0 mt-1" logoSize={20} />
                                     )}
                                     <div className={`flex flex-col max-w-[80%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         {msg.role === 'user' ? (
                                             <div className="px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-                                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [word-break:break-word]">{msg.content}</p>
+                                                <p className="text-sm lg:text-base leading-relaxed whitespace-pre-wrap break-words [word-break:break-word]">{msg.content}</p>
                                             </div>
                                         ) : (
-                                            <div className="px-1 py-1 text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert text-slate-800 dark:text-slate-200 prose-p:break-words prose-pre:overflow-x-auto prose-pre:whitespace-pre">
+                                            <div className="px-1 py-1 text-sm lg:text-base leading-relaxed prose prose-sm lg:prose-base max-w-none dark:prose-invert text-slate-800 dark:text-slate-200 prose-p:break-words prose-pre:overflow-x-auto prose-pre:whitespace-pre">
                                                 <ReactMarkdown rehypePlugins={[rehypeSanitize]} components={MD_COMPONENTS}>
                                                     {msg.content}
                                                 </ReactMarkdown>
@@ -207,9 +210,7 @@ export default function DemoChatPage() {
                             ))}
                             {isLoading && (
                                 <div className="flex gap-4 justify-start">
-                                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 mt-1 shadow-sm" style={{ backgroundColor: THEME_COLOR }}>
-                                        {BOT_NAME.charAt(0).toUpperCase()}
-                                    </div>
+                                    <BotAvatar className="w-8 h-8 shrink-0 mt-1" logoSize={20} />
                                     <div className="flex flex-col items-start pt-2">
                                         <ThinkingDots color={THEME_COLOR} />
                                     </div>
@@ -223,7 +224,7 @@ export default function DemoChatPage() {
 
             {/* Input area */}
             <div className="pb-6 pt-3 px-4 bg-[#f8f9fa] dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800/40 transition-colors">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-3xl xl:max-w-4xl mx-auto">
                     {/* Quick questions (only shown when active chat is running and cap not reached) */}
                     {quickQs.length > 0 && !showHero && !isCapReached && (
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -232,7 +233,7 @@ export default function DemoChatPage() {
                                     key={i}
                                     onClick={() => sendMessage(q)}
                                     disabled={isLoading}
-                                    className="text-xs px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all bg-white dark:bg-slate-900 truncate max-w-[200px]"
+                                    className="text-xs lg:text-sm px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all bg-white dark:bg-slate-900 truncate max-w-[200px]"
                                 >
                                     {q}
                                 </button>
@@ -245,13 +246,13 @@ export default function DemoChatPage() {
                             onChange={e => setInput(e.target.value)}
                             disabled={isLoading || isCapReached}
                             placeholder={isCapReached ? "Demo message limit reached" : "Ask anything..."}
-                            className="flex-1 bg-transparent py-3 text-sm text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none font-medium"
+                            className="flex-1 bg-transparent py-3 lg:py-3.5 text-sm lg:text-base text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none font-medium"
                         />
                         <button
                             type="submit"
                             disabled={isLoading || !input.trim() || isCapReached}
                             className="p-2 rounded-full disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center shrink-0"
-                            style={!isCapReached && input.trim() ? { color: THEME_COLOR } : { color: '#94a3b8' }}
+                            style={!isCapReached && input.trim() ? { color: '#2563eb' } : { color: '#94a3b8' }}
                         >
                             <span className="material-symbols-outlined text-[20px]">send</span>
                         </button>

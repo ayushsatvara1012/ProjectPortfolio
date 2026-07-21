@@ -2,17 +2,18 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Alert from '@/src/components/ui/Alert';
-import { parseFileToChunks } from '@/src/lib/demo/demoRag';
+import { parseFileToChunks, parseUrlToChunks } from '@/src/lib/demo/demoRag';
 import { saveKnowledge, getKnowledge, clearKnowledge, getBotConfig } from '@/src/lib/demo/demoStorage';
-import { Card, SectionHeader, Badge, ProgressBar, EmptyState, cx, fmtNum } from '@/src/components/dashboard/insights/ui';
+import { Card, SectionHeader, Badge, cx, fmtNum } from '@/src/components/dashboard/insights/ui';
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/* Local design tokens — mirror the dashboard Train AI surface so the demo KPI  */
-/* strip is visually identical to /dashboard/train.                             */
+/* The demo Train AI surface mirrors /dashboard/train 1:1 (layout, crawl        */
+/* discovery, drag-drop, async progress) but runs on sessionStorage + a mock    */
+/* backend instead of Clerk + FastAPI, so prospects see the real experience.    */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 import SourceBrowser from '@/src/components/dashboard/SourceBrowser';
-import { StatCard, TONE, NOISE_BG } from '@/src/components/dashboard/TrainStatCard';
+import { StatCard } from '@/src/components/dashboard/TrainStatCard';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { createMockAuthFetch } from '@/src/lib/demo/mockBackend';
 
@@ -35,6 +36,8 @@ const prettyBytes = (n: number) => {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 // ── Selected-file chip ────────────────────────────────────────────────────────
 const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove: () => void }) => (
     <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-3 transition-colors">
@@ -42,17 +45,17 @@ const FileChip = ({ file, icon, onRemove }: { file: File; icon: string; onRemove
             <span className="material-symbols-outlined text-[18px]">{icon}</span>
         </span>
         <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">{file.name}</p>
-            <p className="text-[12px] text-slate-500 dark:text-slate-400">{prettyBytes(file.size)}</p>
+            <p className="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-100">{file.name}</p>
+            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 tabular-nums">{prettyBytes(file.size)}</p>
         </div>
-        <button type="button" onClick={onRemove} aria-label="Remove file"
+        <button type="button" onClick={onRemove} aria-label={`Remove ${file.name}`}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
             <span className="material-symbols-outlined text-[18px]">close</span>
         </button>
     </div>
 );
 
-
+type CrawlCandidate = { url: string; label: string; estimated_words: number };
 
 function DemoTrainAIInner() {
     const queryClient = useQueryClient();
@@ -74,7 +77,17 @@ function DemoTrainAIInner() {
     const [textLabel, setTextLabel] = useState('');
     const [isTraining, setIsTraining] = useState(false);
     const [isPurging, setIsPurging] = useState(false);
+    const [isDiscovering, setIsDiscovering] = useState(false);
+    const [trainingProgress, setTrainingProgress] = useState<{ progress: number; total: number; mode: string } | null>(null);
     const [alert, setAlert] = useState<{ open: boolean; type: 'success' | 'error' | 'warning'; msg: string }>({ open: false, type: 'success', msg: '' });
+
+    // Multi-page crawl discovery — candidate same-site pages harvested from the
+    // entry URL, with an estimated word cost. Selection drives the crawl fan-out.
+    const [candidates, setCandidates] = useState<CrawlCandidate[] | null>(null);
+    const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
+    const [entryEstimate, setEntryEstimate] = useState<number>(0);
+    const [candidateFilter, setCandidateFilter] = useState('');
+    const [dragActive, setDragActive] = useState(false);
 
     const authFetch = React.useMemo(() => createMockAuthFetch(botConfig?.name || 'Demo Bot'), [botConfig]);
 
@@ -99,7 +112,55 @@ function DemoTrainAIInner() {
         queryClient.invalidateQueries({ queryKey: ['knowledge-sources'] });
         queryClient.invalidateQueries({ queryKey: ['knowledge-chunks'] });
     };
-    const showAlert = (type: 'success' | 'error' | 'warning' | 'development', msg: string) => setAlert({ open: true, type: type === 'development' ? 'warning' : type, msg });
+    const showAlert = (type: 'success' | 'error' | 'warning' | 'development', msg: string) =>
+        setAlert({ open: true, type: type === 'development' ? 'warning' : type, msg });
+
+    const resetDiscovery = () => { setCandidates(null); setSelectedUrls(new Set()); setEntryEstimate(0); setCandidateFilter(''); };
+
+    // ── Dropzone helpers (drag-and-drop, matching the live dashboard) ───────────
+    const acceptPdfFile = (f: File | undefined) => {
+        if (!f) return;
+        if (f.type === 'application/pdf') setFile(f);
+        else showAlert('error', 'Please select a valid PDF.');
+    };
+    const acceptCsvFile = (f: File | undefined) => {
+        if (!f) return;
+        const ok = ['.csv', '.xlsx', '.xls'].some(ext => f.name.toLowerCase().endsWith(ext));
+        if (!ok) { showAlert('error', 'Please select a .csv, .xlsx, or .xls file.'); return; }
+        if (f.size > 5 * 1024 * 1024) { showAlert('error', 'File exceeds 5 MB limit.'); return; }
+        setCsvFile(f);
+    };
+    const dropHandlers = (accept: (f: File | undefined) => void) => ({
+        onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragActive(true); },
+        onDragLeave: () => setDragActive(false),
+        onDrop: (e: React.DragEvent) => { e.preventDefault(); setDragActive(false); accept(e.dataTransfer.files?.[0]); },
+    });
+    const dropzoneCls = (active: boolean) => cx(
+        'group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-12 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
+        active
+            ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30'
+            : 'border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20',
+    );
+
+    const handleDiscover = async () => {
+        if (!url.trim()) { showAlert('error', 'Enter a valid URL first.'); return; }
+        setIsDiscovering(true);
+        try {
+            const fd = new FormData();
+            fd.append('url', url.trim());
+            const data = await authFetch('/api/train/discover', { method: 'POST', body: fd }) as any;
+            const found: CrawlCandidate[] = Array.isArray(data.candidates) ? data.candidates : [];
+            setEntryEstimate(Number(data?.entry?.estimated_words) || 0);
+            setCandidates(found);
+            setCandidateFilter('');
+            setSelectedUrls(new Set());
+            if (found.length === 0) showAlert('warning', 'No other pages were found on this site.');
+        } catch {
+            showAlert('error', 'Could not scan the page.');
+        } finally {
+            setIsDiscovering(false);
+        }
+    };
 
     const handleTrain = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -111,24 +172,71 @@ function DemoTrainAIInner() {
 
         setIsTraining(true);
         try {
-            let newChunks: string[];
-            if (activeFile) {
+            // Crawl fan-out: entry page + each selected same-site page, each
+            // really fetched and extracted (not simulated).
+            const selectedPages = candidates ? candidates.filter(c => selectedUrls.has(c.url)) : [];
+            const isCrawl = !!url.trim() && selectedPages.length > 0;
+
+            let newChunks: string[] = [];
+            let successPages = 0;
+            let failedPages = 0;
+
+            if (isCrawl) {
+                const pageUrls = [url.trim(), ...selectedPages.map(c => c.url)];
+                const total = pageUrls.length;
+                setTrainingProgress({ progress: 0, total, mode: 'crawl' });
+                for (let i = 0; i < pageUrls.length; i++) {
+                    try {
+                        newChunks.push(...await parseUrlToChunks(pageUrls[i]));
+                        successPages += 1;
+                    } catch {
+                        failedPages += 1;
+                    }
+                    setTrainingProgress({ progress: i + 1, total, mode: 'crawl' });
+                }
+                if (successPages === 0) {
+                    throw new Error('Could not extract any content from the selected pages.');
+                }
+            } else if (activeFile) {
                 newChunks = await parseFileToChunks(activeFile);
             } else if (url.trim()) {
-                newChunks = [`Mock extracted content from ${url}`];
+                newChunks = await parseUrlToChunks(url.trim());
             } else {
                 newChunks = trainingText.split(/\n{2,}/).filter(p => p.trim().length > 20);
+                if (newChunks.length === 0 && trainingText.trim()) newChunks = [trainingText.trim()];
             }
+
             if (newChunks.length > 200) newChunks = newChunks.slice(0, 200);
-            saveKnowledge(newChunks);
+
+            // Simulated per-segment progress tick for non-crawl sources — crawl
+            // already ticked in real time above, once per page actually fetched.
+            if (!isCrawl) {
+                const total = newChunks.length;
+                setTrainingProgress({ progress: 0, total, mode: 'segments' });
+                for (let i = 1; i <= total; i++) {
+                    await sleep(Math.min(600, 1400 / Math.max(total, 1)));
+                    setTrainingProgress({ progress: i, total, mode: 'segments' });
+                }
+            }
+
+            const merged = [...chunks, ...newChunks].slice(0, 400);
+            saveKnowledge(merged);
             refresh();
-            showAlert('success', `Training complete! ${newChunks.length} segments committed to your bot's knowledge base.`);
+            if (isCrawl) {
+                const parts = [`${successPages} page(s) trained`];
+                if (failedPages) parts.push(`${failedPages} failed`);
+                showAlert(failedPages ? 'warning' : 'success', `${parts.join(' · ')}.`);
+            } else {
+                showAlert('success', `Training complete! ${newChunks.length} segment(s) committed to your bot's knowledge base.`);
+            }
             setFile(null); setCsvFile(null); setTrainingText(''); setTextLabel(''); setUrl('');
+            resetDiscovery();
             if (fileRef.current) fileRef.current.value = '';
             if (csvFileRef.current) csvFileRef.current.value = '';
         } catch (err: any) {
             showAlert('error', err.message || 'Failed to process.');
         } finally {
+            setTrainingProgress(null);
             setIsTraining(false);
         }
     };
@@ -140,10 +248,10 @@ function DemoTrainAIInner() {
         setIsPurging(true);
         clearKnowledge();
         setChunks([]);
+        refresh();
         setIsPurging(false);
         showAlert('success', 'Knowledge purged successfully.');
     };
-
 
     return (
         <div className="flex flex-col h-full w-full min-w-0 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
@@ -188,9 +296,9 @@ function DemoTrainAIInner() {
                         label="AI memory"
                         icon="vital_signs"
                         tone="default"
-                        value={fmtNum(chunksUsed)}
-                        unit="segs"
-                        footer="Segments in this demo session"
+                        value={fmtNum(msgUsed)}
+                        unit="msgs"
+                        footer="Lifetime messages across all bots"
                     />
 
                     <StatCard
@@ -214,7 +322,9 @@ function DemoTrainAIInner() {
                     />
                 </div>
 
-                {/* Add knowledge */}
+                {/* Add + Manage knowledge — side by side on lg+ so an upload can be
+                    verified without scrolling (matches the live dashboard). */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-5 items-start">
                 <Card className="relative p-4 sm:p-5 overflow-hidden">
                     <SectionHeader
                         title="Add knowledge"
@@ -249,21 +359,86 @@ function DemoTrainAIInner() {
 
                     <form onSubmit={handleTrain} className="space-y-4">
                         {activeTab === 'url' && (
-                            <div>
-                                <label className={labelCls}>Website URL</label>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="url"
-                                        value={url}
-                                        onChange={e => setUrl(e.target.value)}
-                                        className={inputCls}
-                                        placeholder="https://example.com/docs"
-                                        required={activeTab === 'url'}
-                                    />
+                            <div className="max-w-xl">
+                                <label className={labelCls}>Source URL</label>
+                                <input type="url" value={url}
+                                    onChange={e => { setUrl(e.target.value); if (candidates) resetDiscovery(); }}
+                                    className={inputCls} placeholder="https://docs.example.com" required={activeTab === 'url'} />
+                                <div className="mt-1.5 flex items-center justify-between gap-3">
+                                    <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        We'll index this page's readable content.
+                                    </p>
+                                    <button type="button"
+                                        onClick={handleDiscover}
+                                        disabled={!url.trim() || isDiscovering || isTraining}
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200 hover:border-blue-400 dark:hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                        {isDiscovering
+                                            ? <><div className="w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin motion-reduce:hidden" /> Scanning…</>
+                                            : <><span className="material-symbols-outlined text-[16px]">travel_explore</span> Find more pages</>}
+                                    </button>
                                 </div>
-                                <p className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">
-                                    Enter a single page URL. In demo mode, it mocks extraction.
-                                </p>
+
+                                {candidates && candidates.length > 0 && (() => {
+                                    const q = candidateFilter.trim().toLowerCase();
+                                    const filtered = q
+                                        ? candidates.filter(c => c.url.toLowerCase().includes(q) || (c.label || '').toLowerCase().includes(q))
+                                        : candidates;
+                                    const selectedCount = candidates.filter(c => selectedUrls.has(c.url)).length;
+                                    const totalEst = entryEstimate + candidates.filter(c => selectedUrls.has(c.url)).reduce((s, c) => s + c.estimated_words, 0);
+                                    return (
+                                    <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-3.5">
+                                        <div className="flex items-center justify-between mb-2 gap-3">
+                                            <p className="text-[12.5px] font-semibold text-slate-700 dark:text-slate-200">
+                                                Also add these pages?
+                                                <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">{selectedCount} of {candidates.length} selected</span>
+                                            </p>
+                                            <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+                                                ~{fmtNum(totalEst)} words est.
+                                            </span>
+                                        </div>
+                                        {candidates.length > 8 && (
+                                            <input type="text" value={candidateFilter}
+                                                onChange={e => setCandidateFilter(e.target.value)}
+                                                placeholder="Filter pages…"
+                                                className="mb-2 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-[12.5px] text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500/40" />
+                                        )}
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <button type="button"
+                                                onClick={() => setSelectedUrls(prev => { const n = new Set(prev); filtered.forEach(c => n.add(c.url)); return n; })}
+                                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                                                Select all{q ? ' shown' : ''}
+                                            </button>
+                                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                                            <button type="button"
+                                                onClick={() => setSelectedUrls(new Set())}
+                                                className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:underline">
+                                                Clear all
+                                            </button>
+                                        </div>
+                                        <ul className="space-y-1 max-h-72 overflow-y-auto">
+                                            {filtered.map(c => (
+                                                <li key={c.url}>
+                                                    <label className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-white dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                                                        <input type="checkbox" checked={selectedUrls.has(c.url)}
+                                                            onChange={() => setSelectedUrls(prev => { const n = new Set(prev); n.has(c.url) ? n.delete(c.url) : n.add(c.url); return n; })}
+                                                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500/40" />
+                                                        <span className="min-w-0 flex-1 truncate text-[13px] text-slate-700 dark:text-slate-200" title={c.url}>
+                                                            {c.label || c.url}
+                                                        </span>
+                                                        <span className="shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">~{fmtNum(c.estimated_words)}w</span>
+                                                    </label>
+                                                </li>
+                                            ))}
+                                            {filtered.length === 0 && (
+                                                <li className="px-2 py-1.5 text-[12px] text-slate-400 dark:text-slate-500">No pages match “{candidateFilter.trim()}”.</li>
+                                            )}
+                                        </ul>
+                                        <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                                            Counts are estimates; the real size is measured when each page is trained.
+                                        </p>
+                                    </div>
+                                    );
+                                })()}
                             </div>
                         )}
 
@@ -273,7 +448,8 @@ function DemoTrainAIInner() {
                                 <button
                                     type="button"
                                     onClick={() => fileRef.current?.click()}
-                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                    {...dropHandlers(acceptPdfFile)}
+                                    className={dropzoneCls(dragActive)}
                                 >
                                     <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                         <span className="material-symbols-outlined text-[24px]">cloud_upload</span>
@@ -283,7 +459,7 @@ function DemoTrainAIInner() {
                                         <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">PDF only · up to 10 MB</p>
                                     </div>
                                     <input type="file" ref={fileRef} className="hidden" accept=".pdf"
-                                        onChange={e => { const f = e.target.files?.[0]; if (f?.type === 'application/pdf') setFile(f); else showAlert('error', 'Please select a valid PDF.'); }} />
+                                        onChange={e => acceptPdfFile(e.target.files?.[0])} />
                                 </button>
                                 {file && <FileChip file={file} icon="picture_as_pdf" onRemove={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }} />}
                             </div>
@@ -295,7 +471,8 @@ function DemoTrainAIInner() {
                                 <button
                                     type="button"
                                     onClick={() => csvFileRef.current?.click()}
-                                    className="group flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-4 py-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                                    {...dropHandlers(acceptCsvFile)}
+                                    className={dropzoneCls(dragActive)}
                                 >
                                     <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                         <span className="material-symbols-outlined text-[24px]">table_chart</span>
@@ -309,14 +486,7 @@ function DemoTrainAIInner() {
                                         ref={csvFileRef}
                                         className="hidden"
                                         accept=".csv,.xlsx,.xls"
-                                        onChange={e => {
-                                            const f = e.target.files?.[0];
-                                            if (!f) return;
-                                            const ok = ['.csv', '.xlsx', '.xls'].some(ext => f.name.toLowerCase().endsWith(ext));
-                                            if (!ok) { showAlert('error', 'Please select a .csv, .xlsx, or .xls file.'); return; }
-                                            if (f.size > 5 * 1024 * 1024) { showAlert('error', 'File exceeds 5 MB limit.'); return; }
-                                            setCsvFile(f);
-                                        }}
+                                        onChange={e => acceptCsvFile(e.target.files?.[0])}
                                     />
                                 </button>
                                 {csvFile && <FileChip file={csvFile} icon="table_chart" onRemove={() => { setCsvFile(null); if (csvFileRef.current) csvFileRef.current.value = ''; }} />}
@@ -333,7 +503,7 @@ function DemoTrainAIInner() {
 
                         {activeTab === 'text' && (
                             <div className="space-y-4">
-                                <div>
+                                <div className="max-w-xl">
                                     <label className={labelCls}>Source label <span className="font-normal text-slate-400 dark:text-slate-500">(optional)</span></label>
                                     <input
                                         type="text"
@@ -356,14 +526,24 @@ function DemoTrainAIInner() {
                             </div>
                         )}
 
-                        <button type="submit" disabled={isTraining}
-                            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 px-7 py-3 text-[13.5px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 active:scale-[0.99]">
-                            {isTraining ? (
-                                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Uploading…</>
-                            ) : (
-                                <><span className="material-symbols-outlined text-[18px]">bolt</span> Start training</>
-                            )}
-                        </button>
+                        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
+                            <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-snug">
+                                {`${fmtNum(wordsUsed)} / ${fmtNum(wordLimit)} words of storage used.`}
+                            </p>
+                            <button type="submit" disabled={isTraining}
+                                className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-600 px-7 py-3 text-[13.5px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 active:scale-[0.99]">
+                                {trainingProgress ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:hidden" />
+                                        Training… {trainingProgress.progress} / {trainingProgress.total} {trainingProgress.mode === 'crawl' ? 'pages' : 'segments'}
+                                    </>
+                                ) : isTraining ? (
+                                    <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Uploading…</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-[18px]">bolt</span> Start training</>
+                                )}
+                            </button>
+                        </div>
                     </form>
                 </Card>
 
@@ -376,39 +556,40 @@ function DemoTrainAIInner() {
                         className="mb-4"
                     />
 
-                    <SourceBrowser 
-                        selectedBotId="demo" 
-                        authFetch={authFetch} 
-                        queryClient={queryClient} 
-                        showAlert={showAlert} 
-                        refreshUser={refresh} 
-                        isFree={false} 
+                    <SourceBrowser
+                        selectedBotId="demo"
+                        authFetch={authFetch}
+                        queryClient={queryClient}
+                        showAlert={showAlert}
+                        refreshUser={refresh}
+                        isFree={false}
                     />
+                </Card>
+                </div>
 
-                    {/* Danger zone */}
-                    <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 transition-colors">
-                        <div className="flex flex-col gap-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 ring-1 ring-inset ring-rose-100 dark:ring-rose-900/40 p-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                                <span className="material-symbols-outlined text-[18px] text-rose-500 dark:text-rose-400 shrink-0 mt-0.5">delete_forever</span>
-                                <div className="min-w-0">
-                                    <p className="text-[13px] font-semibold text-rose-700 dark:text-rose-300">Delete all knowledge</p>
-                                    <p className="text-[12px] text-rose-600/90 dark:text-rose-400/90 leading-relaxed mt-0.5">
-                                        Permanently removes every trained segment for this bot. This cannot be undone.
-                                    </p>
-                                </div>
+                {/* Danger zone */}
+                <Card className="p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 ring-1 ring-inset ring-rose-100 dark:ring-rose-900/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                            <span className="material-symbols-outlined text-[18px] text-rose-500 dark:text-rose-400 shrink-0 mt-0.5">delete_forever</span>
+                            <div className="min-w-0">
+                                <p className="text-[13px] font-semibold text-rose-700 dark:text-rose-300">Delete all knowledge</p>
+                                <p className="text-[12px] text-rose-600/90 dark:text-rose-400/90 leading-relaxed mt-0.5">
+                                    Permanently removes every trained segment for this bot. This cannot be undone.
+                                </p>
                             </div>
-                            <button
-                                onClick={handlePurge}
-                                disabled={isPurging || chunksUsed === 0}
-                                className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
-                            >
-                                {isPurging ? (
-                                    <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Deleting…</>
-                                ) : (
-                                    <><span className="material-symbols-outlined text-[17px]">delete</span> Delete all ({fmtNum(chunksUsed)})</>
-                                )}
-                            </button>
                         </div>
+                        <button
+                            onClick={handlePurge}
+                            disabled={isPurging || chunksUsed === 0}
+                            className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 active:scale-[0.99]"
+                        >
+                            {isPurging ? (
+                                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white animate-spin rounded-full motion-reduce:hidden" /> Deleting…</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-[17px]">delete</span> Delete all ({fmtNum(chunksUsed)})</>
+                            )}
+                        </button>
                     </div>
                 </Card>
             </div>

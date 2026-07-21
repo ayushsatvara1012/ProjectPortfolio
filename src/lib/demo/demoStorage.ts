@@ -3,6 +3,7 @@ const KEYS = {
     KNOWLEDGE: 'demo_knowledge_chunks',
     TRAINED: 'demo_trained',
     MESSAGES: 'demo_chat_messages',
+    ONBOARDING_SEEN: 'demo_onboarding_seen',
 };
 
 // ── Bot Config ────────────────────────────────────────────────────────────────
@@ -87,6 +88,17 @@ export function saveChatMessages(messages: any[]) {
 export function clearChatMessages() {
     if (typeof window === 'undefined') return;
     sessionStorage.removeItem(KEYS.MESSAGES);
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+export function hasSeenOnboarding() {
+    if (typeof window === 'undefined') return true;
+    return sessionStorage.getItem(KEYS.ONBOARDING_SEEN) === 'true';
+}
+
+export function markOnboardingSeen() {
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem(KEYS.ONBOARDING_SEEN, 'true');
 }
 
 // ── Full Reset ────────────────────────────────────────────────────────────────
