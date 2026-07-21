@@ -88,7 +88,7 @@ const Services = () => {
         {/* HEADER BLOCK */}
         <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-12 mb-16">
           <div className="max-w-2xl space-y-4">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-slate-200">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight leading-tight text-slate-900 dark:text-slate-200">
               Your Bot's <br />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
                 Business Intelligence.

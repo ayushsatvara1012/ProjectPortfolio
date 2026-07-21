@@ -34,8 +34,8 @@ function CreateBotModal({ onClose }: { onClose: () => void }) {
                 <span className="material-symbols-outlined text-[20px]">add</span>
               </span>
               <div className="min-w-0">
-                <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100 leading-tight">Create a new bot</h2>
-                <p className="text-[12.5px] text-slate-500 dark:text-slate-400 leading-snug">Provision a bot and get its embed script.</p>
+                <h2 className="text-sm font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100 leading-tight">Create a new bot</h2>
+                <p className="text-small text-slate-500 dark:text-slate-400 leading-snug">Provision a bot and get its embed script.</p>
               </div>
             </div>
             <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors">

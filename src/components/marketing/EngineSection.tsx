@@ -30,7 +30,7 @@ const EngineSection = () => {
 
       {/* Centered Top Heading */}
       <div className="max-w-5xl mx-auto px-6 text-center relative z-10 w-full mb-8 sm:mb-12 lg:mb-16">
-        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-black tracking-tight text-slate-900 dark:text-white leading-none">
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight text-slate-900 dark:text-white leading-tight">
           We Provide <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-red-600 dark:to-yellow-400">RAG </span>Engine
         </h2>
         <p className="font-google text-base sm:text-lg lg:text-xl font-normal text-slate-600 dark:text-slate-100 max-w-2xl mx-auto mt-4 transition-colors duration-300 ease-in-out tracking-widest">TRAINED ON YOUR DOCS · GROUNDED IN YOUR DATA</p>

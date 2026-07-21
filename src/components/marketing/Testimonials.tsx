@@ -42,7 +42,7 @@ const Testimonials = () => {
             <span className="material-symbols-outlined text-[16px] text-blue-500">format_quote</span>
             <span>What our early users say</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-white">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight leading-tight text-slate-900 dark:text-white">
             Real results from real businesses.
           </h2>
         </div>

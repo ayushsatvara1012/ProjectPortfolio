@@ -77,23 +77,23 @@ export const HeroCell = () => (
     <div className="absolute inset-0 pointer-events-none select-none z-0 font-mono text-[9px] text-slate-400/60 dark:text-slate-600/60 hidden md:block">
       {/* Top Left */}
       <div className="absolute top-28 left-10 flex items-center gap-2">
-        <span className="text-[12px] font-light font-sans">+</span>
+        <span className="text-[12px] font-sans">+</span>
         <span>SYS_INIT // OK</span>
       </div>
       {/* Bottom Left */}
       <div className="absolute bottom-10 left-10 flex items-center gap-2">
-        <span className="text-[12px] font-light font-sans">+</span>
+        <span className="text-[12px] font-sans">+</span>
         <span>RETRIEVAL_LATENCY // &lt;80ms</span>
       </div>
       {/* Top Right */}
       <div className="absolute top-28 right-12 flex items-center gap-2">
         <span>VEC_DIM // 1536</span>
-        <span className="text-[12px] font-light font-sans">+</span>
+        <span className="text-[12px] font-sans">+</span>
       </div>
       {/* Bottom Right */}
       <div className="absolute bottom-10 right-12 flex items-center gap-2">
         <span>COS_SIM // 0.982</span>
-        <span className="text-[12px] font-light font-sans">+</span>
+        <span className="text-[12px] font-sans">+</span>
       </div>
     </div>
 

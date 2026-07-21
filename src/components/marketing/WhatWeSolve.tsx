@@ -92,7 +92,7 @@ const WhatWeSolve = () => {
             {/* Title & Text Header Section */}
             <div className="mb-12">
 
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-google font-medium tracking-tight text-slate-900 dark:text-white mb-6 leading-none">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight text-slate-900 dark:text-white mb-6 leading-tight">
                 Every missed question is a&nbsp;
                 <span className="text-transparent bg-clip-text bg-linear-to-r from-red-600 to-orange-600 dark:from-red-500 dark:to-orange-400">
                   missed sale.

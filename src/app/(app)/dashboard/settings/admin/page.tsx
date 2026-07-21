@@ -174,9 +174,9 @@ const Toggle = ({ checked, onChange, label, disabled }: { checked: boolean; onCh
   </button>
 );
 
-const inputCls = "w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-[13.5px] font-google text-slate-900 dark:text-slate-200 rounded-lg transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-const selectCls = "w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-[13.5px] font-google text-slate-900 dark:text-slate-200 rounded-lg transition-colors disabled:opacity-50";
-const labelCls = "block text-[12.5px] font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5";
+const inputCls = "w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-caption font-google text-slate-900 dark:text-slate-200 rounded-lg transition-colors disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+const selectCls = "w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 focus:bg-slate-200 dark:focus:bg-slate-700 focus:outline-none text-caption font-google text-slate-900 dark:text-slate-200 rounded-lg transition-colors disabled:opacity-50";
+const labelCls = "block text-small font-semibold font-google text-slate-600 dark:text-slate-400 mb-1.5";
 
 const NumInput = ({ label, value, onChange, placeholder, disabled, hint }: { label: string; value: any; onChange: (v: string) => void; placeholder: string; disabled?: boolean; hint?: string }) => (
   <div>

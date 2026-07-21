@@ -932,7 +932,7 @@ export default function HowItWorks() {
             <span className="material-symbols-outlined text-[16px] text-blue-500">linear_scale</span>
             <span>How It Works</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight leading-tight text-slate-900 dark:text-white mb-6">
             From your content to a live AI chatbot —{" "}
             <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
               in 10 minutes

@@ -9,14 +9,12 @@ const googleSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-google',
-  weight: ['400', '500', '600', '700'],
 });
 
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
-  weight: ['400', '500', '600', '700'],
 });
 
 // A fallback minimal metadata in case a route misses it.

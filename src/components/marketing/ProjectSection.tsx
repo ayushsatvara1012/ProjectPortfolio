@@ -96,7 +96,7 @@ const ProjectSection = () => {
             
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div className="max-w-2xl">
-                <h2 className="text-4xl md:text-5xl font-google font-semibold tracking-tight text-slate-900 dark:text-slate-100 transition-colors">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight text-slate-900 dark:text-slate-100 transition-colors">
                   Selected <span className="text-blue-600 dark:text-blue-400">Projects</span>
                 </h2>
                 <p className="text-base font-google tracking-wider text-slate-600 dark:text-slate-200 mt-2 leading-relaxed">

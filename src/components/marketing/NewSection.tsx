@@ -80,7 +80,7 @@ const NewSection = () => {
         {/* Right column — content */}
         <div className="flex flex-col justify-center gap-8">
           <div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-medium tracking-tight text-slate-900 dark:text-white leading-tight mb-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight text-slate-900 dark:text-white leading-tight mb-4">
               A chatbot that actually knows your business
             </h2>
             <p className="text-xl font-google font-regular text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg">

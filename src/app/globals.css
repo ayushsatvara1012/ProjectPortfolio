@@ -43,17 +43,10 @@
 
 @layer base {
   html {
-    font-size: 14px;
     scroll-behavior: auto;
     overflow-x: clip; /* `clip` not `hidden` — avoids creating a scroll container so position:sticky still works */
     scrollbar-width: none;
     -ms-overflow-style: none;
-  }
-
-  @media (min-width: 768px) {
-    html {
-      font-size: 16px;
-    }
   }
 
   html::-webkit-scrollbar {
@@ -66,6 +59,7 @@
     position: relative;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    font-weight: 450;
     @apply font-sans antialiased text-slate-500 bg-white dark:bg-slate-950 dark:text-slate-400;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
@@ -384,4 +378,47 @@ body.mobile-menu-open .sapy-chat-root {
   select {
     font-size: 16px !important;
   }
+}
+
+/* --- Typography Utility Scale --- */
+@utility text-h1 {
+  font-size: 2.25rem; /* 36px */
+  line-height: 2.5rem;
+  font-weight: 700;
+}
+
+@utility text-h2 {
+  font-size: 1.875rem; /* 30px */
+  line-height: 2.25rem;
+  font-weight: 600;
+}
+
+@utility text-h3 {
+  font-size: 1.5rem; /* 24px */
+  line-height: 2rem;
+  font-weight: 600;
+}
+
+@utility text-body-lg {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.75rem;
+  font-weight: 450;
+}
+
+@utility text-body {
+  font-size: 1rem; /* 16px */
+  line-height: 1.5rem;
+  font-weight: 450;
+}
+
+@utility text-caption {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+@utility text-small {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem;
+  font-weight: 500;
 }
