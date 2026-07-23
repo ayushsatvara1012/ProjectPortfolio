@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import LazyOverviewCanvas from '@/src/components/architecture/LazyOverviewCanvas';
+import { architectureRegistry } from '@/src/content/architecture/registry';
 
 export const metadata: Metadata = {
   title: 'Architecture | Vaayu by Sapybase',
@@ -23,6 +25,21 @@ export default function ArchitecturePage() {
         </h1>
       </div>
       <LazyOverviewCanvas />
+
+      {/* The canvas is unreadable to assistive tech and its node links are not
+          crawlable, so mirror the map as a real link list: keyboard + screen
+          reader reachable, and internal links for SEO. Visually hidden. */}
+      <nav aria-label="Vaayu features" className="sr-only">
+        <ul>
+          {architectureRegistry.map((f) => (
+            <li key={f.id}>
+              <Link href={`/architecture/${f.id}`}>
+                {f.name} — {f.tagline}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </main>
   );
 }

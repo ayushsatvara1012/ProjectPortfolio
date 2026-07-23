@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import KindNode from './nodes/KindNode';
@@ -14,6 +15,16 @@ export default function DataFlowCanvas({
 }: {
   dataFlow: NonNullable<FeatureArchitecture['dataFlow']>;
 }) {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   const nodes: Node[] = dataFlow.nodes.map((n, i) => ({
     id: n.id,
     type: 'kind',
@@ -26,15 +37,24 @@ export default function DataFlowCanvas({
     source: e.source,
     target: e.target,
     label: e.label,
-    animated: e.animated,
+    animated: Boolean(e.animated) && !reducedMotion,
   }));
 
   return (
     <div className="h-full w-full">
-      <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView>
-        <Background />
-        <Controls />
-        <MiniMap pannable zoomable />
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.3}
+        maxZoom={1.5}
+        nodesConnectable={false}
+      >
+        <Background gap={20} />
+        <Controls showInteractive={false} />
+        <MiniMap pannable zoomable className="!hidden sm:!block" />
       </ReactFlow>
     </div>
   );

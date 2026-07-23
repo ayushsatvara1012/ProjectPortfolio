@@ -69,7 +69,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'campaign',
       group: 'delivery',
       connectsTo: ['embed-widget'],
-      position: { x: 0, y: 140 },
+      position: { x: -380, y: 40 },
     },
   },
   // Grounds: catalog_import.py + the URL scraper (Jina renderer + BeautifulSoup
@@ -84,7 +84,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'cloud_upload',
       group: 'ingestion',
       connectsTo: ['chatbot-rag', 'vertical-agent'],
-      position: { x: 0, y: 320 },
+      position: { x: 0, y: 300 },
     },
     narrative:
       'Uploads are sorted by type. Web pages are rendered and cleanly extracted, catalog spreadsheets are mapped into structured product tables, and everything else is chunked and embedded into the vector store, so the bot can retrieve it later.',
@@ -133,7 +133,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'database',
       group: 'ingestion',
       connectsTo: ['chatbot-rag'],
-      position: { x: 0, y: 460 },
+      position: { x: 0, y: 600 },
     },
     narrative:
       "When a tenant connects their own database, a routing switch decides where each query is answered: read-only from the customer's isolated database, or from the default vector knowledge base. Either way, the retrieved context grounds the model's answer.",
@@ -194,7 +194,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'chat',
       group: 'core',
       connectsTo: ['vertical-agent', 'insights'],
-      position: { x: 360, y: 150 },
+      position: { x: 520, y: 160 },
     },
     narrative:
       'Every question is embedded and matched against the tenant knowledge base in pgvector. The top-ranked chunks are handed to Gemini as context, so answers stay grounded in the customer’s own content rather than invented by the model.',
@@ -252,7 +252,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'smart_toy',
       group: 'core',
       connectsTo: ['insights'],
-      position: { x: 360, y: 370 },
+      position: { x: 620, y: 520 },
     },
     narrative:
       'The agent runs a reasoning loop: it thinks, picks a grounded tool (catalog lookup, quote, sample request), and acts, repeating until it can help. When a visitor is ready, it proposes a quote or sample and hands off to the owner over Slack and email rather than transacting on its own.',
@@ -320,7 +320,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'insights',
       group: 'delivery',
       connectsTo: [],
-      position: { x: 720, y: 260 },
+      position: { x: 1160, y: 320 },
     },
     narrative:
       'Every conversation turn logs its tokens, cost, and events. A rollup turns that raw log into the owner-facing views: engagement funnels, ROI, and per-tenant token cost that feeds metering and caps.',
@@ -363,7 +363,7 @@ export const architectureRegistry: FeatureArchitecture[] = [
       icon: 'apartment',
       group: 'platform',
       connectsTo: ['chatbot-rag'],
-      position: { x: 180, y: 580 },
+      position: { x: 220, y: 860 },
     },
   },
 ];

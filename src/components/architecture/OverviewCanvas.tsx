@@ -6,6 +6,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  MarkerType,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -13,8 +14,18 @@ import {
 import '@xyflow/react/dist/style.css';
 import FeatureNode from './nodes/FeatureNode';
 import { architectureRegistry } from '@/src/content/architecture/registry';
+import type { FeatureGroup } from '@/src/content/architecture/types';
 
 const nodeTypes = { feature: FeatureNode };
+
+// One color per group, matching FeatureNode's accents, so an edge's color
+// identifies which feature it originates from at a glance.
+const EDGE_COLOR: Record<FeatureGroup, string> = {
+  ingestion: '#10b981',
+  core: '#6366f1',
+  delivery: '#0ea5e9',
+  platform: '#94a3b8',
+};
 
 // No minimap: the 8-feature map fits entirely in view, so a minimap is
 // redundant here and only adds visual noise. Revisit in Phase 4 if the map grows.
@@ -57,13 +68,19 @@ export default function OverviewCanvas() {
   const edges = useMemo<Edge[]>(
     () =>
       architectureRegistry.flatMap((f) =>
-        f.overview.connectsTo.map((target) => ({
-          id: `${f.id}->${target}`,
-          source: f.id,
-          target,
-          animated: !reducedMotion,
-          style: { stroke: 'var(--color-slate-400, #94a3b8)', strokeWidth: 1.5 },
-        })),
+        f.overview.connectsTo.map((target) => {
+          const color = EDGE_COLOR[f.overview.group];
+          return {
+            id: `${f.id}->${target}`,
+            source: f.id,
+            target,
+            type: 'smoothstep',
+            pathOptions: { borderRadius: 16 },
+            animated: !reducedMotion,
+            style: { stroke: color, strokeWidth: 1.75 },
+            markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
+          };
+        }),
       ),
     [reducedMotion],
   );
@@ -83,8 +100,8 @@ export default function OverviewCanvas() {
         nodeTypes={nodeTypes}
         onNodeClick={onNodeClick}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.4}
+        fitViewOptions={{ padding: 0.15 }}
+        minZoom={0.3}
         maxZoom={1.5}
         nodesDraggable={false}
         nodesConnectable={false}
