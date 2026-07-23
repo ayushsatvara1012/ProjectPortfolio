@@ -1576,6 +1576,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // showing the card strip), and the mini-form's single input value.
   const [activeHubCard, setActiveHubCard] = useState<HubCard | null>(null);
   const [hubInput, setHubInput] = useState('');
+  // The tool+products card the visitor is currently "inside" (quote, spec, ...),
+  // kept around after submitHubValue nulls activeHubCard so the main chat input
+  // can offer a search icon back into the product picker for a second pick,
+  // without re-showing the picker for cards that don't search products.
+  const [reopenableHubCard, setReopenableHubCard] = useState<HubCard | null>(null);
   // Phase 4b — the structured sample form. Opened from the "Request a sample" hub
   // card OR when the agent emits a {form} action in chat (free-text intent). One
   // form, two entry points; submitting it POSTs to a deterministic endpoint.
@@ -1849,6 +1854,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     }
     setActiveHubCard(card);
     setHubInput('');
+    if (card.input_source === 'products') setReopenableHubCard(card);
+  };
+
+  // Search icon in the main chat input (shown only mid quote/spec session):
+  // reopens the same mini-form + drop-up product list the visitor started from,
+  // so a second product pick doesn't require going back to Home.
+  const reopenProductPicker = () => {
+    if (!reopenableHubCard) return;
+    setActiveHubCard(reopenableHubCard);
+    setHubInput('');
   };
 
   // Open the structured sample form (from a hub card or an agent {form} action),
@@ -2073,6 +2088,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setShowMenu(false);
     setView('chat');
     if (hasHub) setHubView('home');
+    setActiveHubCard(null);
+    setReopenableHubCard(null);
     setClearCount(c => c + 1);
   };
 
@@ -2082,6 +2099,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setSessionId(sid);
     setView('chat');
     if (hasHub) setHubView('chat');
+    setActiveHubCard(null);
+    setReopenableHubCard(null);
     animatedMsgIndices.current.clear();
     // Reset per-conversation gates so the resumed thread doesn't inherit the prior
     // view's lead-capture / handoff state. The fresh greeting shows until rows load.
@@ -2523,7 +2542,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   <div className="relative flex items-center gap-2 pl-1">
                     {hasHub && hubView === 'chat' && view === 'chat' && (
                       // Top-nav back arrow → Home screen (only for vertical bots in chat view).
-                      <button onClick={() => { setActiveHubCard(null); setHubView('home'); }}
+                      <button onClick={() => { setActiveHubCard(null); setReopenableHubCard(null); setHubView('home'); }}
                         style={{ WebkitTapHighlightColor: 'transparent', outlineColor: THEME_COLOR }}
                         className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Go to home">
                         <MIcon name="arrow_back" className="text-[22px] leading-none text-slate-500 dark:text-slate-400" />
@@ -3038,7 +3057,17 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     card's own field is the only input required; the Back button
                     above returns the visitor here to free-ask. */}
                   {!activeHubCard && (
-                    <form onSubmit={handleSend} className="relative flex items-center gap-1.5 rounded-[24px] bg-transparent border border-slate-300 dark:border-slate-600 pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+                    <form onSubmit={handleSend} className={`relative flex items-center gap-1.5 rounded-[24px] bg-transparent border border-slate-300 dark:border-slate-600 ${reopenableHubCard ? 'pl-2.5' : 'pl-4'} pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500`}>
+                      {reopenableHubCard && (
+                        // Mid quote/spec session: lets the visitor pick another product
+                        // without going back to Home — reopens the same drop-up list.
+                        <button type="button" onClick={reopenProductPicker}
+                          title={`Search ${reopenableHubCard.label.toLowerCase()}`}
+                          aria-label={`Search ${reopenableHubCard.label.toLowerCase()}`}
+                          className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
+                          <MIcon name="search" className="text-[18px] leading-none" />
+                        </button>
+                      )}
                       <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
                         placeholder="Ask anything"
                         className="flex-1 max-h-32 min-h-[28px] bg-transparent resize-none py-[6px] focus:outline-none leading-relaxed text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50 appearance-none rounded-none text-[15px] font-google [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
