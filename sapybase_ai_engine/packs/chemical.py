@@ -68,13 +68,37 @@ _PRODUCT_SLOTS = (
     ),
 )
 
+_SDS_SLOTS = (
+    Slot(
+        "cas_number",
+        required=False,
+        description="CAS registry number — the precise, unambiguous product key.",
+    ),
+    Slot(
+        "product_name",
+        required=False,
+        description="Product name; used when the CAS number is unknown.",
+    ),
+    Slot(
+        "grade",
+        required=False,
+        description=(
+            "IGNORED — an SDS is per PRODUCT, not per grade, so grade never "
+            "changes which sheet is returned. Kept only for backward "
+            "compatibility with older calls; never ask the visitor for a "
+            "grade before calling get_sds."
+        ),
+    ),
+)
+
 get_sds = ToolSpec(
     name="get_sds",
     description=(
         "Fetch the real Safety Data Sheet (SDS) for a product. The ONLY source of "
-        "safety/hazard/handling information — never answer those from memory."
+        "safety/hazard/handling information — never answer those from memory. An "
+        "SDS is per PRODUCT, not per grade — never pass or ask for a grade."
     ),
-    slots=_PRODUCT_SLOTS,
+    slots=_SDS_SLOTS,
 )
 
 get_product_spec = ToolSpec(

@@ -108,7 +108,9 @@ class TestGetSdsResolution:
         out = get_sds(FakeCursor(cas=[_row()]), CID, cas_number="7664-93-9")
         assert out["status"] == "found"
         assert out["sds_url"] == "https://sds.example.com/h2so4.pdf"
-        assert out["product"]["grade"] == "Battery"
+        # An SDS is per PRODUCT (D2) — the product object carries name/CAS
+        # only, never grade or packaging (2c).
+        assert out["product"] == {"name": "Sulphuric Acid", "cas_number": "7664-93-9"}
         assert out["last_updated"].startswith("2026-01-02")
 
     def test_found_by_exact_name_case_insensitive(self):
@@ -137,41 +139,112 @@ class TestGetSdsResolution:
                       CID, cas_number="7664-93-9")
         assert out["status"] == "no_sheet_on_file"
 
-    def test_multiple_exact_matches_same_sds_resolves_directly(self):
-        # An SDS is tied to the PRODUCT (CAS), not the grade or pack size — the
+    def test_multiple_grades_same_sds_resolves_directly(self):
+        # An SDS is tied to the PRODUCT, not the grade or pack size — the
         # common case is every grade sharing one sheet, so there's nothing to
-        # ask about; unlike price/spec, grade doesn't change the answer here.
+        # ask about; unlike price/spec, grade never changes the answer here.
         rows = [_row(grade="Battery"), _row(grade="Technical")]
         out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
         assert out["status"] == "found"
         assert out["sds_url"] == "https://sds.example.com/h2so4.pdf"
-        # Grade is blanked, not just "whichever row happened to be first" —
-        # the sheet applies to every grade that matched.
-        assert out["product"]["grade"] is None
+        # Grade never appears on the SDS product object at all (D2/2c) — not
+        # blanked to None, simply not a field.
+        assert "grade" not in out["product"]
 
-    def test_multiple_exact_matches_different_sds_still_ambiguous(self):
-        # The rare real case: grades genuinely carry different SDS documents
-        # (e.g. a supplier publishes a separate sheet per purity) — THIS is a
-        # real ambiguity, so still ask which grade.
+    def test_multiple_grades_differing_links_resolves_to_newest(self):
+        # D3: when grades genuinely carry different SDS documents, the newest
+        # https sds_ref wins deterministically — never ambiguous. Grade is not
+        # a real ambiguity for SDS (unlike price/spec).
         rows = [
-            _row(grade="Battery", sds_ref="https://sds.example.com/h2so4-battery.pdf"),
-            _row(grade="Technical", sds_ref="https://sds.example.com/h2so4-technical.pdf"),
+            _row(grade="Battery", sds_ref="https://sds.example.com/h2so4-old.pdf",
+                 updated=datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc)),
+            _row(grade="Technical", sds_ref="https://sds.example.com/h2so4-new.pdf",
+                 updated=datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)),
         ]
         out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
-        assert out["status"] == "ambiguous"
-        assert {c["grade"] for c in out["candidates"]} == {"Battery", "Technical"}
+        assert out["status"] == "found"
+        assert out["sds_url"] == "https://sds.example.com/h2so4-new.pdf"
+        assert out["last_updated"].startswith("2026-06-01")
+        assert "rows" not in out
+        json.dumps(out)
 
-    def test_partial_name_single_match_still_confirms(self):
-        # A fuzzy match never auto-serves — even one hit must be confirmed.
-        out = get_sds(FakeCursor(partial=[_row()]), CID, product_name="acid")
+    def test_differing_links_with_null_updated_at_never_raises(self):
+        # NULLS LAST (D3): a row with no updated_at can never win over a dated
+        # row, and comparing two rows must never raise even when one is null.
+        # (`_row()`'s `updated or default` can't itself produce a real None, so
+        # this row is built directly in _PRODUCT_COLS order.)
+        null_row = ("Sulphuric Acid", "7664-93-9", "Battery", "35kg can",
+                    "https://sds.example.com/h2so4-null.pdf", None)
+        dated_row = _row(grade="Technical", sds_ref="https://sds.example.com/h2so4-dated.pdf",
+                          updated=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc))
+        out = get_sds(FakeCursor(cas=[null_row, dated_row]), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+        assert out["sds_url"] == "https://sds.example.com/h2so4-dated.pdf"
+        json.dumps(out)
+
+    def test_all_rows_non_https_is_no_sheet_on_file(self):
+        rows = [
+            _row(grade="Battery", sds_ref=None),
+            _row(grade="Technical", sds_ref="http://insecure/h2so4.pdf"),
+        ]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "no_sheet_on_file"
+        assert "sds_url" not in out
+
+    def test_mix_of_https_and_non_https_resolves_among_https_only(self):
+        # A grade with no/insecure sheet must never win just by being "newer" —
+        # the newest pick is scoped to the https-servable rows only.
+        rows = [
+            _row(grade="Battery", sds_ref=None,
+                 updated=datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)),
+            _row(grade="Technical", sds_ref="http://insecure/h2so4.pdf",
+                 updated=datetime.datetime(2026, 5, 1, tzinfo=datetime.timezone.utc)),
+            _row(grade="Industrial", sds_ref="https://sds.example.com/h2so4-good.pdf",
+                 updated=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)),
+        ]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+        assert out["sds_url"] == "https://sds.example.com/h2so4-good.pdf"
+
+    def test_name_grouped_case_insensitively_and_trimmed(self):
+        # D4: product-name grouping is case-insensitive and trimmed — casing/
+        # whitespace variants of the same name are ONE product, never ambiguous.
+        rows = [
+            _row(name="Sulphuric Acid", grade="LR"),
+            _row(name=" SULPHURIC ACID ", grade="AR"),
+            _row(name="sulphuric acid", grade="HPLC"),
+        ]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+
+    def test_cas_shared_across_distinct_product_names_is_ambiguous(self):
+        # Real Expresolv-shaped data: one CAS number spans several DISTINCT
+        # product names — this is a genuine product-level ambiguity, unlike a
+        # CAS shared only across grades of the SAME name.
+        rows = [_row(name="Hydrochloric Acid"), _row(name="Muriatic Acid")]
+        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7647-01-0")
         assert out["status"] == "ambiguous"
-        assert len(out["candidates"]) == 1
+        assert {c["name"] for c in out["candidates"]} == {"Hydrochloric Acid", "Muriatic Acid"}
+        # Candidates are name/cas only — no grade (SDS never disambiguates by grade).
+        assert all(set(c.keys()) == {"name", "cas_number"} for c in out["candidates"])
+        assert "rows" not in out
+        json.dumps(out)
+
+    def test_partial_name_single_distinct_product_resolves_directly(self):
+        # Per D2/2a, ambiguity is judged by DISTINCT PRODUCT NAME, not by
+        # match stage — a fuzzy substring that only ever hits ONE product name
+        # (even across several of its grade rows) has nothing left to confirm.
+        rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_sds(FakeCursor(partial=rows), CID, product_name="acid")
+        assert out["status"] == "found"
 
     def test_partial_name_multiple_matches(self):
         rows = [_row(name="Hydrochloric Acid"), _row(name="Nitric Acid")]
         out = get_sds(FakeCursor(partial=rows), CID, product_name="acid")
         assert out["status"] == "ambiguous"
         assert len(out["candidates"]) == 2
+        assert "rows" not in out
+        json.dumps(out)
 
     def test_cas_falls_back_to_name_when_cas_misses(self):
         # CAS given but no CAS row; an exact-name row should still resolve.
@@ -180,66 +253,32 @@ class TestGetSdsResolution:
         assert out["status"] == "found"
 
 
-class TestGetSdsGradeDisambiguation:
-    """Regression: a name/CAS with several grades must resolve once a grade is
-    given — previously get_sds had no grade slot and looped on 'ambiguous'."""
+class TestGetSdsGradeIsIgnored:
+    """D2/D9: SDS is per product, never per grade — a `grade` argument (from an
+    old client/model) must never change resolution or appear in the response.
+    (get_product_spec's OWN grade narrowing is unaffected — see TestGetProductSpec.)"""
 
-    def test_grade_narrows_multiple_matches_to_one(self):
+    def test_grade_argument_does_not_change_result(self):
         rows = [_row(grade="LR"), _row(grade="AR"), _row(grade="HPLC")]
-        out = get_sds(FakeCursor(name_exact=rows), CID,
-                      product_name="Acetone", grade="AR")
-        assert out["status"] == "found"
-        assert out["product"]["grade"] == "AR"
+        without_grade = get_sds(FakeCursor(name_exact=rows), CID, product_name="Acetone")
+        with_grade = get_sds(FakeCursor(name_exact=rows), CID,
+                             product_name="Acetone", grade="AR")
+        assert without_grade == with_grade
+        assert with_grade["status"] == "found"
+        assert "grade" not in with_grade["product"]
 
-    def test_grade_is_case_insensitive(self):
-        rows = [_row(grade="LR"), _row(grade="AR")]
-        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="ar")
-        assert out["status"] == "found"
-        assert out["product"]["grade"] == "AR"
-
-    def test_unstocked_grade_but_same_sds_resolves_directly(self):
-        # Visitor asked for a grade we don't stock (HPLC), but LR/AR share one
-        # sheet — the requested grade doesn't matter, so just serve it rather
-        # than bouncing them on a grade name that was never the real question.
-        rows = [_row(grade="LR"), _row(grade="AR")]
-        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="HPLC")
-        assert out["status"] == "found"
-
-    def test_unstocked_grade_with_different_sds_lists_available_grades(self):
+    def test_grade_argument_ignored_even_with_differing_links(self):
+        # Previously an unstocked/mismatched grade could change the outcome
+        # (ambiguous vs. found) — now grade never affects it at all.
         rows = [
-            _row(grade="LR", sds_ref="https://sds.example.com/h2so4-lr.pdf"),
-            _row(grade="AR", sds_ref="https://sds.example.com/h2so4-ar.pdf"),
+            _row(grade="LR", sds_ref="https://sds.example.com/h2so4-lr.pdf",
+                 updated=datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc)),
+            _row(grade="AR", sds_ref="https://sds.example.com/h2so4-ar.pdf",
+                 updated=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)),
         ]
         out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9", grade="HPLC")
-        assert out["status"] == "ambiguous"
-        assert "HPLC" in out["message"]
-        assert "LR" in out["message"] and "AR" in out["message"]
-
-    def test_no_grade_same_sds_resolves_directly(self):
-        rows = [_row(grade="LR"), _row(grade="AR")]
-        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
         assert out["status"] == "found"
-
-    def test_no_grade_different_sds_still_ambiguous(self):
-        rows = [
-            _row(grade="LR", sds_ref="https://sds.example.com/h2so4-lr.pdf"),
-            _row(grade="AR", sds_ref="https://sds.example.com/h2so4-ar.pdf"),
-        ]
-        out = get_sds(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
-        assert out["status"] == "ambiguous"
-
-    def test_grade_narrows_partial_name_match(self):
-        rows = [_row(name="Acetone", grade="LR"), _row(name="Acetone", grade="AR")]
-        out = get_sds(FakeCursor(partial=rows), CID, product_name="aceto", grade="AR")
-        assert out["status"] == "found"
-        assert out["product"]["grade"] == "AR"
-
-    def test_grade_threaded_through_product_spec(self):
-        rows = [_row(grade="LR"), _row(grade="AR")]
-        out = get_product_spec(FakeCursor(cas=rows), CID,
-                               cas_number="7664-93-9", grade="LR")
-        assert out["status"] == "found"
-        assert out["product"]["grade"] == "LR"
+        assert out["sds_url"] == "https://sds.example.com/h2so4-ar.pdf"
 
 
 class TestGetSdsTenantScoping:
@@ -306,6 +345,10 @@ class TestGetProductSpec:
         out = get_product_spec(FakeCursor(cas=rows), CID, cas_number="7664-93-9")
         assert out["status"] == "ambiguous"
         assert {c["grade"] for c in out["candidates"]} == {"Battery", "Technical"}
+        # Regression: the original crash — `rows` (raw DB tuples incl. a
+        # datetime) must never leak into what the model/loop serializes.
+        assert "rows" not in out
+        json.dumps(out)
 
     def test_same_product_many_grades_flattens_to_grade_chips(self):
         # One product in several grades → enrich with a grade list for chips.
@@ -325,12 +368,24 @@ class TestGetProductSpec:
         assert "grades" not in out          # never a mislabeled grade chip list
         assert "product" not in out          # never a single wrong product label
         assert out["products"] == ["Sulphuric Acid", "Rust Remover"]
+        assert "rows" not in out
+        json.dumps(out)
 
     def test_partial_name_single_match_still_confirms(self):
         # Same discipline as get_sds: a fuzzy match never auto-serves a spec.
         out = get_product_spec(FakeCursor(partial=[_row()]), CID, product_name="acid")
         assert out["status"] == "ambiguous"
         assert len(out["candidates"]) == 1
+
+    def test_grade_narrows_multiple_matches_to_one(self):
+        # Unlike get_sds (D2/D9), get_product_spec is COMMERCIAL data and grade
+        # genuinely narrows the shared `_resolve_product` resolution — left
+        # byte-for-byte unchanged by the Phase 2 SDS rework (D8).
+        rows = [_row(grade="LR"), _row(grade="AR")]
+        out = get_product_spec(FakeCursor(cas=rows), CID,
+                               cas_number="7664-93-9", grade="LR")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] == "LR"
 
     def test_every_query_is_company_scoped(self):
         cur = FakeCursor(cas=[], name_exact=[], partial=[])
@@ -943,6 +998,24 @@ class TestRunAgentLoop:
         model = FakeModel([FakeResp(content="")])
         out = _run(run_agent_loop(model, [], lambda n, a: {}))
         assert out == AGENT_FALLBACK_TEXT
+
+    def test_raw_datetime_in_observation_never_crashes_the_loop(self):
+        # Defense in depth (Phase 1b): no tool should ever be able to take down
+        # the whole turn just because an observation carries an unserializable
+        # value. Any future tool bug (a stray datetime/Decimal) degrades to a
+        # normal next round instead of raising out of json.dumps.
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}]),
+            FakeResp(content="Here you go."),
+        ])
+        unserializable = {
+            "status": "ambiguous",
+            "updated_at": datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc),
+        }
+        out = _run(run_agent_loop(model, [], lambda n, a: unserializable))
+        assert out == "Here you go."
+        observation = json.loads(model.invocations[1][-1].content)
+        assert observation["updated_at"].startswith("2026-01-02")
 
     # ── Phase 6 metering: usage_out accumulation ──────────────────────────────
     def test_usage_out_accumulates_across_rounds(self):

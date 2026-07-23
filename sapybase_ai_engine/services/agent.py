@@ -215,6 +215,138 @@ def _resolve_product(cursor, company_id, cas: str, name: str, grade: str = "") -
     return {"row": rows[0]}
 
 
+# A partial-name match can pull in far more rows than the picker will ever need
+# (Phase 3's `/api/widget/sds-products` is the exhaustive, capped list) — this
+# just needs enough rows to reliably enumerate the DISTINCT product names for a
+# conversational "which product?" confirmation.
+_SDS_PARTIAL_LIMIT = 50
+
+
+def _resolve_sds(cursor, company_id, cas: str, name: str) -> Dict[str, Any]:
+    """Resolve a CAS/name to ONE product's SDS, grade-agnostic (D2, D4, D9).
+
+    A SEPARATE resolver from ``_resolve_product`` (D8) — that shared path is
+    what ``get_product_spec`` depends on for grade-level commercial data and is
+    left byte-for-byte unchanged. An SDS is tied to the PRODUCT, not the grade,
+    so this resolver never takes or narrows on a grade at all: every matched
+    row is grouped by trimmed, case-insensitive product NAME (D4), and
+    ambiguity is judged by DISTINCT NAME count, not row count — a single CAS
+    shared across several distinct product names (real Expresolv data: one CAS
+    -> 6 names) must still ask which product, even though the CAS matched
+    unambiguously.
+
+    Resolution order mirrors ``_resolve_product``: exact CAS -> exact name ->
+    partial name (never auto-served, only ever offered as candidates).
+
+    Returns one of:
+      - ``{"status": "found", "rows": [...]}`` — exactly one product name
+        matched; ``rows`` are every row for THAT product (all its grades), for
+        the caller to pick the newest https sheet from (see
+        ``_newest_https_row``). This ``rows`` key is internal, same discipline
+        as ``_resolve_product`` — callers must strip it before returning.
+      - ``{"status": "not_found", "message": ...}``
+      - ``{"status": "missing_identifier", "message": ...}``
+      - ``{"status": "ambiguous", "candidates": [...], "message": ...}`` — >1
+        distinct product name matched; candidates are name/cas ONLY (no grade,
+        no rows) since the ask is "which product", never "which grade".
+
+    SECURITY: every query is company_id-scoped, identical discipline to
+    ``_resolve_product``.
+    """
+    if not cas and not name:
+        return {
+            "status": "missing_identifier",
+            "message": "Ask the visitor for the product name or, ideally, its CAS number.",
+        }
+
+    rows = []
+
+    if cas:
+        cursor.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE company_id = %s AND cas_number = %s",
+            (company_id, cas),
+        )
+        rows = cursor.fetchall() or []
+
+    if not rows and name:
+        cursor.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE company_id = %s AND lower(name) = lower(%s)",
+            (company_id, name),
+        )
+        rows = cursor.fetchall() or []
+
+    if not rows and name:
+        cursor.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE company_id = %s AND name ILIKE %s "
+            f"LIMIT {_SDS_PARTIAL_LIMIT}",
+            (company_id, f"%{name}%"),
+        )
+        rows = cursor.fetchall() or []
+
+    if not rows:
+        return {
+            "status": "not_found",
+            "message": (
+                "No matching product in the catalog. Tell the visitor you don't "
+                "have it on file and offer to connect them to the team."
+            ),
+        }
+
+    groups: Dict[str, list] = {}
+    order: List[str] = []
+    for r in rows:
+        key = (r[0] or "").strip().lower()
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(r)
+
+    if len(order) > 1:
+        return {
+            "status": "ambiguous",
+            "candidates": [{"name": groups[k][0][0], "cas_number": groups[k][0][1]} for k in order],
+            "message": (
+                "Several distinct products match. Ask the visitor to confirm the "
+                "exact PRODUCT (never the grade — an SDS is per product) before "
+                "sharing anything."
+            ),
+        }
+
+    return {"status": "found", "rows": groups[order[0]]}
+
+
+def _newest_https_row(rows) -> tuple:
+    """Pick the https-sheet row with the greatest ``updated_at`` (D3, NULLS LAST).
+
+    Shared selection logic — Phase 3's picker endpoint reuses this SAME helper
+    so the conversational path and the picker can never disagree on which
+    sheet a product resolves to (plan 3c).
+
+    Never raises on a NULL ``updated_at`` (comparing two ``None`` values would
+    raise ``TypeError``, so nulls are only ever skipped, never compared against
+    each other) — a null-dated row simply loses to any dated row and, absent
+    any dated row, the first https row wins deterministically.
+
+    Returns ``(best_row_or_None, has_conflicting_links)`` — the second value
+    flags when more than one DISTINCT https link exists across the rows (D3
+    data-hygiene signal), independent of which one "won".
+    """
+    https_rows = [r for r in rows if _is_https(r[4])]
+    if not https_rows:
+        return None, False
+
+    best = https_rows[0]
+    for r in https_rows[1:]:
+        updated, best_updated = r[5], best[5]
+        if updated is None:
+            continue
+        if best_updated is None or updated > best_updated:
+            best = r
+
+    distinct_links = {r[4].strip() for r in https_rows}
+    return best, len(distinct_links) > 1
+
+
 def get_sds(
     cursor,
     company_id,
@@ -225,47 +357,45 @@ def get_sds(
 ) -> Dict[str, Any]:
     """Look up a product's real SDS, scoped to ONE tenant. Pure data, no LLM.
 
-    Resolution is delegated to ``_resolve_product`` (CAS exact -> name exact ->
-    partial = confirm), with ``grade`` narrowing the common many-grades-per-name
-    case to one sheet. Returns a status dict the model reads as its observation:
-      found | no_sheet_on_file | ambiguous | not_found | missing_identifier
+    An SDS is tied to the PRODUCT, not the grade (D2). ``grade`` is accepted
+    only for backward compatibility with older calls and is ALWAYS ignored
+    (D9) — resolution uses the SEPARATE grade-agnostic ``_resolve_sds`` (D8),
+    never the shared ``_resolve_product`` that ``get_product_spec`` depends
+    on. When a product's grades carry the same sheet, or differing sheets, the
+    newest https ``sds_ref`` wins deterministically (D3) — there is nothing to
+    ask. Ambiguity only exists at the PRODUCT level: several DISTINCT products
+    matched (a fuzzy name, or one CAS shared across names) -> ask which
+    product, never which grade. Returns a status dict the model reads as its
+    observation: found | no_sheet_on_file | ambiguous | not_found |
+    missing_identifier
 
-    SECURITY: resolution is tenant-scoped. A product with a missing/non-https
-    ``sds_ref`` is reported as ``no_sheet_on_file`` (we have the product but no
-    servable sheet) so the agent escalates instead of handing out a broken or
-    insecure link.
+    SECURITY: resolution is tenant-scoped (via ``_resolve_sds``). A product
+    with no https sheet on any of its rows is reported as ``no_sheet_on_file``
+    (we have the product but no servable sheet) so the agent escalates
+    instead of handing out a broken or insecure link.
     """
-    resolved = _resolve_product(
-        cursor, company_id, (cas_number or "").strip(), (product_name or "").strip(),
-        (grade or "").strip(),
-    )
+    resolved = _resolve_sds(cursor, company_id, (cas_number or "").strip(), (product_name or "").strip())
 
-    if resolved.get("status") == "ambiguous":
-        # A Safety Data Sheet is tied to the PRODUCT (its CAS number), not to
-        # grade or pack size — unlike price or spec, which genuinely vary per
-        # grade. So "several grades match" is only a REAL ambiguity for this
-        # tool if those grades actually carry different SDS documents. `rows`
-        # (added alongside `candidates` for exactly this) lets us check: if
-        # every matched row shares the same https sds_ref, there's nothing to
-        # ask — serve it directly instead of stopping to ask which grade.
-        amb_rows = resolved.get("rows") or []
-        shared_refs = {r[4].strip() for r in amb_rows if _is_https(r[4])}
-        if len(shared_refs) == 1:
-            base = amb_rows[0]
-            # Blank the grade — this sheet applies across every grade that
-            # matched, so naming just the first one would misleadingly imply
-            # it's grade-specific.
-            resolved = {"row": (base[0], base[1], None, base[3], base[4], base[5])}
-
-    if "row" not in resolved:
+    if resolved.get("status") != "found":
+        resolved.pop("rows", None)
         return resolved
 
-    name_, cas_, grade_, packaging_, sds_ref_, updated_ = resolved["row"]
+    rows = resolved["rows"]
+    name_, cas_ = rows[0][0], rows[0][1]
+    best, has_conflicting_links = _newest_https_row(rows)
 
-    if not _is_https(sds_ref_):
+    if has_conflicting_links:
+        # Data-hygiene signal only (D3) — side-effect-free for the visitor.
+        logger.warning(
+            "get_sds: product %r (cas=%r) has multiple distinct https SDS links "
+            "across its grades; serving the newest, owner should reconcile.",
+            name_, cas_,
+        )
+
+    if best is None:
         return {
             "status": "no_sheet_on_file",
-            "product": {"name": name_, "cas_number": cas_, "grade": grade_},
+            "product": {"name": name_, "cas_number": cas_},
             "message": (
                 "We have this product but no SDS is on file. Tell the visitor you "
                 "don't have the sheet and offer to connect them to the team. Do NOT "
@@ -273,14 +403,11 @@ def get_sds(
             ),
         }
 
+    sds_ref_, updated_ = best[4], best[5]
+
     return {
         "status": "found",
-        "product": {
-            "name": name_,
-            "cas_number": cas_,
-            "grade": grade_,
-            "packaging": packaging_,
-        },
+        "product": {"name": name_, "cas_number": cas_},
         "sds_url": sds_ref_.strip(),
         "last_updated": (
             updated_.isoformat() if hasattr(updated_, "isoformat")
@@ -345,6 +472,9 @@ def get_product_spec(
                 # by product, not grade. No grade chips are emitted; the agent asks
                 # which product from the ``candidates``/``products`` in the message.
                 resolved["products"] = [c.get("name") for c in cands if c.get("name")]
+        # `rows` is an internal helper field (raw DB tuples, incl. a datetime) —
+        # never let it reach the model's observation. See _resolve_product docstring.
+        resolved.pop("rows", None)
         return resolved
 
     name_, cas_, grade_, packaging_, sds_ref_, _updated_ = resolved["row"]
@@ -961,7 +1091,11 @@ def build_agent_directive(pack) -> str:
         "handling, storage, dosage, first-aid, or regulatory status you MUST call "
         "the get_sds tool and answer ONLY from the document it returns. NEVER "
         "generate, paraphrase, estimate, or infer such information from your own "
-        "knowledge or from the knowledge-base text. BEFORE calling get_sds, check "
+        "knowledge or from the knowledge-base text. An SDS is per PRODUCT, not per "
+        "grade — never ask the visitor for a grade before calling get_sds, and "
+        "never pass one (it is ignored). If get_sds returns ambiguous, it means "
+        "several DISTINCT products matched — ask which PRODUCT, never which grade. "
+        "BEFORE calling get_sds, check "
         "the conversation for a `[State: SDS provided for ...]` note for the SAME "
         "product AND grade — if one exists, point back to it (the Open SDS button "
         "shown above) instead of calling get_sds again for an unchanged repeat ask. "
@@ -998,13 +1132,16 @@ def build_agent_directive(pack) -> str:
         "calling it, just tell them to complete the form; never quote a price (use "
         "request_quote), never give safety info (use get_sds), and never promise a "
         "delivery date or quantity limit.\n\n"
-        "GRADE DISAMBIGUATION: many products share one name/CAS across several "
-        "grades (e.g. LR, AR, HPLC), each with its OWN sheet. When a tool returns "
-        "ambiguous, ask which grade — then call the tool AGAIN passing that grade "
-        "in the grade argument. Once the visitor names a grade (e.g. 'AR'), you "
-        "MUST re-call the tool with grade set; do not re-ask the same question. If "
-        "the visitor wants several grades ('both', 'AR and LR', 'all of them'), "
-        "call the tool ONCE PER GRADE and present each result.\n\n"
+        "GRADE DISAMBIGUATION (get_product_spec, request_quote, request_sample "
+        "ONLY — NEVER get_sds, which has no grade concept): many products share "
+        "one name/CAS across several grades (e.g. LR, AR, HPLC). When one of "
+        "these tools returns ambiguous, ask which grade — then call the tool "
+        "AGAIN passing that grade in the grade argument. Once the visitor names a "
+        "grade (e.g. 'AR'), you MUST re-call the tool with grade set; do not "
+        "re-ask the same question. If the visitor wants several grades ('both', "
+        "'AR and LR', 'all of them'), call the tool ONCE PER GRADE and present "
+        "each result. For get_sds, ambiguous always means several DISTINCT "
+        "products matched — ask which PRODUCT, not which grade.\n\n"
         "If a tool returns no servable result (statuses not_found or "
         "no_sheet_on_file), tell the visitor you don't have it on file and offer "
         "to connect them to the team. If it is ambiguous, ask the visitor to "
@@ -1182,7 +1319,7 @@ async def stream_agent_loop(
                 }
             convo.append(
                 ToolMessage(
-                    content=json.dumps(observation),
+                    content=json.dumps(observation, default=str),
                     tool_call_id=call.get("id") or "",
                 )
             )

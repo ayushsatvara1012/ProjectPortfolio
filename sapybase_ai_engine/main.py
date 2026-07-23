@@ -1573,6 +1573,10 @@ from packs import (
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
 from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
+# Phase 3 (get-sds-crash-fix-plan): the SDS picker endpoint reuses the EXACT SAME
+# newest-https selection logic as the conversational get_sds tool (plan 3c), so
+# the two paths can never disagree on which sheet a product resolves to.
+from services.agent import _PRODUCT_COLS as _SDS_PRODUCT_COLS, _newest_https_row as _newest_https_row
 from services import catalog_import as catalog_import
 from services import session_store  # Phase 1b — persistent session memory
 from services import sales_funnel    # Phase 2 — funnel stage + next-best-action
@@ -1605,6 +1609,13 @@ AGENT_MAX_OUTPUT_TOKENS = 2048
 SAMPLE_HONEYPOT_FIELD = "website"          # hidden field; only bots fill it in
 SAMPLE_DAILY_CAP_PER_COMPANY = 50          # per-company/day submit backstop
 SAMPLE_DEDUP_WINDOW_S = 600                # (contact_email, product) dedup window
+
+# Phase 3 (get-sds-crash-fix-plan) — the SDS picker endpoint. The row cap is
+# generous (grades are individual rows) so grouping into distinct products
+# isn't truncated before the real product cap is reached; the product cap is
+# the actual "very large catalog stays responsive" bound the plan asks for.
+SDS_PICKER_ROW_LIMIT = 5000
+SDS_PICKER_PRODUCT_CAP = 500
 
 
 def verify_api_key_and_origin(request: Request, api_key: str = Security(api_key_header)):
@@ -5787,6 +5798,83 @@ async def submit_sample_request(
     )
 
     return {"status": "ok", "confirmation": _sample_confirmation(fields)}
+
+
+@app.get("/api/widget/sds-products")
+@limiter.limit("30/minute", key_func=get_remote_address)  # per-IP burst guard
+@limiter.limit("60/minute")                                 # per-API-key ceiling
+def list_sds_products(
+    request: Request,
+    q: Optional[str] = None,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Deterministic product list for the widget's Get-SDS picker (Phase 3, D4/D6).
+
+    One row per PRODUCT, grouped by trimmed/case-insensitive name (D4) — never
+    CAS, since one CAS can legitimately span several distinct product names
+    (real Expresolv data). Each product's sheet is picked by the SAME
+    ``_newest_https_row`` helper the conversational ``get_sds`` tool uses (3c),
+    so the picker and the chat path can never disagree on which sheet wins.
+    Products with no servable https sheet are omitted (D6) — every pick from
+    this list is guaranteed to succeed. Optional ``?q=`` filters server-side by
+    name or CAS; the row fetch is capped generously (grades are individual
+    rows) and the final distinct-product list is capped to keep a very large
+    catalog responsive.
+
+    A non-chemical bot has no get_sds tool, so this 404s for them — same
+    convention as /api/widget/sample-request; the generic path is untouched.
+    """
+    pack = load_pack(company.get("vertical"))
+    if not pack or "get_sds" not in pack.tool_names():
+        raise HTTPException(status_code=404, detail="SDS lookup is not enabled for this bot.")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        term = (q or "").strip()
+        if term:
+            cursor.execute(
+                f"SELECT {_SDS_PRODUCT_COLS} FROM products WHERE company_id = %s "
+                f"AND (name ILIKE %s OR cas_number ILIKE %s) "
+                f"ORDER BY name LIMIT {SDS_PICKER_ROW_LIMIT}",
+                (company["id"], f"%{term}%", f"%{term}%"),
+            )
+        else:
+            cursor.execute(
+                f"SELECT {_SDS_PRODUCT_COLS} FROM products WHERE company_id = %s "
+                f"ORDER BY name LIMIT {SDS_PICKER_ROW_LIMIT}",
+                (company["id"],),
+            )
+        rows = cursor.fetchall() or []
+    finally:
+        release_db_connection(conn)
+
+    groups = {}
+    order = []
+    for r in rows:
+        key = (r[0] or "").strip().lower()
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(r)
+
+    products = []
+    for key in order:
+        best, _has_conflicting_links = _newest_https_row(groups[key])
+        if best is None:
+            continue  # D6 — no servable sheet on any row, hide from the picker
+        name_, cas_, _grade, _packaging, sds_ref_, updated_ = best
+        products.append({
+            "name": groups[key][0][0],
+            "cas_number": groups[key][0][1],
+            "sds_url": sds_ref_.strip(),
+            "updated_at": (
+                updated_.isoformat() if hasattr(updated_, "isoformat")
+                else (str(updated_) if updated_ else None)
+            ),
+        })
+    products.sort(key=lambda p: p["name"].lower())
+    return {"products": products[:SDS_PICKER_PRODUCT_CAP]}
 
 
 @app.get("/api/leads/{company_id}/pipeline")
