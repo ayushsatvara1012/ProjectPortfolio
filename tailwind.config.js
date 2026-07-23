@@ -14,6 +14,7 @@ export default {
         sans: ['var(--font-google)', 'system-ui', 'sans-serif'],
         display: ['var(--font-google)', 'system-ui', 'sans-serif'],
         google: ['var(--font-google)', 'system-ui', 'sans-serif'],
+        open: ['var(--font-open)', 'sans-serif'],
       },
       maxWidth: {
         '8xl': '88rem',

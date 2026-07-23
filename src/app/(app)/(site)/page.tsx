@@ -1,16 +1,17 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/src/seo/buildMetadata';
-import { PRODUCT } from '@/src/lib/brand';
 
-import HeroSection from '@/src/components/marketing/HeroSection';
-// import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
-import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
-
-import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection';
-// import EngineSection from '@/src/components/marketing/EngineSection'; // hidden for now — re-add the import together with the JSX below
-import Testimonials from '@/src/components/marketing/Testimonials';
-import PricingPreview from '@/src/components/marketing/PricingPreview';
+// Homepage redesign ("warm editorial") — see docs/homepage-redesign-plan.md.
+// The prior marketing sections are kept on disk (unused) for easy revert.
+import HomeHero from '@/src/components/marketing/home/HomeHero';
+import FeatureGrid from '@/src/components/marketing/home/FeatureGrid';
+import ConsoleShowcase from '@/src/components/marketing/home/ConsoleShowcase';
+import InstallStrip from '@/src/components/marketing/home/InstallStrip';
+import IntegrationsRow from '@/src/components/marketing/home/IntegrationsRow';
+import HomeMetrics from '@/src/components/marketing/home/HomeMetrics';
+import HomePricing from '@/src/components/marketing/home/HomePricing';
+import FinalCTA from '@/src/components/marketing/home/FinalCTA';
 
 export const metadata: Metadata = buildMetadata('home');
 
@@ -112,10 +113,6 @@ const faqSchema = {
 export default function HomePage() {
   return (
     <>
-      {/* Prioritize the hero logo (LCP candidate): a high-priority preload so the
-          browser fetches it before hydration work. React 19 hoists this <link>
-          into <head>. Pairs with fetchPriority="high" on the <img> itself. */}
-      <link rel="preload" as="image" href={PRODUCT.logo} fetchPriority="high" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
@@ -125,14 +122,14 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       <main className="relative overflow-x-clip">
-        <HeroSection />
-        {/* <SocialProofBar /> */}
-        <WhatWeSolve />
-        <ScrollTravelSection />
-        {/* <EngineSection /> */}
-        {/* HowItWorks moved to the dedicated /vaayu product page */}
-        <Testimonials />
-        <PricingPreview />
+        <HomeHero />
+        <FeatureGrid />
+        <ConsoleShowcase />
+        <InstallStrip />
+        <IntegrationsRow />
+        <HomeMetrics />
+        <HomePricing />
+        <FinalCTA />
       </main>
     </>
   );

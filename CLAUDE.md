@@ -1,4 +1,4 @@
-# Sapybase / Vaayu - Project Portfolio
+# Sapybase / Vaayu — Project_Portfolio
 
 ## Decision-Making Philosophy
 
