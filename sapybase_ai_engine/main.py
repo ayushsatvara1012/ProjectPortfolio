@@ -3607,6 +3607,10 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             _captured["sds"] = {
                                 "url": obs["sds_url"],
                                 "product": (obs.get("product") or {}).get("name"),
+                                # Phase 5 — the picker's SDS card also shows CAS + updated
+                                # date, so the conversational path carries the same fields.
+                                "cas_number": (obs.get("product") or {}).get("cas_number"),
+                                "updated_at": obs.get("last_updated"),
                                 "label": "Open SDS",
                             }
                         # When request_quote prices a SKU (or logs a price-on-request),
@@ -9273,6 +9277,10 @@ def get_config(
         )
         if pack:
             safe_company["hub_cards"] = pack.hub_cards_payload()
+            # get-sds-crash-fix-plan Phase 4 — config-registry driven (never
+            # `if vertical == "chemical"`): the widget's Get-SDS picker only
+            # renders for a pack that actually declares the get_sds tool.
+            safe_company["features"] = {"sds_picker": "get_sds" in pack.tool_names()}
             # Phase 4b/5 — the structured sample form: the owner's per-bot override
             # if they customised it, otherwise the pack default.
             safe_company["sample_form"] = effective_sample_form(pack, _overrides)
@@ -9314,6 +9322,7 @@ def get_config(
             safe_company["hub_cards"] = []
             safe_company["products"] = []
             safe_company["sample_form"] = []
+            safe_company["features"] = {"sds_picker": False}
 
         return safe_company
     except Exception as e:

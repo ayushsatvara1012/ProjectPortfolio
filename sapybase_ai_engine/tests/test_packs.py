@@ -146,7 +146,10 @@ class TestQualificationSlots:
         assert {"sds", "spec", "ask"} <= ids
         live_tools = set(CHEMICAL_PACK.tool_names())
         card_by_id = {c.id: c for c in cards}
-        assert card_by_id["sds"].action == "tool" and "get_sds" in live_tools
+        # D10: "sds" is repointed to the deterministic picker, but keeps its
+        # tool-card fields as the fallback if features.sds_picker is ever false.
+        assert card_by_id["sds"].action == "sds_picker" and "get_sds" in live_tools
+        assert card_by_id["sds"].input_source == "products"
         assert card_by_id["spec"].action == "tool" and "get_product_spec" in live_tools
         assert card_by_id["quote"].action == "tool" and "request_quote" in live_tools
         # Phase 4b: sample is a FORM card (opens the structured form), not slot-filling.

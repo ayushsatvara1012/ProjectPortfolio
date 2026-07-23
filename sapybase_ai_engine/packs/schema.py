@@ -29,6 +29,14 @@ class HubCard:
       - ``"form"`` opens a structured multi-field intake form (Phase 4b) named by
         ``form_id`` — e.g. the sample request form. Submitting it posts directly to
         a deterministic endpoint (no LLM), so the flow can't loop or time out.
+      - ``"sds_picker"`` (get-sds-crash-fix-plan Phase 5, D10) opens the
+        deterministic Get-SDS product picker instead of a conversational
+        mini-form — the widget fetches the product list itself from
+        ``/api/widget/sds-products``. ``input_label``/``prompt_template``/
+        ``input_source`` are kept on the card as a fallback: if
+        ``features.sds_picker`` is ever false for a company, the widget
+        degrades this card to the old ``"tool"`` mini-form behaviour instead
+        of breaking.
 
     Cards are *config*: the widget renders whatever the pack supplies and never
     hardcodes a vertical. A no-pack (``vertical=NULL``) company has no cards, so
@@ -38,7 +46,7 @@ class HubCard:
     id: str
     label: str
     icon: str                       # Tabler outline icon name, e.g. "file-certificate"
-    action: str = "tool"            # "tool" | "chat" | "form"
+    action: str = "tool"            # "tool" | "chat" | "form" | "sds_picker"
     subtitle: str = ""
     input_label: str = ""           # mini-form placeholder (action="tool")
     prompt_template: str = ""       # message sent on submit; "{value}" is substituted

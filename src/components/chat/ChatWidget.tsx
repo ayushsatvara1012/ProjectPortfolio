@@ -503,7 +503,7 @@ type Message = {
   visitorEmail?: string;
   redirectUrl?: string;
   bookingUrl?: string;
-  sds?: { url: string; product?: string; label?: string };
+  sds?: { url: string; product?: string; cas_number?: string; updated_at?: string; label?: string };
   quote?: {
     status: 'quoted' | 'price_on_request';
     product?: string; grade?: string; pack_size?: string; quantity?: number;
@@ -539,13 +539,22 @@ type HubCard = {
   id: string;
   label: string;
   icon: string;
-  action: 'tool' | 'chat' | 'form';   // "form" opens a structured intake form
+  // "form" opens a structured intake form; "sds_picker" (get-sds-crash-fix-plan
+  // Phase 5, D10) opens the deterministic Get-SDS product picker instead of the
+  // conversational mini-form — falls back to "tool" behavior if
+  // features.sds_picker is false.
+  action: 'tool' | 'chat' | 'form' | 'sds_picker';
   subtitle?: string;
   input_label?: string;
   prompt_template?: string;
   input_source?: string;            // "products" => searchable catalog picker
   form_id?: string;                 // which form to open (action="form")
 };
+
+// A servable SDS product from GET /api/widget/sds-products (Phase 3): one row
+// per product, already grouped and pointed at its newest https sheet — never
+// the model's own guess. Powers the Get-SDS picker (Phase 5).
+type SdsProduct = { name: string; cas_number?: string; sds_url: string; updated_at?: string };
 
 // One field in a pack-driven structured form (Phase 4b). type "product" renders a
 // catalog picker; "grade" a dropdown derived from the chosen product's grades.
@@ -577,6 +586,9 @@ type ConfigData = {
   products?: ProductOption[];
   sample_form?: FormField[];
   handoff_redirect_url?: string;
+  // get-sds-crash-fix-plan Phase 4 — config-registry-driven gate for the
+  // deterministic Get-SDS picker (never a hardcoded vertical check).
+  features?: { sds_picker?: boolean };
 };
 
 // ── Stream-safe Markdown sanitizer ───────────────────────────────────────────
@@ -1192,6 +1204,129 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
   );
 }
 
+// get-sds-crash-fix-plan Phase 5b — the deterministic Get-SDS product picker.
+// A search box + a list sourced from GET /api/widget/sds-products (never the
+// model); loading, empty, and error (retry) states are first-class here since
+// this panel replaces the whole chat body while open.
+function SdsPicker({ products, loading, searching, error, query, onQueryChange, onSelect, onRetry, onCancel }: {
+  products: SdsProduct[];
+  loading: boolean;
+  searching: boolean;
+  error: string | null;
+  query: string;
+  onQueryChange: (q: string) => void;
+  onSelect: (p: SdsProduct) => void;
+  onRetry: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
+        <button type="button" onClick={onCancel} aria-label="Back"
+          className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
+          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+        </button>
+        <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100">Get SDS</span>
+      </div>
+
+      <div className="px-3.5 pt-3 shrink-0">
+        <div className="relative flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+          <MIcon name="search" className="text-[16px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
+          <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
+            placeholder="Search products or CAS…" aria-label="Search products"
+            className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
+          {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
+            Loading products…
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <span className="text-[13px] font-google text-red-500">{error}</span>
+            <button type="button" onClick={onRetry}
+              className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              Retry
+            </button>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-center text-slate-400 dark:text-slate-500 text-[13px] font-google px-4">
+            {query.trim() ? 'No matching products with a safety sheet on file.' : 'No products with a safety sheet on file yet.'}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {products.map((p, i) => (
+              <button key={`${p.name}-${p.cas_number || ''}-${i}`} type="button" onClick={() => onSelect(p)}
+                className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <span className="text-[14px] font-google text-slate-800 dark:text-slate-200 truncate">{p.name}</span>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{p.cas_number || ''}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Inline PDF preview for an SDS card (Phase 5c/5d). A host that blocks
+// embedding via X-Frame-Options/CSP is NOT reliably distinguishable from a
+// successful cross-origin load purely from script: both can fire the
+// iframe's `load` event, and cross-origin content is opaque to same-origin
+// JS (no way to inspect what actually rendered) — this is a well-known web
+// platform limitation, not something a heuristic can fully solve. What IS
+// reliably detectable is a load that never happens at all (network failure
+// or a genuinely hanging host), so that is what the timeout guards (D5): if
+// nothing loads within PREVIEW_LOAD_TIMEOUT_MS, collapse to the fallback.
+// Open/Download stay visible below the preview regardless (5c), so a host
+// that blocks embedding silently still leaves the visitor with a working
+// path — just without the explicit "unavailable" message for that specific
+// case.
+const PREVIEW_LOAD_TIMEOUT_MS = 4000;
+
+function SdsPreview({ url, themeColor }: { url: string; themeColor: string }) {
+  const [failed, setFailed] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    setFailed(false);
+    let loaded = false;
+    const el = iframeRef.current;
+    const handleLoad = () => { loaded = true; };
+    el?.addEventListener('load', handleLoad);
+    const timer = window.setTimeout(() => {
+      if (!loaded) setFailed(true);
+    }, PREVIEW_LOAD_TIMEOUT_MS);
+    return () => {
+      window.clearTimeout(timer);
+      el?.removeEventListener('load', handleLoad);
+    };
+  }, [url]);
+
+  if (failed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-6 px-3 text-center bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-700">
+        <span className="text-[12px] font-google text-slate-500 dark:text-slate-400">Preview unavailable — open in a new tab</span>
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-google font-bold text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: themeColor }}>
+          <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-48 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900">
+      <iframe ref={iframeRef} src={url} title="Safety Data Sheet preview" className="w-full h-full"
+        onError={() => setFailed(true)} />
+    </div>
+  );
+}
+
 // ── ChatWidget ────────────────────────────────────────────────────────────────
 
 type ChatWidgetProps = { apiKey?: string; isEmbed?: boolean };
@@ -1317,6 +1452,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             products: Array.isArray(data.products) ? data.products : [],
             sample_form: Array.isArray(data.sample_form) ? data.sample_form : [],
             handoff_redirect_url: data.human_handoff_enabled ? (data.handoff_redirect_url || '') : '',
+            features: (data.features && typeof data.features === 'object') ? data.features : {},
           });
           leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
           // A pack-enabled bot is signalled by `vertical` (most precise) or, as a
@@ -1407,6 +1543,17 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [sampleFormPrefill, setSampleFormPrefill] = useState<Record<string, string>>({});
   const [sampleSubmitting, setSampleSubmitting] = useState(false);
   const [sampleError, setSampleError] = useState<string | null>(null);
+  // get-sds-crash-fix-plan Phase 5 — the deterministic Get-SDS picker, opened
+  // from the repointed "sds" hub card (D10). `sdsAllProducts` is the one-time
+  // fetch of /api/widget/sds-products, cached for the session; `sdsSearchResults`
+  // is a debounced server-side `?q=` search layered on top for large catalogs.
+  const [sdsPickerOpen, setSdsPickerOpen] = useState(false);
+  const [sdsAllProducts, setSdsAllProducts] = useState<SdsProduct[] | null>(null);
+  const [sdsQuery, setSdsQuery] = useState('');
+  const [sdsSearchResults, setSdsSearchResults] = useState<SdsProduct[] | null>(null);
+  const [sdsLoading, setSdsLoading] = useState(false);
+  const [sdsSearching, setSdsSearching] = useState(false);
+  const [sdsError, setSdsError] = useState<string | null>(null);
   // Phase 4 — the "View & share quote" modal opened from a quote card's
   // deterministic button (same pattern as the SDS button: the model never
   // fabricates the link, the widget renders it from the structured payload).
@@ -1646,6 +1793,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       openSampleForm({});
       return;
     }
+    // D10: only take the deterministic-picker path while the config-registry
+    // flag is on; otherwise this card degrades to the "tool" mini-form below.
+    if (card.action === 'sds_picker' && configData.features?.sds_picker) {
+      openSdsPicker();
+      return;
+    }
     setActiveHubCard(card);
     setHubInput('');
   };
@@ -1654,6 +1807,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // optionally prefilled with the product/grade the visitor mentioned in chat.
   const openSampleForm = (prefill: Record<string, string>) => {
     setActiveHubCard(null);
+    setSdsPickerOpen(false);
     setHubView('chat');
     setSampleError(null);
     setSampleFormPrefill(prefill || {});
@@ -1701,6 +1855,89 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     } finally {
       setSampleSubmitting(false);
     }
+  };
+
+  // get-sds-crash-fix-plan Phase 5 — fetch the deterministic SDS product list
+  // once per session (cached in state; the picker never re-fetches on reopen).
+  const loadSdsProducts = async () => {
+    if (!activeApiKey) return;
+    setSdsLoading(true);
+    setSdsError(null);
+    try {
+      const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+      const res = await fetch(`${activeApiUrl}/api/widget/sds-products`, {
+        headers: {
+          'x-api-key': activeApiKey,
+          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+        },
+      });
+      if (!res.ok) { setSdsError('Something went wrong. Please try again.'); return; }
+      const data = await res.json().catch(() => ({}));
+      setSdsAllProducts(Array.isArray(data.products) ? data.products : []);
+    } catch {
+      setSdsError('Something went wrong. Please try again.');
+    } finally {
+      setSdsLoading(false);
+    }
+  };
+
+  // Open the picker from the repointed "sds" hub card (D10). Mutually
+  // exclusive with the sample form / mini-form panels.
+  const openSdsPicker = () => {
+    setActiveHubCard(null);
+    setSampleFormOpen(false);
+    setHubView('chat');
+    setSdsQuery('');
+    setSdsSearchResults(null);
+    setSdsPickerOpen(true);
+    if (sdsAllProducts === null && !sdsLoading) void loadSdsProducts();
+  };
+
+  // Debounced server-side search (?q=) layered on top of the cached full list —
+  // covers a catalog large enough that a match sits beyond the endpoint's cap,
+  // which a purely client-side filter of the cached page could miss.
+  useEffect(() => {
+    if (!sdsPickerOpen) return;
+    const term = sdsQuery.trim();
+    if (!term) { setSdsSearchResults(null); setSdsSearching(false); return; }
+    if (!activeApiKey) return;
+    setSdsSearching(true);
+    const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+    const handle = window.setTimeout(() => {
+      fetch(`${activeApiUrl}/api/widget/sds-products?q=${encodeURIComponent(term)}`, {
+        headers: {
+          'x-api-key': activeApiKey,
+          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+        },
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => { if (data) setSdsSearchResults(Array.isArray(data.products) ? data.products : []); })
+        .catch(() => { /* keep showing the instant client-filtered list on a search failure */ })
+        .finally(() => setSdsSearching(false));
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [sdsQuery, sdsPickerOpen, activeApiUrl, activeApiKey]);
+
+  // Instant client-side filter of the cached list; superseded by the debounced
+  // server search's results once they land (sdsSearchResults).
+  const sdsDisplayedProducts = useMemo(() => {
+    const term = sdsQuery.trim().toLowerCase();
+    if (!term) return sdsAllProducts ?? [];
+    if (sdsSearchResults) return sdsSearchResults;
+    return (sdsAllProducts ?? []).filter(p =>
+      p.name.toLowerCase().includes(term) || (p.cas_number || '').toLowerCase().includes(term));
+  }, [sdsQuery, sdsAllProducts, sdsSearchResults]);
+
+  // Picking a product is fully deterministic (no LLM round-trip): the sheet
+  // renders via the SAME {sds:...} side-channel the conversational path uses.
+  const selectSdsProduct = (p: SdsProduct) => {
+    setSdsPickerOpen(false);
+    setMessages(prev => [...prev, {
+      role: 'bot',
+      content: `Here's the safety data sheet for ${p.name}.`,
+      sds: { url: p.sds_url, product: p.name, cas_number: p.cas_number, updated_at: p.updated_at, label: 'Open SDS' },
+      ts: Date.now(),
+    }]);
   };
 
   // Thumbs up/down on a bot reply (vertical intelligence plan, Phase 2a).
@@ -2348,7 +2585,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && (
               <div className={`flex-1 relative flex flex-col min-h-0 text-slate-900 dark:text-slate-100 bg-transparent`}>
                 {showJumpPill && (
                   <button
@@ -2445,15 +2682,39 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                     )}
                                   </div>
                                   {msg.role === 'bot' && !msg.isStreaming && msg.sds?.url && (
-                                    // Deterministic SDS action — the agent never pastes
-                                    // the raw link; this button carries the real sheet.
-                                    <a href={msg.sds.url} target="_blank" rel="noopener noreferrer"
-                                      className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-google font-bold text-white transition-opacity hover:opacity-90"
-                                      style={{ backgroundColor: THEME_COLOR }}>
-                                      <MIcon name="description" className="text-[18px] leading-none" />
-                                      {msg.sds.label || 'Open SDS'}
-                                      <MIcon name="arrow_outward" className="text-[16px] leading-none" />
-                                    </a>
+                                    // Deterministic SDS card (Phase 5c/5e) — product, CAS,
+                                    // updated date, and the URL itself all come from the
+                                    // structured payload; the agent never pastes the link.
+                                    // Same card for the conversational path AND the picker.
+                                    <div className="mt-2 w-full max-w-[300px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+                                      <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: THEME_COLOR }}>
+                                        <MIcon name="description" className="text-[16px] leading-none" />
+                                        Safety Data Sheet
+                                      </div>
+                                      <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
+                                        <div className="font-bold">{msg.sds.product}</div>
+                                        {(msg.sds.cas_number || msg.sds.updated_at) && (
+                                          <div className="text-[12px] text-slate-500 dark:text-slate-400">
+                                            {[msg.sds.cas_number, msg.sds.updated_at ? `Updated ${formatRelativeDate(msg.sds.updated_at)}` : null].filter(Boolean).join(' · ')}
+                                          </div>
+                                        )}
+                                        <div className="mt-2">
+                                          <SdsPreview url={msg.sds.url} themeColor={THEME_COLOR} />
+                                        </div>
+                                        <div className="mt-2 flex items-center gap-2">
+                                          <a href={msg.sds.url} target="_blank" rel="noopener noreferrer"
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                            style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}>
+                                            <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
+                                          </a>
+                                          <a href={msg.sds.url} download target="_blank" rel="noopener noreferrer"
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                            style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}>
+                                            <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </div>
                                   )}
                                   {msg.role === 'bot' && !msg.isStreaming && msg.quote && (
                                     // Deterministic quote card — the agent describes but
@@ -2594,6 +2855,20 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               />
             )}
 
+            {view === 'chat' && hubView === 'chat' && sdsPickerOpen && (
+              <SdsPicker
+                products={sdsDisplayedProducts}
+                loading={sdsLoading}
+                searching={sdsSearching}
+                error={sdsError}
+                query={sdsQuery}
+                onQueryChange={setSdsQuery}
+                onSelect={selectSdsProduct}
+                onRetry={loadSdsProducts}
+                onCancel={() => setSdsPickerOpen(false)}
+              />
+            )}
+
             {view === 'chat' && hubView === 'home' && hasHub && (
               // Home screen — 2-col action grid + pill Home/Chat nav + Vaayu footer
               // (chemical Figma). Background is transparent: the gradient is painted
@@ -2642,7 +2917,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && (
               <div className={`shrink-0 z-10 flex flex-col bg-transparent`}>
                 {hasHub && (activeHubCard || (messages.length === 1 && !input.trim())) ? (
                   // Phase 3 — pack-driven hub. Card strip on a fresh conversation;

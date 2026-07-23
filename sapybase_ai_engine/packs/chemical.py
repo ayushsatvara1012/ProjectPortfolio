@@ -168,7 +168,11 @@ _HUB_CARDS = (
         label="Request SDS",
         subtitle="Get the official safety sheet",
         icon="file-certificate",
-        action="tool",
+        # get-sds-crash-fix-plan D10: repointed from the conversational "tool"
+        # mini-form to the deterministic picker. input_label/prompt_template/
+        # input_source stay set as the fallback the widget uses if
+        # features.sds_picker is ever false for this company.
+        action="sds_picker",
         input_label="Search products…",
         prompt_template="I need the Safety Data Sheet for {value}.",
         input_source="products",
