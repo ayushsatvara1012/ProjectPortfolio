@@ -176,6 +176,7 @@ export default function Navbar() {
     { name: 'Home', href: '/#home', id: 'home' },
     { name: 'Product', href: '/vaayu', id: 'product', dropdown: true, dropdownType: 'product' },
     { name: 'Services', href: '/services', id: 'services', dropdown: true, dropdownType: 'services' },
+    { name: 'Architecture', href: '/architecture', id: 'architecture' },
     { name: 'Docs', href: '/docs', id: 'docs' },
     { name: 'Blog', href: '/blog', id: 'blog' },
     { name: 'About', href: '/about', id: 'about' },
