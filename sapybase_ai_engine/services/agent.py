@@ -414,11 +414,11 @@ def get_sds(
             else (str(updated_) if updated_ else None)
         ),
         "message": (
-            "The visitor is automatically shown an 'Open SDS' button that links to "
-            "this official sheet — do NOT paste the URL or a markdown link yourself. "
-            "Just briefly confirm the safety sheet for this product is ready. Do not "
-            "summarise or paraphrase hazard, handling, or storage details — the "
-            "document is the source of truth."
+            "The visitor is automatically shown a dedicated SDS panel with this "
+            "sheet pinned and ready to open — do NOT paste the URL or a markdown "
+            "link yourself. Just briefly confirm the safety sheet for this product "
+            "is ready. Do not summarise or paraphrase hazard, handling, or storage "
+            "details — the document is the source of truth."
         ),
     }
 
@@ -1095,12 +1095,10 @@ def build_agent_directive(pack) -> str:
         "grade — never ask the visitor for a grade before calling get_sds, and "
         "never pass one (it is ignored). If get_sds returns ambiguous, it means "
         "several DISTINCT products matched — ask which PRODUCT, never which grade. "
-        "BEFORE calling get_sds, check "
-        "the conversation for a `[State: SDS provided for ...]` note for the SAME "
-        "product AND grade — if one exists, point back to it (the Open SDS button "
-        "shown above) instead of calling get_sds again for an unchanged repeat ask. "
-        "Call it again if the product or grade differs, or the visitor explicitly "
-        "asks you to recheck.\n\n"
+        "get_sds is a pure, deterministic lookup — call it again freely whenever "
+        "the visitor asks for an SDS, even a repeat ask for the same product; the "
+        "dedicated SDS panel handles showing/re-showing the result, so there is "
+        "no history to check first.\n\n"
         "For a product's COMMERCIAL spec (grade, purity, packaging, available "
         "sizes) call get_product_spec — including when the visitor asks which "
         "grades or pack sizes are available. Do NOT answer grade/pack availability "

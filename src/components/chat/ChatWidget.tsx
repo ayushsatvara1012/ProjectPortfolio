@@ -495,6 +495,10 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// SDS lookups are isolated to the persistent Get-SDS panel (sds-persistent-panel
+// plan) - a result is never attached to a Message; see sdsSelected/pendingSds.
+type SdsResult = { url: string; product?: string; cas_number?: string; updated_at?: string; label?: string };
+
 type Message = {
   role: 'user' | 'bot' | 'lead_capture' | 'handoff_form' | 'handoff_confirmed' | 'lead_confirmed';
   content?: string;
@@ -503,7 +507,6 @@ type Message = {
   visitorEmail?: string;
   redirectUrl?: string;
   bookingUrl?: string;
-  sds?: { url: string; product?: string; cas_number?: string; updated_at?: string; label?: string };
   quote?: {
     status: 'quoted' | 'price_on_request';
     product?: string; grade?: string; pack_size?: string; quantity?: number;
@@ -1204,16 +1207,21 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
   );
 }
 
-// get-sds-crash-fix-plan Phase 5b — the deterministic Get-SDS product picker.
-// A search box + a list sourced from GET /api/widget/sds-products (never the
-// model); loading, empty, and error (retry) states are first-class here since
-// this panel replaces the whole chat body while open.
-function SdsPicker({ products, loading, searching, error, query, onQueryChange, onSelect, onRetry, onCancel }: {
+// sds-persistent-panel plan — the deterministic Get-SDS product picker, now a
+// persistent panel (Option A): picking a result pins it above the search box
+// instead of closing the panel, so a follow-up lookup is one tap away. Reached
+// either from the "Request SDS" hub card (blank) or from a resolved chat-typed
+// request (opens with `selected` already pinned + `query` pre-filled) — see
+// openSdsPicker / openSdsPickerWithResult. Loading, empty, and error (retry)
+// states remain first-class since this panel replaces the whole chat body.
+function SdsPicker({ products, loading, searching, error, query, selected, themeColor, onQueryChange, onSelect, onRetry, onCancel }: {
   products: SdsProduct[];
   loading: boolean;
   searching: boolean;
   error: string | null;
   query: string;
+  selected: SdsResult | null;
+  themeColor: string;
   onQueryChange: (q: string) => void;
   onSelect: (p: SdsProduct) => void;
   onRetry: () => void;
@@ -1222,11 +1230,12 @@ function SdsPicker({ products, loading, searching, error, query, onQueryChange, 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
-        <button type="button" onClick={onCancel} aria-label="Back"
+        <button type="button" onClick={onCancel}
           className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
           <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          <span className="text-[13px] font-google font-semibold">Back to chat</span>
         </button>
-        <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100">Get SDS</span>
+        <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100 ml-1">Get SDS</span>
       </div>
 
       <div className="px-3.5 pt-3 shrink-0">
@@ -1238,6 +1247,49 @@ function SdsPicker({ products, loading, searching, error, query, onQueryChange, 
           {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
         </div>
       </div>
+
+      {selected?.url && (
+        // The pinned result (relocated from the old chat-bubble SDS card) —
+        // stays put while the search box/list below it remain live for the
+        // next lookup, instead of the panel closing on selection.
+        <div className="px-3.5 pt-3 shrink-0">
+          <div className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: themeColor }}>
+              <MIcon name="description" className="text-[16px] leading-none" />
+              Safety Data Sheet
+            </div>
+            <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
+              <div className="font-bold">{selected.product}</div>
+              {(selected.cas_number || selected.updated_at) && (
+                <div className="text-[12px] text-slate-500 dark:text-slate-400">
+                  {[selected.cas_number, selected.updated_at ? `Updated ${formatRelativeDate(selected.updated_at)}` : null].filter(Boolean).join(' · ')}
+                </div>
+              )}
+              <div className="mt-2">
+                <SdsPreview url={selected.url} themeColor={themeColor} />
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <a href={selected.url} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  style={{ borderColor: themeColor, color: themeColor }}>
+                  <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
+                </a>
+                <a href={selected.url} download target="_blank" rel="noopener noreferrer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  style={{ borderColor: themeColor, color: themeColor }}>
+                  <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selected?.url && (
+        <div className="px-3.5 pt-3 shrink-0 text-[10.5px] font-google font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          Other matches
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
         {loading ? (
@@ -1554,6 +1606,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const [sdsLoading, setSdsLoading] = useState(false);
   const [sdsSearching, setSdsSearching] = useState(false);
   const [sdsError, setSdsError] = useState<string | null>(null);
+  // sds-persistent-panel plan — the pinned result shown above the search box
+  // (Option A). Set on a manual pick or when a chat-typed request resolves;
+  // the panel stays open either way so the next lookup is immediate.
+  const [sdsSelected, setSdsSelected] = useState<SdsResult | null>(null);
   // Phase 4 — the "View & share quote" modal opened from a quote card's
   // deterministic button (same pattern as the SDS button: the model never
   // fabricates the link, the widget renders it from the structured payload).
@@ -1889,6 +1945,24 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setHubView('chat');
     setSdsQuery('');
     setSdsSearchResults(null);
+    setSdsSelected(null);
+    setSdsPickerOpen(true);
+    if (sdsAllProducts === null && !sdsLoading) void loadSdsProducts();
+  };
+
+  // sds-persistent-panel plan — a chat-typed SDS request ("SDS for acetone")
+  // resolves via the agent's get_sds tool same as before, but instead of
+  // attaching the result to the chat bubble, it opens the SAME panel the hub
+  // card uses with the resolved product pre-pinned and the search box
+  // pre-filled — isolating the result to the panel (mirrors openSampleForm's
+  // handling of a free-text {form} action).
+  const openSdsPickerWithResult = (sds: SdsResult) => {
+    setActiveHubCard(null);
+    setSampleFormOpen(false);
+    setHubView('chat');
+    setSdsQuery(sds.product || '');
+    setSdsSearchResults(null);
+    setSdsSelected(sds);
     setSdsPickerOpen(true);
     if (sdsAllProducts === null && !sdsLoading) void loadSdsProducts();
   };
@@ -1928,16 +2002,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       p.name.toLowerCase().includes(term) || (p.cas_number || '').toLowerCase().includes(term));
   }, [sdsQuery, sdsAllProducts, sdsSearchResults]);
 
-  // Picking a product is fully deterministic (no LLM round-trip): the sheet
-  // renders via the SAME {sds:...} side-channel the conversational path uses.
+  // Picking a product is fully deterministic (no LLM round-trip). Option A:
+  // the panel stays open and the result just pins above the search box/list,
+  // so a follow-up lookup doesn't require leaving the panel — nothing is
+  // written to chat, this is a static search, not a conversation turn.
   const selectSdsProduct = (p: SdsProduct) => {
-    setSdsPickerOpen(false);
-    setMessages(prev => [...prev, {
-      role: 'bot',
-      content: `Here's the safety data sheet for ${p.name}.`,
-      sds: { url: p.sds_url, product: p.name, cas_number: p.cas_number, updated_at: p.updated_at, label: 'Open SDS' },
-      ts: Date.now(),
-    }]);
+    setSdsSelected({ url: p.sds_url, product: p.name, cas_number: p.cas_number, updated_at: p.updated_at, label: 'Open SDS' });
   };
 
   // Thumbs up/down on a bot reply (vertical intelligence plan, Phase 2a).
@@ -2145,9 +2215,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               content += `\n[State: ${parts}${qtyNote} — price on request, contact captured]`;
             }
           }
-          if (m.sds) {
-            content += `\n[State: SDS provided for ${m.sds.product ?? 'product'}]`;
-          }
           if (m.sample) {
             const sp = [m.sample.product, m.sample.grade].filter(Boolean).join(' ');
             content += `\n[State: sample requested for ${sp}]`;
@@ -2158,8 +2225,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     let firstChunkReceived = false;
     let sseRetryCount = 0;
     // Structured "Open SDS" action emitted by the agent stream (a {sds:{...}}
-    // event); captured here and attached to the bot message on [DONE].
-    let pendingSds: Message['sds'] | null = null;
+    // event); captured here and acted on at [DONE] — opens the persistent SDS
+    // panel with this result pinned, same as pendingForm opens the sample form.
+    // Never attached to the bot message (sds-persistent-panel plan): the
+    // result lives only in the panel, isolated from the chat transcript.
+    let pendingSds: SdsResult | null = null;
     // Structured quote card emitted by the agent stream (a {quote:{...}} event);
     // captured here and attached to the bot message on [DONE], like pendingSds.
     let pendingQuote: Message['quote'] | null = null;
@@ -2262,7 +2332,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot') {
-                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingSds ? { sds: pendingSds } : {}), ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}) };
+                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}) };
               }
               return updated;
             });
@@ -2270,6 +2340,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // Free-text sample intent → open the structured form (prefilled), the
             // same form the hub card opens. After the reply so it reads naturally.
             if (pendingForm) openSampleForm(pendingForm.prefill);
+            // Free-text SDS intent → open the persistent SDS panel with the
+            // resolved product pinned (sds-persistent-panel plan), isolated
+            // from the transcript. Same "after the reply" precedent as pendingForm.
+            if (pendingSds) openSdsPickerWithResult(pendingSds);
             // Never move the viewport on completion — keep the user exactly where
             // they are for reading continuity. If the finished answer extends below
             // the fold, surface the "new message" pill so they can jump down when
@@ -2302,9 +2376,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           try {
             const parsed = JSON.parse(msg.data);
             // Structured side-channel: the agent emits {sds:{url,...}} so the
-            // widget renders a deterministic "Open SDS" button (no raw link).
+            // widget opens the persistent SDS panel with this result pinned
+            // (no raw link typed by the model).
             if (parsed.sds && typeof parsed.sds.url === 'string') {
-              pendingSds = { url: parsed.sds.url, product: parsed.sds.product, label: parsed.sds.label };
+              pendingSds = { url: parsed.sds.url, product: parsed.sds.product, cas_number: parsed.sds.cas_number, updated_at: parsed.sds.updated_at, label: parsed.sds.label };
               return;
             }
             // Structured side-channel: the agent emits {quote:{...}} with the
@@ -2681,41 +2756,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                       </div>
                                     )}
                                   </div>
-                                  {msg.role === 'bot' && !msg.isStreaming && msg.sds?.url && (
-                                    // Deterministic SDS card (Phase 5c/5e) — product, CAS,
-                                    // updated date, and the URL itself all come from the
-                                    // structured payload; the agent never pastes the link.
-                                    // Same card for the conversational path AND the picker.
-                                    <div className="mt-2 w-full max-w-[300px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
-                                      <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: THEME_COLOR }}>
-                                        <MIcon name="description" className="text-[16px] leading-none" />
-                                        Safety Data Sheet
-                                      </div>
-                                      <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
-                                        <div className="font-bold">{msg.sds.product}</div>
-                                        {(msg.sds.cas_number || msg.sds.updated_at) && (
-                                          <div className="text-[12px] text-slate-500 dark:text-slate-400">
-                                            {[msg.sds.cas_number, msg.sds.updated_at ? `Updated ${formatRelativeDate(msg.sds.updated_at)}` : null].filter(Boolean).join(' · ')}
-                                          </div>
-                                        )}
-                                        <div className="mt-2">
-                                          <SdsPreview url={msg.sds.url} themeColor={THEME_COLOR} />
-                                        </div>
-                                        <div className="mt-2 flex items-center gap-2">
-                                          <a href={msg.sds.url} target="_blank" rel="noopener noreferrer"
-                                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                                            style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}>
-                                            <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
-                                          </a>
-                                          <a href={msg.sds.url} download target="_blank" rel="noopener noreferrer"
-                                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                                            style={{ borderColor: THEME_COLOR, color: THEME_COLOR }}>
-                                            <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
-                                          </a>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
                                   {msg.role === 'bot' && !msg.isStreaming && msg.quote && (
                                     // Deterministic quote card — the agent describes but
                                     // never re-derives these figures. GST is shown as
@@ -2862,6 +2902,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 searching={sdsSearching}
                 error={sdsError}
                 query={sdsQuery}
+                selected={sdsSelected}
+                themeColor={THEME_COLOR}
                 onQueryChange={setSdsQuery}
                 onSelect={selectSdsProduct}
                 onRetry={loadSdsProducts}

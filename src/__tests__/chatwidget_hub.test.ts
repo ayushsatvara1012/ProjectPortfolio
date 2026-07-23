@@ -151,12 +151,15 @@ describe('Phase 3 hub — product picker filter', () => {
 
 // Mirrors the onmessage SSE handler: an {sds:{url}}, {quote:{...}} or {form:{...}}
 // event is captured as a pending action; a normal {token} event is streamed text.
+type SdsEvent = { url: string; product?: string; cas_number?: string; updated_at?: string; label?: string };
 function parseSseEvent(raw: string): {
-  sds?: { url: string }; quote?: { status: string };
+  sds?: SdsEvent; quote?: { status: string };
   form?: { form_id: string; prefill: Record<string, string> }; token?: string;
 } {
   const parsed = JSON.parse(raw);
-  if (parsed.sds && typeof parsed.sds.url === 'string') return { sds: parsed.sds };
+  if (parsed.sds && typeof parsed.sds.url === 'string') {
+    return { sds: { url: parsed.sds.url, product: parsed.sds.product, cas_number: parsed.sds.cas_number, updated_at: parsed.sds.updated_at, label: parsed.sds.label } };
+  }
   if (parsed.quote && (parsed.quote.status === 'quoted' || parsed.quote.status === 'price_on_request')) {
     return { quote: parsed.quote };
   }
@@ -173,6 +176,12 @@ describe('Phase 3 hub — SDS action event', () => {
     expect(out.token).toBeUndefined();
   });
 
+  it('captures cas_number and updated_at alongside the url (sds-persistent-panel plan)', () => {
+    const out = parseSseEvent(JSON.stringify({ sds: { url: 'https://sds.example.com/a.pdf', product: 'Acetone', cas_number: '67-64-1', updated_at: '2026-06-01T00:00:00Z' } }));
+    expect(out.sds?.cas_number).toBe('67-64-1');
+    expect(out.sds?.updated_at).toBe('2026-06-01T00:00:00Z');
+  });
+
   it('still treats token events as streamed text', () => {
     const out = parseSseEvent(JSON.stringify({ token: 'The sheet is ready.' }));
     expect(out.token).toBe('The sheet is ready.');
@@ -182,6 +191,49 @@ describe('Phase 3 hub — SDS action event', () => {
   it('ignores a malformed sds event with no url', () => {
     const out = parseSseEvent(JSON.stringify({ sds: { product: 'Acetone' } }));
     expect(out.sds).toBeUndefined();
+  });
+});
+
+// Mirrors the persistent SDS panel (sds-persistent-panel plan, Option A): a
+// pick pins the result and the panel stays open — no chat message, no close.
+// Also mirrors the [DONE] handler's split: pendingSds now drives a panel-open
+// side effect instead of attaching to the bot message.
+type SdsPanelState = { open: boolean; selected: SdsEvent | null };
+
+function pickSdsProduct(state: SdsPanelState, p: SdsEvent): SdsPanelState {
+  return { open: state.open, selected: p };
+}
+
+function applyStreamDone(pendingSds: SdsEvent | null): { messageHasSds: boolean; opensPanel: boolean } {
+  return { messageHasSds: false, opensPanel: pendingSds !== null };
+}
+
+describe('sds-persistent-panel — selection stays in-panel (Option A)', () => {
+  const acetone: SdsEvent = { url: 'https://sds.example.com/acetone.pdf', product: 'Acetone', cas_number: '67-64-1' };
+  const toluene: SdsEvent = { url: 'https://sds.example.com/toluene.pdf', product: 'Toluene', cas_number: '108-88-3' };
+
+  it('picking a product pins it without closing the panel', () => {
+    const state = pickSdsProduct({ open: true, selected: null }, acetone);
+    expect(state.open).toBe(true);
+    expect(state.selected).toEqual(acetone);
+  });
+
+  it('picking a second product swaps the pinned card, panel still open', () => {
+    const afterFirst = pickSdsProduct({ open: true, selected: null }, acetone);
+    const afterSecond = pickSdsProduct(afterFirst, toluene);
+    expect(afterSecond.open).toBe(true);
+    expect(afterSecond.selected).toEqual(toluene);
+  });
+});
+
+describe('sds-persistent-panel — chat-typed request routes to the panel, not the message', () => {
+  it('a resolved get_sds result never attaches to the bot chat message', () => {
+    const acetone: SdsEvent = { url: 'https://sds.example.com/acetone.pdf', product: 'Acetone' };
+    expect(applyStreamDone(acetone)).toEqual({ messageHasSds: false, opensPanel: true });
+  });
+
+  it('no sds event means no panel auto-open', () => {
+    expect(applyStreamDone(null)).toEqual({ messageHasSds: false, opensPanel: false });
   });
 });
 
