@@ -40,4 +40,8 @@ export interface FeatureArchitecture {
     summary: string;
   };
   narrative?: string;
+  // Category-level trust signals shown as a strip on the detail view (agent
+  // only). Must describe guardrails that actually exist in code, never bypass
+  // thresholds or secrets. See docs/architecture-canvas-plan.md ("AI agent").
+  guardrails?: string[];
 }
