@@ -99,6 +99,7 @@ export default function OverviewCanvas() {
         edges={edges}
         nodeTypes={nodeTypes}
         onNodeClick={onNodeClick}
+        colorMode="system"
         fitView
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.3}

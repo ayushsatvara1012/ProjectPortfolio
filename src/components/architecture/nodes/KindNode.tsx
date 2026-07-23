@@ -21,12 +21,20 @@ export interface KindNodeData {
   [key: string]: unknown;
 }
 
+// Left/right carry the main left-to-right flow; top/bottom are a second pair
+// so a "response" edge that points back to an earlier node can loop above or
+// below the row instead of forcing a backward line through the same left/right
+// anchors (see DataFlowCanvas's forward/backward edge routing).
 export default function KindNode({ data }: NodeProps) {
   const d = data as KindNodeData;
   const style = KIND_STYLE[d.kind];
   return (
     <div className={`min-w-40 rounded-xl border bg-white px-3 py-2 shadow-sm dark:bg-slate-900 ${style.ring}`}>
-      <Handle type="target" position={Position.Left} className="!bg-slate-400" />
+      <Handle type="target" id="left" position={Position.Left} className="!bg-slate-400" />
+      <Handle type="target" id="top" position={Position.Top} className="!bg-slate-400" />
+      <Handle type="source" id="top-out" position={Position.Top} className="!bg-slate-400" />
+      <Handle type="target" id="bottom" position={Position.Bottom} className="!bg-slate-400" />
+      <Handle type="source" id="bottom-out" position={Position.Bottom} className="!bg-slate-400" />
       <div className="flex items-center gap-2">
         <span className={`material-symbols-outlined text-[20px] ${style.chip}`} aria-hidden>
           {style.icon}
@@ -36,7 +44,7 @@ export default function KindNode({ data }: NodeProps) {
           {d.sub ? <p className="text-xs text-slate-500 dark:text-slate-400">{d.sub}</p> : null}
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-slate-400" />
+      <Handle type="source" id="right" position={Position.Right} className="!bg-slate-400" />
     </div>
   );
 }

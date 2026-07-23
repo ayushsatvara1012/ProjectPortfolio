@@ -1,6 +1,7 @@
 import Navbar from '@/src/components/layout/Navbar';
 import Footer from '@/src/components/layout/Footer';
 import ClientEffects from '@/src/app/client-effects';
+import PreFooterCanvas from '@/src/components/marketing/PreFooterCanvas';
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       </a>
       <Navbar />
       <main id="main-content">{children}</main>
+      <PreFooterCanvas />
       <Footer />
       <ClientEffects />
     </div>

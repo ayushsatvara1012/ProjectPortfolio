@@ -80,7 +80,7 @@ export default async function FeatureDetailPage({
 
   return (
     <main className="h-full w-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl px-4 pb-24 pt-20 sm:px-6 sm:pt-24">
+      <div className="mx-auto max-w-5xl px-4 pt-20 sm:px-6 sm:pt-24">
         <header>
           <div className="flex items-center gap-3">
             <span
@@ -106,15 +106,24 @@ export default async function FeatureDetailPage({
             {f.narrative}
           </p>
         ) : null}
+      </div>
 
+      {/* Full-bleed section: the diagrams get the whole viewport width (just a
+          little padding) for an immersive canvas, matching the overview map's
+          full-viewport feel, while the surrounding text stays readable-width. */}
+      <div className="w-full px-3 py-10 sm:px-6">
         {hasDiagrams ? (
           <DetailDiagrams dataFlow={f.dataFlow} mermaid={f.mermaid} />
         ) : (
-          <ComingSoon tagline={f.tagline} />
+          <div className="mx-auto max-w-5xl">
+            <ComingSoon tagline={f.tagline} />
+          </div>
         )}
+      </div>
 
+      <div className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
         {f.guardrails && f.guardrails.length > 0 ? (
-          <section aria-labelledby="arch-guardrails-heading" className="mt-12">
+          <section aria-labelledby="arch-guardrails-heading">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-6 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center gap-2">
                 <span
