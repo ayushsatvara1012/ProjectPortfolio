@@ -52,6 +52,8 @@ class HubCard:
     prompt_template: str = ""       # message sent on submit; "{value}" is substituted
     input_source: str = ""          # "" = free text; "products" = searchable catalog picker
     form_id: str = ""               # which structured form to open (action="form")
+    color: str = ""                 # hex accent for this card's Home tile; "" = default theme color
+    disabled: bool = False          # renders dimmed, non-tappable, "Coming soon" badge
 
 
 @dataclass(frozen=True)

@@ -552,6 +552,8 @@ type HubCard = {
   prompt_template?: string;
   input_source?: string;            // "products" => searchable catalog picker
   form_id?: string;                 // which form to open (action="form")
+  color?: string;                   // hex accent for this card's Home tile; "" = default theme color
+  disabled?: boolean;               // dimmed, non-tappable, "Coming soon" badge
 };
 
 // A servable SDS product from GET /api/widget/sds-products (Phase 3): one row
@@ -640,7 +642,27 @@ const HUB_ICON: Record<string, string> = {
   'message-circle': 'forum',
   receipt: 'receipt_long',
   package: 'package_2',
+  certificate: 'verified',
 };
+
+// Home hub tiles — per-card accent (card.color) renders as a soft gradient +
+// grain surface, the same treatment as the dashboard's MetricCard (Insights
+// "Pipeline"/"Financial impact" stat cards, src/components/dashboard/insights/
+// ui.tsx): a tinted gradient fading to the base surface, an inset ring in the
+// tone color, a faint drop shadow, and a fractal-noise grain blended on top so
+// it reads as a tactile surface rather than a flat fill. Ported with inline
+// hex math instead of MetricCard's static Tailwind tone classes because a
+// card's color is pack config (a runtime hex), not a fixed enum Tailwind can
+// generate a class for. Cards without a color (older pack config) render
+// exactly as before — flat surface, theme-var icon.
+const HUB_NOISE_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+function hubTileGradient(hex: string): string {
+  return `linear-gradient(to bottom right, ${hex}24 0%, ${hex}10 55%, transparent 100%)`;
+}
+function hubTileRing(hex: string): string {
+  return `inset 0 0 0 1px ${hex}40, 0 1px 2px rgba(15, 23, 42, 0.05)`;
+}
 
 // ── Inline SVG icons ────────────────────────────────────────────────────────
 // Replaces Material Symbols Outlined so the widget never depends on an external
@@ -666,6 +688,7 @@ const ICON_PATHS: Record<string, { d: string; fill?: boolean; vb?: string }> = {
   chat_bubble: { d: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z', fill: true },
   search: { d: 'M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z', fill: true },
   science: { d: 'M13 11.33L18 18H6l5-6.67V6h2m2-2H7v2h2v4L3 18c-.67.89-.33 2 1 2h16c1.33 0 1.67-1.11 1-2l-6-8V6h2V4z', fill: true },
+  verified: { d: 'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.24 13.94l-3.51-3.51 1.41-1.41 2.1 2.1 5.1-5.1 1.41 1.41-6.51 6.51z', fill: true },
   forum: { d: 'M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z', fill: true },
 };
 
@@ -691,13 +714,13 @@ const ICON_COMPONENTS: Record<string, React.ComponentType<any>> = {
   thumb_down: ThumbsDownIcon,
 };
 
-function MIcon({ name, className }: { name: string; className?: string }) {
+function MIcon({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) {
   const Comp = ICON_COMPONENTS[name];
   if (Comp) {
     return (
       <Comp
         className={className}
-        style={{ width: '1em', height: '1em', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}
+        style={{ width: '1em', height: '1em', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
         aria-hidden="true"
       />
     );
@@ -708,7 +731,7 @@ function MIcon({ name, className }: { name: string; className?: string }) {
   return (
     <svg viewBox={icon.vb || '0 0 24 24'} fill={icon.fill ? 'currentColor' : 'none'}
       stroke={icon.fill ? 'none' : 'currentColor'} xmlns="http://www.w3.org/2000/svg"
-      className={className} style={{ width: '1em', height: '1em', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }} aria-hidden="true">
+      className={className} style={{ width: '1em', height: '1em', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }} aria-hidden="true">
       <path d={icon.d} />
     </svg>
   );
@@ -1214,7 +1237,7 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
 // request (opens with `selected` already pinned + `query` pre-filled) — see
 // openSdsPicker / openSdsPickerWithResult. Loading, empty, and error (retry)
 // states remain first-class since this panel replaces the whole chat body.
-function SdsPicker({ products, loading, searching, error, query, selected, themeColor, onQueryChange, onSelect, onRetry, onCancel }: {
+function SdsPicker({ products, loading, searching, error, query, selected, themeColor, fromChat, onQueryChange, onSelect, onRetry, onCancel }: {
   products: SdsProduct[];
   loading: boolean;
   searching: boolean;
@@ -1222,6 +1245,7 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
   query: string;
   selected: SdsResult | null;
   themeColor: string;
+  fromChat: boolean;
   onQueryChange: (q: string) => void;
   onSelect: (p: SdsProduct) => void;
   onRetry: () => void;
@@ -1230,10 +1254,13 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
-        <button type="button" onClick={onCancel}
+        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
           className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
           <MIcon name="arrow_back" className="text-[18px] leading-none" />
-          <span className="text-[13px] font-google font-semibold">Back to chat</span>
+          {/* Only the chat-typed entry point interrupted an in-progress chat
+              turn, so only it gets the explicit "back to chat" affordance —
+              the hub-card entry keeps the plain icon-only back it always had. */}
+          {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
         </button>
         <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100 ml-1">Get SDS</span>
       </div>
@@ -1610,6 +1637,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // (Option A). Set on a manual pick or when a chat-typed request resolves;
   // the panel stays open either way so the next lookup is immediate.
   const [sdsSelected, setSdsSelected] = useState<SdsResult | null>(null);
+  // Whether the panel was opened by a chat-typed SDS request (vs. the "Request
+  // SDS" hub card) — only that path shows "Back to chat" in the header, since
+  // only that path actually interrupted an in-progress chat turn.
+  const [sdsFromChat, setSdsFromChat] = useState(false);
   // Phase 4 — the "View & share quote" modal opened from a quote card's
   // deterministic button (same pattern as the SDS button: the model never
   // fabricates the link, the widget renders it from the structured payload).
@@ -1946,6 +1977,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setSdsQuery('');
     setSdsSearchResults(null);
     setSdsSelected(null);
+    setSdsFromChat(false);
     setSdsPickerOpen(true);
     if (sdsAllProducts === null && !sdsLoading) void loadSdsProducts();
   };
@@ -1963,6 +1995,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setSdsQuery(sds.product || '');
     setSdsSearchResults(null);
     setSdsSelected(sds);
+    setSdsFromChat(true);
     setSdsPickerOpen(true);
     if (sdsAllProducts === null && !sdsLoading) void loadSdsProducts();
   };
@@ -2904,6 +2937,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 query={sdsQuery}
                 selected={sdsSelected}
                 themeColor={THEME_COLOR}
+                fromChat={sdsFromChat}
                 onQueryChange={setSdsQuery}
                 onSelect={selectSdsProduct}
                 onRetry={loadSdsProducts}
@@ -2923,13 +2957,28 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   <div className="grid grid-cols-2 gap-2.5">
                     {(configData.hub_cards ?? []).map((card, i, arr) => {
                       const oddLast = arr.length % 2 === 1 && i === arr.length - 1;
+                      const tileColor = card.color || '';
+                      const Tag = card.disabled ? 'div' : 'button';
                       return (
-                        <button key={card.id} type="button" onClick={() => openCardFromHome(card)} aria-label={card.label}
-                          className={`${oddLast ? 'col-span-2' : ''} flex flex-col items-center justify-center text-center gap-2 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-5 transition-colors hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40`}>
-                          <MIcon name={HUB_ICON[card.icon] || 'bolt'} className="text-[26px] leading-none text-[var(--sapy-theme)]" />
-                          <span className="text-[13.5px] font-google font-medium text-slate-800 dark:text-slate-100 leading-tight break-words">{card.label}</span>
-                          {card.subtitle && <span className="text-[11.5px] font-google text-slate-500 dark:text-slate-400 leading-snug break-words">{card.subtitle}</span>}
-                        </button>
+                        <Tag key={card.id} {...(card.disabled ? {} : { type: 'button', onClick: () => openCardFromHome(card) })}
+                          aria-label={card.label} aria-disabled={card.disabled || undefined}
+                          style={tileColor ? { boxShadow: hubTileRing(tileColor) } : undefined}
+                          className={`${oddLast ? 'col-span-2' : ''} relative overflow-hidden flex flex-col items-center justify-center text-center gap-2 rounded-2xl bg-white dark:bg-slate-900 px-3 py-5 transition-colors duration-300 ${tileColor ? '' : 'border border-slate-200/70 dark:border-slate-800'} ${card.disabled ? 'opacity-60 cursor-default' : 'hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'}`}>
+                          {tileColor && (
+                            <>
+                              <div className="absolute inset-0" style={{ backgroundImage: hubTileGradient(tileColor) }} aria-hidden="true" />
+                              <div className="absolute inset-0 opacity-[0.35] dark:opacity-[0.20] mix-blend-soft-light pointer-events-none" style={{ backgroundImage: HUB_NOISE_URI, backgroundSize: '140px 140px' }} aria-hidden="true" />
+                            </>
+                          )}
+                          {card.disabled && (
+                            <span className="absolute top-2 right-2 text-[8.5px] font-google font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.12] text-slate-600 dark:text-slate-300">
+                              Coming soon
+                            </span>
+                          )}
+                          <MIcon name={HUB_ICON[card.icon] || 'bolt'} className="relative text-[26px] leading-none" style={tileColor ? { color: tileColor } : undefined} />
+                          <span className="relative text-[13.5px] font-google font-medium text-slate-800 dark:text-slate-100 leading-tight break-words">{card.label}</span>
+                          {card.subtitle && <span className="relative text-[11.5px] font-google text-slate-500 dark:text-slate-400 leading-snug break-words">{card.subtitle}</span>}
+                        </Tag>
                       );
                     })}
                   </div>

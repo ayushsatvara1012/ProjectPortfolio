@@ -176,6 +176,7 @@ _HUB_CARDS = (
         input_label="Search products…",
         prompt_template="I need the Safety Data Sheet for {value}.",
         input_source="products",
+        color="#F59E0B",  # amber — safety / hazard document
     ),
     HubCard(
         id="spec",
@@ -186,6 +187,7 @@ _HUB_CARDS = (
         input_label="Search products…",
         prompt_template="What grade and packaging is available for {value}?",
         input_source="products",
+        color="#14B8A6",  # teal — science / lab
     ),
     HubCard(
         id="quote",
@@ -196,6 +198,7 @@ _HUB_CARDS = (
         input_label="Search products…",
         prompt_template="I'd like a price quote for {value}.",
         input_source="products",
+        color="#6366F1",  # indigo — commerce / trust
     ),
     HubCard(
         id="sample",
@@ -204,6 +207,7 @@ _HUB_CARDS = (
         icon="package",
         action="form",          # opens the structured sample form, not slot-filling
         form_id="sample",
+        color="#8B5CF6",  # violet — physical product
     ),
     HubCard(
         id="ask",
@@ -211,6 +215,16 @@ _HUB_CARDS = (
         subtitle="Chat with the assistant",
         icon="message-circle",
         action="chat",
+        color="#0EA5E9",  # sky — conversation
+    ),
+    HubCard(
+        id="coa",
+        label="Request COA",
+        subtitle="Certificate of Analysis",
+        icon="certificate",
+        action="chat",   # inert while disabled; a real action lands with the feature
+        color="#10B981",  # emerald — certified / quality
+        disabled=True,
     ),
 )
 
