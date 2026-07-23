@@ -2918,25 +2918,27 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   <div className="grid grid-cols-2 gap-2.5">
                     {(configData.hub_cards ?? []).map((card, i, arr) => {
                       const oddLast = arr.length % 2 === 1 && i === arr.length - 1;
-                      const tileColor = card.color || '';
+                      // The tile SURFACE (gradient/ring/grain) is one consistent
+                      // color across every card — the bot's own theme color, so
+                      // the grid reads as one on-brand surface. Only the ICON
+                      // keeps card.color, which is what actually tells the 6
+                      // features apart at a glance.
+                      const surfaceColor = THEME_COLOR;
+                      const iconColor = card.color || THEME_COLOR;
                       const Tag = card.disabled ? 'div' : 'button';
                       return (
                         <Tag key={card.id} {...(card.disabled ? {} : { type: 'button', onClick: () => openCardFromHome(card) })}
                           aria-label={card.label} aria-disabled={card.disabled || undefined}
-                          style={tileColor ? { boxShadow: hubTileRing(tileColor) } : undefined}
-                          className={`${oddLast ? 'col-span-2' : ''} relative overflow-hidden flex flex-col items-center justify-center text-center gap-2 rounded-2xl bg-white dark:bg-slate-900 px-3 py-5 transition-colors duration-300 ${tileColor ? '' : 'border border-slate-200/70 dark:border-slate-800'} ${card.disabled ? 'opacity-60 cursor-default' : 'hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'}`}>
-                          {tileColor && (
-                            <>
-                              <div className="absolute inset-0" style={{ backgroundImage: hubTileGradient(tileColor) }} aria-hidden="true" />
-                              <div className="absolute inset-0 opacity-[0.35] dark:opacity-[0.20] mix-blend-soft-light pointer-events-none" style={{ backgroundImage: HUB_NOISE_URI, backgroundSize: '140px 140px' }} aria-hidden="true" />
-                            </>
-                          )}
+                          style={{ boxShadow: hubTileRing(surfaceColor) }}
+                          className={`${oddLast ? 'col-span-2' : ''} relative overflow-hidden flex flex-col items-center justify-center text-center gap-2 rounded-2xl bg-white dark:bg-slate-900 px-3 py-5 transition-colors duration-300 ${card.disabled ? 'opacity-60 cursor-default' : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/40'}`}>
+                          <div className="absolute inset-0" style={{ backgroundImage: hubTileGradient(surfaceColor) }} aria-hidden="true" />
+                          <div className="absolute inset-0 opacity-[0.35] dark:opacity-[0.20] mix-blend-soft-light pointer-events-none" style={{ backgroundImage: HUB_NOISE_URI, backgroundSize: '140px 140px' }} aria-hidden="true" />
                           {card.disabled && (
                             <span className="absolute top-2 right-2 text-[8.5px] font-google font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/[0.12] text-slate-600 dark:text-slate-300">
                               Coming soon
                             </span>
                           )}
-                          <MIcon name={HUB_ICON[card.icon] || 'bolt'} className="relative text-[26px] leading-none" style={tileColor ? { color: tileColor } : undefined} />
+                          <MIcon name={HUB_ICON[card.icon] || 'bolt'} className="relative text-[26px] leading-none" style={{ color: iconColor }} />
                           <span className="relative text-[13.5px] font-google font-medium text-slate-800 dark:text-slate-100 leading-tight break-words">{card.label}</span>
                           {card.subtitle && <span className="relative text-[11.5px] font-google text-slate-500 dark:text-slate-400 leading-snug break-words">{card.subtitle}</span>}
                         </Tag>
@@ -2971,62 +2973,51 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
             {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && (
               <div className={`shrink-0 z-10 flex flex-col bg-transparent`}>
-                {hasHub && (activeHubCard || (messages.length === 1 && !input.trim())) ? (
-                  // Phase 3 — pack-driven hub. Card strip on a fresh conversation;
-                  // a tool card (here or from Home) swaps in its slot mini-form,
-                  // which may open mid-conversation when launched from the Home tab.
+                {hasHub && activeHubCard ? (
+                  // A "tool" hub card tapped from Home swaps in its slot
+                  // mini-form here. The fresh-conversation pill strip that
+                  // used to duplicate the Home grid's cards as plain-text
+                  // buttons was removed — the Home grid tiles are now the
+                  // only entry point, and each feature will eventually get
+                  // its own dedicated panel there (as SDS already has).
                   <div className="px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">
-                    {activeHubCard ? (
-                      <div className="flex flex-col gap-2">
-                        {/* Back sits at the top so the visitor can return to asking;
-                          below it is the single required field (no duplicate input). */}
-                        <button type="button" onClick={() => setActiveHubCard(null)} aria-label="Back to options"
-                          className="flex items-center gap-1 self-start -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
-                          <MIcon name="arrow_back" className="text-[18px] leading-none" />
-                          <span className="text-[13px] font-medium font-google">Back</span>
-                        </button>
-                        <div className="relative">
-                          {activeHubCard.input_source === 'products' && hubProductMatches.length > 0 && (
-                            // Drop-UP (input sits near the bottom): the searchable catalog.
-                            <div className="absolute bottom-full left-0 right-0 mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin z-20">
-                              {hubProductMatches.map((p, i) => (
-                                <button key={`${p.name}-${p.cas_number || ''}-${i}`} type="button" onClick={() => submitHubValue(p.name)}
-                                  className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                  <span className="text-[14px] font-google text-slate-800 dark:text-slate-200 truncate">{p.name}</span>
-                                  <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{p.cas_number || p.grade || ''}</span>
-                                </button>
-                              ))}
-                            </div>
+                    <div className="flex flex-col gap-2">
+                      {/* Back sits at the top so the visitor can return to asking;
+                        below it is the single required field (no duplicate input). */}
+                      <button type="button" onClick={() => setActiveHubCard(null)} aria-label="Back to options"
+                        className="flex items-center gap-1 self-start -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
+                        <MIcon name="arrow_back" className="text-[18px] leading-none" />
+                        <span className="text-[13px] font-medium font-google">Back</span>
+                      </button>
+                      <div className="relative">
+                        {activeHubCard.input_source === 'products' && hubProductMatches.length > 0 && (
+                          // Drop-UP (input sits near the bottom): the searchable catalog.
+                          <div className="absolute bottom-full left-0 right-0 mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin z-20">
+                            {hubProductMatches.map((p, i) => (
+                              <button key={`${p.name}-${p.cas_number || ''}-${i}`} type="button" onClick={() => submitHubValue(p.name)}
+                                className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                <span className="text-[14px] font-google text-slate-800 dark:text-slate-200 truncate">{p.name}</span>
+                                <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{p.cas_number || p.grade || ''}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <form onSubmit={(e) => { e.preventDefault(); submitHubCard(); }}
+                          className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-3.5 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+                          {activeHubCard.input_source === 'products' && (
+                            <MIcon name="search" className="text-[18px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
                           )}
-                          <form onSubmit={(e) => { e.preventDefault(); submitHubCard(); }}
-                            className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-3.5 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
-                            {activeHubCard.input_source === 'products' && (
-                              <MIcon name="search" className="text-[18px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
-                            )}
-                            <input value={hubInput} onChange={e => setHubInput(e.target.value)} autoFocus
-                              placeholder={activeHubCard.input_label || 'Type your answer'}
-                              aria-label={activeHubCard.input_label || activeHubCard.label}
-                              className="flex-1 min-w-0 bg-transparent focus:outline-none text-[15px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
-                            <button type="submit" disabled={!hubInput.trim() || isLoading} aria-label="Submit"
-                              className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 transition-colors disabled:cursor-not-allowed ${hubInput.trim() && !isLoading ? 'text-blue-900 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
-                              <MIcon name="arrow_upward" className="text-[20px] leading-none" />
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                    ) : (
-                      // Chat empty-state shortcuts: the hub actions as stacked pills
-                      // (chemical Figma). The full card grid lives on the Home screen;
-                      // here they're quick entries for someone already in chat.
-                      <div className="flex flex-col items-start gap-2">
-                        {configData.hub_cards!.map((card) => (
-                          <button key={card.id} type="button" onClick={() => handleHubCardTap(card)} aria-label={card.label}
-                            className="px-4 py-2.5 min-h-[40px] rounded-full text-[14px] font-normal font-google transition-all max-w-full text-left break-words bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-800/80 shadow-sm hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)] hover:border-slate-300 dark:hover:border-slate-700 hover:shadow">
-                            {card.label}
+                          <input value={hubInput} onChange={e => setHubInput(e.target.value)} autoFocus
+                            placeholder={activeHubCard.input_label || 'Type your answer'}
+                            aria-label={activeHubCard.input_label || activeHubCard.label}
+                            className="flex-1 min-w-0 bg-transparent focus:outline-none text-[15px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
+                          <button type="submit" disabled={!hubInput.trim() || isLoading} aria-label="Submit"
+                            className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-slate-200 dark:bg-slate-700 transition-colors disabled:cursor-not-allowed ${hubInput.trim() && !isLoading ? 'text-blue-900 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                            <MIcon name="arrow_upward" className="text-[20px] leading-none" />
                           </button>
-                        ))}
+                        </form>
                       </div>
-                    )}
+                    </div>
                   </div>
                 ) : messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 ? (
                   <div className="flex flex-col items-start gap-2 px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">
