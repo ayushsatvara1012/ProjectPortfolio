@@ -7,9 +7,8 @@ and a real BI-console showcase. Low density, "big AI company" restraint. Approve
 (3 iterations) before this build.
 
 ## Locked design decisions (from the user)
-- Palette: **warm cream + cobalt accent**. Cobalt = `#004DE8` (light) / `#6E97FF` (dark). Paper
-  `#FAF9F5` / `#14130E`. Ink `#1A1914` / `#F5F3EB`.
-- Type: **keep Plus Jakarta Sans** (`font-google`) — no serif. Warmth comes from palette + space + doodles.
+- Palette: **exclusive off-white + midnight slate + cobalt accent**. Cobalt = `#004DE8` (light) / `#6E97FF` (dark). Off-White ground `#FAFAFC` / Midnight Slate `#0B0F19`. Ink `#0F172A` / `#F8FAFC`. (Custom theme, distinct from Claude's warm cream palette).
+- Type: **keep Plus Jakarta Sans** (`font-google`) — no serif. Modern clarity comes from sleek palette + space + doodles.
 - Feature cards: **3 pillars** (grounded answers, lead capture+scoring, ROI) + **owner tools**
   (Slack/email hot-lead handoff) + **advanced** (chemical vertical pack + BYOD Postgres).
 - Integrations row: **real only** — embed platforms (Next.js, React, WordPress, Shopify, Webflow, HTML)

@@ -16,30 +16,30 @@ const Check = () => (
 
 export default function HomePricing() {
   return (
-    <section id="pricing" className="bg-[#FAF9F5] dark:bg-[#14130E] py-28 lg:py-32 transition-colors duration-500">
+    <section id="pricing" className="bg-[#FAFAFC] dark:bg-[#0B0F19] py-28 lg:py-32 transition-colors duration-500">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-[640px] text-center">
           <span className="text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[#004DE8] dark:text-[#6E97FF]">Pricing</span>
-          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#1A1914] dark:text-[#F5F3EB] sm:text-4xl lg:text-[44px]">
+          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#0F172A] dark:text-[#F8FAFC] sm:text-4xl lg:text-[44px]">
             Start free. Upgrade when it pays for itself.
           </h2>
-          <p className="mt-4 font-google text-lg leading-relaxed text-[#57544B] dark:text-[#ABA79A]">
+          <p className="mt-4 font-google text-lg leading-relaxed text-[#475569] dark:text-[#94A3B8]">
             Every plan includes the full console — training, answers, lead capture, and ROI.
           </p>
         </div>
 
         {/* Explore — lifetime-free teaser */}
-        <div className="mx-auto mt-14 flex max-w-[860px] flex-col gap-4 rounded-2xl border border-[#E7E3D8] dark:border-[#2A2820] bg-white/60 dark:bg-[#1C1B15]/60 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto mt-14 flex max-w-[860px] flex-col gap-4 rounded-2xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white/60 dark:bg-[#111827]/60 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-google text-base font-bold text-[#1A1914] dark:text-[#F5F3EB]">Explore</span>
+              <span className="font-google text-base font-bold text-[#0F172A] dark:text-[#F8FAFC]">Explore</span>
               <span className="rounded-full border border-[#D3E0FD] dark:border-[#27375E] bg-[#EAF0FE] dark:bg-[#17203A] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#004DE8] dark:text-[#6E97FF]">Free forever</span>
             </div>
-            <p className="mt-1 font-google text-sm text-[#57544B] dark:text-[#ABA79A]">The full Vaayu Intelligence platform — free, forever. 1 bot · 1,000 messages / month.</p>
+            <p className="mt-1 font-google text-sm text-[#475569] dark:text-[#94A3B8]">The full Vaayu Intelligence platform — free, forever. 1 bot · 1,000 messages / month.</p>
           </div>
           <Link
             href="/pricing"
-            className="inline-flex shrink-0 items-center justify-center rounded-full border border-[#D9D4C6] dark:border-[#37342A] px-6 py-3 font-google text-sm font-semibold text-[#1A1914] dark:text-[#F5F3EB] transition-colors hover:border-[#928E82] dark:hover:border-[#706C61]"
+            className="inline-flex shrink-0 items-center justify-center rounded-full border border-[#CBD5E1] dark:border-[#1E293B] px-6 py-3 font-google text-sm font-semibold text-[#0F172A] dark:text-[#F8FAFC] transition-colors hover:border-[#94A3B8] dark:hover:border-[#475569]"
           >
             Learn more
           </Link>
@@ -53,10 +53,10 @@ export default function HomePricing() {
             return (
               <div
                 key={plan.id}
-                className={`flex flex-col rounded-[22px] bg-white dark:bg-[#1C1B15] p-8 shadow-[0_1px_1px_rgba(26,25,20,0.04),0_6px_16px_-10px_rgba(26,25,20,0.14)] dark:shadow-[0_1px_1px_rgba(0,0,0,0.5),0_8px_20px_-12px_rgba(0,0,0,0.6)] ${
+                className={`flex flex-col rounded-[22px] bg-white dark:bg-[#111827] p-8 shadow-[0_1px_1px_rgba(26,25,20,0.04),0_6px_16px_-10px_rgba(26,25,20,0.14)] dark:shadow-[0_1px_1px_rgba(0,0,0,0.5),0_8px_20px_-12px_rgba(0,0,0,0.6)] ${
                   featured
                     ? 'border-2 border-[#004DE8] dark:border-[#6E97FF]'
-                    : 'border border-[#E7E3D8] dark:border-[#2A2820]'
+                    : 'border border-[#E2E8F0] dark:border-[#1E293B]'
                 }`}
               >
                 {plan.badge && (
@@ -64,15 +64,15 @@ export default function HomePricing() {
                     {plan.badge}
                   </span>
                 )}
-                <div className="font-google text-[15px] font-semibold text-[#57544B] dark:text-[#ABA79A]">{plan.name}</div>
-                <div className="mt-3 font-google text-[42px] font-bold tracking-[-0.035em] text-[#1A1914] dark:text-[#F5F3EB]">
+                <div className="font-google text-[15px] font-semibold text-[#475569] dark:text-[#94A3B8]">{plan.name}</div>
+                <div className="mt-3 font-google text-[42px] font-bold tracking-[-0.035em] text-[#0F172A] dark:text-[#F8FAFC]">
                   ${price}
-                  <span className="font-google text-[15px] font-medium text-[#928E82] dark:text-[#706C61]"> / month</span>
+                  <span className="font-google text-[15px] font-medium text-[#64748B] dark:text-[#64748B]"> / month</span>
                 </div>
-                <p className="mt-2.5 min-h-[44px] font-google text-[14.5px] leading-[1.5] text-[#57544B] dark:text-[#ABA79A]">{plan.description}</p>
+                <p className="mt-2.5 min-h-[44px] font-google text-[14.5px] leading-[1.5] text-[#475569] dark:text-[#94A3B8]">{plan.description}</p>
                 <ul className="my-7 flex flex-1 flex-col gap-3">
                   {plan.features.slice(0, PREVIEW_FEATURE_COUNT).map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 font-google text-[14.5px] text-[#1A1914] dark:text-[#F5F3EB]">
+                    <li key={f} className="flex items-start gap-2.5 font-google text-[14.5px] text-[#0F172A] dark:text-[#F8FAFC]">
                       <Check />
                       <span>{f}</span>
                     </li>
@@ -83,7 +83,7 @@ export default function HomePricing() {
                   className={`inline-flex w-full items-center justify-center rounded-full px-6 py-3 font-google text-sm font-semibold transition-all duration-200 ${
                     featured
                       ? 'bg-[#004DE8] dark:bg-[#3E6BE0] text-white hover:bg-[#002B82] dark:hover:bg-[#2E5FD6]'
-                      : 'border border-[#D9D4C6] dark:border-[#37342A] text-[#1A1914] dark:text-[#F5F3EB] hover:border-[#928E82] dark:hover:border-[#706C61]'
+                      : 'border border-[#CBD5E1] dark:border-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] hover:border-[#94A3B8] dark:hover:border-[#475569]'
                   }`}
                 >
                   Get {plan.name}
@@ -96,7 +96,7 @@ export default function HomePricing() {
         <div className="mt-12 flex justify-center">
           <Link
             href="/pricing"
-            className="inline-flex items-center gap-2 rounded-full border border-[#D9D4C6] dark:border-[#37342A] px-8 py-3.5 font-google text-base font-semibold text-[#1A1914] dark:text-[#F5F3EB] transition-colors hover:border-[#928E82] dark:hover:border-[#706C61]"
+            className="inline-flex items-center gap-2 rounded-full border border-[#CBD5E1] dark:border-[#1E293B] px-8 py-3.5 font-google text-base font-semibold text-[#0F172A] dark:text-[#F8FAFC] transition-colors hover:border-[#94A3B8] dark:hover:border-[#475569]"
           >
             See full pricing
           </Link>

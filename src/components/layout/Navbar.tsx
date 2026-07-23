@@ -210,7 +210,7 @@ export default function Navbar() {
     <>
       <header className={`fixed top-0 w-full z-50 h-20 transition-[background-color,border-color,box-shadow] duration-500 will-change-[background-color] ${
         scrolled
-          ? 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl saturate-150 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
+          ? 'bg-[#FAFAFC]/80 dark:bg-[#0B0F19]/80 backdrop-blur-2xl saturate-150 border-b border-[#E2E8F0]/60 dark:border-[#1E293B]/60 shadow-[0_4px_30px_rgba(0,0,0,0.04)] dark:shadow-none'
           : 'bg-transparent'
       }`}>
         <div className="max-w-screen-2xl mx-auto h-full flex items-center justify-between transition-colors duration-500">
@@ -227,7 +227,7 @@ export default function Navbar() {
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
-                className="relative text-[15px] font-google font-normal antialiased text-slate-300 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
+                className="relative text-[15px] font-google font-normal antialiased text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors h-full flex items-center"
               >
                 {link.dropdown && link.dropdownType ? (() => {
                   const cfg = dropdownConfig[link.dropdownType];
@@ -235,7 +235,7 @@ export default function Navbar() {
                   return (
                   <button
                     onClick={() => setActiveDropdown(isActive ? null : link.dropdownType!)}
-                    className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
+                    className="text-[15px] font-google font-medium text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
                   >
                     {link.name}
                     <span
@@ -246,14 +246,14 @@ export default function Navbar() {
 
                     {/* Desktop Dropdown */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isActive ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      className={`absolute top-full -left-1/4 w-[760px] bg-[#FAFAFC]/95 dark:bg-[#0B0F19]/95 backdrop-blur-xl saturate-150 ring-1 ring-[#CBD5E1]/60 dark:ring-[#1E293B] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)] rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isActive ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
                       onMouseLeave={() => setActiveDropdown(null)}
                     >
                       <div className="flex p-8">
                         {/* Left Content */}
                         <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
                           <div>
-                            <h3 className="text-2xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-6 tracking-tight">
+                            <h3 className="text-2xl font-google font-medium text-[#0F172A] dark:text-[#F8FAFC] leading-tight mb-6 tracking-tight">
                               {cfg.heading}
                             </h3>
 
@@ -279,35 +279,35 @@ export default function Navbar() {
                                 )
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center p-5">
-                                  <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed text-center">
+                                  <p className="text-sm font-google text-[#64748B] dark:text-[#94A3B8] leading-relaxed text-center">
                                     {cfg.pitch}
                                   </p>
                                 </div>
                               )}
                             </div>
                           </div>
-                          <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
+                          <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className="px-5 py-2.5 bg-[#F1F5F9] dark:bg-[#111827] hover:bg-[#E2E8F0] dark:hover:bg-[#1E293B] border border-[#CBD5E1] dark:border-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] text-sm font-google font-medium rounded-full transition-colors">
                             {cfg.cta.label}
                           </Link>
                         </div>
 
                         {/* Right Content - Item List */}
-                        <div className="w-1/2 flex flex-col divide-y divide-slate-200/70 dark:divide-slate-800/70">
+                        <div className="w-1/2 flex flex-col divide-y divide-[#E2E8F0] dark:divide-[#1E293B]">
                           {cfg.items.map((service, idx) => {
                             return (
                                <Link
                                 key={`${link.dropdownType}-drop-${idx}`}
                                 href={service.href ?? cfg.itemHref}
                                 onClick={() => setActiveDropdown(null)}
-                                className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
+                                className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-[#F1F5F9] dark:hover:bg-[#111827]/60 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
                                   <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-70 group-hover/item:opacity-100 transition-opacity" />
-                                  <span className="text-[15px] font-google text-slate-700 dark:text-slate-300 group-hover/item:text-slate-900 dark:group-hover/item:text-slate-100 transition-colors">
+                                  <span className="text-[15px] font-google text-[#475569] dark:text-[#CBD5E1] group-hover/item:text-[#0F172A] dark:group-hover/item:text-[#F8FAFC] transition-colors">
                                     {service.title}
                                   </span>
                                 </div>
-                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 transition-all duration-300 ease-out">
+                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 group-hover/item:text-[#004DE8] dark:group-hover/item:text-[#6E97FF] group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 transition-all duration-300 ease-out">
                                   arrow_outward
                                 </span>
                               </Link>
@@ -322,10 +322,10 @@ export default function Navbar() {
                   <Link
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors py-2 relative group"
+                    className="text-[15px] font-google font-medium text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors py-2 relative group"
                   >
                     {link.name}
-                    <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+                    <div className="absolute -bottom-1 left-0 w-full h-px bg-[#0F172A] dark:bg-[#F8FAFC] scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
                   </Link>
                 )}
               </div>
@@ -337,14 +337,14 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
                 <SignInButton mode="redirect">
-                  <button className="text-[15px] font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
+                  <button className="text-[15px] font-google font-normal tracking-wider text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
                     Login
                   </button>
                 </SignInButton>
               </div>
               <div className="h-full flex items-center transition-colors duration-500">
                 <SignUpButton mode="redirect">
-                  <button className=" text-slate-600 dark:text-slate-200 text-[15px] font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
+                  <button className=" text-[#475569] dark:text-[#CBD5E1] text-[15px] font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-400 to-blue-500 transition-all duration-500">
                       Get Started
                     </span>
@@ -356,7 +356,7 @@ export default function Navbar() {
               <div className="h-full flex items-center px-3 lg:px-6 gap-6 transition-[background-color] duration-500 bg-transparent">
                 <Link
                   href="/dashboard"
-                  className="text-[15px] font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2"
+                  className="text-[15px] font-google font-normal tracking-wider text-[#475569] dark:text-[#CBD5E1] hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2"
                 >
                   <span className="material-symbols-outlined ">dashboard</span>
                   Dashboard
@@ -391,7 +391,7 @@ export default function Navbar() {
             </Show>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="h-16 w-16 flex items-center justify-center text-slate-900 dark:text-slate-200 rounded-none transition-colors bg-transparent active:bg-slate-50 dark:active:bg-slate-900"
+              className="h-16 w-16 flex items-center justify-center text-[#0F172A] dark:text-[#F8FAFC] rounded-none transition-colors bg-transparent active:bg-slate-50 dark:active:bg-slate-900"
               aria-label="Toggle Menu"
               aria-expanded={isOpen}
               aria-controls="mobile-nav-menu"
@@ -405,7 +405,7 @@ export default function Navbar() {
       {/* Mobile Navigation Menu */}
       <div
         id="mobile-nav-menu"
-        className={`fixed inset-0 top-20 z-40 bg-white dark:bg-slate-950 transition-all duration-500 ease-in-out lg:hidden flex flex-col ${
+        className={`fixed inset-0 top-20 z-40 bg-[#FAFAFC] dark:bg-[#0B0F19] transition-all duration-500 ease-in-out lg:hidden flex flex-col ${
           isOpen ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
         }`}
         style={{ touchAction: 'pan-y' }}
@@ -418,11 +418,11 @@ export default function Navbar() {
                 const cfg = dropdownConfig[link.dropdownType];
                 const isOpenMob = activeMobileDropdown === link.dropdownType;
                 return (
-                <div key={`nav-mob-${link.id}`} className="border-b border-gray-50 dark:border-slate-800/60">
+                <div key={`nav-mob-${link.id}`} className="border-b border-[#E2E8F0]/60 dark:border-[#1E293B]/60">
                   {/* Dropdown toggle row */}
                   <button
                     onClick={() => setActiveMobileDropdown(isOpenMob ? null : link.dropdownType!)}
-                    className="w-full px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
+                    className="w-full px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-[#0F172A] dark:text-[#F8FAFC] hover:bg-[#F1F5F9]/50 dark:hover:bg-[#111827]/50 transition-colors"
                   >
                     <span>{link.name}</span>
                     <span
@@ -439,7 +439,7 @@ export default function Navbar() {
 
                       {/* Header (mirrors desktop) */}
                       <div className="px-2 py-4 mb-2">
-                        <h4 className="text-xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-2 tracking-tight">
+                        <h4 className="text-xl font-google font-medium text-[#0F172A] dark:text-[#F8FAFC] leading-tight mb-2 tracking-tight">
                           {cfg.heading}
                         </h4>
                       </div>
@@ -453,20 +453,20 @@ export default function Navbar() {
                               setIsOpen(false);
                               setActiveMobileDropdown(null);
                             }}
-                            className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-300"
+                            className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-[#F1F5F9]/50 dark:bg-[#111827]/40 hover:bg-[#E2E8F0] dark:hover:bg-[#1E293B]/60 transition-all duration-300"
                           >
                             <div className="flex items-center gap-4">
                               <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-40 group-hover/item:opacity-80 transition-opacity" />
                               <div className="flex flex-col">
-                                <span className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-200 transition-colors">
+                                <span className="text-[15px] font-google font-medium text-[#0F172A] dark:text-[#F8FAFC] transition-colors">
                                   {service.title}
                                 </span>
-                                <span className="text-xs font-google text-slate-500 dark:text-slate-500">
+                                <span className="text-xs font-google text-[#64748B] dark:text-[#94A3B8]">
                                   {service.price}
                                 </span>
                               </div>
                             </div>
-                            <span className="material-symbols-outlined text-[16px] text-slate-300 dark:text-slate-600 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors">
+                            <span className="material-symbols-outlined text-[16px] text-slate-300 dark:text-slate-600 group-hover/item:text-[#004DE8] dark:group-hover/item:text-[#6E97FF] transition-colors">
                               chevron_right
                             </span>
                           </Link>
@@ -476,7 +476,7 @@ export default function Navbar() {
                       <Link
                         href={cfg.cta.href}
                         onClick={() => setIsOpen(false)}
-                        className="mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-slate-100 dark:bg-slate-800 text-sm font-google font-medium text-slate-900 dark:text-white transition-colors"
+                        className="mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-[#F1F5F9] dark:bg-[#111827] text-sm font-google font-medium text-[#0F172A] dark:text-[#F8FAFC] transition-colors"
                       >
                         {cfg.cta.label}
                         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -491,7 +491,7 @@ export default function Navbar() {
                   key={`nav-mob-${link.id || link.name}`}
                   href={link.href}
                   onClick={(e) => handleLinkClick(e, link.href)}
-                  className="w-full border-b border-gray-50 dark:border-slate-800/60 px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
+                  className="w-full border-b border-[#E2E8F0]/60 dark:border-[#1E293B]/60 px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-[#0F172A] dark:text-[#F8FAFC] hover:bg-[#F1F5F9]/50 dark:hover:bg-[#111827]/50 transition-colors"
                 >
                   <span>{link.name}</span>
                   <span className="material-symbols-outlined text-[18px] opacity-40">chevron_right</span>
@@ -502,7 +502,7 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Bottom CTA Section */}
-        <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
+        <div className="p-6 sm:p-8 bg-[#FAFAFC] dark:bg-[#0B0F19] space-y-4 border-t border-[#E2E8F0] dark:border-[#1E293B] shrink-0">
             <Show when="signed-out">
               <div className="flex flex-row gap-3">
                 <SignUpButton mode="redirect">

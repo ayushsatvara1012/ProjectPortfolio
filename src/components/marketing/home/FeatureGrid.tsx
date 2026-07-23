@@ -7,8 +7,8 @@ import React from 'react';
 
 function Moment({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-[232px] items-center justify-center overflow-hidden rounded-2xl bg-[#F2F0E8] dark:bg-[#1B1913] px-6 py-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#DAD5C7_1px,transparent_1px)] dark:bg-[radial-gradient(#2E2B22_1px,transparent_1px)] [background-size:16px_16px]" />
+    <div className="relative flex min-h-[232px] items-center justify-center overflow-hidden rounded-2xl bg-[#F1F5F9] dark:bg-[#0F172A] px-6 py-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] dark:bg-[radial-gradient(#1E293B_1px,transparent_1px)] [background-size:16px_16px]" />
       <div className="relative w-full max-w-[330px]">{children}</div>
     </div>
   );
@@ -16,8 +16,8 @@ function Moment({ children }: { children: React.ReactNode }) {
 
 function BotDot() {
   return (
-    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#1A1914] dark:bg-[#F5F3EB]">
-      <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-[#FAF9F5] dark:text-[#14130E]" aria-hidden="true">
+    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#0F172A] dark:bg-[#F8FAFC]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-[#FAFAFC] dark:text-[#0B0F19]" aria-hidden="true">
         <path d="M12 3l2 5 5 1-3.5 3.5L17 18l-5-2.5L7 18l.5-5.5L4 9l5-1z" fill="currentColor" />
       </svg>
     </span>
@@ -25,26 +25,26 @@ function BotDot() {
 }
 
 const cardShell =
-  'flex flex-col overflow-hidden rounded-[22px] border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] p-3 shadow-[0_1px_1px_rgba(26,25,20,0.04),0_6px_16px_-10px_rgba(26,25,20,0.14)] dark:shadow-[0_1px_1px_rgba(0,0,0,0.5),0_8px_20px_-12px_rgba(0,0,0,0.6)]';
-const cardTitle = 'font-google text-xl font-bold tracking-[-0.02em] text-[#1A1914] dark:text-[#F5F3EB]';
-const cardBody = 'mt-2.5 font-google text-[15px] leading-[1.55] text-[#57544B] dark:text-[#ABA79A]';
+  'flex flex-col overflow-hidden rounded-[22px] border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] p-3 shadow-[0_1px_1px_rgba(26,25,20,0.04),0_6px_16px_-10px_rgba(26,25,20,0.14)] dark:shadow-[0_1px_1px_rgba(0,0,0,0.5),0_8px_20px_-12px_rgba(0,0,0,0.6)]';
+const cardTitle = 'font-google text-xl font-bold tracking-[-0.02em] text-[#0F172A] dark:text-[#F8FAFC]';
+const cardBody = 'mt-2.5 font-google text-[15px] leading-[1.55] text-[#475569] dark:text-[#94A3B8]';
 const qBubble =
-  'inline-flex items-center gap-2 rounded-xl border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] px-3 py-2 text-[13px] text-[#1A1914] dark:text-[#F5F3EB] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]';
-const aBubble = 'inline-flex items-center gap-2 rounded-xl bg-[#1A1914] dark:bg-[#F5F3EB] px-3 py-2 text-[13px] text-[#FAF9F5] dark:text-[#14130E]';
+  'inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] px-3 py-2 text-[13px] text-[#0F172A] dark:text-[#F8FAFC] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]';
+const aBubble = 'inline-flex items-center gap-2 rounded-xl bg-[#0F172A] dark:bg-[#F8FAFC] px-3 py-2 text-[13px] text-[#FAFAFC] dark:text-[#0B0F19]';
 const avatarSm = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EAF0FE] dark:bg-[#17203A] text-[11px] font-bold text-[#004DE8] dark:text-[#6E97FF]';
 const notif =
-  'flex items-center gap-2.5 rounded-xl border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] px-3 py-2.5 text-[12.5px] text-[#1A1914] dark:text-[#F5F3EB] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]';
+  'flex items-center gap-2.5 rounded-xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] px-3 py-2.5 text-[12.5px] text-[#0F172A] dark:text-[#F8FAFC] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]';
 
 export default function FeatureGrid() {
   return (
-    <section id="features" className="bg-[#FAF9F5] dark:bg-[#14130E] py-28 lg:py-32 transition-colors duration-500">
+    <section id="features" className="bg-[#FAFAFC] dark:bg-[#0B0F19] py-28 lg:py-32 transition-colors duration-500">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-[640px] text-center">
           <span className="text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[#004DE8] dark:text-[#6E97FF]">What it does</span>
-          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#1A1914] dark:text-[#F5F3EB] sm:text-4xl lg:text-[44px]">
+          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#0F172A] dark:text-[#F8FAFC] sm:text-4xl lg:text-[44px]">
             Everything your website needs to answer, capture, and convert
           </h2>
-          <p className="mt-4 font-google text-lg leading-relaxed text-[#57544B] dark:text-[#ABA79A]">
+          <p className="mt-4 font-google text-lg leading-relaxed text-[#475569] dark:text-[#94A3B8]">
             One agent trained on your content — doing the work of a support rep and a sales rep at once.
           </p>
         </div>
@@ -59,13 +59,13 @@ export default function FeatureGrid() {
                   <span className={avatarSm}>C</span>
                 </div>
                 <svg viewBox="0 0 120 26" className="ml-3.5 h-[26px] w-[120px]" aria-hidden="true">
-                  <path d="M6 0 V13 H114" fill="none" stroke="#D9D4C6" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#37342A]" />
+                  <path d="M6 0 V13 H114" fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#1E293B]" />
                 </svg>
                 <div className="flex items-start gap-2">
                   <BotDot />
                   <span className={aBubble}>33&nbsp;°C, closed cup.</span>
                 </div>
-                <div className="ml-[35px] flex items-center gap-3 rounded-xl border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] px-3.5 py-3 shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
+                <div className="ml-[35px] flex items-center gap-3 rounded-xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] px-3.5 py-3 shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
                   <span className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-[#EAF0FE] dark:bg-[#17203A] text-[#004DE8] dark:text-[#6E97FF]">
                     <svg viewBox="0 0 24 24" fill="none" className="h-[17px] w-[17px]" aria-hidden="true">
                       <rect x="4" y="3" width="16" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
@@ -73,8 +73,8 @@ export default function FeatureGrid() {
                     </svg>
                   </span>
                   <div>
-                    <div className="text-[13px] font-semibold text-[#1A1914] dark:text-[#F5F3EB]">SDS_thinner.pdf</div>
-                    <div className="text-[11.5px] text-[#928E82] dark:text-[#706C61]">section 4.2</div>
+                    <div className="text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">SDS_thinner.pdf</div>
+                    <div className="text-[11.5px] text-[#64748B] dark:text-[#64748B]">section 4.2</div>
                   </div>
                   <span className="ml-auto rounded-md bg-[#E4F1EA] dark:bg-[#11251C] px-2 py-1 text-[10.5px] font-bold tracking-wide text-[#157A52] dark:text-[#45C089]">grounded ✓</span>
                 </div>
@@ -101,17 +101,17 @@ export default function FeatureGrid() {
                   <span className={aBubble}>Sure — let me grab a couple of details.</span>
                 </div>
                 <svg viewBox="0 0 120 22" className="mx-auto h-[22px] w-[120px]" aria-hidden="true">
-                  <path d="M60 0 V18" fill="none" stroke="#D9D4C6" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#37342A]" />
+                  <path d="M60 0 V18" fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#1E293B]" />
                 </svg>
-                <div className="flex items-center gap-3 rounded-xl border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] px-3.5 py-3 shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
+                <div className="flex items-center gap-3 rounded-xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] px-3.5 py-3 shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F7E9DC] dark:bg-[#2a1c11] text-[14px] font-bold text-[#C25A1B] dark:text-[#E9945B]">R</span>
                   <div>
-                    <div className="text-[13px] font-semibold text-[#1A1914] dark:text-[#F5F3EB]">Rajesh — bulk 200 L order</div>
-                    <div className="text-[11.5px] text-[#928E82] dark:text-[#706C61]">quote + delivery to Surat</div>
+                    <div className="text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Rajesh — bulk 200 L order</div>
+                    <div className="text-[11.5px] text-[#64748B] dark:text-[#64748B]">quote + delivery to Surat</div>
                   </div>
                   <div className="ml-auto text-right">
                     <div className="text-[10px] font-bold tracking-[0.08em] text-[#C25A1B] dark:text-[#E9945B]">HOT</div>
-                    <div className="text-[19px] font-bold tabular-nums text-[#1A1914] dark:text-[#F5F3EB]">92</div>
+                    <div className="text-[19px] font-bold tabular-nums text-[#0F172A] dark:text-[#F8FAFC]">92</div>
                   </div>
                 </div>
               </div>
@@ -129,9 +129,9 @@ export default function FeatureGrid() {
             {/* ROI */}
             <div className={cardShell}>
               <Moment>
-                <div className="w-full max-w-[300px] rounded-2xl border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] p-[18px] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
-                  <div className="text-[11.5px] font-semibold text-[#928E82] dark:text-[#706C61]">Attributed revenue · 30d</div>
-                  <div className="mt-0.5 text-[28px] font-bold tracking-[-0.03em] text-[#1A1914] dark:text-[#F5F3EB]">
+                <div className="w-full max-w-[300px] rounded-2xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] p-[18px] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
+                  <div className="text-[11.5px] font-semibold text-[#64748B] dark:text-[#64748B]">Attributed revenue · 30d</div>
+                  <div className="mt-0.5 text-[28px] font-bold tracking-[-0.03em] text-[#0F172A] dark:text-[#F8FAFC]">
                     $18,940 <span className="text-[12px] font-semibold text-[#157A52] dark:text-[#45C089]">▲34%</span>
                   </div>
                   <svg viewBox="0 0 260 64" preserveAspectRatio="none" className="mt-3 h-14 w-full" aria-hidden="true">
@@ -156,7 +156,7 @@ export default function FeatureGrid() {
                     Hot lead — notify owner
                   </span>
                   <svg viewBox="0 0 200 20" className="h-5 w-[180px]" aria-hidden="true">
-                    <path d="M40 2 V10 H160 M100 2 V10" fill="none" stroke="#D9D4C6" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#37342A]" />
+                    <path d="M40 2 V10 H160 M100 2 V10" fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#1E293B]" />
                   </svg>
                   <div className="flex w-full flex-col gap-2.5">
                     <div className={notif}>
@@ -190,7 +190,7 @@ export default function FeatureGrid() {
                     </span>
                     <div><b className="font-semibold">Chemical pack</b> · SDS, quotes, samples</div>
                   </div>
-                  <span className="inline-flex items-center rounded-full border border-[#E7E3D8] dark:border-[#2A2820] bg-[#F2F0E8] dark:bg-[#1B1913] px-3.5 py-1.5 text-[12px] font-bold text-[#1A1914] dark:text-[#F5F3EB]">config, not code</span>
+                  <span className="inline-flex items-center rounded-full border border-[#E2E8F0] dark:border-[#1E293B] bg-[#F1F5F9] dark:bg-[#0F172A] px-3.5 py-1.5 text-[12px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">config, not code</span>
                   <div className={`${notif} w-full`}>
                     <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg bg-[#EAF0FE] text-[#004DE8] dark:bg-[#17203A] dark:text-[#6E97FF]">
                       <svg viewBox="0 0 24 24" fill="none" className="h-[15px] w-[15px]" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3" stroke="currentColor" strokeWidth="1.7" /><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3" stroke="currentColor" strokeWidth="1.7" /></svg>

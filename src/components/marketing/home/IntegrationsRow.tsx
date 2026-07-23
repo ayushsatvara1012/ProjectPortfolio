@@ -24,14 +24,14 @@ const chips: Chip[] = [
 
 export default function IntegrationsRow() {
   return (
-    <section className="bg-[#FAF9F5] dark:bg-[#14130E] py-28 lg:py-32 text-center transition-colors duration-500">
+    <section className="bg-[#FAFAFC] dark:bg-[#0B0F19] py-28 lg:py-32 text-center transition-colors duration-500">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-[640px]">
           <span className="text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[#004DE8] dark:text-[#6E97FF]">Works where you already are</span>
-          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#1A1914] dark:text-[#F5F3EB] sm:text-4xl lg:text-[44px]">
+          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#0F172A] dark:text-[#F8FAFC] sm:text-4xl lg:text-[44px]">
             Drops into your site, talks to your team
           </h2>
-          <p className="mt-4 font-google text-lg leading-relaxed text-[#57544B] dark:text-[#ABA79A]">
+          <p className="mt-4 font-google text-lg leading-relaxed text-[#475569] dark:text-[#94A3B8]">
             Embed on any platform, and Vaayu reaches you where you work.
           </p>
         </div>
@@ -39,7 +39,7 @@ export default function IntegrationsRow() {
           {chips.map((c) => (
             <span
               key={c.label}
-              className="inline-flex items-center gap-2.5 rounded-full border border-[#E7E3D8] dark:border-[#2A2820] bg-white dark:bg-[#1C1B15] px-[18px] py-2.5 text-[14.5px] font-semibold text-[#1A1914] dark:text-[#F5F3EB] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]"
+              className="inline-flex items-center gap-2.5 rounded-full border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] px-[18px] py-2.5 text-[14.5px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]"
             >
               <span className="grid h-[18px] w-[18px] place-items-center text-[#004DE8] dark:text-[#6E97FF]">{c.icon}</span>
               {c.label}

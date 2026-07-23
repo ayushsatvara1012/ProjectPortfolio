@@ -502,7 +502,13 @@ export default function PreFooterCanvas() {
         }
       }
 
-      // Render Fixed 2D Grid Dots (Pure Grayscale, Solid & Non-Blinking)
+      // Render Fixed 2D Grid Dots (Theme-Aware, High-Performance Canvas Loop)
+      const isDark = typeof window !== 'undefined' && (
+        document.documentElement.classList.contains('dark') ||
+        document.body.classList.contains('dark') ||
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+      );
+
       for (let i = 0; i < dots.length; i++) {
         const dot = dots[i];
 
@@ -511,27 +517,44 @@ export default function PreFooterCanvas() {
         dot.currentIntensity += (dot.targetIntensity - dot.currentIntensity) * lerpFactor;
         dot.currentDepthScale += (dot.targetDepthScale - dot.currentDepthScale) * lerpFactor;
 
-        // Steady base ambient opacity (blinking & flickering disabled)
-        const baseAmbientOpacity = 0.085; // Steady 8.5% background grid opacity
+        // Steady base ambient opacity
+        const baseAmbientOpacity = isDark ? 0.08 : 0.12;
 
-        // Illuminated Opacity (Pure Grayscale White)
-        // Active dots scale smoothly from ambient 0.085 to bright white 0.96
+        // Illuminated Opacity
         const activeOpacity = dot.currentIntensity * 0.88 * dot.currentDepthScale;
         const finalAlpha = Math.min(0.96, Math.max(baseAmbientOpacity, baseAmbientOpacity + activeOpacity));
 
-        // Minimal radius scale (from 1.0px ambient to 1.2px front-face max)
-        const dotRadius = dot.baseRadius + dot.currentIntensity * dot.currentDepthScale * 0.2;
+        // Minimal radius scale
+        const dotRadius = dot.baseRadius + dot.currentIntensity * dot.currentDepthScale * 0.3;
 
         ctx.beginPath();
         ctx.arc(dot.x, dot.y, dotRadius, 0, Math.PI * 2);
 
-        // Pure Grayscale Rendering (High contrast crisp white)
-        if (dot.currentIntensity > 0.1) {
-          const brightness = Math.floor(210 + dot.currentDepthScale * 45); // 210 to 255 grayscale
-          ctx.fillStyle = `rgba(${brightness}, ${brightness}, ${brightness}, ${finalAlpha.toFixed(3)})`;
+        if (isDark) {
+          // Dark Mode: Midnight Slate (#0B0F19) ground, Luminous Crisp White & Slate-Blue 3D depth
+          if (dot.currentIntensity > 0.08) {
+            const depthRatio = Math.max(0, Math.min(1, dot.currentDepthScale));
+            // Front-face: brilliant luminous white (255, 255, 255), Back-face: glowing slate blue (148, 163, 184)
+            const r = Math.floor(148 + depthRatio * 107);
+            const g = Math.floor(163 + depthRatio * 92);
+            const b = Math.floor(184 + depthRatio * 71);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${finalAlpha.toFixed(3)})`;
+          } else {
+            // Ambient grid dots in Dark Mode: subtle low-contrast dark slate
+            ctx.fillStyle = `rgba(51, 65, 85, ${(baseAmbientOpacity * 1.2).toFixed(3)})`;
+          }
         } else {
-          // Ambient dim gray dots (matching image grid pattern)
-          ctx.fillStyle = `rgba(215, 225, 240, ${finalAlpha.toFixed(3)})`;
+          // Light Mode: Off-white (#FAFAFC) ground, High-Definition Deep Slate Navy (#0F172A) 3D depth
+          if (dot.currentIntensity > 0.08) {
+            const depthRatio = Math.max(0, Math.min(1, dot.currentDepthScale));
+            // Front-face: crisp dark slate navy (15, 23, 42), Back-face: medium slate (71, 85, 105)
+            const r = Math.floor(71 - depthRatio * 56);
+            const g = Math.floor(85 - depthRatio * 62);
+            const b = Math.floor(105 - depthRatio * 63);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${finalAlpha.toFixed(3)})`;
+          } else {
+            ctx.fillStyle = `rgba(203, 213, 225, ${(baseAmbientOpacity * 1.5).toFixed(3)})`;
+          }
         }
         ctx.fill();
       }
@@ -607,12 +630,7 @@ export default function PreFooterCanvas() {
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="relative w-full min-h-screen h-screen bg-slate-950 text-white overflow-hidden select-none border-t border-b border-slate-900 flex items-center justify-center"
-      style={{
-        // Smooth top and bottom fade mask for seamless dark theme integration
-        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
-        maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
-      }}
+      className="relative w-full min-h-screen h-screen bg-[#FAFAFC] dark:bg-[#0B0F19] text-[#0F172A] dark:text-white overflow-hidden select-none flex items-center justify-center transition-colors duration-500"
     >
       {/* HTML5 Fixed Dot Matrix Canvas Layer */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block z-0 cursor-default" />

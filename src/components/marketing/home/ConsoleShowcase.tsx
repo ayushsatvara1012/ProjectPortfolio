@@ -11,7 +11,7 @@ const funnel = [
 
 export default function ConsoleShowcase() {
   return (
-    <section id="console" className="bg-[#FAF9F5] dark:bg-[#14130E] py-28 lg:py-32 transition-colors duration-500">
+    <section id="console" className="bg-[#FAFAFC] dark:bg-[#0B0F19] py-28 lg:py-32 transition-colors duration-500">
       <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 lg:grid-cols-[1.35fr_0.65fr] lg:gap-14">
         {/* Dark console panel */}
         <div className="relative min-h-[320px] overflow-hidden rounded-[22px] bg-[radial-gradient(130%_130%_at_15%_10%,#1d2740,#12121b_60%)] p-7 sm:p-8 shadow-[0_16px_44px_-22px_rgba(26,25,20,0.4)]">
@@ -48,10 +48,10 @@ export default function ConsoleShowcase() {
               <path d="M4 20V10M9 20V4M14 20v-7M19 20V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <h2 className="font-google text-2xl font-bold leading-[1.12] tracking-[-0.03em] text-[#1A1914] dark:text-[#F5F3EB] sm:text-[32px]">
+          <h2 className="font-google text-2xl font-bold leading-[1.12] tracking-[-0.03em] text-[#0F172A] dark:text-[#F8FAFC] sm:text-[32px]">
             One console for the whole funnel
           </h2>
-          <p className="mt-3.5 font-google text-[16.5px] leading-[1.55] text-[#57544B] dark:text-[#ABA79A]">
+          <p className="mt-3.5 font-google text-[16.5px] leading-[1.55] text-[#475569] dark:text-[#94A3B8]">
             Visitors, chats, leads, conversions, and dollars — all in one BI console, updated in real time. Finally know exactly what your website chat is worth.
           </p>
         </div>

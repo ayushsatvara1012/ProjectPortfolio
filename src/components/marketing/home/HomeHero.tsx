@@ -8,10 +8,10 @@ export default function HomeHero() {
   return (
     <section
       id="home"
-      className="relative bg-[#FAF9F5] dark:bg-[#14130E] pt-28 lg:pt-36 pb-0 overflow-x-clip transition-colors duration-500"
+      className="relative bg-[#FAFAFC] dark:bg-[#0B0F19] pt-28 lg:pt-36 pb-0 overflow-x-clip transition-colors duration-500"
     >
       <div className="max-w-3xl mx-auto px-6 text-center">
-        <div className="w-[74px] h-[62px] mx-auto mb-7 text-[#1A1914] dark:text-[#F5F3EB]" aria-hidden="true">
+        <div className="w-[74px] h-[62px] mx-auto mb-7 text-[#0F172A] dark:text-[#F8FAFC]" aria-hidden="true">
           <svg viewBox="0 0 78 66" fill="none" className="w-full h-full">
             <path d="M8 30c0-11 9-19 24-19s26 7 26 19-11 18-26 18c-4 0-7-.4-10-1.2L9 52l3-9.5C9.6 39.6 8 35 8 30Z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
             <path d="M23 27c6-3 13-3 20 0M23 34c5-2.4 11-2.4 15 0" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
@@ -19,13 +19,13 @@ export default function HomeHero() {
           </svg>
         </div>
 
-        <h1 className="font-google font-bold tracking-[-0.04em] leading-[1.03] text-[#1A1914] dark:text-[#F5F3EB] text-[40px] sm:text-[54px] lg:text-[64px]">
+        <h1 className="font-google font-bold tracking-[-0.04em] leading-[1.03] text-[#0F172A] dark:text-[#F8FAFC] text-[40px] sm:text-[54px] lg:text-[64px]">
           Give your website an
           <br />
           intelligence that <span className="text-[#004DE8] dark:text-[#6E97FF]">answers.</span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-[34ch] font-google text-[#57544B] dark:text-[#ABA79A] text-[17px] sm:text-lg leading-[1.55]">
+        <p className="mx-auto mt-6 max-w-[34ch] font-google text-[#475569] dark:text-[#94A3B8] text-[17px] sm:text-lg leading-[1.55]">
           Vaayu learns your business, answers every customer 24/7, captures the leads, and shows you the revenue it earned.
         </p>
 
@@ -38,20 +38,20 @@ export default function HomeHero() {
           </Link>
           <a
             href="#console"
-            className="inline-flex items-center gap-2 rounded-full border border-[#D9D4C6] dark:border-[#37342A] px-7 py-3.5 text-base font-google font-semibold text-[#1A1914] dark:text-[#F5F3EB] transition-all duration-200 hover:border-[#928E82] dark:hover:border-[#706C61] hover:-translate-y-0.5"
+            className="inline-flex items-center gap-2 rounded-full border border-[#CBD5E1] dark:border-[#1E293B] px-7 py-3.5 text-base font-google font-semibold text-[#0F172A] dark:text-[#F8FAFC] transition-all duration-200 hover:border-[#94A3B8] dark:hover:border-[#475569] hover:-translate-y-0.5"
           >
             See the console
           </a>
         </div>
 
-        <p className="mt-5 font-google text-[13.5px] text-[#928E82] dark:text-[#706C61]">
+        <p className="mt-5 font-google text-[13.5px] text-[#64748B] dark:text-[#64748B]">
           Free forever tier · no credit card · live in 5 minutes
         </p>
       </div>
 
       {/* Tinted product showcase */}
       <div className="max-w-6xl mx-auto px-6 mt-16 sm:mt-[68px]">
-        <div className="relative overflow-hidden rounded-t-[28px] rounded-b-none border border-b-0 border-[#D3E0FD] dark:border-[#27375E] bg-[radial-gradient(120%_140%_at_50%_-10%,#EAF0FD,#DEE7FB)] dark:bg-[radial-gradient(120%_140%_at_50%_-10%,#141d33,#18233E)] px-5 sm:px-10 pt-8 sm:pt-14">
+        <div className="relative overflow-hidden rounded-t-[28px] rounded-b-none border border-b-0 border-[#CBD5E1] dark:border-[#1E293B] bg-[radial-gradient(120%_140%_at_50%_-10%,#EFF6FF,#DBEAFE)] dark:bg-[radial-gradient(120%_140%_at_50%_-10%,#0F172A,#1E293B)] px-5 sm:px-10 pt-8 sm:pt-14">
           <p className="relative mb-5 text-[13px] font-google font-semibold text-[#002B82]/80 dark:text-[#6E97FF]">
             Vaayu, answering a real customer — grounded in your documents
           </p>
