@@ -1255,21 +1255,17 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
         <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
-          className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
+          className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors shrink-0">
           <MIcon name="arrow_back" className="text-[18px] leading-none" />
           {/* Only the chat-typed entry point interrupted an in-progress chat
               turn, so only it gets the explicit "back to chat" affordance —
               the hub-card entry keeps the plain icon-only back it always had. */}
           {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
         </button>
-        <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100 ml-1">Get SDS</span>
-      </div>
-
-      <div className="px-3.5 pt-3 shrink-0">
-        <div className="relative flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+        <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
           <MIcon name="search" className="text-[16px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
           <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
-            placeholder="Search products or CAS…" aria-label="Search products"
+            placeholder="Search product SDS" aria-label="Search products"
             className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
           {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
         </div>
@@ -1292,20 +1288,17 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
                   {[selected.cas_number, selected.updated_at ? `Updated ${formatRelativeDate(selected.updated_at)}` : null].filter(Boolean).join(' · ')}
                 </div>
               )}
-              <div className="mt-2">
-                <SdsPreview url={selected.url} themeColor={themeColor} />
-              </div>
               <div className="mt-2 flex items-center gap-2">
                 <a href={selected.url} target="_blank" rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
                   style={{ borderColor: themeColor, color: themeColor }}>
                   <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                 </a>
-                <a href={selected.url} download target="_blank" rel="noopener noreferrer"
+                <button type="button" onClick={() => downloadSds(selected.url, `${selected.product || 'safety-data-sheet'}.pdf`)}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
                   style={{ borderColor: themeColor, color: themeColor }}>
                   <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -1351,59 +1344,27 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
   );
 }
 
-// Inline PDF preview for an SDS card (Phase 5c/5d). A host that blocks
-// embedding via X-Frame-Options/CSP is NOT reliably distinguishable from a
-// successful cross-origin load purely from script: both can fire the
-// iframe's `load` event, and cross-origin content is opaque to same-origin
-// JS (no way to inspect what actually rendered) — this is a well-known web
-// platform limitation, not something a heuristic can fully solve. What IS
-// reliably detectable is a load that never happens at all (network failure
-// or a genuinely hanging host), so that is what the timeout guards (D5): if
-// nothing loads within PREVIEW_LOAD_TIMEOUT_MS, collapse to the fallback.
-// Open/Download stay visible below the preview regardless (5c), so a host
-// that blocks embedding silently still leaves the visitor with a working
-// path — just without the explicit "unavailable" message for that specific
-// case.
-const PREVIEW_LOAD_TIMEOUT_MS = 4000;
-
-function SdsPreview({ url, themeColor }: { url: string; themeColor: string }) {
-  const [failed, setFailed] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    setFailed(false);
-    let loaded = false;
-    const el = iframeRef.current;
-    const handleLoad = () => { loaded = true; };
-    el?.addEventListener('load', handleLoad);
-    const timer = window.setTimeout(() => {
-      if (!loaded) setFailed(true);
-    }, PREVIEW_LOAD_TIMEOUT_MS);
-    return () => {
-      window.clearTimeout(timer);
-      el?.removeEventListener('load', handleLoad);
-    };
-  }, [url]);
-
-  if (failed) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 py-6 px-3 text-center bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-700">
-        <span className="text-[12px] font-google text-slate-500 dark:text-slate-400">Preview unavailable — open in a new tab</span>
-        <a href={url} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-google font-bold text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: themeColor }}>
-          <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
-        </a>
-      </div>
-    );
+// Best-effort real download for an SDS: an <a download> is silently ignored
+// by the browser for cross-origin URLs (no way around that from script), so
+// this fetches the file and saves it via a blob URL when the host's CORS
+// headers allow it, falling back to the old "open in a new tab" behavior —
+// never worse than before, just better when the host cooperates.
+async function downloadSds(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`SDS download failed: ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
-
-  return (
-    <div className="w-full h-48 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900">
-      <iframe ref={iframeRef} src={url} title="Safety Data Sheet preview" className="w-full h-full"
-        onError={() => setFailed(true)} />
-    </div>
-  );
 }
 
 // ── ChatWidget ────────────────────────────────────────────────────────────────
