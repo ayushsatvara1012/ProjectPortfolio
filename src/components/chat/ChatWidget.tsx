@@ -3024,7 +3024,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         <form onSubmit={(e) => { e.preventDefault(); submitHubCard(); }}
                           className="relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 pl-3.5 pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
                           {activeHubCard.input_source === 'products' && (
-                            <MIcon name="search" className="text-[18px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
+                            // Same search icon as the one that opened this list (main chat
+                            // input) — clicking it here closes the list back to plain chat,
+                            // making it a real open/close toggle instead of a dead end.
+                            <button type="button" onClick={() => setActiveHubCard(null)} aria-label="Close product search" title="Close product search"
+                              className="shrink-0 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                              <MIcon name="search" className="text-[18px] leading-none" />
+                            </button>
                           )}
                           <input value={hubInput} onChange={e => setHubInput(e.target.value)} autoFocus
                             placeholder={activeHubCard.input_label || 'Type your answer'}
