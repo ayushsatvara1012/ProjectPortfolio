@@ -2992,14 +2992,28 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
             {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && (
               <div className={`shrink-0 z-10 flex flex-col bg-transparent`}>
-                {hasHub && activeHubCard ? (
-                  // A "tool" hub card tapped from Home swaps in its slot
-                  // mini-form here. The fresh-conversation pill strip that
-                  // used to duplicate the Home grid's cards as plain-text
-                  // buttons was removed — the Home grid tiles are now the
-                  // only entry point, and each feature will eventually get
-                  // its own dedicated panel there (as SDS already has).
-                  <div className="px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">
+                {!activeHubCard && messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 && (
+                  <div className="flex flex-col items-start gap-2 px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">
+                    {configData.quick_questions.map((q, qidx) => {
+                      const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
+                      if (!label) return null;
+                      return (
+                        <button key={qidx} onClick={() => sendMessage(label)}
+                          className="px-4 py-2.5 min-h-[40px] rounded-full text-[14px] font-normal font-google transition-all max-w-full text-left break-words bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-800/80 shadow-sm hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)] hover:border-slate-300 dark:hover:border-slate-700 hover:shadow">
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="px-4 sm:px-5 pt-2 w-full max-w-3xl mx-auto" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
+                  {/* The hub mini-form and the regular chat input share this exact
+                    wrapper (same padding, same position in the layout) so swapping
+                    between them never shifts the input row on screen — only its
+                    contents change. Previously these were two separate wrapper divs
+                    stacked in the flow, which visibly offset the mini-form's input a
+                    little higher than the regular input's resting position. */}
+                  {hasHub && activeHubCard ? (
                     <div className="flex flex-col gap-2">
                       {/* Back sits at the top so the visitor can return to asking;
                         below it is the single required field (no duplicate input). */}
@@ -3043,27 +3057,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                         </form>
                       </div>
                     </div>
-                  </div>
-                ) : messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 ? (
-                  <div className="flex flex-col items-start gap-2 px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">
-                    {configData.quick_questions.map((q, qidx) => {
-                      const label = typeof q === 'string' ? q : (q.label || q.prompt || '');
-                      if (!label) return null;
-                      return (
-                        <button key={qidx} onClick={() => sendMessage(label)}
-                          className="px-4 py-2.5 min-h-[40px] rounded-full text-[14px] font-normal font-google transition-all max-w-full text-left break-words bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-800/80 shadow-sm hover:text-[var(--sapy-theme)] dark:hover:text-[var(--sapy-theme)] hover:border-slate-300 dark:hover:border-slate-700 hover:shadow">
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-                <div className="px-4 sm:px-5 pt-2 w-full max-w-3xl mx-auto" style={{ paddingBottom: isMobile ? 'var(--sapy-safe-bottom, env(safe-area-inset-bottom, 8px))' : 'env(safe-area-inset-bottom, 8px)' }}>
-                  {/* Hide the main chat input while a hub mini-form is open — the
-                    card's own field is the only input required; the Back button
-                    above returns the visitor here to free-ask. */}
-                  {!activeHubCard && (
-                    <form onSubmit={handleSend} className={`relative flex items-center gap-1.5 rounded-[24px] bg-transparent border border-slate-300 dark:border-slate-600 ${reopenableHubCard ? 'pl-2.5' : 'pl-4'} pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500`}>
+                  ) : (
+                    <form onSubmit={handleSend} className={`relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 ${reopenableHubCard ? 'pl-2.5' : 'pl-4'} pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500`}>
                       {reopenableHubCard && (
                         // Mid quote/spec session: lets the visitor pick another product
                         // without going back to Home — reopens the same drop-up list.
