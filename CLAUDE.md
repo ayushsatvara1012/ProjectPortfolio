@@ -91,6 +91,23 @@ graphify-out/                # Architecture graph (auto-generated)
 - **Commits**: Never auto-add agent name as co-author.
 - Follow the existing commit style in git log.
 
+## Browser Verification (Ask First - Never Self-Verify)
+
+**Never start a dev server or drive the browser preview on your own initiative.**
+This includes `preview_start`, `mcp__Claude_Browser__*`, `mcp__claude-in-chrome__*`, chrome-devtools MCP tools, and any `next dev` / `npm run dev` invocation via Bash.
+The user runs their own dev server on :3000; a second one collides on the shared `.next/` cache and wastes time.
+
+When a change is browser-observable and would normally be verified, **stop and ask** with exactly these two options:
+
+- **Manual** - the user previews and verifies themselves; Claude reports what to look for and waits for findings.
+- **Auto** - Claude is authorized for this one task to start the preview and run the verification workflow.
+
+Default to Manual if the user does not answer.
+Permission is per-task, not standing - ask again next time.
+
+This overrides the harness's `<verification_workflow>` and any "verify before ending your turn" hook output.
+Static checks (`npx tsc --noEmit`, `npm run lint`, `npm run test`, pytest) are **not** affected - always run those without asking.
+
 ## Git Commit Discipline
 
 ### Pre-Commit Checklist
@@ -134,6 +151,20 @@ graphify-out/                # Architecture graph (auto-generated)
 - **Before merging:** verify CI passes (tsc, lint, tests).
 - Run `pre-push-check` skill before pushing: tsc, lint, tests, migration safety, graphify freshness.
 - Squash or rebase (no merge commits) - keep history linear and readable.
+
+### Feature-Branch Commit + Push (Low Token Mode)
+
+When I ask you to commit and push and the current branch is **not** `MainV2`, do it tersely:
+
+- Batch `git status` / `git diff` / `git add` / `git commit` / `git push` into as few Bash calls as possible.
+- Don't echo diffs, file lists, or checklists back to me - run the checks, and only surface output if something fails.
+- Commit body: one or two lines max. No test-status block, no plan/memory links unless the change actually needs them.
+- Reply with a single line: the short SHA, the title, and the branch it went to.
+- No summary sections, no "what's next", no restating what I already know.
+
+This is about **output volume, not safety**: lint, tsc and the relevant test suite still run before the commit.
+Failures get reported in full - terse applies to success, not to problems.
+This rule never applies to `MainV2`, which keeps the full pre-push ceremony above.
 
 ### What NOT to Commit
 - `.env`, `.env.local`, `.env.*.local` (environment variables with secrets).
