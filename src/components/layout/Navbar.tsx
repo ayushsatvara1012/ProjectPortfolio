@@ -34,8 +34,13 @@ export default function Navbar() {
   const [activeMobileDropdown, setActiveMobileDropdown] = useState<DropdownKey | null>(null);
   const [renderCanvas, setRenderCanvas] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  // Gates the clip-path transition so the first painted frame lands on the
+  // correct shape instead of animating into it after hydration.
+  const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const triggerRefs = useRef<Partial<Record<DropdownKey, HTMLButtonElement | null>>>({});
   const pathname = usePathname();
 
   useEffect(() => {
@@ -59,10 +64,28 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
+    // Split thresholds: without the gap, jitter around a single 80px boundary
+    // restarts the 560ms shell animation in both directions.
+    let ticking = false;
+    const sync = () => {
+      ticking = false;
+      const y = window.scrollY;
+      setScrolled((was) => (was ? y > 40 : y > 80));
+    };
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(sync);
+    };
+    sync();
+    // Enable the transition only once the restored scroll position has been
+    // reflected, so a reload deep in the page paints the pill directly.
+    const raf = requestAnimationFrame(() => setMounted(true));
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -101,7 +124,11 @@ export default function Navbar() {
       document.body.style.overflow = '';
       document.body.classList.remove('mobile-menu-open');
     }
+    // Restore the overflow too, not just the class: unmounting while the menu
+    // is open otherwise leaves the page permanently unscrollable.
     return () => {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
       document.body.classList.remove('mobile-menu-open');
     };
   }, [isOpen]);
@@ -115,6 +142,23 @@ export default function Navbar() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (activeDropdown) {
+        const trigger = triggerRefs.current[activeDropdown];
+        setActiveDropdown(null);
+        trigger?.focus();
+      } else if (isOpen) {
+        setIsOpen(false);
+      } else if (activeMobileDropdown) {
+        setActiveMobileDropdown(null);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [activeDropdown, isOpen, activeMobileDropdown]);
 
   // Vaayu product — the Business Intelligence console and its capability modules.
   // (These mirror the dashboard panels: Leads, Funnel, ROI, Conversations.)
@@ -198,11 +242,6 @@ export default function Navbar() {
     const [basePath, hash] = href.split('#');
     const targetPath = basePath || '/';
 
-    // Same-page hash (e.g. "/#home" while already on "/"): intercept and
-    // smooth-scroll instead of triggering a full navigation. For every other
-    // case we let <Link> navigate natively — that path is prefetched and runs
-    // inside React's transition, which is the whole point of this change
-    // (raw <a> + router.push defeated prefetch and blocked the main thread).
     if (hash && pathname === targetPath) {
       e.preventDefault();
       const targetElement = document.querySelector(`#${hash}`);
@@ -210,18 +249,82 @@ export default function Navbar() {
         targetElement.scrollIntoView({ behavior: 'smooth' });
       }
     }
-    // Cross-page hash links navigate via <Link>; the pathname effect above
-    // scrolls to the hash once the destination route mounts.
+  };
+
+  // The bar retracts into its arrow pill when scrolled down on desktop, and only
+  // unfurls at the top of the page. The remaining terms are guards, not triggers:
+  // focus inside the nav, an open dropdown, or the open mobile menu all stop the
+  // bar retracting out from under the user mid-interaction.
+  const collapsed = scrolled && !focusWithin && !activeDropdown && !isOpen;
+
+  // The pill never expands in place — clicking it returns the page to the top,
+  // and the bar unfurls on its own once `scrolled` flips back to false.
+  const handleRevealClick = () => {
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
   };
 
   return (
     <>
-      <header className={`fixed top-0 w-full z-50 h-20 transition-[background-color,border-color,box-shadow] duration-500 will-change-[background-color] ${
-        scrolled
-          ? 'bg-[#FAFAFC]/70 dark:bg-[#0B0F19]/70 backdrop-blur-2xl saturate-150 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
-          : 'bg-transparent'
-      }`}>
-        <div className="max-w-screen-2xl mx-auto h-full flex items-center justify-between transition-colors duration-500">
+      <header
+        className="fixed z-50 pointer-events-none top-0 left-0 w-full h-[80px] lg:w-[calc(100%-32px)] lg:max-w-[1400px] lg:left-1/2 lg:-translate-x-1/2"
+      >
+        {/* Border layer. Sits 1px outside the glass layer below, so the sliver
+            left showing reads as a stroke that follows the clip shape — the
+            pill included. See the note in globals.css. */}
+        <div
+          aria-hidden
+          className={`nav-shell__layer absolute inset-0 pointer-events-none bg-slate-900/10 dark:bg-white/15 rounded-none lg:rounded-b-[28px] ${
+            mounted ? 'nav-shell__layer--animated' : ''
+          } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
+        />
+
+        {/* Glass surface, inset 1px on the sides and bottom (never the top —
+            the bar is flush with the viewport edge). */}
+        <div
+          aria-hidden
+          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-none lg:rounded-b-[27px] ${
+            // Opaque behind the open mobile menu: a translucent bar over the
+            // menu's solid panel reads as a seam across the top of the sheet.
+            isOpen
+              ? 'bg-[#FAFAFC] dark:bg-[#0B0F19] lg:bg-white/75 lg:dark:bg-slate-950/75'
+              : 'bg-white/75 dark:bg-slate-950/75'
+          } ${
+            mounted ? 'nav-shell__layer--animated' : ''
+          } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
+        />
+
+        {/* Collapsed-pill control: marks where the nav is and scrolls back to the
+            top. `invisible` while expanded so it cannot swallow nav-link clicks. */}
+        <button
+          type="button"
+          onClick={handleRevealClick}
+          tabIndex={collapsed ? 0 : -1}
+          aria-label="Back to top and show navigation"
+          className={`hidden lg:flex absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[30px] items-center justify-center cursor-pointer transition-[opacity,visibility] ease-[var(--nav-ease)] motion-reduce:transition-none ${
+            mounted ? '' : 'transition-none'
+          } ${
+            collapsed
+              ? 'opacity-100 visible pointer-events-auto duration-200 delay-[380ms]'
+              : 'opacity-0 invisible pointer-events-none duration-[120ms]'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px] leading-none text-slate-700 dark:text-slate-300">
+            keyboard_arrow_down
+          </span>
+        </button>
+
+        {/* Focus tracking lives here, not on the <header>: the pill button is a
+            sibling, so focusing it must not expand the bar in place. */}
+        <div
+          onFocusCapture={() => setFocusWithin(true)}
+          onBlurCapture={() => setFocusWithin(false)}
+          className={`relative w-full max-w-screen-2xl mx-auto h-full flex items-center justify-between pointer-events-auto transition-[opacity,visibility,transform] ease-[var(--nav-ease)] motion-reduce:transition-none ${
+          mounted ? '' : 'transition-none'
+        } ${
+          collapsed
+            ? 'opacity-100 visible translate-y-0 duration-200 lg:opacity-0 lg:invisible lg:-translate-y-3'
+            : 'opacity-100 visible translate-y-0 duration-300 delay-[260ms]'
+        }`}>
 
           {/* Cell 1: Logo */}
           <div className="px-6 h-full flex items-center shrink-0 min-w-fit">
@@ -231,19 +334,25 @@ export default function Navbar() {
           </div>
 
           {/* Cell 2: Desktop Navigation Links (md+) */}
-          <div ref={dropdownRef} className="hidden lg:flex flex-1 items-center gap-4 lg:gap-8 xl:gap-10 px-6 lg:px-10 h-full">
+          <div ref={dropdownRef} className="hidden lg:flex flex-1 items-center gap-5 xl:gap-8 2xl:gap-10 px-4 xl:px-8 h-full">
             {navLinks.map((link) => (
               <div
                 key={`nav-desk-${link.id || link.name}`}
-                className="relative text-base font-google font-normal antialiased tracking-wider text-slate-800 dark:text-slate-50 hover:text-slate-900 dark:hover:text-white transition-colors h-full flex items-center"
+                className="relative text-base font-google font-normal antialiased tracking-wider h-full flex items-center"
               >
                 {link.dropdown && link.dropdownType ? (() => {
                   const cfg = dropdownConfig[link.dropdownType];
-                  const isActive = activeDropdown === link.dropdownType;
+                  const key = link.dropdownType;
+                  const isActive = activeDropdown === key;
                   return (
+                  <>
                   <button
-                    onClick={() => setActiveDropdown(isActive ? null : link.dropdownType!)}
-                    className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
+                    ref={(el) => { triggerRefs.current[key] = el; }}
+                    onClick={() => setActiveDropdown(isActive ? null : key)}
+                    aria-expanded={isActive}
+                    aria-haspopup="true"
+                    aria-controls={`nav-dropdown-${key}`}
+                    className="text-base font-google text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
                   >
                     {link.name}
                     <span
@@ -251,10 +360,17 @@ export default function Navbar() {
                     >
                       keyboard_arrow_down
                     </span>
+                  </button>
 
-                    {/* Desktop Dropdown */}
+                    {/* Desktop Dropdown. A sibling of the trigger, never a child:
+                        as a descendant of the <button> its links were interactive
+                        content inside interactive content, which swallowed the
+                        first click and made the whole panel the button's name.
+                        Fixed + centred so a 760px panel cannot overflow the
+                        viewport when its trigger sits off-centre. */}
                     <div
-                      className={`absolute top-full -left-1/4 w-[760px] bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] rounded-3xl transition-all duration-300 ease-out z-50 transform origin-top ${isActive ? 'opacity-100 translate-y-4 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      id={`nav-dropdown-${key}`}
+                      className={`fixed top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] rounded-3xl transition-[opacity,transform] duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top ${isActive ? 'opacity-100 translate-y-1 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
                       onMouseLeave={() => setActiveDropdown(null)}
                     >
                       <div className="flex p-8">
@@ -324,13 +440,13 @@ export default function Navbar() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </>
                   );
                 })() : (
                   <Link
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="text-base font-google text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors py-2 relative group"
+                    className="text-base font-google text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors py-2 relative group"
                   >
                     {link.name}
                     <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
@@ -343,7 +459,7 @@ export default function Navbar() {
           {/* Cell 3: Auth & Account (Desktop md+) */}
           <div className="hidden lg:flex items-center h-full overflow-hidden shrink-0">
             <Show when="signed-out">
-              <div className="h-full flex items-center px-2 lg:px-4 transition-colors duration-500">
+              <div className="h-full flex items-center px-1 xl:px-4 transition-colors duration-500">
                 <SignInButton mode="redirect">
                   <button className="text-base font-google font-normal tracking-wider text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
                     Login
@@ -352,7 +468,7 @@ export default function Navbar() {
               </div>
               <div className="h-full flex items-center transition-colors duration-500">
                 <SignUpButton mode="redirect">
-                  <button className=" text-slate-600 dark:text-slate-200 text-base font-google font-normal tracking-wider px-4 lg:px-6 xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
+                  <button className=" text-slate-600 dark:text-slate-200 text-base font-google font-normal tracking-wider px-4 xl:px-6 2xl:px-8 py-5 h-full transition-all  shrink-0 duration-500 group cursor-pointer">
                     <span className="group-hover:text-transparent bg-clip-text bg-linear-to-r from-green-400 to-blue-500 transition-all duration-500">
                       Get Started
                     </span>
@@ -430,6 +546,8 @@ export default function Navbar() {
                   {/* Dropdown toggle row */}
                   <button
                     onClick={() => setActiveMobileDropdown(isOpenMob ? null : link.dropdownType!)}
+                    aria-expanded={isOpenMob}
+                    aria-controls={`mob-dropdown-${link.dropdownType}`}
                     className="w-full px-8 py-6 flex items-center justify-between text-lg font-google font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
                   >
                     <span>{link.name}</span>
@@ -441,7 +559,7 @@ export default function Navbar() {
                   </button>
 
                   {/* Dropdown sub-items */}
-                  <div className={`grid transition-all duration-500 ease-in-out ${isOpenMob ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div id={`mob-dropdown-${link.dropdownType}`} className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[var(--nav-ease)] motion-reduce:transition-none ${isOpenMob ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                   <div className="overflow-y-auto max-h-[50vh]" style={{ touchAction: 'pan-y' }}>
                     <div className="px-6 pb-8 flex flex-col gap-1">
 

@@ -380,6 +380,75 @@ body.mobile-menu-open .sapy-chat-root {
   }
 }
 
+/* --- Collapsing navbar shell (desktop only) ---
+   The header box never changes size; a clip-path mask retracts the glass
+   surface upward into a centred pill. inset() interpolates its four offsets
+   and its round radii together, clips hit testing and the backdrop-filter
+   along with paint, and never reflows the header's children.
+
+   Two layers share this geometry: an outer border layer and an inner glass
+   layer positioned 1px inside it. A real CSS `border` cannot be used, because
+   clip-path cuts through the middle of the box in the collapsed state and the
+   border lives on the box edges — the pill would come out unbordered. The 1px
+   offset between the two clip shapes is what draws a stroke that follows the
+   shape in both states. Hence the inner layer's smaller pill and radii. */
+/* Shared by the shell clip-path and by the content/chevron transitions in
+   Navbar.tsx, so the three pieces of the collapse cannot drift apart. */
+:root {
+  --nav-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-shell__layer {
+  --nav-pill-width: 300px;
+  --nav-pill-height: 30px;
+  --nav-radius: 28px;
+  --nav-radius-collapsed: 24px;
+}
+
+.nav-shell__layer--inner {
+  --nav-pill-width: 298px;
+  --nav-pill-height: 29px;
+  --nav-radius: 27px;
+  --nav-radius-collapsed: 23px;
+}
+
+/* 64rem, not 1024px: Tailwind v4 compiles `lg:` to `(width >= 64rem)`, and the
+   two only coincide at a 16px root. A visitor who raises their browser's
+   default font size would otherwise land in a band where the clip-path is
+   active but the `lg:` utilities are not - nav content unclipped and visible,
+   pill button still hidden. */
+@media (width >= 64rem) {
+  .nav-shell__layer {
+    clip-path: inset(0 0 0 0 round 0 0 var(--nav-radius) var(--nav-radius));
+  }
+
+  /* will-change because the clip-path animates over a backdrop-filter surface:
+     without it the backdrop is re-sampled across the full 1400px bar each
+     frame. The class is only applied after `mounted`, so this is not a
+     permanent compositor cost from first paint. */
+  .nav-shell__layer--animated {
+    transition: clip-path 560ms var(--nav-ease);
+    will-change: clip-path;
+  }
+
+  .nav-shell__layer--collapsed {
+    clip-path: inset(
+      0
+      calc((100% - var(--nav-pill-width)) / 2)
+      calc(100% - var(--nav-pill-height))
+      calc((100% - var(--nav-pill-width)) / 2)
+      round 0 0 var(--nav-radius-collapsed) var(--nav-radius-collapsed)
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-shell__layer--animated {
+    transition: none;
+    will-change: auto;
+  }
+}
+
 /* --- Typography Utility Scale --- */
 @utility text-h1 {
   font-size: 2.25rem; /* 36px */
