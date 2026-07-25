@@ -34,6 +34,7 @@ export default function Navbar() {
   const [activeMobileDropdown, setActiveMobileDropdown] = useState<DropdownKey | null>(null);
   const [renderCanvas, setRenderCanvas] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
 
@@ -48,6 +49,14 @@ export default function Navbar() {
     }
     return () => clearTimeout(timeoutId);
   }, [activeDropdown]);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -209,7 +218,7 @@ export default function Navbar() {
     <>
       <header className={`fixed top-0 w-full z-50 h-20 transition-[background-color,border-color,box-shadow] duration-500 will-change-[background-color] ${
         scrolled
-          ? 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl saturate-150 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
+          ? 'bg-[#FAFAFC]/70 dark:bg-[#0B0F19]/70 backdrop-blur-2xl saturate-150 shadow-[0_4px_30px_rgba(0,0,0,0.06)] dark:shadow-none'
           : 'bg-transparent'
       }`}>
         <div className="max-w-screen-2xl mx-auto h-full flex items-center justify-between transition-colors duration-500">
@@ -259,7 +268,7 @@ export default function Navbar() {
                             {/* Left visual: animated canvas (Product) or static gradient (Services) */}
                             <div className="relative w-full h-48 overflow-hidden rounded-2xl">
                               {cfg.animated ? (
-                                renderCanvas && isActive && (
+                                renderCanvas && isActive && !prefersReducedMotion && (
                                   <AntigravityBackground
                                     effectStyle="water_drop"
                                     particleCount={100}
@@ -404,7 +413,7 @@ export default function Navbar() {
       {/* Mobile Navigation Menu */}
       <div
         id="mobile-nav-menu"
-        className={`fixed inset-0 top-20 z-40 bg-white dark:bg-slate-950 transition-all duration-500 ease-in-out lg:hidden flex flex-col ${
+        className={`fixed inset-0 top-20 z-40 bg-[#FAFAFC] dark:bg-[#0B0F19] transition-all duration-500 ease-in-out lg:hidden flex flex-col ${
           isOpen ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
         }`}
         style={{ touchAction: 'pan-y' }}
@@ -501,7 +510,7 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Bottom CTA Section */}
-        <div className="p-6 sm:p-8 bg-white dark:bg-slate-950 space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
+        <div className="p-6 sm:p-8 bg-[#FAFAFC] dark:bg-[#0B0F19] space-y-4 border-t border-gray-100 dark:border-slate-800/60 shrink-0">
             <Show when="signed-out">
               <div className="flex flex-row gap-3">
                 <SignUpButton mode="redirect">

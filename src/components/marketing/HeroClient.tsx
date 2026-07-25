@@ -14,11 +14,20 @@ const AntigravityBackground = dynamic<AntigravityBackgroundProps>(
 export function HeroBackground() {
   const [isMobile, setIsMobile] = useState(true);
   const [mount, setMount] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(true);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
     setIsMobile(!mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(!e.matches);
+    mq.addEventListener('change', handler, { passive: true } as AddEventListenerOptions);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     mq.addEventListener('change', handler, { passive: true } as AddEventListenerOptions);
     return () => mq.removeEventListener('change', handler);
   }, []);
@@ -33,7 +42,7 @@ export function HeroBackground() {
     return () => window.clearTimeout(id);
   }, []);
 
-  if (isMobile || !mount) return null;
+  if (isMobile || !mount || prefersReducedMotion) return null;
 
   return (
     <AntigravityBackground
@@ -50,7 +59,7 @@ export function DemoButton() {
   return (
     <Link
       href="/demo/train"
-      className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-yellow-500 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1"
+      className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-8 py-4 text-lg font-google text-amber-700 dark:text-yellow-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors rounded-full flex items-center justify-center gap-1"
     >
       Try Demo
       <ExperimentIcon size={30} />

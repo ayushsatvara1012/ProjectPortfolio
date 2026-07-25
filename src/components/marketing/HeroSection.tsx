@@ -6,9 +6,9 @@ import { ArrowRightIcon } from '@/src/components/icons';
 
 export default function HeroSection() {
   return (
-    <section id="home" className="relative min-h-screen bg-white dark:bg-slate-950 pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
+    <section id="home" className="relative min-h-dvh bg-[#FAFAFC] dark:bg-[#0B0F19] pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
       <HeroBackground />
-      <div className="max-w-8xl mx-auto w-full min-h-[calc(100vh-4rem)] lg:min-h-[calc(100vh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
         <div className="relative z-10 max-w-xl lg:max-w-3xl flex flex-col justify-center items-center text-center">
           <h1
             className="font-google font-medium tracking-tight leading-[1.05] text-slate-900 dark:text-slate-200 mb-6 transition-colors"
@@ -54,7 +54,7 @@ export default function HeroSection() {
               <span className="absolute w-40 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left" />
               <span className="absolute w-40 h-36 -top-15 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-[120%] transition-transform group-hover:duration-700 duration-700 origin-left" />
               <span className="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-75 transition-transform group-hover:duration-1000 duration-500 origin-left" />
-              <span className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap">Explore Now !</span>
+              <span aria-hidden="true" className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap">Explore Now !</span>
             </Link>
 
             <DemoButton />

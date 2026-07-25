@@ -9,7 +9,7 @@ export default function Logo({ className, style }: LogoProps) {
   return (
     <Image
       src="/logo2.svg"
-      alt="Logo"
+      alt="Sapybase"
       width={62}
       height={46}
       className={className}

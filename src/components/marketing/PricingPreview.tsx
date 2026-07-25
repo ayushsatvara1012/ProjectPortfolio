@@ -15,7 +15,7 @@ const PREVIEW_PLAN_IDS = ['STARTER', 'PRO', 'BUSINESS']; // the three self-serve
 
 const PricingPreview = () => {
   return (
-    <section className="w-full bg-white dark:bg-slate-950 py-24 sm:py-32 transition-colors duration-500">
+    <section className="w-full bg-[#FAFAFC] dark:bg-[#0B0F19] py-24 sm:py-32 transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 sm:px-12 lg:px-20">
 
         {/* Header */}

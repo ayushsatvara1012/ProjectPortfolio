@@ -67,14 +67,14 @@ const WhatWeSolve = () => {
   }, []);
 
   return (
-    <section className="relative w-full bg-white dark:bg-slate-950 py-10 lg:py-12 overflow-hidden transition-colors duration-500 border-none shadow-none">
+    <section className="relative w-full bg-[#FAFAFC] dark:bg-[#0B0F19] py-10 lg:py-12 overflow-hidden transition-colors duration-500 border-none shadow-none">
       {/* Immersive Full-Screen SVG Background Container */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
+      <div aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
         <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500">
           <div className="absolute inset-0 bg-red-500/5 dark:bg-red-600/10  rounded-full p-5 blur-[100px] scale-100 lg:scale-90" />
           <img
             src="/vector_WWS.svg"
-            alt="Friction Points Background"
+            alt=""
             loading="lazy"
             decoding="async"
             className="w-full h-full object-cover object-left lg:object-center relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_20px_50px_rgba(255,255,255,0.03)]"

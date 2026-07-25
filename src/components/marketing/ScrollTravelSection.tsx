@@ -16,6 +16,7 @@ export default function ScrollTravelSection() {
   const maskRef    = useRef<HTMLDivElement>(null);  // viewport-sized clip + mask
   const [isVisible, setIsVisible] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const rafIdRef = useRef<number | null>(null);
 
   // Written every rAF frame, read inside Three.js useFrame — zero React re-renders.
@@ -30,7 +31,15 @@ export default function ScrollTravelSection() {
   }, []);
 
   useEffect(() => {
-    if (!isDesktop) return;
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop || prefersReducedMotion) return;
 
     const spring = { p: 0, vp: 0 };
 
@@ -119,10 +128,10 @@ export default function ScrollTravelSection() {
         cancelAnimationFrame(rafIdRef.current);
       }
     };
-  }, [isDesktop]);
+  }, [isDesktop, prefersReducedMotion]);
 
   return (
-    <div ref={wrapperRef} className="relative bg-white dark:bg-slate-950 transition-colors duration-500">
+    <div ref={wrapperRef} className="relative bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
 
       {/* ── Sticky background (desktop only) ──────────────────────────────────
           h-screen keeps it pinned while sections scroll beneath it.

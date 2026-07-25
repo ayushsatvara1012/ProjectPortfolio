@@ -38,12 +38,12 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-white border-x border-gray-100 dark:border-slate-800 overflow-hidden dark:bg-slate-950">
+    <footer className="bg-[#FAFAFC] border-x border-gray-100 dark:border-slate-800 overflow-hidden dark:bg-[#0B0F19]">
       <div className="max-w-8xl mx-auto">
         <div className="grid grid-cols-1 min-[1011px]:grid-cols-12 gap-px bg-gray-200 dark:bg-slate-800 border-x border-gray-200 dark:border-slate-800">
 
           {/* Branding cell */}
-          <div className="min-[1011px]:col-span-5 bg-white dark:bg-slate-950 p-12 min-[1011px]:p-16 flex flex-col justify-between gap-12 group/brand relative overflow-hidden transition-colors">
+          <div className="min-[1011px]:col-span-5 bg-[#FAFAFC] dark:bg-[#0B0F19] p-12 min-[1011px]:p-16 flex flex-col justify-between gap-12 group/brand relative overflow-hidden transition-colors">
             <InteractiveSchematic />
             <div className="space-y-8 relative z-10">
               <div className="flex items-center gap-3">
@@ -74,7 +74,7 @@ export default function Footer() {
           <div className="min-[1011px]:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200 dark:bg-slate-800">
 
             {/* Platform */}
-            <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10">
+            <div className="bg-[#FAFAFC] dark:bg-[#0B0F19] p-10 min-[1011px]:p-12 space-y-10">
               <div className="flex items-center gap-2 text-sm tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google">
                 <div className="h-1.5 w-1.5 rounded-none bg-blue-600" />
                 <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Platform</span>
@@ -96,7 +96,7 @@ export default function Footer() {
             </div>
 
             {/* Launched On */}
-            <div className="bg-white dark:bg-slate-950 p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors">
+            <div className="bg-[#FAFAFC] dark:bg-[#0B0F19] p-10 min-[1011px]:p-12 space-y-10 group/cell transition-colors">
               <div className="flex items-center gap-2 text-sm tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google">
                 <div className="h-1.5 w-1.5 rounded-none bg-orange-500" />
                 <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Launched On</span>
@@ -129,7 +129,16 @@ export default function Footer() {
                   />
                 </a>
                 {/* Fazier */}
-                <a href="https://fazier.com/launches/vaayu" target="_blank"><img src="https://fazier.com/api/v1/public/badges/embed_image.svg?launch_id=9650&badge_type=daily&variant=2&theme=light" width="270" alt="Fazier badge" /></a>
+                <a href="https://fazier.com/launches/vaayu" target="_blank" rel="noopener noreferrer">
+                  <img
+                    src="https://fazier.com/api/v1/public/badges/embed_image.svg?launch_id=9650&badge_type=daily&variant=2&theme=light"
+                    width={270}
+                    height={87}
+                    loading="lazy"
+                    decoding="async"
+                    alt="Fazier badge"
+                  />
+                </a>
                 <a
                   href="https://fazier.com/launches/www.sapybase.com"
                   target="_blank"
@@ -139,7 +148,7 @@ export default function Footer() {
                   <img
                     src="https://fazier.com/api/v1/public/badges/embed_image.svg?launch_id=9650&badge_type=featured&theme=light"
                     width={120}
-                    height={51}
+                    height={26}
                     loading="lazy"
                     decoding="async"
                     alt="Sapybase launch on Fazier"
@@ -150,7 +159,7 @@ export default function Footer() {
             </div>
 
             {/* Social */}
-            <div className="bg-white dark:bg-slate-950 p-6 min-[1011px]:p-12 space-y-6 min-[1011px]:space-y-10 relative overflow-hidden">
+            <div className="bg-[#FAFAFC] dark:bg-[#0B0F19] p-6 min-[1011px]:p-12 space-y-6 min-[1011px]:space-y-10 relative overflow-hidden">
               <div className="flex items-center gap-2 text-sm tracking-widest font-bold text-slate-600 dark:text-slate-400 font-google relative z-10">
                 <div className="h-1.5 w-1.5 rounded-none bg-emerald-500" />
                 <span className='font-normal font-google text-base tracking-wider text-slate-900 dark:text-slate-200'>Social Network</span>
@@ -192,7 +201,7 @@ export default function Footer() {
           </div>
 
           {/* Bottom legend row */}
-          <div className="min-[1011px]:col-span-12 bg-white dark:bg-slate-950 px-6 py-4 min-[1011px]:px-8 min-[1011px]:py-4 border-t border-white dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
+          <div className="min-[1011px]:col-span-12 bg-[#FAFAFC] dark:bg-[#0B0F19] px-6 py-4 min-[1011px]:px-8 min-[1011px]:py-4 border-t border-gray-200 dark:border-slate-800 flex flex-col min-[1011px]:flex-row justify-between items-center gap-6">
             <div className="flex flex-col min-[1011px]:flex-row items-center gap-6 text-sm tracking-wide font-normal text-slate-600 dark:text-slate-400 font-google">
               <p className="text-center">© 2026 Sapybase LLC — Built to make AI work for every business.</p>
               <div className="hidden min-[1011px]:block h-px w-6 bg-gray-200 dark:bg-slate-800" />
