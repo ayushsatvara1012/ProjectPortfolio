@@ -5,6 +5,8 @@ import { PRODUCT } from '@/src/lib/brand';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
 // import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
+import ChatbotShowcase from '@/src/components/marketing/home/ChatbotShowcase';
+import FeatureGrid from '@/src/components/marketing/home/FeatureGrid';
 import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
 
 import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection';
@@ -127,6 +129,8 @@ export default function HomePage() {
       <main className="relative overflow-x-clip">
         <HeroSection />
         {/* <SocialProofBar /> */}
+        <ChatbotShowcase />
+        <FeatureGrid />
         <WhatWeSolve />
         <ScrollTravelSection />
         {/* <EngineSection /> */}
