@@ -36,6 +36,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [focusWithin, setFocusWithin] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [forceExpanded, setForceExpanded] = useState(false);
   // Gates the clip-path transition so the first painted frame lands on the
   // correct shape instead of animating into it after hydration.
   const [mounted, setMounted] = useState(false);
@@ -75,6 +76,10 @@ export default function Navbar() {
     const onScroll = () => {
       if (ticking) return;
       ticking = true;
+      // Clear force-expanded state once user scrolls.
+      if (forceExpanded) {
+        setForceExpanded(false);
+      }
       requestAnimationFrame(sync);
     };
     sync();
@@ -86,7 +91,7 @@ export default function Navbar() {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
     };
-  }, []);
+  }, [forceExpanded]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash) {
@@ -254,13 +259,14 @@ export default function Navbar() {
   // The bar retracts into its arrow pill when scrolled down on desktop, and only
   // unfurls at the top of the page. The remaining terms are guards, not triggers:
   // focus inside the nav, an open dropdown, or the open mobile menu all stop the
-  // bar retracting out from under the user mid-interaction.
-  const collapsed = scrolled && !focusWithin && !activeDropdown && !isOpen;
+  // bar retracting out from under the user mid-interaction. forceExpanded keeps the
+  // bar open after a click, until the user scrolls again.
+  const collapsed = scrolled && !focusWithin && !activeDropdown && !isOpen && !forceExpanded;
 
-  // The pill never expands in place — clicking it returns the page to the top,
-  // and the bar unfurls on its own once `scrolled` flips back to false.
+  // Expand the navbar in place without scrolling the page. The forceExpanded state
+  // keeps it open until the user scrolls, then auto-collapse/expand logic resumes.
   const handleRevealClick = () => {
-    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    setForceExpanded(true);
   };
 
   return (
