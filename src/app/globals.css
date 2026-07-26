@@ -310,6 +310,85 @@
     from { opacity: 0; transform: scale3d(0.5, 0.5, 1); }
     to   { opacity: 1; transform: scale3d(1, 1, 1); }
   }
+
+  /* ── Animated mesh gradient ────
+     Deliberately no `filter: blur()`. The softness lives in the colour stops —
+     each blob fades to transparent — so the same look costs no filter pass.
+     Only transforms animate, which keeps every frame on the compositor. */
+  @keyframes meshDriftA {
+    0%, 100% { transform: translate3d(-8%, -6%, 0) scale3d(1, 1, 1); }
+    50%      { transform: translate3d(10%, 8%, 0) scale3d(1.18, 1.18, 1); }
+  }
+  @keyframes meshDriftB {
+    0%, 100% { transform: translate3d(6%, 8%, 0) scale3d(1.1, 1.1, 1); }
+    50%      { transform: translate3d(-9%, -5%, 0) scale3d(0.92, 0.92, 1); }
+  }
+  @keyframes meshDriftC {
+    0%, 100% { transform: translate3d(4%, -8%, 0) scale3d(0.95, 0.95, 1); }
+    50%      { transform: translate3d(-7%, 7%, 0) scale3d(1.22, 1.22, 1); }
+  }
+
+  .mesh-blob {
+    position: absolute;
+    width: 78%;
+    height: 78%;
+    border-radius: 50%;
+    will-change: transform;
+  }
+
+  .mesh-blob--a {
+    top: -14%;
+    left: -10%;
+    background: radial-gradient(circle at 50% 50%, rgba(110, 151, 255, 0.55) 0%, rgba(110, 151, 255, 0) 68%);
+    animation: meshDriftA 26s ease-in-out infinite;
+  }
+  .mesh-blob--b {
+    top: 4%;
+    right: -16%;
+    background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.42) 0%, rgba(59, 130, 246, 0) 66%);
+    animation: meshDriftB 32s ease-in-out infinite;
+  }
+  .mesh-blob--c {
+    bottom: -20%;
+    left: 18%;
+    background: radial-gradient(circle at 50% 50%, rgba(0, 43, 130, 0.32) 0%, rgba(0, 43, 130, 0) 70%);
+    animation: meshDriftC 38s ease-in-out infinite;
+  }
+
+  /* This project has no theme provider and no `dark` class — Tailwind v4's
+     `dark:` variant resolves to prefers-color-scheme, so these must match it. */
+  @media (prefers-color-scheme: dark) {
+    .mesh-blob--a {
+      background: radial-gradient(circle at 50% 50%, rgba(110, 151, 255, 0.30) 0%, rgba(110, 151, 255, 0) 68%);
+    }
+    .mesh-blob--b {
+      background: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.26) 0%, rgba(37, 99, 235, 0) 66%);
+    }
+    .mesh-blob--c {
+      background: radial-gradient(circle at 50% 50%, rgba(76, 29, 149, 0.28) 0%, rgba(76, 29, 149, 0) 70%);
+    }
+  }
+
+  /* Film grain. Static, so it rasterises once — and it is what dithers the
+     gradient, which is why these backgrounds do not band. */
+  .mesh-grain {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.20;
+    mix-blend-mode: soft-light;
+  }
+  @media (prefers-color-scheme: dark) {
+    .mesh-grain {
+      opacity: 0.13;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mesh-blob {
+      animation: none;
+    }
+  }
 }
 
 @layer utilities {

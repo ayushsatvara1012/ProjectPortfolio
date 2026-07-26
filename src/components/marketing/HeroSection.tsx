@@ -1,22 +1,34 @@
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { PRODUCT } from '@/src/lib/brand';
-import { HeroBackground, DemoButton } from './HeroClient';
+import { DemoButton } from './HeroClient';
 import { ArrowRightIcon } from '@/src/components/icons';
 
 export default function HeroSection() {
   return (
     <section id="home" className="relative min-h-dvh bg-[#FAFAFC] dark:bg-[#0B0F19] pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
-      <HeroBackground />
-      <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-        <div className="relative z-10 max-w-xl lg:max-w-3xl flex flex-col justify-center items-center text-center">
+      {/* Decorative. `priority` because this is the hero's LCP candidate, and
+          next/image serves it as responsive AVIF/WebP rather than the 3.9 MB
+          bg.svg, which was a 1200x1200 PNG base64'd inside an SVG wrapper. */}
+      <Image
+        src="/bg.webp"
+        alt=""
+        aria-hidden
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover pointer-events-none select-none"
+      />
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center lg:items-start justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+        <div className="relative z-10 max-w-xl lg:max-w-[44%] flex flex-col justify-center items-center text-center lg:items-start lg:text-left">
           <h1
             className="font-google font-medium tracking-tight leading-[1.05] text-slate-900 dark:text-slate-200 mb-6 transition-colors"
             aria-label={`Introducing ${PRODUCT.name} — A Business Intelligence`}
           >
-            <span aria-hidden="true" className="flex flex-col items-center">
+            <span aria-hidden="true" className="flex flex-col items-center lg:items-start">
               <span className="text-3xl sm:text-4xl md:text-5xl font-normal">Introducing</span>
-              <span className="mt-2 flex items-center justify-center gap-3 sm:gap-4">
+              <span className="mt-2 flex items-center justify-center lg:justify-start gap-3 sm:gap-4">
                 <img
                   src={PRODUCT.logo}
                   alt=""
@@ -36,11 +48,11 @@ export default function HeroSection() {
             </span>
           </h1>
 
-          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors mx-auto">
-            {PRODUCT.name} is the chat that lives on your site, answers every customer question 24/7, captures and scores leads automatically, and shows you the funnel, conversions, and exact ROI it earned you — no code required.
+          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors mx-auto lg:mx-0">
+            The chat that answers every customer question 24/7, captures the lead, and proves the revenue it earned.
           </p>
 
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-8 w-full transition-colors">
+          <div className="flex flex-col sm:flex-row justify-center lg:justify-start items-center gap-8 w-full transition-colors">
             <Link
               href="/vaayu"
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center gap-2 px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
@@ -59,6 +71,10 @@ export default function HeroSection() {
 
             <DemoButton />
           </div>
+
+          <p className="mt-5 text-sm font-google text-slate-500 dark:text-slate-400 transition-colors">
+            No code required.
+          </p>
         </div>
       </div>
     </section>

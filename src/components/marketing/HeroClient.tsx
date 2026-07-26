@@ -1,59 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import type { AntigravityBackgroundProps } from './AntigravityBackground';
 import { ExperimentIcon } from '../icons';
-
-const AntigravityBackground = dynamic<AntigravityBackgroundProps>(
-  () => import('./AntigravityBackground'),
-  { ssr: false },
-);
-
-export function HeroBackground() {
-  const [isMobile, setIsMobile] = useState(true);
-  const [mount, setMount] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(true);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    setIsMobile(!mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(!e.matches);
-    mq.addEventListener('change', handler, { passive: true } as AddEventListenerOptions);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setPrefersReducedMotion(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
-    mq.addEventListener('change', handler, { passive: true } as AddEventListenerOptions);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  useEffect(() => {
-    const ric = window.requestIdleCallback;
-    if (typeof ric === 'function') {
-      const id = ric(() => setMount(true), { timeout: 2000 });
-      return () => window.cancelIdleCallback?.(id);
-    }
-    const id = window.setTimeout(() => setMount(true), 200);
-    return () => window.clearTimeout(id);
-  }, []);
-
-  if (isMobile || !mount || prefersReducedMotion) return null;
-
-  return (
-    <AntigravityBackground
-      particleCount={50}
-      particleType="capsule"
-      particleSeparation={4}
-      effectStyle="classic"
-      interactive
-    />
-  );
-}
 
 export function DemoButton() {
   return (

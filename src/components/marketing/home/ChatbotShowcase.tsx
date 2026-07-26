@@ -1,18 +1,15 @@
 import React from 'react';
-import PreFooterCanvas from '../PreFooterCanvas';
+import MeshGradientBackground from '../MeshGradientBackground';
 
 /* Chatbot showcase — two vertical-bot mockups (generic + chemical) over an
-   animated 3D dot matrix background. Server Component (no interactivity). */
+   animated mesh gradient. Server Component (no interactivity). */
 export default function ChatbotShowcase() {
   return (
     <section
       id="chatbots"
       className="relative bg-[#FAFAFC] dark:bg-[#0B0F19] py-16 sm:py-24 overflow-hidden transition-colors duration-500"
     >
-      {/* Animated 3D Dot Matrix Canvas Background */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <PreFooterCanvas className="relative w-full h-full overflow-hidden select-none" />
-      </div>
+      <MeshGradientBackground />
 
       <div className="relative z-10 max-w-5xl mx-auto px-6">
         <p className="mb-10 text-center text-[13px] sm:text-[14px] font-google font-semibold text-[#002B82]/80 dark:text-[#6E97FF] tracking-wide">
