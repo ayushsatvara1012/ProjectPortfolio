@@ -9,11 +9,12 @@ export default function MeshGradientBackground({ className = '' }: { className?:
   return (
     <div
       aria-hidden
-      className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
+      className={`mesh-root pointer-events-none absolute inset-0 overflow-hidden ${className}`}
     >
       <div className="mesh-blob mesh-blob--a" />
       <div className="mesh-blob mesh-blob--b" />
       <div className="mesh-blob mesh-blob--c" />
+      <div className="mesh-blob mesh-blob--d" />
       <div className="mesh-grain" />
     </div>
   );

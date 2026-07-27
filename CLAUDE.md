@@ -82,6 +82,13 @@ graphify-out/                # Architecture graph (auto-generated)
 
 ## Workflow
 
+### Small / Quick Tasks (Fast Path)
+- When I say "small", "quick", "just", or the task is obviously trivial - remove an element, change a color or CSS value, tweak spacing, edit/update text or a label, rename a string - just do it.
+- No plan doc, no memory entry, no exploration agents, no options analysis, no extended thinking. Locate the code, make the edit, reply in one line.
+- Skip the full pre-commit ceremony for these unless I ask to commit.
+- Exception: if the "small" task is actually destructive or hard to reverse - deleting files, dropping/altering DB columns, removing a component used elsewhere, rewriting git history, touching auth/env/config or anything shared - stop and confirm with me first.
+- If a "quick" task turns out to be non-trivial once I look, say so in one line before continuing.
+
 - **Plans & Memory**: Every non-trivial task needs a plan in `docs/<feature>-plan.md` + matching memory entry.
 - Plans and memory are a pair - never create one without the other.
 - **Implementation**: Work in small slices, suite green between each.

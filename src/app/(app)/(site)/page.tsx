@@ -4,12 +4,13 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 import { PRODUCT } from '@/src/lib/brand';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
+import MeshGradientBackground from '@/src/components/marketing/MeshGradientBackground';
 // import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
 import ChatbotShowcase from '@/src/components/marketing/home/ChatbotShowcase';
 import FeatureGrid from '@/src/components/marketing/home/FeatureGrid';
-import WhatWeSolve from '@/src/components/marketing/WhatWeSolve';
+// import WhatWeSolve from '@/src/components/marketing/WhatWeSolve'; // hidden for now — component kept in src/components/marketing/WhatWeSolve.tsx
 
-import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection';
+// import ScrollTravelSection from '@/src/components/marketing/ScrollTravelSection'; // hidden for now — wraps FeatureIllustration ("Sound familiar?") + NewSection, both kept in src/components/marketing/
 // import EngineSection from '@/src/components/marketing/EngineSection'; // hidden for now — re-add the import together with the JSX below
 import Testimonials from '@/src/components/marketing/Testimonials';
 import PricingPreview from '@/src/components/marketing/PricingPreview';
@@ -126,17 +127,24 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
-      <main className="relative overflow-x-clip">
+      <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
+        {/* One mesh gradient for the whole page: fixed, so it stays continuous
+            behind every section instead of restarting per section. */}
+        <div className="pointer-events-none fixed inset-0 z-0">
+          <MeshGradientBackground />
+        </div>
+        <div className="relative z-10">
         <HeroSection />
         {/* <SocialProofBar /> */}
         <ChatbotShowcase />
         <FeatureGrid />
-        <WhatWeSolve />
-        <ScrollTravelSection />
+        {/* <WhatWeSolve /> */}
+        {/* <ScrollTravelSection /> */}
         {/* <EngineSection /> */}
         {/* HowItWorks moved to the dedicated /vaayu product page */}
         <Testimonials />
         <PricingPreview />
+        </div>
       </main>
     </>
   );

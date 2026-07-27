@@ -33,7 +33,7 @@ const TESTIMONIALS = [
 
 const Testimonials = () => {
   return (
-    <section className="w-full bg-[#FAFAFC] dark:bg-[#0B0F19] py-10 sm:py-12 transition-colors duration-500">
+    <section className="w-full py-10 sm:py-12 transition-colors duration-500">
       <div className="max-w-8xl mx-auto px-6 sm:px-12 lg:px-20">
 
         {/* Header */}

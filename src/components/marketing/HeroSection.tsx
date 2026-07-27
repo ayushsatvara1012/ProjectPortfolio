@@ -1,26 +1,19 @@
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { PRODUCT } from '@/src/lib/brand';
 import { DemoButton } from './HeroClient';
+import HeroSpiral from './HeroSpiral';
 import { ArrowRightIcon } from '@/src/components/icons';
 
 export default function HeroSection() {
   return (
-    <section id="home" className="relative min-h-dvh bg-[#FAFAFC] dark:bg-[#0B0F19] pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
-      {/* Decorative. `priority` because this is the hero's LCP candidate, and
-          next/image serves it as responsive AVIF/WebP rather than the 3.9 MB
-          bg.svg, which was a 1200x1200 PNG base64'd inside an SVG wrapper. */}
-      <Image
-        src="/bg.webp"
-        alt=""
-        aria-hidden
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover pointer-events-none select-none"
-      />
+    <section id="home" className="relative min-h-dvh pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center lg:items-start justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+        {/* sm–lg: centred behind the copy, faint enough to read text over.
+            lg+: moves out to the empty right column at full strength.
+            <sm: hidden — a phone hero is headline, subhead, CTA and nothing else. */}
+        <HeroSpiral className="pointer-events-none absolute top-1/2 hidden sm:block left-1/2 w-[90vw] h-auto -translate-x-1/2 -translate-y-1/2 opacity-25 dark:opacity-20 lg:left-auto lg:translate-x-0 lg:right-6 xl:right-12 lg:w-auto lg:h-[min(68vh,600px)] lg:opacity-70 lg:dark:opacity-60" />
+
         <div className="relative z-10 max-w-xl lg:max-w-[44%] flex flex-col justify-center items-center text-center lg:items-start lg:text-left">
           <h1
             className="font-google font-medium tracking-tight leading-[1.05] text-slate-900 dark:text-slate-200 mb-6 transition-colors"

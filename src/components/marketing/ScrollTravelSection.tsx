@@ -131,7 +131,7 @@ export default function ScrollTravelSection() {
   }, [isDesktop, prefersReducedMotion]);
 
   return (
-    <div ref={wrapperRef} className="relative bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
+    <div ref={wrapperRef} className="relative transition-colors duration-500">
 
       {/* ── Sticky background (desktop only) ──────────────────────────────────
           h-screen keeps it pinned while sections scroll beneath it.

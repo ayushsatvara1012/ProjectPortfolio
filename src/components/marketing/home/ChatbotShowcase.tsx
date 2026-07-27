@@ -1,17 +1,18 @@
 import React from 'react';
-import MeshGradientBackground from '../MeshGradientBackground';
 
-/* Chatbot showcase — two vertical-bot mockups (generic + chemical) over an
-   animated mesh gradient. Server Component (no interactivity). */
+/* Chatbot showcase — two vertical-bot mockups (generic + chemical) over the
+   shared page mesh gradient. Server Component (no interactivity). */
 export default function ChatbotShowcase() {
   return (
     <section
       id="chatbots"
-      className="relative bg-[#FAFAFC] dark:bg-[#0B0F19] py-16 sm:py-24 overflow-hidden transition-colors duration-500"
+      className="relative py-16 sm:py-24 overflow-hidden transition-colors duration-500"
     >
-      <MeshGradientBackground />
-
       <div className="relative z-10 max-w-5xl mx-auto px-6">
+        <h2 className="mb-4 text-center font-google font-bold tracking-tight leading-[1.05] text-4xl sm:text-5xl lg:text-6xl text-slate-900 dark:text-white">
+          Our two new chatbots
+        </h2>
+
         <p className="mb-10 text-center text-[13px] sm:text-[14px] font-google font-semibold text-[#002B82]/80 dark:text-[#6E97FF] tracking-wide">
           One assistant, tailored to every business — from service bookings to chemical distribution
         </p>

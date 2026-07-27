@@ -67,7 +67,7 @@ const WhatWeSolve = () => {
   }, []);
 
   return (
-    <section className="relative w-full bg-[#FAFAFC] dark:bg-[#0B0F19] py-10 lg:py-12 overflow-hidden transition-colors duration-500 border-none shadow-none">
+    <section className="relative w-full py-10 lg:py-12 overflow-hidden transition-colors duration-500 border-none shadow-none">
       {/* Immersive Full-Screen SVG Background Container */}
       <div aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
         <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-15 sm:opacity-20 lg:opacity-100 transition-opacity duration-500">

@@ -37,7 +37,7 @@ const notif =
 
 export default function FeatureGrid() {
   return (
-    <section id="features" className="bg-[#FAFAFC] dark:bg-[#0B0F19] py-28 lg:py-32 transition-colors duration-500">
+    <section id="features" className="py-28 lg:py-32 transition-colors duration-500">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-[640px] text-center">
           <span className="text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[#004DE8] dark:text-[#6E97FF]">What it does</span>
