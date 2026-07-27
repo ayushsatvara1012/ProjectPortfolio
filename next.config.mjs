@@ -18,7 +18,7 @@ const nextConfig = {
   },
   // The migration is complete, Next.js will now use default extensions.
   async rewrites() {
-    const apiUrl = isDev ? 'http://127.0.0.1:8000' : 'https://sapyai.onrender.com';
+    const apiUrl = isDev ? 'http://localhost:8000' : 'https://sapyai.onrender.com';
 
     return [
       {
