@@ -8,44 +8,24 @@ import { ArrowRightIcon } from '@/src/components/icons';
 export default function HeroSection() {
   return (
     <section id="home" className="relative min-h-dvh pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
-      <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center lg:items-start justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-        {/* sm–lg: centred behind the copy, faint enough to read text over.
-            lg+: moves out to the empty right column at full strength.
-            <sm: hidden — a phone hero is headline, subhead, CTA and nothing else. */}
-        <HeroSpiral className="pointer-events-none absolute top-1/2 hidden sm:block left-1/2 w-[90vw] h-auto -translate-x-1/2 -translate-y-1/2 opacity-25 dark:opacity-20 lg:left-auto lg:translate-x-0 lg:right-6 xl:right-12 lg:w-auto lg:h-[min(68vh,600px)] lg:opacity-70 lg:dark:opacity-60" />
+      {/* Decorative — hugs the viewport's right wall and bleeds past it; the
+          section's overflow-x-clip does the trimming. */}
+      <HeroSpiral className="pointer-events-none absolute z-0 top-1/2 right-0 -translate-y-1/2 translate-x-[30%] hidden sm:block w-[min(120vw,1000px)] opacity-[0.12] dark:opacity-[0.08]" />
 
-        <div className="relative z-10 max-w-xl lg:max-w-[44%] flex flex-col justify-center items-center text-center lg:items-start lg:text-left">
-          <h1
-            className="font-google font-medium tracking-tight leading-[1.05] text-slate-900 dark:text-slate-200 mb-6 transition-colors"
-            aria-label={`Introducing ${PRODUCT.name} — A Business Intelligence`}
-          >
-            <span aria-hidden="true" className="flex flex-col items-center lg:items-start">
-              <span className="text-3xl sm:text-4xl md:text-5xl font-normal">Introducing</span>
-              <span className="mt-2 flex items-center justify-center lg:justify-start gap-3 sm:gap-4">
-                <img
-                  src={PRODUCT.logo}
-                  alt=""
-                  width={36}
-                  height={23}
-                  decoding="async"
-                  fetchPriority="high"
-                  className="h-14 sm:h-16 md:h-20 w-auto"
-                />
-                <span className="text-6xl sm:text-7xl md:text-8xl text-transparent bg-clip-text bg-linear-to-r from-blue-700 to-blue-500">
-                  {PRODUCT.name}
-                </span>
-              </span>
-              <span className="mt-3 text-3xl sm:text-4xl md:text-5xl font-normal italic text-slate-600 dark:text-slate-300">
-                A Business Intelligence
-              </span>
-            </span>
+      <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
+        <div className="relative z-10 w-full flex flex-col items-start">
+          <div className="max-w-xl flex flex-col justify-center items-start text-left">
+          <h1 className="font-newsreader font-light tracking-tight leading-[1.08] text-5xl sm:text-6xl md:text-7xl text-slate-900 dark:text-slate-100 mb-6 transition-colors">
+            Answers for every customer
           </h1>
 
-          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors mx-auto lg:mx-0">
-            The chat that answers every customer question 24/7, captures the lead, and proves the revenue it earned.
+          <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors">
+            Built on your own content. Powered by {PRODUCT.name}.
+            <br className="hidden sm:block" />
+            Answering 24/7, capturing every lead, proving the revenue it earned.
           </p>
 
-          <div className="flex flex-col sm:flex-row justify-center lg:justify-start items-center gap-8 w-full transition-colors">
+          <div className="flex flex-col sm:flex-row justify-start items-center gap-8 w-full transition-colors">
             <Link
               href="/vaayu"
               className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center gap-2 px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
@@ -68,8 +48,34 @@ export default function HeroSection() {
           <p className="mt-5 text-sm font-google text-slate-500 dark:text-slate-400 transition-colors">
             No code required.
           </p>
+          </div>
         </div>
+
+        <TrustedByStrip />
       </div>
     </section>
+  );
+}
+
+/* ⚠️ PLACEHOLDER wordmarks — swap for real customer logos before launch. */
+const TRUSTED_BY = ['Acme Co', 'NorthPeak', 'BrightCart', 'Lumen Labs', 'Vertex', 'Hatch'];
+
+function TrustedByStrip() {
+  return (
+    <div className="relative z-10 w-full mt-16 lg:mt-20">
+      <p className="text-center text-xs font-google font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+        Businesses building with {PRODUCT.name}
+      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-5 sm:gap-x-14">
+        {TRUSTED_BY.map((name) => (
+          <span
+            key={name}
+            className="text-lg sm:text-xl font-google font-bold tracking-tight text-slate-400 dark:text-slate-600 select-none"
+          >
+            {name}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

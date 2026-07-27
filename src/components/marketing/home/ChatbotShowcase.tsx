@@ -9,7 +9,7 @@ export default function ChatbotShowcase() {
       className="relative py-16 sm:py-24 overflow-hidden transition-colors duration-500"
     >
       <div className="relative z-10 max-w-5xl mx-auto px-6">
-        <h2 className="mb-4 text-center font-google font-bold tracking-tight leading-[1.05] text-4xl sm:text-5xl lg:text-6xl text-slate-900 dark:text-white">
+        <h2 className="mb-4 text-center font-newsreader font-light tracking-tight leading-[1.05] text-4xl sm:text-5xl lg:text-6xl text-slate-900 dark:text-white">
           Our two new chatbots
         </h2>
 
@@ -30,14 +30,14 @@ export default function ChatbotShowcase() {
    full uncropped window. */
 function GenericChatPanel() {
   return (
-    <div className="mx-auto w-full max-w-[420px] overflow-hidden rounded-[18px]">
+    <div className="mx-auto w-full max-w-[420px] rounded-[24px] border border-slate-200/70 bg-white/60 p-5 sm:p-6 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
       <p className="sr-only">
         Chat conversation: customer asks about a Saturday booking slot and pricing; Vaayu answers with availability and price, citing the services FAQ.
       </p>
       <img
         src="/generic_chat.svg"
         alt="Chat conversation mockup"
-        className="block h-auto w-full"
+        className="block h-auto w-full rounded-[16px]"
         width={300}
         height={400}
       />
@@ -48,14 +48,14 @@ function GenericChatPanel() {
 /* Chemical-vertical panel — assistant mockup displaying hub options and chemical query flows. */
 function ChemicalHubPanel() {
   return (
-    <div className="mx-auto w-full max-w-[420px] overflow-hidden rounded-[18px]">
+    <div className="mx-auto w-full max-w-[420px] rounded-[24px] border border-slate-200/70 bg-white/60 p-5 sm:p-6 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
       <p className="sr-only">
         Expresolv AI chemical assistant chat conversation mockup.
       </p>
       <img
         src="/chemical_chat.svg"
         alt="Expresolv AI chemical assistant chat mockup"
-        className="block h-auto w-full"
+        className="block h-auto w-full rounded-[16px]"
         width={300}
         height={400}
       />

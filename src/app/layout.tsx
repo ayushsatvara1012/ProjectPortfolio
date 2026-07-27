@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Plus_Jakarta_Sans, Inter } from 'next/font/google';
+import { Plus_Jakarta_Sans, Inter, Newsreader } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
@@ -9,6 +9,13 @@ const googleSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-google',
+});
+
+const newsreader = Newsreader({
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-newsreader',
 });
 
 const inter = Inter({
@@ -43,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${googleSans.variable} ${inter.variable}`}>
+    <html lang="en" className={`${googleSans.variable} ${inter.variable} ${newsreader.variable}`}>
       <head>
         {/* Google tag (gtag.js) */}
         <Script

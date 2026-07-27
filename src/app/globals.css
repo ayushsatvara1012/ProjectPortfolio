@@ -4,6 +4,7 @@
   --font-sans: "Plus Jakarta Sans", var(--font-google), sans-serif;
   --font-display: "Plus Jakarta Sans", var(--font-google), sans-serif;
   --font-google: "Plus Jakarta Sans", var(--font-google), sans-serif;
+  --font-newsreader: var(--font-newsreader), "Newsreader", serif;
 }
 
 @theme {
