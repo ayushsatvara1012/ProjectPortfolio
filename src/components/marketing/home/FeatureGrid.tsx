@@ -40,8 +40,7 @@ export default function FeatureGrid() {
     <section id="features" className="py-28 lg:py-32 transition-colors duration-500">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-[640px] text-center">
-          <span className="text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[#004DE8] dark:text-[#6E97FF]">What it does</span>
-          <h2 className="mt-4 font-google text-[29px] font-bold leading-[1.08] tracking-[-0.035em] text-[#0F172A] dark:text-[#F8FAFC] sm:text-4xl lg:text-[44px]">
+          <h2 className="mt-4 font-newsreader font-light leading-[1.05] tracking-tight text-4xl text-[#0F172A] dark:text-[#F8FAFC] sm:text-5xl lg:text-6xl">
             Everything your website needs to answer, capture, and convert
           </h2>
           <p className="mt-4 font-google text-lg leading-relaxed text-[#475569] dark:text-[#94A3B8]">

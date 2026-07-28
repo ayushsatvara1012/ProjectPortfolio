@@ -1,9 +1,7 @@
 import React from 'react';
-import Link from 'next/link';
 import { PRODUCT } from '@/src/lib/brand';
-import { DemoButton } from './HeroClient';
+import { DemoButton, GetStartedButton } from './HeroClient';
 import HeroSpiral from './HeroSpiral';
-import { ArrowRightIcon } from '@/src/components/icons';
 
 export default function HeroSection() {
   return (
@@ -16,7 +14,7 @@ export default function HeroSection() {
         <div className="relative z-10 w-full flex flex-col items-start">
           <div className="max-w-xl flex flex-col justify-center items-start text-left">
           <h1 className="font-newsreader font-light tracking-tight leading-[1.08] text-5xl sm:text-6xl md:text-7xl text-slate-900 dark:text-slate-100 mb-6 transition-colors">
-            Answers for every customer
+            Convert your static site to AI powered
           </h1>
 
           <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors">
@@ -26,21 +24,7 @@ export default function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row justify-start items-center gap-8 w-full transition-colors">
-            <Link
-              href="/vaayu"
-              className="overflow-hidden relative bg-slate-900 dark:bg-slate-900 text-lg font-google text-white border-none font-medium cursor-pointer z-10 group flex items-center justify-center gap-2 px-8 py-4 rounded-full border border-slate-200/50 dark:border-slate-800"
-            >
-                Get {PRODUCT.name}
-              <span>
-                <ArrowRightIcon size={20} className="shrink-0" />
-              </span>
-
-
-              <span className="absolute w-40 h-32 -top-14 -left-2 bg-blue-200 rotate-12 transform scale-x-0 group-hover:scale-x-150 transition-transform group-hover:duration-500 duration-1000 origin-left" />
-              <span className="absolute w-40 h-36 -top-15 -left-2 bg-blue-600 rotate-12 transform scale-x-0 group-hover:scale-x-[120%] transition-transform group-hover:duration-700 duration-700 origin-left" />
-              <span className="absolute w-36 h-32 -top-8 -left-2 bg-blue-800 rotate-12 transform scale-x-0 group-hover:scale-x-75 transition-transform group-hover:duration-1000 duration-500 origin-left" />
-              <span aria-hidden="true" className="group-hover:opacity-100 group-hover:duration-1000 duration-100 opacity-0 absolute left-6 z-10 whitespace-nowrap">Explore Now !</span>
-            </Link>
+            <GetStartedButton />
 
             <DemoButton />
           </div>
@@ -58,7 +42,7 @@ export default function HeroSection() {
 }
 
 /* ⚠️ PLACEHOLDER wordmarks — swap for real customer logos before launch. */
-const TRUSTED_BY = ['Acme Co', 'NorthPeak', 'BrightCart', 'Lumen Labs', 'Vertex', 'Hatch'];
+const TRUSTED_BY = ['Gyanesha Institute', 'Expresolv Ltd.', 'SP Designs'];
 
 function TrustedByStrip() {
   return (

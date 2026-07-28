@@ -38,11 +38,7 @@ const Testimonials = () => {
 
         {/* Header */}
         <div className="max-w-2xl mb-16">
-          <div className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold font-google text-slate-400 dark:text-slate-500 mb-4">
-            <span className="material-symbols-outlined text-[16px] text-blue-500">format_quote</span>
-            <span>What our early users say</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight leading-tight text-slate-900 dark:text-white">
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-newsreader font-light tracking-tight leading-[1.05] text-slate-900 dark:text-white">
             Real results from real businesses.
           </h2>
         </div>

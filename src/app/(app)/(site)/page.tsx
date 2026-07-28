@@ -128,9 +128,11 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
-        {/* One mesh gradient for the whole page: fixed, so it stays continuous
-            behind every section instead of restarting per section. */}
-        <div className="pointer-events-none fixed inset-0 z-0">
+        {/* The mesh belongs to the hero only: pinned to the top of the page and
+            one viewport tall, so it scrolls away with the hero. Its mask fades
+            to nothing before the bottom edge, which resolves the gradient into
+            the page base — no seam where the hero ends. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-dvh z-0">
           <MeshGradientBackground />
         </div>
         <div className="relative z-10">

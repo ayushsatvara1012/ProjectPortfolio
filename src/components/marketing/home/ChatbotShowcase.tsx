@@ -1,4 +1,5 @@
 import React from 'react';
+import ChatbotShowcaseOrnament from '../ChatbotShowcaseOrnament';
 
 /* Chatbot showcase — two vertical-bot mockups (generic + chemical) over the
    shared page mesh gradient. Server Component (no interactivity). */
@@ -8,12 +9,14 @@ export default function ChatbotShowcase() {
       id="chatbots"
       className="relative py-16 sm:py-24 overflow-hidden transition-colors duration-500"
     >
+      <ChatbotShowcaseOrnament />
+
       <div className="relative z-10 max-w-5xl mx-auto px-6">
         <h2 className="mb-4 text-center font-newsreader font-light tracking-tight leading-[1.05] text-4xl sm:text-5xl lg:text-6xl text-slate-900 dark:text-white">
           Our two new chatbots
         </h2>
 
-        <p className="mb-10 text-center text-[13px] sm:text-[14px] font-google font-semibold text-[#002B82]/80 dark:text-[#6E97FF] tracking-wide">
+        <p className="mb-10 text-center text-sm sm:text-base font-google font-medium text-[#002B82]/80 dark:text-[#6E97FF] tracking-wide">
           One assistant, tailored to every business — from service bookings to chemical distribution
         </p>
 
