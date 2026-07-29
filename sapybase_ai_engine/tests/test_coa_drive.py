@@ -114,8 +114,31 @@ class TestTokenize:
         assert tokens[:3] == ("102NF", "102", "26P001")
 
     def test_doubled_space_and_ampersand(self):
+        # The ampersand is a separator, not a token: "&" is punctuation and was only
+        # ever indexable as a match for a query of "&". Every separator is now any run
+        # of non-alphanumerics, so there is no per-character exception list to keep.
         assert tokenize("101HPLC_101.26R001_ACETONITRILE  HPLC & SPEC.pdf") == (
-            "101HPLC", "101", "26R001", "ACETONITRILE", "HPLC", "&", "SPEC")
+            "101HPLC", "101", "26R001", "ACETONITRILE", "HPLC", "SPEC")
+
+    def test_punctuation_is_a_separator_not_part_of_a_token(self):
+        # The live bug: a comma is not in the old `[_\-.\s/]` set, so "acetone,"
+        # became a token that matches nothing, the strict pass failed, and the
+        # fallback returned the whole catalogue.
+        assert tokenize("acetone, batch 100.26R016") == (
+            "ACETONE", "BATCH", "100", "26R016")
+        assert tokenize("BUTAN-1-OL (N-BUTANOL)") == ("BUTAN", "1", "OL", "N", "BUTANOL")
+        assert tokenize("GLYCEROL 85%") == ("GLYCEROL", "85")
+
+    def test_a_comma_convention_needs_no_configuration(self):
+        # D2 — the separator set must not encode any one client's punctuation taste.
+        assert tokenize("ACET,LR,B1042.pdf") == ("ACET", "LR", "B1042")
+        assert tokenize("ACET|LR|B1042.pdf") == ("ACET", "LR", "B1042")
+
+    def test_non_latin_filenames_survive_tokenization(self):
+        # `[\W_]+` is Unicode-aware; an ASCII-only separator class would reduce these
+        # to nothing and make the file permanently unfindable.
+        assert tokenize("АЦЕТОН_100.26R016.pdf") == ("АЦЕТОН", "100", "26R016")
+        assert tokenize("丙酮-100.pdf") == ("丙酮", "100")
 
     def test_dotted_pharmacopoeia_reference_splits(self):
         # PH.EUR is a dot like any other — no special case, no exception list.
@@ -256,6 +279,43 @@ class TestFallbackPass:
     def test_a_query_matching_nothing_returns_nothing(self, library):
         found, truncated = search(library, "ZZZZQQ")
         assert found == [] and truncated is False
+
+    def test_only_the_best_matching_tier_survives(self, library):
+        # The fallback used to admit anything matching AT LEAST ONE token, so one
+        # unmatched word returned the whole catalogue instead of the near misses. Now
+        # only the documents that matched the MOST query tokens come back.
+        best, _ = search(library, "acetone 100.26R016 ZZZZQQ")
+        loose, _ = search(library, "acetone ZZZZQQ")
+        assert len(best) < len(loose), (
+            "adding a second real token must narrow the fallback, not widen it")
+        assert all("100.26R016" in n for n in names_of(best))
+
+    def test_conversational_phrasing_matches_the_clean_query_inside_it(self, library):
+        # The live-conversation bug: the model passes natural language straight
+        # through, so filler words must not each become a required search token.
+        clean, _ = search(library, "100.26R016")
+        for phrasing in [
+            "acetone, batch 100.26R016",
+            "I have a drum of acetone batch 100.26R016",
+            "COA for batch 100.26R016",
+            "please send me the certificate for batch 100.26R016",
+        ]:
+            found, _ = search(library, phrasing)
+            assert names_of(found) == names_of(clean), f"{phrasing!r} should match the batch"
+
+    def test_a_substring_only_hit_cannot_carry_the_fallback(self, library):
+        # "ME" prefix-matches METHANOL and "THE" sits inside ETHER, so short filler
+        # words otherwise drag in half the corpus. A fallback result now needs at
+        # least one token matching at prefix strength or better.
+        found, _ = search(library, "aa bb cc")
+        assert found == []
+
+    def test_filler_alone_still_returns_nothing(self, library):
+        # The corollary: dropping filler must not turn a contentless question into a
+        # match-everything query (H6's hole, reached by a different route).
+        for query in ["batch", "certificate please", "can you send me the COA"]:
+            found, _ = search(library, query)
+            assert found == [], f"{query!r} carries no identifier and must return nothing"
 
 
 class TestSearchConstraints:

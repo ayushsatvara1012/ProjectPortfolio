@@ -8,10 +8,26 @@ Turn the currently-disabled `Request COA` hub card into a Certificate of Analysi
 Phases 0, 1 and 2 are **built and committed**; Phases 3 and 4 are not started.
 Suite green: backend 1873, frontend 459, tsc 0, lint 0 errors.
 
-**Nothing has ever run against real Google Drive.**
-Every test uses `httpx.MockTransport`, and no company has a COA folder saved (`pack_overrides -> 'coa'` is absent on all three chemical bots, checked 2026-07-29).
-The §3 filenames were transcribed by hand, so the tokenizer has never met the actual folder.
-This is the single largest unknown in the feature, and no further test-writing shrinks it - the next step that reduces risk is saving a folder link and clicking Test Connection.
+**The pipeline has now run against the client's real Drive folder** (2026-07-29, read-only scratchpad script calling `walk_folder` and `search` directly - no dashboard, no dev server).
+It worked on the first attempt.
+
+```
+folder_id extracted   1w-sEG… (from the plain folder URL)
+walk                  1.44s · 8 folders · 2240 files seen · 2 non-PDF ignored · 1781 indexed · capped: ()
+```
+
+Confirmed against real filenames, not fixtures: `100.26R016` returns exactly the three grades (F1); `100EP 100.26P001` returns the single certificate; `26R16` finds `26R016`; `acetone LR` returns 16 acetone LR rows; `___`, `1` and `nonsense9999` return nothing (H6).
+Every indexed file carried a `webViewLink` (H7 - the failure that would have looked healthy).
+The folder is **regular Drive folders, not a Shared Drive** (Q2 answered): a root plus seven `COA <Month> 2026` subfolders.
+Shortcuts, a `.lnk` and an `Untitled drawing` were classified out correctly.
+
+**D6 dedupe is now measured, not assumed.**
+411 filenames repeat and 457 copies collapse; spot-checked examples are the same certificate filed in two month folders (F4), e.g. `100MC3_100.26P001` in both July and January.
+Only 3 names duplicate *within* a single folder, and those share an identical `modifiedTime` with different file IDs - genuine double-uploads, resolved by the file-ID tiebreak.
+H16's worst case (distinct documents sharing a name) does not occur in this folder.
+
+Still never exercised end to end through the product: the dashboard field, Test Connection, the endpoint, the agent tool.
+No company has a COA folder saved (`pack_overrides -> 'coa'` absent on all three chemical bots).
 
 | Phase | State | Where |
 |---|---|---|
@@ -48,12 +64,32 @@ A slot per field would reintroduce through the tool schema exactly the filename 
 This is a live behaviour change to the existing Expresolv bot the moment it deploys: a new tool in the schema on every request.
 Worth watching in a real conversation before it ships.
 
+### What the real folder disagreed with
+
+**Volume is roughly 7x the estimate, and `MAX_FILES` is the thing it threatens.**
+§1 said "a few hundred COAs per year"; the folder holds **2240 files for seven months of 2026** - 269 to 449 per month, averaging ~320.
+`MAX_FILES = 5000` is therefore already 45% consumed, and on current intake is breached around **mid-2027**, after which the walk serves partial results and only says so through `WalkResult.capped`.
+§6 calls the file cap the signal to move to a `coa_documents` Postgres index and puts that "years away". It is not years away.
+See the open decision below.
+
+**The 50-row result cap is load-bearing.**
+`acetone` and `P001` both hit it; `EP` returns 48.
+Phase 3's "keep typing to narrow" hint is a functional requirement, not decoration.
+
+**Cache entry and search cost - since fixed, see §6.1.**
+One company's listing serialized to **421 KB** of Redis, and the parse back out of it cost **38 ms on every single search** - three to five times the 7-14 ms search it fed.
+Neither is what "a few hundred files fit in one cache entry" (D9) assumed.
+The panel should still debounce rather than search per keystroke.
+
+**Filename quality is better than feared**: exactly one file (`129LR.pdf`) has a single token and is findable only by that exact code, and two carry a `Copy of ` prefix that adds junk tokens without breaking anything.
+
 ### Known gaps, in priority order
 
-1. **No contact with reality** (above).
-2. **H5 is open** - `/api/widget/coa` can be driven to walk Drive repeatedly. What exists is an in-process 60s cooldown plus a rule that only a miss against a *cached* listing re-walks; that is not H5, which needs the Redis single-flight to be correct across workers.
-3. **H15 is partial** - Drive 403/404/5xx are classified and mapped to distinct owner- and visitor-facing outcomes, but there is no retry with backoff yet.
-4. The `coa` hub card stays `disabled=True` until §13.1 is empty.
+1. ~~**Open decision - `MAX_FILES` vs a Postgres index.**~~ **Closed 2026-07-29 - see §6.1.** Cap raised to 25,000 after making a listing cheap enough that the raise costs nothing.
+2. **Only the dashboard UI is now unexercised.** `/api/widget/coa` and `get_coa` were driven against the real DB row, Redis, Drive and a real model call on 2026-07-29 (§7.1) - which is how the conversational-query bug was found. `CoaFolderField.tsx` and Test Connection have still only run under vitest; a Vercel preview off this branch is the cleanest place to close that.
+3. **H5 is open** - `/api/widget/coa` can be driven to walk Drive repeatedly. What exists is an in-process 60s cooldown plus a rule that only a miss against a *cached* listing re-walks; that is not H5, which needs the Redis single-flight to be correct across workers.
+4. **H15 is partial** - Drive 403/404/5xx are classified and mapped to distinct owner- and visitor-facing outcomes, but there is no retry with backoff yet.
+5. The `coa` hub card stays `disabled=True` until §13.1 is empty.
 
 ## 1. Problem
 
@@ -62,7 +98,8 @@ Today a customer holding a drum has to email or call to get that batch's certifi
 
 The bot should answer it: the customer types the product code or batch number off their drum or invoice, sees the matching certificates, and picks one.
 
-Scale: a few hundred COAs per year, roughly one per dispatch.
+Scale, **measured 2026-07-29** (the earlier "a few hundred per year" was an estimate and was wrong by ~7x): **2240 files across seven months of 2026**, 269-449 per month, collapsing to 1781 distinct certificates once the same file in two month folders is deduped.
+Roughly one per dispatch still holds - there are simply far more dispatches than assumed.
 
 ## 2. The core design decision - no filename grammar
 
@@ -86,8 +123,9 @@ A client with any naming convention works on day one.
 
 ## 3. Reference data
 
-The client's live folder (`COA-Expresolv 2026`), read 2026-07-28.
+The client's live folder (`COA-Expresolv 2026`), transcribed by hand 2026-07-28.
 These are **test fixtures, not a specification** - the search must work on them without any of them being encoded as rules.
+The folder was read for real on 2026-07-29 (§0) and the transcription held up: the shapes below are representative of all 2240 files.
 
 ```
 100MC3_100.26P001_ACETONE USP-NF PH.EUR BP.pdf
@@ -130,7 +168,7 @@ Structural facts worth knowing, none of which are encoded as parsing rules:
 | D6 | Duplicates | **Identical filename = same document, newest `modifiedTime` wins** | Generic version of the newest-wins invariant `_newest_https_row` enforces for SDS |
 | D7 | Gating | **Open to anyone**, no email capture | Owner's choice, raised twice. Search-first is a speed bump, not a gate |
 | D8 | Link delivery | **Direct Drive `webViewLink`** | Requires the folder stay shared "anyone with the link" |
-| D9 | Freshness | **Redis-cached listing (600s TTL)** + force-refresh on a miss. No DB table, no cron | A few hundred files fit in one cache entry; miss-refresh removes staleness |
+| D9 | Freshness | **In-process memo + compressed Redis listing (600s TTL)** + force-refresh on a miss. No DB table, no cron | Miss-refresh removes staleness. The "a few hundred files fit in one entry" premise was wrong by ~7x; §6.1 is the correction |
 | D10 | Credential | **Platform Drive API key**, not a service account | A link-shared folder is readable with a plain key. No OAuth, no per-tenant secret, no new dependency |
 | D11 | Matching location | **In our own Python**, never Drive's `name contains` | Drive's `contains` does word-*prefix* matching and misses a token mid-filename |
 | D12 | Folder scope | **Recurse from wherever the link points**, arbitrary depth; owner can change the link any time | No assumption about year/month structure, so a reorganisation cannot break it |
@@ -153,18 +191,80 @@ Drive is live-connected at all times; Redis holds only the filename listing so w
 
 Latency: ~1s for the first request in a 10-minute window, instant afterwards.
 
-**Guard rails on the walk.** Max depth 6, max 5,000 files, max 200 folders - each breach logs a warning and serves what it has rather than hanging.
-Hitting the file cap is the signal to revisit this design in favour of a `coa_documents` Postgres index.
-At current volume that is years away.
+**Guard rails on the walk.** Max depth 6, max 25,000 files, max 200 folders - each breach logs a warning and serves what it has rather than hanging.
+The file cap was 5,000 on an estimated volume that turned out to be ~7x too low; see §6.1.
+
+## 6.1 Cache tiers - implemented 2026-07-29
+
+Three tiers, cheapest first: an **in-process memo** of the already-parsed listing, **Redis** holding it compressed, then **Drive**.
+Built after measuring the real folder, where the dominant cost turned out not to be Drive or Redis but rebuilding 1,781 `CoaDocument`s out of JSON on *every* search.
+
+| | Before | After |
+|---|---|---|
+| Warm search (same worker) | 38 ms parse + 1 Redis GET | **0.02 ms**, no Redis |
+| Cold worker | 38 ms parse | 40 ms, once per TTL |
+| Cold start (walk) | 1.4 s | 1.7 s |
+| Redis entry | 421 KB | **93 KB** |
+| Redis reads | one per search | one per TTL per worker |
+
+**The memo** (`INDEX_MEMO_MAX_ENTRIES = 8`, keyed by the same `cache_key`, expiring on the same `CACHE_TTL_SECONDS`) holds ~2 MB of parsed objects per company, so the bound caps a worker at ~16 MB however many chemical tenants onboard.
+`WalkResult` and `CoaDocument` are frozen and hold only tuples, so a memoized listing is safe to hand out repeatedly.
+`force=True` bypasses and replaces it, so a stale memo can never be what makes a newly uploaded COA unfindable (§6 step 5).
+
+**Compression** is plain zlib at level 6 (`encode_index` / `decode_payload`). Filenames repeat heavily across batches, so the listing squashes 4.5x.
+An uncompressed entry written by an older deploy is still read correctly - overlapping deploys share one Redis and one 600s TTL - and anything undecodable is a miss, never an exception.
+The columnar variant that derives `webViewLink` from the file ID was measured (71 KB) and **rejected**: 22 KB is not worth dropping the stored link, which is the canary for H7.
+
+This is what made raising `MAX_FILES` to 25,000 free: at that size the entry is still under a megabyte compressed.
+**The signal to move to a `coa_documents` Postgres index is now the cached entry approaching 1 MB, not the file count.**
+
+H13 is unchanged in spirit but better in practice: with Redis dead the memo still serves, so the degradation is one walk per TTL per worker rather than one per request.
+Redis Cloud's free tier is 30 MB with `volatile-lru`, and our key carries a TTL, so even a full Redis evicts the listing into a cache miss - one extra walk, never an error.
 
 ## 7. Matching
 
 Pure functions in `services/coa_drive.py`, unit-testable without Drive or Redis.
 
-**Tokenize** both filename and query: uppercase, split on `_ - . space /`, drop empties, drop the extension.
+**Tokenize** both filename and query: NFKC-normalize, uppercase, split on **every run of non-alphanumerics**, drop empties, drop the extension.
+The separator set was originally `_ - . space /`, picked from this client's filenames - itself a small piece of the convention-fitting D2 forbids, and the direct cause of the live bug in §7.1.
+The regex is `[\W_]+`, which is Unicode-aware, so a Cyrillic or CJK filename still yields tokens instead of nothing.
 
 **Pass 1 - strict.** Every query token must match some file token, by exact match, prefix, or substring.
-**Pass 2 - fallback.** If pass 1 returns nothing, match *any* token and rank by how many hit, so a typo degrades into close suggestions rather than a dead end.
+**Pass 2 - fallback.** Only when pass 1 returns nothing: the documents that matched the **most** query tokens, and only if at least one of those hits was at **prefix strength or better**.
+A typo therefore degrades into close suggestions, while a filler word degrades into nothing at all.
+
+### 7.1 The conversational-query bug - found live 2026-07-29, fixed
+
+The first real conversation against the client's folder exposed a defect no mock test could have, because every test fed a clean query like `100.26R016`.
+
+> **Visitor:** I have a drum of acetone, batch 100.26R016. Can I get the COA?
+> **Bot:** I found **50** Certificates of Analysis…
+
+The answer is 3.
+The model passes natural language straight into the tool's single free-text slot, so **every filler word became a required search token.**
+Two independent causes:
+
+1. **A comma was not a separator.** `acetone,` tokenized as one token matching nothing, so the strict pass failed.
+2. **The fallback admitted anything matching one token.** With strict failed, it returned the entire acetone catalogue, capped at 50 - and 50 is the cap, not a real count.
+
+Both are fixed above. The count reaching the model is now the count of certificates that actually match, which matters because the model reads it aloud.
+
+Measured on the real 1781-document corpus:
+
+| Query | Before | After |
+|---|---|---|
+| `acetone, batch 100.26R016` | 50 | **3** |
+| `I have a drum of acetone batch 100.26R016` | 50 | **3** |
+| `COA for batch 100.26R016` | 50 | **3** |
+| `certificate for 100EP 100.26P001` | 50 | **1** |
+| `please send the chloroform certificate` | 50 | **18** (chloroform's true count) |
+| `acetnoe 100.26R016` (typo) | 50 | **3** |
+| `EP` / `100EP` / `26R16` / `acetone LR` | 48 / 4 / 18 / 16 | unchanged |
+| `batch`, `certificate please`, `___`, `ZZ.99Q999` | 0 | 0 |
+
+**Accepted residual.** `can you send me the COA` still returns 12, because `ME` prefix-matches `METHANOL`.
+Tightening this further means barring prefix matching for 2-character tokens, which would break the documented `EP` behaviour in §8 - a 2-character query has to keep matching mid-token.
+It does not bite in practice: a query with no identifier makes the model ask for one rather than call the tool (observed), and `missing_identifier` covers the empty case.
 
 **Ranking**: exact token > prefix > substring; more matched tokens higher; newest `modifiedTime` breaks ties.
 
@@ -387,7 +487,8 @@ The `multiple` tool status must also tell the model the panel is already showing
 
 ## 12. Tests
 
-- `tokenize()` against every fixture in §3 - extra underscores, stray and doubled spaces, dots, ampersands.
+- `tokenize()` against every fixture in §3 - extra underscores, stray and doubled spaces, dots, ampersands, commas, parentheses and percent signs; a comma- and a pipe-delimited convention with no config change; a Cyrillic and a CJK filename.
+- Conversational phrasing (§7.1): "acetone, batch X", "I have a drum of acetone batch X", "COA for batch X" all return exactly what the bare batch number returns; filler alone (`batch`, `certificate please`) returns nothing; a substring-only hit cannot carry the fallback.
 - Search: exact code, substring code, full batch, partial batch, multi-token query, description-only query, F1 multi-grade fan-out.
 - Strict pass returns nothing → fallback pass returns ranked near-misses.
 - Numeric tolerance: `26R16` finds `26R016`.
@@ -397,6 +498,7 @@ The `multiple` tool status must also tell the model the panel is already showing
 - Walk: nested folders, depth cap, file cap, folder cap, pagination.
 - Endpoint: mocked Drive - hit, miss-then-refresh-hit, miss-then-handoff, Drive down.
 - Cache: TTL respected, force-refresh on miss, key changes when the folder link changes.
+- Cache tiers (§6.1): compressed round trip; an uncompressed entry from an older deploy still reads; undecodable bytes are a miss, not an exception; a memo hit reads neither Redis nor Drive; a Redis hit warms the memo; `force` bypasses and replaces the memo; the memo expires on the TTL, is bounded, evicts least-recently-used, and never shares an entry between tenants.
 - Security: COA folder ID absent from `/api/config`.
 - Config: a non-chemical bot 404s on the COA endpoint.
 
@@ -451,8 +553,8 @@ H5's cooldown value is deliberately unset until we have measured a real walk.
 
 | # | Question | Blocks | Status |
 |---|---|---|---|
-| Q1 | F5 file-size split: can a 30 KB and a 740 KB variant both exist for one batch? | Nothing - D6 newest-wins covers it either way | Unconfirmed with client |
-| Q2 | Is the folder a regular Drive folder or a Shared Drive? | Reading Test Connection's "0 files" result correctly | Unanswered - Test Connection will show it |
+| Q1 | F5 file-size split: can a 30 KB and a 740 KB variant both exist for one batch? | Nothing - D6 newest-wins covers it either way | Unconfirmed with client (we never request `size`, so the live walk could not answer it) |
+| Q2 | Is the folder a regular Drive folder or a Shared Drive? | Reading Test Connection's "0 files" result correctly | **Answered 2026-07-29 - regular Drive folders**, root + 7 month subfolders. The H2 flags cost nothing and stay |
 | Q3 | `GOOGLE_DRIVE_API_KEY` created and set on Render | Phase 1 | **Local done** 2026-07-29 (`sapybase_ai_engine/.env`); Render still to do |
 | Q4 | API key restricted to the Drive API only (+ IP restriction if Render exposes static outbound IPs) | Ship | Not started - do before Render |
 | Q5 | Dedicated GCP project, and does it need billing enabled to clear the 400M unit/day free threshold? | Phase 1 | Not started |

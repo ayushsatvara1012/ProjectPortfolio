@@ -20,7 +20,9 @@ from services.coa_drive import (
     WalkResult,
     build_document,
     cache_key,
+    decode_payload,
     deserialize_index,
+    encode_index,
     load_index,
     serialize_index,
 )
@@ -194,6 +196,120 @@ class TestLoadIndex:
         assert cache.store == {}, "an outage must not be cached as an empty folder"
 
 
+class TestCompression:
+    """The listing is compressed into Redis (~4.5x on real data)."""
+
+    def test_a_walk_survives_the_compressed_round_trip(self):
+        original = walk_result()
+        restored = deserialize_index(decode_payload(encode_index(original)))
+        assert [d.name for d in restored.documents] == [d.name for d in original.documents]
+
+    def test_the_stored_bytes_are_actually_compressed(self):
+        original = walk_result()
+        assert len(encode_index(original)) < len(serialize_index(original))
+
+    def test_an_uncompressed_entry_from_an_older_deploy_still_reads(self):
+        # Overlapping deploys share one Redis and one 600s TTL, so the new code must
+        # read what the old code wrote rather than treating it as a corrupt entry.
+        legacy = serialize_index(walk_result())
+        restored = deserialize_index(decode_payload(legacy.encode()))
+        assert restored is not None and restored.indexed == walk_result().indexed
+
+    @pytest.mark.parametrize("junk", [
+        b"", b"\x78not really compressed", b"\x00\x01\x02", "plain text", None,
+    ])
+    def test_undecodable_bytes_are_a_miss_not_an_exception(self, junk):
+        assert deserialize_index(decode_payload(junk)) is None
+
+    @pytest.mark.asyncio
+    async def test_what_lands_in_redis_is_compressed_and_reads_back(self):
+        cache = FakeRedis()
+        async with httpx.AsyncClient(transport=drive({FOLDER_ID: [entry(FIXTURES[0])]})) as client:
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+            stored = cache.store[cache_key(COMPANY_ID, FOLDER_ID)]
+            assert isinstance(stored, (bytes, bytearray)) and stored[:1] == b"\x78"
+            coa_drive.reset_index_memo()
+            result, from_cache = await load_index(
+                COMPANY_ID, FOLDER_ID, redis_client=cache, api_key=API_KEY, client=client)
+        assert from_cache is True and result.indexed == 1
+
+
+class TestIndexMemo:
+    """The parsed listing is held in process, so a warm worker never re-parses it."""
+
+    @pytest.mark.asyncio
+    async def test_a_second_search_touches_neither_redis_nor_drive(self):
+        cache = FakeRedis()
+        requests = []
+        transport = drive({FOLDER_ID: [entry(FIXTURES[0])]}, requests)
+        async with httpx.AsyncClient(transport=transport) as client:
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+            gets_before = cache.gets
+            result, from_cache = await load_index(
+                COMPANY_ID, FOLDER_ID, redis_client=cache, api_key=API_KEY, client=client)
+        assert from_cache is True and result.indexed == 1
+        assert cache.gets == gets_before, "a memo hit must not read Redis"
+        assert len(requests) == 1
+
+    @pytest.mark.asyncio
+    async def test_a_redis_hit_populates_the_memo(self):
+        # Two workers: the second must warm its memo from Redis rather than walking.
+        cache = FakeRedis()
+        requests = []
+        transport = drive({FOLDER_ID: [entry(FIXTURES[0])]}, requests)
+        async with httpx.AsyncClient(transport=transport) as client:
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+            coa_drive.reset_index_memo()          # a cold worker
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+            gets_before = cache.gets
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+        assert cache.gets == gets_before, "the Redis hit should have warmed the memo"
+        assert len(requests) == 1, "a cold worker reads Redis, it does not re-walk"
+
+    @pytest.mark.asyncio
+    async def test_force_bypasses_the_memo_and_refreshes_it(self):
+        # §6 step 5 — a stale memo must not be what makes a new COA unfindable.
+        cache = FakeRedis()
+        tree = {FOLDER_ID: [entry(FIXTURES[0])]}
+        async with httpx.AsyncClient(transport=drive(tree)) as client:
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+            tree[FOLDER_ID].append(entry(FIXTURES[1]))
+            forced, _ = await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                                         api_key=API_KEY, client=client, force=True)
+            after, from_cache = await load_index(
+                COMPANY_ID, FOLDER_ID, redis_client=cache, api_key=API_KEY, client=client)
+        assert forced.indexed == 2
+        assert from_cache is True and after.indexed == 2, "the forced walk must replace the memo"
+
+    def test_an_expired_entry_is_dropped(self):
+        result = walk_result()
+        coa_drive._memo_put("k", result, now=0.0)
+        assert coa_drive._memo_get("k", now=coa_drive.CACHE_TTL_SECONDS - 1) is result
+        assert coa_drive._memo_get("k", now=coa_drive.CACHE_TTL_SECONDS) is None
+
+    def test_the_memo_is_bounded_and_evicts_the_least_recently_used(self):
+        # One real listing is ~2 MB of parsed objects, so this bound is what stops a
+        # fleet of chemical tenants from growing the worker without limit.
+        for i in range(coa_drive.INDEX_MEMO_MAX_ENTRIES + 3):
+            coa_drive._memo_put(f"k{i}", walk_result(), now=0.0)
+        assert len(coa_drive._index_memo) == coa_drive.INDEX_MEMO_MAX_ENTRIES
+        assert coa_drive._memo_get("k0", now=1.0) is None
+        assert coa_drive._memo_get("k10", now=1.0) is not None
+
+    def test_tenants_never_share_a_memo_entry(self):
+        a, b = walk_result(), walk_result(names=FIXTURES[:1])
+        coa_drive._memo_put(cache_key("company-a", FOLDER_ID), a, now=0.0)
+        coa_drive._memo_put(cache_key("company-b", FOLDER_ID), b, now=0.0)
+        assert coa_drive._memo_get(cache_key("company-a", FOLDER_ID), now=1.0) is a
+        assert coa_drive._memo_get(cache_key("company-b", FOLDER_ID), now=1.0) is b
+
+
 class TestRedisUnavailable:
     """H13 — degrade to walking per request: slower, still correct, never a 500."""
 
@@ -211,10 +327,27 @@ class TestRedisUnavailable:
         transport = drive({FOLDER_ID: [entry(FIXTURES[0])]}, requests)
         async with httpx.AsyncClient(transport=transport) as client:
             for _ in range(3):
-                result, from_cache = await load_index(
+                result, _ = await load_index(
                     COMPANY_ID, FOLDER_ID, redis_client=cache, api_key=API_KEY, client=client)
-                assert result.indexed == 1 and from_cache is False
-        assert len(requests) == 3, "every request walks when the cache is dead"
+                assert result.indexed == 1, "a dead cache must never change the answer"
+        assert len(requests) == 1, (
+            "the in-process memo absorbs the repeats — H13's degradation is one walk "
+            "per TTL per worker, not one per request"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_failing_redis_walks_again_once_the_memo_expires(self):
+        # The memo must not turn a Redis outage into a permanently frozen listing.
+        cache = FakeRedis(fail=True)
+        requests = []
+        transport = drive({FOLDER_ID: [entry(FIXTURES[0])]}, requests)
+        async with httpx.AsyncClient(transport=transport) as client:
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+            coa_drive.reset_index_memo()
+            await load_index(COMPANY_ID, FOLDER_ID, redis_client=cache,
+                             api_key=API_KEY, client=client)
+        assert len(requests) == 2
 
     @pytest.mark.asyncio
     async def test_h3_a_redis_error_carrying_the_key_is_scrubbed_before_logging(self, caplog):

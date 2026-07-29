@@ -36,3 +36,19 @@ def _disable_slowapi_limiter():
     yield
     if limiter is not None and previous is not None:
         limiter.enabled = previous
+
+
+@pytest.fixture(autouse=True)
+def _reset_coa_index_memo():
+    """Drop the COA in-process index memo around every test.
+
+    `coa_drive` memoizes the parsed Drive listing for the cache TTL so a warm worker
+    never re-parses it. That memo is module-global, so without this a listing walked
+    by one test is silently served to the next — which would hide exactly the walk
+    counts and cache misses these tests exist to assert.
+    """
+    from services import coa_drive
+
+    coa_drive.reset_index_memo()
+    yield
+    coa_drive.reset_index_memo()
