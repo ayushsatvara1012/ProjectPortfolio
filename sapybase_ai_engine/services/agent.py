@@ -25,6 +25,7 @@ Design constraints discovered in the codebase (must hold):
 """
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import os
@@ -1309,6 +1310,11 @@ async def stream_agent_loop(
             }
             try:
                 observation = tool_executor(call.get("name"), call.get("args") or {})
+                # A tool may be async — `get_coa` reaches Google Drive, which must not
+                # block the event loop the SSE stream is running on. Sync tools (every
+                # DB-backed one) are unaffected: they never return an awaitable.
+                if inspect.isawaitable(observation):
+                    observation = await observation
             except Exception:
                 logger.exception("agent loop: tool '%s' failed", call.get("name"))
                 observation = {

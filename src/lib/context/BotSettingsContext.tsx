@@ -53,6 +53,9 @@ type BotSettings = {
   sampleSinkUrl: string;             // owner's own sheet/Zapier webhook
   sampleSinkSecret: string;          // HMAC secret paired with the sink
   sinkStatus: { ok: boolean; detail?: string; at?: string } | null;  // last "Send test row" outcome
+  // ── COA finder (Phase 0): the client's Drive folder of certificates ──
+  coaFolder: string;                 // owner pastes a Drive folder URL; '' = feature off
+  coaFolderUrl: string;              // canonical URL echoed back for the saved folder
   // ── Contextual teaser (Phase 1): launcher bubble copy ──
   teaserEnabled: boolean;
   teaserTitle: string;               // '' = default copy ("Hi, I'm {botName}")
@@ -101,6 +104,8 @@ const DEFAULT_SETTINGS: BotSettings = {
   sampleSinkUrl: '',
   sampleSinkSecret: '',
   sinkStatus: null,
+  coaFolder: '',
+  coaFolderUrl: '',
   teaserEnabled: true,
   teaserTitle: '',
   teaserSubtext: '',
@@ -146,6 +151,11 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     sampleSinkUrl: company.sample_sink?.url || '',
     sampleSinkSecret: company.sample_sink?.secret || '',
     sinkStatus: company.channel_delivery_status?.sink || null,
+    // COA finder (Phase 0) — the backend stores the extracted folder ID but echoes
+    // a canonical URL back; the editor shows the URL so the owner can click through
+    // and confirm it points at the folder they meant.
+    coaFolder: company.coa?.folder_url || '',
+    coaFolderUrl: company.coa?.folder_url || '',
     // Contextual teaser (Phase 1) — enabled defaults to true; empty text means
     // "using the default copy" (shown as placeholder in the editor).
     teaserEnabled: company.teaser?.enabled !== false,
@@ -259,6 +269,9 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         payload.sample_form = botSettings.sampleForm;
         payload.sample_sink_url = botSettings.sampleSinkUrl.trim();
         payload.sample_sink_secret = botSettings.sampleSinkSecret.trim();
+        // COA finder (Phase 0) — send the raw paste; the backend extracts the folder
+        // ID and 400s on an unparseable link rather than silently ignoring it.
+        payload.coa_folder = botSettings.coaFolder.trim();
       }
       await authFetch<any>('/api/company', {
         method: 'PATCH',

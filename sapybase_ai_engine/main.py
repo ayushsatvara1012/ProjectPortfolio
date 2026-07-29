@@ -1568,7 +1568,10 @@ from packs import (
     effective_required_fields,
     effective_sample_sink,
     sanitize_visitor_fields,
+    sanitize_coa,
+    effective_coa_config,
 )
+from services import coa_drive
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
@@ -2311,6 +2314,16 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
             result["sample_form"] = effective_sample_form(pack, _overrides)
             result["hub_cards"] = pack.hub_cards_payload()
             result["sample_sink"] = _overrides.get("sample_sink") if isinstance(_overrides.get("sample_sink"), dict) else {}
+            # COA finder (Phase 0): owner-only. The folder ID is the one secret
+            # protecting a link-shared folder, so it is returned HERE (authenticated
+            # owner) and never from /api/config (plan §11). Echo a canonical URL back
+            # rather than the bare ID — the owner pasted a link and needs to be able
+            # to click it and confirm it points at the folder they meant.
+            _coa_folder = effective_coa_config(_overrides)
+            result["coa"] = {
+                "folder_id": _coa_folder,
+                "folder_url": f"https://drive.google.com/drive/folders/{_coa_folder}" if _coa_folder else "",
+            }
             # Phase 3.4: last "Send test row" outcome per channel, so the customise
             # tab can show a green/red status instead of leaving the owner guessing.
             result["channel_delivery_status"] = company_row[25] if isinstance(company_row[25], dict) else {}
@@ -2613,7 +2626,7 @@ async def update_company_details(
         # sample_form / sample_sink_* aren't plain columns; intercept them here,
         # merge over the bot's existing pack_overrides, and write the column once.
         # (Pulled out of the generic loop below so they don't become bad SET clauses.)
-        _ov_keys = {"sample_form", "sample_sink_url", "sample_sink_secret"}
+        _ov_keys = {"sample_form", "sample_sink_url", "sample_sink_secret", "coa_folder"}
         _ov_sent = update.model_dump(exclude_unset=True)
         if _ov_keys & set(_ov_sent.keys()):
             # The sink is an outbound webhook → gate it like webhook_url.
@@ -2644,6 +2657,22 @@ async def update_company_details(
                     _merged["sample_sink"] = _sink
                 else:
                     _merged.pop("sample_sink", None)
+            # COA finder (Phase 0). A blank clears the folder (= feature off). A
+            # non-blank paste that yields no valid folder ID is REJECTED rather than
+            # silently dropped — the owner pasted something and needs to know why it
+            # did not take, which is the whole of Phase 0's save-time feedback.
+            if "coa_folder" in _ov_sent:
+                _coa_raw = str(_ov_sent.get("coa_folder") or "").strip()
+                _coa = sanitize_coa({"folder_id": _coa_raw})
+                if _coa_raw and not _coa:
+                    raise HTTPException(status_code=400, detail={
+                        "code": "INVALID_COA_FOLDER",
+                        "message": "That doesn't look like a Google Drive folder link. "
+                                   "Open the folder in Drive and copy the URL from the address bar."})
+                if _coa:
+                    _merged["coa"] = _coa
+                else:
+                    _merged.pop("coa", None)
             updates.append("pack_overrides = %s::jsonb")
             params.append(json.dumps(_merged) if _merged else None)
 
@@ -3598,6 +3627,11 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     _captured = {}
 
                     def _tool_executor(tool_name, tool_args):
+                        # get_coa reaches Google Drive, not Postgres, so it is the one
+                        # async tool: this returns a coroutine and the agent loop awaits
+                        # it rather than blocking the event loop the stream runs on.
+                        if tool_name == "get_coa":
+                            return _get_coa_observation(company, tool_args, _captured)
                         obs = execute_tool(tool_name, tool_args, agent_cursor, company["id"],
                                            session_id=chat_req.session_id)
                         # When get_sds resolves a real sheet, surface it as a deterministic
@@ -5369,6 +5403,88 @@ async def test_sample_sink(
         release_db_connection(conn)
 
 
+# COA finder Phase 1 (§13.4). Deliberately NOT shipped in Phase 0: a Test Connection
+# button with no walker behind it can only return a fake success, which is worse
+# than no button. Every message below is owner-facing and names no folder ID (H11)
+# and no Drive URL (H3) — those live in server logs only.
+_COA_TEST_ERRORS = {
+    "invalid_folder": (400, "That folder link isn't valid. Paste the URL from Drive's address bar and save first."),
+    "not_configured": (503, "Certificate lookup isn't enabled on this deployment yet. Contact support."),
+    "not_found":      (400, "We couldn't find that folder. Check the link, and that the folder hasn't been moved or deleted."),
+    "forbidden":      (400, "Drive refused access. Share the folder as \"Anyone with the link\" and try again."),
+    "unreachable":    (503, "We couldn't reach Google Drive. Try again in a moment."),
+    "unavailable":    (503, "Google Drive returned an unexpected error. Try again in a moment."),
+}
+
+
+@app.post("/api/companies/{company_id}/coa/test-connection")
+async def test_coa_connection(
+    company_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Walk the bot's configured COA folder and report what is actually in it.
+
+    Always forces a fresh walk: a Test Connection that answered from a ten-minute
+    cache would tell the owner their folder is fine after they had already fixed or
+    broken the sharing setting.
+
+    H2 is the whole reason this reports counts rather than a boolean — a folder in a
+    Google Shared Drive read without the ``allDrives`` flags returns zero files with
+    HTTP 200, which is indistinguishable from an empty folder unless "connected, 0
+    files" is a distinct, visible outcome.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT pack_overrides FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+    finally:
+        release_db_connection(conn)
+
+    folder_id = effective_coa_config(coerce_overrides(row[0]))
+    if not folder_id:
+        raise HTTPException(status_code=400, detail={
+            "code": "NO_COA_FOLDER",
+            "message": "No certificate folder is configured. Add a Drive folder link and save first."})
+
+    try:
+        result, _ = await coa_drive.load_index(company_id, folder_id, redis_client=r, force=True)
+    except coa_drive.CoaDriveError as e:
+        status_code, message = _COA_TEST_ERRORS.get(e.reason, _COA_TEST_ERRORS["unavailable"])
+        logger.warning("COA test-connection failed for company %s: %s", company_id, e.reason)
+        raise HTTPException(status_code=status_code, detail={"code": "COA_UNREACHABLE", "message": message})
+
+    if result.indexed:
+        message = (f"Connected. Indexed {result.indexed} certificate"
+                   f"{'' if result.indexed == 1 else 's'} across {result.folders_visited} "
+                   f"folder{'' if result.folders_visited == 1 else 's'}.")
+    elif result.files_seen:
+        message = (f"Connected, but none of the {result.files_seen} files here are PDFs. "
+                   "Certificates need to be PDF files to be searchable.")
+    else:
+        # H2 — the failure that looks like success.
+        message = ("Connected, but the folder is empty. If your certificates are in a "
+                   "Shared Drive, check the link points at the folder itself and that "
+                   "it is shared with \"Anyone with the link\".")
+
+    return {
+        "status": "ok",
+        "connected": True,
+        "indexed": result.indexed,
+        "folders": result.folders_visited,
+        "files_seen": result.files_seen,
+        "ignored_non_pdf": result.ignored_non_pdf,
+        "capped": list(result.capped),
+        "message": message,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _coerce_qualification(v) -> dict:
     """Phase 5 — a session's `lead_profile->'qualification'` JSONB → a clean
     ``{label-safe str: str}`` dict for the owner request panels. Tolerates a dict,
@@ -5879,6 +5995,123 @@ def list_sds_products(
         })
     products.sort(key=lambda p: p["name"].lower())
     return {"products": products[:SDS_PICKER_PRODUCT_CAP]}
+
+
+# COA finder Phase 2. Visitor-facing copy for every failure — none of it names the
+# folder ID (H11), and a Drive outage is never phrased as "no certificate exists"
+# (H15), because that would tell a customer holding a real drum that their batch
+# was never tested.
+COA_UNAVAILABLE_MESSAGE = ("We couldn't reach the document library just now. "
+                           "Our team can send the certificate over instead.")
+
+
+def _coa_folder_for(company: dict) -> str:
+    return effective_coa_config(coerce_overrides(company.get("pack_overrides")))
+
+
+@app.get("/api/widget/coa")
+@limiter.limit("30/minute", key_func=get_remote_address)  # per-IP burst guard
+@limiter.limit("60/minute")                                 # per-API-key ceiling
+async def search_coa(
+    request: Request,
+    q: Optional[str] = None,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Deterministic certificate search for the widget's COA panel (D1, §7).
+
+    Search-first and never browsable: a blank or too-short ``q`` returns an empty
+    list, never a listing, so the company's production history is never on display.
+
+    Calls the SAME ``coa_drive.resolve`` as the ``get_coa`` agent tool, so the panel
+    and the conversational path can never disagree about which certificates match.
+
+    A non-chemical bot has no ``get_coa`` tool, so this 404s for them — the same
+    convention ``/api/widget/sds-products`` uses.
+    """
+    pack = load_pack(company.get("vertical"))
+    if not pack or "get_coa" not in pack.tool_names():
+        raise HTTPException(status_code=404, detail="Certificate lookup is not enabled for this bot.")
+
+    folder_id = _coa_folder_for(company)
+    if not folder_id:
+        # Configured off, not broken: an empty result set with the feature flagged
+        # off lets the panel show its handoff copy without inventing an error.
+        return {"results": [], "truncated": False, "configured": False}
+
+    try:
+        results, truncated = await coa_drive.resolve(
+            company["id"], folder_id, q, redis_client=r)
+    except coa_drive.CoaDriveError as e:
+        logger.warning("COA search failed for company %s: %s", company["id"], e.reason)
+        raise HTTPException(status_code=503, detail={
+            "code": "COA_UNAVAILABLE", "message": COA_UNAVAILABLE_MESSAGE})
+
+    return {
+        "results": [coa_drive.to_payload(d) for d in results],
+        "truncated": truncated,
+        "configured": True,
+    }
+
+
+async def _run_get_coa(company: dict, args: dict) -> dict:
+    """The ``get_coa`` agent tool (plan §8 "Chat entry").
+
+    H10 — the model NEVER sees a filename. Anyone who can write to the client's Drive
+    folder can name a file, and filenames reach the model as tool observations, so a
+    filename is an injection vector. The observation carries a status and a count;
+    the panel does every bit of the display.
+
+    The ``_rows`` key is internal, stripped by the caller before the observation
+    reaches the model — the same discipline ``_resolve_product`` uses for its rows.
+    """
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {"status": "missing_identifier",
+                "message": "Ask the visitor for the product code or batch number "
+                           "printed on their drum, label or invoice."}
+
+    folder_id = _coa_folder_for(company)
+    if not folder_id:
+        return {"status": "not_configured",
+                "message": "Certificate lookup isn't set up for this company. Offer to "
+                           "have the team send the certificate over, and collect the batch number."}
+
+    try:
+        results, truncated = await coa_drive.resolve(company["id"], folder_id, query, redis_client=r)
+    except coa_drive.CoaDriveError as e:
+        logger.warning("COA tool failed for company %s: %s", company["id"], e.reason)
+        # H15 — a Drive outage is NOT "no certificate exists".
+        return {"status": "unavailable", "message": COA_UNAVAILABLE_MESSAGE}
+
+    if not results:
+        return {"status": "not_found", "count": 0,
+                "message": "No certificate matched. Ask the visitor to check the code, or "
+                           "offer to have the team look it up and send it over."}
+
+    rows = [coa_drive.to_payload(d) for d in results]
+    if len(results) == 1:
+        return {"status": "found", "count": 1, "_rows": rows,
+                "message": "The certificate is already open in a panel for the visitor. "
+                           "Confirm you have found it — do not paste a link, do not name "
+                           "the file, and do not state anything the certificate contains."}
+
+    return {"status": "multiple", "count": len(results), "truncated": truncated, "_rows": rows,
+            # §10 loop safety — without this the model re-calls get_coa with the same
+            # arguments and burns its round budget.
+            "message": f"{len(results)} certificates matched and are ALREADY listed in a panel "
+                       "for the visitor to pick from. Say how many there are and ask them to "
+                       "choose. Do not call this tool again with the same query, and do not "
+                       "list the results yourself."}
+
+
+async def _get_coa_observation(company: dict, args: dict, captured: dict) -> dict:
+    """Run ``get_coa`` and split its result: rows to the widget, status to the model."""
+    obs = await _run_get_coa(company, args)
+    rows = obs.pop("_rows", None)
+    if rows is not None:
+        captured["coa"] = {"status": obs.get("status"), "results": rows,
+                           "query": (args.get("query") or "").strip()}
+    return obs
 
 
 @app.get("/api/leads/{company_id}/pipeline")

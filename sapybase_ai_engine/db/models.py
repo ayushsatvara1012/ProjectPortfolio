@@ -290,6 +290,9 @@ class CompanyUpdate(BaseModel):
     sample_form:        Optional[list] = None  # full replacement field list; [] = reset to pack default
     sample_sink_url:    Optional[str]  = None  # owner's own sheet/Zapier webhook (HTTPS); "" = clear
     sample_sink_secret: Optional[str]  = None  # HMAC secret paired with the sink url
+    # ── COA finder (Phase 0): the client's Drive folder of certificates. Accepts a
+    # folder URL or a bare ID; stored as the extracted ID. "" clears it (= feature off).
+    coa_folder:         Optional[str]  = None
     # ── Contextual teaser (Phase 1): folded into companies.teaser_config JSONB ──
     teaser_enabled:  Optional[bool] = None  # False hides the launcher teaser bubble
     teaser_title:    Optional[str]  = None  # bold line; "" = reset to default copy

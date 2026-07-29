@@ -10,9 +10,12 @@ from packs.registry import known_verticals, load_pack
 from packs.schema import Pack, QualificationSlot, Slot, ToolSpec, normalize_vertical
 from packs.overrides import (
     coerce_overrides,
+    effective_coa_config,
     effective_required_fields,
     effective_sample_form,
     effective_sample_sink,
+    extract_folder_id,
+    sanitize_coa,
     sanitize_overrides,
     sanitize_visitor_fields,
 )
@@ -32,4 +35,8 @@ __all__ = [
     "effective_required_fields",
     "effective_sample_sink",
     "sanitize_visitor_fields",
+    # COA finder (Phase 0) — the Drive folder override
+    "sanitize_coa",
+    "extract_folder_id",
+    "effective_coa_config",
 ]

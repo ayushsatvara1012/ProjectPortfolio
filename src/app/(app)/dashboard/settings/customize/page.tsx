@@ -13,6 +13,7 @@ import ChatWidget from '@/src/components/chat/ChatWidget';
 import Alert from '@/src/components/ui/Alert';
 import SampleFormEditor, { validateSampleForm } from '@/src/components/dashboard/SampleFormEditor';
 import TeaserRuleEditor, { TeaserSuggestButton, validateTeaserRules } from '@/src/components/dashboard/TeaserRuleEditor';
+import CoaFolderField, { isCoaFolderInvalid } from '@/src/components/dashboard/CoaFolderField';
 
 // Friendly heading per vertical pack (kept tiny; grows as packs are added).
 const VERTICAL_LABEL: Record<string, string> = { chemical: 'Chemical agent' };
@@ -158,7 +159,8 @@ export default function CustomizePage() {
   const sampleSinkInvalid =
     (botSettings.sampleSinkUrl || '').trim() !== '' &&
     !(botSettings.sampleSinkUrl || '').trim().toLowerCase().startsWith('https://');
-  const packConfigInvalid = isVerticalBot && (!sampleFormValidation.valid || sampleSinkInvalid);
+  const coaFolderInvalid = isCoaFolderInvalid(botSettings.coaFolder || '');
+  const packConfigInvalid = isVerticalBot && (!sampleFormValidation.valid || sampleSinkInvalid || coaFolderInvalid);
 
   // ── Contextual teaser (Phase 3): rule editor validity ──
   const teaserRulesValidation = validateTeaserRules(botSettings.teaserRules || []);
@@ -189,7 +191,9 @@ export default function CustomizePage() {
         type: 'error',
         msg: sampleSinkInvalid
           ? 'Data destination must be a secure link (starts with https://).'
-          : 'Fix the sample form: every field needs a unique key.',
+          : coaFolderInvalid
+            ? "That doesn't look like a Google Drive folder link. Copy the URL from Drive's address bar."
+            : 'Fix the sample form: every field needs a unique key.',
       });
       return;
     }
@@ -207,7 +211,7 @@ export default function CustomizePage() {
     } else {
       setAlert({ open: true, type: 'error', msg: res.message ?? 'Failed to save settings.' });
     }
-  }, [showFullOverlay, leadAlertsInvalid, alertEmailInvalid, slackUrlInvalid, packConfigInvalid, sampleSinkInvalid, teaserRulesInvalid, selectedBotId, saveSettings]);
+  }, [showFullOverlay, leadAlertsInvalid, alertEmailInvalid, slackUrlInvalid, packConfigInvalid, sampleSinkInvalid, coaFolderInvalid, teaserRulesInvalid, selectedBotId, saveSettings]);
 
   // ── Phase 4: Cmd+S / Ctrl+S keyboard shortcut ──
   useEffect(() => {
@@ -614,7 +618,7 @@ export default function CustomizePage() {
                     {VERTICAL_LABEL[botSettings.vertical] || 'Vertical agent'}
                   </p>
                   <p className={sectionDescCls}>
-                    Your industry pack pre-configures the agent. Customise the sample-request form your widget collects and where its submissions land.
+                    Your industry pack pre-configures the agent. Customise the sample-request form your widget collects, where its submissions land, and the document library it looks certificates up in.
                   </p>
                   <SampleFormEditor
                     fields={botSettings.sampleForm || []}
@@ -626,6 +630,15 @@ export default function CustomizePage() {
                     botId={selectedBotId}
                     authFetch={authFetch}
                     sinkStatus={botSettings.sinkStatus}
+                  />
+                  <CoaFolderField
+                    value={botSettings.coaFolder || ''}
+                    onChange={(v) => updateSetting('coaFolder', v)}
+                    inputCls={inputCls}
+                    labelCls={labelCls}
+                    helpCls={helpCls}
+                    botId={selectedBotId}
+                    authFetch={authFetch}
                   />
                 </Section>
               )}
