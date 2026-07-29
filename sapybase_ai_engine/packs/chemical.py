@@ -101,6 +101,25 @@ get_sds = ToolSpec(
     slots=_SDS_SLOTS,
 )
 
+get_coa = ToolSpec(
+    name="get_coa",
+    description=(
+        "Look up a Certificate of Analysis (COA) for a specific BATCH the visitor "
+        "already has — they read the code off a drum, label or invoice. Pass whatever "
+        "they typed, verbatim, as `query`: a product code, a batch number, a product "
+        "name, or several together. Do not reformat it, do not guess a batch, and do "
+        "not ask which part is the code. Returns a status and a COUNT only — the "
+        "certificates appear in a panel the visitor picks from, so never list "
+        "filenames, never state a result, and never paste a link. A COA reports one "
+        "batch's tested values: it is NOT a safety sheet (use get_sds) and NOT a "
+        "product spec (use get_product_spec)."
+    ),
+    slots=(
+        Slot("query", required=True,
+             description="What the visitor typed — product code, batch number, or product name."),
+    ),
+)
+
 get_product_spec = ToolSpec(
     name="get_product_spec",
     description=(
@@ -359,7 +378,7 @@ _TEASER_RULES = (
 CHEMICAL_PACK = Pack(
     vertical=CHEMICAL_VERTICAL,
     persona_prompt=_PERSONA_PROMPT,
-    tools=(get_sds, get_product_spec, request_quote, request_sample),
+    tools=(get_sds, get_coa, get_product_spec, request_quote, request_sample),
     hub_cards=_HUB_CARDS,
     sample_form=_SAMPLE_FORM,
     knowledge_kinds=("catalog", "sds"),

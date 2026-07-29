@@ -903,7 +903,12 @@ class TestSchemasAndDirective:
     def test_chemical_schema_shape(self):
         schemas = build_tool_schemas(load_pack("chemical"))
         by_name = {s["name"]: s for s in schemas}
-        assert set(by_name) == {"get_sds", "get_product_spec", "request_quote", "request_sample"}
+        assert set(by_name) == {"get_sds", "get_coa", "get_product_spec",
+                                "request_quote", "request_sample"}
+        # get_coa is the one tool with a hard-required slot: without something the
+        # visitor typed there is nothing to search, and D1 forbids listing the folder.
+        assert set(by_name["get_coa"]["parameters"]["properties"]) == {"query"}
+        assert by_name["get_coa"]["parameters"]["required"] == ["query"]
         # The two read-only tools take CAS or name, plus an optional grade to
         # disambiguate the many-grades-per-product case (none individually required).
         for name in ("get_sds", "get_product_spec"):
@@ -1125,6 +1130,72 @@ class TestStreamAgentLoop:
         model = FakeModel([FakeResp(content="never reached")], raise_on=0)
         events = _run(_drain(stream_agent_loop(model, [], lambda n, a: {})))
         assert events == [{"type": "final", "text": AGENT_FALLBACK_TEXT}]
+
+
+class TestAsyncToolObservations:
+    """An executor may return an awaitable — `get_coa` reaches Google Drive, and
+    doing that synchronously would block the event loop the SSE stream runs on for
+    every visitor sharing the worker. Sync tools must be entirely unaffected."""
+
+    def test_an_awaitable_observation_is_awaited_and_fed_back(self):
+        seen = {}
+
+        async def async_executor(name, args):
+            seen["ran"] = True
+            return {"status": "found", "count": 1}
+
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_coa", "args": {"query": "100RG"}, "id": "c1"}]),
+            FakeResp(content="Found it."),
+        ])
+        events = _run(_drain(stream_agent_loop(model, [], async_executor)))
+        assert seen.get("ran") is True
+        assert events[-1] == {"type": "final", "text": "Found it."}
+
+    def test_the_observation_reaches_the_model_unwrapped(self):
+        # A coroutine that was never awaited would serialize as "<coroutine object…>"
+        # into the ToolMessage, and the model would answer from garbage.
+        async def async_executor(name, args):
+            return {"status": "multiple", "count": 3}
+
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_coa", "args": {}, "id": "c1"}]),
+            FakeResp(content="Three certificates."),
+        ])
+        _run(_drain(stream_agent_loop(model, [], async_executor)))
+        tool_message = model.invocations[-1][-1]
+        assert "coroutine" not in tool_message.content
+        assert json.loads(tool_message.content) == {"status": "multiple", "count": 3}
+
+    def test_an_async_tool_that_raises_degrades_like_a_sync_one(self):
+        async def boom(name, args):
+            raise RuntimeError("drive exploded")
+
+        model = FakeModel([
+            FakeResp(tool_calls=[{"name": "get_coa", "args": {}, "id": "c1"}]),
+            FakeResp(content="I'll get the team to send it."),
+        ])
+        events = _run(_drain(stream_agent_loop(model, [], boom)))
+        assert events[-1] == {"type": "final", "text": "I'll get the team to send it."}
+
+    def test_a_mixed_round_awaits_only_the_async_tool(self):
+        def mixed(name, args):
+            if name == "get_coa":
+                async def _later():
+                    return {"status": "found", "count": 1}
+                return _later()
+            return {"status": "found"}
+
+        model = FakeModel([
+            FakeResp(tool_calls=[
+                {"name": "get_sds", "args": {}, "id": "c1"},
+                {"name": "get_coa", "args": {}, "id": "c2"},
+            ]),
+            FakeResp(content="Both done."),
+        ])
+        _run(_drain(stream_agent_loop(model, [], mixed)))
+        contents = [m.content for m in model.invocations[-1] if hasattr(m, "tool_call_id")]
+        assert all("coroutine" not in c for c in contents)
 
     def test_wrapper_returns_same_text_as_final_event(self):
         # run_agent_loop must equal the generator's final-event text (contract parity).

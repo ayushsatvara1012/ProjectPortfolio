@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, urlparse
 
 # Mirror FormField.type (packs/schema.py). A field whose type isn't here is coerced
 # to "text" rather than dropped — the safest visible fallback.
@@ -27,6 +28,14 @@ MAX_FIELDS = 30
 MAX_NAME_LEN = 64
 MAX_LABEL_LEN = 120
 MAX_PLACEHOLDER_LEN = 160
+
+# COA finder (coa-finder-plan §9 Phase 0). A Drive folder ID is interpolated into
+# the Drive query `'{folder_id}' in parents`, so an ID containing an apostrophe
+# would break out of the quoted string and rewrite the query (plan H1). This regex
+# is the ONLY gate: enforced here on the write path and again by the connector
+# before every Drive call. It is also the SSRF guard — we build the googleapis.com
+# URL ourselves and never fetch an owner-supplied one.
+COA_FOLDER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
 
 
 def coerce_overrides(raw: Any) -> Dict[str, Any]:
@@ -208,6 +217,56 @@ def sanitize_sample_sink(raw: Any) -> Dict[str, str]:
     return {"url": url[:2048], "secret": secret[:256]}
 
 
+def extract_folder_id(raw: Any) -> str:
+    """A Drive folder URL (or a bare ID) → the folder ID; ``""`` if unusable.
+
+    Owners paste whatever the Drive UI gave them, which is any of::
+
+        https://drive.google.com/drive/folders/<id>?usp=sharing
+        https://drive.google.com/drive/u/0/folders/<id>
+        https://drive.google.com/open?id=<id>
+        <id>
+
+    The extracted value is validated against ``COA_FOLDER_ID_RE`` (H1) before it is
+    returned, so an unparseable or hostile paste collapses to ``""`` rather than
+    reaching the connector.
+    """
+    if not isinstance(raw, str):
+        return ""
+    value = raw.strip()
+    if not value or len(value) > 2048:
+        return ""
+
+    candidate = ""
+    if COA_FOLDER_ID_RE.match(value):
+        candidate = value
+    else:
+        m = re.search(r"/folders/([^/?#]+)", value)
+        if m:
+            candidate = m.group(1)
+        else:
+            try:
+                qs = parse_qs(urlparse(value).query)
+                candidate = (qs.get("id") or [""])[0]
+            except Exception:
+                candidate = ""
+
+    candidate = candidate.strip()
+    return candidate if COA_FOLDER_ID_RE.match(candidate) else ""
+
+
+def sanitize_coa(raw: Any) -> Dict[str, str]:
+    """Validate a ``coa`` override → ``{"folder_id"}``; ``{}`` when unusable.
+
+    ``{}`` means "no COA folder configured", which is what disables the feature for
+    a bot — there is no separate on/off flag to drift out of sync with the folder.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    folder_id = extract_folder_id(raw.get("folder_id"))
+    return {"folder_id": folder_id} if folder_id else {}
+
+
 def sanitize_overrides(raw: Any) -> Dict[str, Any]:
     """Full sanitise of an overrides dict for STORAGE (drops empty sub-sections).
 
@@ -222,6 +281,9 @@ def sanitize_overrides(raw: Any) -> Dict[str, Any]:
     sink = sanitize_sample_sink(base.get("sample_sink"))
     if sink:
         out["sample_sink"] = sink
+    coa = sanitize_coa(base.get("coa"))
+    if coa:
+        out["coa"] = coa
     return out
 
 
@@ -255,3 +317,16 @@ def effective_sample_sink(overrides: Any) -> Tuple[str, str]:
     """
     sink = sanitize_sample_sink(coerce_overrides(overrides).get("sample_sink"))
     return sink.get("url", ""), sink.get("secret", "")
+
+
+def effective_coa_config(overrides: Any) -> str:
+    """Resolve the COA Drive folder from the PER-BOT override only → folder ID or ``""``.
+
+    Deliberately no pack default and no env fallback: a platform-wide folder would
+    serve one tenant's certificates to another. ``""`` means the bot has no COA
+    library, and every caller treats that as "feature off".
+
+    Re-validates on the way out (H1) so a row hand-edited around the write path
+    still cannot reach the Drive query.
+    """
+    return sanitize_coa(coerce_overrides(overrides).get("coa")).get("folder_id", "")

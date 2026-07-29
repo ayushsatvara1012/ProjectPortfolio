@@ -71,11 +71,25 @@ class TestChemicalPack:
 
     def test_declares_tools(self):
         # Phase 1 get_sds + Phase 2a get_product_spec + Phase 4a request_quote
-        # + Phase 4b request_sample.
+        # + Phase 4b request_sample + COA finder Phase 2 get_coa.
         assert CHEMICAL_PACK.tool_names() == (
-            "get_sds", "get_product_spec", "request_quote", "request_sample")
-        for name in ("get_sds", "get_product_spec", "request_quote", "request_sample"):
+            "get_sds", "get_coa", "get_product_spec", "request_quote", "request_sample")
+        for name in ("get_sds", "get_coa", "get_product_spec", "request_quote", "request_sample"):
             assert isinstance(CHEMICAL_PACK.get_tool(name), ToolSpec)
+
+    def test_coa_tool_takes_the_visitors_words_verbatim(self):
+        # COA finder D2 — there is no code/batch/grade split here on purpose. The
+        # whole design rests on NOT deciding which token means what, so a slot per
+        # field would reintroduce the filename grammar the plan rejects.
+        tool = CHEMICAL_PACK.get_tool("get_coa")
+        assert {s.name for s in tool.slots} == {"query"}
+        assert tool.slots[0].required is True
+
+    def test_coa_tool_is_distinguished_from_sds_and_spec(self):
+        # A COA reports one batch's tested values; conflating it with the safety
+        # sheet would route a hazard question at a certificate.
+        description = CHEMICAL_PACK.get_tool("get_coa").description
+        assert "get_sds" in description and "get_product_spec" in description
 
     def test_sample_tool_is_a_form_launcher(self):
         # Phase 4b form: request_sample only carries prefill hints — collection is
