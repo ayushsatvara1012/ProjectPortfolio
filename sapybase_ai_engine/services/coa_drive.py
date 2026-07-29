@@ -6,8 +6,8 @@ Plan `docs/coa-finder-plan.md` Phase 1 (§6 how it works, §7 matching, §10 har
 client's convention (`{code}_{batch}_{description}.pdf`) as a regex, which is exactly
 the hardcoded vertical logic this codebase forbids — the next client names files
 `ACET-LR-B1042.pdf` and the parser is dead. Instead every filename is *tokenized*
-(split on ``_ - . space /``, NFKC-normalized, uppercased) and a query matches against
-those tokens. We never decide which token is "the product code" or "the batch"; the
+(NFKC-normalized, uppercased, split on every run of non-alphanumerics) and a query
+matches against those tokens. We never decide which token is "the product code" or "the batch"; the
 file simply contains them. The consequence is zero per-client configuration: a folder
 link is the entire onboarding.
 
@@ -33,6 +33,8 @@ import os
 import re
 import time
 import unicodedata
+import zlib
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -51,12 +53,19 @@ SHORTCUT_MIME = "application/vnd.google-apps.shortcut"
 # i.e. every link in the panel is broken while the walk looks perfectly healthy.
 DRIVE_FIELDS = "nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,shortcutDetails)"
 
-# Walk guard rails (plan §6). Hitting the file cap is the signal to revisit this
-# design in favour of a `coa_documents` Postgres index; at a few hundred COAs a
-# year that is years away.
+# Walk guard rails (plan §6).
+#
+# MAX_FILES was 5,000 on an estimate of "a few hundred COAs a year". The client's
+# real folder turned out to hold 2,240 files for seven months of 2026 (~320/month),
+# which would have breached that cap around mid-2027 — and a breach serves PARTIAL
+# results, announced only through `WalkResult.capped`. Raised to 25,000 (~2032 at
+# the same intake) now that a listing costs ~54 bytes compressed and is parsed once
+# per TTL rather than once per search. The binding constraint is no longer this
+# number but the cached entry size; the signal to move to a `coa_documents` Postgres
+# index is that entry approaching a megabyte.
 MAX_DEPTH = 6
 MAX_FOLDERS = 200
-MAX_FILES = 5000
+MAX_FILES = 25000
 MAX_PAGES_PER_FOLDER = 10
 PAGE_SIZE = 1000
 WALK_CONCURRENCY = 8
@@ -73,7 +82,20 @@ MAX_RESULTS = 50
 
 # Everything that separates one meaningful chunk of a filename from the next. The
 # whole point is that we do NOT care which chunk means what.
-_SEPARATORS = re.compile(r"[_\-.\s/]+")
+#
+# This was `[_\-.\s/]+` — a list hand-picked from one client's filenames, which is a
+# small piece of the convention-fitting D2 forbids. It also had a live consequence: a
+# comma is not in that set, so a visitor typing "acetone, batch 100.26R016" produced
+# the token "ACETONE," which matches nothing, the strict pass failed, and the fallback
+# returned the whole acetone catalogue. Any run of non-alphanumerics is a separator
+# now, so `ACET,LR,B1042.pdf` and `BUTAN-1-OL (N-BUTANOL)` tokenize as well as the
+# underscore convention does.
+#
+# `[\W_]+` rather than `[^0-9A-Z]+` on purpose: `\W` is Unicode-aware for str
+# patterns, so letters and digits of any script survive as tokens, while the
+# underscore — a word character to `\w` — is still split on. An ASCII-only class
+# would tokenize a Cyrillic or CJK filename to nothing and make it unfindable.
+_SEPARATORS = re.compile(r"[\W_]+")
 
 # Leading zeros inside a numeric run, so `26R16` still finds `26R016` (§7).
 _LEADING_ZEROS = re.compile(r"0*(\d+)")
@@ -310,8 +332,15 @@ def search(
 
     Two passes (§7). **Strict**: every query token must hit something, which is what
     makes ``acetone LR`` mean acetone AND LR. **Fallback**, only when strict found
-    nothing: any token may hit, ranked by how many did, so a typo degrades into close
-    suggestions instead of a dead end.
+    nothing: the documents that matched the MOST query tokens, so a typo or a filler
+    word degrades into close suggestions instead of a dead end.
+
+    The fallback used to admit anything matching at least one token, which made a
+    single unmatched word catastrophic rather than harmless: a real visitor asking
+    "I have a drum of acetone, batch 100.26R016" failed the strict pass on "drum" and
+    "batch", and the fallback then returned the entire acetone catalogue — 50 rows
+    capped, where the answer is 3. Keeping only the best-matching tier is what makes
+    conversational phrasing behave like the clean query it contains.
 
     This is the ONE resolver — the panel endpoint and the ``get_coa`` agent tool both
     call it, so the conversational path and the picker can never disagree about which
@@ -325,17 +354,27 @@ def search(
     if not query_tokens or sum(len(t) for t in query_tokens) < MIN_QUERY_CHARS:
         return [], False
 
-    strict: List[Tuple[int, int, CoaDocument]] = []
-    loose: List[Tuple[int, int, CoaDocument]] = []
+    strict: List[Tuple[int, int, CoaDocument, int]] = []
+    loose: List[Tuple[int, int, CoaDocument, int]] = []
     for doc in documents:
         scores = [_token_score(t, doc.tokens, doc.numeric_tokens) for t in query_tokens]
         matched = sum(1 for s in scores if s)
         if not matched:
             continue
-        entry = (matched, sum(scores), doc)
+        entry = (matched, sum(scores), doc, max(scores))
         (strict if matched == len(query_tokens) else loose).append(entry)
 
-    ranked = strict or loose
+    ranked = strict
+    if not ranked and loose:
+        # A substring-only hit is too weak to carry a fallback result on its own:
+        # short filler words match half the corpus that way ("ME" inside "METHANOL"),
+        # so "please send the chloroform certificate" returned 50 rows instead of
+        # chloroform's 18. Require at least one token to have hit at prefix strength
+        # or better, then keep only the documents that matched the MOST tokens.
+        strong = [e for e in loose if e[3] >= MATCH_PREFIX]
+        if strong:
+            best = max(e[0] for e in strong)
+            ranked = [e for e in strong if e[0] == best]
 
     # Three stable sorts, least significant first — the readable way to express
     # "matched count, then score, then newest, then file ID" when the recency key is
@@ -579,9 +618,9 @@ async def _walk(folder_id: str, api_key: str, client: httpx.AsyncClient) -> Walk
 
 # ─────────────────────────────── I/O: cache ─────────────────────────────────
 
-# D9 — a few hundred filenames fit in one entry, and the miss-refresh path (§6
-# step 5) is what removes staleness, so the TTL only has to bound how long a
-# DELETED file keeps showing up.
+# D9 — the miss-refresh path (§6 step 5) is what removes staleness, so the TTL only
+# has to bound how long a DELETED file keeps showing up. It governs the in-process
+# memo as well, so the two tiers can never disagree about how old is too old.
 CACHE_TTL_SECONDS = 600
 
 # Bump when the cached shape changes; a mismatched version is treated as a miss
@@ -600,7 +639,7 @@ def cache_key(company_id: Any, folder_id: str) -> str:
 
 
 def serialize_index(result: WalkResult) -> str:
-    """A walk → the JSON held in Redis.
+    """A walk → its JSON form. :func:`encode_index` compresses this for Redis.
 
     Only the RAW Drive fields are stored, never the derived tokens or display string,
     so a change to the tokenizer takes effect on the very next read instead of being
@@ -625,6 +664,41 @@ def serialize_index(result: WalkResult) -> str:
         },
         separators=(",", ":"),
     )
+
+
+# Filenames repeat themselves heavily — "ACETONE USP-NF PH.EUR BP" recurs across
+# hundreds of batches — so the listing compresses about 4.5x (measured: 421 KB →
+# 93 KB for 1,781 real certificates, 242 → 54 bytes per document). Level 6 is
+# zlib's default; the decompression it buys back costs ~1 ms against a parse that
+# now happens once per TTL instead of once per search.
+COMPRESS_LEVEL = 6
+
+# zlib's own header, used to tell a compressed entry from a plain-JSON one written
+# by an older deploy. Overlapping deploys must not read each other's writes as junk.
+_ZLIB_MAGIC = b"\x78"
+
+
+def encode_index(result: WalkResult) -> bytes:
+    """A walk → the compressed bytes held in Redis."""
+    return zlib.compress(serialize_index(result).encode("utf-8"), COMPRESS_LEVEL)
+
+
+def decode_payload(raw: Any) -> Any:
+    """Redis bytes → the JSON text :func:`deserialize_index` expects.
+
+    Accepts an uncompressed entry unchanged so a deploy rolling out mid-TTL can read
+    what the previous version wrote, and returns anything undecodable untouched —
+    :func:`deserialize_index` turns it into a miss, which is the correct outcome for
+    a corrupt entry either way.
+    """
+    if not isinstance(raw, (bytes, bytearray)):
+        return raw
+    if not raw[:1] == _ZLIB_MAGIC:
+        return raw
+    try:
+        return zlib.decompress(bytes(raw)).decode("utf-8", "replace")
+    except zlib.error:
+        return raw
 
 
 def _as_int(value: Any) -> int:
@@ -666,11 +740,11 @@ def deserialize_index(raw: Any) -> Optional[WalkResult]:
 
 
 async def _cache_get(redis_client: Any, key: str) -> Optional[WalkResult]:
-    """H13 — a Redis outage degrades to a per-request walk: slower, still correct."""
+    """H13 — a Redis outage degrades to walking: slower, still correct, never a 500."""
     if redis_client is None:
         return None
     try:
-        return deserialize_index(await redis_client.get(key))
+        return deserialize_index(decode_payload(await redis_client.get(key)))
     except Exception as exc:
         logger.warning("COA cache read failed (%s)", scrub(exc))
         return None
@@ -680,9 +754,51 @@ async def _cache_put(redis_client: Any, key: str, result: WalkResult) -> None:
     if redis_client is None:
         return
     try:
-        await redis_client.setex(key, CACHE_TTL_SECONDS, serialize_index(result))
+        await redis_client.setex(key, CACHE_TTL_SECONDS, encode_index(result))
     except Exception as exc:
         logger.warning("COA cache write failed (%s)", scrub(exc))
+
+
+# ─────────────────────────── I/O: in-process memo ───────────────────────────
+
+# Rebuilding every CoaDocument from JSON costs ~38 ms for 1,781 real certificates —
+# three to five times the search it feeds (7-14 ms) — and it was happening on EVERY
+# request, because Redis stores text and the parse is not free. The memo holds the
+# already-parsed listing, so a warm worker searches without touching Redis or JSON
+# at all, and Redis is demoted to what it is good at: surviving a restart and
+# sharing one walk across workers.
+#
+# WalkResult and CoaDocument are frozen and hold only tuples, so a memoized listing
+# cannot be mutated by a caller — the entry is safe to hand out repeatedly.
+INDEX_MEMO_MAX_ENTRIES = 8
+_index_memo: "OrderedDict[str, Tuple[float, WalkResult]]" = OrderedDict()
+
+
+def reset_index_memo() -> None:
+    """Drop every memoized listing. For tests and for a folder re-point."""
+    _index_memo.clear()
+
+
+def _memo_get(key: str, now: Optional[float] = None) -> Optional[WalkResult]:
+    entry = _index_memo.get(key)
+    if entry is None:
+        return None
+    expires_at, result = entry
+    if (time.monotonic() if now is None else now) >= expires_at:
+        _index_memo.pop(key, None)
+        return None
+    _index_memo.move_to_end(key)
+    return result
+
+
+def _memo_put(key: str, result: WalkResult, now: Optional[float] = None) -> None:
+    now = time.monotonic() if now is None else now
+    _index_memo[key] = (now + CACHE_TTL_SECONDS, result)
+    _index_memo.move_to_end(key)
+    # Bounded so a fleet of chemical tenants cannot grow this without limit: one
+    # real listing is ~2 MB of parsed objects, so 8 entries is ~16 MB worst case.
+    while len(_index_memo) > INDEX_MEMO_MAX_ENTRIES:
+        _index_memo.popitem(last=False)
 
 
 async def load_index(
@@ -696,18 +812,30 @@ async def load_index(
 ) -> Tuple[WalkResult, bool]:
     """The cached folder listing. Returns ``(result, from_cache)``.
 
-    ``force=True`` skips the read and re-walks — that is what makes a COA uploaded
+    Three tiers, cheapest first: the in-process memo (already parsed), Redis
+    (compressed text, shared across workers and surviving a restart), then Drive.
+    ``from_cache`` is True for either cache, since both can be stale and both must
+    therefore allow :func:`resolve`'s miss-triggered refresh.
+
+    ``force=True`` skips both caches and re-walks — that is what makes a COA uploaded
     two minutes ago findable (§6 step 5) and why there is no cron job. The forced
     path is also the self-inflicted-DoS risk H5 addresses, so callers must not wire
     it to an unauthenticated miss until the single-flight lock and cooldown land.
     """
     key = cache_key(company_id, folder_id)
     if not force:
+        memoized = _memo_get(key)
+        if memoized is not None:
+            return memoized, True
         cached = await _cache_get(redis_client, key)
         if cached is not None:
+            _memo_put(key, cached)
             return cached, True
 
     result = await walk_folder(folder_id, api_key, client=client)
+    # Memoized before the Redis write so a dead Redis still gets the benefit (H13):
+    # the degradation becomes one walk per TTL per worker rather than one per request.
+    _memo_put(key, result)
     await _cache_put(redis_client, key, result)
     return result, False
 
