@@ -13,3 +13,26 @@ os.environ.setdefault("CLERK_WEBHOOK_SECRET", "whsec_test")
 os.environ.setdefault("POLAR_WEBHOOK_SECRET", "test-polar-secret")
 os.environ.setdefault("ADMIN_SECRET", "test-admin-secret")
 os.environ.setdefault("ENV", "test")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _disable_slowapi_limiter():
+    """Turn off slowapi's per-IP/per-key limits for the whole run.
+
+    The limiter is backed by REDIS, so its counters outlive the process: a file that
+    passes on its own fails when the suite re-runs it inside the same minute, and
+    whether you get a 429 depends on how recently you last ran the tests. That is
+    pure flakiness — every endpoint here is exercised from one IP with one key.
+
+    The app's OWN rate limits (tier chat caps, the sample daily cap) use separate
+    Redis counters and are unaffected, so the tests that assert a 429 still do.
+    """
+    import main
+
+    limiter = getattr(main, "limiter", None)
+    previous = getattr(limiter, "enabled", None)
+    if limiter is not None:
+        limiter.enabled = False
+    yield
+    if limiter is not None and previous is not None:
+        limiter.enabled = previous
