@@ -189,3 +189,14 @@ class BreakerRegistry:
 
     def state_of(self, company_id: str) -> BreakerState:
         return self.get(company_id).state
+
+    def reset(self, company_id: str) -> None:
+        """Forget everything learned about one tenant; the next :meth:`get` is CLOSED.
+
+        For the case where something authoritative proves the dependency is healthy
+        again and waiting out the cooldown would be wrong — an owner clicking a "test
+        connection" button, say. Deliberately not reachable from the gated path, which
+        must only ever learn from its own probes.
+        """
+        with self._lock:
+            self._breakers.pop(company_id, None)

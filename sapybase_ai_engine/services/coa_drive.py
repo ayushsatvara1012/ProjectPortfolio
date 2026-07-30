@@ -30,16 +30,19 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import time
 import unicodedata
 import zlib
 from collections import OrderedDict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import httpx
 
+from byod_breaker import BreakerConfig, BreakerOpen, BreakerRegistry
 from packs.overrides import COA_FOLDER_ID_RE
 
 logger = logging.getLogger("coa_drive")
@@ -71,9 +74,41 @@ PAGE_SIZE = 1000
 WALK_CONCURRENCY = 8
 HTTP_TIMEOUT = 10.0
 
+# H15 — bounded retry with backoff. Three attempts costs at most ~1.5s of added
+# latency against a ~1.5s walk, which a visitor waiting on a search will accept and
+# which is well inside the widget's patience. The walk fans out 8 folders at once, so
+# a rate-limited Drive would have all 8 retrying in lockstep without the jitter.
+MAX_DRIVE_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 0.25
+RETRY_MAX_DELAY_SECONDS = 2.0
+
+# Transient by definition: too many requests, or Drive itself being unwell.
+RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+# A 403 is the ambiguous one. These reasons mean "slow down" and are retryable;
+# anything else on a 403 means the folder is not readable by us and retrying is pure
+# latency. Compared lowercased because Drive is not consistent about case.
+_RATE_LIMIT_REASONS = frozenset({
+    "ratelimitexceeded", "userratelimitexceeded", "sharingratelimitexceeded",
+    "quotaexceeded", "backendlimitexceeded", "rate_limit_exceeded",
+})
+
 # H10 — a filename is attacker-controlled by anyone who can write to the Drive
 # folder, so it is capped on ingest before it can reach a log or an observation.
 MAX_NAME_LEN = 300
+
+# Phase 4 (owner visibility). Both lists are samples, not inventories: the owner
+# needs to recognise the *shape* of a problem and go fix it in Drive, and an
+# unbounded list would put a 400-name array in a cached entry and on a settings page.
+MAX_DUPLICATE_SAMPLES = 25
+MAX_THIN_SAMPLES = 25
+
+# A filename with one token is findable only by typing that token exactly — no
+# batch, no product name, nothing to narrow with. `129LR.pdf` in the client's real
+# folder is the whole population of this category, but a folder of `scan001.pdf` is
+# unsearchable by any design (§11), and Phase 4 exists to make that visible rather
+# than to fix it.
+MIN_FINDABLE_TOKENS = 2
 
 # §7 constraints: a 2-character floor (otherwise "1" returns the folder) and a
 # result cap that drives the "keep typing to narrow" hint.
@@ -122,11 +157,17 @@ class CoaDriveError(Exception):
     Carries a short machine-readable ``reason`` and never any Drive response text,
     folder ID, or URL — a 403 must not be able to smuggle the API key (H3) or the
     folder ID (H11) into a widget response, a log line, or a Slack handoff.
+
+    ``retryable`` is what H15 turns on: a 403 meaning "you are going too fast" and a
+    403 meaning "this folder is not shared with you" arrive identically and must be
+    treated completely differently — retrying the second is pure latency, and
+    reporting the first to a visitor as "no certificate exists" is a lie.
     """
 
-    def __init__(self, reason: str):
+    def __init__(self, reason: str, retryable: bool = False):
         super().__init__(reason)
         self.reason = reason
+        self.retryable = retryable
 
 
 def scrub(text: Any) -> str:
@@ -297,11 +338,42 @@ def dedupe(documents: Iterable[CoaDocument]) -> List[CoaDocument]:
 
 
 def duplicate_names(documents: Iterable[CoaDocument]) -> Dict[str, int]:
-    """Filenames seen more than once, for the owner panel (H16, Phase 4)."""
+    """Filenames seen more than once, for the owner panel (H16, Phase 4).
+
+    Must be called on the PRE-dedupe document list — after :func:`dedupe` there are
+    by definition no duplicates left to report, which is exactly why the walk
+    computes this and stores it rather than the panel deriving it from a listing.
+    """
     counts: Dict[str, int] = {}
     for doc in documents:
         counts[doc.name] = counts.get(doc.name, 0) + 1
     return {name: n for name, n in counts.items() if n > 1}
+
+
+def duplicate_summary(
+    documents: Iterable[CoaDocument],
+) -> Tuple[int, Tuple[Tuple[str, int], ...]]:
+    """``(copies_collapsed, samples)`` for the duplicate report (H16).
+
+    ``copies_collapsed`` counts documents that :func:`dedupe` will drop, not names
+    that repeat: 411 repeated names collapsing 457 copies is one folder's real
+    measurement, and the second number is the one that answers "did I lose a
+    document?". Samples are the worst offenders first, so the owner sees a name filed
+    five times before one filed twice.
+    """
+    counts = duplicate_names(documents)
+    collapsed = sum(n - 1 for n in counts.values())
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    return collapsed, tuple(ranked[:MAX_DUPLICATE_SAMPLES])
+
+
+def thin_documents(documents: Iterable[CoaDocument]) -> List[CoaDocument]:
+    """Certificates with too few tokens to be findable in practice (Phase 4, §11).
+
+    Pure and derived from the tokenizer, so a change to how filenames split shows up
+    here on the next read instead of being frozen into a cached counter.
+    """
+    return [d for d in documents if len(d.tokens) < MIN_FINDABLE_TOKENS]
 
 
 # ─────────────────────────────── pure: search ───────────────────────────────
@@ -399,6 +471,11 @@ class WalkResult:
     dropped, so "connected, 0 files" is distinguishable from "connected, N files" —
     H2's requirement, because a Shared Drive folder read without the ``allDrives``
     flags returns zero files with HTTP 200 and looks exactly like an empty folder.
+
+    The Phase 4 fields all record something that happened DURING the walk and is
+    unrecoverable from ``documents`` afterwards: ``unindexable`` counts PDFs dropped
+    before they became documents, and the duplicate figures describe what
+    :func:`dedupe` collapsed — a deduped listing has no duplicates left to count.
     """
 
     documents: Tuple[CoaDocument, ...]
@@ -406,6 +483,10 @@ class WalkResult:
     files_seen: int
     ignored_non_pdf: int
     capped: Tuple[str, ...]
+    unindexable: int = 0
+    duplicates_collapsed: int = 0
+    duplicate_samples: Tuple[Tuple[str, int], ...] = ()
+    walked_at: str = ""
 
     @property
     def indexed(self) -> int:
@@ -466,6 +547,125 @@ def _classify(entry: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     return "file", entry
 
 
+def _error_reasons(response: httpx.Response) -> Tuple[str, ...]:
+    """The ``error.errors[].reason`` codes from a Drive error body, lowercased.
+
+    Used ONLY to classify retryability. The body is never logged and never reaches a
+    response: a Drive error message can contain the request URL, and the URL carries
+    the API key (H3).
+    """
+    try:
+        payload = response.json()
+    except ValueError:
+        return ()
+    if not isinstance(payload, dict):
+        return ()
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return ()
+    out: List[str] = []
+    status = error.get("status")
+    if isinstance(status, str):
+        out.append(status.strip().lower())
+    errors = error.get("errors")
+    if isinstance(errors, list):
+        for item in errors:
+            if isinstance(item, dict) and isinstance(item.get("reason"), str):
+                out.append(item["reason"].strip().lower())
+    return tuple(out)
+
+
+def classify_status(response: httpx.Response) -> CoaDriveError:
+    """One non-200 Drive response → the error to raise (H15).
+
+    The split that matters is inside 403. ``userRateLimitExceeded`` and a folder whose
+    sharing was revoked are both 403s, and they need opposite handling: the first is
+    worth retrying and must never surface as "no certificate exists", the second is
+    permanent and the owner has to go fix the share.
+    """
+    code = response.status_code
+    if code == 404:
+        return CoaDriveError("not_found")
+    if code == 403 and any(reason in _RATE_LIMIT_REASONS for reason in _error_reasons(response)):
+        return CoaDriveError("rate_limited", retryable=True)
+    if code in (401, 403):
+        return CoaDriveError("forbidden")
+    if code in RETRYABLE_STATUSES:
+        return CoaDriveError("unavailable", retryable=True)
+    return CoaDriveError("unavailable")
+
+
+def backoff_delay(attempt: int, jitter: float = 1.0) -> float:
+    """Exponential backoff for ``attempt`` (1-based), capped and jittered.
+
+    ``jitter`` is a 0-1 draw, injected so the arithmetic is testable. It scales the
+    delay into [50%, 100%] of the exponential step: the walk lists 8 folders
+    concurrently, so an un-jittered backoff would have all 8 retry in the same
+    millisecond and re-create the burst that got them rate-limited.
+    """
+    step = min(RETRY_MAX_DELAY_SECONDS, RETRY_BASE_DELAY_SECONDS * (2 ** max(0, attempt - 1)))
+    return step * (0.5 + 0.5 * min(1.0, max(0.0, jitter)))
+
+
+async def _backoff(attempt: int) -> None:
+    await asyncio.sleep(backoff_delay(attempt, random.random()))
+
+
+async def _fetch_page(
+    folder_id: str,
+    api_key: str,
+    client: httpx.AsyncClient,
+    semaphore: asyncio.Semaphore,
+    page_token: str,
+) -> Dict[str, Any]:
+    """One ``files.list`` page, retried with backoff on a transient failure (H15).
+
+    The semaphore is taken per ATTEMPT, not around the retry loop, so a request
+    sleeping between attempts gives its concurrency slot back instead of holding one
+    of the eight open while doing nothing.
+    """
+    for attempt in range(1, MAX_DRIVE_ATTEMPTS + 1):
+        try:
+            return await _attempt_page(folder_id, api_key, client, semaphore, page_token)
+        except CoaDriveError as exc:
+            if not exc.retryable or attempt == MAX_DRIVE_ATTEMPTS:
+                raise
+            logger.warning(
+                "COA walk: retrying after a transient Drive failure (%s, attempt %s/%s)",
+                exc.reason, attempt, MAX_DRIVE_ATTEMPTS)
+            await _backoff(attempt)
+    raise CoaDriveError("unavailable")  # unreachable; the loop always returns or raises
+
+
+async def _attempt_page(
+    folder_id: str,
+    api_key: str,
+    client: httpx.AsyncClient,
+    semaphore: asyncio.Semaphore,
+    page_token: str,
+) -> Dict[str, Any]:
+    async with semaphore:
+        try:
+            response = await client.get(
+                DRIVE_FILES_ENDPOINT, params=_list_params(folder_id, api_key, page_token)
+            )
+        except httpx.HTTPError as exc:
+            # A timeout or a reset connection is the most retryable failure there is.
+            logger.warning("COA walk: Drive request failed (%s)", scrub(exc))
+            raise CoaDriveError("unreachable", retryable=True) from None
+
+    if response.status_code != 200:
+        error = classify_status(response)
+        logger.warning("COA walk: Drive returned HTTP %s (%s)", response.status_code, error.reason)
+        raise error
+
+    try:
+        payload = response.json()
+    except ValueError:
+        raise CoaDriveError("unavailable") from None
+    return payload if isinstance(payload, dict) else {}
+
+
 async def _list_folder(
     folder_id: str,
     api_key: str,
@@ -478,31 +678,7 @@ async def _list_folder(
     # H14 — a repeating or malformed nextPageToken spins forever, so pages are
     # capped as well as compared against the previous token.
     for _ in range(MAX_PAGES_PER_FOLDER):
-        async with semaphore:
-            try:
-                response = await client.get(
-                    DRIVE_FILES_ENDPOINT, params=_list_params(folder_id, api_key, page_token)
-                )
-            except httpx.HTTPError as exc:
-                logger.warning("COA walk: Drive request failed (%s)", scrub(exc))
-                raise CoaDriveError("unreachable") from None
-
-        if response.status_code == 404:
-            raise CoaDriveError("not_found")
-        if response.status_code in (401, 403):
-            # H15 — `userRateLimitExceeded` and a revoked share both land here, and
-            # neither means "no certificate exists". Retry-with-backoff is §13.1.
-            logger.warning("COA walk: Drive refused the request (HTTP %s)", response.status_code)
-            raise CoaDriveError("forbidden")
-        if response.status_code != 200:
-            logger.warning("COA walk: unexpected Drive status %s", response.status_code)
-            raise CoaDriveError("unavailable")
-
-        try:
-            payload = response.json()
-        except ValueError:
-            raise CoaDriveError("unavailable") from None
-
+        payload = await _fetch_page(folder_id, api_key, client, semaphore, page_token)
         entries.extend(e for e in (payload.get("files") or []) if isinstance(e, dict))
         next_token = str(payload.get("nextPageToken") or "")
         if not next_token or next_token == page_token:
@@ -560,6 +736,7 @@ async def _walk(folder_id: str, api_key: str, client: httpx.AsyncClient) -> Walk
     documents: List[CoaDocument] = []
     files_seen = 0
     ignored_non_pdf = 0
+    unindexable = 0
     capped: List[str] = []
 
     while frontier:
@@ -598,8 +775,14 @@ async def _walk(folder_id: str, api_key: str, client: httpx.AsyncClient) -> Walk
                     ignored_non_pdf += 1
                     continue
                 doc = build_document(entry)
-                if doc is not None:
-                    documents.append(doc)
+                if doc is None:
+                    # A PDF that cannot be served or cannot be tokenized — no link,
+                    # or a name like `___.pdf`. Dropped as before, but counted now:
+                    # silently vanishing files are the one thing an owner staring at
+                    # a short count has no way to explain.
+                    unindexable += 1
+                    continue
+                documents.append(doc)
 
         frontier = next_frontier
         depth += 1
@@ -607,12 +790,19 @@ async def _walk(folder_id: str, api_key: str, client: httpx.AsyncClient) -> Walk
     if capped:
         logger.warning("COA walk hit guard rails: %s", ", ".join(capped))
 
+    # Computed before dedupe, because dedupe is what destroys the evidence (H16).
+    duplicates_collapsed, duplicate_samples = duplicate_summary(documents)
+
     return WalkResult(
         documents=tuple(dedupe(documents)),
         folders_visited=len(visited),
         files_seen=files_seen,
         ignored_non_pdf=ignored_non_pdf,
         capped=tuple(capped),
+        unindexable=unindexable,
+        duplicates_collapsed=duplicates_collapsed,
+        duplicate_samples=duplicate_samples,
+        walked_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
 
 
@@ -624,8 +814,10 @@ async def _walk(folder_id: str, api_key: str, client: httpx.AsyncClient) -> Walk
 CACHE_TTL_SECONDS = 600
 
 # Bump when the cached shape changes; a mismatched version is treated as a miss
-# rather than migrated, so a deploy can never read a stale shape.
-CACHE_VERSION = 1
+# rather than migrated, so a deploy can never read a stale shape. Version 2 added
+# the Phase 4 walk diagnostics, which cannot be recomputed from a deduped listing —
+# reading a v1 entry would report zero duplicates for a folder full of them.
+CACHE_VERSION = 2
 
 
 def cache_key(company_id: Any, folder_id: str) -> str:
@@ -652,6 +844,10 @@ def serialize_index(result: WalkResult) -> str:
             "files_seen": result.files_seen,
             "ignored_non_pdf": result.ignored_non_pdf,
             "capped": list(result.capped),
+            "unindexable": result.unindexable,
+            "duplicates_collapsed": result.duplicates_collapsed,
+            "duplicate_samples": [[n, c] for n, c in result.duplicate_samples],
+            "walked_at": result.walked_at,
             "files": [
                 {
                     "id": d.file_id,
@@ -708,6 +904,21 @@ def _as_int(value: Any) -> int:
         return 0
 
 
+def _as_duplicate_samples(raw: Any) -> Tuple[Tuple[str, int], ...]:
+    """A cached ``[[name, copies], …]`` → the tuple form, junk entries dropped."""
+    if not isinstance(raw, list):
+        return ()
+    out: List[Tuple[str, int]] = []
+    for item in raw[:MAX_DUPLICATE_SAMPLES]:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            continue
+        name = str(item[0])[:MAX_NAME_LEN]
+        copies = _as_int(item[1])
+        if name and copies > 1:
+            out.append((name, copies))
+    return tuple(out)
+
+
 def deserialize_index(raw: Any) -> Optional[WalkResult]:
     """Redis bytes → a :class:`WalkResult`, or ``None`` for anything unusable.
 
@@ -736,6 +947,10 @@ def deserialize_index(raw: Any) -> Optional[WalkResult]:
         files_seen=_as_int(payload.get("files_seen")),
         ignored_non_pdf=_as_int(payload.get("ignored_non_pdf")),
         capped=tuple(str(c) for c in capped) if isinstance(capped, list) else (),
+        unindexable=_as_int(payload.get("unindexable")),
+        duplicates_collapsed=_as_int(payload.get("duplicates_collapsed")),
+        duplicate_samples=_as_duplicate_samples(payload.get("duplicate_samples")),
+        walked_at=str(payload.get("walked_at") or ""),
     )
 
 
@@ -801,6 +1016,36 @@ def _memo_put(key: str, result: WalkResult, now: Optional[float] = None) -> None
         _index_memo.popitem(last=False)
 
 
+# ───────────────────────── I/O: circuit breaker (H15) ─────────────────────────
+
+# The failure the retry layer above does NOT fix. With Drive unreachable, nothing
+# ever lands in the cache, so *every* search walks and every walk burns the full
+# timeout budget — the caches only protect the healthy path. One dead folder would
+# therefore hold a worker for ~10s per visitor message, indefinitely. The breaker is
+# what makes a sustained outage cheap: after a few failures it fast-fails that
+# company for a cooldown, then lets one probe test recovery.
+#
+# Per company, so one tenant's revoked share cannot slow anyone else down. In-process
+# like the memo, so each worker learns independently — acceptable for the same reason.
+COA_BREAKER_CONFIG = BreakerConfig(
+    failure_threshold=3,
+    reset_timeout_seconds=60.0,
+    success_threshold=1,
+    half_open_max_probes=1,
+)
+_breakers = BreakerRegistry(COA_BREAKER_CONFIG)
+
+
+def reset_breakers() -> None:
+    """Drop every breaker. For tests, and for a folder re-point."""
+    global _breakers
+    _breakers = BreakerRegistry(COA_BREAKER_CONFIG)
+
+
+def breaker_state(company_id: Any) -> str:
+    return _breakers.state_of(str(company_id)).value
+
+
 async def load_index(
     company_id: Any,
     folder_id: str,
@@ -809,6 +1054,7 @@ async def load_index(
     api_key: str = "",
     client: Optional[httpx.AsyncClient] = None,
     force: bool = False,
+    bypass_breaker: bool = False,
 ) -> Tuple[WalkResult, bool]:
     """The cached folder listing. Returns ``(result, from_cache)``.
 
@@ -818,9 +1064,14 @@ async def load_index(
     therefore allow :func:`resolve`'s miss-triggered refresh.
 
     ``force=True`` skips both caches and re-walks — that is what makes a COA uploaded
-    two minutes ago findable (§6 step 5) and why there is no cron job. The forced
-    path is also the self-inflicted-DoS risk H5 addresses, so callers must not wire
-    it to an unauthenticated miss until the single-flight lock and cooldown land.
+    two minutes ago findable (§6 step 5) and why there is no cron job. H5 gates who
+    may ask for that: see :func:`forced_walk_allowed`.
+
+    ``bypass_breaker=True`` is for the owner's own Test Connection, which must reach
+    Drive even while the breaker is open — the owner has usually just fixed the
+    sharing setting and is clicking to find out whether it worked, and "still broken"
+    from a fast-fail would be a lie. It still reports its outcome, and a success
+    resets the breaker: an authoritative probe beats waiting out the cooldown.
     """
     key = cache_key(company_id, folder_id)
     if not force:
@@ -832,7 +1083,32 @@ async def load_index(
             _memo_put(key, cached)
             return cached, True
 
-    result = await walk_folder(folder_id, api_key, client=client)
+    breaker = _breakers.get(str(company_id))
+    if not bypass_breaker:
+        try:
+            breaker.before_request()
+        except BreakerOpen:
+            # Deliberately the generic reason: to every caller this is "Drive is not
+            # answering", which is exactly what it means.
+            logger.warning("COA walk short-circuited for company %s (breaker open)", company_id)
+            raise CoaDriveError("unavailable") from None
+
+    try:
+        result = await walk_folder(folder_id, api_key, client=client)
+    except CoaDriveError as exc:
+        # A folder ID that never passed validation, or a missing platform key, never
+        # touched Drive — counting those would trip the breaker on a config mistake
+        # and then hide the fix behind a cooldown.
+        if exc.reason in ("invalid_folder", "not_configured"):
+            breaker.on_ignore()
+        else:
+            breaker.on_failure()
+        raise
+    if bypass_breaker:
+        _breakers.reset(str(company_id))
+    else:
+        breaker.on_success()
+
     # Memoized before the Redis write so a dead Redis still gets the benefit (H13):
     # the degradation becomes one walk per TTL per worker rather than one per request.
     _memo_put(key, result)
@@ -840,21 +1116,72 @@ async def load_index(
     return result, False
 
 
-# Miss-refresh throttle. This is NOT H5 — H5 needs a Redis single-flight lock to be
-# correct across workers, and is still owed (plan §13.1). This in-process cooldown
-# is the cheap part of it: it bounds one worker's forced walks while that lands.
+# ────────────────────── I/O: forced-walk single flight (H5) ──────────────────────
+
+# Every miss re-walks (§6 step 5), which without a gate is a self-inflicted DoS: a
+# visitor typing nonsense batch numbers, or any scanner, produces unlimited Drive
+# walks, and concurrent misses each start their own.
+#
+# One Redis key does both jobs the plan asks for. It is claimed with SET NX before
+# the walk and held for the whole cooldown, so concurrent misses across every worker
+# see exactly one winner (the single flight) AND a later miss inside the window is
+# refused (the cooldown). The two collapse into one key precisely because the
+# cooldown is longer than a walk; a short-lived lock released on completion would let
+# the next miss re-walk immediately, which is the thing being prevented.
+#
+# 60s is the plan's figure and now has a measurement behind it: a real walk is
+# 1.4-1.7s, so the window is ~40x the work it protects.
 FORCED_WALK_COOLDOWN_SECONDS = 60
 _last_forced_walk: Dict[str, float] = {}
 
 
-def _forced_walk_allowed(company_id: Any, now: Optional[float] = None) -> bool:
-    key = str(company_id)
+def forced_walk_key(company_id: Any) -> str:
+    """Company-scoped, not folder-scoped: the point is to bound Drive traffic per
+    tenant, and re-pointing the folder must not hand out a fresh allowance."""
+    return f"coa:forced:{company_id}"
+
+
+def _local_forced_walk_allowed(company_id: Any, now: float) -> bool:
+    """The in-process half. Checks without committing, so a Redis refusal does not
+    silently consume this worker's allowance too."""
+    last = _last_forced_walk.get(str(company_id))
+    return last is None or (now - last) >= FORCED_WALK_COOLDOWN_SECONDS
+
+
+async def forced_walk_allowed(
+    company_id: Any,
+    redis_client: Any = None,
+    *,
+    now: Optional[float] = None,
+) -> bool:
+    """May this request force a re-walk? (H5)
+
+    Two gates, and the cheap one first: an in-process timestamp answers most repeat
+    offenders with no network call at all, and it is also the WHOLE gate when Redis is
+    unavailable — a Redis outage must degrade to "one forced walk per worker per
+    minute", never to "no limit at all" (H13's spirit applied to a throttle).
+    """
     now = time.monotonic() if now is None else now
-    last = _last_forced_walk.get(key)
-    if last is not None and (now - last) < FORCED_WALK_COOLDOWN_SECONDS:
+    if not _local_forced_walk_allowed(company_id, now):
         return False
-    _last_forced_walk[key] = now
+
+    if redis_client is not None:
+        try:
+            acquired = await redis_client.set(
+                forced_walk_key(company_id), b"1", nx=True, ex=FORCED_WALK_COOLDOWN_SECONDS)
+        except Exception as exc:
+            logger.warning("COA forced-walk gate unavailable (%s)", scrub(exc))
+            acquired = True     # degrade to the in-process gate, which just passed
+        if not acquired:
+            return False
+
+    _last_forced_walk[str(company_id)] = now
     return True
+
+
+def reset_forced_walk_gate() -> None:
+    """Drop the in-process half of the gate. For tests."""
+    _last_forced_walk.clear()
 
 
 async def resolve(
@@ -876,7 +1203,12 @@ async def resolve(
     A miss against a CACHED listing triggers one forced re-walk (§6 step 5), which is
     what makes a COA uploaded two minutes ago findable and why there is no cron job.
     A miss against a listing we just walked is not retried — the file genuinely is
-    not there — and that alone removes most of the stampede H5 describes.
+    not there — and that alone removes most of the stampede H5 describes; the Redis
+    gate below closes the rest of it, across workers.
+
+    Beyond the gate a miss simply answers from cache, and the caller hands off. That
+    is the correct outcome and not a degradation: the visitor's batch is almost never
+    a file uploaded in the last sixty seconds.
     """
     result, from_cache = await load_index(
         company_id, folder_id, redis_client=redis_client, api_key=api_key, client=client)
@@ -884,13 +1216,49 @@ async def resolve(
     if results or not from_cache:
         return results, truncated
 
-    if not _forced_walk_allowed(company_id):
+    if not await forced_walk_allowed(company_id, redis_client):
         return results, truncated
 
     refreshed, _ = await load_index(
         company_id, folder_id, redis_client=redis_client, api_key=api_key,
         client=client, force=True)
     return search(refreshed.documents, query, limit=limit)
+
+
+def folder_report(result: WalkResult) -> Dict[str, Any]:
+    """The owner's view of their certificate library (Phase 4, §9).
+
+    Same spirit as the near-miss warnings ``catalog_import`` gives for a catalog
+    upload: the search itself is fine, and what the owner cannot otherwise see is
+    which of *their* files it will never be able to find. Three such blind spots:
+
+    * ``unindexable`` and ``ignored_non_pdf`` — files present in Drive that are not
+      in the index at all, which is the only honest explanation for a short count.
+    * ``duplicates`` — the safety net for D6/H16. Collapsing identical filenames is
+      an assumption about this client, not a law, and a client filing per-customer
+      subfolders with repeated names would silently lose documents. We do not guess
+      here; we show the owner and let them tell us it is wrong.
+    * ``hard_to_find`` — a one-token filename is only findable by typing that token
+      exactly (§11's filename-quality ceiling). Nothing can fix it but a rename.
+
+    Every list is a bounded sample. This payload is owner-facing and authenticated,
+    so it may carry filenames — H10 bars raw filenames from *model observations*,
+    which is a different path.
+    """
+    thin = thin_documents(result.documents)
+    return {
+        "indexed": result.indexed,
+        "folders": result.folders_visited,
+        "files_seen": result.files_seen,
+        "ignored_non_pdf": result.ignored_non_pdf,
+        "unindexable": result.unindexable,
+        "duplicates_collapsed": result.duplicates_collapsed,
+        "duplicate_samples": [{"name": n, "copies": c} for n, c in result.duplicate_samples],
+        "hard_to_find": len(thin),
+        "hard_to_find_samples": [d.display for d in thin[:MAX_THIN_SAMPLES]],
+        "capped": list(result.capped),
+        "walked_at": result.walked_at or None,
+    }
 
 
 def to_payload(doc: CoaDocument) -> Dict[str, Any]:
