@@ -633,6 +633,7 @@ export default function CustomizePage() {
                   />
                   <CoaFolderField
                     value={botSettings.coaFolder || ''}
+                    savedValue={botSettings.coaFolderUrl || ''}
                     onChange={(v) => updateSetting('coaFolder', v)}
                     inputCls={inputCls}
                     labelCls={labelCls}

@@ -30,6 +30,10 @@ from tests.test_coa_drive import API_KEY, FIXTURES, FOLDER_ID, drive, entry
 
 COMPANY_ID = "11111111-2222-3333-4444-555555555555"
 
+# Read from the module, never hardcoded: a payload written with a stale version is a
+# MISS, so a literal here turns every assertion below into a version-mismatch test.
+_V = coa_drive.CACHE_VERSION
+
 
 class FakeRedis:
     """Just enough async Redis. ``fail`` makes every call raise (H13)."""
@@ -111,8 +115,8 @@ class TestDeserializeIsAlwaysAMiss:
         None, "", "   ", b"", "not json", "[]", "123", '"a string"',
         json.dumps({"files": []}),                          # no version
         json.dumps({"v": 999, "files": []}),                # future version
-        json.dumps({"v": 1}),                               # no files key
-        json.dumps({"v": 1, "files": "not a list"}),
+        json.dumps({"v": _V}),                              # no files key
+        json.dumps({"v": _V, "files": "not a list"}),
     ])
     def test_unusable_payloads_return_none_rather_than_raise(self, junk):
         assert deserialize_index(junk) is None
@@ -121,7 +125,7 @@ class TestDeserializeIsAlwaysAMiss:
         assert deserialize_index(serialize_index(walk_result())[:40]) is None
 
     def test_garbage_entries_inside_a_valid_payload_are_dropped(self):
-        raw = json.dumps({"v": 1, "files": [
+        raw = json.dumps({"v": _V, "files": [
             {"id": "a", "name": "100RG_100.26R016_ACETONE RG.pdf", "webViewLink": "https://x/1"},
             {"id": "b"},                       # no name, no link
             "not a dict",
@@ -131,7 +135,7 @@ class TestDeserializeIsAlwaysAMiss:
         assert len(restored.documents) == 1
 
     def test_negative_or_garbage_counters_normalize(self):
-        raw = json.dumps({"v": 1, "files": [], "folders_visited": -5, "files_seen": "lots"})
+        raw = json.dumps({"v": _V, "files": [], "folders_visited": -5, "files_seen": "lots"})
         restored = deserialize_index(raw)
         assert restored.folders_visited == 0 and restored.files_seen == 0
 

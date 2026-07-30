@@ -23,6 +23,21 @@ const baseProps = {
   helpCls: 'help',
 };
 
+// The field hosts the Phase 4 library panel, which fetches its own report on mount.
+// Mocks are therefore routed by path — a bare `vi.fn()` would let the panel consume
+// the response written for Test Connection, which is the kind of coupling that makes
+// a passing test meaningless.
+const HEALTHY_REPORT = {
+  status: 'ok', from_cache: false, indexed: 3, folders: 1, files_seen: 3,
+  ignored_non_pdf: 0, unindexable: 0, duplicates_collapsed: 0, duplicate_samples: [],
+  hard_to_find: 0, hard_to_find_samples: [], capped: [], walked_at: '2026-07-29T10:00:00.000Z',
+};
+
+function routed(onTest: () => Promise<any>) {
+  return vi.fn((path: string) =>
+    path.endsWith('/coa/report') ? Promise.resolve(HEALTHY_REPORT) : onTest());
+}
+
 describe('CoaFolderField Test Connection', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -37,7 +52,7 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('POSTs to the test-connection endpoint', async () => {
-    const authFetch = vi.fn(() => Promise.resolve({ indexed: 3, files_seen: 3, message: 'Connected. Indexed 3 certificates across 2 folders.' }));
+    const authFetch = routed(() => Promise.resolve({ indexed: 3, files_seen: 3, message: 'Connected. Indexed 3 certificates across 2 folders.' }));
     render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
     fireEvent.click(screen.getByText('Test connection'));
     expect(authFetch).toHaveBeenCalledWith('/api/companies/bot-1/coa/test-connection', { method: 'POST' });
@@ -45,7 +60,7 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('shows a success state when certificates were indexed', async () => {
-    const authFetch = vi.fn(() => Promise.resolve({ indexed: 3, files_seen: 3, message: 'Connected. Indexed 3 certificates across 2 folders.' }));
+    const authFetch = routed(() => Promise.resolve({ indexed: 3, files_seen: 3, message: 'Connected. Indexed 3 certificates across 2 folders.' }));
     const { container } = render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
     fireEvent.click(screen.getByText('Test connection'));
     await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
@@ -54,7 +69,7 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('H2 — an empty folder is a warning, never a green tick', async () => {
-    const authFetch = vi.fn(() => Promise.resolve({
+    const authFetch = routed(() => Promise.resolve({
       indexed: 0,
       files_seen: 0,
       message: 'Connected, but the folder is empty. If your certificates are in a Shared Drive, check the link points at the folder itself.',
@@ -69,7 +84,7 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('a folder of non-PDFs is also not a success', async () => {
-    const authFetch = vi.fn(() => Promise.resolve({
+    const authFetch = routed(() => Promise.resolve({
       indexed: 0, files_seen: 4, message: 'Connected, but none of the 4 files here are PDFs.',
     }));
     render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
@@ -78,7 +93,7 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('surfaces the backend message when the folder is unreachable', async () => {
-    const authFetch = vi.fn(() => Promise.reject({
+    const authFetch = routed(() => Promise.reject({
       body: { detail: { code: 'COA_UNREACHABLE', message: 'Drive refused access. Share the folder as "Anyone with the link" and try again.' } },
     }));
     render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
@@ -88,7 +103,7 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('falls back to a generic message when the error carries none', async () => {
-    const authFetch = vi.fn(() => Promise.reject(new Error('')));
+    const authFetch = routed(() => Promise.reject(new Error('')));
     render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
     fireEvent.click(screen.getByText('Test connection'));
     await waitFor(() => expect(screen.getByText(/couldn't reach the folder/)).toBeInTheDocument());
@@ -96,7 +111,7 @@ describe('CoaFolderField Test Connection', () => {
 
   it('disables the button while the walk is in flight', async () => {
     let resolve: (v: any) => void = () => {};
-    const authFetch = vi.fn(() => new Promise((r) => { resolve = r; }));
+    const authFetch = routed(() => new Promise((r) => { resolve = r; }));
     render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
     fireEvent.click(screen.getByText('Test connection'));
     await waitFor(() => expect(screen.getByText('Checking…')).toBeInTheDocument());
@@ -106,10 +121,11 @@ describe('CoaFolderField Test Connection', () => {
   });
 
   it('clears the previous result when a new test starts', async () => {
-    const authFetch = vi
-      .fn()
-      .mockResolvedValueOnce({ indexed: 0, files_seen: 0, message: 'Connected, but the folder is empty.' })
-      .mockResolvedValueOnce({ indexed: 2, files_seen: 2, message: 'Connected. Indexed 2 certificates across 1 folder.' });
+    const queue = [
+      { indexed: 0, files_seen: 0, message: 'Connected, but the folder is empty.' },
+      { indexed: 2, files_seen: 2, message: 'Connected. Indexed 2 certificates across 1 folder.' },
+    ];
+    const authFetch = routed(() => Promise.resolve(queue.shift()));
     render(<CoaFolderField {...baseProps} botId="bot-1" authFetch={authFetch} />);
     fireEvent.click(screen.getByText('Test connection'));
     await waitFor(() => expect(screen.getByText(/folder is empty/)).toBeInTheDocument());

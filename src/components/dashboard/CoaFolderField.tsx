@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import CoaLibraryPanel from './CoaLibraryPanel';
 
 /**
  * COA finder — the owner points the bot at their Drive folder of certificates.
@@ -10,7 +11,9 @@ import React, { useState } from 'react';
  * Test Connection (Phase 1) walks the folder for real and reports counts rather
  * than a tick, because H2's failure mode — a Shared Drive folder returning zero
  * files with HTTP 200 — is indistinguishable from an empty folder unless
- * "connected, 0 files" is a visible outcome of its own.
+ * "connected, 0 files" is a visible outcome of its own. It is also the ONE action
+ * that forces a fresh walk: the Phase 4 panel below reads the cache this populates,
+ * so there is no second refresh button doing the same job.
  */
 
 // Mirrors COA_FOLDER_ID_RE in packs/overrides.py. The backend re-validates and is
@@ -60,16 +63,24 @@ type Props = {
   helpCls: string;
   botId?: string;
   authFetch?: (path: string, init?: any) => Promise<any>;
+  /** The folder the backend has SAVED, echoed back. Defaults to `value`. */
+  savedValue?: string;
 };
 
 export default function CoaFolderField({
-  value, onChange, inputCls, labelCls, helpCls, botId, authFetch,
+  value, onChange, inputCls, labelCls, helpCls, botId, authFetch, savedValue,
 }: Props) {
   const invalid = isCoaFolderInvalid(value);
   const folderId = extractDriveFolderId(value);
+  // The panel describes the folder the SEARCH uses, which is the saved one. Showing
+  // 1,781 healthy certificates under a freshly pasted, unsaved link would read as
+  // approval of the new folder.
+  const savedFolderId = extractDriveFolderId(savedValue === undefined ? value : savedValue);
+  const unsaved = savedFolderId !== '' && folderId !== savedFolderId;
 
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<CoaTestResult | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const testConnection = async () => {
     if (!botId || !authFetch) return;
@@ -85,6 +96,9 @@ export default function CoaFolderField({
         indexed: res?.indexed,
         filesSeen: res?.files_seen,
       });
+      // The forced walk just replaced the cached listing, so the panel's numbers are
+      // now stale by exactly one walk. Refetching costs nothing — it reads that cache.
+      setReloadKey((k) => k + 1);
     } catch (e: any) {
       const msg = e?.body?.detail?.message || e?.message || "We couldn't reach the folder.";
       setResult({ ok: false, message: msg });
@@ -165,6 +179,20 @@ export default function CoaFolderField({
           </span>
         </div>
       )}
+
+      {unsaved && (
+        <p className="mt-3 text-[11px] font-google text-amber-600 dark:text-amber-400">
+          You&apos;ve changed the folder link but not saved it — the summary below still
+          describes the folder your bot is using.
+        </p>
+      )}
+
+      <CoaLibraryPanel
+        botId={botId}
+        authFetch={authFetch}
+        savedFolderId={savedFolderId}
+        reloadKey={reloadKey}
+      />
     </div>
   );
 }

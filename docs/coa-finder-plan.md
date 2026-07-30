@@ -5,8 +5,9 @@ Turn the currently-disabled `Request COA` hub card into a Certificate of Analysi
 
 ## 0. Status - 2026-07-29
 
-Phases 0, 1 and 2 are **built and committed**; **Phase 3 is built, browser-verified and uncommitted**; Phase 4 is not started.
-Suite green: backend 1900, frontend 479, tsc 0, lint 0 errors.
+Phases 0-3 are **built and committed**; **Phase 4, H5 and H15 are built and uncommitted**.
+All five phases exist and **§13.1 is empty** - no hardening item is outstanding.
+Suite green: backend 1969, frontend 509, tsc 0, lint 0 errors.
 
 **The pipeline has now run against the client's real Drive folder** (2026-07-29, read-only scratchpad script calling `walk_folder` and `search` directly - no dashboard, no dev server).
 It worked on the first attempt.
@@ -36,10 +37,38 @@ No company has a COA folder saved (`pack_overrides -> 'coa'` absent on all three
 | 1 - Test Connection | Done | `POST /api/companies/{id}/coa/test-connection` + the button in `CoaFolderField.tsx` |
 | 2 - lookup endpoint | Done | `GET /api/widget/coa?q=` (30/min IP, 60/min key, 404s without the tool) |
 | 2 - `get_coa` tool | Done | `packs/chemical.py` ToolSpec + `_run_get_coa`/`_get_coa_observation` in `main.py` |
-| 3 - widget | Built + browser-verified, uncommitted | `CoaPicker` in `ChatWidget.tsx`, pure logic in `components/chat/panels.ts`; `coa_picker` card action in `packs/chemical.py`; `features.coa_picker` in `/api/config` |
-| 4 - owner visibility | Not started | - |
+| 3 - widget | Done, browser-verified | `CoaPicker` in `ChatWidget.tsx`, pure logic in `components/chat/panels.ts`; `coa_picker` card action in `packs/chemical.py`; `features.coa_picker` in `/api/config` |
+| 4 - owner visibility | Built, uncommitted | Walk diagnostics on `WalkResult` + `duplicate_summary`/`thin_documents`/`folder_report` in `coa_drive.py`; `GET /api/companies/{id}/coa/report`; `CoaLibraryPanel.tsx` + pure `coaReport.ts` |
+| H5 + H15 | Built, uncommitted | `forced_walk_allowed` (Redis `SET NX`), `classify_status`/`backoff_delay`/`_fetch_page`, and a per-company breaker off `byod_breaker.py`; `tests/test_coa_resilience.py` |
 
-Tests: `tests/test_coa_config.py`, `test_config_coa_folder_leak.py`, `test_coa_drive.py`, `test_coa_cache.py`, `test_coa_test_connection.py`, `test_coa_endpoint.py`, `test_config_sds_picker_feature.py` (both feature flags), `src/__tests__/coa-folder-field.test.ts`, `src/__tests__/coa-test-connection.test.tsx`, `src/__tests__/coa-picker.test.ts`.
+Tests: `tests/test_coa_config.py`, `test_config_coa_folder_leak.py`, `test_coa_drive.py`, `test_coa_cache.py`, `test_coa_test_connection.py`, `test_coa_endpoint.py`, `test_coa_report.py`, `test_config_sds_picker_feature.py` (both feature flags), `src/__tests__/coa-folder-field.test.ts`, `src/__tests__/coa-test-connection.test.tsx`, `src/__tests__/coa-picker.test.ts`, `src/__tests__/coa-report.test.ts`, `src/__tests__/coa-library-panel.test.tsx`.
+
+### Phase 4 decisions - 2026-07-29
+
+**The diagnostics had to be measured during the walk, not derived from a listing.**
+`duplicate_names()` existed since Phase 1 and was unusable for the report: `_walk` dedupes before it builds `WalkResult`, so calling it on the result always answers "no duplicates" for a folder holding 457 collapsed copies.
+`unindexable` is the same shape of problem - a PDF with no `webViewLink` or no searchable filename was dropped without a trace, which left a short index with no explanation.
+So `WalkResult` gained `unindexable`, `duplicates_collapsed`, `duplicate_samples` and `walked_at`, all of which travel through the cache, and `CACHE_VERSION` went to 2 - reading a v1 entry would have reported zero duplicates for a folder full of them, which is a silent wrong answer rather than a miss.
+
+**Cache-first, and Test Connection is the only thing that forces a walk.**
+The panel loads whenever the customise tab is opened, so forcing would spend a Drive walk on rendering a settings page.
+Two buttons that both force were the alternative and were rejected: the panel reads the cache Test Connection populates, and a successful test bumps a reload key.
+That is also why the panel reports `walked_at` as an age - "Checked 3 minutes ago" is the honest reading of a cached answer.
+Minute granularity is a new helper, not the widget's `formatRelativeDate`, which is day-granular and would label every value inside the 600s TTL "Today".
+
+**The panel describes the SAVED folder.**
+`CoaFolderField` now takes `savedValue` (`botSettings.coaFolderUrl`, the backend's echo) alongside the live input.
+Rendering 1,781 healthy certificates underneath a freshly pasted, unsaved link reads as approval of a folder the backend has never seen.
+
+**Test Connection's "none of these are PDFs" message was wrong and is now fixable.**
+With `unindexable` counted, a folder of PDFs whose filenames carry nothing searchable no longer reports as a folder of non-PDFs.
+
+**Hosting the panel inside `CoaFolderField` broke the field's own tests, which was the useful signal.**
+The panel fetches on mount, so a `mockResolvedValueOnce` chain written for Test Connection got consumed by the panel instead.
+Those mocks are now routed by path, and the panel's loading card dropped its `role="status"` so it stops competing with the field's live region for the same announcement.
+
+**`useEffect` sets no state synchronously.**
+Every `setState` sits behind the `await`, in one `{report, error}` object where `null` means in-flight, which drops the `set-state-in-effect` lint warning, keeps the previous numbers on screen during a reload instead of flashing the placeholder, and makes a slow first response unable to overwrite a newer one (`cancelled`).
 
 ### Phase 3 decisions - 2026-07-29
 
@@ -129,10 +158,10 @@ The panel should still debounce rather than search per keystroke.
 ### Known gaps, in priority order
 
 1. ~~**Open decision - `MAX_FILES` vs a Postgres index.**~~ **Closed 2026-07-29 - see §6.1.** Cap raised to 25,000 after making a listing cheap enough that the raise costs nothing.
-2. **What is still unexercised, after the browser pass (§0.1).** The COA panel has now run in a real browser, but against a stub company and fixture filenames; the **owner dashboard** (`CoaFolderField.tsx` + Test Connection) has still only run under vitest, and nothing has ever run the panel against a real bot with a real folder. Both need the same thing: a chemical bot whose `pack_overrides.coa.folder_id` is set, which is a write to the production control DB and is Q7's open question. A Vercel preview off this branch closes both at once - the owner saves the folder through the dashboard, which is also how Test Connection gets exercised.
-3. **H5 is open** - `/api/widget/coa` can be driven to walk Drive repeatedly. What exists is an in-process 60s cooldown plus a rule that only a miss against a *cached* listing re-walks; that is not H5, which needs the Redis single-flight to be correct across workers.
-4. **H15 is partial** - Drive 403/404/5xx are classified and mapped to distinct owner- and visitor-facing outcomes, but there is no retry with backoff yet.
-5. The `coa` hub card stays `disabled=True` until §13.1 is empty.
+2. **What is still unexercised, after the browser pass (§0.1) and Phase 4.** The COA panel has run in a real browser against a stub company and fixture filenames; the **owner dashboard** (`CoaFolderField.tsx` + Test Connection + the new `CoaLibraryPanel`) has only ever run under vitest, and nothing has run either surface against a real bot with a real folder. All of it needs the same one thing: a chemical bot whose `pack_overrides.coa.folder_id` is set, which is a write to the production control DB and is Q7's open question. A Vercel preview off this branch closes the lot at once - the owner saves the folder through the dashboard, which is also what exercises Test Connection and the library panel, and against the real folder the panel's duplicate figure should read 457 (§0).
+3. ~~**H5 is open.**~~ **Closed 2026-07-29 - see §13.1.1.** One Redis `SET NX EX 60` is both the single flight and the cooldown; the in-process check is the Redis-down fallback.
+4. ~~**H15 is partial.**~~ **Closed 2026-07-29 - see §13.1.1.** Retryable/permanent split inside 403, bounded jittered retry, and a per-company circuit breaker for the sustained case - which turned out to be the part that mattered, since a failed walk never reaches the cache and so every request re-walks and re-times-out.
+5. Deployment items Q3 (`GOOGLE_DRIVE_API_KEY` on Render), Q4 (restrict the key to the Drive API) and Q5 (dedicated GCP project) are untouched. Q3 does not *break* production if it ships unset - no company has a folder saved, so `features.coa_picker` is false everywhere, the card degrades to its mini-form, `get_coa` answers `not_configured` and hands off - but it does mean the feature is inert until the key is set, and the first owner to paste a folder link would get "isn't enabled on this deployment yet" from Test Connection. Q4 should land before the key does.
 
 ## 1. Problem
 
@@ -410,9 +439,13 @@ As with SDS, the model confirms and routes - never pastes a link, never states a
 - Chat entry: the `{coa:{…}}` side-channel opens the same panel, pinning a single match and listing several (D5).
 - H12 closed both ways; H8 closed in the widget.
 
-### Phase 4 - owner visibility
-- Dashboard panel: file count, folder count, last refresh, duplicate filenames (F4), and files with too few tokens to be findable.
-- Same spirit as the near-miss warnings `catalog_import.py` gives for catalog uploads.
+### Phase 4 - owner visibility - built 2026-07-29
+- Dashboard panel: certificate count, folder count, files-in-Drive count, last refresh, duplicate filenames (F4/H16), and files with too few tokens to be findable.
+- Same spirit as the near-miss warnings `catalog_import.py` gives for catalog uploads: the search is fine, and what the owner cannot otherwise see is which of *their* files it will never find.
+- Three blind spots, each a distinct notice with the filenames behind a disclosure: files present in Drive but absent from the index (`unindexable` + `ignored_non_pdf`), duplicates collapsed by D6, and one-token filenames that only an exact match can reach.
+- A cap breach outranks all of it, being the one case where the *search itself* serves partial results.
+- `GET /api/companies/{id}/coa/report`, owner-scoped and cache-first; the walk diagnostics it reports are recorded during the walk and cached, because `dedupe` destroys the evidence.
+- H16 closed.
 
 ## 10. Hardening - findings from the pre-implementation review
 
@@ -510,7 +543,8 @@ Index and query must normalize identically (NFKC + uppercase) or nothing matches
 
 ### Loop safety summary
 
-Every unbounded path is capped: walk depth (6), folders (200), files (5,000), pages per folder (H14), Drive retries (H15), forced re-walks (H5), visited folders (H4), and agent tool rounds (`MAX_TOOL_ROUNDS`, already enforced by the existing loop).
+Every unbounded path is capped: walk depth (6), folders (200), files (25,000 - raised from 5,000, see §6.1), pages per folder (H14), Drive retries (H15), forced re-walks (H5), visited folders (H4), and agent tool rounds (`MAX_TOOL_ROUNDS`, already enforced by the existing loop).
+Phase 4 adds two display caps for the same reason: the duplicate and hard-to-find sample lists are bounded, so a pathological folder cannot put a 400-name array in a cached entry or on a settings page.
 The `multiple` tool status must also tell the model the panel is already showing the matches, so it does not re-call `get_coa` with the same arguments and burn rounds.
 
 ## 11. Risks
@@ -549,6 +583,10 @@ The `multiple` tool status must also tell the model the panel is already showing
 - Phase 3 panel: the prompt shows whenever the panel holds no rows; chat-delivered rows render with an empty box; clearing the box falls back to the prompt; "no answer yet" is distinct from "nothing matched"; an error or an unconfigured folder outranks any result state.
 - Phase 3 flag: `features.coa_picker` is true only with a folder saved, false for a chemical bot without one, and neither picker flag can open the other picker's panel.
 - Phase 3 chat entry: rows + cap flag survive the side-channel and the prose query is dropped; a payload with no rows opens no panel; one match pins and several do not (D5).
+- Phase 4 diagnostics: the duplicate count counts copies dropped, not names repeated; samples are worst-first and bounded while the count is not; a one-token filename is flagged and a two-token one is not; the walk counts a PDF with no link and a PDF with no searchable name separately from a non-PDF; the same certificate in two month folders (F4) dedupes to one *and* reports one copy merged.
+- Phase 4 cache: the diagnostics round-trip; a previous-version entry is a miss, not a zeroed report; junk in the sample list is dropped rather than raised. Cache-version literals come from `CACHE_VERSION`, never a number - a literal turns every assertion in that file into a version-mismatch test the moment the version moves.
+- Phase 4 endpoint: reports the library; is cache-first, so opening the page twice walks Drive once; another owner's bot 404s; an unconfigured bot 400s; a Drive 403 is not an empty library (H15) and carries no folder ID, key or Drive URL (H11/H3).
+- Phase 4 panel: fetches the right path for the right bot; no saved folder means no fetch at all; an unreachable folder renders as an error and never as an empty library; each notice discloses only its own filenames; a clean folder is confirmed rather than silent; the reload key refetches (what a successful Test Connection bumps) and a failed test does not.
 
 Hardening (§10), one test each:
 
@@ -565,7 +603,9 @@ Hardening (§10), one test each:
 - H11 visitor-facing errors contain no folder ID.
 - H13 with Redis unavailable the search still returns correct results.
 - H14 a repeating `nextPageToken` terminates at the page cap.
-- H15 a Drive 403 surfaces as a handoff, never as "no certificate exists".
+- H15 a Drive 403 surfaces as a handoff, never as "no certificate exists"; a rate-limited 403 is retried and a permission 403 is not; a bare 403 with no usable body is treated as permission; 404 is never retried; retries are bounded and the backoff is jittered into the upper half of each step; a retried failure still carries no key, folder ID or URL.
+- H15 breaker: a sustained outage stops reaching Drive at all; recovery is automatic after the cooldown; a warm cache still serves while it is open; a config mistake (`invalid_folder`) never trips it; one tenant's broken folder does not slow another down; Test Connection reaches Drive through an open breaker and a success resets it.
+- H5 the gate holds **across workers** (a second worker with an empty local map is still refused), the allowance expires with the key, one tenant cannot spend another's, a folder re-point does not hand out a fresh allowance, a Redis outage still limits this worker, and a Redis refusal does not consume the local allowance.
 - H17 index and query normalization are the same function.
 
 ## 13. Deferred - close before ship
@@ -585,20 +625,58 @@ H4 (visited-set) and H14 (page cap) join them: both are a few lines and both pre
 | Item | What | Phase | Test | State (2026-07-29) |
 |---|---|---|---|---|
 | H3 | Scrub `key=` from logs and handoff payloads | 1 | §12 H3 | **Done** - pulled forward; `scrub()` plus errors carrying no key, folder ID or URL |
-| H5 | Single-flight lock + 60s forced-walk cooldown | 1 | §12 H5 | **Open** - in-process cooldown only; needs the Redis single-flight |
+| H5 | Single-flight lock + 60s forced-walk cooldown | 1 | §12 H5 | **Done** - one Redis `SET NX EX 60` is both, with the in-process check as the Redis-down fallback |
 | H13 | Redis unavailable degrades to per-request walk | 1 | §12 H13 | **Done** - every cache failure is a miss |
-| H15 | Drive 403 retry with backoff, then handoff | 1 | §12 H15 | **Partial** - classified and mapped; no retry yet |
+| H15 | Drive 403 retry with backoff, then handoff | 1 | §12 H15 | **Done** - retryable/permanent split inside 403, 3 attempts with jittered backoff, plus a per-company breaker for the sustained case |
 | H10 | `get_coa` returns status + count, never raw filenames | 2 | §12 H10 | **Done** |
 | H11 | No folder ID in visitor-facing error text | 2 | §12 H11 | **Done** |
 | H8 | Download targets `uc?export=download`, not `webViewLink` | 3 | §12 H8 | **Done** - `CoaDocument.download_url`, and the panel's Download button uses it (asserted against the source) |
 | H12 | Opening either panel closes the other | 3 | §12 H12 | **Done** - `openCoaPicker`/`openCoaPickerWithResults` close the SDS panel and the sample form; `openSdsPicker`/`openSdsPickerWithResult`/`openSampleForm` close the COA panel |
-| H16 | Duplicate-filename report (safety net for the dedup assumption) | 4 | - | Open - `duplicate_names()` exists, no panel yet |
+| H16 | Duplicate-filename report (safety net for the dedup assumption) | 4 | §12 Phase 4 | **Done** - measured during the walk, cached, and rendered as a notice that invites a correction rather than asserting D6 is right |
 
-So §13.1 is down to **H5, H15 and H16**.
-H5's cooldown value is deliberately unset until we have measured a real walk.
+**§13.1 is now empty.**
+H5's cooldown stayed at the plan's 60s and now has a measurement behind it: a real walk is 1.4-1.7s, so the window is ~40x the work it protects.
 
-**The `coa` hub card is now enabled** (`disabled=True` removed, per Phase 3), so the merge to MainV2 - not the flag - is what gates this from production while H5, H15 and H16 are open.
-That matches §13's "local and staging run wide open in the meantime", but it does mean this branch must not merge until that list is empty.
+**The `coa` hub card is enabled** (`disabled=True` removed, per Phase 3), so the merge to MainV2 - not the flag - is what gates this from production.
+With §13.1 empty the remaining gates are operational, not code: Q3/Q4 (the Render key, restricted first) and one real-folder run through the dashboard.
+
+### 13.1.1 How H5 and H15 were closed - 2026-07-29
+
+**H5: one Redis key does both jobs the plan asked for.**
+`SET coa:forced:{company_id} NX EX 60` is claimed *before* the walk and held for the whole cooldown, so concurrent misses across every worker see exactly one winner (the single flight) and a later miss inside the window is refused (the cooldown).
+The two collapse into one key precisely because the cooldown is longer than a walk - a short-lived lock released on completion would let the next miss re-walk immediately, which is the thing being prevented.
+The in-process timestamp survives as the cheap first check and as the *whole* gate when Redis is down: a Redis outage must degrade to "one forced walk per worker per minute", never to "no limit at all", which is H13's spirit applied to a throttle.
+It is a check-then-commit, so a caller refused by Redis has not silently spent this worker's allowance too.
+The key is company-scoped, unlike the cache key, because the point is bounding Drive traffic per tenant and a folder re-point must not be a way around it.
+
+**H15: the retry was the easy half, and not the half that mattered.**
+The 403 split is the specified part - `userRateLimitExceeded` and a revoked share arrive identically, and retrying the second is pure latency while reporting the first to a visitor as "no certificate exists" tells someone holding a real drum their batch was never tested.
+So `classify_status` reads `error.errors[].reason` (only to classify - the body is never logged and never returned, since a Drive error message can contain the request URL and the URL carries the key), 403-rate-limit and 429/5xx and network errors are retryable, 403-permission and 404 are not, and a bare 403 with no usable body is treated as permission: the conservative direction sends the owner to check sharing rather than burning three retries.
+Three attempts, exponential backoff jittered into the upper half of each step because the walk lists 8 folders at once and an un-jittered backoff would have all 8 retry in the same millisecond and rebuild the burst that got them limited.
+The semaphore is taken per *attempt*, so a sleeping request gives its concurrency slot back.
+
+**The failure that retry does not fix, found while building it.**
+With Drive unreachable nothing ever reaches the cache, because the caches only ever hold a *successful* walk.
+So every search walks, and every walk burns the full 10s timeout budget - one dead folder would hold a worker for ~10s per visitor message, indefinitely, and the H5 gate does not apply because that path is not a forced re-walk.
+That is what the circuit breaker is for, and it is why the plan's "reuse `byod_breaker.py`" turned out to be the load-bearing instruction rather than a nicety.
+Config: 3 consecutive failures, 60s cooldown, 1 probe - per company, so one tenant's revoked share cannot slow anyone else down, and in-process like the memo so each worker learns independently.
+Three details that are not obvious:
+- **A warm cache still serves while the breaker is open.** The degradation is "no fresh walks", not "no certificates" - the gate sits after the cache tiers, not before them.
+- **`invalid_folder` and `not_configured` never count.** They never touched Drive, and counting them would trip the breaker on a bad paste and then hide the owner's fix behind a cooldown.
+- **Test Connection bypasses it** (`bypass_breaker=True`). The owner has usually just fixed the sharing setting and is clicking to find out whether it worked; a fast-fail would report "still broken" without looking. A success there resets the breaker, an authoritative probe beating the cooldown - which needed a small additive `BreakerRegistry.reset()` in `byod_breaker.py`.
+
+**Owner-facing copy gained a `rate_limited` case.**
+Telling an owner to go re-check their sharing settings because Drive rate-limited us sends them to fix something that is not broken.
+The visitor-facing message needed no change: "We couldn't reach the document library just now" is already true for both.
+
+### 13.1.2 Accepted residual - the cold-start walk is not single-flighted
+
+H5 gates the *forced* re-walk. The first walk after a restart or a TTL expiry is not gated, so N concurrent requests arriving on a cold cache each start their own walk.
+
+Quantified rather than waved at: worst case is ~100 concurrent requests x 8 `files.list` calls = 80,000 quota units against a 1,000,000/min ceiling, once per 600s TTL boundary, and it self-heals the moment the first walk lands.
+It is not attacker-amplifiable in the way the miss-refresh path was - repeat queries cannot clear the cache, so it needs genuine concurrent traffic landing in the same narrow window.
+Closing it properly means a short-TTL lock plus a decision for the losers (poll for the winner's result, or walk anyway), and polling is real complexity for a bounded, self-healing cost.
+Revisit if the Drive quota dashboard ever shows a spike at TTL boundaries.
 
 ### 13.2 Open questions - need the owner or the client
 

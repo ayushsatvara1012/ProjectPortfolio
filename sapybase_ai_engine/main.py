@@ -5413,25 +5413,19 @@ _COA_TEST_ERRORS = {
     "not_found":      (400, "We couldn't find that folder. Check the link, and that the folder hasn't been moved or deleted."),
     "forbidden":      (400, "Drive refused access. Share the folder as \"Anyone with the link\" and try again."),
     "unreachable":    (503, "We couldn't reach Google Drive. Try again in a moment."),
+    # H15 — a rate limit is a 403 like a revoked share is, and telling the owner to
+    # go re-check their sharing settings over a rate limit sends them to fix
+    # something that is not broken.
+    "rate_limited":   (503, "Google Drive is rate-limiting us right now. Wait a minute and try again."),
     "unavailable":    (503, "Google Drive returned an unexpected error. Try again in a moment."),
 }
 
 
-@app.post("/api/companies/{company_id}/coa/test-connection")
-async def test_coa_connection(
-    company_id: str,
-    user: dict = Depends(get_current_user),
-):
-    """Walk the bot's configured COA folder and report what is actually in it.
+def _owner_coa_folder(company_id: str, user: dict) -> str:
+    """The bot's saved COA folder ID, or a 404/400 — the owner-side gate.
 
-    Always forces a fresh walk: a Test Connection that answered from a ten-minute
-    cache would tell the owner their folder is fine after they had already fixed or
-    broken the sharing setting.
-
-    H2 is the whole reason this reports counts rather than a boolean — a folder in a
-    Google Shared Drive read without the ``allDrives`` flags returns zero files with
-    HTTP 200, which is indistinguishable from an empty folder unless "connected, 0
-    files" is a distinct, visible outcome.
+    Scoped by ``user_id`` so one owner cannot read another's folder, and re-resolved
+    through ``effective_coa_config`` so H1's regex applies on read as well as write.
     """
     conn = get_db_connection()
     try:
@@ -5451,18 +5445,82 @@ async def test_coa_connection(
         raise HTTPException(status_code=400, detail={
             "code": "NO_COA_FOLDER",
             "message": "No certificate folder is configured. Add a Drive folder link and save first."})
+    return folder_id
+
+
+def _coa_unreachable(company_id: str, reason: str, where: str) -> HTTPException:
+    """Map a :class:`CoaDriveError` to owner-facing copy that names no identifier.
+
+    The reason goes to the log with the company ID; the message goes to the owner
+    with neither the folder ID (H11) nor a Drive URL (H3).
+    """
+    status_code, message = _COA_TEST_ERRORS.get(reason, _COA_TEST_ERRORS["unavailable"])
+    logger.warning("COA %s failed for company %s: %s", where, company_id, reason)
+    return HTTPException(status_code=status_code,
+                         detail={"code": "COA_UNREACHABLE", "message": message})
+
+
+@app.get("/api/companies/{company_id}/coa/report")
+async def coa_folder_report(
+    company_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """What the owner's certificate library looks like to the search (Phase 4, §9).
+
+    Deliberately **cache-first**, unlike Test Connection: this loads whenever the
+    customise tab is opened, and forcing a walk on every page view would spend a
+    Drive quota budget on rendering a settings panel. The reported ``walked_at`` is
+    therefore the age of the answer, and Test Connection is the force-refresh action
+    — one button that walks, rather than two that both do.
+    """
+    folder_id = _owner_coa_folder(company_id, user)
+    try:
+        result, from_cache = await coa_drive.load_index(company_id, folder_id, redis_client=r)
+    except coa_drive.CoaDriveError as e:
+        raise _coa_unreachable(company_id, e.reason, "report")
+
+    return {"status": "ok", "from_cache": from_cache, **coa_drive.folder_report(result)}
+
+
+@app.post("/api/companies/{company_id}/coa/test-connection")
+async def test_coa_connection(
+    company_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Walk the bot's configured COA folder and report what is actually in it.
+
+    Always forces a fresh walk: a Test Connection that answered from a ten-minute
+    cache would tell the owner their folder is fine after they had already fixed or
+    broken the sharing setting. It is also what refreshes the Phase 4 library panel,
+    which reads the cache this write populates.
+
+    H2 is the whole reason this reports counts rather than a boolean — a folder in a
+    Google Shared Drive read without the ``allDrives`` flags returns zero files with
+    HTTP 200, which is indistinguishable from an empty folder unless "connected, 0
+    files" is a distinct, visible outcome.
+    """
+    folder_id = _owner_coa_folder(company_id, user)
 
     try:
-        result, _ = await coa_drive.load_index(company_id, folder_id, redis_client=r, force=True)
+        # `bypass_breaker` — the owner has usually just changed the sharing setting and
+        # is clicking to find out whether it worked. A fast-fail from the visitor-path
+        # breaker would report "still broken" without looking, and a success here is
+        # authoritative enough to close the breaker rather than wait out its cooldown.
+        result, _ = await coa_drive.load_index(
+            company_id, folder_id, redis_client=r, force=True, bypass_breaker=True)
     except coa_drive.CoaDriveError as e:
-        status_code, message = _COA_TEST_ERRORS.get(e.reason, _COA_TEST_ERRORS["unavailable"])
-        logger.warning("COA test-connection failed for company %s: %s", company_id, e.reason)
-        raise HTTPException(status_code=status_code, detail={"code": "COA_UNREACHABLE", "message": message})
+        raise _coa_unreachable(company_id, e.reason, "test-connection")
 
     if result.indexed:
         message = (f"Connected. Indexed {result.indexed} certificate"
                    f"{'' if result.indexed == 1 else 's'} across {result.folders_visited} "
                    f"folder{'' if result.folders_visited == 1 else 's'}.")
+    elif result.unindexable:
+        # Phase 4 made this branch possible to write: PDFs that ARE here but carry
+        # nothing searchable in their names used to be counted as "not PDFs".
+        message = (f"Connected, but none of the {result.unindexable} PDFs here could be "
+                   "indexed — their filenames have nothing searchable in them. "
+                   "Certificates need a product code or batch number in the filename.")
     elif result.files_seen:
         message = (f"Connected, but none of the {result.files_seen} files here are PDFs. "
                    "Certificates need to be PDF files to be searchable.")

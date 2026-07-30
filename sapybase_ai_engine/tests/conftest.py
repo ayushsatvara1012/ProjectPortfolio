@@ -39,16 +39,23 @@ def _disable_slowapi_limiter():
 
 
 @pytest.fixture(autouse=True)
-def _reset_coa_index_memo():
-    """Drop the COA in-process index memo around every test.
+def _reset_coa_module_state():
+    """Drop every piece of COA module-global state around each test.
 
-    `coa_drive` memoizes the parsed Drive listing for the cache TTL so a warm worker
-    never re-parses it. That memo is module-global, so without this a listing walked
-    by one test is silently served to the next — which would hide exactly the walk
-    counts and cache misses these tests exist to assert.
+    Three of them now, all module-global and all deliberately so: the parsed-listing
+    memo (§6.1), the circuit breaker (H15) and the in-process half of the forced-walk
+    gate (H5). Without this a listing walked by one test is silently served to the
+    next, a test that trips the breaker fast-fails every test after it, and one
+    test's forced walk exhausts the next test's 60-second allowance — hiding exactly
+    the walk counts and cache misses these tests exist to assert.
     """
     from services import coa_drive
 
-    coa_drive.reset_index_memo()
+    def clear():
+        coa_drive.reset_index_memo()
+        coa_drive.reset_breakers()
+        coa_drive.reset_forced_walk_gate()
+
+    clear()
     yield
-    coa_drive.reset_index_memo()
+    clear()
