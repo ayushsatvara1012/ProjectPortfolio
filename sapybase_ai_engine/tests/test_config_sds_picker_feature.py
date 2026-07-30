@@ -1,8 +1,12 @@
-"""Endpoint tests for GET /api/config's `features.sds_picker` flag
-(get-sds-crash-fix-plan, Phase 4a).
+"""Endpoint tests for GET /api/config's `features` flags — `sds_picker`
+(get-sds-crash-fix-plan Phase 4a) and `coa_picker` (coa-finder-plan Phase 3).
 
 Config-registry driven: true only when the company's pack actually declares
-the get_sds tool — never a hardcoded `if vertical == "chemical"` check.
+the backing tool — never a hardcoded `if vertical == "chemical"` check.
+
+`coa_picker` adds one condition on top of tool presence: the company's own
+Drive folder. get_coa is declared to every chemical bot, so tool presence alone
+would open a panel that can only ever say "not set up".
 """
 from fastapi.testclient import TestClient
 from fastapi_cache import FastAPICache
@@ -62,15 +66,49 @@ def _get_config(monkeypatch, *, company=None, api_key="unique-test-key"):
         m.app.dependency_overrides.clear()
 
 
+COA_FOLDER = "1wsEGabcdefghij_-"
+
+
 def test_chemical_pack_has_sds_picker_true(monkeypatch):
     resp = _get_config(monkeypatch, company=_company(vertical="chemical"),
                        api_key="key-chemical")
     assert resp.status_code == 200
-    assert resp.json()["features"] == {"sds_picker": True}
+    assert resp.json()["features"]["sds_picker"] is True
 
 
 def test_generic_bot_has_sds_picker_false(monkeypatch):
     resp = _get_config(monkeypatch, company=_company(vertical=None),
                        api_key="key-generic")
     assert resp.status_code == 200
-    assert resp.json()["features"] == {"sds_picker": False}
+    assert resp.json()["features"] == {"sds_picker": False, "coa_picker": False}
+
+
+def test_coa_picker_true_when_the_bot_has_a_folder(monkeypatch):
+    resp = _get_config(
+        monkeypatch,
+        company=_company(vertical="chemical",
+                         pack_overrides={"coa": {"folder_id": COA_FOLDER}}),
+        api_key="key-coa-configured")
+    assert resp.status_code == 200
+    assert resp.json()["features"]["coa_picker"] is True
+
+
+def test_coa_picker_false_for_a_chemical_bot_with_no_folder(monkeypatch):
+    # get_coa IS declared for this bot, so this is the case tool presence alone
+    # would get wrong: the card must degrade to its mini-form, not open a panel.
+    resp = _get_config(monkeypatch, company=_company(vertical="chemical"),
+                       api_key="key-coa-unconfigured")
+    assert resp.status_code == 200
+    assert resp.json()["features"]["coa_picker"] is False
+
+
+def test_coa_folder_id_never_reaches_the_widget_config(monkeypatch):
+    # §11 — the folder ID is the only thing protecting a link-shared folder. The
+    # flag may reveal that a library exists; the identifier must not travel.
+    resp = _get_config(
+        monkeypatch,
+        company=_company(vertical="chemical",
+                         pack_overrides={"coa": {"folder_id": COA_FOLDER}}),
+        api_key="key-coa-leak")
+    assert resp.status_code == 200
+    assert COA_FOLDER not in resp.text

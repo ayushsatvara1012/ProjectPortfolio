@@ -247,6 +247,24 @@ class TestSideChannel:
         assert captured["coa"]["results"][0]["display"]
 
     @pytest.mark.asyncio
+    async def test_the_capped_flag_travels_with_the_rows(self, monkeypatch):
+        # Phase 3 — the panel's "keep typing to narrow" hint reads this. Without it
+        # a capped result set arriving through the conversation looks complete.
+        captured = {}
+        await run_tool(monkeypatch, {"query": "100.26R016"}, captured=captured)
+        assert captured["coa"]["truncated"] is False
+
+        # The flag has to be total across both statuses, not just `multiple`: a
+        # narrow enough cap makes a capped set of 3 present as a single `found`
+        # certificate, and dropping the flag there would tell the visitor that the
+        # one certificate they can see is the only one that matched.
+        monkeypatch.setattr(coa_drive, "MAX_RESULTS", 1)
+        capped = {}
+        await run_tool(monkeypatch, {"query": "100.26R016"}, captured=capped)
+        assert len(capped["coa"]["results"]) == 1
+        assert capped["coa"]["truncated"] is True
+
+    @pytest.mark.asyncio
     async def test_nothing_is_captured_when_there_is_no_match(self, monkeypatch):
         captured = {}
         await run_tool(monkeypatch, {"query": "ZZZZQQ"}, captured=captured)
