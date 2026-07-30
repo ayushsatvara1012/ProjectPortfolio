@@ -6090,7 +6090,7 @@ async def _run_get_coa(company: dict, args: dict) -> dict:
 
     rows = [coa_drive.to_payload(d) for d in results]
     if len(results) == 1:
-        return {"status": "found", "count": 1, "_rows": rows,
+        return {"status": "found", "count": 1, "truncated": truncated, "_rows": rows,
                 "message": "The certificate is already open in a panel for the visitor. "
                            "Confirm you have found it — do not paste a link, do not name "
                            "the file, and do not state anything the certificate contains."}
@@ -6110,7 +6110,11 @@ async def _get_coa_observation(company: dict, args: dict, captured: dict) -> dic
     rows = obs.pop("_rows", None)
     if rows is not None:
         captured["coa"] = {"status": obs.get("status"), "results": rows,
-                           "query": (args.get("query") or "").strip()}
+                           "query": (args.get("query") or "").strip(),
+                           # The panel shows "keep typing to narrow" off this, so the
+                           # chat path has to carry it too or a capped result set looks
+                           # complete to a visitor who arrived through the conversation.
+                           "truncated": bool(obs.get("truncated"))}
     return obs
 
 
@@ -9513,7 +9517,17 @@ def get_config(
             # get-sds-crash-fix-plan Phase 4 — config-registry driven (never
             # `if vertical == "chemical"`): the widget's Get-SDS picker only
             # renders for a pack that actually declares the get_sds tool.
-            safe_company["features"] = {"sds_picker": "get_sds" in pack.tool_names()}
+            # coa-finder-plan Phase 3 — same registry gate PLUS the company's own
+            # folder: get_coa is declared to every chemical bot, so tool presence
+            # alone would open a panel that can only ever say "not set up". With
+            # the flag false the card degrades to its mini-form and the visitor
+            # gets a conversational handoff instead. Existence only — §11 keeps the
+            # folder ID itself out of this payload.
+            safe_company["features"] = {
+                "sds_picker": "get_sds" in pack.tool_names(),
+                "coa_picker": ("get_coa" in pack.tool_names()
+                               and bool(effective_coa_config(_overrides))),
+            }
             # Phase 4b/5 — the structured sample form: the owner's per-bot override
             # if they customised it, otherwise the pack default.
             safe_company["sample_form"] = effective_sample_form(pack, _overrides)
@@ -9555,7 +9569,7 @@ def get_config(
             safe_company["hub_cards"] = []
             safe_company["products"] = []
             safe_company["sample_form"] = []
-            safe_company["features"] = {"sds_picker": False}
+            safe_company["features"] = {"sds_picker": False, "coa_picker": False}
 
         return safe_company
     except Exception as e:

@@ -37,6 +37,14 @@ class HubCard:
         ``features.sds_picker`` is ever false for a company, the widget
         degrades this card to the old ``"tool"`` mini-form behaviour instead
         of breaking.
+      - ``"coa_picker"`` (coa-finder-plan Phase 3) opens the certificate search
+        panel, which queries ``/api/widget/coa`` as the visitor types. Search
+        first and never browsable (D1), so unlike the SDS picker it fetches no
+        list up front. ``features.coa_picker`` is false for a company with no
+        Drive folder configured, and the same ``input_label``/``prompt_template``
+        fallback applies: the card degrades to the ``"tool"`` mini-form, whose
+        message reaches ``get_coa``, which answers ``not_configured`` and hands
+        off to the team.
 
     Cards are *config*: the widget renders whatever the pack supplies and never
     hardcodes a vertical. A no-pack (``vertical=NULL``) company has no cards, so
@@ -46,7 +54,7 @@ class HubCard:
     id: str
     label: str
     icon: str                       # Tabler outline icon name, e.g. "file-certificate"
-    action: str = "tool"            # "tool" | "chat" | "form" | "sds_picker"
+    action: str = "tool"            # "tool" | "chat" | "form" | "sds_picker" | "coa_picker"
     subtitle: str = ""
     input_label: str = ""           # mini-form placeholder (action="tool")
     prompt_template: str = ""       # message sent on submit; "{value}" is substituted

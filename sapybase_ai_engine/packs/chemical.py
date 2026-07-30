@@ -241,9 +241,16 @@ _HUB_CARDS = (
         label="Request COA",
         subtitle="Certificate of Analysis",
         icon="certificate",
-        action="chat",   # inert while disabled; a real action lands with the feature
+        # coa-finder-plan Phase 3 — the certificate search panel. input_label /
+        # prompt_template are the fallback the widget uses when
+        # features.coa_picker is false (no Drive folder configured): the message
+        # reaches get_coa, which answers not_configured and offers a handoff.
+        # No input_source: D4 keeps COA isolated from the catalog, so the field
+        # is free text (a batch number is not a product name).
+        action="coa_picker",
+        input_label="Product code or batch number",
+        prompt_template="I need the Certificate of Analysis for {value}.",
         color="#10B981",  # emerald — certified / quality
-        disabled=True,
     ),
 )
 

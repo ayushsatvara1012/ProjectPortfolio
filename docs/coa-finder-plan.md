@@ -5,8 +5,8 @@ Turn the currently-disabled `Request COA` hub card into a Certificate of Analysi
 
 ## 0. Status - 2026-07-29
 
-Phases 0, 1 and 2 are **built and committed**; Phases 3 and 4 are not started.
-Suite green: backend 1873, frontend 459, tsc 0, lint 0 errors.
+Phases 0, 1 and 2 are **built and committed**; **Phase 3 is built, browser-verified and uncommitted**; Phase 4 is not started.
+Suite green: backend 1900, frontend 479, tsc 0, lint 0 errors.
 
 **The pipeline has now run against the client's real Drive folder** (2026-07-29, read-only scratchpad script calling `walk_folder` and `search` directly - no dashboard, no dev server).
 It worked on the first attempt.
@@ -36,10 +36,53 @@ No company has a COA folder saved (`pack_overrides -> 'coa'` absent on all three
 | 1 - Test Connection | Done | `POST /api/companies/{id}/coa/test-connection` + the button in `CoaFolderField.tsx` |
 | 2 - lookup endpoint | Done | `GET /api/widget/coa?q=` (30/min IP, 60/min key, 404s without the tool) |
 | 2 - `get_coa` tool | Done | `packs/chemical.py` ToolSpec + `_run_get_coa`/`_get_coa_observation` in `main.py` |
-| 3 - widget | Not started | - |
+| 3 - widget | Built + browser-verified, uncommitted | `CoaPicker` in `ChatWidget.tsx`, pure logic in `components/chat/panels.ts`; `coa_picker` card action in `packs/chemical.py`; `features.coa_picker` in `/api/config` |
 | 4 - owner visibility | Not started | - |
 
-Tests: `tests/test_coa_config.py`, `test_config_coa_folder_leak.py`, `test_coa_drive.py`, `test_coa_cache.py`, `test_coa_test_connection.py`, `test_coa_endpoint.py`, `src/__tests__/coa-folder-field.test.ts`, `src/__tests__/coa-test-connection.test.tsx`.
+Tests: `tests/test_coa_config.py`, `test_config_coa_folder_leak.py`, `test_coa_drive.py`, `test_coa_cache.py`, `test_coa_test_connection.py`, `test_coa_endpoint.py`, `test_config_sds_picker_feature.py` (both feature flags), `src/__tests__/coa-folder-field.test.ts`, `src/__tests__/coa-test-connection.test.tsx`, `src/__tests__/coa-picker.test.ts`.
+
+### Phase 3 decisions - 2026-07-29
+
+**`features.coa_picker` is gated on the folder, not only on the tool.**
+`sds_picker` is pure pack config, but `get_coa` is declared to every chemical bot (including ones with no Drive folder), so tool presence alone would open a panel that can only ever say "not set up".
+With the flag false the card degrades to its mini-form, whose message reaches `get_coa`, which answers `not_configured` and offers a handoff - a conversation instead of a dead end.
+The flag leaks only *existence*; §11 keeps the folder ID out of `/api/config`, asserted by a test.
+
+**The COA panel is not a copy of `SdsPicker`.**
+That panel prefetches the whole product list and filters it client-side; D1 forbids any listing reaching the widget, so this one has no cached list, no `loading` state, and the debounced `?q=` query is the only source of rows.
+Consequences: `results === null` means "no answer yet" and `[]` means "the server found nothing", and collapsing the two would tell a visitor their batch does not exist while the request is still in flight.
+
+**The pure logic lives in `src/components/chat/panels.ts`** - `coaListState`, `hubCardTarget`, `parseCoaEvent`, `coaPinnedRow`, `COA_MIN_QUERY_CHARS`.
+It started as named exports on `ChatWidget.tsx` and had to move: a file exporting both a component and plain values drops out of Fast Refresh, so every edit to the widget forced a full page reload (visible in the dev server log as "Fast Refresh had to perform a full reload").
+The point of exporting them at all is that the older widget tests mirror the component's logic inside the test file, which passes happily once the component stops agreeing with it.
+`coaListState` also replaces a 6-deep ternary. D1 is enforced by *what can put rows in `results`* - only a >=2-character query or an explicit chat request, never a listing - deliberately not by requiring text in the box, which is what the browser pass corrected (below).
+
+**H8 is asserted against the source text.**
+`view_url` and `download_url` are both strings, so swapping them type-checks cleanly and fails invisibly - the customer gets an HTML page saved as `.pdf`.
+Same reasoning as the backend's `inspect.getsource` one-resolver test.
+
+**`truncated` was missing from the `found` observation.**
+The panel's "keep typing to narrow" hint reads the flag off the `{coa:{…}}` side-channel, which did not carry it at all; adding it exposed that `_run_get_coa` only set it on the `multiple` branch.
+Unreachable at `MAX_RESULTS = 50` (a capped set is never a single result), but it would have said "here is your certificate" about one row out of many the moment any narrower cap existed.
+
+### 0.1 The browser pass - 2026-07-29
+
+Driven in a real browser, which found **four defects the whole test suite was green through**.
+Every one of them is a wiring or presentation bug, i.e. exactly the class a headless suite cannot see.
+
+Method, worth reusing: a throwaway **git worktree** with the Phase 3 diff applied, its `node_modules` symlinked, `next dev` on a spare port with the dev API proxy pointed at a **stub backend**, and `/embed/{anything}` as the entry point.
+The stub replaces only what needs production data - widget auth (the raw `api_key` is unrecoverable by design, being stored as SHA-256) and the company row (no bot has a COA folder, and this backend writes the **prod** control DB) - while `coa_drive.search`, `display`, `to_payload` and the real chemical pack's hub cards are the real code, fed the §3 fixture filenames.
+The worktree is what makes this safe: no prod write, no edit to the shared `next.config.mjs`, and no disturbance to the dev servers already running on :3000 and :8000.
+Turbopack rejects a `node_modules` symlink pointing outside the project root, so the dev server runs `--webpack`.
+
+| Defect | Why no test caught it |
+|---|---|
+| The chat path prefilled the search box with the model's raw prose, so the field showed the tail of "…batch 100.26R016. Can I get the COA?" | The prefill was *specified* (mirroring `openSdsPickerWithResult`); only seeing it renders shows that SDS prefills a clean product name while §7.1's slot holds a whole sentence |
+| Leaving the box empty then hid the rows: the search effect's below-the-floor branch nulled `results` on the panel's first render, wiping the chat-delivered rows | A unit test on `coaListState` cannot see an effect firing on mount. Fixed by moving the clear to `onCoaQueryChange`, where the visitor's own edit is - which also dropped the `set-state-in-effect` lint warning |
+| A single chat match rendered the same row again directly under the pinned card, headerless | `others = results.filter(r => r.id !== selected?.id)` is obvious once seen and invisible in a payload assertion |
+| With Drive down, the "Other matches" header sat directly above the error text, labelling it | Both states were individually correct; only the combination is wrong |
+
+Confirmed working, in both themes: the card is live with no "Coming soon"; the panel opens empty (D1); one keystroke fires no request and ten keystrokes fire exactly one (debounce); `100.26R016` returns the three grades (F1); a description-only query works; `ZZ.99Q999` gives the no-match copy; tapping pins with Open + Download and leaves the list live; **H8 verified at runtime** - the Download handler's fetch *and* its `window.open` fallback both target `uc?export=download`, while Open uses the viewer link; **H12 verified both ways**; the cap hint appears only when the server sets `truncated`; a chat request opens the panel with rows and a clean box, pinning only an unambiguous match (D5); and a dead backend gives "We couldn't reach the document library" + Retry with the pinned certificate still in hand (H15/H11), never "no certificate exists".
 
 ### Decisions taken during the build
 
@@ -86,7 +129,7 @@ The panel should still debounce rather than search per keystroke.
 ### Known gaps, in priority order
 
 1. ~~**Open decision - `MAX_FILES` vs a Postgres index.**~~ **Closed 2026-07-29 - see §6.1.** Cap raised to 25,000 after making a listing cheap enough that the raise costs nothing.
-2. **Only the dashboard UI is now unexercised.** `/api/widget/coa` and `get_coa` were driven against the real DB row, Redis, Drive and a real model call on 2026-07-29 (§7.1) - which is how the conversational-query bug was found. `CoaFolderField.tsx` and Test Connection have still only run under vitest; a Vercel preview off this branch is the cleanest place to close that.
+2. **What is still unexercised, after the browser pass (§0.1).** The COA panel has now run in a real browser, but against a stub company and fixture filenames; the **owner dashboard** (`CoaFolderField.tsx` + Test Connection) has still only run under vitest, and nothing has ever run the panel against a real bot with a real folder. Both need the same thing: a chemical bot whose `pack_overrides.coa.folder_id` is set, which is a write to the production control DB and is Q7's open question. A Vercel preview off this branch closes both at once - the owner saves the folder through the dashboard, which is also how Test Connection gets exercised.
 3. **H5 is open** - `/api/widget/coa` can be driven to walk Drive repeatedly. What exists is an in-process 60s cooldown plus a rule that only a miss against a *cached* listing re-walks; that is not H5, which needs the Redis single-flight to be correct across workers.
 4. **H15 is partial** - Drive 403/404/5xx are classified and mapped to distinct owner- and visitor-facing outcomes, but there is no retry with backoff yet.
 5. The `coa` hub card stays `disabled=True` until §13.1 is empty.
@@ -360,10 +403,12 @@ As with SDS, the model confirms and routes - never pastes a link, never states a
   Description states: returns a link only, never assay values.
 - Rate limits matching the SDS endpoints (30/min per IP, 60/min per key).
 
-### Phase 3 - widget
-- New `coa_picker` hub-card action + `features.coa_picker` flag, parallel to `sds_picker`.
-- Panel per §8; remove `disabled=True` from the `coa` hub card.
+### Phase 3 - widget - built 2026-07-29
+- New `coa_picker` hub-card action + `features.coa_picker` flag, parallel to `sds_picker` but additionally gated on the company's folder (see the Phase 3 decisions in §0).
+- Panel per §8; `disabled=True` removed from the `coa` hub card.
 - Degrades to the `tool` mini-form if the flag is off, same fallback contract as `sds_picker`.
+- Chat entry: the `{coa:{…}}` side-channel opens the same panel, pinning a single match and listing several (D5).
+- H12 closed both ways; H8 closed in the widget.
 
 ### Phase 4 - owner visibility
 - Dashboard panel: file count, folder count, last refresh, duplicate filenames (F4), and files with too few tokens to be findable.
@@ -501,6 +546,9 @@ The `multiple` tool status must also tell the model the panel is already showing
 - Cache tiers (§6.1): compressed round trip; an uncompressed entry from an older deploy still reads; undecodable bytes are a miss, not an exception; a memo hit reads neither Redis nor Drive; a Redis hit warms the memo; `force` bypasses and replaces the memo; the memo expires on the TTL, is bounded, evicts least-recently-used, and never shares an entry between tenants.
 - Security: COA folder ID absent from `/api/config`.
 - Config: a non-chemical bot 404s on the COA endpoint.
+- Phase 3 panel: the prompt shows whenever the panel holds no rows; chat-delivered rows render with an empty box; clearing the box falls back to the prompt; "no answer yet" is distinct from "nothing matched"; an error or an unconfigured folder outranks any result state.
+- Phase 3 flag: `features.coa_picker` is true only with a folder saved, false for a chemical bot without one, and neither picker flag can open the other picker's panel.
+- Phase 3 chat entry: rows + cap flag survive the side-channel and the prose query is dropped; a payload with no rows opens no panel; one match pins and several do not (D5).
 
 Hardening (§10), one test each:
 
@@ -542,12 +590,15 @@ H4 (visited-set) and H14 (page cap) join them: both are a few lines and both pre
 | H15 | Drive 403 retry with backoff, then handoff | 1 | §12 H15 | **Partial** - classified and mapped; no retry yet |
 | H10 | `get_coa` returns status + count, never raw filenames | 2 | §12 H10 | **Done** |
 | H11 | No folder ID in visitor-facing error text | 2 | §12 H11 | **Done** |
-| H8 | Download targets `uc?export=download`, not `webViewLink` | 3 | §12 H8 | **Done early** - `CoaDocument.download_url`; the widget still has to use it |
-| H12 | Opening either panel closes the other | 3 | §12 H12 | Open - Phase 3 |
+| H8 | Download targets `uc?export=download`, not `webViewLink` | 3 | §12 H8 | **Done** - `CoaDocument.download_url`, and the panel's Download button uses it (asserted against the source) |
+| H12 | Opening either panel closes the other | 3 | §12 H12 | **Done** - `openCoaPicker`/`openCoaPickerWithResults` close the SDS panel and the sample form; `openSdsPicker`/`openSdsPickerWithResult`/`openSampleForm` close the COA panel |
 | H16 | Duplicate-filename report (safety net for the dedup assumption) | 4 | - | Open - `duplicate_names()` exists, no panel yet |
 
-So §13.1 is down to **H5, H15, H12 and H16**.
+So §13.1 is down to **H5, H15 and H16**.
 H5's cooldown value is deliberately unset until we have measured a real walk.
+
+**The `coa` hub card is now enabled** (`disabled=True` removed, per Phase 3), so the merge to MainV2 - not the flag - is what gates this from production while H5, H15 and H16 are open.
+That matches §13's "local and staging run wide open in the meantime", but it does mean this branch must not merge until that list is empty.
 
 ### 13.2 Open questions - need the owner or the client
 

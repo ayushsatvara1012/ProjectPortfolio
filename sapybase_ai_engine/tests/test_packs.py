@@ -170,6 +170,14 @@ class TestQualificationSlots:
         assert card_by_id["sample"].action == "form" and card_by_id["sample"].form_id == "sample"
         assert "request_sample" in live_tools
         assert card_by_id["ask"].action == "chat"  # chat card needs no tool
+        # coa-finder-plan Phase 3: the COA card is live (no longer "Coming soon")
+        # and points at the certificate panel, keeping the mini-form fields as the
+        # fallback for a bot with no Drive folder (features.coa_picker false).
+        assert card_by_id["coa"].action == "coa_picker" and "get_coa" in live_tools
+        assert not card_by_id["coa"].disabled
+        assert card_by_id["coa"].prompt_template and card_by_id["coa"].input_label
+        # D4 — COA is isolated from the catalog, so the fallback field is free text.
+        assert card_by_id["coa"].input_source == ""
 
     def test_hub_cards_payload_is_json_serializable(self):
         import json

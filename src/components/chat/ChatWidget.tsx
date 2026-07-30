@@ -8,6 +8,16 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import ThinkingLogo from './ThinkingLogo';
+import {
+  COA_MIN_QUERY_CHARS,
+  coaListState,
+  coaPinnedRow,
+  hubCardTarget,
+  parseCoaEvent,
+  type CoaRow,
+  type HubCardAction,
+  type WidgetFeatures,
+} from './panels';
 import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
 import { FAB_SHAPES, resolveAvatarBg } from '../ui/avatar/AvatarShared';
 import {
@@ -542,11 +552,7 @@ type HubCard = {
   id: string;
   label: string;
   icon: string;
-  // "form" opens a structured intake form; "sds_picker" (get-sds-crash-fix-plan
-  // Phase 5, D10) opens the deterministic Get-SDS product picker instead of the
-  // conversational mini-form — falls back to "tool" behavior if
-  // features.sds_picker is false.
-  action: 'tool' | 'chat' | 'form' | 'sds_picker';
+  action: HubCardAction;
   subtitle?: string;
   input_label?: string;
   prompt_template?: string;
@@ -593,7 +599,7 @@ type ConfigData = {
   handoff_redirect_url?: string;
   // get-sds-crash-fix-plan Phase 4 — config-registry-driven gate for the
   // deterministic Get-SDS picker (never a hardcoded vertical check).
-  features?: { sds_picker?: boolean };
+  features?: WidgetFeatures;
 };
 
 // ── Stream-safe Markdown sanitizer ───────────────────────────────────────────
@@ -1294,7 +1300,7 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
                   style={{ borderColor: themeColor, color: themeColor }}>
                   <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                 </a>
-                <button type="button" onClick={() => downloadSds(selected.url, `${selected.product || 'safety-data-sheet'}.pdf`)}
+                <button type="button" onClick={() => downloadDocument(selected.url, `${selected.product || 'safety-data-sheet'}.pdf`)}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
                   style={{ borderColor: themeColor, color: themeColor }}>
                   <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
@@ -1344,15 +1350,165 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
   );
 }
 
-// Best-effort real download for an SDS: an <a download> is silently ignored
+// coa-finder-plan Phase 3 — the certificate search panel (§8 "The COA panel").
+// Deliberately NOT a copy of SdsPicker's shape: that panel opens with the whole
+// product list and filters it, while this one opens EMPTY (D1) and renders
+// nothing until the visitor types, so a company's production history is never
+// on display. There is no full listing to prefetch, hence no `loading` state —
+// only `searching`, which belongs to the query the visitor is typing.
+//
+// Rows carry no labelled fields because nothing was parsed into any (D2): a row
+// is the filename cleaned up, e.g. `100RG · 100.26R016 · ACETONE RG`.
+function CoaPicker({ results, searching, truncated, configured, error, query, selected, themeColor, fromChat, onQueryChange, onSelect, onRetry, onCancel }: {
+  results: CoaRow[] | null;
+  searching: boolean;
+  truncated: boolean;
+  configured: boolean;
+  error: string | null;
+  query: string;
+  selected: CoaRow | null;
+  themeColor: string;
+  fromChat: boolean;
+  onQueryChange: (q: string) => void;
+  onSelect: (row: CoaRow) => void;
+  onRetry: () => void;
+  onCancel: () => void;
+}) {
+  const listState = coaListState(configured, error, query, results);
+  // The list below the pinned card is the OTHER matches, so the pinned certificate
+  // is not repeated directly beneath itself — which is what a single chat-typed match
+  // did, rendering the same row twice with nothing to explain the second one.
+  const others = (results ?? []).filter(row => row.id !== selected?.id);
+  return (
+    <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
+        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
+          className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors shrink-0">
+          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
+        </button>
+        <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+          <MIcon name="search" className="text-[16px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
+          <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
+            placeholder="Product code or batch number" aria-label="Search certificates"
+            className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
+          {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
+        </div>
+      </div>
+
+      {selected && (
+        <div className="px-3.5 pt-3 shrink-0">
+          <div className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: themeColor }}>
+              <MIcon name="verified" className="text-[16px] leading-none" />
+              Certificate of Analysis
+            </div>
+            <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
+              <div className="font-bold break-words">{selected.display}</div>
+              {selected.modified_at && (
+                <div className="text-[12px] text-slate-500 dark:text-slate-400">
+                  Released {formatRelativeDate(selected.modified_at)}
+                </div>
+              )}
+              <div className="mt-2 flex items-center gap-2">
+                {selected.view_url && (
+                  <a href={selected.view_url} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, color: themeColor }}>
+                    <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
+                  </a>
+                )}
+                {selected.download_url && (
+                  // H8 — download_url, never view_url: a Drive webViewLink is an
+                  // HTML viewer page, so saving that blob as .pdf hands the
+                  // customer a corrupt file.
+                  <button type="button" onClick={() => downloadDocument(selected.download_url!, `${selected.display || 'certificate-of-analysis'}.pdf`)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, color: themeColor }}>
+                    <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selected && others.length > 0 && listState === 'results' && (
+        // Gated on the list actually rendering rows: an error or an emptied box
+        // replaces the list, and the header would otherwise sit above the error
+        // text, labelling it "other matches".
+        <div className="px-3.5 pt-3 shrink-0 text-[10.5px] font-google font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          Other matches
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+        {listState === 'unconfigured' ? (
+          <div className="flex items-center justify-center py-12 text-center text-slate-400 dark:text-slate-500 text-[13px] font-google px-4">
+            Certificate lookup isn&apos;t set up yet. Ask in the chat and our team will send yours over.
+          </div>
+        ) : listState === 'error' ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <span className="text-[13px] font-google text-red-500">{error}</span>
+            <button type="button" onClick={onRetry}
+              className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              Retry
+            </button>
+          </div>
+        ) : listState === 'prompt' ? (
+          // The empty state IS the design (D1): no listing is rendered until the
+          // visitor names something they are holding.
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center px-6">
+            <MIcon name="verified" className="text-[30px] leading-none text-slate-300 dark:text-slate-600" />
+            <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
+              Type the product code or batch number printed on your drum, label or invoice.
+            </span>
+          </div>
+        ) : listState === 'searching' ? (
+          <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
+            Searching…
+          </div>
+        ) : listState === 'empty' ? (
+          <div className="flex items-center justify-center py-12 text-center text-slate-400 dark:text-slate-500 text-[13px] font-google px-4">
+            No certificate matched that code. Check it against your label, or ask us in the chat.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {others.map(row => (
+              <button key={row.id} type="button" onClick={() => onSelect(row)}
+                className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <span className="text-[13.5px] font-google text-slate-800 dark:text-slate-200 break-words">{row.display}</span>
+                {row.modified_at && (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{formatRelativeDate(row.modified_at)}</span>
+                )}
+              </button>
+            ))}
+            {truncated && (
+              // Measured against the real folder: `acetone` and `P001` both hit
+              // the server's 50-row cap, so this hint is functional, not decoration.
+              <p className="pt-2 px-1 text-[11.5px] font-google text-slate-400 dark:text-slate-500 leading-snug">
+                Showing the closest {results?.length ?? 0} — keep typing to narrow it down.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Best-effort real download for a document: an <a download> is silently ignored
 // by the browser for cross-origin URLs (no way around that from script), so
 // this fetches the file and saves it via a blob URL when the host's CORS
 // headers allow it, falling back to the old "open in a new tab" behavior —
-// never worse than before, just better when the host cooperates.
-async function downloadSds(url: string, filename: string) {
+// never worse than before, just better when the host cooperates. Google Drive
+// does not send CORS headers, so a COA takes the open-in-a-tab path, which is
+// exactly what the uc?export=download URL is for.
+async function downloadDocument(url: string, filename: string) {
   try {
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`SDS download failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1607,6 +1763,20 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // SDS" hub card) — only that path shows "Back to chat" in the header, since
   // only that path actually interrupted an in-progress chat turn.
   const [sdsFromChat, setSdsFromChat] = useState(false);
+  // coa-finder-plan Phase 3 — the certificate search panel. No cached "all
+  // certificates" list on purpose (D1: search-first, never browsable), so every
+  // keystroke is served by the debounced /api/widget/coa query and `coaResults`
+  // is null until the first response lands. `coaConfigured` tracks the endpoint
+  // telling us the folder went away since /api/config was cached.
+  const [coaPickerOpen, setCoaPickerOpen] = useState(false);
+  const [coaQuery, setCoaQuery] = useState('');
+  const [coaResults, setCoaResults] = useState<CoaRow[] | null>(null);
+  const [coaTruncated, setCoaTruncated] = useState(false);
+  const [coaConfigured, setCoaConfigured] = useState(true);
+  const [coaSearching, setCoaSearching] = useState(false);
+  const [coaError, setCoaError] = useState<string | null>(null);
+  const [coaSelected, setCoaSelected] = useState<CoaRow | null>(null);
+  const [coaFromChat, setCoaFromChat] = useState(false);
   // Phase 4 — the "View & share quote" modal opened from a quote card's
   // deterministic button (same pattern as the SDS button: the model never
   // fabricates the link, the widget renders it from the structured payload).
@@ -1837,20 +2007,25 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // slot mini-form. Submitting the form fills {value} into the card's template
   // and sends it — driving the existing agent loop to the card's tool.
   const handleHubCardTap = (card: HubCard) => {
-    if (card.action === 'chat') {
-      setActiveHubCard(null);
-      inputRef.current?.focus();
-      return;
-    }
-    if (card.action === 'form') {
-      openSampleForm({});
-      return;
-    }
-    // D10: only take the deterministic-picker path while the config-registry
-    // flag is on; otherwise this card degrades to the "tool" mini-form below.
-    if (card.action === 'sds_picker' && configData.features?.sds_picker) {
-      openSdsPicker();
-      return;
+    // D10: a "*_picker" card only takes the deterministic-panel path while its
+    // config-registry flag is on. With the flag off — which for COA means this bot
+    // has no Drive folder — hubCardTarget returns "tool" and the card degrades to
+    // the mini-form, whose message reaches the agent and gets a handoff instead of
+    // a panel that could only say "not set up".
+    switch (hubCardTarget(card.action, configData.features)) {
+      case 'chat':
+        setActiveHubCard(null);
+        inputRef.current?.focus();
+        return;
+      case 'form':
+        openSampleForm({});
+        return;
+      case 'sds_picker':
+        openSdsPicker();
+        return;
+      case 'coa_picker':
+        openCoaPicker();
+        return;
     }
     setActiveHubCard(card);
     setHubInput('');
@@ -1871,6 +2046,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const openSampleForm = (prefill: Record<string, string>) => {
     setActiveHubCard(null);
     setSdsPickerOpen(false);
+    setCoaPickerOpen(false);
     setHubView('chat');
     setSampleError(null);
     setSampleFormPrefill(prefill || {});
@@ -1949,6 +2125,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const openSdsPicker = () => {
     setActiveHubCard(null);
     setSampleFormOpen(false);
+    setCoaPickerOpen(false);   // H12 — only one panel ever replaces the chat body
     setHubView('chat');
     setSdsQuery('');
     setSdsSearchResults(null);
@@ -1967,6 +2144,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   const openSdsPickerWithResult = (sds: SdsResult) => {
     setActiveHubCard(null);
     setSampleFormOpen(false);
+    setCoaPickerOpen(false);   // H12
     setHubView('chat');
     setSdsQuery(sds.product || '');
     setSdsSearchResults(null);
@@ -2017,6 +2195,115 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // written to chat, this is a static search, not a conversation turn.
   const selectSdsProduct = (p: SdsProduct) => {
     setSdsSelected({ url: p.sds_url, product: p.name, cas_number: p.cas_number, updated_at: p.updated_at, label: 'Open SDS' });
+  };
+
+  // coa-finder-plan Phase 3 — open the certificate panel from the "Request COA"
+  // hub card. H12: the SDS panel and the sample form both replace the chat body
+  // too, so opening this one closes them.
+  const openCoaPicker = () => {
+    setActiveHubCard(null);
+    setSampleFormOpen(false);
+    setSdsPickerOpen(false);
+    setHubView('chat');
+    setCoaQuery('');
+    setCoaResults(null);
+    setCoaTruncated(false);
+    setCoaConfigured(true);
+    setCoaError(null);
+    setCoaSelected(null);
+    setCoaFromChat(false);
+    setCoaPickerOpen(true);
+  };
+
+  // A chat-typed request ("COA for batch 100.26R016") resolves through the agent's
+  // get_coa tool, which emits its rows as a {coa:{...}} side-channel — never a link
+  // in the model's text. That opens the SAME panel the hub card does: one match pins
+  // immediately, several list for the visitor to pick from (§8 "Chat entry").
+  // Mirrors openSdsPickerWithResult, except the search box is left EMPTY rather than
+  // prefilled — openSdsPickerWithResult can prefill a clean product name, while the
+  // COA tool's slot holds the visitor's whole sentence.
+  const openCoaPickerWithResults = (rows: CoaRow[], truncated: boolean) => {
+    setActiveHubCard(null);
+    setSampleFormOpen(false);
+    setSdsPickerOpen(false);
+    setHubView('chat');
+    setCoaQuery('');
+    setCoaResults(rows);
+    setCoaTruncated(truncated);
+    setCoaConfigured(true);
+    setCoaError(null);
+    setCoaSelected(coaPinnedRow(rows));
+    setCoaFromChat(true);
+    setCoaPickerOpen(true);
+  };
+
+  // Bumped by Retry to re-run the search effect for the query already in the box.
+  const [coaRetryNonce, setCoaRetryNonce] = useState(0);
+
+  // Dropping below the query floor clears the rows — but that belongs HERE, on the
+  // visitor's own edit, not in the search effect. Clearing there also fired on the
+  // effect's first run after openCoaPickerWithResults, wiping the chat-delivered
+  // rows the panel had just been opened to show.
+  const onCoaQueryChange = (q: string) => {
+    setCoaQuery(q);
+    if (q.trim().length < COA_MIN_QUERY_CHARS) {
+      setCoaResults(null);
+      setCoaTruncated(false);
+      setCoaSearching(false);
+    }
+  };
+
+  // Debounced certificate search. Unlike the SDS panel there is no cached list to
+  // filter client-side — the whole point of D1 is that no listing ever reaches the
+  // widget — so this is the only source of rows, and the debounce is a functional
+  // requirement: the server-side search is cheap but the corpus is thousands of
+  // files, and a request per keystroke would also be the H5 pressure valve.
+  useEffect(() => {
+    if (!coaPickerOpen) return;
+    const term = coaQuery.trim();
+    // Nothing to search below the floor. onCoaQueryChange owns clearing the rows,
+    // so this returns without touching state — which is also what keeps a panel
+    // opened from chat (rows, empty box) from clearing itself on mount.
+    if (term.length < COA_MIN_QUERY_CHARS) return;
+    if (!activeApiKey) return;
+    setCoaSearching(true);
+    let cancelled = false;
+    const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+    const handle = window.setTimeout(() => {
+      fetch(`${activeApiUrl}/api/widget/coa?q=${encodeURIComponent(term)}`, {
+        headers: {
+          'x-api-key': activeApiKey,
+          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+        },
+      })
+        .then(async res => {
+          if (cancelled) return;
+          if (!res.ok) {
+            // H15/H11 — a Drive outage is not "no certificate exists", and the
+            // visitor-facing text names neither the folder nor the failure.
+            setCoaError("We couldn't reach the document library. Please try again, or ask us in the chat.");
+            return;
+          }
+          const data = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          setCoaError(null);
+          setCoaConfigured(data.configured !== false);
+          setCoaResults(Array.isArray(data.results) ? data.results : []);
+          setCoaTruncated(Boolean(data.truncated));
+        })
+        .catch(() => {
+          if (!cancelled) setCoaError("We couldn't reach the document library. Please try again, or ask us in the chat.");
+        })
+        .finally(() => { if (!cancelled) setCoaSearching(false); });
+    }, 300);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+  }, [coaQuery, coaPickerOpen, coaRetryNonce, activeApiUrl, activeApiKey]);
+
+  // Picking a row pins it above the search box and leaves the list live below,
+  // the persistent-panel behaviour the SDS panel established (Option A) — nothing
+  // is written to chat, this is a static lookup and not a conversation turn.
+  const selectCoaRow = (row: CoaRow) => {
+    setCoaSelected(row);
   };
 
   // Thumbs up/down on a bot reply (vertical intelligence plan, Phase 2a).
@@ -2243,6 +2530,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // Never attached to the bot message (sds-persistent-panel plan): the
     // result lives only in the panel, isolated from the chat transcript.
     let pendingSds: SdsResult | null = null;
+    // Same mechanism for certificates (a {coa:{status,results,query}} event): the
+    // rows go to the panel, never into the transcript, and the model's own reply
+    // only ever says how many matched (H10 — it is never shown a filename).
+    let pendingCoa: { rows: CoaRow[]; truncated: boolean } | null = null;
     // Structured quote card emitted by the agent stream (a {quote:{...}} event);
     // captured here and attached to the bot message on [DONE], like pendingSds.
     let pendingQuote: Message['quote'] | null = null;
@@ -2357,6 +2648,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // resolved product pinned (sds-persistent-panel plan), isolated
             // from the transcript. Same "after the reply" precedent as pendingForm.
             if (pendingSds) openSdsPickerWithResult(pendingSds);
+            // Free-text COA intent → the certificate panel, same "after the reply"
+            // ordering so the bot's "3 certificates matched" lands first.
+            if (pendingCoa) openCoaPickerWithResults(pendingCoa.rows, pendingCoa.truncated);
             // Never move the viewport on completion — keep the user exactly where
             // they are for reading continuity. If the finished answer extends below
             // the fold, surface the "new message" pill so they can jump down when
@@ -2393,6 +2687,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // (no raw link typed by the model).
             if (parsed.sds && typeof parsed.sds.url === 'string') {
               pendingSds = { url: parsed.sds.url, product: parsed.sds.product, cas_number: parsed.sds.cas_number, updated_at: parsed.sds.updated_at, label: parsed.sds.label };
+              return;
+            }
+            // Structured side-channel: {coa:{status,results,query}} from the get_coa
+            // tool. Only the found/multiple statuses carry rows at all — not_found,
+            // not_configured and unavailable never emit this event, so the panel
+            // opens exactly when there is something in it to show.
+            if (parsed.coa) {
+              pendingCoa = parseCoaEvent(parsed);
               return;
             }
             // Structured side-channel: the agent emits {quote:{...}} with the
@@ -2673,7 +2975,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && !coaPickerOpen && (
               <div className={`flex-1 relative flex flex-col min-h-0 text-slate-900 dark:text-slate-100 bg-transparent`}>
                 {showJumpPill && (
                   <button
@@ -2925,6 +3227,24 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               />
             )}
 
+            {view === 'chat' && hubView === 'chat' && coaPickerOpen && (
+              <CoaPicker
+                results={coaResults}
+                searching={coaSearching}
+                truncated={coaTruncated}
+                configured={coaConfigured}
+                error={coaError}
+                query={coaQuery}
+                selected={coaSelected}
+                themeColor={THEME_COLOR}
+                fromChat={coaFromChat}
+                onQueryChange={onCoaQueryChange}
+                onSelect={selectCoaRow}
+                onRetry={() => { setCoaError(null); setCoaRetryNonce(n => n + 1); }}
+                onCancel={() => setCoaPickerOpen(false)}
+              />
+            )}
+
             {view === 'chat' && hubView === 'home' && hasHub && (
               // Home screen — 2-col action grid + pill Home/Chat nav + Vaayu footer
               // (chemical Figma). Background is transparent: the gradient is painted
@@ -2990,7 +3310,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && !coaPickerOpen && (
               <div className={`shrink-0 z-10 flex flex-col bg-transparent`}>
                 {!activeHubCard && messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 && (
                   <div className="flex flex-col items-start gap-2 px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">
