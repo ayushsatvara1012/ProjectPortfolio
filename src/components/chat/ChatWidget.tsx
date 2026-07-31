@@ -1442,6 +1442,16 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
         <p className="pt-1.5 px-1 text-[11.5px] font-google text-slate-400 dark:text-slate-500 leading-snug">
           Enter your product code and batch number, exactly as printed on your drum, label or invoice.
         </p>
+        {/* Search is exact-token matching (services/coa_drive.py MIN_QUERY_TOKENS),
+            so the space between code and batch is what lets it recognize both. */}
+        <div className="pt-1.5 px-1 text-[11px] font-google text-slate-400 dark:text-slate-500 leading-snug">
+          <p>Type both, with a space between them — the order doesn&apos;t matter, just make sure there&apos;s a space and not a dash, slash or comma. For example:</p>
+          <ul className="mt-0.5 space-y-0.5 text-slate-500 dark:text-slate-400">
+            <li>ABC-2201 L045B</li>
+            <li>B23.0456 7X100RG</li>
+            <li>PRD450 BATCH19K</li>
+          </ul>
+        </div>
       </form>
 
       <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
