@@ -1424,8 +1424,8 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
       <form
         onSubmit={e => { e.preventDefault(); onSubmit(); }}
         className="px-3.5 pt-3 pb-1 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+        <div className="flex items-stretch gap-2">
+          <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-l-full rounded-r-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
             <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
               disabled={inputDisabled}
               placeholder="e.g. 100RG 100.26R016" aria-label="Product code and batch number"
@@ -1433,7 +1433,7 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
             {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
           </div>
           <button type="submit" disabled={inputDisabled || searching || !query.trim()}
-            className="shrink-0 px-4 py-2 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="shrink-0 px-4 py-2 rounded-l-xl rounded-r-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
             style={{ backgroundColor: themeColor }}>
             Request
           </button>
