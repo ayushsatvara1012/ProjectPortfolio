@@ -9,11 +9,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import ThinkingLogo from './ThinkingLogo';
 import {
-  COA_MIN_QUERY_CHARS,
-  coaListState,
-  coaPinnedRow,
+  COA_LOCKED_MESSAGE,
+  COA_OUTAGE_MESSAGE,
+  COA_REFUSED_MESSAGE,
+  coaOutcome,
+  coaPanelState,
   hubCardTarget,
   parseCoaEvent,
+  parseCoaLockout,
   type CoaRow,
   type HubCardAction,
   type WidgetFeatures,
@@ -696,6 +699,7 @@ const ICON_PATHS: Record<string, { d: string; fill?: boolean; vb?: string }> = {
   science: { d: 'M13 11.33L18 18H6l5-6.67V6h2m2-2H7v2h2v4L3 18c-.67.89-.33 2 1 2h16c1.33 0 1.67-1.11 1-2l-6-8V6h2V4z', fill: true },
   verified: { d: 'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.24 13.94l-3.51-3.51 1.41-1.41 2.1 2.1 5.1-5.1 1.41 1.41-6.51 6.51z', fill: true },
   forum: { d: 'M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z', fill: true },
+  lock: { d: 'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z', fill: true },
 };
 
 const ICON_COMPONENTS: Record<string, React.ComponentType<any>> = {
@@ -1350,35 +1354,60 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
   );
 }
 
-// coa-finder-plan Phase 3 — the certificate search panel (§8 "The COA panel").
-// Deliberately NOT a copy of SdsPicker's shape: that panel opens with the whole
-// product list and filters it, while this one opens EMPTY (D1) and renders
-// nothing until the visitor types, so a company's production history is never
-// on display. There is no full listing to prefetch, hence no `loading` state —
-// only `searching`, which belongs to the query the visitor is typing.
+// The certificate panel (coa-confidential-access §6). Not a search: one field, one
+// Request button, and either the certificate the visitor asked for or one refusal
+// that says nothing about the library.
 //
-// Rows carry no labelled fields because nothing was parsed into any (D2): a row
-// is the filename cleaned up, e.g. `100RG · 100.26R016 · ACETONE RG`.
-function CoaPicker({ results, searching, truncated, configured, error, query, selected, themeColor, fromChat, onQueryChange, onSelect, onRetry, onCancel }: {
-  results: CoaRow[] | null;
+// Search-as-you-type is gone with the search itself. A live list was what published
+// the client's production history — every row carried a product code, batch and
+// release date, so `EP` returned 48 of them without a PDF being opened. Nothing
+// happens now until Request is pressed, which is also what keeps a customer
+// correcting a typo mid-entry from burning their allowance (C7).
+//
+// The certificate carries no labelled fields because nothing was parsed into any
+// (D2): it is the filename cleaned up, e.g. `100RG · 100.26R016 · ACETONE RG`.
+/**
+ * The way out of a dead end (plan L2).
+ *
+ * Every COA failure ends in "contact our support team", and that was an instruction
+ * with no button attached: the visitor had to go back to the chat and ask for the
+ * same thing again in their own words. This is the same handoff the ⋮ menu offers,
+ * so a refusal routes a confused human to a human in one press.
+ */
+function CoaSupportButton({ sent, onClick }: { sent: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={sent}
+      className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+      {sent ? 'Team notified ✓' : 'Contact support'}
+    </button>
+  );
+}
+
+export function CoaPicker({ result, refused, searching, lockedOut, configured, error, query, themeColor, fromChat, supportSent, onQueryChange, onSubmit, onCancel, onContactSupport }: {
+  result: CoaRow | null;
+  refused: boolean;
   searching: boolean;
-  truncated: boolean;
+  lockedOut: boolean;
   configured: boolean;
   error: string | null;
   query: string;
-  selected: CoaRow | null;
   themeColor: string;
   fromChat: boolean;
+  supportSent: boolean;
   onQueryChange: (q: string) => void;
-  onSelect: (row: CoaRow) => void;
-  onRetry: () => void;
+  onSubmit: () => void;
   onCancel: () => void;
+  onContactSupport: () => void;
 }) {
-  const listState = coaListState(configured, error, query, results);
-  // The list below the pinned card is the OTHER matches, so the pinned certificate
-  // is not repeated directly beneath itself — which is what a single chat-typed match
-  // did, rendering the same row twice with nothing to explain the second one.
-  const others = (results ?? []).filter(row => row.id !== selected?.id);
+  const state = coaPanelState({ configured, lockedOut, error, searching, result, refused });
+  // Non-null only in the 'released' state, so the card below reads the certificate
+  // without an assertion that would go on compiling if the precedence ever changed.
+  const released = state === 'released' ? result : null;
+  // Disabling the field is presentation and never the control (§5.1) — anyone can
+  // re-enable an input from devtools, so the backend refuses a locked-out request
+  // whatever this shows. It exists so a customer can SEE that the lookup has stopped
+  // answering, instead of typing into a box that silently cannot help them.
+  const inputDisabled = lockedOut || !configured;
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
@@ -1387,42 +1416,96 @@ function CoaPicker({ results, searching, truncated, configured, error, query, se
           <MIcon name="arrow_back" className="text-[18px] leading-none" />
           {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
         </button>
-        <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
-          <MIcon name="search" className="text-[16px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
-          <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
-            placeholder="Product code or batch number" aria-label="Search certificates"
-            className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500" />
-          {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
-        </div>
+        <span className="text-[13.5px] font-google font-bold text-slate-800 dark:text-slate-100 truncate">
+          Certificate of Analysis
+        </span>
       </div>
 
-      {selected && (
-        <div className="px-3.5 pt-3 shrink-0">
+      <form
+        onSubmit={e => { e.preventDefault(); onSubmit(); }}
+        className="px-3.5 pt-3 pb-1 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+            <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
+              disabled={inputDisabled}
+              placeholder="e.g. 100RG 100.26R016" aria-label="Product code and batch number"
+              className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:cursor-not-allowed disabled:opacity-60" />
+            {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
+          </div>
+          <button type="submit" disabled={inputDisabled || searching || !query.trim()}
+            className="shrink-0 px-4 py-2 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ backgroundColor: themeColor }}>
+            Request
+          </button>
+        </div>
+        {/* There are no field labels to carry the format, so this does (§6). */}
+        <p className="pt-1.5 px-1 text-[11.5px] font-google text-slate-400 dark:text-slate-500 leading-snug">
+          Enter your product code and batch number, exactly as printed on your drum, label or invoice.
+        </p>
+      </form>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+        {state === 'unconfigured' ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
+            <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
+              Certificate lookup isn&apos;t set up yet. Our team can send yours over.
+            </span>
+            <CoaSupportButton sent={supportSent} onClick={onContactSupport} />
+          </div>
+        ) : state === 'locked' ? (
+          // No countdown, deliberately: "try again in 14:32" hands over the exact
+          // window and invites the visitor to wait it out. The route offered is
+          // support, not patience.
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-6">
+            <MIcon name="lock" className="text-[30px] leading-none text-slate-300 dark:text-slate-600" />
+            <span className="text-[13px] font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+              {COA_LOCKED_MESSAGE}
+            </span>
+            {/* The one state where this button is the ONLY way forward: the field
+                and Request are both disabled, and there is no countdown to wait on. */}
+            <CoaSupportButton sent={supportSent} onClick={onContactSupport} />
+          </div>
+        ) : state === 'error' ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-6">
+            <span className="text-[13px] font-google text-red-500">{error}</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onSubmit}
+                className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                Retry
+              </button>
+              <CoaSupportButton sent={supportSent} onClick={onContactSupport} />
+            </div>
+          </div>
+        ) : state === 'searching' ? (
+          <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
+            Checking…
+          </div>
+        ) : released ? (
           <div className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: themeColor }}>
               <MIcon name="verified" className="text-[16px] leading-none" />
               Certificate of Analysis
             </div>
             <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
-              <div className="font-bold break-words">{selected.display}</div>
-              {selected.modified_at && (
+              <div className="font-bold break-words">{released.display}</div>
+              {released.modified_at && (
                 <div className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Released {formatRelativeDate(selected.modified_at)}
+                  Released {formatRelativeDate(released.modified_at)}
                 </div>
               )}
               <div className="mt-2 flex items-center gap-2">
-                {selected.view_url && (
-                  <a href={selected.view_url} target="_blank" rel="noopener noreferrer"
+                {released.view_url && (
+                  <a href={released.view_url} target="_blank" rel="noopener noreferrer"
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
                     style={{ borderColor: themeColor, color: themeColor }}>
                     <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                   </a>
                 )}
-                {selected.download_url && (
+                {released.download_url && (
                   // H8 — download_url, never view_url: a Drive webViewLink is an
                   // HTML viewer page, so saving that blob as .pdf hands the
                   // customer a corrupt file.
-                  <button type="button" onClick={() => downloadDocument(selected.download_url!, `${selected.display || 'certificate-of-analysis'}.pdf`)}
+                  <button type="button" onClick={() => downloadDocument(released.download_url!, `${released.display || 'certificate-of-analysis'}.pdf`)}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
                     style={{ borderColor: themeColor, color: themeColor }}>
                     <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
@@ -1431,66 +1514,21 @@ function CoaPicker({ results, searching, truncated, configured, error, query, se
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {selected && others.length > 0 && listState === 'results' && (
-        // Gated on the list actually rendering rows: an error or an emptied box
-        // replaces the list, and the header would otherwise sit above the error
-        // text, labelling it "other matches".
-        <div className="px-3.5 pt-3 shrink-0 text-[10.5px] font-google font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-          Other matches
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
-        {listState === 'unconfigured' ? (
-          <div className="flex items-center justify-center py-12 text-center text-slate-400 dark:text-slate-500 text-[13px] font-google px-4">
-            Certificate lookup isn&apos;t set up yet. Ask in the chat and our team will send yours over.
+        ) : state === 'refused' ? (
+          // Identical for a wrong code, a wrong batch, a single word and a query that
+          // matched two hundred files (C3). It names no count and no near-miss.
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
+            <span className="text-[13px] font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+              {COA_REFUSED_MESSAGE}
+            </span>
+            <CoaSupportButton sent={supportSent} onClick={onContactSupport} />
           </div>
-        ) : listState === 'error' ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-            <span className="text-[13px] font-google text-red-500">{error}</span>
-            <button type="button" onClick={onRetry}
-              className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              Retry
-            </button>
-          </div>
-        ) : listState === 'prompt' ? (
-          // The empty state IS the design (D1): no listing is rendered until the
-          // visitor names something they are holding.
+        ) : (
           <div className="flex flex-col items-center justify-center gap-2 py-12 text-center px-6">
             <MIcon name="verified" className="text-[30px] leading-none text-slate-300 dark:text-slate-600" />
             <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
-              Type the product code or batch number printed on your drum, label or invoice.
+              Your certificate is released to the exact code and batch on your container.
             </span>
-          </div>
-        ) : listState === 'searching' ? (
-          <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
-            Searching…
-          </div>
-        ) : listState === 'empty' ? (
-          <div className="flex items-center justify-center py-12 text-center text-slate-400 dark:text-slate-500 text-[13px] font-google px-4">
-            No certificate matched that code. Check it against your label, or ask us in the chat.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {others.map(row => (
-              <button key={row.id} type="button" onClick={() => onSelect(row)}
-                className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                <span className="text-[13.5px] font-google text-slate-800 dark:text-slate-200 break-words">{row.display}</span>
-                {row.modified_at && (
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">{formatRelativeDate(row.modified_at)}</span>
-                )}
-              </button>
-            ))}
-            {truncated && (
-              // Measured against the real folder: `acetone` and `P001` both hit
-              // the server's 50-row cap, so this hint is functional, not decoration.
-              <p className="pt-2 px-1 text-[11.5px] font-google text-slate-400 dark:text-slate-500 leading-snug">
-                Showing the closest {results?.length ?? 0} — keep typing to narrow it down.
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -1763,20 +1801,21 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // SDS" hub card) — only that path shows "Back to chat" in the header, since
   // only that path actually interrupted an in-progress chat turn.
   const [sdsFromChat, setSdsFromChat] = useState(false);
-  // coa-finder-plan Phase 3 — the certificate search panel. No cached "all
-  // certificates" list on purpose (D1: search-first, never browsable), so every
-  // keystroke is served by the debounced /api/widget/coa query and `coaResults`
-  // is null until the first response lands. `coaConfigured` tracks the endpoint
-  // telling us the folder went away since /api/config was cached.
+  // The certificate panel (coa-confidential-access §6). Nothing is cached and
+  // nothing is listed: a lookup happens only when the visitor presses Request, and
+  // it returns their certificate or nothing at all. `coaConfigured` tracks the
+  // endpoint telling us the folder went away since /api/config was cached.
   const [coaPickerOpen, setCoaPickerOpen] = useState(false);
   const [coaQuery, setCoaQuery] = useState('');
-  const [coaResults, setCoaResults] = useState<CoaRow[] | null>(null);
-  const [coaTruncated, setCoaTruncated] = useState(false);
+  const [coaResult, setCoaResult] = useState<CoaRow | null>(null);
+  const [coaRefused, setCoaRefused] = useState(false);
   const [coaConfigured, setCoaConfigured] = useState(true);
   const [coaSearching, setCoaSearching] = useState(false);
   const [coaError, setCoaError] = useState<string | null>(null);
-  const [coaSelected, setCoaSelected] = useState<CoaRow | null>(null);
   const [coaFromChat, setCoaFromChat] = useState(false);
+  // Survives closing and reopening the panel, and a lookup arriving from the chat:
+  // a visitor inside a cooldown finds the field disabled however they reach it (§7).
+  const [coaLockedOut, setCoaLockedOut] = useState(false);
   // Phase 4 — the "View & share quote" modal opened from a quote card's
   // deterministic button (same pattern as the SDS button: the model never
   // fabricates the link, the widget renders it from the structured payload).
@@ -2197,113 +2236,106 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setSdsSelected({ url: p.sds_url, product: p.name, cas_number: p.cas_number, updated_at: p.updated_at, label: 'Open SDS' });
   };
 
-  // coa-finder-plan Phase 3 — open the certificate panel from the "Request COA"
-  // hub card. H12: the SDS panel and the sample form both replace the chat body
-  // too, so opening this one closes them.
+  // Open the certificate panel from the "Request COA" hub card. H12: the SDS panel
+  // and the sample form both replace the chat body too, so opening this one closes
+  // them. `coaLockedOut` is deliberately NOT reset — a cooldown belongs to the
+  // visitor, not to the panel, so closing and reopening must not clear it.
   const openCoaPicker = () => {
     setActiveHubCard(null);
     setSampleFormOpen(false);
     setSdsPickerOpen(false);
     setHubView('chat');
     setCoaQuery('');
-    setCoaResults(null);
-    setCoaTruncated(false);
+    setCoaResult(null);
+    setCoaRefused(false);
     setCoaConfigured(true);
     setCoaError(null);
-    setCoaSelected(null);
     setCoaFromChat(false);
     setCoaPickerOpen(true);
   };
 
-  // A chat-typed request ("COA for batch 100.26R016") resolves through the agent's
-  // get_coa tool, which emits its rows as a {coa:{...}} side-channel — never a link
-  // in the model's text. That opens the SAME panel the hub card does: one match pins
-  // immediately, several list for the visitor to pick from (§8 "Chat entry").
-  // Mirrors openSdsPickerWithResult, except the search box is left EMPTY rather than
-  // prefilled — openSdsPickerWithResult can prefill a clean product name, while the
-  // COA tool's slot holds the visitor's whole sentence.
-  const openCoaPickerWithResults = (rows: CoaRow[], truncated: boolean) => {
+  // A chat-typed request ("COA for 100RG batch 100.26R016") resolves through the
+  // agent's get_coa tool, which emits the certificate as a {coa:{...}} side-channel —
+  // never a link in the model's text. That opens the SAME panel the hub card does,
+  // already holding the released certificate. Mirrors openSdsPickerWithResult, except
+  // the field is left EMPTY rather than prefilled — openSdsPickerWithResult can
+  // prefill a clean product name, while the COA tool's slot holds whatever the model
+  // passed it, which reads as the tail of a question in a text box.
+  const openCoaPickerWithResult = (row: CoaRow) => {
     setActiveHubCard(null);
     setSampleFormOpen(false);
     setSdsPickerOpen(false);
     setHubView('chat');
     setCoaQuery('');
-    setCoaResults(rows);
-    setCoaTruncated(truncated);
+    setCoaResult(row);
+    setCoaRefused(false);
     setCoaConfigured(true);
     setCoaError(null);
-    setCoaSelected(coaPinnedRow(rows));
     setCoaFromChat(true);
     setCoaPickerOpen(true);
   };
 
-  // Bumped by Retry to re-run the search effect for the query already in the box.
-  const [coaRetryNonce, setCoaRetryNonce] = useState(0);
+  // Only the latest submission may write state. Two Requests in flight (a slow
+  // network, an impatient second press) would otherwise race, and the loser could
+  // paint a refusal over the certificate the winner just released.
+  const coaRequestId = useRef(0);
+  const coaLockTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (coaLockTimer.current) window.clearTimeout(coaLockTimer.current); }, []);
 
-  // Dropping below the query floor clears the rows — but that belongs HERE, on the
-  // visitor's own edit, not in the search effect. Clearing there also fired on the
-  // effect's first run after openCoaPickerWithResults, wiping the chat-delivered
-  // rows the panel had just been opened to show.
-  const onCoaQueryChange = (q: string) => {
-    setCoaQuery(q);
-    if (q.trim().length < COA_MIN_QUERY_CHARS) {
-      setCoaResults(null);
-      setCoaTruncated(false);
-      setCoaSearching(false);
-    }
+  // The lockout re-enables the field on its own once the window passes, without
+  // announcing it (§5.1). The timer is the INTERFACE catching up with the server, not
+  // the rule: the backend refuses every locked-out request regardless, so a fallback
+  // window that guesses low costs a refusal, never an unearned certificate.
+  const lockCoaPanel = (ms: number) => {
+    setCoaLockedOut(true);
+    if (coaLockTimer.current) window.clearTimeout(coaLockTimer.current);
+    coaLockTimer.current = window.setTimeout(() => setCoaLockedOut(false), ms);
   };
 
-  // Debounced certificate search. Unlike the SDS panel there is no cached list to
-  // filter client-side — the whole point of D1 is that no listing ever reaches the
-  // widget — so this is the only source of rows, and the debounce is a functional
-  // requirement: the server-side search is cheap but the corpus is thousands of
-  // files, and a request per keystroke would also be the H5 pressure valve.
-  useEffect(() => {
-    if (!coaPickerOpen) return;
+  // One lookup per Request press (C7) — no debounce, because there are no keystroke
+  // requests left to debounce, and a keystroke that could burn a miss would punish a
+  // customer for correcting their own typo.
+  const submitCoaLookup = () => {
     const term = coaQuery.trim();
-    // Nothing to search below the floor. onCoaQueryChange owns clearing the rows,
-    // so this returns without touching state — which is also what keeps a panel
-    // opened from chat (rows, empty box) from clearing itself on mount.
-    if (term.length < COA_MIN_QUERY_CHARS) return;
-    if (!activeApiKey) return;
+    if (!term || coaSearching || coaLockedOut || !coaConfigured || !activeApiKey) return;
+    const id = ++coaRequestId.current;
     setCoaSearching(true);
-    let cancelled = false;
+    setCoaError(null);
+    setCoaResult(null);
+    setCoaRefused(false);
     const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
-    const handle = window.setTimeout(() => {
-      fetch(`${activeApiUrl}/api/widget/coa?q=${encodeURIComponent(term)}`, {
-        headers: {
-          'x-api-key': activeApiKey,
-          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
-        },
+    // visitor_id is what the throttle binds to (§5): sessionId rotates on "New
+    // conversation", so a cooldown bound to it would survive exactly one click.
+    const visitor = visitorIdRef.current ? `&visitor_id=${encodeURIComponent(visitorIdRef.current)}` : '';
+    fetch(`${activeApiUrl}/api/widget/coa?q=${encodeURIComponent(term)}${visitor}`, {
+      headers: {
+        'x-api-key': activeApiKey,
+        ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+      },
+    })
+      .then(async res => {
+        if (id !== coaRequestId.current) return;
+        const outcome = coaOutcome(res.status, await res.json().catch(() => null));
+        if (id !== coaRequestId.current) return;
+        if (outcome.kind === 'locked') {
+          lockCoaPanel(outcome.lockoutMs);
+          return;
+        }
+        if (outcome.kind === 'outage') {
+          // H15/H11 — a Drive outage is not "no certificate exists", and the
+          // visitor-facing text names neither the folder nor the failure.
+          setCoaError(COA_OUTAGE_MESSAGE);
+          return;
+        }
+        setCoaError(null);
+        setCoaConfigured(outcome.configured);
+        setCoaResult(outcome.kind === 'released' ? outcome.row : null);
+        setCoaRefused(outcome.kind === 'refused');
       })
-        .then(async res => {
-          if (cancelled) return;
-          if (!res.ok) {
-            // H15/H11 — a Drive outage is not "no certificate exists", and the
-            // visitor-facing text names neither the folder nor the failure.
-            setCoaError("We couldn't reach the document library. Please try again, or ask us in the chat.");
-            return;
-          }
-          const data = await res.json().catch(() => ({}));
-          if (cancelled) return;
-          setCoaError(null);
-          setCoaConfigured(data.configured !== false);
-          setCoaResults(Array.isArray(data.results) ? data.results : []);
-          setCoaTruncated(Boolean(data.truncated));
-        })
-        .catch(() => {
-          if (!cancelled) setCoaError("We couldn't reach the document library. Please try again, or ask us in the chat.");
-        })
-        .finally(() => { if (!cancelled) setCoaSearching(false); });
-    }, 300);
-    return () => { cancelled = true; window.clearTimeout(handle); };
-  }, [coaQuery, coaPickerOpen, coaRetryNonce, activeApiUrl, activeApiKey]);
-
-  // Picking a row pins it above the search box and leaves the list live below,
-  // the persistent-panel behaviour the SDS panel established (Option A) — nothing
-  // is written to chat, this is a static lookup and not a conversation turn.
-  const selectCoaRow = (row: CoaRow) => {
-    setCoaSelected(row);
+      .catch(() => {
+        if (id === coaRequestId.current) setCoaError(COA_OUTAGE_MESSAGE);
+      })
+      .finally(() => { if (id === coaRequestId.current) setCoaSearching(false); });
   };
 
   // Thumbs up/down on a bot reply (vertical intelligence plan, Phase 2a).
@@ -2531,9 +2563,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // result lives only in the panel, isolated from the chat transcript.
     let pendingSds: SdsResult | null = null;
     // Same mechanism for certificates (a {coa:{status,results,query}} event): the
-    // rows go to the panel, never into the transcript, and the model's own reply
-    // only ever says how many matched (H10 — it is never shown a filename).
-    let pendingCoa: { rows: CoaRow[]; truncated: boolean } | null = null;
+    // certificate goes to the panel, never into the transcript, and the model is
+    // never shown a filename (H10) or a count (C3).
+    let pendingCoa: CoaRow | null = null;
+    // A cooldown earned in the conversation. Applied without opening the panel: the
+    // model's own reply is the visitor-facing message, and a panel that opened only
+    // to say "restricted" would be a worse way to hear it.
+    let pendingCoaLockout: number | null = null;
     // Structured quote card emitted by the agent stream (a {quote:{...}} event);
     // captured here and attached to the bot message on [DONE], like pendingSds.
     let pendingQuote: Message['quote'] | null = null;
@@ -2649,8 +2685,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // from the transcript. Same "after the reply" precedent as pendingForm.
             if (pendingSds) openSdsPickerWithResult(pendingSds);
             // Free-text COA intent → the certificate panel, same "after the reply"
-            // ordering so the bot's "3 certificates matched" lands first.
-            if (pendingCoa) openCoaPickerWithResults(pendingCoa.rows, pendingCoa.truncated);
+            // ordering so the bot's confirmation lands first.
+            if (pendingCoa) openCoaPickerWithResult(pendingCoa);
+            if (pendingCoaLockout) lockCoaPanel(pendingCoaLockout);
             // Never move the viewport on completion — keep the user exactly where
             // they are for reading continuity. If the finished answer extends below
             // the fold, surface the "new message" pill so they can jump down when
@@ -2689,12 +2726,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               pendingSds = { url: parsed.sds.url, product: parsed.sds.product, cas_number: parsed.sds.cas_number, updated_at: parsed.sds.updated_at, label: parsed.sds.label };
               return;
             }
-            // Structured side-channel: {coa:{status,results,query}} from the get_coa
-            // tool. Only the found/multiple statuses carry rows at all — not_found,
-            // not_configured and unavailable never emit this event, so the panel
-            // opens exactly when there is something in it to show.
+            // Structured side-channel: {coa:{status,results}} from the get_coa tool.
+            // Only `found` carries a certificate — not_found, not_configured and
+            // unavailable never emit this event, so the panel opens exactly when
+            // there is something in it to show. `locked_out` carries no certificate
+            // but must still reach the panel: the chat shares the throttle counters,
+            // so a visitor can earn the cooldown in a conversation and has to find
+            // the field already disabled when they get there (§7).
             if (parsed.coa) {
               pendingCoa = parseCoaEvent(parsed);
+              pendingCoaLockout = parseCoaLockout(parsed);
               return;
             }
             // Structured side-channel: the agent emits {quote:{...}} with the
@@ -2775,6 +2816,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       { role: 'bot', content: "I'll connect you with our team! Share your email so they can reply to you directly. 👇", ts: Date.now() },
       { role: 'handoff_form', id: 'handoff-form' },
     ]);
+  };
+
+  // The COA panel's way out (L2). The handoff form renders as a chat message, so the
+  // panel has to step aside for the visitor to see it — but a configured contact link
+  // opens a new tab instead and produces no message, and closing the panel for that
+  // would take a released certificate off screen for nothing.
+  const contactSupportFromCoa = () => {
+    if (!configData.handoff_redirect_url) setCoaPickerOpen(false);
+    handleHandoff();
   };
 
   const submitHandoff = async (visitorEmail: string, visitorName: string) => {
@@ -3229,19 +3279,20 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
 
             {view === 'chat' && hubView === 'chat' && coaPickerOpen && (
               <CoaPicker
-                results={coaResults}
+                result={coaResult}
+                refused={coaRefused}
                 searching={coaSearching}
-                truncated={coaTruncated}
+                lockedOut={coaLockedOut}
                 configured={coaConfigured}
                 error={coaError}
                 query={coaQuery}
-                selected={coaSelected}
                 themeColor={THEME_COLOR}
                 fromChat={coaFromChat}
-                onQueryChange={onCoaQueryChange}
-                onSelect={selectCoaRow}
-                onRetry={() => { setCoaError(null); setCoaRetryNonce(n => n + 1); }}
+                supportSent={handoffSent}
+                onQueryChange={setCoaQuery}
+                onSubmit={submitCoaLookup}
                 onCancel={() => setCoaPickerOpen(false)}
+                onContactSupport={contactSupportFromCoa}
               />
             )}
 

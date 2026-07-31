@@ -26,6 +26,9 @@ export type CoaReport = {
   capped: string[];
   walkedAt: string | null;
   fromCache: boolean;
+  /** Refused lookups over the window, or `null` for "we could not read the counter". */
+  failedLookups: number | null;
+  failedLookupsDays: number;
 };
 
 const num = (v: unknown): number => {
@@ -33,10 +36,24 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 };
 
+/**
+ * Strict, because zero is a real answer here and `null` is a different one.
+ *
+ * `num` folds both onto 0, which would render "0 failed lookups" for a company whose
+ * counter we could not read — the false assurance the backend deliberately avoids
+ * giving (coa-confidential-access §8).
+ */
+const strictCount = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null;
+
 export function parseCoaReport(raw: any): CoaReport | null {
   if (!raw || typeof raw !== 'object') return null;
   const dups = Array.isArray(raw.duplicate_samples) ? raw.duplicate_samples : [];
   const thin = Array.isArray(raw.hard_to_find_samples) ? raw.hard_to_find_samples : [];
+  // A count without its window is not a fact the panel can state, so the window is
+  // the backend's to declare — never a default invented here that could disagree
+  // with the days actually summed.
+  const failedDays = num(raw.failed_lookups_days);
   return {
     indexed: num(raw.indexed),
     folders: num(raw.folders),
@@ -52,6 +69,8 @@ export function parseCoaReport(raw: any): CoaReport | null {
     capped: Array.isArray(raw.capped) ? raw.capped.filter((c: any) => typeof c === 'string') : [],
     walkedAt: typeof raw.walked_at === 'string' && raw.walked_at ? raw.walked_at : null,
     fromCache: raw.from_cache === true,
+    failedLookups: failedDays > 0 ? strictCount(raw.failed_lookups) : null,
+    failedLookupsDays: failedDays,
   };
 }
 

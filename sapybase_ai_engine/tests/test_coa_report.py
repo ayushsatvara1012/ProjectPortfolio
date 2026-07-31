@@ -14,12 +14,14 @@ will never find. Three blind spots, and one of them is load-bearing:
 * **Filename quality (§11).** A one-token filename is findable only by typing that
   token exactly. Nothing but a rename fixes it, so the panel's job is visibility.
 """
+from datetime import datetime, timezone
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 import main as m
-from services import coa_drive
+from services import coa_drive, coa_throttle
 from services.coa_drive import (
     WalkResult,
     build_document,
@@ -32,9 +34,21 @@ from services.coa_drive import (
     walk_folder,
 )
 from tests.test_coa_drive import API_KEY, FIXTURES, FOLDER_ID, drive, entry, folder_entry
+from tests.test_coa_throttle import FakeRedis
 
 COMPANY_ID = "11111111-2222-3333-4444-555555555555"
 USER = {"id": "user-1", "email": "owner@acme.example.com"}
+
+
+def _seeded(redis, count):
+    """A ledger already holding ``count`` refused lookups today.
+
+    Seeded rather than recorded: that the two agree is the round trip
+    ``test_coa_throttle.py`` asserts, and what matters here is that the endpoint
+    surfaces the number rather than dropping or recomputing it.
+    """
+    redis.store[coa_throttle.ledger_key(COMPANY_ID, datetime.now(timezone.utc).date())] = str(count)
+    return redis
 
 
 def docs(*specs):
@@ -245,13 +259,13 @@ class _FakeConn:
 _REAL_LOAD_INDEX = coa_drive.load_index
 
 
-def get(monkeypatch, *, transport=None, overrides=None, row_missing=False, times=1):
+def get(monkeypatch, *, transport=None, overrides=None, row_missing=False, times=1, redis=None):
     """GET the report endpoint with the DB and Drive both faked."""
     row = None if row_missing else (overrides if overrides is not None
                                     else {"coa": {"folder_id": FOLDER_ID}},)
     monkeypatch.setattr(m, "get_db_connection", lambda: _FakeConn(row))
     monkeypatch.setattr(m, "release_db_connection", lambda c: None)
-    monkeypatch.setattr(m, "r", None)          # no Redis: only the memo caches (H13)
+    monkeypatch.setattr(m, "r", redis)         # default: no Redis, only the memo caches (H13)
     monkeypatch.setenv("GOOGLE_DRIVE_API_KEY", API_KEY)
 
     if transport is not None:
@@ -334,3 +348,33 @@ class TestReportEndpoint:
         assert body["duplicates_collapsed"] == 0
         assert body["hard_to_find"] == 0
         assert body["capped"] == []
+
+
+# ───────────────────── the tripwire (coa-confidential-access §8) ─────────────────────
+
+class TestFailedLookupsReachTheOwner:
+    """Phase E. Probing was completely invisible before this: the throttle slows a
+    guesser down, and this is the only thing that lets the owner see one."""
+
+    def test_the_count_is_the_one_the_throttle_recorded(self, monkeypatch):
+        body = get(monkeypatch, transport=drive({FOLDER_ID: [entry(FIXTURES[0])]}),
+                   redis=_seeded(FakeRedis(), 4)).json()
+        assert body["failed_lookups"] == 4
+        assert body["failed_lookups_days"] == coa_throttle.MISS_LEDGER_DAYS
+
+    def test_an_unreadable_counter_is_null_never_zero(self, monkeypatch):
+        # "0 failed lookups" would tell the owner nobody is guessing at their batch
+        # numbers, which is the one assurance this must not give falsely.
+        body = get(monkeypatch, transport=drive({FOLDER_ID: [entry(FIXTURES[0])]})).json()
+        assert body["failed_lookups"] is None
+
+    def test_a_quiet_week_reports_zero_rather_than_nothing(self, monkeypatch):
+        body = get(monkeypatch, transport=drive({FOLDER_ID: [entry(FIXTURES[0])]}),
+                   redis=FakeRedis()).json()
+        assert body["failed_lookups"] == 0
+
+    def test_the_report_names_no_visitor(self, monkeypatch):
+        # A count, never a list of who missed (L1).
+        body = get(monkeypatch, transport=drive({FOLDER_ID: [entry(FIXTURES[0])]}),
+                   redis=_seeded(FakeRedis(), 3)).text
+        assert "visitor" not in body.lower()

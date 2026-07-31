@@ -1572,6 +1572,7 @@ from packs import (
     effective_coa_config,
 )
 from services import coa_drive
+from services import coa_throttle
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
@@ -3631,7 +3632,14 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         # async tool: this returns a coroutine and the agent loop awaits
                         # it rather than blocking the event loop the stream runs on.
                         if tool_name == "get_coa":
-                            return _get_coa_observation(company, tool_args, _captured)
+                            # The SAME throttle identity the panel sends (§7): a
+                            # conversation that had its own allowance would be the
+                            # cheapest way to guess, and the model is the easiest
+                            # thing here to talk into trying once more.
+                            return _get_coa_observation(
+                                company, tool_args, _captured,
+                                visitor_id=chat_req.visitor_id,
+                                client_ip=get_remote_address(request))
                         obs = execute_tool(tool_name, tool_args, agent_cursor, company["id"],
                                            session_id=chat_req.session_id)
                         # When get_sds resolves a real sheet, surface it as a deterministic
@@ -5472,6 +5480,10 @@ async def coa_folder_report(
     Drive quota budget on rendering a settings panel. The reported ``walked_at`` is
     therefore the age of the answer, and Test Connection is the force-refresh action
     — one button that walks, rather than two that both do.
+
+    ``failed_lookups`` is the tripwire from coa-confidential-access §8: the throttle
+    slows a guesser down, and this is what makes them visible. ``None`` means we could
+    not read the counter, which the panel must not render as zero.
     """
     folder_id = _owner_coa_folder(company_id, user)
     try:
@@ -5479,7 +5491,10 @@ async def coa_folder_report(
     except coa_drive.CoaDriveError as e:
         raise _coa_unreachable(company_id, e.reason, "report")
 
-    return {"status": "ok", "from_cache": from_cache, **coa_drive.folder_report(result)}
+    failed = await coa_throttle.recent_misses(company_id, redis_client=r)
+    return {"status": "ok", "from_cache": from_cache, **coa_drive.folder_report(result),
+            "failed_lookups": failed,
+            "failed_lookups_days": coa_throttle.MISS_LEDGER_DAYS}
 
 
 @app.post("/api/companies/{company_id}/coa/test-connection")
@@ -6062,6 +6077,25 @@ def list_sds_products(
 COA_UNAVAILABLE_MESSAGE = ("We couldn't reach the document library just now. "
                            "Our team can send the certificate over instead.")
 
+# The one visible outcome (coa-confidential-access C4/§5.1). It describes our rate
+# limit, which says nothing about any certificate, so revealing it is not the oracle
+# C3 closes — and hiding it left a customer who had mistyped three times pressing
+# Request against a system that could no longer answer.
+COA_LOCKED_OUT_MESSAGE = ("Too many unsuccessful attempts. Please contact our support "
+                          "team and we'll help you.")
+
+
+def _coa_lockout(retry_after: int) -> HTTPException:
+    """429 with the window attached, which is what re-enables the panel's field.
+
+    ``retry_after`` is for the interface catching up with the server, never a promise:
+    every request is gated here regardless of what the browser has re-enabled, since
+    a disabled input is presentation and anyone can undo it from devtools.
+    """
+    return HTTPException(status_code=429, detail={
+        "code": "COA_LOCKED_OUT", "message": COA_LOCKED_OUT_MESSAGE,
+        "retry_after": retry_after})
+
 
 def _coa_folder_for(company: dict) -> str:
     return effective_coa_config(coerce_overrides(company.get("pack_overrides")))
@@ -6073,15 +6107,26 @@ def _coa_folder_for(company: dict) -> str:
 async def search_coa(
     request: Request,
     q: Optional[str] = None,
+    visitor_id: Optional[str] = None,
     company: dict = Depends(verify_api_key_and_origin),
 ):
-    """Deterministic certificate search for the widget's COA panel (D1, §7).
+    """Exact certificate lookup for the widget's COA panel (coa-confidential-access §4).
 
-    Search-first and never browsable: a blank or too-short ``q`` returns an empty
-    list, never a listing, so the company's production history is never on display.
+    Not a search. ``q`` must carry at least two tokens, every one of them must match a
+    filename token exactly, and exactly one certificate may survive — otherwise this
+    returns nothing at all. ``results`` therefore holds either one row or zero, and
+    the caller cannot distinguish "no such certificate" from "that matched two
+    hundred of them", because a visitor must not be able to either (C3).
 
     Calls the SAME ``coa_drive.resolve`` as the ``get_coa`` agent tool, so the panel
-    and the conversational path can never disagree about which certificates match.
+    and the conversational path can never disagree about which certificate a query
+    identifies.
+
+    Three misses in five minutes lock this for fifteen (§5), and the 429 is the ONLY
+    outcome a visitor can tell apart — it describes our rate limit rather than the
+    library. ``visitor_id`` is the device-local id the widget already sends for
+    session history; without it only the per-IP backstop can bind, which is also
+    exactly the case that backstop exists for.
 
     A non-chemical bot has no ``get_coa`` tool, so this 404s for them — the same
     convention ``/api/widget/sds-products`` uses.
@@ -6094,85 +6139,135 @@ async def search_coa(
     if not folder_id:
         # Configured off, not broken: an empty result set with the feature flagged
         # off lets the panel show its handoff copy without inventing an error.
-        return {"results": [], "truncated": False, "configured": False}
+        return {"results": [], "configured": False}
+
+    client_ip = get_remote_address(request)
+    # Before the lookup, so a locked-out visitor costs us no Drive call and no cache
+    # read — and so the gate holds whatever the browser has re-enabled.
+    retry_after = await coa_throttle.lockout_seconds(
+        company["id"], visitor_id, client_ip, redis_client=r)
+    if retry_after:
+        raise _coa_lockout(retry_after)
 
     try:
-        results, truncated = await coa_drive.resolve(
-            company["id"], folder_id, q, redis_client=r)
+        doc = await coa_drive.resolve(company["id"], folder_id, q, redis_client=r)
     except coa_drive.CoaDriveError as e:
         logger.warning("COA search failed for company %s: %s", company["id"], e.reason)
+        # NOT a miss. An outage is our failure, and counting it would lock out the
+        # customers who kept trying during it, exactly when they need the handoff.
         raise HTTPException(status_code=503, detail={
             "code": "COA_UNAVAILABLE", "message": COA_UNAVAILABLE_MESSAGE})
 
+    if doc is None:
+        earned = await coa_throttle.record_miss(
+            company["id"], visitor_id, client_ip, redis_client=r)
+        # The miss that trips the limit answers 429 rather than the refusal, so the
+        # visitor learns on the attempt that earned it instead of wasting one more.
+        if earned:
+            raise _coa_lockout(earned)
+
     return {
-        "results": [coa_drive.to_payload(d) for d in results],
-        "truncated": truncated,
+        "results": [coa_drive.to_payload(doc)] if doc else [],
         "configured": True,
     }
 
 
-async def _run_get_coa(company: dict, args: dict) -> dict:
-    """The ``get_coa`` agent tool (plan §8 "Chat entry").
+# C3 through the conversation: "you gave me too little" and "that does not exist" are
+# the SAME answer to the model, because a model that can tell them apart will tell the
+# visitor, and "that batch exists but I need the grade" is the oracle this closes.
+_COA_NOT_FOUND_MESSAGE = (
+    "No certificate was released. Ask the visitor to read out BOTH the product code "
+    "and the batch number printed on their drum, label or invoice — one alone is "
+    "usually not enough to identify a certificate. Do not say how many certificates "
+    "exist or whether any partly matched, do not offer to list or describe any, and "
+    "do not guess at an identifier yourself. Offer to have the team look it up and "
+    "send it over."
+)
+
+_COA_LOCKED_OUT_MESSAGE = (
+    "The certificate lookup is temporarily restricted for this visitor after several "
+    "unsuccessful attempts. Tell them it is restricted for now and that our support "
+    "team can help, and do NOT try the lookup again in this conversation. Do not "
+    "explain the limit, do not say how long it lasts, and do not suggest they wait."
+)
+
+
+async def _run_get_coa(company: dict, args: dict, *, visitor_id: Optional[str] = None,
+                       client_ip: Optional[str] = None) -> dict:
+    """The ``get_coa`` agent tool (coa-confidential-access §7).
+
+    Every rule the panel obeys applies here identically (C6). A laxer conversational
+    path would be a bypass, and the model is the easiest thing in the system to talk
+    into trying again — so it shares the resolver, the single refusal, and the throttle
+    counters, and a visitor locked out in the panel is locked out in the chat.
 
     H10 — the model NEVER sees a filename. Anyone who can write to the client's Drive
     folder can name a file, and filenames reach the model as tool observations, so a
-    filename is an injection vector. The observation carries a status and a count;
-    the panel does every bit of the display.
+    filename is an injection vector. It sees a status and an instruction; the panel
+    does every bit of the display.
 
-    The ``_rows`` key is internal, stripped by the caller before the observation
-    reaches the model — the same discipline ``_resolve_product`` uses for its rows.
+    The ``_rows`` and ``_lockout`` keys are internal, stripped by the caller before the
+    observation reaches the model — the same discipline ``_resolve_product`` uses.
     """
     query = (args.get("query") or "").strip()
-    if not query:
-        return {"status": "missing_identifier",
-                "message": "Ask the visitor for the product code or batch number "
-                           "printed on their drum, label or invoice."}
-
     folder_id = _coa_folder_for(company)
     if not folder_id:
         return {"status": "not_configured",
                 "message": "Certificate lookup isn't set up for this company. Offer to "
                            "have the team send the certificate over, and collect the batch number."}
 
+    retry_after = await coa_throttle.lockout_seconds(
+        company["id"], visitor_id, client_ip, redis_client=r)
+    if retry_after:
+        return {"status": "locked_out", "_lockout": retry_after,
+                "message": _COA_LOCKED_OUT_MESSAGE}
+
+    if not query:
+        # Folded into not_found (§7). Nothing was looked up, so this costs the visitor
+        # nothing — but the model must not learn that its own empty call is a distinct
+        # outcome, or it will say so.
+        return {"status": "not_found", "message": _COA_NOT_FOUND_MESSAGE}
+
     try:
-        results, truncated = await coa_drive.resolve(company["id"], folder_id, query, redis_client=r)
+        doc = await coa_drive.resolve(company["id"], folder_id, query, redis_client=r)
     except coa_drive.CoaDriveError as e:
         logger.warning("COA tool failed for company %s: %s", company["id"], e.reason)
-        # H15 — a Drive outage is NOT "no certificate exists".
+        # H15 — a Drive outage is NOT "no certificate exists", and it is not a miss.
         return {"status": "unavailable", "message": COA_UNAVAILABLE_MESSAGE}
 
-    if not results:
-        return {"status": "not_found", "count": 0,
-                "message": "No certificate matched. Ask the visitor to check the code, or "
-                           "offer to have the team look it up and send it over."}
+    if doc is None:
+        # The SAME counters the panel uses. Two independent allowances would make the
+        # conversation the cheaper way to guess, which is the bypass C6 names.
+        earned = await coa_throttle.record_miss(
+            company["id"], visitor_id, client_ip, redis_client=r)
+        if earned:
+            return {"status": "locked_out", "_lockout": earned,
+                    "message": _COA_LOCKED_OUT_MESSAGE}
+        return {"status": "not_found", "message": _COA_NOT_FOUND_MESSAGE}
 
-    rows = [coa_drive.to_payload(d) for d in results]
-    if len(results) == 1:
-        return {"status": "found", "count": 1, "truncated": truncated, "_rows": rows,
-                "message": "The certificate is already open in a panel for the visitor. "
-                           "Confirm you have found it — do not paste a link, do not name "
-                           "the file, and do not state anything the certificate contains."}
-
-    return {"status": "multiple", "count": len(results), "truncated": truncated, "_rows": rows,
-            # §10 loop safety — without this the model re-calls get_coa with the same
-            # arguments and burns its round budget.
-            "message": f"{len(results)} certificates matched and are ALREADY listed in a panel "
-                       "for the visitor to pick from. Say how many there are and ask them to "
-                       "choose. Do not call this tool again with the same query, and do not "
-                       "list the results yourself."}
+    return {"status": "found", "_rows": [coa_drive.to_payload(doc)],
+            "message": "The certificate is already open in a panel for the visitor. "
+                       "Confirm you have found it — do not paste a link, do not name "
+                       "the file, and do not state anything the certificate contains."}
 
 
-async def _get_coa_observation(company: dict, args: dict, captured: dict) -> dict:
-    """Run ``get_coa`` and split its result: rows to the widget, status to the model."""
-    obs = await _run_get_coa(company, args)
+async def _get_coa_observation(company: dict, args: dict, captured: dict, *,
+                               visitor_id: Optional[str] = None,
+                               client_ip: Optional[str] = None) -> dict:
+    """Run ``get_coa`` and split its result: the widget's half out, the model's half back.
+
+    A lockout is captured as well as a certificate, so a visitor who is inside a
+    cooldown finds the panel already disabled when they reach it from the conversation
+    (§7) rather than discovering it by pressing Request.
+    """
+    obs = await _run_get_coa(company, args, visitor_id=visitor_id, client_ip=client_ip)
     rows = obs.pop("_rows", None)
+    lockout = obs.pop("_lockout", None)
     if rows is not None:
         captured["coa"] = {"status": obs.get("status"), "results": rows,
-                           "query": (args.get("query") or "").strip(),
-                           # The panel shows "keep typing to narrow" off this, so the
-                           # chat path has to carry it too or a capped result set looks
-                           # complete to a visitor who arrived through the conversation.
-                           "truncated": bool(obs.get("truncated"))}
+                           "query": (args.get("query") or "").strip()}
+    elif lockout:
+        captured["coa"] = {"status": "locked_out", "results": [], "retry_after": lockout}
     return obs
 
 

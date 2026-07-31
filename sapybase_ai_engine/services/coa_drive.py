@@ -110,10 +110,13 @@ MAX_THIN_SAMPLES = 25
 # than to fix it.
 MIN_FINDABLE_TOKENS = 2
 
-# §7 constraints: a 2-character floor (otherwise "1" returns the folder) and a
-# result cap that drives the "keep typing to narrow" hint.
-MIN_QUERY_CHARS = 2
-MAX_RESULTS = 50
+# §4 of the confidential-access amendment. A query carrying fewer than two tokens is
+# refused before it is matched at all, so "acetone" and "EP" never reach the library.
+#
+# There is no result cap any more because there is no result list: a query resolves to
+# exactly one certificate or to nothing, so the "keep typing to narrow" hint the cap
+# used to drive has nothing left to describe.
+MIN_QUERY_TOKENS = 2
 
 # Everything that separates one meaningful chunk of a filename from the next. The
 # whole point is that we do NOT care which chunk means what.
@@ -143,13 +146,6 @@ _EXTENSION_SUFFIX = re.compile(r"\.(pdf|docx?|jpe?g|png|tiff?)$", re.IGNORECASE)
 # H3 — the Drive API key travels as a URL query parameter, so any string built from
 # a request URL (notably `str(httpx_error)`) carries it. Scrub before logging.
 _KEY_IN_URL = re.compile(r"([?&]key=)[^&\s]*")
-
-# Match strength, strongest first (§7 "exact token > prefix > substring").
-MATCH_EXACT = 4
-MATCH_PREFIX = 3
-MATCH_SUBSTRING = 2
-MATCH_NUMERIC = 1
-
 
 class CoaDriveError(Exception):
     """Drive could not be reached, or refused us.
@@ -378,87 +374,58 @@ def thin_documents(documents: Iterable[CoaDocument]) -> List[CoaDocument]:
 
 # ─────────────────────────────── pure: search ───────────────────────────────
 
-def _token_score(query_token: str, tokens: Sequence[str], numeric_tokens: Sequence[str]) -> int:
-    """How strongly one query token hits a file, 0 for not at all.
+def _hits(query_token: str, doc: CoaDocument) -> bool:
+    """Does one query token match this file? Exactly, or not at all (§4 step 3).
 
-    Ordered strongest-first so an exact hit anywhere beats a prefix hit anywhere,
-    which is what makes `100RG` rank its own certificates above `100RGX`'s.
+    Prefix and substring matching are gone deliberately. They are what let `EP` return
+    48 certificates and `acetone` fill the result cap, and a result row carries the
+    product code, batch and date — so the list alone published the client's production
+    history without a single PDF being opened.
+
+    The leading-zero normalization survives as the one tolerance, because it is a
+    normalization rather than a fuzzy match: `26R16` and `26R016` are one identifier
+    written two ways, not two identifiers that happen to look alike.
     """
-    if query_token in tokens:
-        return MATCH_EXACT
-    if any(t.startswith(query_token) for t in tokens):
-        return MATCH_PREFIX
-    if any(query_token in t for t in tokens):
-        return MATCH_SUBSTRING
-    if numeric_key(query_token) in numeric_tokens:
-        return MATCH_NUMERIC
-    return 0
+    return query_token in doc.tokens or numeric_key(query_token) in doc.numeric_tokens
 
 
-def search(
-    documents: Sequence[CoaDocument],
-    query: Any,
-    limit: Optional[int] = None,
-) -> Tuple[List[CoaDocument], bool]:
-    """Rank certificates against a free-text query. Returns ``(results, truncated)``.
+def _matches(documents: Sequence[CoaDocument], query: Any) -> List[CoaDocument]:
+    """Every document matching EVERY token of the query exactly (§4 steps 1-4).
 
-    Two passes (§7). **Strict**: every query token must hit something, which is what
-    makes ``acetone LR`` mean acetone AND LR. **Fallback**, only when strict found
-    nothing: the documents that matched the MOST query tokens, so a typo or a filler
-    word degrades into close suggestions instead of a dead end.
-
-    The fallback used to admit anything matching at least one token, which made a
-    single unmatched word catastrophic rather than harmless: a real visitor asking
-    "I have a drum of acetone, batch 100.26R016" failed the strict pass on "drum" and
-    "batch", and the fallback then returned the entire acetone catalogue — 50 rows
-    capped, where the answer is 3. Keeping only the best-matching tier is what makes
-    conversational phrasing behave like the clean query it contains.
-
-    This is the ONE resolver — the panel endpoint and the ``get_coa`` agent tool both
-    call it, so the conversational path and the picker can never disagree about which
-    certificate wins. That is the invariant ``_newest_https_row`` establishes for SDS.
+    Module-private, and that is the point. The NUMBER of matches is exactly the fact
+    C3 withholds from the visitor — "16 certificates matched" tells someone probing
+    that acetone exists and that they are close — so it must not leave this module.
+    Only :func:`resolve` sees it, and only to decide whether a re-walk could help.
     """
     query_tokens = tokenize(query)
-    # H6 — "every query token must match" is VACUOUSLY TRUE for zero tokens, so a
-    # query of "___" or "..." would return the entire folder. The 2-character floor
-    # does not catch it either, because it counts characters and "___" is three. Both
-    # checks therefore happen AFTER tokenizing.
-    if not query_tokens or sum(len(t) for t in query_tokens) < MIN_QUERY_CHARS:
-        return [], False
+    # H6 — "every query token must match" is VACUOUSLY TRUE for zero tokens, so an
+    # unguarded query of "___" would match the entire folder. The floor closes that
+    # and enforces §4's two-part rule in one check, but only AFTER tokenizing: "___"
+    # is three characters and no tokens, so counting characters would not catch it.
+    if len(query_tokens) < MIN_QUERY_TOKENS:
+        return []
+    return [d for d in documents if all(_hits(t, d) for t in query_tokens)]
 
-    strict: List[Tuple[int, int, CoaDocument, int]] = []
-    loose: List[Tuple[int, int, CoaDocument, int]] = []
-    for doc in documents:
-        scores = [_token_score(t, doc.tokens, doc.numeric_tokens) for t in query_tokens]
-        matched = sum(1 for s in scores if s)
-        if not matched:
-            continue
-        entry = (matched, sum(scores), doc, max(scores))
-        (strict if matched == len(query_tokens) else loose).append(entry)
 
-    ranked = strict
-    if not ranked and loose:
-        # A substring-only hit is too weak to carry a fallback result on its own:
-        # short filler words match half the corpus that way ("ME" inside "METHANOL"),
-        # so "please send the chloroform certificate" returned 50 rows instead of
-        # chloroform's 18. Require at least one token to have hit at prefix strength
-        # or better, then keep only the documents that matched the MOST tokens.
-        strong = [e for e in loose if e[3] >= MATCH_PREFIX]
-        if strong:
-            best = max(e[0] for e in strong)
-            ranked = [e for e in strong if e[0] == best]
+def lookup(documents: Sequence[CoaDocument], query: Any) -> Optional[CoaDocument]:
+    """The one certificate this query identifies, or ``None`` (§4 step 5).
 
-    # Three stable sorts, least significant first — the readable way to express
-    # "matched count, then score, then newest, then file ID" when the recency key is
-    # a string that sorts DESCENDING while everything after it sorts ascending.
-    ranked.sort(key=lambda e: e[2].file_id)
-    ranked.sort(key=lambda e: e[2].modified_time or "", reverse=True)
-    ranked.sort(key=lambda e: (-e[0], -e[1]))
+    Replaces the ranked ``search()`` the finder shipped with. Ranking went with it:
+    ranking only means something when the caller may show more than one row, and
+    showing more than one row is what turned this feature into a browsable index of
+    the client's production history.
 
-    # Resolved here rather than as a default argument, which would bind MAX_RESULTS
-    # once at import and quietly ignore any later change to it.
-    limit = max(1, MAX_RESULTS if limit is None else limit)
-    return [e[2] for e in ranked[:limit]], len(ranked) > limit
+    ``None`` covers three different situations deliberately — nothing matched, several
+    matched, and the query was too short to be matched at all. The caller cannot tell
+    them apart because the visitor must not be able to either (C3): a refusal that
+    varies is an oracle telling a guesser when they are warm.
+
+    Still the ONE resolver. The panel endpoint and the ``get_coa`` agent tool both
+    reach it through :func:`resolve`, so the conversational path and the panel can
+    never disagree — the invariant ``_newest_https_row`` establishes for SDS.
+    """
+    matches = _matches(documents, query)
+    return matches[0] if len(matches) == 1 else None
 
 
 # ──────────────────────────────── I/O: walk ─────────────────────────────────
@@ -1192,12 +1159,11 @@ async def resolve(
     redis_client: Any = None,
     api_key: str = "",
     client: Optional[httpx.AsyncClient] = None,
-    limit: Optional[int] = None,
-) -> Tuple[List[CoaDocument], bool]:
-    """Search a company's certificates. Returns ``(results, truncated)``.
+) -> Optional[CoaDocument]:
+    """The certificate a company's visitor has identified, or ``None`` (§4).
 
     **The one resolver.** Both the widget panel endpoint and the ``get_coa`` agent
-    tool call this, so the conversational path and the picker can never disagree —
+    tool call this, so the conversational path and the panel can never disagree —
     the invariant ``_newest_https_row`` establishes for SDS.
 
     A miss against a CACHED listing triggers one forced re-walk (§6 step 5), which is
@@ -1212,17 +1178,21 @@ async def resolve(
     """
     result, from_cache = await load_index(
         company_id, folder_id, redis_client=redis_client, api_key=api_key, client=client)
-    results, truncated = search(result.documents, query, limit=limit)
-    if results or not from_cache:
-        return results, truncated
+    matches = _matches(result.documents, query)
+    # Only a query that matched NOTHING can be helped by walking again. An ambiguous
+    # query has already found its documents — a re-walk returns the same ones and
+    # refuses again — so testing "did we release a certificate" here instead of "did
+    # anything match" would spend a Drive walk on every `acetone` a visitor types.
+    if matches or not from_cache:
+        return matches[0] if len(matches) == 1 else None
 
     if not await forced_walk_allowed(company_id, redis_client):
-        return results, truncated
+        return None
 
     refreshed, _ = await load_index(
         company_id, folder_id, redis_client=redis_client, api_key=api_key,
         client=client, force=True)
-    return search(refreshed.documents, query, limit=limit)
+    return lookup(refreshed.documents, query)
 
 
 def folder_report(result: WalkResult) -> Dict[str, Any]:

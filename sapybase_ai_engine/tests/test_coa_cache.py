@@ -91,10 +91,12 @@ class TestRoundTrip:
         assert restored.folders_visited == original.folders_visited
         assert restored.files_seen == original.files_seen
 
-    def test_restored_documents_are_searchable(self):
+    def test_restored_documents_are_still_resolvable(self):
+        # Tokens are rebuilt on read, so this is what proves a cached listing can
+        # still release a certificate rather than silently matching nothing.
         restored = deserialize_index(serialize_index(walk_result()))
-        found, _ = coa_drive.search(list(restored.documents), "100.26R016")
-        assert len(found) == 3
+        released = coa_drive.lookup(list(restored.documents), "100RG 100.26R016")
+        assert released is not None and released.name == "100RG_100.26R016_ACETONE RG.pdf"
 
     def test_derived_fields_are_not_stored(self):
         # Tokens and display are rebuilt on read, so a tokenizer change takes effect

@@ -169,6 +169,28 @@ export default function CoaLibraryPanel({ botId, authFetch, savedFolderId, reloa
         <Stat value={report.filesSeen} label="files in Drive" />
       </div>
 
+      {/* The tripwire (coa-confidential-access §8). Separated from the three counts
+          above because it describes visitors rather than the folder — and omitted
+          entirely when the count is unknown, since "0" would read as "nobody is
+          guessing at your batch numbers". */}
+      {report.failedLookups !== null && (
+        <div className="mt-3.5 pt-3.5 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[12px] font-google font-medium text-slate-700 dark:text-slate-200">
+              Failed lookups
+            </p>
+            <p className="text-[13px] font-google font-semibold text-slate-800 dark:text-slate-100 tabular-nums">
+              {report.failedLookups.toLocaleString()}
+            </p>
+          </div>
+          <p className="text-[11.5px] font-google text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">
+            Customers who entered a product code or batch number we could not match, over the
+            last {report.failedLookupsDays} days. A few is normal typing. A run of them is
+            someone guessing at batch numbers - tell us if this looks unusual.
+          </p>
+        </div>
+      )}
+
       {notices.length > 0 ? (
         <ul className="mt-3.5 pt-3.5 border-t border-slate-200 dark:border-slate-800 space-y-3">
           {notices.map((n) => (
