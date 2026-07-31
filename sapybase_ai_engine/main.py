@@ -3820,6 +3820,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     agent_handoff = _captured.get("handoff")
                     agent_grade_selector = _captured.get("grade_selector")
                     agent_pack_selector = _captured.get("pack_selector")
+                    agent_coa = _captured.get("coa")
 
                     if full_reply:
                         yield f"data: {json.dumps({'token': full_reply})}\n\n"
@@ -3833,6 +3834,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'grade_selector': agent_grade_selector})}\n\n"
                     if agent_pack_selector:
                         yield f"data: {json.dumps({'pack_selector': agent_pack_selector})}\n\n"
+                    if agent_coa:
+                        yield f"data: {json.dumps({'coa': agent_coa})}\n\n"
 
                     # ── SESSION MEMORY: persist this turn on the gen-owned conn ──
                     if _session_active and full_reply:
@@ -3840,7 +3843,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             _actions = {
                                 k: _captured[k]
                                 for k in ("sds", "quote", "form", "handoff",
-                                          "grade_selector", "pack_selector")
+                                          "grade_selector", "pack_selector", "coa")
                                 if k in _captured
                             } or None
                             session_store.append_message(
