@@ -23,9 +23,9 @@ from services.coa_drive import (
     build_document,
     dedupe,
     display_name,
+    lookup,
     normalize,
     numeric_key,
-    search,
     tokenize,
     walk_folder,
 )
@@ -90,6 +90,11 @@ def index(names):
 
 def names_of(documents):
     return [d.name for d in documents]
+
+
+def name_of(document):
+    """The released certificate's filename, or ``None`` when nothing was released."""
+    return document.name if document is not None else None
 
 
 @pytest.fixture
@@ -207,166 +212,164 @@ class TestDisplayName:
         assert display_name("scan0012.pdf") == "scan0012"
 
 
-# ──────────────────────────────── search ────────────────────────────────────
+# ──────────────────────────────── lookup ────────────────────────────────────
+#
+# `docs/coa-confidential-access-plan.md` §4. These tests replace the ranked-search
+# suite wholesale, and the deletions are the point: every case that used to assert a
+# LIST of near misses now asserts nothing at all comes back. A certificate is
+# released only when the visitor has identified exactly one.
 
-class TestSearch:
-    def test_exact_product_code(self, library):
-        found, _ = search(library, "100RG")
-        assert names_of(found) == ["100RG_100.26R016_ACETONE RG.pdf"]
+class TestLookupReleases:
+    def test_product_code_plus_batch(self, library):
+        assert name_of(lookup(library, "100RG 100.26R016")) == "100RG_100.26R016_ACETONE RG.pdf"
 
-    def test_full_batch_fans_out_across_grades(self, library):
-        # F1 — one batch spans several grades. This falls out of tokenization with
-        # no logic at all: three filenames simply contain the token.
-        found, _ = search(library, "100.26R016")
-        assert sorted(names_of(found)) == sorted([
-            "100RG_100.26R016_ACETONE RG.pdf",
-            "100PU_100.26R016_ACETONE PURE.pdf",
-            "100LR_100.26R016_ACETONE LR.pdf",
+    @pytest.mark.parametrize("typed", [
+        "100RG 100.26R016",
+        "100RG_100.26R016",
+        "100RG/100.26R016",
+        "100RG,100.26R016",
+        "  100rg   100.26r016  ",
+    ])
+    def test_separators_and_case_do_not_matter(self, library, typed):
+        # The customer is copying off a drum or an invoice; how they punctuate it is
+        # not something they should have to get right.
+        assert name_of(lookup(library, typed)) == "100RG_100.26R016_ACETONE RG.pdf"
+
+    def test_pasting_the_whole_filename_works(self, library):
+        assert name_of(lookup(library, "100RG_100.26R016_ACETONE RG.pdf")) == (
+            "100RG_100.26R016_ACETONE RG.pdf")
+
+    def test_numeric_tolerance_survives_the_tightening(self, library):
+        # The one tolerance kept: a dropped leading zero is the same identifier
+        # written differently, not a near miss.
+        assert name_of(lookup(library, "100RG 26R16")) == "100RG_100.26R016_ACETONE RG.pdf"
+
+    def test_uniqueness_is_the_rule_not_the_field_names(self, library):
+        # Nothing here knows what a "product code" is (D2). Any two tokens that
+        # happen to identify one certificate release it — here a description and a
+        # grade. On the client's real 1,781-file folder the same query matches 16 and
+        # is refused, which is the rule doing its job in both directions.
+        assert name_of(lookup(library, "acetone LR")) == "100LR_100.26R016_ACETONE LR.pdf"
+
+    def test_f4_duplicate_filings_collapse_to_one_release(self):
+        # The same certificate filed in two month folders must not read as two
+        # matches and refuse itself. Dedupe is load-bearing now, not a tidy-up.
+        both = dedupe([
+            build_document(entry("100RG_100.26R016_ACETONE RG.pdf", file_id="jan",
+                                 modified="2026-01-04T09:00:00.000Z")),
+            build_document(entry("100RG_100.26R016_ACETONE RG.pdf", file_id="jul",
+                                 modified="2026-07-04T09:00:00.000Z")),
         ])
-
-    def test_partial_batch(self, library):
-        found, _ = search(library, "26R016")
-        assert len(found) == 3
-
-    def test_substring_of_a_batch_token(self, library):
-        found, _ = search(library, "R016")
-        assert len(found) == 3
-
-    def test_multi_token_query_narrows_to_one(self, library):
-        found, _ = search(library, "100LR 100.26R016")
-        assert names_of(found) == ["100LR_100.26R016_ACETONE LR.pdf"]
-
-    def test_description_only_query(self, library):
-        found, _ = search(library, "acetone")
-        assert len(found) == 4
-        assert all("ACETONE " in n.upper() for n in names_of(found))
-
-    def test_acetonitrile_is_not_an_acetone_match(self, library):
-        # Guards the prefix rule: ACETONE must not reach ACETONITRILE.
-        found, _ = search(library, "acetone")
-        assert not any("ACETONITRILE" in n for n in names_of(found))
-
-    def test_description_plus_grade(self, library):
-        found, _ = search(library, "acetone LR")
-        assert names_of(found) == ["100LR_100.26R016_ACETONE LR.pdf"]
-
-    def test_numeric_tolerance_finds_the_padded_batch(self, library):
-        found, _ = search(library, "26R16")
-        assert len(found) == 3
-
-    def test_exact_outranks_prefix_and_substring(self, library):
-        found, _ = search(library, "104IP")
-        assert names_of(found)[0] == "104IP_104.26P004_BENZYL ALCOHOL_IP.pdf"
-
-    def test_ranking_is_deterministic_across_repeated_calls(self, library):
-        first = names_of(search(library, "acetone")[0])
-        for _ in range(5):
-            assert names_of(search(library, "acetone")[0]) == first
+        assert name_of(lookup(both, "100RG 100.26R016")) == "100RG_100.26R016_ACETONE RG.pdf"
 
 
-class TestFallbackPass:
-    def test_a_typo_degrades_into_near_misses_instead_of_nothing(self, library):
-        # Strict finds nothing (no file has both tokens); the fallback ranks what
-        # matched the real one.
-        found, _ = search(library, "acetone ZZZZQQ")
-        assert found, "fallback pass should surface near misses"
-        assert all("ACETONE" in n.upper() for n in names_of(found))
+class TestLookupRefuses:
+    def test_batch_alone_when_it_spans_grades(self, library):
+        # F1 — three grades share this batch, so the batch alone does not identify a
+        # certificate. This is the case the client accepted: that customer is now
+        # sent to support rather than shown three options.
+        assert lookup(library, "100.26R016") is None
 
-    def test_strict_wins_when_it_has_anything(self, library):
-        found, _ = search(library, "acetone LR")
-        assert len(found) == 1, "fallback must not dilute a successful strict pass"
+    def test_a_product_name_alone(self, library):
+        assert lookup(library, "acetone") is None
 
-    def test_a_query_matching_nothing_returns_nothing(self, library):
-        found, truncated = search(library, "ZZZZQQ")
-        assert found == [] and truncated is False
+    def test_a_description_matching_several_certificates(self, library):
+        # Two BENZYL ALCOHOL certificates exist, so the pair identifies neither.
+        assert lookup(library, "BENZYL ALCOHOL") is None
 
-    def test_only_the_best_matching_tier_survives(self, library):
-        # The fallback used to admit anything matching AT LEAST ONE token, so one
-        # unmatched word returned the whole catalogue instead of the near misses. Now
-        # only the documents that matched the MOST query tokens come back.
-        best, _ = search(library, "acetone 100.26R016 ZZZZQQ")
-        loose, _ = search(library, "acetone ZZZZQQ")
-        assert len(best) < len(loose), (
-            "adding a second real token must narrow the fallback, not widen it")
-        assert all("100.26R016" in n for n in names_of(best))
+    def test_a_single_token_even_when_it_is_unique(self, library):
+        # `100RG` identifies exactly one file, and is still refused: the two-token
+        # floor is checked before uniqueness, which is what keeps a lucky one-word
+        # guess from releasing anything.
+        assert lookup(library, "100RG") is None
 
-    def test_conversational_phrasing_matches_the_clean_query_inside_it(self, library):
-        # The live-conversation bug: the model passes natural language straight
-        # through, so filler words must not each become a required search token.
-        clean, _ = search(library, "100.26R016")
+    def test_prefix_matching_is_gone(self, library):
+        # `ACET` used to reach ACETONE. It is not a token, so it now reaches nothing.
+        assert lookup(library, "ACET 100.26R016") is None
+
+    def test_substring_matching_is_gone(self, library):
+        # `R016` sits inside `26R016` and used to return all three grades.
+        assert lookup(library, "R016 100RG") is None
+
+    def test_a_typo_no_longer_degrades_into_suggestions(self, library):
+        # The fallback pass is deleted. A misspelling is a refusal, not a shortlist —
+        # a shortlist is a list of the client's certificates.
+        assert lookup(library, "acetnoe 100.26R016") is None
+
+    def test_conversational_phrasing_is_refused(self, library):
+        # REVERSAL of the §7.1 behaviour, and deliberate. Filler words are not tokens
+        # in the filename, so prose passed straight through matches nothing. This is
+        # the matcher's job and it stays this way; Phase D moved the extraction to the
+        # model instead — `get_coa`'s description now requires the identifiers alone,
+        # asserted in test_coa_endpoint.TestGetCoaToolContract.
         for phrasing in [
             "acetone, batch 100.26R016",
             "I have a drum of acetone batch 100.26R016",
             "COA for batch 100.26R016",
-            "please send me the certificate for batch 100.26R016",
         ]:
-            found, _ = search(library, phrasing)
-            assert names_of(found) == names_of(clean), f"{phrasing!r} should match the batch"
+            assert lookup(library, phrasing) is None, f"{phrasing!r} must not release"
 
-    def test_a_substring_only_hit_cannot_carry_the_fallback(self, library):
-        # "ME" prefix-matches METHANOL and "THE" sits inside ETHER, so short filler
-        # words otherwise drag in half the corpus. A fallback result now needs at
-        # least one token matching at prefix strength or better.
-        found, _ = search(library, "aa bb cc")
-        assert found == []
-
-    def test_filler_alone_still_returns_nothing(self, library):
-        # The corollary: dropping filler must not turn a contentless question into a
-        # match-everything query (H6's hole, reached by a different route).
+    def test_filler_alone(self, library):
         for query in ["batch", "certificate please", "can you send me the COA"]:
-            found, _ = search(library, query)
-            assert found == [], f"{query!r} carries no identifier and must return nothing"
+            assert lookup(library, query) is None, f"{query!r} carries no identifier"
+
+    def test_two_matches_are_never_resolved_by_a_tie_break(self):
+        # There is no ranking any more, so nothing may quietly pick the newest of an
+        # ambiguous pair. Two DIFFERENT certificates sharing the queried tokens must
+        # release neither — dedupe cannot collapse them, their names differ.
+        pair = dedupe([
+            build_document(entry("100RG_100.26R016_ACETONE RG.pdf",
+                                 modified="2026-01-04T09:00:00.000Z")),
+            build_document(entry("100RG_100.26R016_ACETONE RG GRADE II.pdf",
+                                 modified="2026-07-04T09:00:00.000Z")),
+        ])
+        assert len(pair) == 2
+        assert lookup(pair, "100RG 100.26R016") is None
 
 
-class TestSearchConstraints:
+class TestLookupConstraints:
     @pytest.mark.parametrize("query", ["___", "...", "", "   ", "-.-", None, 123])
-    def test_h6_empty_token_list_returns_nothing_not_everything(self, library, query):
+    def test_h6_empty_token_list_releases_nothing(self, library, query):
         # "every query token must match" is vacuously true for zero tokens, so this
-        # is the check that stops a separator-only query dumping the whole folder.
-        found, truncated = search(library, query)
-        assert found == [] and truncated is False
+        # is the check that stops a separator-only query matching the whole folder.
+        assert lookup(library, query) is None
 
-    def test_single_character_query_is_refused(self, library):
-        assert search(library, "1")[0] == []
+    def test_the_floor_counts_tokens_not_characters(self, library):
+        # `___` is three characters and no tokens, which is why the old character
+        # floor could not close H6 on its own.
+        assert coa_drive._matches(library, "___") == []
+        assert coa_drive._matches(library, "100RG") == []
 
-    def test_two_character_query_is_allowed(self, library):
-        assert search(library, "10")[0] != []
-
-    def test_results_are_capped_and_report_truncation(self, library):
-        found, truncated = search(library, "10", limit=2)
-        assert len(found) == 2 and truncated is True
-
-    def test_no_truncation_flag_when_everything_fits(self, library):
-        found, truncated = search(library, "100RG", limit=50)
-        assert len(found) == 1 and truncated is False
+    def test_ambiguous_and_absent_are_indistinguishable(self, library):
+        # C3 — the caller gets None either way, so nothing downstream is able to vary
+        # its message by how many certificates matched. That sameness IS the control:
+        # "16 matched" tells someone probing that acetone exists and they are close.
+        assert lookup(library, "100.26R016") is None    # three matched
+        assert lookup(library, "ZZZZ QQQQ") is None     # none matched
 
 
 class TestConventionIndependence:
-    """§12 — the same search behaviour against a folder that shares no naming
-    convention with the client's. Zero configuration changes hands."""
+    """§12 — the same behaviour against a folder that shares no naming convention
+    with the client's. Zero configuration changes hands."""
 
     @pytest.fixture
     def library(self):
         return index(OTHER_CONVENTION)
 
-    def test_batch_fans_out_across_grades(self, library):
-        found, _ = search(library, "B1042")
-        assert sorted(names_of(found)) == ["ACET-LR-B1042.pdf", "ACET-RG-B1042.pdf"]
+    def test_code_plus_grade_releases(self, library):
+        assert name_of(lookup(library, "ACET LR")) == "ACET-LR-B1042.pdf"
 
-    def test_product_code(self, library):
-        found, _ = search(library, "ACET")
-        assert len(found) == 2
+    def test_code_plus_batch_spanning_grades_is_refused(self, library):
+        assert lookup(library, "ACET B1042") is None
 
-    def test_code_plus_grade(self, library):
-        found, _ = search(library, "ACET LR")
-        assert names_of(found) == ["ACET-LR-B1042.pdf"]
+    def test_all_three_parts_release(self, library):
+        assert name_of(lookup(library, "ACET LR B1042")) == "ACET-LR-B1042.pdf"
 
     def test_numeric_tolerance_still_applies(self, library):
-        found, _ = search(library, "B997")
-        assert names_of(found) == ["BENZ-IP-B0997.pdf"]
+        assert name_of(lookup(library, "BENZ B997")) == "BENZ-IP-B0997.pdf"
 
     def test_h6_still_holds(self, library):
-        assert search(library, "___")[0] == []
+        assert lookup(library, "___") is None
 
 
 # ──────────────────────────── documents / dedupe ────────────────────────────
@@ -532,8 +535,7 @@ class TestWalkTraversal:
         # F3 — the folder path is never read for meaning.
         tree = {FOLDER_ID: [folder_entry("2026-01")], "2026-01": [entry(FIXTURES[8])]}
         result = await run_walk(drive(tree))
-        found, _ = search(list(result.documents), "104.24P008")
-        assert len(found) == 1
+        assert name_of(lookup(list(result.documents), "104.24P008")) == FIXTURES[8]
 
     @pytest.mark.asyncio
     async def test_non_pdf_files_are_ignored_and_counted(self):

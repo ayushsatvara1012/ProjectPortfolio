@@ -23,6 +23,7 @@ const REPORT = {
   duplicate_samples: [{ name: '100MC3_100.26P001_ACETONE USP-NF PH.EUR BP.pdf', copies: 2 }],
   hard_to_find: 1, hard_to_find_samples: ['129LR'], capped: [],
   walked_at: new Date().toISOString(),
+  failed_lookups: 12, failed_lookups_days: 7,
 };
 
 const fieldProps = {
@@ -101,6 +102,32 @@ describe('CoaLibraryPanel', () => {
     render(<CoaLibraryPanel botId="bot-1" authFetch={authFetch} savedFolderId={FOLDER_ID} />);
     await waitFor(() => expect(screen.getByText(/Every certificate in this folder is searchable/))
       .toBeInTheDocument());
+  });
+
+  it('shows the failed lookups the owner cannot otherwise see', async () => {
+    // coa-confidential-access §8 — the throttle makes a guesser slow, this is what
+    // makes them visible.
+    const authFetch = vi.fn(() => Promise.resolve(REPORT));
+    render(<CoaLibraryPanel botId="bot-1" authFetch={authFetch} savedFolderId={FOLDER_ID} />);
+    await waitFor(() => expect(screen.getByText('Failed lookups')).toBeInTheDocument());
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText(/last 7 days/)).toBeInTheDocument();
+  });
+
+  it('says nothing at all when the count could not be read, rather than showing zero', async () => {
+    // A "0" here reads as "nobody is guessing at your batch numbers", which is the
+    // one thing an unreadable counter must not be allowed to say.
+    const authFetch = vi.fn(() => Promise.resolve({ ...REPORT, failed_lookups: null }));
+    render(<CoaLibraryPanel botId="bot-1" authFetch={authFetch} savedFolderId={FOLDER_ID} />);
+    await waitFor(() => expect(screen.getByText('Certificate library')).toBeInTheDocument());
+    expect(screen.queryByText('Failed lookups')).not.toBeInTheDocument();
+  });
+
+  it('renders a quiet week as zero, which is the reassuring answer', async () => {
+    const authFetch = vi.fn(() => Promise.resolve({ ...REPORT, failed_lookups: 0 }));
+    render(<CoaLibraryPanel botId="bot-1" authFetch={authFetch} savedFolderId={FOLDER_ID} />);
+    await waitFor(() => expect(screen.getByText('Failed lookups')).toBeInTheDocument());
+    expect(screen.getByText('0')).toBeInTheDocument();
   });
 
   it('refetches when the reload key changes, which is what a Test Connection bumps', async () => {

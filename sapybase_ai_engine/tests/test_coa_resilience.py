@@ -461,14 +461,14 @@ class TestResolveUsesTheGate:
             warm = len(requests)
             coa_drive.reset_index_memo()        # force the Redis tier, not the memo
 
-            first, _ = await resolve(COMPANY_ID, FOLDER_ID, "ZZ.99Q999",
-                                    redis_client=cache, api_key=API_KEY, client=client)
+            first = await resolve(COMPANY_ID, FOLDER_ID, "ZZ.99Q999",
+                                  redis_client=cache, api_key=API_KEY, client=client)
             after_first = len(requests)
             for _ in range(5):
                 await resolve(COMPANY_ID, FOLDER_ID, "ZZ.99Q999",
                               redis_client=cache, api_key=API_KEY, client=client)
 
-        assert first == []
+        assert first is None
         assert after_first > warm               # the first miss did refresh
         assert len(requests) == after_first     # the next five did not
 

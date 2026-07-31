@@ -33,6 +33,8 @@ const RAW = {
   hard_to_find_samples: ['129LR'],
   capped: [],
   walked_at: '2026-07-29T10:00:00.000Z',
+  failed_lookups: 4,
+  failed_lookups_days: 7,
 };
 
 const report = (over: Partial<CoaReport> = {}): CoaReport => ({
@@ -68,6 +70,25 @@ describe('parseCoaReport', () => {
     expect(parsed.duplicateSamples).toEqual([]);
     expect(parsed.capped).toEqual([]);
     expect(parsed.walkedAt).toBeNull();
+    // …except the tripwire, which is unknown rather than zero (see below).
+    expect(parsed.failedLookups).toBeNull();
+  });
+
+  it('reads the failed-lookup count with the window it covers', () => {
+    const parsed = parseCoaReport(RAW)!;
+    expect(parsed.failedLookups).toBe(4);
+    expect(parsed.failedLookupsDays).toBe(7);
+  });
+
+  it('keeps "we could not read the counter" distinct from "nobody missed"', () => {
+    // coa-confidential-access §8 — folding these together would tell an owner whose
+    // Redis is down that nobody is guessing at their batch numbers.
+    expect(parseCoaReport({ ...RAW, failed_lookups: null })!.failedLookups).toBeNull();
+    expect(parseCoaReport({ ...RAW, failed_lookups: 0 })!.failedLookups).toBe(0);
+  });
+
+  it('never invents the window, so a count is only shown with the days it covers', () => {
+    expect(parseCoaReport({ ...RAW, failed_lookups_days: 0 })!.failedLookups).toBeNull();
   });
 
   it('drops junk sample entries instead of rendering blanks', () => {

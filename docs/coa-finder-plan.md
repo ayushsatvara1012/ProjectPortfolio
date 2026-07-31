@@ -3,6 +3,11 @@
 Chemical vertical.
 Turn the currently-disabled `Request COA` hub card into a Certificate of Analysis lookup against the company's own Google Drive folder.
 
+> **Amended 2026-07-30 by `docs/coa-confidential-access-plan.md`.**
+> The client reclassified certificates as confidential, so the visitor-facing lookup becomes exact retrieval rather than search.
+> That amendment supersedes D1, D3, D5 and D7 and rewrites §7 and §8; everything else below still holds.
+> Read it alongside this document, not instead of it.
+
 ## 0. Status - 2026-07-29
 
 Phases 0-3 are **built and committed**; **Phase 4, H5 and H15 are built and uncommitted**.

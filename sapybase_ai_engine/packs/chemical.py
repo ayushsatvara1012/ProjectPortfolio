@@ -105,18 +105,22 @@ get_coa = ToolSpec(
     name="get_coa",
     description=(
         "Look up a Certificate of Analysis (COA) for a specific BATCH the visitor "
-        "already has — they read the code off a drum, label or invoice. Pass whatever "
-        "they typed, verbatim, as `query`: a product code, a batch number, a product "
-        "name, or several together. Do not reformat it, do not guess a batch, and do "
-        "not ask which part is the code. Returns a status and a COUNT only — the "
-        "certificates appear in a panel the visitor picks from, so never list "
-        "filenames, never state a result, and never paste a link. A COA reports one "
-        "batch's tested values: it is NOT a safety sheet (use get_sds) and NOT a "
-        "product spec (use get_product_spec)."
+        "already has — they read the codes off a drum, label or invoice. This is an "
+        "exact lookup, not a search: it releases the one certificate the identifiers "
+        "name, or nothing at all. Pass ONLY the identifiers themselves as `query` — "
+        "the codes and numbers, separated by spaces, with every ordinary word "
+        "removed. From 'I have a drum of acetone, batch 100.26R016, grade 100RG' pass "
+        "'100RG 100.26R016'. Never pass the visitor's sentence, never invent or "
+        "complete an identifier they did not give you, and never guess a batch. If "
+        "they have given only one identifier, ask for the other before calling this. "
+        "Never list filenames, never state a result, and never paste a link — the "
+        "certificate opens in a panel. A COA reports one batch's tested values: it is "
+        "NOT a safety sheet (use get_sds) and NOT a product spec (use get_product_spec)."
     ),
     slots=(
         Slot("query", required=True,
-             description="What the visitor typed — product code, batch number, or product name."),
+             description=("Only the identifiers the visitor read out — product code and "
+                          "batch number, space-separated, with no other words.")),
     ),
 )
 
@@ -248,7 +252,7 @@ _HUB_CARDS = (
         # No input_source: D4 keeps COA isolated from the catalog, so the field
         # is free text (a batch number is not a product name).
         action="coa_picker",
-        input_label="Product code or batch number",
+        input_label="Product code and batch number",
         prompt_template="I need the Certificate of Analysis for {value}.",
         color="#10B981",  # emerald — certified / quality
     ),
