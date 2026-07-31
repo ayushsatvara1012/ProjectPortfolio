@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import time
 from collections import OrderedDict
 from datetime import date, datetime, timedelta, timezone
@@ -30,18 +31,44 @@ from typing import Any, List, Optional, Tuple
 
 logger = logging.getLogger("coa_throttle")
 
+
+def _tunable(name: str, default: int) -> int:
+    """An env override for one throttle number, falling back to the shipped default.
+
+    These exist so the limits can be loosened for testing, and retuned later against
+    Phase E's real failed-lookup count, without a code change. Every default below is
+    the value the plan specifies (C4), so an unset environment behaves exactly as
+    specified — an override is something someone has to do on purpose.
+
+    A junk or non-positive value falls back rather than raising: a typo in a dashboard
+    env var must not take the gate to zero, and must not stop the app booting.
+    """
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Ignoring non-integer %s=%r; using %d", name, raw, default)
+        return default
+    if value < 1:
+        logger.warning("Ignoring %s=%d (must be >= 1); using %d", name, value, default)
+        return default
+    return value
+
+
 # The tripwire for random typing (C4). Small on purpose: a customer holding a drum
 # reads the code off the label, and three failures is already the point at which a
 # human should be talking to a human rather than typing.
-MISS_LIMIT = 3
-MISS_WINDOW_SECONDS = 300
-LOCKOUT_SECONDS = 900
+MISS_LIMIT = _tunable("COA_MISS_LIMIT", 3)
+MISS_WINDOW_SECONDS = _tunable("COA_MISS_WINDOW_SECONDS", 300)
+LOCKOUT_SECONDS = _tunable("COA_LOCKOUT_SECONDS", 900)
 
 # The backstop, for a script that clears its `visitorId` between attempts. Loose
 # enough that a shared office never reaches it — twenty *failed* lookups in an hour
 # from one address is not a floor of colleagues checking their own certificates.
-IP_MISS_LIMIT = 20
-IP_MISS_WINDOW_SECONDS = 3600
+IP_MISS_LIMIT = _tunable("COA_IP_MISS_LIMIT", 20)
+IP_MISS_WINDOW_SECONDS = _tunable("COA_IP_MISS_WINDOW_SECONDS", 3600)
 
 # The owner's tripwire (§8). Probing is completely invisible today, and a count the
 # owner can see is worth more than another control: someone walking the batch sequence

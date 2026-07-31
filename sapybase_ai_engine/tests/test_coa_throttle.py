@@ -212,6 +212,36 @@ class TestIpBackstop:
         assert await lockout_seconds(COMPANY_ID, None, None, now=0.0) == 0
 
 
+class TestTunables:
+    """The limits are env-overridable so they can be loosened for testing and retuned
+    against Phase E's real numbers. The safety that matters is that an unset or junk
+    environment lands on the plan's values rather than on zero."""
+
+    def test_the_shipped_defaults_are_the_plan_values(self, monkeypatch):
+        for name in ("COA_MISS_LIMIT", "COA_MISS_WINDOW_SECONDS", "COA_LOCKOUT_SECONDS",
+                     "COA_IP_MISS_LIMIT", "COA_IP_MISS_WINDOW_SECONDS"):
+            monkeypatch.delenv(name, raising=False)
+        assert coa_throttle._tunable("COA_MISS_LIMIT", 3) == 3
+        assert coa_throttle._tunable("COA_LOCKOUT_SECONDS", 900) == 900
+
+    def test_an_override_is_read(self, monkeypatch):
+        monkeypatch.setenv("COA_MISS_LIMIT", "50")
+        assert coa_throttle._tunable("COA_MISS_LIMIT", 3) == 50
+
+    def test_junk_falls_back_rather_than_raising(self, monkeypatch):
+        # A typo in a dashboard env var must not stop the app booting.
+        monkeypatch.setenv("COA_MISS_LIMIT", "three")
+        assert coa_throttle._tunable("COA_MISS_LIMIT", 3) == 3
+
+    def test_zero_or_negative_cannot_take_the_gate_to_nothing(self, monkeypatch):
+        # `0` would mean "locked out before your first attempt", which is the one
+        # value an override must never be able to produce by accident.
+        monkeypatch.setenv("COA_MISS_LIMIT", "0")
+        assert coa_throttle._tunable("COA_MISS_LIMIT", 3) == 3
+        monkeypatch.setenv("COA_MISS_LIMIT", "-5")
+        assert coa_throttle._tunable("COA_MISS_LIMIT", 3) == 3
+
+
 class TestKeys:
     def test_identities_are_hashed_into_the_key(self):
         # `visitor_id` comes from the browser, so raw it could carry a megabyte, or a
