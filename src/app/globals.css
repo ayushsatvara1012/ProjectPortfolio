@@ -315,7 +315,7 @@
   /* ── Hero spiral ───────────────────────────────────────────────────────
      Each leaf draws itself once via stroke-dashoffset (pathLength=1 on the
      path normalises every leaf to the same length, so one keyframe fits all),
-     staggered from the darkest leaf backwards through the trail, so the cascade
+     staggered from the faintest leaf forwards into the darkest, so the cascade
      builds the full form leaf by leaf. No rotation — the drawing is the motion. */
   /* 22s = one A→B→A loop, each design owning a full half with no dead time:
      draw (0–14%), hold (14–36%), retract (36–50%), then empty while the other
@@ -327,11 +327,23 @@
     14%, 36%  { stroke-dashoffset: 0; }
     50%, 100% { stroke-dashoffset: -1; }
   }
-  /* Pure white. The depth comes from the per-leaf `opacity` already in the
-     artwork (0.04 → 1), not from hue, so the form reads as one white filament
-     fading into the background rather than as 25 differently-tinted strokes. */
+  /* One flat colour per theme. The depth comes from the per-leaf `opacity` the
+     component derives, not from hue, so the form reads as a single filament
+     fading into the background rather than as 25 differently-tinted strokes —
+     which is also why this is one token rather than a gradient.
+
+     Light gets #1E6FB8 — the exact stroke of ChatbotShowcaseOrnament, the
+     filament artwork in the section directly below. The two are the same motif
+     on the same page base, so they must be the same blue; if you change one,
+     change the other. Dark stays pure white, as the ornament's own dark value
+     (#6EB2E8) is tuned for a mid-section it sits further inside.
+
+     Same convention as the mesh blobs below: light is the base and
+     `prefers-color-scheme: dark` overrides, because this project has no theme
+     provider and no `dark` class, so Tailwind's `dark:` variant — which
+     HeroSpiral's wrapper uses for its opacity — resolves to the media query. */
   .spiral-leaf {
-    stroke: #fff;
+    stroke: #1e6fb8;
     /* `1 2`, not `1`. A bare `1` means dash 1 / gap 1 — a period of 2 over a
        path normalised to length 1, so as the offset runs negative the *next*
        dash in the repeat creeps back onto the path and leaves stubs behind.
@@ -341,6 +353,12 @@
     /* Symmetric ease so the draw and the retract accelerate and settle the
        same way — an asymmetric curve makes the handover feel like a snap. */
     animation: spiralDraw 22s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .spiral-leaf {
+      stroke: #fff;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

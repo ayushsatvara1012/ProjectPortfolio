@@ -4,7 +4,6 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 import { PRODUCT } from '@/src/lib/brand';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
-import MeshGradientBackground from '@/src/components/marketing/MeshGradientBackground';
 // import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
 import ChatbotShowcase from '@/src/components/marketing/home/ChatbotShowcase';
 import FeatureGrid from '@/src/components/marketing/home/FeatureGrid';
@@ -128,13 +127,6 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
-        {/* The mesh belongs to the hero only: pinned to the top of the page and
-            one viewport tall, so it scrolls away with the hero. Its mask fades
-            to nothing before the bottom edge, which resolves the gradient into
-            the page base — no seam where the hero ends. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-dvh z-0">
-          <MeshGradientBackground />
-        </div>
         <div className="relative z-10">
         <HeroSection />
         {/* <SocialProofBar /> */}

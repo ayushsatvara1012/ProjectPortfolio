@@ -292,8 +292,8 @@ export default function Navbar() {
             // Opaque behind the open mobile menu: a translucent bar over the
             // menu's solid panel reads as a seam across the top of the sheet.
             isOpen
-              ? 'bg-[#FAFAFC] dark:bg-[#0B0F19] lg:bg-white/75 lg:dark:bg-slate-950/75'
-              : 'bg-white/75 dark:bg-slate-950/75'
+              ? 'bg-[#FAFAFC] dark:bg-[#0B0F19] lg:bg-white/75 lg:dark:bg-[#0B0F19]'
+              : 'bg-white/75 dark:bg-[#0B0F19]'
           } ${
             mounted ? 'nav-shell__layer--animated' : ''
           } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
@@ -376,7 +376,7 @@ export default function Navbar() {
                         viewport when its trigger sits off-centre. */}
                     <div
                       id={`nav-dropdown-${key}`}
-                      className={`fixed top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] rounded-3xl transition-[opacity,transform] duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top ${isActive ? 'opacity-100 translate-y-1 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
+                      className={`fixed top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] bg-white/80 dark:bg-[#0B0F19]/80 backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] rounded-3xl transition-[opacity,transform] duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top ${isActive ? 'opacity-100 translate-y-1 scale-100' : 'opacity-0 translate-y-0 scale-95 pointer-events-none'}`}
                       onMouseLeave={() => setActiveDropdown(null)}
                     >
                       <div className="flex p-8">
