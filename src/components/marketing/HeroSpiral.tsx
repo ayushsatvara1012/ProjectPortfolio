@@ -1,30 +1,24 @@
 import React from 'react';
 
-/* Hero spiral — the leaves of public/hero-spiral.svg and hero-spiral-2.svg,
-   inlined so each path can be staggered individually (an <img> cannot be
-   styled from outside). Those files stay the source of truth for the artwork.
+/* Hero spiral — the leaves of public/hero-spiral-2.svg, inlined so each path
+   can be staggered individually (an <img> cannot be styled from outside).
+   That file stays the source of truth for the artwork.
 
-   Two normalisations are applied here, both derived from a circle fitted to
-   each design's 25 leaf start points:
+   This is machine-perfect artwork: one leaf stamped 25 times at 14.4°
+   (arc length 102.77, rmin 10.87, rmax 45.21 across all 25, and each leaf's
+   inner edge spans 33.3° against a 14.4° pitch — a 2.3x overlap — so the ring
+   is continuous with zero uncovered arc). No per-leaf rotation correction or
+   anisotropic unsquash is needed, unlike the hand-drawn variant this replaced.
 
-   1. viewBox — recomputed around the fitted centre so both designs' inner
-      circles render concentric and identically sized, and the A→B handover
-      keeps one continuous ring.
+   Opacity and stroke width are not authored per leaf — see LEAF_MIN_OPACITY
+   and STROKE_WIDTH below for why they are derived instead.
 
-      This must be fitted to the leaves' INNER TIPS, not to their start points.
-      Fitting the start points looks equivalent and is not: A's start point is
-      its inner tip (r 10.9 vs 10.86), but B's sits well outside its own
-      (r 14.16 vs 10.87), so a start-point fit silently rendered A's inner
-      circle 25.5% larger than B's — 13.39% of the box against 10.67%.
-   2. `r` — a per-leaf rotation about that centre. As authored, both rings have
-      a ~2x-width gap (31.7° in A, 27.8° in B, against a ~13.7° norm), so the
-      ring visibly fails to close. Rotating each leaf onto an exact 360/25 =
-      14.4° grid closes it without altering a single leaf's shape.
-   3. `unsquash` — A only. See UNSQUASH below; `r` alone cannot close A's ring,
-      because A's ring is not a circle.
-
-   Opacity and stroke width are no longer authored per leaf — see LEAF_MIN_*
-   below for why they are derived instead.
+   The ring is permanently drawn: nothing draws on or erases, and no leaf
+   moves. One palette is on the ring at a time, spread across the leaves as a
+   fixed three-stop gradient (see LEAF_STOP_MIX below); the animation is the
+   palette swapping underneath it, which happens in CSS rather than here —
+   see the "Hero spiral" block in globals.css. The only thing this file
+   contributes to that animation is each leaf's phase offset, LEAF_DELAY.
 
    Decorative only. */
 
@@ -33,50 +27,10 @@ type Variant = {
   viewBox: string;
   cx: number;
   cy: number;
-  /* Anisotropic correction applied to the whole layer, about (cx, cy):
-     compress by `k` along the axis at `angle` degrees. Omitted = already round. */
-  unsquash?: { k: number; angle: number };
   leaves: Leaf[];
 };
 
-const SPIRAL_A: Variant = {
-  /* Span 98.67, not the authored 78.62: sized so A's mean inner-tip radius
-     (10.526 after `unsquash`) lands on the same fraction of the box as B's
-     (10.875 / 101.95 = 10.667%). Centre is unchanged — it stays the box centre. */
-  viewBox: '-6.51 -8.79 98.67 98.67',
-  cx: 42.83,
-  cy: 40.55,
-  unsquash: { k: 0.93845, angle: -4.74 },
-  leaves: [
-    { d: "M43.1909 51.048L40.0611 51.5548C37.5361 51.9636 35.3485 53.5306 34.2041 55.7503L25.0676 73.4702L27.6201 69.5289C28.8152 67.6835 30.7339 66.3727 32.9271 65.9034L45.3653 63.2415C46.9606 62.9001 48.3781 61.9953 49.3348 60.7079C52.6955 56.1853 48.8457 50.1324 43.1909 51.048Z", r: -5.31 },
-    { d: "M40.2393 50.8088L37.2652 50.6069C34.7655 50.4372 32.3275 51.4211 30.7179 53.2491L17.281 68.5087L20.8217 65.193C22.4048 63.7105 24.5511 62.896 26.7713 62.9352L39.5925 63.1616C41.214 63.1903 42.7914 62.6457 44.0173 61.6342C48.4019 58.0164 46.0235 51.2015 40.2393 50.8088Z", r: -7.051 },
-    { d: "M37.4333 49.8412L34.7889 49.0322C32.4593 48.3195 29.9351 48.7003 27.9889 50.058L10.9682 61.931L15.3262 59.4631C17.1852 58.4104 19.4218 58.1179 21.5396 58.6504L34.0082 61.7858C35.5605 62.1762 37.1979 62.0113 38.6094 61.3224C43.755 58.8111 43.0109 51.5475 37.4333 49.8412Z", r: -8.628 },
-    { d: "M35.0303 48.2327L32.8072 46.9322C30.7646 45.7374 28.2924 45.5352 26.1304 46.3864L6.49461 54.117L11.4229 52.6833C13.4476 52.0943 15.6495 52.3162 17.551 53.301L28.9266 59.1922C30.3237 59.9158 31.9284 60.1254 33.4425 59.7822C39.05 58.5109 40.0587 51.1742 35.0303 48.2327Z", r: -9.511 },
-    { d: "M33.2173 46.16L31.4491 44.4557C29.7844 42.8512 27.4735 42.1048 25.1995 42.4371L4.11745 45.5178L9.30598 45.2367C11.3952 45.1235 13.4548 45.8315 15.0438 47.2091L24.6336 55.5232C25.8023 56.5364 27.2936 57.0991 28.8336 57.1077C34.5867 57.1401 37.3777 50.17 33.2173 46.16Z", r: -9.411 },
-    { d: "M32.0781 43.836L30.7868 41.7761C29.5732 39.8403 27.5144 38.5921 25.2195 38.4008L3.97496 36.6297L9.08157 37.5285C11.1408 37.8909 12.9642 39.0446 14.1609 40.7421L21.3786 50.9809C22.2588 52.2294 23.5663 53.1132 25.0608 53.4699C30.6406 54.8013 35.1076 48.6688 32.0781 43.836Z", r: -8.284 },
-    { d: "M31.5955 41.4509L30.8306 39.0664C30.1312 36.886 28.4117 35.1809 26.188 34.4627L6.0744 27.966L10.7645 29.9743C12.6993 30.8027 14.1995 32.3513 14.9392 34.2834L19.3566 45.8217C19.8999 47.241 20.9594 48.4052 22.3378 49.0977C27.4338 51.6577 33.3121 46.8023 31.5955 41.4509Z", r: -6.294 },
-    { d: "M31.6979 39.1322L31.5462 36.48C31.4134 34.1578 30.1267 32.0532 28.0811 30.8127L10.2955 20.0267L14.2802 22.9889C15.9899 24.2598 17.0837 26.1379 17.3181 28.205L18.695 40.3451C18.8668 41.8596 19.6185 43.2516 20.8068 44.2559C25.1285 47.9082 32.0146 44.6687 31.6979 39.1322Z", r: -3.737 },
-    { d: "M32.3106 36.9436L32.8691 34.1435C33.3358 31.8038 32.5793 29.3857 30.8383 27.6522L16.394 13.2702L19.4561 16.9729C20.834 18.6389 21.4443 20.7585 21.1475 22.8466L19.4377 34.8748C19.2211 36.3991 19.6124 37.9496 20.5352 39.2233C23.8273 43.7673 31.2355 42.333 32.3106 36.9436Z", r: -1.002 },
-    { d: "M33.3961 34.9163L34.722 32.1605C35.7869 29.9471 35.6465 27.3424 34.346 25.189L24.0178 8.08669L26.0199 12.2918C26.9624 14.2714 27.0295 16.5171 26.2054 18.5019L21.5414 29.7351C20.9423 31.1781 20.9361 32.8004 21.5239 34.2771C23.585 39.4544 31.0202 39.8547 33.3961 34.9163Z", r: 1.477 },
-    { d: "M34.9563 33.0953L37.0191 30.6212C38.6341 28.6843 39.1584 26.0615 38.4195 23.6158L32.727 4.77527L33.5999 9.24772C34.0242 11.4219 33.5208 13.6533 32.2098 15.4092L24.8789 25.2277C23.9288 26.5003 23.5123 28.0937 23.7143 29.6838C24.4139 35.1919 31.4325 37.3218 34.9563 33.0953Z", r: 3.287 },
-    { d: "M36.9995 31.572L39.6607 29.6097C41.7268 28.0861 42.9033 25.6373 42.8008 23.0738L42.0187 3.52717L41.7415 8.04559C41.6052 10.2664 40.5503 12.3312 38.8302 13.7441L29.2502 21.6131C28.005 22.636 27.1971 24.0955 26.9918 25.6931C26.2834 31.205 32.5249 34.8715 36.9995 31.572Z", r: 4.122 },
-    { d: "M39.4914 30.4853L42.5221 29.2011C44.8985 28.1942 46.6438 26.1033 47.1844 23.6156L51.3565 4.41444L49.9412 8.76493C49.2546 10.8755 47.7183 12.6302 45.6987 13.6104L34.3969 19.0959C32.9329 19.8065 31.7851 21.0348 31.1869 22.5312C29.1131 27.7186 34.2987 32.6855 39.4914 30.4853Z", r: 3.873 },
-    { d: "M42.3159 29.9885L45.4473 29.4494C47.9698 29.0152 50.1425 27.4242 51.264 25.19L60.2014 7.38585L57.6946 11.3491C56.5187 13.2082 54.6131 14.5393 52.4242 15.0306L40.0188 17.8151C38.4268 18.1725 37.0185 19.092 36.0753 20.3899C32.7642 24.9463 36.6739 30.9597 42.3159 29.9885Z", r: 2.708 },
-    { d: "M45.268 30.1956L48.2531 30.3685C50.757 30.5135 53.1877 29.5036 54.7798 27.6565L68.0426 12.2698L64.5419 15.6174C62.9734 17.1174 60.8341 17.9543 58.6123 17.9371L45.7926 17.8379C44.1702 17.8253 42.5977 18.3861 41.3817 19.4108C37.0365 23.0726 39.4825 29.8605 45.268 30.1956Z", r: 1.072 },
-    { d: "M48.0857 31.1326L50.7469 31.9177C53.0865 32.6079 55.61 32.2011 57.5443 30.822L74.4275 18.7845L70.1004 21.2935C68.2511 22.3658 66.0158 22.6811 63.891 22.1693L51.3916 19.1584C49.8344 18.7833 48.1976 18.9648 46.7924 19.6683C41.6739 22.231 42.4919 29.4824 48.0857 31.1326Z", r: -0.444 },
-    { d: "M50.511 32.7164L52.7534 33.9977C54.8105 35.1731 57.2875 35.3506 59.4423 34.477L78.9875 26.5537L74.078 28.0355C72.0583 28.645 69.8525 28.445 67.9395 27.4788L56.5015 21.7017C55.096 20.9918 53.4881 20.7981 51.9768 21.1566C46.3829 22.4835 45.4518 29.8258 50.511 32.7164Z", r: -1.315 },
-    { d: "M52.3519 34.7734L54.1403 36.4614C55.823 38.0496 58.1429 38.7733 60.414 38.4183L81.4594 35.1289L76.2752 35.4614C74.1867 35.5954 72.1189 34.9077 70.5146 33.5458L60.834 25.3278C59.654 24.326 58.1562 23.7781 56.6159 23.7848C50.8624 23.8095 48.1478 30.8053 52.3519 34.7734Z", r: -1.235 },
-    { d: "M53.521 37.0907L54.8338 39.1358C56.0683 41.0589 58.1398 42.2863 60.4357 42.4547L81.7004 44.0151L76.5831 43.1668C74.5206 42.825 72.6851 41.6897 71.4699 40.0044L64.1388 29.8371C63.245 28.5975 61.9281 27.7269 60.4302 27.3852C54.8363 26.1092 50.4378 32.2878 53.521 37.0907Z", r: -0.148 },
-    { d: "M54.0306 39.4764L54.8199 41.8476C55.5429 44.0194 57.279 45.7057 59.5079 46.401L79.6966 52.6992L74.9819 50.7364C73.0397 49.9279 71.5236 48.3952 70.7629 46.4714L66.2175 34.9753C65.6586 33.562 64.5871 32.409 63.2021 31.7307C58.0788 29.2217 52.2544 34.1407 54.0306 39.4764Z", r: 1.797 },
-    { d: "M53.9521 41.7997L54.1325 44.4422C54.2909 46.7607 55.5985 48.8494 57.6543 50.0675L75.5637 60.6799L71.5433 57.755C69.8217 56.5025 68.7085 54.6372 68.4514 52.5737L66.9399 40.4448C66.7515 38.9327 65.9853 37.5493 64.7871 36.5579C60.4261 32.9493 53.5741 36.2642 53.9521 41.7997Z", r: 4.311 },
-    { d: "M53.3605 43.9947L52.8345 46.7919C52.3942 49.1336 53.1757 51.5404 54.9328 53.2536L69.5403 67.4964L66.4346 63.8211C65.0401 62.1709 64.4073 60.0596 64.6809 57.9699L66.258 45.9222C66.4577 44.3965 66.0498 42.8512 65.114 41.588C61.7724 37.0778 54.3764 38.5922 53.3605 43.9947Z", r: 7.008 },
-    { d: "M52.2953 46.0297L51.0029 48.7922C49.9634 51.0142 50.1321 53.614 51.4544 55.7514L61.9742 72.7553L59.9241 68.5671C58.9608 66.5989 58.8692 64.356 59.6709 62.364L64.2114 51.0828C64.7944 49.6344 64.7829 48.0132 64.1792 46.5435C62.0614 41.3878 54.6175 41.0659 52.2953 46.0297Z", r: 9.454 },
-    { d: "M50.7561 47.8611L48.7232 50.3525C47.1305 52.3045 46.6353 54.9305 47.4006 57.3667L53.3021 76.153L52.3794 71.6874C51.9313 69.5188 52.4099 67.2836 53.7011 65.5152L60.9239 55.6234C61.8598 54.3417 62.2585 52.7448 62.0391 51.1575C61.2787 45.6571 54.2338 43.5989 50.7561 47.8611Z", r: 11.233 },
-    { d: "M48.7337 49.4L46.0943 51.3887C44.0451 52.9326 42.8957 55.393 43.0266 57.9555L44.0247 77.4932L44.252 72.9723C44.3637 70.7502 45.3957 68.6751 47.1001 67.2451L56.5925 59.2816C57.8264 58.2464 58.6181 56.779 58.8058 55.1794C59.4531 49.6607 53.1715 46.0563 48.7337 49.4Z", r: 12.028 },
-  ],
-};
-
-const SPIRAL_B: Variant = {
+const SPIRAL: Variant = {
   viewBox: '0.63 0.52 101.95 101.95',
   cx: 51.61,
   cy: 51.5,
@@ -109,75 +63,61 @@ const SPIRAL_B: Variant = {
   ],
 };
 
-const CYCLE_MS = 22000;   // full A→B→A loop; matches spiralDraw in globals.css
-const STAGGER_MS = 100;   // per-leaf cascade delay
+/* This leaf's fixed position on the active palette's three-stop gradient:
+   leaf 0 resolves to stop 0, the middle leaf to stop 1, the last to stop 2.
+   Static — it is the palette underneath that animates, not this.
 
-/* The ring closes geometrically (every step is an exact 14.4°), but as authored
-   the trail faded to opacity 0.04 — ~1% luminance contrast on the hero's near
-   black, i.e. invisible. The five faintest leaves spanned 72° of arc that
-   simply did not render, and they sat directly beside the opacity-1 head, so
-   the seam read as a gap in the ring. A's stroke width also ran *backwards*
-   against its opacity (widest where faintest), collapsing the fade faster
-   still and putting a second discontinuity on the same seam.
+   Two mixes rather than one across all three stops, so stop 1 is a point the
+   gradient actually passes through rather than merely leans toward. The two
+   branches meet exactly at u = 0.5 (100% of s1 from below, 0% of s2 from
+   above), so there is no discontinuity at the handover.
 
-   Opacity is a *periodic* ramp, not a linear one. Any monotonic 0→1 sweep is
-   by definition discontinuous where it wraps: leaf 24 lands on 1.0 and leaf 0
-   on the floor, and since those two are 14.4° apart like every other pair, the
-   step reads as a seam no matter how high the floor is raised. A raised cosine
-   over the full 25 leaves matches in both value and slope at the wrap, so the
-   ring has no seam anywhere — it breathes from LEAF_MIN_OPACITY up to 1 and
-   back once around, and there is no leaf index you can point at as "the end".
+   `in oklab`: sRGB mixing dips lightness through the middle of a two-colour
+   blend, which on the fire palette showed as a muddy band between the red
+   and the orange. This is the ring's spatial gradient only — the palette
+   animation in globals.css is a separate, temporal blend, and it lands in
+   oklab too, but by a different route: registered `<color>` properties
+   interpolate there without being asked. It needs to, now that the cycle
+   goes colour-to-colour with no neutral between. */
+const LEAF_STOP_MIX = (i: number, count: number) => {
+  const u = i / (count - 1);
+  return u <= 0.5
+    ? `color-mix(in oklab, var(--spiral-s0), var(--spiral-s1) ${(u * 200).toFixed(2)}%)`
+    : `color-mix(in oklab, var(--spiral-s1), var(--spiral-s2) ${((u - 0.5) * 200).toFixed(2)}%)`;
+};
 
-   Stroke width is a single hairline shared by every leaf of both designs — the
-   depth comes from opacity alone. */
+/* Static, per-leaf, and deliberately not animated — this is the depth in the
+   ring's form, separate from the colour wheel travelling over it.
+
+   Opacity is a *periodic* ramp, not a linear one: any monotonic 0→1 sweep is
+   by definition discontinuous where it wraps, since leaf 24 would land on 1.0
+   and leaf 0 on the floor while sitting only 14.4° apart, like every other
+   pair. A raised cosine over the full 25 leaves matches in both value and
+   slope at the wrap, so the ring has no seam anywhere — it breathes from
+   LEAF_MIN_OPACITY up to 1 and back once around, and there is no leaf index
+   you can point at as "the end". */
 const LEAF_MIN_OPACITY = 0.45;
 
-/* ── Why A needs `unsquash` ──────────────────────────────────────────────────
-   B is machine-perfect: one leaf stamped 25 times at 14.4°. Measured, all 25
-   are identical to 5 decimal places (arc length 102.77, rmin 10.87, rmax 45.21)
-   and each leaf's inner edge spans 33.3° against a 14.4° pitch — a 2.3x overlap,
-   so B's ring is continuous with zero uncovered arc.
+/* Rendered hairline thickness, in this variant's own viewBox units. */
+const STROKE_WIDTH = 0.389;
 
-   A is not. Its leaves are all *different*: arc length 73.13–74.62, inner radius
-   10.47–11.16, outer 36.96–39.05. Crucially the variation is a clean two-cycle
-   sinusoid around the ring (fitted 2-cycle amplitude 0.32 against a 1-cycle
-   amplitude of 0.03) — one cycle would mean the ring is merely off-centre, two
-   means it is an ELLIPSE. A is circular artwork that was scaled non-uniformly
-   somewhere upstream, squashed ~6% along one axis.
+/* Phase offset for leaf i, in seconds. Negative so the animation starts
+   already advanced rather than every leaf waiting out its delay on load.
+   0.3s per leaf puts leaf 24 a full 7.2s ahead of leaf 0, which is what makes
+   the palette change arrive as a wipe travelling from the spiral's open end
+   inward instead of the whole ring flipping at once.
 
-   That is why no amount of per-leaf rotation ever closed it. `r` slides leaves
-   *along* the ring; it cannot make an elliptical ring round. Where the ellipse
-   bulges, consecutive leaves stop overlapping and the ring opens: measured
-   153.6° of the circumference uncovered, with a single 44.3° hole — the gap in
-   the screenshot.
+   Sign, not magnitude, sets the direction: negate this to sweep leaf 0 → 24.
 
-   Fix: invert the squash for the whole layer. Values below are a numeric fit
-   minimising the spread of the 25 inner-tip radii; they take that spread from
-   0.693 to 0.117 and the largest hole from 44.3° to 2.4°, which at hairline
-   width is nothing. The residual is genuine hand-drawn irregularity in A, not
-   a systematic error, so this is as round as the artwork gets.
+   This number is half of a pair — it is the ratio against the 1.5s per-leaf
+   crossfade in globals.css that fixes the 5-leaf width of the travelling
+   band. Changing it here alone re-widths the band. The same file explains why
+   it must also stay well under the hold plateau. */
+const LEAF_DELAY = (i: number) => `${(-0.3 * i).toFixed(2)}s`;
 
-   Rendered hairline thickness, in units of A's viewBox. Both layers fill the
-   same square box from *different* viewBoxes (A spans 78.62, B spans 101.95),
-   so an identical `stroke-width` number would render B ~23% thinner. Each
-   variant's width is scaled by its own span to land on the same optical
-   thickness on screen. */
-const HAIRLINE = 0.3;
-const A_SPAN = 78.62;
-
-function hairlineFor(variant: Variant) {
-  const span = Number(variant.viewBox.split(' ')[2]);
-  /* A non-uniform scale scales the stroke with it, so an unsquashed layer would
-     render ~sqrt(k) thinner on average than an untouched one. Pre-divide to
-     bring the mean optical weight back onto B's. */
-  const squashLoss = variant.unsquash ? Math.sqrt(variant.unsquash.k) : 1;
-  return (HAIRLINE * span) / A_SPAN / squashLoss;
-}
-
-function SpiralLayer({ variant, phase }: { variant: Variant; phase: 0 | 1 }) {
+function SpiralLayer({ variant }: { variant: Variant }) {
   const count = variant.leaves.length;
-  const strokeWidth = hairlineFor(variant);
-  const { cx, cy, unsquash } = variant;
+  const { cx, cy } = variant;
 
   return (
     <svg
@@ -185,49 +125,42 @@ function SpiralLayer({ variant, phase }: { variant: Variant; phase: 0 | 1 }) {
       fill="none"
       className="absolute inset-0 h-full w-full"
     >
-      <g
-        transform={
-          unsquash
-            ? `translate(${cx} ${cy}) rotate(${unsquash.angle}) scale(${unsquash.k} 1)` +
-              ` rotate(${-unsquash.angle}) translate(${-cx} ${-cy})`
-            : undefined
-        }
-      >
-        {variant.leaves.map((leaf, i) => {
-          /* `/ count`, not `/ (count - 1)`. The leaves sit on 25 equal 14.4°
-             steps, so the phase must advance in 25 equal steps too — dividing
-             by 24 would put leaves 0 and 24 at the same value and leave the
-             wrap step at zero, i.e. a doubled-up dim leaf right at the join. */
-          const t = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / count);
-          return (
-            <path
-              key={i}
-              d={leaf.d}
-              opacity={LEAF_MIN_OPACITY + (1 - LEAF_MIN_OPACITY) * t}
-              strokeWidth={strokeWidth}
-              pathLength={1}
-              transform={`rotate(${leaf.r} ${cx} ${cy})`}
-              className="spiral-leaf"
-              /* Cascade sweeps one way around the ring, starting from the dim
-                 point of the opacity cycle so the draw resolves on the bright
-                 side rather than trailing off into it. */
-              style={{ animationDelay: `${phase * (CYCLE_MS / 2) + i * STAGGER_MS}ms` }}
-            />
-          );
-        })}
-      </g>
+      {variant.leaves.map((leaf, i) => {
+        /* `/ count`, not `/ (count - 1)`. The leaves sit on 25 equal 14.4°
+           steps, so the phase must advance in 25 equal steps too — dividing
+           by 24 would put leaves 0 and 24 at the same value and leave the
+           wrap step at zero, i.e. a doubled-up dim leaf right at the join. */
+        const t = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / count);
+        return (
+          <path
+            key={i}
+            d={leaf.d}
+            opacity={LEAF_MIN_OPACITY + (1 - LEAF_MIN_OPACITY) * t}
+            strokeWidth={STROKE_WIDTH}
+            transform={`rotate(${leaf.r} ${cx} ${cy})`}
+            /* `stroke` resolves against the --spiral-s* properties this leaf
+               animates for itself, so the static mix re-evaluates on its own
+               as the palette moves beneath it. */
+            style={
+              {
+                stroke: LEAF_STOP_MIX(i, count),
+                '--leaf-delay': LEAF_DELAY(i),
+              } as React.CSSProperties
+            }
+          />
+        );
+      })}
     </svg>
   );
 }
 
 export default function HeroSpiral({ className = '' }: { className?: string }) {
   return (
-    /* No position utility here — the caller supplies one (the layers below are
-       absolute, so the caller's class is what they resolve against). Setting
-       `relative` here would collide with an `absolute` passed in. */
+    /* No position utility here — the caller supplies one (the layers below
+       are absolute, so the caller's class is what they resolve against).
+       Setting `relative` here would collide with an `absolute` passed in. */
     <span aria-hidden className={`spiral block aspect-square ${className}`}>
-      <SpiralLayer variant={SPIRAL_A} phase={0} />
-      <SpiralLayer variant={SPIRAL_B} phase={1} />
+      <SpiralLayer variant={SPIRAL} />
     </span>
   );
 }

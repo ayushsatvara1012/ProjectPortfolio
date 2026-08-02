@@ -10,7 +10,7 @@ export default function HeroSection() {
     <section id="home" className="relative min-h-dvh pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
       {/* Decorative — hugs the viewport's right wall and bleeds past it; the
           section's overflow-x-clip does the trimming. */}
-      <HeroSpiral className="pointer-events-none absolute z-0 top-1/2 right-0 -translate-y-1/2 translate-x-[30%] hidden sm:block w-[min(120vw,1000px)] opacity-[0.12] dark:opacity-[0.08]" />
+      <HeroSpiral className="pointer-events-none absolute z-0 top-1/2 right-0 -translate-y-1/2 translate-x-[30%] hidden sm:block w-[min(120vw,1000px)] opacity-[0.18] dark:opacity-[0.12]" />
 
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
         <div className="relative z-10 w-full flex flex-col items-center sm:items-start">
@@ -36,7 +36,7 @@ export default function HeroSection() {
           {/* Mobile-only spiral: the desktop version is a huge absolute
               background wash hidden below sm; here it's a small, in-flow
               decorative mark under the CTAs instead of being hidden outright. */}
-          <HeroSpiral className="relative sm:hidden mx-auto mt-10 w-56 opacity-[0.18] dark:opacity-[0.12]" />
+          <HeroSpiral className="relative sm:hidden mx-auto mt-10 w-56 opacity-[0.27] dark:opacity-[0.18]" />
           </div>
         </div>
 

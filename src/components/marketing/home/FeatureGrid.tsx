@@ -51,34 +51,13 @@ export default function FeatureGrid() {
         <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Pillar 1 — grounded answers */}
           <div className={cardShell}>
-            <Moment>
-              <div className="flex flex-col gap-3.5">
-                <div className="flex items-center gap-2 self-end">
-                  <span className={qBubble}>What&apos;s the flash point of the thinner?</span>
-                  <span className={avatarSm}>C</span>
-                </div>
-                <svg viewBox="0 0 120 26" className="ml-3.5 h-[26px] w-[120px]" aria-hidden="true">
-                  <path d="M6 0 V13 H114" fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 4" className="dark:[stroke:#1E293B]" />
-                </svg>
-                <div className="flex items-start gap-2">
-                  <BotDot />
-                  <span className={aBubble}>33&nbsp;°C, closed cup.</span>
-                </div>
-                <div className="ml-[35px] flex items-center gap-3 rounded-xl border border-[#E2E8F0] dark:border-[#1E293B] bg-white dark:bg-[#111827] px-3.5 py-3 shadow-[0_6px_16px_-10px_rgba(26,25,20,0.14)]">
-                  <span className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-[#EAF0FE] dark:bg-[#17203A] text-[#004DE8] dark:text-[#6E97FF]">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-[17px] w-[17px]" aria-hidden="true">
-                      <rect x="4" y="3" width="16" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
-                      <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    </svg>
-                  </span>
-                  <div>
-                    <div className="text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">SDS_thinner.pdf</div>
-                    <div className="text-[11.5px] text-[#64748B] dark:text-[#64748B]">section 4.2</div>
-                  </div>
-                  <span className="ml-auto rounded-md bg-[#E4F1EA] dark:bg-[#11251C] px-2 py-1 text-[10.5px] font-bold tracking-wide text-[#157A52] dark:text-[#45C089]">grounded ✓</span>
-                </div>
-              </div>
-            </Moment>
+            <div className="overflow-hidden rounded-2xl">
+              <img
+                src="/specs_dig_1.svg"
+                alt="Document Answers Illustration"
+                className="w-full h-auto object-cover"
+              />
+            </div>
             <div className="px-4 pb-6 pt-6">
               <h3 className={cardTitle}>It only answers from your documents</h3>
               <p className={cardBody}>

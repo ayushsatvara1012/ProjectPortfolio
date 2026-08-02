@@ -42,6 +42,34 @@
   --animate-spin-slow: spin 3s linear infinite;
 }
 
+/* Hero spiral palette — the three stops of whichever palette the ring is
+   currently showing. Registered rather than plain custom properties for two
+   reasons: only a registered property with a `<color>` syntax can be
+   ANIMATED (an unregistered one flips between values with no interpolation),
+   and `inherits: true` is what lets the 25 leaves read the palette from the
+   wrapper it animates on.
+
+   Declared at top level, outside `@layer base`, because `@property` inside a
+   cascade layer is not reliably honoured. Initial values are the light-mode
+   fire palette, which is also the reduced-motion resting state.
+
+   See the "Hero spiral" block in `@layer base` for how these are driven. */
+@property --spiral-s0 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #c0392b;
+}
+@property --spiral-s1 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #e07a2e;
+}
+@property --spiral-s2 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #e8b93a;
+}
+
 @layer base {
   html {
     scroll-behavior: auto;
@@ -313,58 +341,121 @@
   }
 
   /* ── Hero spiral ───────────────────────────────────────────────────────
-     Each leaf draws itself once via stroke-dashoffset (pathLength=1 on the
-     path normalises every leaf to the same length, so one keyframe fits all),
-     staggered from the faintest leaf forwards into the darkest, so the cascade
-     builds the full form leaf by leaf. No rotation — the drawing is the motion. */
-  /* 22s = one A→B→A loop, each design owning a full half with no dead time:
-     draw (0–14%), hold (14–36%), retract (36–50%), then empty while the other
-     runs. Retract ends exactly where the other design's draw begins, and the
-     leaf stagger carries the tail slightly past it, so the two overlap by a
-     beat instead of leaving a pause. */
-  @keyframes spiralDraw {
-    0%        { stroke-dashoffset: 1; }
-    14%, 36%  { stroke-dashoffset: 0; }
-    50%, 100% { stroke-dashoffset: -1; }
+     The ring is permanently drawn — nothing draws on or erases, and no leaf
+     ever moves. One palette is on the ring at a time, spread across the 25
+     leaves as a fixed three-stop gradient: leaf 0 sits on stop 0, leaf 12 on
+     stop 1, leaf 24 on stop 2, and that mapping never changes. The animation
+     is the palette swapping underneath that fixed gradient.
+
+     Fire → Sky → Forest, with no neutral rest between them. Each palette
+     changes hands as a WIPE that travels the ring one leaf at a time rather
+     than the whole ring crossfading at once.
+
+     The wipe is why the animation runs on each leaf (`.spiral path`) and not
+     on the wrapper. Every leaf runs these identical keyframes; the component
+     hands each one a negative `--leaf-delay` of -0.3s × index, so leaf 24 is
+     7.2s ahead of leaf 0 and the palette boundary sweeps from the spiral's
+     open end inward.
+
+     THE INVARIANT THAT MAKES THIS WORK: the total stagger spread (7.2s) must
+     stay well under the hold plateau (18.5s). Only the overlap of those holds
+     is time when every leaf is in the same palette — here 11.3s per segment,
+     which is what lets the ring read as solidly "fire" before anything moves.
+     Widen the stagger past the hold and the ring is never uniform; it becomes
+     a permanent smear of all three palettes at once.
+
+     The numbers, for a 60s cycle:
+       segment           20s      (3 palettes)
+       per-leaf crossfade 1.5s    = 2.5% — smoothness of each leaf's own flip
+       leaf-to-leaf step  0.3s    — the "one by one" cadence
+       leaves mid-blend   5       = 1.5 / 0.3, the width of the travelling band
+       full sweep         ~8.7s   first leaf starts → last leaf lands
+       uniform hold       ~11.3s
+
+     Note the two durations do different jobs and are not interchangeable:
+     the 1.5s crossfade controls how soft each leaf's transition is, the 0.3s
+     step controls how fast the boundary travels. Their ratio IS the band
+     width — change one without the other and the band widens or sharpens.
+
+     Dropping the neutral means Fire→Sky and Sky→Forest now interpolate
+     saturated-to-saturated, the case the neutral used to prevent. It holds up
+     because registered `<color>` properties interpolate in oklab, and because
+     only 5 leaves are ever mid-blend for 1.5s each — the intermediate is
+     brief and spatially confined, so it reads as part of the sweep. */
+  /* Each palette's three stops must SWEEP HUE, not just lightness. The ring
+     spreads them spatially across 25 leaves, so three shades of one hue
+     render as a flat single-colour ring no matter how far apart their
+     lightness is — which is what sky and forest did when they were authored
+     as a light ramp (4° and 2° of hue travel respectively). All three now
+     traverse ~38° in even ~19° steps, matching fire, the one that always
+     read correctly:
+
+       fire    6° →  26° →  44°   red    → orange → gold
+       sky   209° → 193° → 176°   petrol → cerulean → aqua
+       forest155° → 136° → 117°   pine   → grass  → leaf
+
+     Sky travels toward cyan rather than the other way; going the other
+     direction lands in indigo. */
+  @keyframes spiralPalette {
+    0%,       30.833%  { --spiral-s0: #c0392b; --spiral-s1: #e07a2e; --spiral-s2: #e8b93a; }
+    33.333%,  64.167%  { --spiral-s0: #0f3f6b; --spiral-s1: #1587a8; --spiral-s2: #64d8d0; }
+    66.667%,  97.5%    { --spiral-s0: #12442f; --spiral-s1: #339950; --spiral-s2: #64c95e; }
+    100%               { --spiral-s0: #c0392b; --spiral-s1: #e07a2e; --spiral-s2: #e8b93a; }
   }
-  /* One flat colour per theme. The depth comes from the per-leaf `opacity` the
-     component derives, not from hue, so the form reads as a single filament
-     fading into the background rather than as 25 differently-tinted strokes —
-     which is also why this is one token rather than a gradient.
 
-     Light gets #1E6FB8 — the exact stroke of ChatbotShowcaseOrnament, the
-     filament artwork in the section directly below. The two are the same motif
-     on the same page base, so they must be the same blue; if you change one,
-     change the other. Dark stays pure white, as the ornament's own dark value
-     (#6EB2E8) is tuned for a mid-section it sits further inside.
+  /* Dark anchors are tuned against #0B0F19 rather than lightened from the
+     light set — they have to sit far enough above the page base to stay
+     legible at the wrapper's reduced dark-mode opacity. They hold the same
+     hue sweep as the light set above; only lightness and chroma differ. */
+  @keyframes spiralPaletteDark {
+    0%,       30.833%  { --spiral-s0: #e2574a; --spiral-s1: #f0954a; --spiral-s2: #f2ce5c; }
+    33.333%,  64.167%  { --spiral-s0: #2a72b0; --spiral-s1: #2fa8cc; --spiral-s2: #96e8e0; }
+    66.667%,  97.5%    { --spiral-s0: #2d8f63; --spiral-s1: #40bf66; --spiral-s2: #8fdd88; }
+    100%               { --spiral-s0: #e2574a; --spiral-s1: #f0954a; --spiral-s2: #f2ce5c; }
+  }
 
-     Same convention as the mesh blobs below: light is the base and
+  /* `linear`: the three anchors are evenly spaced and carry their own holds,
+     so an eased curve would only stall and lurch on top of that — and worse,
+     would desynchronise the leaves, since each sits at a different point of
+     the curve and would travel at a different rate.
+
+     The fallback `0s` is not dead code: it keeps a leaf sane if the component
+     ever renders without its inline delay. */
+  .spiral path {
+    animation: spiralPalette 60s linear infinite;
+    animation-delay: var(--leaf-delay, 0s);
+  }
+
+  /* Same convention as the mesh blobs below: light is the base and
      `prefers-color-scheme: dark` overrides, because this project has no theme
      provider and no `dark` class, so Tailwind's `dark:` variant — which
      HeroSpiral's wrapper uses for its opacity — resolves to the media query. */
-  .spiral-leaf {
-    stroke: #1e6fb8;
-    /* `1 2`, not `1`. A bare `1` means dash 1 / gap 1 — a period of 2 over a
-       path normalised to length 1, so as the offset runs negative the *next*
-       dash in the repeat creeps back onto the path and leaves stubs behind.
-       A gap of 2 guarantees only ever one dash within reach of the path. */
-    stroke-dasharray: 1 2;
-    stroke-dashoffset: 1;
-    /* Symmetric ease so the draw and the retract accelerate and settle the
-       same way — an asymmetric curve makes the handover feel like a snap. */
-    animation: spiralDraw 22s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-
   @media (prefers-color-scheme: dark) {
-    .spiral-leaf {
-      stroke: #fff;
+    .spiral path {
+      animation-name: spiralPaletteDark;
     }
   }
 
+  /* Freeze on fire, the palette the cycle opens on. Set on the wrapper rather
+     than the leaves: with the leaves' animation off, nothing writes the
+     `--spiral-s*` properties any more, so the leaves inherit these instead.
+     The form stays fully drawn — removing the motion must not remove the
+     artwork. */
   @media (prefers-reduced-motion: reduce) {
-    .spiral-leaf {
-      stroke-dashoffset: 0;
+    .spiral path {
       animation: none;
+    }
+    .spiral {
+      --spiral-s0: #c0392b;
+      --spiral-s1: #e07a2e;
+      --spiral-s2: #e8b93a;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) and (prefers-color-scheme: dark) {
+    .spiral {
+      --spiral-s0: #e2574a;
+      --spiral-s1: #f0954a;
+      --spiral-s2: #f2ce5c;
     }
   }
 
