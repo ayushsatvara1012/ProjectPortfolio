@@ -20,7 +20,7 @@ const PricingPreview = () => {
 
         {/* Header */}
         <div className="max-w-2xl mb-16">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-google font-semibold tracking-tight leading-tight text-slate-900 dark:text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-newsreader font-light tracking-tight leading-tight text-slate-900 dark:text-white mb-4">
             Simple pricing.{' '}
             <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
               Start free.

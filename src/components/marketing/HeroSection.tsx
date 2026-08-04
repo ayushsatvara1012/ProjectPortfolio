@@ -51,7 +51,7 @@ const TRUSTED_BY = ['Gyanesha Institute', 'Expresolv Ltd.', 'SP Designs'];
 
 function DemoButton() {
   return (
-    <Link href="/demo/train" className={`${HERO_BUTTON} rounded-full`}>
+    <Link href="/demo/train" className={`${HERO_BUTTON} rounded-full cursor-pointer `}>
       Try Demo
     </Link>
   );

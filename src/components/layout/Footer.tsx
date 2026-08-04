@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import SapybaseWordmark from './SapybaseWordmark';
 
 type FooterLink = { name: string; href: string; external?: boolean };
 type FooterColumn = { heading: string; links: FooterLink[] };
@@ -54,9 +53,8 @@ export default function Footer() {
   return (
     <footer className="relative overflow-hidden bg-[#FAFAFC] dark:bg-[#0B0F19]">
       <div className="max-w-8xl mx-auto px-6 min-[1011px]:px-12 pt-16 pb-10 min-[1011px]:pt-20">
-        {/* Plain link directory: bold heading, stacked plain links — no icons,
-            no borders, no CTAs. */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 min-[1011px]:grid-cols-5 gap-x-8 gap-y-12">
+        {/* Plain link directory: bold heading, stacked plain links in a 3x2 grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-12">
           {footerColumns.map((column) => (
             <div key={column.heading} className="space-y-5">
               <h3 className="text-sm font-google font-semibold text-slate-900 dark:text-slate-100">
@@ -86,38 +84,32 @@ export default function Footer() {
               </ul>
             </div>
           ))}
-        </div>
 
-        {/* Bottom bar — just copyright now; status and the launch badge were
-            dropped, social lives in the Connect column above. */}
-        <div className="mt-16 min-[1011px]:mt-20 text-sm font-google text-slate-500 dark:text-slate-400 text-center min-[1011px]:text-left">
-          <p>© 2026 Sapybase LLC</p>
+          {/* Copyright text position inline with Row 2 (beside Connect) */}
+          <div className="flex items-start lg:items-center min-[1011px]:pt-6">
+            <p className="text-sm font-google text-slate-500 dark:text-slate-400">
+              © 2026 Sapybase LLC | All rights reserved
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Giant brand wordmark, reserved in normal flow instead of overlaid —
-          this box adds real height to the footer, so the mark sits below the
-          content instead of behind it. The box's own height is exactly 80%
-          of the SVG's natural height (from its 55:11 viewBox), so the SVG's
-          bottom 20% overflows past the box and is clipped by its own
-          overflow-hidden. The mask fades that same last stretch (60%→80% of
-          the SVG's height) to transparent, so it fades out right as it
-          reaches the clip line instead of ending on a hard edge. */}
+      {/* Footer SVG - responsive, edge-to-edge with no padding */}
       <div
         aria-hidden
-        className="pointer-events-none select-none relative mt-2 w-full overflow-hidden"
-        style={{ aspectRatio: '25 / 4' }}
+        className="pointer-events-none select-none relative w-full overflow-hidden flex flex-col justify-end items-center"
       >
-        <div
-          className="absolute inset-x-0 top-0 flex justify-center"
-          style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 80%)',
-            maskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 80%)',
-          }}
-        >
-          <SapybaseWordmark className="w-[95vw] max-w-[1800px] text-slate-900/[0.08] dark:text-white/[0.08]" />
+        {/* Wordmark SVG (black container split background is natively embedded inside the SVG) */}
+        <div className="relative z-10 w-full grid">
+          <img
+            src="/footer.svg"
+            alt="Sapybase Footer"
+            className="w-full h-auto translate-y-20"
+          />
+         
         </div>
       </div>
     </footer>
   );
 }
+
