@@ -68,20 +68,22 @@ export default function DetailDiagrams({
   mermaid?: FeatureArchitecture['mermaid'];
 }) {
   return (
-    <div className="mt-10 flex flex-col gap-10">
+    <div className="flex flex-col gap-10">
       {dataFlow ? (
         <section aria-labelledby="arch-dataflow-heading">
-          <h2
-            id="arch-dataflow-heading"
-            className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
-          >
-            Data flow
-          </h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            How the pieces connect and where data moves.
-          </p>
+          <div className="mx-auto max-w-5xl px-1">
+            <h2
+              id="arch-dataflow-heading"
+              className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+            >
+              Data flow
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              How the pieces connect and where data moves.
+            </p>
+          </div>
           <p className="sr-only">{dataFlowText(dataFlow)}</p>
-          <div className="mt-4 h-[460px] overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="mt-4 h-[540px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
             <DiagramErrorBoundary fallback={<DataFlowTextFallback dataFlow={dataFlow} />}>
               <LazyDataFlowCanvas dataFlow={dataFlow} />
             </DiagramErrorBoundary>
@@ -91,17 +93,19 @@ export default function DetailDiagrams({
 
       {mermaid ? (
         <section aria-labelledby="arch-behavior-heading">
-          <h2
-            id="arch-behavior-heading"
-            className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
-          >
-            Behavior
-          </h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            How it behaves step by step over time.
-          </p>
-          <figure className="mt-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="mx-auto max-w-5xl px-1">
+            <h2
+              id="arch-behavior-heading"
+              className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+            >
+              Behavior
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              How it behaves step by step over time.
+            </p>
+          </div>
+          <figure className="mx-auto mt-4 max-w-5xl">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60">
               <DiagramErrorBoundary
                 fallback={
                   <p className="text-sm text-slate-600 dark:text-slate-300">{mermaid.summary}</p>
@@ -110,7 +114,7 @@ export default function DetailDiagrams({
                 <LazyMermaidDiagram mermaid={mermaid} />
               </DiagramErrorBoundary>
             </div>
-            <figcaption className="mt-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            <figcaption className="mt-3 px-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
               {mermaid.summary}
             </figcaption>
           </figure>
