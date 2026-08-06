@@ -8,10 +8,10 @@ type LogoProps = {
 export default function Logo({ className, style }: LogoProps) {
   return (
     <Image
-      src="/new_brand.svg"
+      src="/Vector.png"
       alt="Vaayu"
-      width={60}
-      height={60}
+      width={80}
+      height={80}
       className={className}
       style={style}
       priority

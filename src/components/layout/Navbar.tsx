@@ -298,7 +298,7 @@ export default function Navbar() {
         {/* Border layer (desktop only). Hidden on mobile so mobile navbar has no outer border stroke. */}
         <div
           aria-hidden
-          className={`nav-shell__layer absolute inset-0 pointer-events-none hidden lg:block bg-slate-900/10 dark:bg-white/15 rounded-b-2xl lg:rounded-b-[28px] ${
+          className={`nav-shell__layer absolute inset-0 pointer-events-none hidden lg:block bg-slate-900/10 dark:bg-white/15 rounded-2xl lg:rounded-[28px] ${
             mounted ? 'nav-shell__layer--animated' : ''
           } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
         />
@@ -306,10 +306,10 @@ export default function Navbar() {
         {/* Glass surface with rounded bottom corners on mobile. */}
         <div
           aria-hidden
-          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-b-2xl lg:rounded-b-[27px] ${
+          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] ${
             isOpen
-              ? 'bg-[#FAFAFC] dark:bg-[#0B0F19] lg:bg-white/75 lg:dark:bg-[#0B0F19]'
-              : 'bg-white/75 dark:bg-[#0B0F19]'
+              ? 'bg-white dark:bg-[#0B0F19] lg:bg-white lg:dark:bg-[#0B0F19]'
+              : 'bg-white dark:bg-[#0B0F19]'
           } ${
             mounted ? 'nav-shell__layer--animated' : ''
           } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}

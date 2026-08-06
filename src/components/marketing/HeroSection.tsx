@@ -8,15 +8,19 @@ import HeroSpiral from './HeroSpiral';
 export default function HeroSection() {
   return (
     <section id="home" className="relative min-h-dvh pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
+      {/* Blurred, Faded, and Vignetted Background Layer */}
+      <div className="absolute inset-0 z-0 pointer-events-none [mask-image:radial-gradient(ellipse,black_50%,transparent_100%)]">
+        <div className="absolute inset-0 bg-[url('/image%201.svg')] bg-cover bg-center bg-no-repeat opacity-40 blur-[3px] scale-[1.15]" />
+      </div>
       {/* Decorative — hugs the viewport's right wall and bleeds past it; the
           section's overflow-x-clip does the trimming. */}
-      <HeroSpiral className="pointer-events-none absolute z-0 top-1/2 right-0 -translate-y-1/2 translate-x-[30%] hidden sm:block w-[min(120vw,1000px)] opacity-[0.18] dark:opacity-[0.12]" />
+      {/* <HeroSpiral className="pointer-events-none absolute z-0 top-1/2 right-0 -translate-y-1/2 translate-x-[30%] hidden sm:block w-[min(120vw,1000px)] opacity-[0.18] dark:opacity-[0.12]" /> */}
 
       <div className="max-w-8xl mx-auto w-full min-h-[calc(100dvh-4rem)] lg:min-h-[calc(100dvh-5rem)] bg-transparent relative overflow-hidden flex flex-col items-center justify-center px-6 sm:px-12 lg:px-20 py-12 lg:py-12 transition-colors duration-500 border-none shadow-none">
-        <div className="relative z-10 w-full flex flex-col items-center sm:items-start">
-          <div className="max-w-xl flex flex-col justify-center items-center text-center sm:items-start sm:text-left">
+        <div className="relative z-10 w-full flex flex-col items-center">
+          <div className="max-w-xl flex flex-col justify-center items-center text-center">
           <h1 className="font-newsreader font-light tracking-tight leading-[1.08] text-5xl sm:text-6xl md:text-7xl text-slate-900 dark:text-slate-100 mb-6 transition-colors">
-            Power your website with Vaayu an AI assistant.
+            Meet Vaayu <br /> An AI assistant.
           </h1>
 
           <p className="text-base md:text-lg font-google text-slate-600 dark:text-slate-200 leading-relaxed max-w-xl mb-10 transition-colors">
@@ -27,7 +31,7 @@ export default function HeroSection() {
 
           {/* Row on every breakpoint, gap tightened on mobile to fit — the
               mirrored corners only read as one unit when the buttons sit close. */}
-          <div className="flex flex-row justify-center sm:justify-start items-center gap-3 sm:gap-4 w-full transition-colors">
+          <div className="flex flex-row justify-center items-center gap-3 sm:gap-4 w-full transition-colors">
             <GetStartedButton />
 
             <DemoButton />
@@ -51,7 +55,7 @@ const TRUSTED_BY = ['Gyanesha Institute', 'Expresolv Ltd.', 'SP Designs'];
 
 function DemoButton() {
   return (
-    <Link href="/demo/train" className={`${HERO_BUTTON} rounded-full cursor-pointer `}>
+    <Link href="/demo/train" className={`${HERO_BUTTON} rounded-full cursor-pointer`}>
       Try Demo
     </Link>
   );
