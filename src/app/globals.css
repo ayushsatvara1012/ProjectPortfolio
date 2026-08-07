@@ -459,6 +459,36 @@
     }
   }
 
+  /* ── Hero horizon field ────────────────────────────────────────────────
+     One short dash travelling along four of the links, and nothing else in
+     the drawing moves. The plane is static on purpose: a grid this dense
+     reads as vibration the moment any of it animates.
+
+     The dash pattern (2 on, 92 off) and the offset distance are a pair —
+     -600 over 6s has to be long enough that the dash clears the longest link
+     before the cycle restarts, or the mark reappears mid-path. 92 is just
+     under that longest chord, so at most one dash is on a link at a time.
+
+     Staggered from the component so the four pulses never fire together;
+     simultaneous pulses read as a blink rather than as traffic. */
+  @keyframes hfPulse {
+    to {
+      stroke-dashoffset: -600;
+    }
+  }
+
+  .horizon-field .hf-pulse {
+    animation: hfPulse 6s linear infinite;
+  }
+
+  /* The links stay fully drawn — the pulse is an overlay on top of a path
+     that is already there, so dropping it removes motion, not artwork. */
+  @media (prefers-reduced-motion: reduce) {
+    .horizon-field .hf-pulse {
+      display: none;
+    }
+  }
+
   /* ── Animated mesh gradient ────
      Palette: blues only — deep ocean / azure / cerulean / pale sky. No teal,
      no indigo, no violet; the hue range stays inside 200–215.
