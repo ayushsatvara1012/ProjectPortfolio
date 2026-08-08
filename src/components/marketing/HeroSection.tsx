@@ -9,8 +9,11 @@ import HeroHorizonField from './HeroHorizonField';
 export default function HeroSection() {
   return (
     <section id="home" className="relative min-h-dvh pt-16 lg:pt-20 overflow-x-clip transition-colors duration-500">
-      {/* Blurred, Faded, and Vignetted Background Layer */}
-      <div className="absolute inset-0 z-0 pointer-events-none [mask-image:radial-gradient(ellipse,black_50%,transparent_100%)]">
+      {/* Blurred, Faded Background Layer. The radial vignette mask is
+          desktop-only — on a narrow viewport the ellipse crops into the
+          image's corners instead of softening them, so mobile gets the
+          plain faded wash with no mask. */}
+      <div className="absolute inset-0 z-0 pointer-events-none sm:[mask-image:radial-gradient(ellipse,black_50%,transparent_100%)]">
         <div className="absolute inset-0 bg-[url('/image%201.svg')] bg-cover bg-center bg-no-repeat opacity-40 blur-[3px] scale-[1.15]" />
       </div>
 

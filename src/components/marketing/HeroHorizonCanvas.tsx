@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { generateGalaxySky, drawGalaxySky } from './heroSky';
 
 interface HeroHorizonCanvasProps {
   className?: string;
@@ -15,8 +16,6 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    let animationFrameId: number;
 
     // Viewport Virtual Canvas Dimensions
     const W = 1600;
@@ -67,68 +66,15 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
       return [px, py, d];
     }
 
-    interface TechTower {
-      u: number;
-      v: number;
-      height: number;
-    }
+    // Sky region is everything above HORIZON, i.e. exactly where the grid
+    // has ended - stars only need to live there.
+    const SKY = generateGalaxySky(1337, W, HORIZON, 220);
 
-    const TOWERS: TechTower[] = [
-      { u: 8, v: 8, height: 1.6 },
-      { u: 14, v: 12, height: 2.4 },
-      { u: 10, v: 16, height: 2.0 },
-      { u: 18, v: 15, height: 3.0 },
-      { u: 13, v: 22, height: 2.6 },
-      { u: 21, v: 20, height: 3.4 },
-      { u: 17, v: 26, height: 3.1 },
-    ];
+    // No theme provider and no `dark` class in this project - `dark:` resolves
+    // to the media query, so the canvas has to read it the same way.
+    const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-    const TOWER_NODES = TOWERS.map((t) => {
-      const baseH = terrainHeight(t.u, t.v);
-      const topH = baseH + t.height;
-      const [bx, by] = project(t.u, t.v, baseH);
-      const [tx, ty, td] = project(t.u, t.v, topH);
-      return { ...t, bx, by, tx, ty, d: td };
-    });
-
-    interface NetworkLink {
-      fromIdx: number;
-      toIdx: number;
-      pulseOffset: number;
-      speed: number;
-    }
-
-    const LINKS: NetworkLink[] = [];
-    for (let i = 0; i < TOWER_NODES.length; i++) {
-      for (let j = i + 1; j < TOWER_NODES.length; j++) {
-        const du = TOWER_NODES[i].u - TOWER_NODES[j].u;
-        const dv = TOWER_NODES[i].v - TOWER_NODES[j].v;
-        if (Math.hypot(du, dv) < 11) {
-          LINKS.push({
-            fromIdx: i,
-            toIdx: j,
-            pulseOffset: Math.random(),
-            speed: 0.2 + Math.random() * 0.3,
-          });
-        }
-      }
-    }
-
-    const handleResize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    let startTime = performance.now();
-
-    const render = (now: number) => {
-      const elapsed = (now - startTime) / 1000;
+    const draw = () => {
       const rect = canvas.getBoundingClientRect();
       const width = rect.width;
       const height = rect.height;
@@ -138,13 +84,21 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
       const scaleX = width / W;
       const scaleY = height / H;
 
-      const isDarkMode = document.documentElement.classList.contains('dark');
+      const isDarkMode = darkQuery.matches;
 
-      const strokeRGB = isDarkMode ? '56, 189, 248' : '30, 64, 175';
-      const accentRGB = isDarkMode ? '14, 165, 233' : '37, 99, 235';
+      // Near-neutral on dark so the warm gradient tints the lines itself rather
+      // than a saturated accent competing with it.
+      const strokeRGB = isDarkMode ? '100, 116, 139' : '30, 64, 175';
 
       ctx.save();
       ctx.scale(scaleX, scaleY);
+
+      // --- 0. GALAXY SKY: nebula wash + starfield, dark mode only. Drawn
+      // before the terrain so the facet erase-pass below naturally occludes
+      // stars sitting behind the mountain silhouette. ---
+      if (isDarkMode) {
+        drawGalaxySky(ctx, SKY, HORIZON);
+      }
 
       // --- 1. PAINTER'S ALGORITHM: NAVBAR-MATCHED FROSTED GLASS FACETS ---
       for (let v = V_MAX; v >= V_MIN; v -= V_STEP) {
@@ -189,8 +143,10 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
           const glassAlpha = Math.min(0.82, 0.42 + (28 - d00) / 60 + elevationShade * 0.18);
 
           if (isDarkMode) {
-            const lift = Math.round(elevationShade * 18);
-            ctx.fillStyle = `rgba(${11 + lift}, ${15 + lift}, ${25 + lift}, ${glassAlpha.toFixed(3)})`;
+            // Navbar's glass: #0B0F19 at 0.70 over backdrop-blur-xl. Depth scales
+            // it down so far facets sink into the gradient instead of slabbing it.
+            const darkAlpha = Math.min(0.7, 0.28 + (28 - d00) / 70 + elevationShade * 0.12);
+            ctx.fillStyle = `rgba(11, 15, 25, ${darkAlpha.toFixed(3)})`;
           } else {
             const shade = Math.round(elevationShade * 26);
             ctx.fillStyle = `rgba(${255 - shade}, ${255 - shade}, ${255 - Math.round(shade * 0.6)}, ${glassAlpha.toFixed(3)})`;
@@ -205,66 +161,25 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
         }
       }
 
-      // --- 2. TECH TOWERS & NETWORK NODES ---
-      TOWER_NODES.forEach((node) => {
-        const alpha = Math.min(0.7, Math.max(0.15, (30 - node.d) / 25));
-
-        ctx.beginPath();
-        ctx.moveTo(node.bx, node.by);
-        ctx.lineTo(node.tx, node.ty);
-        ctx.strokeStyle = `rgba(${strokeRGB}, ${(alpha * 1.1).toFixed(3)})`;
-        ctx.lineWidth = 1.3;
-        ctx.setLineDash([3, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        const radius = Math.max(2.5, 26 / node.d);
-        ctx.beginPath();
-        ctx.arc(node.tx, node.ty, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isDarkMode ? '#0284c7' : '#2563eb';
-        ctx.fill();
-        ctx.strokeStyle = `rgba(${accentRGB}, ${alpha.toFixed(3)})`;
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-      });
-
-      // --- 3. CONNECTED NETWORK BEAMS & ANIMATED PULSES ---
-      LINKS.forEach((link) => {
-        const n1 = TOWER_NODES[link.fromIdx];
-        const n2 = TOWER_NODES[link.toIdx];
-
-        const midX = (n1.tx + n2.tx) / 2;
-        const midY = (n1.ty + n2.ty) / 2 - 12;
-
-        const alpha = Math.min(0.4, Math.max(0.1, (30 - (n1.d + n2.d) / 2) / 25));
-
-        ctx.beginPath();
-        ctx.moveTo(n1.tx, n1.ty);
-        ctx.quadraticCurveTo(midX, midY, n2.tx, n2.ty);
-        ctx.strokeStyle = `rgba(${accentRGB}, ${alpha.toFixed(3)})`;
-        ctx.lineWidth = 1.1;
-        ctx.stroke();
-
-        const t = (elapsed * link.speed + link.pulseOffset) % 1;
-        const px = (1 - t) * (1 - t) * n1.tx + 2 * (1 - t) * t * midX + t * t * n2.tx;
-        const py = (1 - t) * (1 - t) * n1.ty + 2 * (1 - t) * t * midY + t * t * n2.ty;
-
-        ctx.beginPath();
-        ctx.arc(px, py, 2.2, 0, Math.PI * 2);
-        ctx.fillStyle = isDarkMode ? '#38bdf8' : '#1d4ed8';
-        ctx.fill();
-      });
-
       ctx.restore();
-
-      animationFrameId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(render);
+    const handleResize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      draw();
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    darkQuery.addEventListener('change', draw);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationFrameId);
+      darkQuery.removeEventListener('change', draw);
     };
   }, []);
 
