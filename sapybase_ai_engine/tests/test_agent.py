@@ -945,6 +945,39 @@ class TestSchemasAndDirective:
         # and cheap enough to call again freely on every repeat ask.
         assert "call it again freely whenever" in directive
 
+    def test_directive_forbids_fabricated_identity(self):
+        """agent-conversation-gaps-plan.md §13.3a: a staff/contact directory has no
+        tool, so nothing else in the prompt stopped the model inventing a person
+        (real transcript: a fabricated name + email, paired with the WEBSITE
+        FOOTER's switchboard number, delivered at confidence 1.0)."""
+        directive = build_agent_directive(load_pack("chemical"))
+        assert "NEVER invent a name" in directive
+        # The specific failure mode: a real digit string lifted from an unrelated
+        # context and paired with an invented name must be named as fabrication,
+        # not just "don't make up phone numbers" in the abstract.
+        assert "NEVER attach a phone number or email you found elsewhere" in directive
+        assert "still fabrication even if every individual digit is real" in directive
+        # Must not weaken into "ask the visitor for more detail" — the correct
+        # response is a plain admission plus handoff, not a repeated question.
+        assert "say plainly that you don't have that specific contact on file" in directive
+        # RULE 7 already lets the model use general knowledge for founders/history;
+        # this guardrail must not be phrased as a blanket "no internal knowledge"
+        # rule that would swallow that carve-out — it targets identity/contact
+        # attribution specifically.
+        assert "IDENTITY OF ANYONE OTHER THAN THE VISITOR" in directive
+
+    def test_directive_forbids_adjacent_role_substitution(self):
+        """agent-conversation-gaps-plan.md §13.3, symptom 11: a Chairman/MD and a
+        regional Sales Head were each offered as the business-development
+        contact. Unlike the no-record-at-all case (§13.3a), retrieval DID return
+        a real person here — just the wrong role — so the directive must name
+        that this is still not an answer, using the plan's own example."""
+        directive = build_agent_directive(load_pack("chemical"))
+        assert "no record for THAT EXACT role exists" in directive
+        assert "adjacent-sounding role" in directive
+        assert "a Chairman is not a business-development contact" in directive
+        assert "Do NOT present the adjacent-role person as the answer" in directive
+
 
 # ── run_agent_loop ───────────────────────────────────────────────────────────
 

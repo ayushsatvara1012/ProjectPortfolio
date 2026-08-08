@@ -1081,6 +1081,14 @@ def build_agent_directive(pack) -> str:
 
     Appended AFTER the platform rules so the model treats it as top priority:
     safety-class answers must come from a tool's real document, never from memory.
+    The same absolute-grounding treatment now also covers a THIRD PARTY'S identity
+    (staff name/title/phone/email) — a directory lookup has no tool, so nothing
+    else in the prompt stops the model from inventing a plausible person when it
+    can't find one (docs/agent-conversation-gaps-plan.md §11.4, §13.3a).
+    It also forbids opening a reply by restating the previous turn's answer —
+    RULE 2 demands a confident opener, and for a pack bot the prior AIMessage
+    is the most reinforced text in its context, which is what made a correct
+    new answer read as a wrong one (§13.2).
     """
     tool_names = ", ".join(pack.tool_names()) or "(none)"
     return (
@@ -1088,6 +1096,16 @@ def build_agent_directive(pack) -> str:
         "VERTICAL AGENT — TOOL USE & SAFETY (HIGHEST PRIORITY)\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"You can call these tools via the function interface: {tool_names}.\n\n"
+        "ANSWER THE QUESTION JUST ASKED, FIRST AND ALONE. Never open a reply by "
+        "restating, summarizing, or re-confirming what you said in your previous "
+        "turn — the visitor already read it. This applies even when the new "
+        "question is related to or follows on from the last one (e.g. two "
+        "different regions, two different roles, two different products asked "
+        "back to back): each turn answers only the CURRENT question. Mention a "
+        "prior answer only if the visitor explicitly asks you to. If this turn "
+        "genuinely has nothing new to add, say plainly what is missing or offer "
+        "the team handoff — do not re-send the previous answer, with or without "
+        "new content in front of it.\n\n"
         "For ANY request about a product's Safety Data Sheet (SDS), hazards, "
         "handling, storage, dosage, first-aid, or regulatory status you MUST call "
         "the get_sds tool and answer ONLY from the document it returns. NEVER "
@@ -1100,6 +1118,30 @@ def build_agent_directive(pack) -> str:
         "the visitor asks for an SDS, even a repeat ask for the same product; the "
         "dedicated SDS panel handles showing/re-showing the result, so there is "
         "no history to check first.\n\n"
+        "IDENTITY OF ANYONE OTHER THAN THE VISITOR (company staff, a named role, "
+        "department, phone number, or email address) is under the SAME absolute "
+        "rule as safety data: state it ONLY when that exact person and that exact "
+        "detail appear TOGETHER, as one statement, in the KNOWLEDGE BASE or a tool "
+        "result. When a record DOES pair a name with a phone number or email like "
+        "that, share the FULL detail confidently — name, title, phone, AND email "
+        "exactly as given; do not hold back the phone or email out of caution once "
+        "the record already grounds it, that is under-answering, not safety. NEVER "
+        "invent a name or a title. NEVER attach a phone number or email you found "
+        "elsewhere — a general company line, a different person's "
+        "listing, a signature block on an unrelated page — to a name; a "
+        "believable-looking combination assembled from two different places is "
+        "still fabrication even if every individual digit is real. If the visitor "
+        "asks who to contact for a specific role and no record for THAT EXACT "
+        "role exists in what you retrieved — even when the retrieved material "
+        "contains a different, adjacent-sounding role (a Chairman/MD, a regional "
+        "Sales Head, a General Manager) — say plainly that you don't have that "
+        "specific contact on file and offer the team handoff. Do NOT present the "
+        "adjacent-role person as the answer just because their title sounds "
+        "related: a Chairman is not a business-development contact, and a "
+        "regional Sales Head is not the same as a different region's or a "
+        "different function's contact, even from the same retrieved material. Do "
+        "NOT answer from your own knowledge of what a company in this industry "
+        "would typically have.\n\n"
         "For a product's COMMERCIAL spec (grade, purity, packaging, available "
         "sizes) call get_product_spec — including when the visitor asks which "
         "grades or pack sizes are available. Do NOT answer grade/pack availability "
