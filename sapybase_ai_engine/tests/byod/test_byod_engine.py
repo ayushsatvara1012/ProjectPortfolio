@@ -92,9 +92,25 @@ def test_routing_active_only_when_enabled_and_canary(monkeypatch):
 
 # ── Pure: E3 output validation ───────────────────────────────────────────────────
 def test_validate_knowledge_rows_keeps_good_rows_and_shape():
+    # OLD 2-tuple input (no id) still validates cleanly — content_id is None.
     rows = [("hello world", "https://acme.test/a"), ("another", None)]
     out = validate_knowledge_rows(rows)
-    assert out == [("hello world", "https://acme.test/a"), ("another", None)]
+    assert out == [("hello world", "https://acme.test/a", None), ("another", None, None)]
+
+
+def test_validate_knowledge_rows_preserves_content_id():
+    # Slice D (agent-conversation-gaps plan §12.3) — the 3rd column NEW callers
+    # pass through untouched.
+    rows = [("hello world", "https://acme.test/a", "row-uuid-1")]
+    out = validate_knowledge_rows(rows)
+    assert out == [("hello world", "https://acme.test/a", "row-uuid-1")]
+
+
+def test_validate_knowledge_rows_coerces_non_str_content_id():
+    import uuid as _uuid
+    rid = _uuid.uuid4()
+    out = validate_knowledge_rows([("hello", "u", rid)])
+    assert out == [("hello", "u", str(rid))]
 
 
 def test_validate_knowledge_rows_skips_null_empty_and_wrong_type_content():
@@ -105,20 +121,20 @@ def test_validate_knowledge_rows_skips_null_empty_and_wrong_type_content():
         ("good", "u4"),          # keeper
     ]
     out = validate_knowledge_rows(rows)
-    assert out == [("good", "u4")]
+    assert out == [("good", "u4", None)]
 
 
 def test_validate_knowledge_rows_skips_oversized_content():
     big = "x" * (MAX_KNOWLEDGE_CONTENT_CHARS + 1)
     out = validate_knowledge_rows([(big, "u"), ("ok", "u2")])
-    assert out == [("ok", "u2")]
+    assert out == [("ok", "u2", None)]
 
 
 def test_validate_knowledge_rows_sanitizes_url():
     long_url = "h" * (MAX_URL_CHARS + 50)
     out = validate_knowledge_rows([("c1", 999), ("c2", long_url)])
     # Non-str url coerced to None; oversized url truncated; rows still kept.
-    assert out[0] == ("c1", None)
+    assert out[0] == ("c1", None, None)
     assert out[1][0] == "c2"
     assert len(out[1][1]) == MAX_URL_CHARS
 
@@ -127,7 +143,7 @@ def test_validate_knowledge_rows_handles_empty_and_malformed_input():
     assert validate_knowledge_rows(None) == []
     assert validate_knowledge_rows([]) == []
     # A malformed/too-short row is skipped, not fatal.
-    assert validate_knowledge_rows([(), ("ok", "u")]) == [("ok", "u")]
+    assert validate_knowledge_rows([(), ("ok", "u")]) == [("ok", "u", None)]
 
 
 # ── Pure: E6 error sanitization ──────────────────────────────────────────────────
@@ -174,6 +190,21 @@ def test_tenant_log_chat_degrades_soft_on_failure():
     # Must NOT raise — a background analytics write degrades soft (§16.9).
     ok = byod_engine.tenant_log_chat("c1", "q", "a", False, False, None, None, registry=reg)
     assert ok is False
+
+
+def test_tenant_log_chat_accepts_sources_kwarg_but_does_not_persist_it():
+    # Slice D (agent-conversation-gaps plan §12.6) — signature parity with
+    # log_chat_to_db, deliberately NOT written (no tenant chat_logs.sources
+    # column yet). The INSERT constants are the source of truth for what's
+    # actually persisted; this only proves the call doesn't blow up.
+    reg = _FakeRegistry(psycopg2.OperationalError('host "db.internal" down'))
+    ok = byod_engine.tenant_log_chat(
+        "c1", "q", "a", False, False, None, None, registry=reg,
+        sources=[{"kind": "kb", "label": "x"}],
+    )
+    assert ok is False
+    assert "sources" not in byod_engine._CHAT_LOG_INSERT
+    assert "sources" not in byod_engine._CHAT_LOG_INSERT_WITH_ID
 
 
 def test_resolve_runtime_dsn_unprovisioned_raises_sanitized(monkeypatch):
@@ -305,7 +336,7 @@ def test_malformed_tenant_rows_skipped_not_crash(tenant_db_dsn):
     finally:
         reg.close_all()
 
-    urls = {u for _c, u in cleaned}
+    urls = {u for _c, u, _cid in cleaned}
     assert urls == {"https://acme.test/good"}  # NULL + oversized dropped
 
 

@@ -480,6 +480,53 @@ def get_product_spec(
 
     name_, cas_, grade_, packaging_, sds_ref_, _updated_ = resolved["row"]
 
+    # Fallback for symptom 3 (agent-conversation-gaps plan §4.1): `products` and
+    # `product_skus` are catalogued at different levels — a product row can carry
+    # no grade/packaging text of its own while its SKUs (the same rows the quote
+    # flow reads) know exactly which grades and pack sizes exist. Only reached
+    # when a field is actually blank; a populated `products` value always wins,
+    # this never overrides it. Resolution itself is untouched — this runs strictly
+    # after a single product is already chosen.
+    if not (grade_ or "").strip() or not (packaging_ or "").strip():
+        cursor.execute(
+            "SELECT DISTINCT grade, pack_size FROM product_skus "
+            "WHERE company_id = %s AND lower(product_name) = lower(%s)",
+            (company_id, name_),
+        )
+        sku_rows = cursor.fetchall() or []
+        if not (grade_ or "").strip():
+            sku_grades = sorted({(r[0] or "").strip() for r in sku_rows if r[0] and r[0].strip()})
+            if sku_grades:
+                grade_ = ", ".join(sku_grades)
+        if not (packaging_ or "").strip():
+            sku_packs = sorted({(r[1] or "").strip() for r in sku_rows if r[1] and r[1].strip()})
+            if sku_packs:
+                packaging_ = ", ".join(sku_packs)
+
+    # Additive, honest partial results (symptom 4, plan §4.2): `status` stays
+    # "found" — a new status would be a value the widget/tests may switch on,
+    # which the plan freezes. `missing_fields` tells the model plainly what's NOT
+    # on file instead of silently answering the same question two different ways.
+    missing_fields = [
+        f for f, v in (("grade", grade_), ("packaging", packaging_))
+        if not (v or "").strip()
+    ]
+
+    message = (
+        "Share the commercial spec fields that are present; do not invent any "
+        "field that is null. This is commercial information only — for ANY "
+        "safety, hazard, handling, storage, or regulatory question call get_sds "
+        "and answer only from that document. Never infer hazards from grade or "
+        "purity. If sds_available is true, you may offer to fetch the SDS."
+    )
+    if missing_fields:
+        message += (
+            f" {', '.join(missing_fields)} — not on file for this product. State "
+            "plainly that these details aren't on file and offer to connect the "
+            "visitor with the team for them; do not stay silent about what's "
+            "missing and do not imply the product doesn't exist."
+        )
+
     return {
         "status": "found",
         "product": {
@@ -490,13 +537,8 @@ def get_product_spec(
         },
         "pack_sizes": _split_packs(packaging_),
         "sds_available": _is_https(sds_ref_),
-        "message": (
-            "Share the commercial spec fields that are present; do not invent any "
-            "field that is null. This is commercial information only — for ANY "
-            "safety, hazard, handling, storage, or regulatory question call get_sds "
-            "and answer only from that document. Never infer hazards from grade or "
-            "purity. If sds_available is true, you may offer to fetch the SDS."
-        ),
+        "missing_fields": missing_fields,
+        "message": message,
     }
 
 
@@ -517,6 +559,38 @@ _SKU_COLS = (
     "product_name, cas_number, grade, pack_size, pack_size_norm, pack_code, "
     "list_price, gst_rate, is_por, currency"
 )
+
+
+def _pack_magnitude(s: object) -> Optional[tuple]:
+    """``(numeric value, base unit)`` for a pack-size string, or ``None`` if
+    unparseable — e.g. ``'2.5 Ltr'`` -> ``(2500.0, 'ml')``.
+
+    A standalone parser, NOT a refactor of ``_norm_pack`` below: that function
+    resolves which SKU a visitor's pack matches and is frozen by the
+    agent-conversation-gaps plan §2 (pricing/POR gating must stay byte-for-byte).
+    This exists only to compare magnitude for the not_found_sku bulk-routing hint
+    (plan §4.3) — same number+unit grammar, duplicated on purpose to keep the
+    two call sites independently safe to change.
+    """
+    import re
+    t = (s if isinstance(s, str) else "").lower().strip()
+    matches = re.findall(
+        r"(\d+(?:\.\d+)?)\s*"
+        r"(kilograms?|kgs?|kg|grams?|gms?|gm|g|"
+        r"millilitres?|milliliters?|ml|litres?|liters?|ltrs?|ltr|lit|l)\b",
+        t,
+    )
+    if not matches:
+        return None
+    num_str, unit = matches[-1]
+    num = float(num_str)
+    if unit in ("kg", "kgs", "kilogram", "kilograms"):
+        return num * 1000, "g"
+    if unit in ("g", "gm", "gms", "gram", "grams"):
+        return num, "g"
+    if unit in ("ml", "millilitre", "millilitres", "milliliter", "milliliters"):
+        return num, "ml"
+    return num * 1000, "ml"
 
 
 def _norm_pack(s: object) -> str:
@@ -727,10 +801,31 @@ def request_quote(
     pnorm = _norm_pack(pack_in)
     prows = [r for r in grows if r[3] and _norm_pack(r[3]) == pnorm]
     if not prows:
+        # Symptom 5 (plan §4.3): "not in the price list" is not "does not exist" —
+        # neither branch below touches price/POR gating, only the message and a
+        # routing hint. A requested pack strictly larger (same unit family) than
+        # every listed pack for this grade is a bulk enquiry, not a dead end.
+        req_mag = _pack_magnitude(pack_in)
+        listed_mags = [_pack_magnitude(p) for p in packs]
+        is_bulk = bool(listed_mags) and req_mag is not None and all(
+            m is not None and m[1] == req_mag[1] and m[0] < req_mag[0] for m in listed_mags
+        )
+        if is_bulk:
+            message = (
+                f"'{pack_in}' is larger than every pack we price online for "
+                f"{product} ({grade_sel}) — that's a bulk enquiry, not a pack that "
+                "doesn't exist. Do NOT offer only the smaller listed packs; tell "
+                "the visitor you'll route this to the team for a bulk quote and "
+                "offer to take their contact details."
+            )
+        else:
+            message = (
+                f"'{pack_in}' is not in the price list for {product} ({grade_sel}) "
+                "— that does not mean it doesn't exist. Offer the available pack "
+                f"sizes ({', '.join(packs[:20])}) or connect the visitor with the team."
+            )
         return {"status": "not_found_sku", "product": product, "grade": grade_sel,
-                "pack_sizes": packs[:20],
-                "message": (f"No '{pack_in}' pack for {product} ({grade_sel}). Offer the "
-                            "available pack sizes or connect them to the team.")}
+                "pack_sizes": packs[:20], "message": message}
 
     # 3. Resolve to one priced SKU. Dup rows for this exact pack must agree, or we
     #    escalate rather than pick arbitrarily by DB order (Phase 1.3). A row is POR
@@ -983,6 +1078,35 @@ def _insert_agent_request(cursor, company_id, *, kind, product, cas, grade,
         return False
 
 
+def _session_has_capture(cursor, company_id, session_id) -> bool:
+    """True if this session already has an ``agent_requests`` or
+    ``quote_requests`` row (Slice A, agent-conversation-gaps plan §3.3).
+
+    Gates opportunistic contact capture so a session that already reached the
+    owner via a quote or sample doesn't also fire a duplicate 'contact' ping.
+    Tenant-scoped. Degrades to ``False`` (never suppress a real capture) on a
+    missing session_id or a DB error — a duplicate ping costs the owner one
+    extra notification; a wrongly-suppressed one loses a lead, which is the
+    exact failure this plan repairs."""
+    if not session_id:
+        return False
+    try:
+        cursor.execute(
+            "SELECT 1 FROM agent_requests WHERE company_id = %s AND session_id = %s LIMIT 1",
+            (company_id, session_id),
+        )
+        if cursor.fetchone():
+            return True
+        cursor.execute(
+            "SELECT 1 FROM quote_requests WHERE company_id = %s AND session_id = %s LIMIT 1",
+            (company_id, session_id),
+        )
+        return cursor.fetchone() is not None
+    except Exception:
+        logger.exception("_session_has_capture: lookup failed")
+        return False
+
+
 def execute_tool(name: str, args: Dict[str, Any], cursor, company_id,
                  session_id: Optional[str] = None) -> Dict[str, Any]:
     """Dispatch a model-requested tool to its deterministic implementation.
@@ -1105,7 +1229,10 @@ def build_agent_directive(pack) -> str:
         "prior answer only if the visitor explicitly asks you to. If this turn "
         "genuinely has nothing new to add, say plainly what is missing or offer "
         "the team handoff — do not re-send the previous answer, with or without "
-        "new content in front of it.\n\n"
+        "new content in front of it. If the visitor's message includes a phone "
+        "number or email address, explicitly acknowledge that you've noted it "
+        "and confirm the team will follow up — never let a shared contact detail "
+        "pass without comment or get folded silently into an unrelated answer.\n\n"
         "For ANY request about a product's Safety Data Sheet (SDS), hazards, "
         "handling, storage, dosage, first-aid, or regulatory status you MUST call "
         "the get_sds tool and answer ONLY from the document it returns. NEVER "

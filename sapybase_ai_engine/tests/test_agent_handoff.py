@@ -24,6 +24,16 @@ def _sample(**over):
     return base
 
 
+def _contact(**over):
+    base = {
+        "kind": "contact", "product": "Hexane LR", "contact_name": None,
+        "contact_email": None, "contact_phone": "9824315602",
+        "note": "Do you have Hexane LR in 200 Ltr? My Mob. 9824315602",
+    }
+    base.update(over)
+    return base
+
+
 def _quote(**over):
     base = {
         "kind": "quote", "status": "quoted", "product": "Acetone", "grade": "AR",
@@ -50,6 +60,33 @@ class TestSummarize:
                                            subtotal=None, unit_price=None))
         assert "price on request" in s.lower()
         assert "₹" not in s   # never invent a number for a POR
+
+
+class TestContactKind:
+    # Slice A (agent-conversation-gaps plan §3.3) — a visitor who leaves only a
+    # phone/email mid-chat, with no priced quote or sample form involved.
+
+    def test_summarize_uses_contact_label(self):
+        s = summarize_agent_request(_contact())
+        assert "New contact" in s and "Hexane LR" in s
+
+    def test_slack_shows_phone_and_note(self):
+        p = build_agent_request_slack_payload("ChemBot", _contact())
+        assert "New contact" in p["blocks"][0]["text"]["text"]
+        section = p["blocks"][1]["text"]["text"]
+        assert "9824315602" in section
+        assert "200 Ltr" in section   # the visitor's verbatim question
+
+    def test_email_shows_phone_and_note(self):
+        subject, html = build_agent_request_email("ChemBot", _contact())
+        assert "New contact" in subject
+        assert "9824315602" in html and "200 Ltr" in html
+
+    def test_unknown_kind_still_degrades_safely(self):
+        # _KIND_META.get default — confirms adding 'contact' didn't remove the
+        # fallback for a genuinely unrecognized future kind.
+        s = summarize_agent_request(_contact(kind="callback"))
+        assert "New request" in s
 
 
 class TestSlackPayload:

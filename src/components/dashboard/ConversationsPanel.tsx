@@ -32,6 +32,93 @@ const FilterBtn = ({ active, onClick, children, dot }: { active: boolean; onClic
     </button>
 );
 
+// Slice D (agent-conversation-gaps plan §12.5) — owner-facing source attribution.
+// Renders three distinct states so a wrong answer's cause is never mistaken for
+// another: `was_cache_hit` always wins ("served from cache", regardless of
+// `sources`); `sources == null` is an older row logged before this shipped
+// ("not recorded"); `sources == []` is a real, empty-on-purpose turn (a
+// decline/escalation with zero retrieval). Only a non-empty list gets the
+// collapsed count + expand affordance. Never renders `confidence` as a
+// correctness signal — plan §11.4 D found it doesn't track correctness (1.0 on
+// a fabricated answer, 0.2 on a correct one) — a per-source score here is
+// always labelled "match strength", never "confidence".
+const SourceAttribution = ({ msg, selectedBotId, authFetch }: { msg: any; selectedBotId: string; authFetch: any }) => {
+    const [expanded, setExpanded] = useState(false);
+    const [chunks, setChunks] = useState<Record<string, { content: string; url: string | null } | 'loading' | 'error'>>({});
+
+    const openChunk = async (contentId: string) => {
+        if (chunks[contentId]) return; // already fetched or in flight
+        setChunks((c) => ({ ...c, [contentId]: 'loading' }));
+        try {
+            const res = await authFetch(`/api/conversations/${selectedBotId}/chunk/${contentId}`);
+            setChunks((c) => ({ ...c, [contentId]: { content: res?.content ?? '', url: res?.url ?? null } }));
+        } catch {
+            setChunks((c) => ({ ...c, [contentId]: 'error' }));
+        }
+    };
+
+    if (msg.was_cache_hit) {
+        return <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 italic">Served from cache</p>;
+    }
+    if (msg.sources == null) {
+        return <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 italic">Source not recorded</p>;
+    }
+    const sources: any[] = msg.sources;
+    if (sources.length === 0) {
+        return <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 italic">No sources used this turn</p>;
+    }
+
+    const top = sources[0];
+    const topLabel = top.detail || top.label;
+
+    return (
+        <div className="mt-1.5">
+            <button
+                onClick={() => setExpanded((e) => !e)}
+                aria-expanded={expanded}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            >
+                <span className="material-symbols-outlined text-[13px]">{expanded ? 'expand_less' : 'expand_more'}</span>
+                {sources.length} source{sources.length !== 1 ? 's' : ''} · <span className="truncate max-w-[220px]">{topLabel}</span>
+            </button>
+            {expanded && (
+                <ul className="mt-1.5 flex flex-col gap-1.5 border-l-2 border-slate-200 dark:border-slate-700 pl-2.5">
+                    {sources.map((src, i) => {
+                        const key = `${i}-${src.content_id || src.label}`;
+                        const chunk = src.content_id ? chunks[src.content_id] : undefined;
+                        return (
+                            <li key={key} className="text-[11.5px] text-slate-600 dark:text-slate-400">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Badge tone="neutral" dot={false}>{src.kind}</Badge>
+                                    <span className="truncate max-w-[260px]" title={src.label}>{src.detail || src.label}</span>
+                                    {typeof src.score === 'number' && (
+                                        <span className="tabular-nums text-slate-400">match strength {src.score.toFixed(1)}/10</span>
+                                    )}
+                                    {src.kind === 'kb' && src.content_id && (
+                                        <button
+                                            onClick={() => openChunk(src.content_id)}
+                                            className="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                                        >
+                                            {chunk ? 'hide' : 'view chunk'}
+                                        </button>
+                                    )}
+                                </div>
+                                {chunk === 'loading' && <p className="mt-1 text-slate-400 italic">Loading…</p>}
+                                {chunk === 'error' && <p className="mt-1 text-red-500">Couldn't load this chunk.</p>}
+                                {chunk && chunk !== 'loading' && chunk !== 'error' && (
+                                    <p className="mt-1 whitespace-pre-wrap break-words text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 rounded-md p-2">
+                                        {chunk.content}
+                                    </p>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+};
+
 const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized, focusSessionId, onFocusHandled }: ConversationsPanelProps) => {
     const [page, setPage] = useState(1);
     const [filter, setFilter] = useState('all');
@@ -165,6 +252,7 @@ const ConversationsPanel = ({ selectedBotId, authFetch, isAuthorized, focusSessi
                                                             {msg.is_unanswered && <Badge tone="alert">Unanswered</Badge>}
                                                         </div>
                                                         <p className="text-[13.5px] text-slate-600 dark:text-slate-400 leading-snug mt-0.5 break-words whitespace-pre-wrap">{msg.bot_response}</p>
+                                                        <SourceAttribution msg={msg} selectedBotId={selectedBotId} authFetch={authFetch} />
                                                         {msg.is_unanswered && !isTrainingThis && (
                                                             <button
                                                                 onClick={() => setTrainingQuery(msg.user_query)}

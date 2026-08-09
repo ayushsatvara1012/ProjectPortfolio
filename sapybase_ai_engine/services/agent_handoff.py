@@ -35,6 +35,7 @@ from services.slack_handoff import _slack_escape
 _KIND_META = {
     "sample": ("🧪", "New sample request"),
     "quote": ("🧾", "New quote"),
+    "contact": ("📇", "New contact"),
 }
 
 

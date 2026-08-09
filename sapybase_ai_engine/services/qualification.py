@@ -177,6 +177,109 @@ def extract_application(text: str) -> Optional[str]:
     return val
 
 
+# ── contact (phone / email) ──────────────────────────────────────────────────
+# Identity, not a buyer fact — deliberately NOT in `_EXTRACTORS` below. That
+# registry holds `lead_profile['qualification']` facts keyed by the pack's
+# qualification_slots; contact details already have a home in `lead_profile`'s
+# own name/email/phone, owned by `sales_funnel.build_lead_profile`. Mixing the
+# two would put an identity into the qualification sub-dict, where the owner
+# panel renders it as a fact chip instead of a contact.
+#
+# A chemical bot's chat is full of digit strings that are NOT phone numbers:
+# CAS numbers (7758-11-4), batch/lot codes (100.26R016), HSN/GST codes,
+# invoice/order numbers, pack sizes, prices. Same precision-over-recall
+# discipline as the rest of this module — a missed phone just means the
+# visitor gets asked again by the model; a false positive mails the owner a
+# fake lead.
+
+_DIGIT_CUE_REJECT = re.compile(
+    r"\b(cas|batch|lot|hsn|gst|gstin|invoice|inv|order|po)\b", re.IGNORECASE)
+_PHONE_CONTACT_CUE = re.compile(
+    r"\b(mob(?:ile)?|phone|contact|whatsapp|call\s+me\s+on|reach\s+me\s+(?:at|on))\b",
+    re.IGNORECASE)
+
+# Strict Indian mobile shape: optional +91 / 0 prefix, then a clean 10-digit
+# run starting 6-9 — not embedded in a longer digit run and not immediately
+# touching a CAS/batch-style separator (-, ., /), so it can't be a slice of a
+# longer identifier.
+_PHONE_STRICT_RE = re.compile(
+    r"(?<![\d\-./])(?:\+?91[\s-]?|0)?([6-9]\d{9})(?![\d\-./])")
+# Relaxed shape, used ONLY right after an explicit contact cue: still a clean
+# 10-digit run starting 6-9 (never a slice of a longer digit run), but
+# tolerant of surrounding punctuation the strict pass would reject.
+_PHONE_RELAXED_RE = re.compile(r"(?<!\d)([6-9]\d{9})(?!\d)")
+_CONTACT_CONTEXT_WINDOW = 40
+
+
+def extract_phone(text: str) -> Optional[str]:
+    """An Indian mobile number in free text, high precision, or ``None``.
+
+    Two passes: a strict shape match anywhere in the text, then — only if that
+    found nothing — a relaxed match right after an explicit cue phrase
+    ("mob", "call me on", ...). Either pass is dropped if a CAS/batch/HSN/GST/
+    invoice/order cue appears within 40 characters, since that context means
+    the digits are an identifier, not a phone number.
+    """
+    text = text or ""
+    if not text.strip():
+        return None
+
+    for m in _PHONE_STRICT_RE.finditer(text):
+        lo, hi = max(0, m.start() - _CONTACT_CONTEXT_WINDOW), m.end() + _CONTACT_CONTEXT_WINDOW
+        if _DIGIT_CUE_REJECT.search(text[lo:hi]):
+            continue
+        return m.group(1)
+
+    for cue in _PHONE_CONTACT_CUE.finditer(text):
+        tail = text[cue.end():cue.end() + _CONTACT_CONTEXT_WINDOW]
+        rm = _PHONE_RELAXED_RE.search(tail)
+        if not rm:
+            continue
+        lo = cue.start() - _CONTACT_CONTEXT_WINDOW
+        hi = cue.end() + rm.end() + _CONTACT_CONTEXT_WINDOW
+        if _DIGIT_CUE_REJECT.search(text[max(0, lo):hi]):
+            continue
+        return rm.group(1)
+
+    return None
+
+
+# Search-then-verify: isolate a candidate substring, trim trailing sentence
+# punctuation, then hold it to the SAME strict full-match shape
+# `services.agent._EMAIL_SHAPE` applies to a model-supplied address (defined
+# locally rather than imported, keeping this module's zero-dependency,
+# pure-function discipline).
+_EMAIL_SEARCH_RE = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+_EMAIL_SHAPE_RE = re.compile(r"\A[^@\s]+@[^@\s]+\.[^@\s]+\Z")
+
+
+def extract_email(text: str) -> Optional[str]:
+    """A well-shaped email address found in free text, or ``None``."""
+    text = text or ""
+    if not text.strip():
+        return None
+    m = _EMAIL_SEARCH_RE.search(text)
+    if not m:
+        return None
+    candidate = m.group(0).strip(".,;:!?)>\"'")
+    return candidate if _EMAIL_SHAPE_RE.match(candidate) else None
+
+
+def extract_contact(text: str) -> Dict[str, str]:
+    """Phone and/or email found in free text. Either key is independently
+    optional; returns ``{}`` when neither is found. Identity, not a
+    qualification fact — see the section header above for why this stays out
+    of ``_EXTRACTORS``."""
+    out: Dict[str, str] = {}
+    phone = extract_phone(text)
+    if phone:
+        out["phone"] = phone
+    email = extract_email(text)
+    if email:
+        out["email"] = email
+    return out
+
+
 # ── registry + public API ────────────────────────────────────────────────────
 
 _EXTRACTORS: Dict[str, Callable[[str], Optional[str]]] = {
@@ -251,8 +354,11 @@ def qualification_block(pack, lead_profile: Optional[Dict[str, Any]]) -> str:
             "into your reply, and only when it fits the conversation. NEVER "
             "interrogate, never stack multiple questions, and NEVER withhold or "
             "delay a product/price/SDS answer to collect a fact — answer first, ask "
-            "second. If the visitor ignores the question, do not repeat it. Do not "
-            "ask about a fact already listed as known."
+            "second, and do NOT ask at all when this turn had no real answer to "
+            "give (a tool returned nothing useful, or you're declining/escalating) "
+            "— a discovery question right after a non-answer reads as evasive, not "
+            "helpful. If the visitor ignores the question, do not repeat it. Do "
+            "not ask about a fact already listed as known."
         )
     else:
         body = (

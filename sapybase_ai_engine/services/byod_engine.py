@@ -82,16 +82,20 @@ MAX_KNOWLEDGE_CONTENT_CHARS = 100_000
 # one (a bad URL must not drop an otherwise-good answer chunk).
 MAX_URL_CHARS = 2_048
 
-KnowledgeRow = Tuple[Optional[str], Optional[str]]
+KnowledgeRow = Tuple[Optional[str], Optional[str], Optional[str]]
 
 
 def validate_knowledge_rows(rows: Optional[Sequence[Sequence]]) -> List[KnowledgeRow]:
-    """Filter RAG rows ``(content, url)`` from the tenant DB defensively (E3).
+    """Filter RAG rows ``(content, url, content_id)`` from the tenant DB
+    defensively (E3).
 
     Skips rows whose content is NULL, the wrong type, empty, or oversized — never
     raises on a malformed row (§16.2: malformed rows are skipped, not fatal). URL
-    is coerced to a clean str-or-None and truncated. Preserves the ``(content,
-    url)`` tuple shape the chat path already consumes."""
+    is coerced to a clean str-or-None and truncated. ``content_id`` (Slice D,
+    agent-conversation-gaps plan §12.3) is coerced to str-or-None — it is display/
+    lookup metadata only, never trusted as a DB key without a fresh tenant-scoped
+    read. A caller passing the OLD 2-tuple shape (no id) still validates cleanly;
+    ``content_id`` is simply ``None``."""
     if not rows:
         return []
     valid: List[KnowledgeRow] = []
@@ -100,6 +104,7 @@ def validate_knowledge_rows(rows: Optional[Sequence[Sequence]]) -> List[Knowledg
         try:
             content = row[0]
             url = row[1] if len(row) > 1 else None
+            content_id = row[2] if len(row) > 2 else None
         except (TypeError, IndexError):
             skipped += 1
             continue
@@ -114,7 +119,9 @@ def validate_knowledge_rows(rows: Optional[Sequence[Sequence]]) -> List[Knowledg
                 url = None
             elif len(url) > MAX_URL_CHARS:
                 url = url[:MAX_URL_CHARS]
-        valid.append((content, url))
+        if content_id is not None and not isinstance(content_id, str):
+            content_id = str(content_id)
+        valid.append((content, url, content_id))
     if skipped:
         logger.warning("BYOD knowledge rows skipped (malformed/oversized): count=%d", skipped)
     return valid
@@ -528,6 +535,7 @@ def tenant_log_chat(
     *,
     message_id: Optional[str] = None,
     registry: Optional[TenantPoolRegistry] = None,
+    sources: Optional[list] = None,
 ) -> bool:
     """Write the conversation log to the tenant DB. Returns True on success.
 
@@ -535,7 +543,18 @@ def tenant_log_chat(
     idempotency key the control-plane meter and reconciler key on (Phase 3.3).
     Degrades soft (§16.9): on ANY tenant-DB failure it logs a SANITIZED warning
     and returns False — a tenant analytics-write hiccup never breaks chat or leaks
-    DB internals. The caller (a background task) ignores the result."""
+    DB internals. The caller (a background task) ignores the result.
+
+    ``sources`` (Slice D, agent-conversation-gaps plan §12.6) is accepted for
+    signature parity with the control-plane ``log_chat_to_db`` but is NOT
+    persisted — the tenant ``chat_logs`` table has no ``sources`` column yet.
+    Same precedent as token metering and feedback (this function's signature
+    already omits both): those need a data-plane schema-version bump plus a
+    rolling per-tenant migration the control-plane dark-apply doesn't cover, and
+    verified against the live BYOD registry that no chemical-vertical traffic
+    is BYOD-routed today, so this gap does not affect the transcripts driving
+    this plan. A future data-plane version can add the column and start
+    forwarding this argument into the INSERT without any caller change."""
     try:
         with tenant_connection(company_id, registry=registry) as conn:
             cur = conn.cursor()

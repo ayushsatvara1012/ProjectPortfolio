@@ -34,12 +34,17 @@ from packs import load_pack
 
 class FakeCursor:
     """Returns programmed rows by inspecting the SQL shape get_sds emits, and
-    records every (sql, params) so tests can assert tenant scoping."""
+    records every (sql, params) so tests can assert tenant scoping.
 
-    def __init__(self, *, cas=None, name_exact=None, partial=None):
+    ``skus`` (Slice B, plan §4.1) programs the ``product_skus`` fallback query
+    ``get_product_spec`` runs when the resolved product's grade/packaging is
+    blank — a list of (grade, pack_size) tuples, default none."""
+
+    def __init__(self, *, cas=None, name_exact=None, partial=None, skus=None):
         self._cas = cas or []
         self._name_exact = name_exact or []
         self._partial = partial or []
+        self._skus = skus or []
         self._last_sql = ""
         self.calls = []  # list of (sql, params)
 
@@ -49,6 +54,8 @@ class FakeCursor:
 
     def fetchall(self):
         s = self._last_sql
+        if "FROM product_skus" in s:
+            return list(self._skus)
         if "cas_number = %s" in s:
             return list(self._cas)
         if "lower(name) = lower" in s:
@@ -396,6 +403,63 @@ class TestGetProductSpec:
             assert params[0] == CID
 
 
+class TestGetProductSpecSkuFallback:
+    # Slice B (agent-conversation-gaps plan §4.1/§4.2) — a product row with blank
+    # grade/packaging falls back to the SKUs the quote flow already reads, and the
+    # observation says plainly what's still missing instead of a silent null.
+
+    def test_blank_fields_filled_from_skus(self):
+        row = _row(grade=None, packaging=None)
+        cur = FakeCursor(cas=[row], skus=[("AR", "2.5 Ltr"), ("LR", "500 ml")])
+        out = get_product_spec(cur, CID, cas_number="7664-93-9")
+        assert out["status"] == "found"
+        assert out["product"]["grade"] == "AR, LR"
+        assert out["product"]["packaging"] == "2.5 Ltr, 500 ml"
+        assert out["missing_fields"] == []
+        # pack_sizes is rebuilt from the now-filled packaging, for free.
+        assert out["pack_sizes"] == ["2.5 Ltr", "500 ml"]
+
+    def test_populated_packaging_is_never_overwritten(self):
+        # products.packaging already has a value → the SKU read must not touch it,
+        # even if the SKU rows disagree.
+        row = _row(grade="Battery", packaging="35kg can")
+        cur = FakeCursor(cas=[row], skus=[("Technical", "1 kg")])
+        out = get_product_spec(cur, CID, cas_number="7664-93-9")
+        assert out["product"]["grade"] == "Battery"
+        assert out["product"]["packaging"] == "35kg can"
+        # A populated row never even reaches the fallback query.
+        assert not any("FROM product_skus" in sql for sql, _ in cur.calls)
+
+    def test_only_the_blank_field_is_filled(self):
+        row = _row(grade=None, packaging="35kg can")
+        cur = FakeCursor(cas=[row], skus=[("Battery", "35kg can"), ("Technical", "1kg tin")])
+        out = get_product_spec(cur, CID, cas_number="7664-93-9")
+        assert out["product"]["grade"] == "Battery, Technical"
+        assert out["product"]["packaging"] == "35kg can"   # untouched
+
+    def test_missing_fields_when_skus_have_nothing_either(self):
+        row = _row(grade=None, packaging=None)
+        out = get_product_spec(FakeCursor(cas=[row]), CID, cas_number="7664-93-9")
+        assert out["status"] == "found"   # never a new status — additive only
+        assert out["missing_fields"] == ["grade", "packaging"]
+        assert "not on file" in out["message"]
+        assert "connect" in out["message"].lower()
+
+    def test_missing_fields_partial(self):
+        row = _row(grade="AR", packaging=None)
+        out = get_product_spec(FakeCursor(cas=[row]), CID, cas_number="7664-93-9")
+        assert out["missing_fields"] == ["packaging"]
+
+    def test_fallback_query_is_tenant_scoped(self):
+        row = _row(grade=None, packaging=None)
+        cur = FakeCursor(cas=[row], skus=[("AR", "2.5 Ltr")])
+        get_product_spec(cur, CID, cas_number="7664-93-9")
+        sku_calls = [(sql, p) for sql, p in cur.calls if "FROM product_skus" in sql]
+        assert sku_calls
+        for sql, params in sku_calls:
+            assert "company_id = %s" in sql and params[0] == CID
+
+
 # ── execute_tool ─────────────────────────────────────────────────────────────
 
 class TestExecuteTool:
@@ -451,7 +515,7 @@ class TestExecuteTool:
 
 # ── request_quote (Phase 4a) ─────────────────────────────────────────────────
 
-from services.agent import request_quote, _norm_pack  # noqa: E402
+from services.agent import request_quote, _norm_pack, _pack_magnitude  # noqa: E402
 
 
 class TestNormPack:
@@ -474,6 +538,29 @@ class TestNormPack:
 
     def test_last_size_wins_for_multipack_text(self):
         assert _norm_pack("8 x 500 ml") == "500ml"
+
+
+class TestPackMagnitude:
+    # Standalone comparator for the not_found_sku bulk-routing hint (plan §4.3) —
+    # deliberately NOT sharing code with _norm_pack, which resolves pricing and
+    # is frozen (plan §2).
+
+    def test_volume_to_ml(self):
+        assert _pack_magnitude("2.5 Ltr") == (2500.0, "ml")
+        assert _pack_magnitude("500 ml") == (500.0, "ml")
+
+    def test_mass_to_grams(self):
+        assert _pack_magnitude("35 Kg") == (35000.0, "g")
+        assert _pack_magnitude("500 g") == (500.0, "g")
+
+    def test_unparseable_returns_none(self):
+        assert _pack_magnitude("a few drums") is None
+        assert _pack_magnitude(None) is None
+        assert _pack_magnitude("") is None
+
+    def test_comparable_within_same_unit_family(self):
+        assert _pack_magnitude("200 Ltr")[0] > _pack_magnitude("2.5 Ltr")[0]
+        assert _pack_magnitude("1 Ltr")[0] < _pack_magnitude("2.5 Ltr")[0]
 
     def test_unparseable_falls_back_to_text(self):
         assert _norm_pack("sample") == "sample"
@@ -774,6 +861,47 @@ class TestRequestQuote:
                             pack_size="999 Ltr")
         assert out["status"] == "not_found_sku"
 
+    def test_not_found_sku_message_says_not_in_price_list_not_nonexistence(self):
+        # Symptom 5 (plan §4.3) — the buyer transcript this fixes had the model
+        # tell a visitor "there is no 200 Ltr pack" as if it doesn't exist.
+        cur = FakeSkuCursor(name_exact=[_sku(grade="LR", pack="30 Kg", price=500)])
+        out = request_quote(cur, CID, product_name="hexane", grade="LR",
+                            pack_size="200 Ltr")
+        assert out["status"] == "not_found_sku"
+        assert "not in the price list" in out["message"]
+        assert "there is no" not in out["message"].lower()
+        # The old wording implied non-existence; the new one explicitly says the
+        # opposite rather than leaving it ambiguous.
+        assert "does not mean it doesn't exist" in out["message"].lower()
+
+    def test_not_found_sku_routes_bulk_when_larger_than_every_listed_pack(self):
+        cur = FakeSkuCursor(name_exact=[_sku(grade="LR", pack="2.5 Ltr", price=500)])
+        out = request_quote(cur, CID, product_name="hexane", grade="LR",
+                            pack_size="200 Ltr")
+        assert out["status"] == "not_found_sku"
+        assert "bulk" in out["message"].lower()
+        assert "not a pack that doesn't exist" in out["message"].lower()
+        # Must not steer the model to offer only the smaller packs as if that's
+        # a substitute for the bulk quantity actually asked for.
+        assert "do not offer only the smaller" in out["message"].lower()
+
+    def test_not_found_sku_not_bulk_when_smaller_than_a_listed_pack(self):
+        cur = FakeSkuCursor(name_exact=[_sku(grade="LR", pack="2.5 Ltr", price=500)])
+        out = request_quote(cur, CID, product_name="hexane", grade="LR",
+                            pack_size="1 Ltr")
+        assert out["status"] == "not_found_sku"
+        assert "bulk" not in out["message"].lower()
+        assert "not in the price list" in out["message"]
+
+    def test_not_found_sku_not_bulk_across_mismatched_units(self):
+        # A weight pack can't be judged "larger" than a volume request — stay
+        # conservative rather than guess across unit families.
+        cur = FakeSkuCursor(name_exact=[_sku(grade="LR", pack="30 Kg", price=500)])
+        out = request_quote(cur, CID, product_name="hexane", grade="LR",
+                            pack_size="200 Ltr")
+        assert out["status"] == "not_found_sku"
+        assert "bulk" not in out["message"].lower()
+
     def test_every_query_is_tenant_scoped(self):
         cur = FakeSkuCursor(name_exact=[_sku(price=1894)])
         request_quote(cur, CID, product_name="acetone", grade="AR", pack_size="2.5 Ltr")
@@ -897,6 +1025,64 @@ class TestInsertAgentRequest:
         assert ok is False
 
 
+class FakeExistsCursor:
+    """A cursor whose ``fetchone()`` result is driven by which table the last
+    ``execute`` queried — for testing ``_session_has_capture`` (Slice A, plan §3.3)
+    without a real DB."""
+
+    def __init__(self, *, agent_requests_hit=False, quote_requests_hit=False):
+        self._agent_hit = agent_requests_hit
+        self._quote_hit = quote_requests_hit
+        self._last_sql = ""
+        self.calls = []
+
+    def execute(self, sql, params=None):
+        self._last_sql = sql
+        self.calls.append((sql, params))
+
+    def fetchone(self):
+        if "FROM agent_requests" in self._last_sql:
+            return (1,) if self._agent_hit else None
+        if "FROM quote_requests" in self._last_sql:
+            return (1,) if self._quote_hit else None
+        return None
+
+
+class TestSessionHasCapture:
+    # Gates Slice A's opportunistic contact capture: a session that already
+    # reached the owner via a quote/sample must not also fire a duplicate ping.
+
+    def test_no_session_id_degrades_false(self):
+        cur = FakeExistsCursor(agent_requests_hit=True)
+        assert agent._session_has_capture(cur, CID, None) is False
+        assert cur.calls == []   # never even queried — cheap short-circuit
+
+    def test_no_existing_rows_returns_false(self):
+        cur = FakeExistsCursor()
+        assert agent._session_has_capture(cur, CID, "s1") is False
+
+    def test_existing_agent_request_returns_true(self):
+        cur = FakeExistsCursor(agent_requests_hit=True)
+        assert agent._session_has_capture(cur, CID, "s1") is True
+
+    def test_existing_quote_request_returns_true(self):
+        cur = FakeExistsCursor(quote_requests_hit=True)
+        assert agent._session_has_capture(cur, CID, "s1") is True
+        # Checked agent_requests first, then fell through to quote_requests.
+        assert len(cur.calls) == 2
+
+    def test_short_circuits_on_agent_request_hit(self):
+        cur = FakeExistsCursor(agent_requests_hit=True, quote_requests_hit=True)
+        assert agent._session_has_capture(cur, CID, "s1") is True
+        assert len(cur.calls) == 1   # never needed to check quote_requests
+
+    def test_db_error_degrades_false_never_suppresses_a_real_capture(self):
+        class BoomCursor(FakeExistsCursor):
+            def execute(self, sql, params=None):
+                raise RuntimeError("db down")
+        assert agent._session_has_capture(BoomCursor(), CID, "s1") is False
+
+
 # ── pack -> schema + directive ───────────────────────────────────────────────
 
 class TestSchemasAndDirective:
@@ -944,6 +1130,14 @@ class TestSchemasAndDirective:
         # panel (never a [State: ...] chat note), so get_sds is deterministic
         # and cheap enough to call again freely on every repeat ask.
         assert "call it again freely whenever" in directive
+
+    def test_directive_requires_acknowledging_a_shared_contact_detail(self):
+        # Slice B (agent-conversation-gaps plan §4.4) — Slice A silently captures
+        # a phone/email typed mid-chat for the owner; the visitor-facing reply
+        # must not stay silent about it.
+        directive = build_agent_directive(load_pack("chemical"))
+        assert "explicitly acknowledge that you've noted it" in directive
+        assert "confirm the team will follow up" in directive
 
     def test_directive_forbids_fabricated_identity(self):
         """agent-conversation-gaps-plan.md §13.3a: a staff/contact directory has no

@@ -49,6 +49,13 @@ def test_tier_sample_always_notifies():
     assert main._handoff_meets_tier({"kind": "sample"}) is True
 
 
+def test_tier_contact_always_notifies():
+    # Slice A (agent-conversation-gaps plan §3.3/§7.2) — a phone-only visitor
+    # scores COLD in _score_lead, so this must NOT be gated on band.
+    assert main._handoff_meets_tier({"kind": "contact", "contact_phone": "9824315602"}) is True
+    assert main._handoff_meets_tier({"kind": "contact", "contact_email": None}) is True
+
+
 # ── dedup (async) ────────────────────────────────────────────────────────────
 
 def test_dedup_first_notifies_second_suppressed(monkeypatch):

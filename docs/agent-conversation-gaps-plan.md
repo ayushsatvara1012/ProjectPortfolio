@@ -9,8 +9,13 @@ The tool layer discussed alongside it (`capture_contact`, `escalate_to_human`, `
 ## 0. Status - 2026-08-08
 
 Five slices, independently shippable, in the order A -> B -> C -> D -> E.
-**§13.3a, §13.3b, §13.1, §13.2, §13.3, §13.4, §13.5, and §13.7 are BUILT and live-model-verified** (backend only, uncommitted) - see §14 (§14.10 for §13.1, §14.11 for §13.2, §14.12 for §13.3, §14.13 for §13.4, §14.14 for §13.5, §14.15 for §13.7).
-Only §13.6 (deliberately deferred) and §13.8 (a summary section, not a fix) remain in Slice E; all of Slices A-D are still PLAN ONLY.
+**§13.3a, §13.3b, §13.1, §13.2, §13.3, §13.4, §13.5, and §13.7 are BUILT and live-model-verified** (backend only) - see §14 (§14.10 for §13.1, §14.11 for §13.2, §14.12 for §13.3, §14.13 for §13.4, §14.14 for §13.5, §14.15 for §13.7).
+Only §13.6 (deliberately deferred) and §13.8 (a summary section, not a fix) remain in Slice E.
+**Slices A (§3), B (§4), and D (§12) are now BUILT and deterministic-suite-verified, uncommitted** (see §3.5, §4.5, §12.9).
+D's migration 0036 (`chat_logs.sources`) is applied dark to prod control DB; the BYOD half is deliberately code-only (signature parity, no persistence) - see §12.9 for why.
+Slice C is still PLAN ONLY; user has deprioritized it ("won't make large impact").
+Slice E is COMMITTED locally on `MainV2` (`aa61ed71`), NOT pushed; Slices A, B, and D are on top of that, uncommitted.
+Browser/live verification of D's dashboard UI is still owed (§12.9).
 
 Revised 2026-08-08 after a **second** client complaint carrying two further transcripts.
 Those transcripts are analysed in §11 and are the origin of Slice E (§13).
@@ -123,6 +128,39 @@ Add a `'contact'` entry to `_KIND_META` in `services/agent_handoff.py:53` so the
 
 Replaying transcript 2 produces one `agent_requests` row with `kind='contact'`, phone `9824315602`, note carrying the Hexane 200 Ltr question, and one owner email plus Slack card within the turn.
 
+### 3.5 BUILT 2026-08-08
+
+Shipped as designed, with one deliberate deviation from §3.1's "two hooks" and one implementation detail worth recording.
+
+**`extract_phone` / `extract_email` / `extract_contact`** landed in `services/qualification.py`, kept out of `_EXTRACTORS` per §3.1.
+`extract_phone` is two-pass: a strict shape match anywhere in the text (clean 10 digits, 6-9 leading, optional `+91`/`0` prefix, not adjacent to another digit or a `-`/`.`/`/`), then — only if that finds nothing — a relaxed match right after an explicit cue phrase (`mob`, `call me on`, `whatsapp`, ...).
+Either pass is dropped if a CAS/batch/lot/HSN/GST/invoice/order cue appears within 40 characters.
+`extract_email` is search-then-verify: isolate a candidate substring, trim trailing sentence punctuation, then hold it to the same strict full-match shape `services.agent._EMAIL_SHAPE` uses (redefined locally rather than imported, to keep this module's zero-dependency pure-function discipline intact).
+
+**Only ONE of the two hooks was wired — deliberately.**
+The plan named `main.py:3873` (streaming chat turn) and `main.py:5945` (originally read as "non-streaming") as the two places `extract_facts` already runs.
+Investigating hook 2 at build time found it is `/api/widget/sample-request` (`submit_sample_request`), and there **`_insert_agent_request(..., kind="sample", ...)` already runs and commits *before* `extract_facts` is even called** — meaning `_session_has_capture` would find that just-inserted row and unconditionally block a `kind='contact'` insert every single time.
+Wiring it there would be dead code: reachable, but provably never able to fire, given the form's contact fields (`contact_name`/`contact_email`/`contact_phone`) are already structured and authoritative there anyway.
+Skipped per the "no half-finished / no dead paths" standard; all of Slice A's real value is at hook 1, which is where transcript 2's actual failure happened.
+
+**Where hook 1 landed**: `main.py`, immediately after `full_reply = _strip_source_citation(full_reply)` and *before* the `_captured` snapshot that feeds both the SSE yields and the real-time owner-handoff trigger (`agent_handoff = _captured.get("handoff")`, a few lines later).
+Setting `_captured["handoff"]` at this point — not inside the later SESSION MEMORY block — is what lets the existing trigger fire completely unchanged, exactly as §3.3 specifies; the SESSION MEMORY block's own `agent_handoff` read happens strictly after, so setting it any later would have silently no-opped the owner ping.
+
+**Free side-effect, not extra code**: `sales_funnel._candidate_stage` already promotes a session to `"captured"` stage whenever `handoff.get("contact_email") or handoff.get("contact_phone")` is truthy, and `build_lead_profile`'s `_set` path already reads `handoff.get("contact_email"/"contact_phone")` into `lead_profile`.
+Because the contact handoff is written into the *same* `_captured["handoff"]` dict the quote/sample paths already populate, both funnel-stage advancement and lead-profile identity capture happen for free — no edits needed to `sales_funnel.py`.
+
+**Gating**: new `services.agent._session_has_capture(cursor, company_id, session_id)` — checks `agent_requests` then `quote_requests` for an existing row this session, tenant-scoped.
+Degrades to `False` (never suppress a real capture) on a missing `session_id` or a DB error, matching `_handoff_dedup_ok`'s existing "degrade open" philosophy: a duplicate ping costs the owner one extra notification, a wrongly-suppressed one recreates the exact bug this slice fixes.
+
+**Owner-facing rendering**: added `"contact": ("📇", "New contact")` to `services/agent_handoff.py`'s `_KIND_META`.
+`_handoff_meets_tier` already returns `True` for every non-quote kind (§7.2), so `kind='contact'` notifies unconditionally with no tiering change, as designed.
+
+**Tests**: `tests/test_qualification.py` (`TestExtractPhone`/`TestExtractEmail`/`TestExtractContact`, including every negative case §6 lists — CAS, batch code `100.26R016`, pack size, quantity, HSN, price, and a longer digit run), `tests/test_agent.py::TestSessionHasCapture` (a small `FakeExistsCursor`, no real DB), `tests/test_agent_handoff.py::TestContactKind`, `tests/test_handoff_tiering.py::test_tier_contact_always_notifies`.
+Full backend suite green: 2086 passed / 134 skipped (up from 2053/134 before this slice — no regressions, no live-LLM component since this is pure deterministic Python control flow, nothing for a model to verify).
+
+Not yet done: browser/live verification of the real chat flow end-to-end (transcript 2 replay against a running bot) — per [[browser-verification-policy]], Manual vs Auto to be asked before any dev server starts.
+Not committed as of this session.
+
 ## 4. Slice B - four correctness fixes
 
 All four are edits to existing files.
@@ -176,6 +214,37 @@ Prompt-only, no control flow:
 - Suppress the discovery question when the tool returned nothing useful. `qualification_block` already says "answer first, ask second"; it needs to also say "and do not ask at all when you had no answer to give".
 
 A deterministic no-progress guard in the loop is the stronger fix and is deferred to §8 - a prompt rule cannot be relied on absolutely, but it is the change that does not touch working control flow.
+
+### 4.5 BUILT 2026-08-08
+
+All four landed. One of §4.4's three bullets turned out to already be shipped by Slice E.
+
+**§4.1 SKU fallback**: `get_product_spec` now runs one supplementary `SELECT DISTINCT grade, pack_size FROM product_skus WHERE company_id = %s AND lower(product_name) = lower(%s)` — but **only** when `_resolve_product`'s row has a blank `grade` or blank `packaging`, checked before the query ever runs.
+Distinct values are joined with `", "` and assigned only to the blank field(s); a populated `products` value is never read by the fallback at all (the query doesn't even execute).
+Filling `packaging_` this way means `pack_sizes: _split_packs(packaging_)` — already the next line — rebuilds the pack-size list for free; no parallel list-building code needed.
+
+**§4.2 `missing_fields`**: additive list on the same observation, computed from whichever of `grade`/`packaging` is still blank *after* the §4.1 fallback ran.
+`status` stays `"found"` exactly as §2 requires.
+When non-empty, the `message` gets one appended sentence naming which fields aren't on file and instructing the model to say so plainly and offer the team handoff — never to imply non-existence.
+
+**§4.3 `not_found_sku` reword + bulk routing**: two message branches, chosen by a new standalone `_pack_magnitude(s) -> (value, unit) | None` helper (services/agent.py, next to `_norm_pack`).
+Deliberately **not** a refactor of `_norm_pack` — that function resolves which SKU a visitor's pack matches and is frozen by §2 (byte-for-byte pricing/POR gating); `_pack_magnitude` duplicates `_norm_pack`'s number+unit regex on purpose so the two stay independently safe to change.
+A requested pack is judged "bulk" only when every listed pack for that grade parses to the *same unit family* (both mass or both volume) and is strictly smaller — mismatched units (a Kg listing vs a Ltr ask) deliberately fall through to the plain reworded message rather than guess.
+Neither branch touches price computation, POR gating, or `_norm_pack`'s own SKU-matching call a few lines above.
+
+**§4.4, bullet 1 was already done.**
+Investigating the exact wording before writing it found `build_agent_directive` already carries "ANSWER THE QUESTION JUST ASKED, FIRST AND ALONE... do not re-send the previous answer, with or without new content in front of it" — Slice E §13.2 shipped this (a *different* fix, for the staff-directory one-turn-lag symptom, but the instruction generalizes to any repeated-message case, which is what §4.4 bullet 1 asks for). Confirmed nothing further was needed there.
+The other two bullets were genuine gaps and got built:
+- Bullet 2 (contact acknowledgment) — one sentence added to the same `build_agent_directive` paragraph, right after the "do not re-send" sentence: explicitly acknowledge a phone/email the visitor just shared and confirm the team will follow up. This is the visitor-facing counterpart to Slice A's silent backend capture — without it, the model has no reason to ever mention that a shared contact detail was noticed.
+- Bullet 3 (suppress the discovery question after a non-answer) — one clause added to `qualification_block`'s existing "answer first, ask second" sentence: "...and do NOT ask at all when this turn had no real answer to give (a tool returned nothing useful, or you're declining/escalating)". Prompt-only, same as the rest of that function — no code can detect "this turn had no answer" from inside `qualification_block` (it only sees `lead_profile`), so this relies on the model's own visibility into what it just did, same trust level as the sentence it extends.
+
+**Tests**: `tests/test_agent.py::TestGetProductSpecSkuFallback` (6 tests — fill-from-blank, populate-never-overwritten, partial fill, missing_fields both full and partial, tenant scoping), `TestPackMagnitude` (4 tests), five new `TestRequestQuote` cases covering the reworded message, the bulk branch, the non-bulk-smaller branch, and the mismatched-unit non-bulk branch, plus one `TestSchemasAndDirective` case and one `TestQualificationBlock` case for the two directive/qualification sentences.
+`FakeCursor` (test_agent.py) gained an optional `skus=` constructor kwarg to program the new fallback query; unset, it behaves exactly as before (returns `[]`), so every pre-existing test using it needed no changes.
+Full backend suite green: 2102 passed / 134 skipped (up from 2086/134 after Slice A — no regressions).
+No live-LLM component: every change here is deterministic Python control flow or static prompt text with a direct substring assertion, not model behavior needing live verification.
+
+Not yet done: browser/live verification of transcript 1's replay (the two identical spec questions, and the COA pre-sales interim mitigation from §7.4 — the latter was NOT built, since §4 as scoped never named it as one of the four fixes; flagging here so it isn't assumed done).
+Not committed as of this session.
 
 ## 5. Slice C - two-day activity digest
 
@@ -591,6 +660,28 @@ Nothing to add.
 ### 12.8 Acceptance
 
 Replaying transcript 3 and opening that session in the dashboard shows, for each turn, which knowledge chunks produced it - making the divergence between its two identical questions visible as **two different source sets for the same query**, which is the evidence for §11.2 and the thing the owner currently cannot see.
+
+### 12.9 BUILT 2026-08-08
+
+Shipped in full for the control plane; BYOD gets the code (signature parity) but not the persistence, per a deliberate, documented decision - see below.
+
+**§12.4 trap 1 (tuple widening), done first as its own slice, suite green before continuing**: `retrieve_knowledge`'s two SQL branches now project a third column - `COALESCE(p.id, rrf.child_id)` (hybrid branch) / `COALESCE(p.id, ck.id)` (legacy vector-only branch) - the id of whichever row's content is actually returned. Appended, never inserted, so `context_text`/`knowledge_context` (main.py, both index `row[0]`/`row[1]`) needed zero changes. `byod_engine.validate_knowledge_rows` widened its `KnowledgeRow` alias to a 3-tuple, backward-compatible with 2-tuple input (`content_id` defaults `None`), non-str ids coerced via `str()`. `rerank_chunks` now returns a 3-tuple `(chunks, top_score, chunk_scores)` - the per-chunk 0-10 score was already computed and discarded before this; both call sites (`/api/chat`, `/api/eval/run`) updated.
+
+**§12.2/§12.3 (the sources themselves)**: two new pure builders in `main.py`, right after `rerank_chunks` - `_build_kb_sources(retrieved_docs, chunk_scores)` (one entry per retrieved chunk, pointer only - label/content_id/rank/score, never chunk text) and `_build_tool_sources(captured)` (reads the SAME `_captured` dict the SSE payload and the real-time owner-handoff already populate, for `sds`/`spec`/`quote`/`coa`/`form` - zero new tracking). `get_coa` deliberately never gets a `url` in its source entry, even for the owner - this module has no visibility into the visitor's throttle/lockout state, and COA documents are confidentiality-gated (see [[coa-confidential-access]]).
+
+**§12.4 trap 2 (the streaming closure), the actual load-bearing design decision**: `_kb_sources` is built ONCE outside `stream_generator` (shared by both branches via closure); `_turn_sources: list = list(_kb_sources)` is declared inside `stream_generator` right next to `_agent_usage` - NOT inside the `if pack is not None:` branch. The vertical-agent branch appends `_build_tool_sources(_captured)` to it at the exact same point Slice A's contact-capture code runs (after `full_reply` is finalized, before the `_captured` snapshot that feeds the SSE yields). Both branches then hit the SAME shared `finally` block ("ROBUST POST-STREAM PERSISTENCE") - confirmed by re-reading that block's own comment ("Persistence/metering still runs in the shared finally below, exactly like the live path") before writing anything, since the plan's "streaming vs non-streaming" framing turned out not to describe two separate code paths at all: `/api/chat` is ONE SSE endpoint with two internal branches sharing one persistence block, not two endpoints. Cache-hit calls pass `sources=[]` explicitly (never `None`) so a genuinely-empty-on-purpose turn is distinguishable from a pre-migration row.
+
+**Storage**: migration 0036 (`chat_logs.sources JSONB`, additive, no backfill) - **applied dark to prod** (Supabase project `tticllabbbqwnhsmggfo`) and verified live; real Alembic will no-op it on next deploy since the DDL is `IF NOT EXISTS`. `log_chat_to_db` widened with a `sources` kwarg, `None` vs `[]` preserved through the `%s::jsonb` cast (`json.dumps(sources) if sources is not None else None`).
+
+**§12.6 BYOD - resolved by checking the live registry, not by guessing**: queried `byod_tenant_databases` directly. Only 2 companies are BYOD-provisioned company-wide; Expresolv (and by extension every chemical-vertical transcript driving this plan) is NOT one of them - it's on the shared control-plane DB. This changed the build plan materially: rather than doing a live data-plane schema-version bump (`byod_dataplane.DATA_PLANE_SCHEMA_VERSION`) plus a rolling per-tenant migration - genuinely out of reach from this session anyway, since BYOD DSNs are encrypted/tenant-specific and there's no tooling here to apply DDL to a customer's live external database - `tenant_log_chat` was widened to *accept* `sources` (signature parity with `log_chat_to_db`, so `_byod_store_and_meter` and every caller stay uniform) but does **not** persist it, matching the EXACT precedent migration 0034 already set for token metering and feedback on this same function ("Control-plane only for now... the tenant logger keeps its existing signature" - now also true of `sources`). A BYOD-routed company's dashboard renders "not recorded" until a dedicated data-plane version does this properly. Documented in both the migration docstring and `tenant_log_chat`'s own docstring so this isn't mistaken for an oversight.
+
+**§12.5 read path**: `/api/conversations/{company_id}`'s per-message SELECT gates the `sources` column on `not byod_engine.routing_active(company_id)` - **decided on, never try/except**, since selecting a column that doesn't exist on a BYOD tenant DB would 500 the whole panel for that company, not just omit one field. `was_cache_hit` added unconditionally (already exists on both schemas). A defensive `json.loads` fallback handles a driver/pool that hands back JSONB as a raw string instead of an already-parsed object. New `GET /api/conversations/{company_id}/chunk/{chunk_id}` - owner-authed + entitlement-gated identically to `list_conversations`, BYOD-aware via the same `_byod_dataplane_cursor`, single-row lookup only (never bulk) - this is the on-demand second call §12.5 specified so chunk TEXT never rides the list payload.
+
+**Frontend**: `ConversationsPanel.tsx` gained a `SourceAttribution` sub-component rendered under each `bot_response`, right above the existing "Teach the assistant" affordance (paired per §12.5's own instruction). Three render states, checked in this priority order: `was_cache_hit` -> "Served from cache" (regardless of `sources`' value); `sources == null` -> "Source not recorded"; `sources == []` -> "No sources used this turn"; otherwise a collapsed `N sources · <top label>` toggle that expands to the ordered list, each with a `kind` badge, its label/detail, and - **only ever labelled "match strength", never "confidence"** (§11.4 D: confidence scored 1.0 on the fabricated Jay Patel answer and 0.2 on the correct one) - and a `kb` entry gets a "view chunk" button that lazy-fetches from the new endpoint and renders content inline, cached per `content_id` so re-toggling doesn't re-fetch. `tsc --noEmit` and `eslint` both clean on the new code (two pre-existing, unrelated warnings/errors untouched). No vitest coverage added - checked first: zero dashboard panel components have vitest coverage anywhere in this codebase (11 test files total in `src/`, none in `components/dashboard/`), so adding one exclusively for this component would be inventing a testing convention the project doesn't have, not following one.
+
+**Tests**: new `tests/test_conversation_sources.py` (21 tests) - both pure builders including the "never includes chunk content" pointer-not-excerpt check, both endpoints (ownership 404, entitlement 402, chunk-not-found 404, happy path, BYOD-column-omission, raw-string-JSONB defensive path). `tests/test_groundedness.py` and `tests/byod/test_byod_engine.py` updated for the widened tuple shapes (including the functional BYOD tests gated behind `tenant_db_dsn`, which don't run in this sandbox but must stay correct for whenever a real Postgres fixture is available). Full suite green: 2126 passed / 134 skipped (up from 2105 before this slice's own tests - zero regressions). No live-LLM component anywhere in Slice D - deterministic Python, SQL, and a React component, nothing for a model to verify.
+
+**Not yet done**: browser/live verification of the actual dashboard UI (transcript 3 replay, opening a real session, confirming the collapsed/expanded states render as designed) - per [[browser-verification-policy]], Manual vs Auto to be asked before any dev server starts. §12.8's acceptance criterion (replaying transcript 3 and seeing two different source sets for the identical question) is therefore not yet visually confirmed, only unit-tested at the data-shape level.
 
 ## 13. Slice E - directory answers
 

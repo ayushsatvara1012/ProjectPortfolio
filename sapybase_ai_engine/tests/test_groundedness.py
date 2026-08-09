@@ -1,8 +1,10 @@
 """
 Tests for the per-answer groundedness/confidence score (Track 3 item 10).
 
-Covers the pure _compute_confidence mapping and the new rerank_chunks tuple
-contract (chunks, top_score) — including the no-score fallback paths.
+Covers the pure _compute_confidence mapping and the rerank_chunks tuple
+contract (chunks, top_score, chunk_scores) — including the no-score fallback
+paths. chunk_scores was added in Slice D (agent-conversation-gaps plan §12.3)
+so the owner dashboard can show a per-source relevance score, not just the max.
 """
 import asyncio
 import json
@@ -68,26 +70,31 @@ class _FakeModel:
 class TestRerankChunksContract:
     def test_returns_tuple_when_at_or_below_top_k(self):
         cands = [("chunk a", "src1"), ("chunk b", "src2")]
-        result, score = _run(main.rerank_chunks("q", cands, top_k=5))
+        result, score, chunk_scores = _run(main.rerank_chunks("q", cands, top_k=5))
         assert result == cands
         assert score is None  # no scoring performed
+        assert chunk_scores == [None, None]  # one slot per candidate, all unknown
 
     def test_empty_candidates_returns_empty_and_none(self):
-        result, score = _run(main.rerank_chunks("q", [], top_k=5))
+        result, score, chunk_scores = _run(main.rerank_chunks("q", [], top_k=5))
         assert result == []
         assert score is None
+        assert chunk_scores == []
 
     def test_scores_and_returns_top_with_max_score(self, monkeypatch):
         # 6 candidates so reranking runs (len > top_k).
         cands = [(f"chunk {i}", f"src{i}") for i in range(6)]
         scores = [3, 9, 1, 7, 2, 5]
         monkeypatch.setattr(main, "ChatGoogleGenerativeAI", lambda **kw: _FakeModel(scores))
-        result, top_score = _run(main.rerank_chunks("q", cands, top_k=3))
+        result, top_score, chunk_scores = _run(main.rerank_chunks("q", cands, top_k=3))
         assert len(result) == 3
         # top 3 by score are 9,7,5 -> max is 9.0
         assert top_score == 9.0
         # highest-scoring chunk (index 1) must be first
         assert result[0] == ("chunk 1", "src1")
+        # chunk_scores is per-RESULT (same order/length as result), not per-candidate.
+        assert chunk_scores == [9.0, 7.0, 5.0]
+        assert len(chunk_scores) == len(result)
 
     def test_reranker_failure_falls_back_to_none_score(self, monkeypatch):
         cands = [(f"chunk {i}", f"src{i}") for i in range(6)]
@@ -97,16 +104,18 @@ class TestRerankChunksContract:
                 raise RuntimeError("LLM down")
 
         monkeypatch.setattr(main, "ChatGoogleGenerativeAI", lambda **kw: _BrokenModel())
-        result, top_score = _run(main.rerank_chunks("q", cands, top_k=3))
+        result, top_score, chunk_scores = _run(main.rerank_chunks("q", cands, top_k=3))
         assert len(result) == 3          # falls back to first top_k
         assert top_score is None         # no score available
+        assert chunk_scores == [None, None, None]
 
     def test_score_length_mismatch_falls_back(self, monkeypatch):
         cands = [(f"chunk {i}", f"src{i}") for i in range(6)]
         monkeypatch.setattr(main, "ChatGoogleGenerativeAI", lambda **kw: _FakeModel([1, 2, 3]))  # wrong length
-        result, top_score = _run(main.rerank_chunks("q", cands, top_k=3))
+        result, top_score, chunk_scores = _run(main.rerank_chunks("q", cands, top_k=3))
         assert len(result) == 3
         assert top_score is None
+        assert chunk_scores == [None, None, None]
 
 
 # ── end-to-end: confidence derived from rerank output ────────────────────────
@@ -116,12 +125,12 @@ class TestConfidenceFromRerank:
         cands = [(f"c{i}", f"s{i}") for i in range(6)]
         monkeypatch.setattr(main, "ChatGoogleGenerativeAI",
                             lambda **kw: _FakeModel([8, 2, 1, 0, 3, 4]))
-        docs, top_score = _run(main.rerank_chunks("q", cands, top_k=3))
+        docs, top_score, _chunk_scores = _run(main.rerank_chunks("q", cands, top_k=3))
         conf = main._compute_confidence(False, len(docs), top_score)
         assert conf == 0.8
 
     def test_rerank_skipped_small_kb_yields_unknown_confidence(self):
         # Only 2 chunks (<= top_k) -> no score -> confidence unknown (None).
-        docs, top_score = _run(main.rerank_chunks("q", [("a", "s"), ("b", "s")], top_k=5))
+        docs, top_score, _chunk_scores = _run(main.rerank_chunks("q", [("a", "s"), ("b", "s")], top_k=5))
         conf = main._compute_confidence(False, len(docs), top_score)
         assert conf is None

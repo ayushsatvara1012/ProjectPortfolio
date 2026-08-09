@@ -1577,6 +1577,7 @@ from services import coa_throttle
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
 from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
+from services.agent import _session_has_capture as _session_has_capture
 # Phase 3 (get-sds-crash-fix-plan): the SDS picker endpoint reuses the EXACT SAME
 # newest-https selection logic as the conversational get_sds tool (plan 3c), so
 # the two paths can never disagree on which sheet a product resolves to.
@@ -2423,6 +2424,11 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
 
     Falls back to pure vector search when the FTS column is not yet present
     (i.e. before migration v20 has been applied).
+
+    Each row is ``(content, url, content_id)`` — ``content_id`` (Slice D, plan
+    §12.3) is the id of whichever row's content is actually returned (parent
+    when resolved, else the child itself), appended as a third element so every
+    existing ``row[0]``/``row[1]`` consumer is unaffected.
     """
     cursor = conn.cursor()
     has_fts = _check_fts_column()
@@ -2473,7 +2479,12 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
                 -- Return parent content when available (richer context for the LLM),
                 -- fall back to child content for legacy flat chunks.
                 COALESCE(p.content, rrf.child_content) AS context_content,
-                rrf.url
+                rrf.url,
+                -- The id of whichever row's content is actually returned above (Slice D,
+                -- agent-conversation-gaps plan §12.3) — lets the owner dashboard link a
+                -- source back to its chunk. Appended, never inserted, so every existing
+                -- consumer indexing row[0]/row[1] is unaffected.
+                COALESCE(p.id, rrf.child_id) AS content_id
             FROM rrf
             LEFT JOIN company_knowledge p
                    ON p.id = rrf.parent_id
@@ -2492,7 +2503,8 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
             """
             SELECT
                 COALESCE(p.content, ck.content) AS context_content,
-                ck.url
+                ck.url,
+                COALESCE(p.id, ck.id) AS content_id
             FROM company_knowledge ck
             LEFT JOIN company_knowledge p ON p.id = ck.parent_id
             WHERE ck.company_id = %s
@@ -2525,22 +2537,28 @@ def _byod_retrieve_knowledge(company_id, query_vector, query_text: str = ""):
     return byod_engine.validate_knowledge_rows(rows)
 
 
-async def rerank_chunks(query: str, candidates: list, top_k: int = 5) -> tuple[list, float | None]:
+async def rerank_chunks(
+    query: str, candidates: list, top_k: int = 5
+) -> tuple[list, float | None, list]:
     """
     LLM-based reranker using Gemini Flash Lite (fast + cheap).
     Scores each candidate chunk 0-10 for relevance to the query,
     then returns the top_k highest-scoring chunks.
 
-    Returns a tuple: (reranked_chunks, top_score) where top_score is the highest
-    0-10 relevance score among the returned chunks, or None when no scoring was
-    performed (≤top_k candidates, or reranker error). top_score powers the
-    per-answer groundedness/confidence signal — no extra LLM call needed.
+    Returns a 3-tuple: ``(reranked_chunks, top_score, chunk_scores)``.
+    ``top_score`` is the highest 0-10 relevance score among the returned chunks,
+    or None when no scoring was performed (≤top_k candidates, or reranker
+    error) — it powers the per-answer groundedness/confidence signal, no extra
+    LLM call needed. ``chunk_scores`` (Slice D, agent-conversation-gaps plan
+    §12.3) is the PER-CHUNK score for each entry in ``reranked_chunks``, same
+    order, same length — previously computed and discarded here, kept now so
+    the owner dashboard can show which chunk scored what, not just the max.
 
     Falls back to returning the first top_k candidates unchanged if reranking fails,
     so the chat endpoint is never blocked by a reranker error.
     """
     if not candidates or len(candidates) <= top_k:
-        return candidates, None
+        return candidates, None, [None] * len(candidates)
 
     try:
         rerank_model = ChatGoogleGenerativeAI(
@@ -2579,11 +2597,76 @@ Output nothing else."""
         return (
             [chunk for _, chunk in top],
             float(top_score) if top_score is not None else None,
+            [float(s) for s, _ in top],
         )
 
     except Exception as e:
         print(f"[RERANKER] Failed, using raw retrieval order: {e}")
-        return candidates[:top_k], None
+        top = candidates[:top_k]
+        return top, None, [None] * len(top)
+
+
+# ── Owner-facing source attribution (Slice D, agent-conversation-gaps plan §12) ──
+# Pointers only, never chunk text (§12.3/§12.7) — the dashboard fetches a chunk's
+# content on demand. Owner-dashboard-only by construction: nothing here is ever
+# read by /api/chat's response body or the embed route (§12.1 boundary).
+
+def _build_kb_sources(retrieved_docs: list, chunk_scores: list) -> list:
+    """One 'kb' source entry per retrieved chunk, ordered by rank (plan §12.2/§12.3).
+
+    ``retrieved_docs`` rows are ``(content, url, content_id)`` — content itself
+    is never stored here. ``chunk_scores`` is rerank_chunks' per-result score
+    list, same order/length as ``retrieved_docs``."""
+    sources = []
+    for rank, row in enumerate(retrieved_docs or [], start=1):
+        url = row[1] if len(row) > 1 else None
+        content_id = row[2] if len(row) > 2 else None
+        score = chunk_scores[rank - 1] if chunk_scores and rank - 1 < len(chunk_scores) else None
+        sources.append({
+            "kind": "kb",
+            "label": url or "(untitled source)",
+            "content_id": str(content_id) if content_id is not None else None,
+            "rank": rank,
+            "score": score,
+        })
+    return sources
+
+
+def _build_tool_sources(captured: dict) -> list:
+    """One 'tool' source entry per transactional/lookup tool that actually
+    produced this turn's answer (plan §12.2) — read from the SAME ``_captured``
+    dict the SSE payload and the real-time owner-handoff already use, so this
+    adds no new tracking, just a second read of data already in hand.
+
+    ``get_sds`` is the clearest case named in the plan: the owner needs to see
+    WHICH document the SDS panel showed, and that never appears in
+    ``retrieved_docs`` at all — it comes straight from the tool result."""
+    sources = []
+    sds = captured.get("sds")
+    if sds:
+        sources.append({"kind": "tool", "label": "get_sds",
+                        "detail": sds.get("product"), "url": sds.get("url")})
+    spec = captured.get("spec")
+    if spec:
+        sources.append({"kind": "tool", "label": "get_product_spec",
+                        "detail": spec.get("product"), "url": None})
+    quote = captured.get("quote")
+    if quote:
+        sources.append({"kind": "tool", "label": "request_quote",
+                        "detail": quote.get("product"), "url": quote.get("quote_url")})
+    coa = captured.get("coa")
+    if coa and coa.get("status") == "found":
+        results = coa.get("results") or []
+        first = results[0] if results and isinstance(results[0], dict) else {}
+        # No URL here even for the owner: COA documents are confidentiality-gated
+        # (docs/coa-confidential-access-plan.md) and this module has no context
+        # on whether the visitor's throttle/lockout state still permits a link.
+        sources.append({"kind": "tool", "label": "get_coa",
+                        "detail": coa.get("query") or first.get("name"), "url": None})
+    if captured.get("form"):
+        sources.append({"kind": "tool", "label": "request_sample", "detail": None, "url": None})
+    return sources
+
 
 # (CompanyUpdate moved to models.py — re-exported above)
 
@@ -2971,7 +3054,7 @@ def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: floa
         return round(min(max(rerank_top_score / 10.0, 0.0), 1.0), 2)
     return None
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None, client_message_id: Optional[str] = None):
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None, client_message_id: Optional[str] = None, sources: Optional[list] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed.
     `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit).
@@ -2981,24 +3064,33 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     context-cache discount (0 = no cache hit that turn, None = usage not surfaced).
     `client_message_id` (Phase 2a, vertical intelligence plan) is the widget-
     generated id a later POST /api/feedback attaches a thumbs up/down to —
-    control-plane only for now, same precedent as token metering above."""
+    control-plane only for now, same precedent as token metering above.
+    `sources` (Slice D, agent-conversation-gaps plan §12.3) is the ordered list
+    of kb/tool source entries the owner dashboard renders — `None` means "not
+    recorded" (a pre-migration row or a caller that hasn't been updated), an
+    explicit `[]` means "recorded, genuinely no source this turn" (a cache hit,
+    or a decline with zero retrieval)."""
     # BYOD tenants store chat_logs on their OWN database (Phase 3.2, dark by
     # default — data-plane write via get_tenant_db / vaayu_runtime). Degrades
     # soft on failure (§16.9): a tenant analytics-write hiccup never breaks chat.
-    # Token metering and feedback are control-plane only for now (the vertical
-    # agent is not on BYOD); the tenant logger keeps its existing signature.
+    # Token metering, feedback, AND sources are control-plane only for now (no
+    # chemical-vertical / pack traffic is BYOD-routed today — verified against
+    # the live registry, see plan §12.6); the tenant logger keeps accepting
+    # `sources` for signature parity but does not yet persist it.
     if byod_engine.routing_active(company_id):
         byod_engine.tenant_log_chat(
-            company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence
+            company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence,
+            sources=sources,
         )
         return
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id)
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id, sources)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)""",
+            (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id,
+             json.dumps(sources) if sources is not None else None)
         )
         conn.commit()
     except Exception as e:
@@ -3040,6 +3132,7 @@ def _byod_store_and_meter(
     session_id: Optional[str],
     confidence: Optional[float],
     user_uuid: str,
+    sources: Optional[list] = None,
 ):
     """BYOD store-then-meter background task (Phase 3.3, §16.1 / E1, E2).
 
@@ -3049,10 +3142,12 @@ def _byod_store_and_meter(
     before the store is confirmed, so a store failure simply isn't counted (and
     leaves no chat_log → no drift). If the meter fails AFTER a confirmed store,
     the chat_log carries the key and the reconciler repairs the lagging counter
-    later — so a meter hiccup degrades soft and never double-counts on retry."""
+    later — so a meter hiccup degrades soft and never double-counts on retry.
+    `sources` (Slice D) is forwarded for signature parity only — see
+    ``tenant_log_chat``'s docstring for why it isn't persisted yet."""
     stored = byod_engine.tenant_log_chat(
         company_id, user_query, bot_response, was_cache_hit, is_unanswered,
-        session_id, confidence, message_id=message_id,
+        session_id, confidence, message_id=message_id, sources=sources,
     )
     if not stored:
         return  # store unconfirmed → do NOT meter (§16.1)
@@ -3319,7 +3414,7 @@ async def chat_endpoint(
                     background_tasks.add_task(
                         _byod_store_and_meter, company["id"], str(uuid.uuid4()),
                         chat_req.message, cached_response, True, False,
-                        chat_req.session_id, None, user_uuid,
+                        chat_req.session_id, None, user_uuid, sources=[],
                     )
                 else:
                     # Still increment usage — cache hits count toward billing
@@ -3342,6 +3437,10 @@ async def chat_endpoint(
                         log_chat_to_db, company["id"], chat_req.message,
                         cached_response, True, False, chat_req.session_id,
                         client_message_id=chat_req.client_message_id,
+                        # No RAG performed on a cache hit — an explicit [] (not
+                        # None) so the dashboard renders "served from cache",
+                        # never "not recorded" (plan §12.2).
+                        sources=[],
                     )
 
                 return ChatResponse(
@@ -3375,7 +3474,9 @@ async def chat_endpoint(
         else:
             candidate_docs = await asyncio.to_thread(retrieve_knowledge, conn, company["id"], query_vector, query_text=chat_req.message)
         _t_retrieve = time.perf_counter()
-        retrieved_docs, rerank_top_score = await rerank_chunks(chat_req.message, candidate_docs, top_k=5)
+        retrieved_docs, rerank_top_score, rerank_chunk_scores = await rerank_chunks(
+            chat_req.message, candidate_docs, top_k=5
+        )
         _t_rerank = time.perf_counter()
         logger.info(
             "CHAT TIMING company=%s hyde=%.0fms embed=%.0fms retrieve=%.0fms rerank=%.0fms rag_total=%.0fms",
@@ -3387,6 +3488,11 @@ async def chat_endpoint(
             (_t_rerank - _t0) * 1000,
         )
         context_text = "\n\n".join([f"Source ({row[1]}): {row[0]}" for row in retrieved_docs])
+        # Slice D (agent-conversation-gaps plan §12) — the kb half of this turn's
+        # owner-facing source attribution. Computed once here (shared by both the
+        # generic and vertical-agent branches below); the vertical-agent branch
+        # additionally appends tool sources once its tool round is done.
+        _kb_sources = _build_kb_sources(retrieved_docs, rerank_chunk_scores)
         # ── Runtime values from company record ─────────────────────────────────
         bot_name        = company.get("bot_name") or "Sapy AI"
         company_name    = company.get("company_name") or "Sapybase"
@@ -3684,6 +3790,13 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         async def stream_generator():
             full_reply = ""
             _agent_usage: dict = {}  # Phase 6 metering; populated by the agent path below
+            # Slice D (plan §12.4 trap 2): the vertical-agent answer is computed
+            # INSIDE this generator, so sources must ride this same closure the
+            # way _agent_usage already does, or the streaming path silently logs
+            # NULL while a non-streaming caller would have worked. Starts as the
+            # kb sources every path shares; the vertical-agent branch appends
+            # tool sources once its round is done.
+            _turn_sources: list = list(_kb_sources)
             agent_gen_conn = None    # generator-owned conn for the vertical-agent path
             try:
                 # Vertical-agent path: the answer is already computed (see above);
@@ -3884,6 +3997,48 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                                 pass
 
                     full_reply = _strip_source_citation(full_reply)
+
+                    # Slice A (agent-conversation-gaps plan §3) — a visitor who types a
+                    # phone/email mid-chat currently reaches nobody unless a tool already
+                    # fired a handoff this turn. Opportunistic + best-effort: never blocks
+                    # the reply, and yields to a handoff a tool already captured this turn
+                    # (e.g. a priced quote) rather than overwriting it. Setting
+                    # `_captured["handoff"]` here — BEFORE the snapshot below reads it —
+                    # is what makes the existing real-time owner-ping trigger fire
+                    # unchanged; nothing past this point needs to know about "contact".
+                    if pack is not None and chat_req.session_id and not _captured.get("handoff"):
+                        try:
+                            _contact = qualification.extract_contact(chat_req.message)
+                        except Exception:
+                            _contact = {}
+                        if _contact and not _session_has_capture(
+                                agent_cursor, company["id"], chat_req.session_id):
+                            _contact_product = (
+                                (_captured.get("quote") or {}).get("product")
+                                or (_captured.get("spec") or {}).get("product")
+                                or (((_prior_state or {}).get("products") or [{}])[-1] or {}).get("name")
+                            )
+                            if _insert_agent_request(
+                                    agent_cursor, company["id"], kind="contact",
+                                    product=_contact_product, cas=None, grade=None,
+                                    pack_size=None, qty=None, note=chat_req.message,
+                                    name=None, email=_contact.get("email"),
+                                    phone=_contact.get("phone"),
+                                    session_id=chat_req.session_id):
+                                _captured["handoff"] = {
+                                    "kind": "contact",
+                                    "product": _contact_product,
+                                    "contact_email": _contact.get("email"),
+                                    "contact_phone": _contact.get("phone"),
+                                    "note": chat_req.message,
+                                }
+
+                    # Slice D (plan §12.2) — append whichever tool actually
+                    # produced this answer to the kb sources already in
+                    # _turn_sources; kb first (matches the plan's own example
+                    # ordering), tool second.
+                    _turn_sources = _turn_sources + _build_tool_sources(_captured)
+
                     agent_sds = _captured.get("sds")
                     agent_quote = _captured.get("quote")
                     agent_form = _captured.get("form")
@@ -4058,6 +4213,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             _byod_store_and_meter, company["id"], str(uuid.uuid4()),
                             chat_req.message, full_reply, False, is_un_final,
                             chat_req.session_id, confidence, user_uuid,
+                            sources=_turn_sources,
                         )
                     else:
                         background_tasks.add_task(
@@ -4069,6 +4225,12 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             _agent_usage.get("output_tokens"),
                             _agent_usage.get("cached_tokens"),
                             client_message_id=chat_req.client_message_id,
+                            # Slice D (plan §12.4 trap 2) — this finally block is
+                            # SHARED by the generic and vertical-agent branches
+                            # above; _turn_sources rides the same closure
+                            # _agent_usage already uses so both branches log the
+                            # right sources here, not just the generic one.
+                            sources=_turn_sources,
                         )
 
                         # 3. Usage Tracking (Background Task)
@@ -6513,6 +6675,16 @@ def list_conversations(
         unanswered_clause = "AND cl.is_unanswered = true" if filter == "unanswered" else ""
         offset = (page - 1) * limit
 
+        # Slice D (agent-conversation-gaps plan §12.5/§12.6) — `sources` exists
+        # only on the control-plane chat_logs table today; selecting it against
+        # a BYOD tenant DB (no such column yet) would 500 the whole panel for
+        # that company. Gate the column on the routing decision, never on
+        # try/except — a broken dashboard is worse than a missing column.
+        _has_sources_col = not byod_engine.routing_active(company_id)
+        _msg_cols = "user_query, bot_response, is_unanswered, created_at, was_cache_hit"
+        if _has_sources_col:
+            _msg_cols += ", sources"
+
         # chat_logs is a data-plane table → tenant DB for a BYOD tenant.
         with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
             # Count total distinct sessions (NULL session_ids count individually)
@@ -6551,8 +6723,8 @@ def list_conversations(
             for grp, last_active, msg_count, has_unanswered in session_rows:
                 # Fetch the actual messages for this session
                 dcur.execute(
-                    """
-                    SELECT user_query, bot_response, is_unanswered, created_at
+                    f"""
+                    SELECT {_msg_cols}
                     FROM chat_logs
                     WHERE company_id = %s
                       AND COALESCE(session_id::text, id::text) = %s
@@ -6561,15 +6733,32 @@ def list_conversations(
                     """,
                     (company_id, grp)
                 )
-                messages = [
-                    {
+                messages = []
+                for r in dcur.fetchall():
+                    _sources = r[5] if _has_sources_col and len(r) > 5 else None
+                    if isinstance(_sources, str):
+                        # Defensive: a driver/pool that doesn't auto-adapt JSONB
+                        # hands back the raw string — never let that surface as
+                        # "not recorded" (None) or a raw JSON string in the UI.
+                        try:
+                            _sources = json.loads(_sources)
+                        except (TypeError, ValueError):
+                            _sources = None
+                    messages.append({
                         "user_query": r[0],
                         "bot_response": r[1],
                         "is_unanswered": r[2],
                         "timestamp": r[3].isoformat() if r[3] else None,
-                    }
-                    for r in dcur.fetchall()
-                ]
+                        # Slice D (plan §12.2/§12.5) — was_cache_hit=True always
+                        # means "served from cache" regardless of sources' value;
+                        # sources=None means "not recorded" (pre-migration row,
+                        # or a BYOD-routed company); sources=[] means "recorded,
+                        # genuinely nothing this turn". The panel, not this
+                        # endpoint, renders the three states — this just passes
+                        # the column through unchanged.
+                        "was_cache_hit": r[4],
+                        "sources": _sources,
+                    })
                 sessions.append({
                     "session_id": grp,
                     "last_active": last_active.isoformat() if last_active else None,
@@ -6584,6 +6773,58 @@ def list_conversations(
             "page": page,
             "pages": max(1, (total + limit - 1) // limit),
         }
+    finally:
+        release_db_connection(conn)
+
+
+@app.get("/api/conversations/{company_id}/chunk/{chunk_id}")
+def get_conversation_source_chunk(
+    company_id: str,
+    chunk_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Fetch ONE company_knowledge chunk's content/url on demand, for the owner
+    dashboard's source panel (Slice D, agent-conversation-gaps plan §12.5).
+
+    A conversation can carry dozens of source entries across its messages, and
+    ConversationsPanel already loads several sessions at once — bundling chunk
+    TEXT into list_conversations would inflate that payload for chunks nobody
+    opens. This is the on-demand second call the plan calls for. Owner-authed +
+    entitlement-gated identically to list_conversations, and tenant-aware
+    (company_knowledge is a data-plane table): never a bulk read, never reachable
+    from the widget or /api/chat's response body (§12.1 boundary)."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Verify ownership — same check as list_conversations.
+        cursor.execute(
+            "SELECT id FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"])
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+
+        if not has_entitlement(user, "analytics"):
+            raise HTTPException(status_code=402, detail={
+                "code": "TIER_REQUIRED",
+                "message": "Conversation transcripts require the Pro plan or a custom plan with analytics enabled.",
+                "upgrade_url": "/app/pricing"
+            })
+
+        # company_knowledge is a data-plane table → tenant DB for a BYOD tenant,
+        # same routing list_conversations already uses.
+        with _byod_dataplane_cursor(company_id, conn) as (dcur, _dconn):
+            dcur.execute(
+                "SELECT content, url FROM company_knowledge WHERE company_id = %s AND id = %s",
+                (company_id, chunk_id),
+            )
+            row = dcur.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="Source chunk not found.")
+
+        return {"content": row[0], "url": row[1]}
     finally:
         release_db_connection(conn)
 
@@ -13259,7 +13500,7 @@ async def run_eval(
         finally:
             release_db_connection(conn)
 
-        top_chunks, _ = await rerank_chunks(eq.question, candidates, top_k=5)
+        top_chunks, _, _ = await rerank_chunks(eq.question, candidates, top_k=5)
         retrieved_text = "\n\n".join([f"[{i+1}] {c[0][:400]}" for i, c in enumerate(top_chunks)])
 
         # 4. Generate answer with the same system prompt structure as live chat

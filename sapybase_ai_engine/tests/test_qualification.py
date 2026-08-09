@@ -134,6 +134,92 @@ class TestMergeQualification:
             "qualification": {"industry": "rubber"}}
 
 
+class TestExtractPhone:
+    def test_captures_plain_indian_mobile(self):
+        assert q.extract_phone("My Mob. 9824315602") == "9824315602"
+
+    def test_captures_with_country_and_local_prefix(self):
+        assert q.extract_phone("+91 9876543210 is my number") == "9876543210"
+        assert q.extract_phone("call 09876543210") == "9876543210"
+
+    def test_relaxed_shape_behind_explicit_cue(self):
+        assert q.extract_phone("call me on 9876543210 anytime") == "9876543210"
+        assert q.extract_phone("whatsapp: 9876543210") == "9876543210"
+
+    # Negative cases required by plan §6 — a CAS number, a batch code, a pack
+    # size, a quantity, an HSN code, and a price must all extract nothing.
+    def test_cas_number_not_captured(self):
+        assert q.extract_phone("the CAS number is 7758-11-4") is None
+
+    def test_batch_code_not_captured(self):
+        assert q.extract_phone("batch 100.26R016") is None
+        assert q.extract_phone("Batch No: 9012345678, please confirm") is None
+
+    def test_pack_size_not_captured(self):
+        assert q.extract_phone("do you have a 200 Ltr pack?") is None
+
+    def test_quantity_not_captured(self):
+        assert q.extract_phone("we need 500 kg") is None
+        assert q.extract_phone("about 5000 litres monthly") is None
+
+    def test_hsn_code_not_captured(self):
+        assert q.extract_phone("HSN 9012345678 for this product") is None
+
+    def test_gst_or_invoice_context_not_captured(self):
+        assert q.extract_phone("gst 9876543210") is None
+        assert q.extract_phone("invoice 9876543210 was sent") is None
+        assert q.extract_phone("order 9876543210 confirmed") is None
+
+    def test_price_not_captured(self):
+        assert q.extract_phone("price is Rs. 98,765.43") is None
+
+    def test_digit_run_longer_than_ten_not_captured(self):
+        # A slice of a longer digit run must never be mistaken for a phone.
+        assert q.extract_phone("ref 912345678901234") is None
+
+    def test_no_digits_at_all(self):
+        assert q.extract_phone("just checking in, no updates") is None
+
+    def test_empty_and_blank(self):
+        assert q.extract_phone("") is None
+        assert q.extract_phone("   ") is None
+
+
+class TestExtractEmail:
+    def test_captures_well_shaped_email(self):
+        assert q.extract_email("reach me at buyer@acme.co.in") == "buyer@acme.co.in"
+
+    def test_trims_trailing_sentence_punctuation(self):
+        assert q.extract_email("email me at buyer@acme.com.") == "buyer@acme.com"
+
+    def test_no_email_returns_none(self):
+        assert q.extract_email("no contact details here") is None
+
+    def test_empty_and_blank(self):
+        assert q.extract_email("") is None
+        assert q.extract_email("   ") is None
+
+
+class TestExtractContact:
+    def test_both_fields_when_present(self):
+        out = q.extract_contact("My Mob. 9824315602, email me at a@b.com")
+        assert out == {"phone": "9824315602", "email": "a@b.com"}
+
+    def test_phone_only(self):
+        assert q.extract_contact("My Mob. 9824315602") == {"phone": "9824315602"}
+
+    def test_email_only(self):
+        assert q.extract_contact("reach me at a@b.com") == {"email": "a@b.com"}
+
+    def test_neither_returns_empty_dict(self):
+        assert q.extract_contact("what grades do you have") == {}
+
+    def test_not_registered_as_a_qualification_slot_extractor(self):
+        # Identity, not a buyer fact — must stay out of the qualification registry.
+        assert "phone" not in q._EXTRACTORS and "email" not in q._EXTRACTORS
+        assert "contact" not in q._EXTRACTORS
+
+
 class TestQualificationBlock:
     def test_empty_for_pack_without_slots(self):
         from packs import Pack
@@ -172,3 +258,9 @@ class TestQualificationBlock:
         # The guardrail: qualification must not gate answering.
         block = q.qualification_block(CHEMICAL_PACK, {})
         assert "answer first" in block.lower()
+
+    def test_suppresses_discovery_question_after_a_non_answer(self):
+        # Slice B (agent-conversation-gaps plan §4.4) — a discovery question right
+        # after a tool returned nothing useful read as evasive in the transcripts.
+        block = q.qualification_block(CHEMICAL_PACK, {})
+        assert "do NOT ask at all when this turn had no real answer to give" in block
