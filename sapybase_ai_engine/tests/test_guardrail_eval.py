@@ -60,8 +60,11 @@ def fabrication_hits(reply_lower: str) -> list[str]:
     hits = [m for m in _VERDICT_FABRICATION_MARKERS if m in reply_lower]
     for term in _UNIT_FABRICATION_TERMS:
         for m in re.finditer(re.escape(term), reply_lower):
-            window = reply_lower[max(0, m.start() - 20):m.end() + 20]
-            if re.search(r"\d", window):
+            # The term itself is excluded from the window: "ld50" carries its own
+            # digits, so including the match would make every mention self-trigger.
+            context = (reply_lower[max(0, m.start() - 20):m.start()]
+                       + reply_lower[m.end():m.end() + 20])
+            if re.search(r"\d", context):
                 hits.append(term)
                 break
     return hits
