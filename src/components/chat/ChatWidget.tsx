@@ -17,8 +17,21 @@ import {
   hubCardTarget,
   parseCoaEvent,
   parseCoaLockout,
+  parseSpecDocEvent,
+  SPEC_DEBOUNCE_MS,
+  SPEC_EMPTY_MESSAGE,
+  SPEC_MIN_QUERY_CHARS,
+  SPEC_OUTAGE_MESSAGE,
+  SPEC_PROMPT_MESSAGE,
+  SPEC_TOO_BROAD_MESSAGE,
+  SPEC_UNCONFIGURED_MESSAGE,
+  specOutcome,
+  specPanelState,
   type CoaRow,
   type HubCardAction,
+  type SpecDocEvent,
+  type SpecRow,
+  type SpecSearchStatus,
   type WidgetFeatures,
 } from './panels';
 import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
@@ -533,6 +546,12 @@ type Message = {
   };
   grade_selector?: { product?: string; grades: string[]; grade_pack_map?: Record<string, string[]> };
   pack_selector?: { product?: string; grade?: string; pack_sizes: string[] };
+  // 2026-08-09 fix (plan §15.1.3) — attached to the reply rather than auto-opening the
+  // specification panel. get_product_spec is the GENERAL product tool, so it answers
+  // packaging and grade questions too; forcing the panel open on every one of those
+  // replaced the chat body for a question that was never about a document. The
+  // visitor now taps this card to open the panel themselves, same as msg.quote.
+  specDoc?: SpecDocEvent;
   ts?: number;
   // Vertical intelligence plan, Phase 2a: thumbs up/down on this reply. `id`
   // doubles as the `client_message_id` sent on the originating /api/chat call
@@ -1546,6 +1565,178 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
   );
 }
 
+// The specification panel (spec-finder-plan §6). Deliberately everything the
+// certificate panel is not: it searches as the visitor types, shows a ranked list of
+// up to eight, and pins the chosen sheet ABOVE a search box that stays live so
+// comparing two grades never means going back to Home (the SdsPicker pattern).
+//
+// Rows carry filenames, and that is the feature: a specification is a public document
+// meant to be browsed (D1). H10 binds what reaches the MODEL, never this panel.
+export function SpecPicker({ rows, pinned, searching, configured, error, query, status, totalMatched, themeColor, fromChat, onQueryChange, onSelect, onRetry, onCancel, onAskInChat }: {
+  rows: SpecRow[];
+  pinned: SpecRow | null;
+  searching: boolean;
+  configured: boolean;
+  error: string | null;
+  query: string;
+  status: SpecSearchStatus | null;
+  totalMatched: number;
+  themeColor: string;
+  fromChat: boolean;
+  onQueryChange: (q: string) => void;
+  onSelect: (row: SpecRow) => void;
+  onRetry: () => void;
+  onCancel: () => void;
+  onAskInChat: () => void;
+}) {
+  const state = specPanelState({ configured, error, searching, rows, status });
+  // R3 — "showing 8 of 41" is what tells a visitor that typing more will narrow it.
+  // Without it a capped list looks like the whole answer.
+  const truncated = state === 'results' && totalMatched > rows.length;
+  return (
+    <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
+        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
+          className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors shrink-0">
+          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
+        </button>
+        <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
+          <MIcon name="search" className="text-[16px] leading-none text-slate-400 dark:text-slate-500 shrink-0" />
+          <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
+            disabled={!configured}
+            placeholder="Search product specifications" aria-label="Search product specifications"
+            className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:cursor-not-allowed disabled:opacity-60" />
+          {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
+        </div>
+      </div>
+
+      {pinned && (
+        // R7 — pinning does not close the search. A visitor comparing USP against BP
+        // picks the second one from the same list they picked the first from.
+        <div className="px-3.5 pt-3 shrink-0">
+          <div className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: themeColor }}>
+              <MIcon name="science" className="text-[16px] leading-none" />
+              Specification sheet
+            </div>
+            <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed">
+              <div className="font-bold break-words">{pinned.display}</div>
+              {pinned.modified_at && (
+                // Omitted rather than rendered empty when Drive gave us no timestamp.
+                <div className="text-[12px] text-slate-500 dark:text-slate-400">
+                  Updated {formatRelativeDate(pinned.modified_at)}
+                </div>
+              )}
+              <div className="mt-2 flex items-center gap-2">
+                {pinned.view_url && (
+                  <a href={pinned.view_url} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, color: themeColor }}>
+                    <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open spec
+                  </a>
+                )}
+                {pinned.download_url && (
+                  // H8 — download_url, never view_url: a Drive webViewLink is an HTML
+                  // viewer page. §15 — the extension follows the source file, so a
+                  // .docx specification is not saved under a .pdf name.
+                  <button type="button" onClick={() => downloadDocument(pinned.download_url!, `${pinned.display || 'specification'}.${pinned.ext || 'pdf'}`)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, color: themeColor }}>
+                    <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinned && state === 'results' && (
+        <div className="px-3.5 pt-3 shrink-0 text-[10.5px] font-google font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          Other matches
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+        {state === 'unconfigured' ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
+            <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
+              {SPEC_UNCONFIGURED_MESSAGE}
+            </span>
+            <SpecChatButton onClick={onAskInChat} />
+          </div>
+        ) : state === 'error' ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-6">
+            <span className="text-[13px] font-google text-red-500">{error}</span>
+            <button type="button" onClick={onRetry}
+              className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              Retry
+            </button>
+          </div>
+        ) : state === 'results' ? (
+          <div className="flex flex-col gap-1">
+            {rows.map(row => (
+              <button key={row.id} type="button" onClick={() => onSelect(row)}
+                className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <span className="text-[14px] font-google text-slate-800 dark:text-slate-200 break-words">{row.display}</span>
+                {row.modified_at && (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 shrink-0 font-google">
+                    {formatRelativeDate(row.modified_at)}
+                  </span>
+                )}
+              </button>
+            ))}
+            {truncated && (
+              <p className="pt-2 px-1 text-[11.5px] font-google text-slate-400 dark:text-slate-500 leading-snug">
+                Showing {rows.length} of {totalMatched}. Keep typing to narrow it down.
+              </p>
+            )}
+          </div>
+        ) : state === 'searching' ? (
+          <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
+            Searching…
+          </div>
+        ) : state === 'too_broad' ? (
+          // Deliberately NOT the empty copy. A visitor who typed one common word must
+          // be told to type more; telling them we have nothing would be false.
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center px-6">
+            <MIcon name="search" className="text-[30px] leading-none text-slate-300 dark:text-slate-600" />
+            <span className="text-[13px] font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+              {SPEC_TOO_BROAD_MESSAGE}
+            </span>
+          </div>
+        ) : state === 'empty' ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-6">
+            <span className="text-[13px] font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+              {SPEC_EMPTY_MESSAGE}
+            </span>
+            <SpecChatButton onClick={onAskInChat} />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center px-6">
+            <MIcon name="science" className="text-[30px] leading-none text-slate-300 dark:text-slate-600" />
+            <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
+              {SPEC_PROMPT_MESSAGE}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The way out when the panel has nothing: back to the conversation, which can take a
+// product name we do not stock and route it to a human.
+function SpecChatButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="px-4 py-1.5 rounded-full text-[13px] font-google font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+      Ask in the chat
+    </button>
+  );
+}
+
 // Best-effort real download for a document: an <a download> is silently ignored
 // by the browser for cross-origin URLs (no way around that from script), so
 // this fetches the file and saves it via a blob URL when the host's CORS
@@ -1826,6 +2017,19 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // Survives closing and reopening the panel, and a lookup arriving from the chat:
   // a visitor inside a cooldown finds the field disabled however they reach it (§7).
   const [coaLockedOut, setCoaLockedOut] = useState(false);
+  // The specification panel (spec-finder-plan §6). A ranked search rather than the
+  // certificate panel's one-or-nothing lookup, and `specPinned` coexists with the
+  // list instead of replacing it (R7) — the search box stays live after a pick.
+  const [specPickerOpen, setSpecPickerOpen] = useState(false);
+  const [specQuery, setSpecQuery] = useState('');
+  const [specRows, setSpecRows] = useState<SpecRow[]>([]);
+  const [specPinned, setSpecPinned] = useState<SpecRow | null>(null);
+  const [specStatus, setSpecStatus] = useState<SpecSearchStatus | null>(null);
+  const [specTotal, setSpecTotal] = useState(0);
+  const [specConfigured, setSpecConfigured] = useState(true);
+  const [specSearching, setSpecSearching] = useState(false);
+  const [specError, setSpecError] = useState<string | null>(null);
+  const [specFromChat, setSpecFromChat] = useState(false);
   // Phase 4 — the "View & share quote" modal opened from a quote card's
   // deterministic button (same pattern as the SDS button: the model never
   // fabricates the link, the widget renders it from the structured payload).
@@ -2075,6 +2279,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
       case 'coa_picker':
         openCoaPicker();
         return;
+      case 'spec_picker':
+        openSpecPicker();
+        return;
     }
     setActiveHubCard(card);
     setHubInput('');
@@ -2096,6 +2303,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setActiveHubCard(null);
     setSdsPickerOpen(false);
     setCoaPickerOpen(false);
+    setSpecPickerOpen(false);
     setHubView('chat');
     setSampleError(null);
     setSampleFormPrefill(prefill || {});
@@ -2175,6 +2383,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setActiveHubCard(null);
     setSampleFormOpen(false);
     setCoaPickerOpen(false);   // H12 — only one panel ever replaces the chat body
+    setSpecPickerOpen(false);  // §10.2 — the fourth participant
     setHubView('chat');
     setSdsQuery('');
     setSdsSearchResults(null);
@@ -2194,6 +2403,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setActiveHubCard(null);
     setSampleFormOpen(false);
     setCoaPickerOpen(false);   // H12
+    setSpecPickerOpen(false);  // §10.2
     setHubView('chat');
     setSdsQuery(sds.product || '');
     setSdsSearchResults(null);
@@ -2254,6 +2464,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setActiveHubCard(null);
     setSampleFormOpen(false);
     setSdsPickerOpen(false);
+    setSpecPickerOpen(false);  // §10.2
     setHubView('chat');
     setCoaQuery('');
     setCoaResult(null);
@@ -2275,6 +2486,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setActiveHubCard(null);
     setSampleFormOpen(false);
     setSdsPickerOpen(false);
+    setSpecPickerOpen(false);  // §10.2
     setHubView('chat');
     setCoaQuery('');
     setCoaResult(row);
@@ -2283,6 +2495,127 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setCoaError(null);
     setCoaFromChat(true);
     setCoaPickerOpen(true);
+  };
+
+  // Open the specification panel from the "Product specs" hub card. §10.2 — one panel
+  // ever replaces the chat body, and this is its fourth participant.
+  const openSpecPicker = () => {
+    setActiveHubCard(null);
+    setSampleFormOpen(false);
+    setSdsPickerOpen(false);
+    setCoaPickerOpen(false);
+    setHubView('chat');
+    setSpecQuery('');
+    setSpecRows([]);
+    setSpecPinned(null);
+    setSpecStatus(null);
+    setSpecTotal(0);
+    setSpecConfigured(true);
+    setSpecError(null);
+    setSpecFromChat(false);
+    setSpecPickerOpen(true);
+  };
+
+  // A chat-typed request ("send me the spec sheet for acetone") resolves through the
+  // agent's get_product_spec answer, which emits the sheets as a {spec_doc:{...}}
+  // side-channel — never a link in the model's text. That opens the SAME panel the hub
+  // card does, already holding the ranked rows. The field IS prefilled here, unlike
+  // openCoaPickerWithResult: the server sends the resolved PRODUCT NAME, which is a
+  // clean search term, where the COA tool's slot holds whatever the model passed it.
+  const openSpecPickerWithResults = (event: SpecDocEvent) => {
+    setActiveHubCard(null);
+    setSampleFormOpen(false);
+    setSdsPickerOpen(false);
+    setCoaPickerOpen(false);
+    setHubView('chat');
+    setSpecQuery(event.query);
+    setSpecRows(event.rows);
+    setSpecPinned(event.pinned);
+    setSpecStatus('ok');
+    setSpecTotal(event.rows.length);
+    setSpecConfigured(true);
+    setSpecError(null);
+    setSpecFromChat(true);
+    setSpecPickerOpen(true);
+  };
+
+  // Only the newest keystroke may write state. A debounced typeahead has more than
+  // one request in flight routinely, and a slow "acet" landing after "acetone USP"
+  // would repaint the wide list over the narrow one.
+  const specRequestId = useRef(0);
+  const specDebounce = useRef<number | null>(null);
+  useEffect(() => () => { if (specDebounce.current) window.clearTimeout(specDebounce.current); }, []);
+
+  const runSpecSearch = useCallback((term: string) => {
+    if (!activeApiKey) return;
+    const id = ++specRequestId.current;
+    setSpecSearching(true);
+    setSpecError(null);
+    const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+    // No visitor_id: it exists on the COA endpoint only to bind the throttle, and
+    // there is no throttle here (D1). Sending it would collect an identifier this
+    // feature has no use for.
+    fetch(`${activeApiUrl}/api/widget/spec?q=${encodeURIComponent(term)}`, {
+      headers: {
+        'x-api-key': activeApiKey,
+        ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+      },
+    })
+      .then(async res => {
+        if (id !== specRequestId.current) return;
+        const outcome = specOutcome(res.status, await res.json().catch(() => null));
+        if (id !== specRequestId.current) return;
+        if (outcome.kind === 'outage') {
+          setSpecError(SPEC_OUTAGE_MESSAGE);
+          return;
+        }
+        setSpecError(null);
+        if (outcome.kind === 'unconfigured') {
+          // The folder went away since /api/config was cached. The panel says so
+          // rather than showing an empty list nobody can explain.
+          setSpecConfigured(false);
+          setSpecRows([]);
+          setSpecStatus(null);
+          setSpecTotal(0);
+          return;
+        }
+        setSpecConfigured(true);
+        if (outcome.kind === 'results') {
+          setSpecRows(outcome.rows);
+          setSpecStatus('ok');
+          setSpecTotal(outcome.totalMatched);
+          return;
+        }
+        // R4 — the rows go, but the STATUS is what the panel renders: "we have
+        // nothing" and "you matched most of the library" need opposite instructions.
+        setSpecRows([]);
+        setSpecStatus(outcome.status);
+        setSpecTotal(0);
+      })
+      .catch(() => {
+        if (id === specRequestId.current) setSpecError(SPEC_OUTAGE_MESSAGE);
+      })
+      .finally(() => { if (id === specRequestId.current) setSpecSearching(false); });
+  }, [activeApiKey, activeApiUrl]);
+
+  // Typing is the whole interaction here — there is no Request button to press,
+  // because a specification search costs a visitor nothing and a list that follows
+  // along is what makes "acetone" narrow to "acetone USP" (§1).
+  const onSpecQueryChange = (value: string) => {
+    setSpecQuery(value);
+    if (specDebounce.current) window.clearTimeout(specDebounce.current);
+    const term = value.trim();
+    if (term.length < SPEC_MIN_QUERY_CHARS) {
+      // Cancel whatever was in flight too: a visitor who cleared the box must not
+      // have the old rows land on an empty field a moment later.
+      specRequestId.current += 1;
+      setSpecSearching(false);
+      setSpecRows([]);
+      setSpecStatus(null);
+      setSpecTotal(0);
+      return;
+    }
+    specDebounce.current = window.setTimeout(() => runSpecSearch(term), SPEC_DEBOUNCE_MS);
   };
 
   // Only the latest submission may write state. Two Requests in flight (a slow
@@ -2580,6 +2913,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // model's own reply is the visitor-facing message, and a panel that opened only
     // to say "restricted" would be a worse way to hear it.
     let pendingCoaLockout: number | null = null;
+    // Specification sheets found for a product the visitor asked about in chat (a
+    // {spec_doc:{query,results,pinned_id}} event). Same destination as the hub card:
+    // the sheets live in the panel, never as a link in the transcript.
+    let pendingSpecDoc: SpecDocEvent | null = null;
     // Structured quote card emitted by the agent stream (a {quote:{...}} event);
     // captured here and attached to the bot message on [DONE], like pendingSds.
     let pendingQuote: Message['quote'] | null = null;
@@ -2682,7 +3019,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot') {
-                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}) };
+                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}), ...(pendingSpecDoc ? { specDoc: pendingSpecDoc } : {}) };
               }
               return updated;
             });
@@ -2698,6 +3035,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // ordering so the bot's confirmation lands first.
             if (pendingCoa) openCoaPickerWithResult(pendingCoa);
             if (pendingCoaLockout) lockCoaPanel(pendingCoaLockout);
+            // 2026-08-09 fix (plan §15.1.3) — deliberately NOT auto-opened, unlike SDS
+            // and COA above. get_product_spec answers every product question, not only
+            // "send me the spec sheet", so forcing the panel open here would replace
+            // the chat body for an ordinary packaging or grade question. pendingSpecDoc
+            // is attached to the message above instead, and the visitor opens the
+            // panel themselves by tapping the card that renders from it.
             // Never move the viewport on completion — keep the user exactly where
             // they are for reading continuity. If the finished answer extends below
             // the fold, surface the "new message" pill so they can jump down when
@@ -2746,6 +3089,14 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             if (parsed.coa) {
               pendingCoa = parseCoaEvent(parsed);
               pendingCoaLockout = parseCoaLockout(parsed);
+              return;
+            }
+            // Structured side-channel: {spec_doc:{query,results,pinned_id}} from a
+            // get_product_spec answer on a bot with a specification folder. Emitted
+            // only when the Drive lookup actually found sheets, so the panel opens
+            // exactly when there is something in it to show.
+            if (parsed.spec_doc) {
+              pendingSpecDoc = parseSpecDocEvent(parsed);
               return;
             }
             // Structured side-channel: the agent emits {quote:{...}} with the
@@ -3035,7 +3386,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && !coaPickerOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && !coaPickerOpen && !specPickerOpen && (
               <div className={`flex-1 relative flex flex-col min-h-0 text-slate-900 dark:text-slate-100 bg-transparent`}>
                 {showJumpPill && (
                   <button
@@ -3205,6 +3556,32 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                       </div>
                                     </div>
                                   )}
+                                  {msg.role === 'bot' && !msg.isStreaming && msg.specDoc && (
+                                    // 2026-08-09 fix (plan §15.1.3) — a tappable card, not an
+                                    // auto-opened panel. get_product_spec answers every product
+                                    // question, not only "send me the spec sheet", so forcing the
+                                    // panel open here replaced the chat body for an ordinary
+                                    // packaging or grade question. Same pattern as msg.quote: the
+                                    // model attaches data, the visitor decides whether to act on it.
+                                    <button
+                                      type="button"
+                                      onClick={() => openSpecPickerWithResults(msg.specDoc!)}
+                                      className="mt-2 w-full max-w-[280px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                                    >
+                                      <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: THEME_COLOR }}>
+                                        <MIcon name="science" className="text-[16px] leading-none" />
+                                        {msg.specDoc.rows.length === 1 ? 'Specification sheet' : 'Specification sheets'}
+                                      </div>
+                                      <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed flex items-center justify-between gap-2">
+                                        <span>
+                                          {msg.specDoc.rows.length === 1
+                                            ? msg.specDoc.rows[0].display
+                                            : `${msg.specDoc.rows.length} sheets found for ${msg.specDoc.query}`}
+                                        </span>
+                                        <MIcon name="open_in_new" className="text-[16px] leading-none shrink-0 text-slate-400 dark:text-slate-500" />
+                                      </div>
+                                    </button>
+                                  )}
                                   {/* Phase 0a: combined grade + pack selector. Shows both in one UI
                                       so the user never needs a second round-trip. Grade chips for
                                       ≤4 options (click = highlight), dropdown for more; pack sizes
@@ -3306,6 +3683,26 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               />
             )}
 
+            {view === 'chat' && hubView === 'chat' && specPickerOpen && (
+              <SpecPicker
+                rows={specRows}
+                pinned={specPinned}
+                searching={specSearching}
+                configured={specConfigured}
+                error={specError}
+                query={specQuery}
+                status={specStatus}
+                totalMatched={specTotal}
+                themeColor={THEME_COLOR}
+                fromChat={specFromChat}
+                onQueryChange={onSpecQueryChange}
+                onSelect={setSpecPinned}
+                onRetry={() => runSpecSearch(specQuery.trim())}
+                onCancel={() => setSpecPickerOpen(false)}
+                onAskInChat={() => { setSpecPickerOpen(false); inputRef.current?.focus(); }}
+              />
+            )}
+
             {view === 'chat' && hubView === 'home' && hasHub && (
               // Home screen — 2-col action grid + pill Home/Chat nav + Vaayu footer
               // (chemical Figma). Background is transparent: the gradient is painted
@@ -3371,7 +3768,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               </div>
             )}
 
-            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && !coaPickerOpen && (
+            {view === 'chat' && hubView === 'chat' && !sampleFormOpen && !sdsPickerOpen && !coaPickerOpen && !specPickerOpen && (
               <div className={`shrink-0 z-10 flex flex-col bg-transparent`}>
                 {!activeHubCard && messages.length === 1 && !input.trim() && (configData.quick_questions?.length ?? 0) > 0 && (
                   <div className="flex flex-col items-start gap-2 px-4 sm:px-5 pb-1 pt-2.5 w-full max-w-3xl mx-auto">

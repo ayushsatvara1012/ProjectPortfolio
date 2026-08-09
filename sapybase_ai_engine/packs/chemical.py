@@ -206,7 +206,12 @@ _HUB_CARDS = (
         label="Product specs",
         subtitle="Grade & packaging",
         icon="flask",
-        action="tool",
+        # spec-finder-plan Phase 3 — the Drive-backed specification search panel.
+        # input_label / prompt_template / input_source stay set as the fallback the
+        # widget uses when features.spec_picker is false (no Drive folder configured):
+        # the card degrades to the mini-form, whose message reaches get_product_spec
+        # and answers with the catalog's commercial fields exactly as it does today.
+        action="spec_picker",
         input_label="Search products…",
         prompt_template="What grade and packaging is available for {value}?",
         input_source="products",

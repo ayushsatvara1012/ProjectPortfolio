@@ -11,11 +11,13 @@ from packs.schema import Pack, QualificationSlot, Slot, ToolSpec, normalize_vert
 from packs.overrides import (
     coerce_overrides,
     effective_coa_config,
+    effective_spec_config,
     effective_required_fields,
     effective_sample_form,
     effective_sample_sink,
     extract_folder_id,
     sanitize_coa,
+    sanitize_spec,
     sanitize_overrides,
     sanitize_visitor_fields,
 )
@@ -37,6 +39,8 @@ __all__ = [
     "sanitize_visitor_fields",
     # COA finder (Phase 0) — the Drive folder override
     "sanitize_coa",
+    "sanitize_spec",
     "extract_folder_id",
     "effective_coa_config",
+    "effective_spec_config",
 ]

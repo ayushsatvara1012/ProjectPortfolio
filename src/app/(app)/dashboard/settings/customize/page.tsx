@@ -14,6 +14,7 @@ import Alert from '@/src/components/ui/Alert';
 import SampleFormEditor, { validateSampleForm } from '@/src/components/dashboard/SampleFormEditor';
 import TeaserRuleEditor, { TeaserSuggestButton, validateTeaserRules } from '@/src/components/dashboard/TeaserRuleEditor';
 import CoaFolderField, { isCoaFolderInvalid } from '@/src/components/dashboard/CoaFolderField';
+import SpecFolderField, { isSpecFolderInvalid } from '@/src/components/dashboard/SpecFolderField';
 
 // Friendly heading per vertical pack (kept tiny; grows as packs are added).
 const VERTICAL_LABEL: Record<string, string> = { chemical: 'Chemical agent' };
@@ -160,7 +161,9 @@ export default function CustomizePage() {
     (botSettings.sampleSinkUrl || '').trim() !== '' &&
     !(botSettings.sampleSinkUrl || '').trim().toLowerCase().startsWith('https://');
   const coaFolderInvalid = isCoaFolderInvalid(botSettings.coaFolder || '');
-  const packConfigInvalid = isVerticalBot && (!sampleFormValidation.valid || sampleSinkInvalid || coaFolderInvalid);
+  const specFolderInvalid = isSpecFolderInvalid(botSettings.specFolder || '');
+  const packConfigInvalid = isVerticalBot && (!sampleFormValidation.valid || sampleSinkInvalid
+    || coaFolderInvalid || specFolderInvalid);
 
   // ── Contextual teaser (Phase 3): rule editor validity ──
   const teaserRulesValidation = validateTeaserRules(botSettings.teaserRules || []);
@@ -191,7 +194,7 @@ export default function CustomizePage() {
         type: 'error',
         msg: sampleSinkInvalid
           ? 'Data destination must be a secure link (starts with https://).'
-          : coaFolderInvalid
+          : coaFolderInvalid || specFolderInvalid
             ? "That doesn't look like a Google Drive folder link. Copy the URL from Drive's address bar."
             : 'Fix the sample form: every field needs a unique key.',
       });
@@ -211,7 +214,7 @@ export default function CustomizePage() {
     } else {
       setAlert({ open: true, type: 'error', msg: res.message ?? 'Failed to save settings.' });
     }
-  }, [showFullOverlay, leadAlertsInvalid, alertEmailInvalid, slackUrlInvalid, packConfigInvalid, sampleSinkInvalid, coaFolderInvalid, teaserRulesInvalid, selectedBotId, saveSettings]);
+  }, [showFullOverlay, leadAlertsInvalid, alertEmailInvalid, slackUrlInvalid, packConfigInvalid, sampleSinkInvalid, coaFolderInvalid, specFolderInvalid, teaserRulesInvalid, selectedBotId, saveSettings]);
 
   // ── Phase 4: Cmd+S / Ctrl+S keyboard shortcut ──
   useEffect(() => {
@@ -635,6 +638,16 @@ export default function CustomizePage() {
                     value={botSettings.coaFolder || ''}
                     savedValue={botSettings.coaFolderUrl || ''}
                     onChange={(v) => updateSetting('coaFolder', v)}
+                    inputCls={inputCls}
+                    labelCls={labelCls}
+                    helpCls={helpCls}
+                    botId={selectedBotId}
+                    authFetch={authFetch}
+                  />
+                  <SpecFolderField
+                    value={botSettings.specFolder || ''}
+                    savedValue={botSettings.specFolderUrl || ''}
+                    onChange={(v) => updateSetting('specFolder', v)}
                     inputCls={inputCls}
                     labelCls={labelCls}
                     helpCls={helpCls}

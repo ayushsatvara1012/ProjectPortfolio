@@ -164,7 +164,11 @@ class TestQualificationSlots:
         # tool-card fields as the fallback if features.sds_picker is ever false.
         assert card_by_id["sds"].action == "sds_picker" and "get_sds" in live_tools
         assert card_by_id["sds"].input_source == "products"
-        assert card_by_id["spec"].action == "tool" and "get_product_spec" in live_tools
+        # spec-finder-plan Phase 3, R6: repointed to the specification panel, keeping
+        # its tool-card fields as the fallback when features.spec_picker is false.
+        assert card_by_id["spec"].action == "spec_picker" and "get_product_spec" in live_tools
+        assert card_by_id["spec"].input_source == "products"
+        assert card_by_id["spec"].prompt_template and card_by_id["spec"].input_label
         assert card_by_id["quote"].action == "tool" and "request_quote" in live_tools
         # Phase 4b: sample is a FORM card (opens the structured form), not slot-filling.
         assert card_by_id["sample"].action == "form" and card_by_id["sample"].form_id == "sample"

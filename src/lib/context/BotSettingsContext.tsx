@@ -56,6 +56,9 @@ type BotSettings = {
   // ── COA finder (Phase 0): the client's Drive folder of certificates ──
   coaFolder: string;                 // owner pastes a Drive folder URL; '' = feature off
   coaFolderUrl: string;              // canonical URL echoed back for the saved folder
+  // ── Spec finder (Phase 2): a SECOND, independent Drive folder of spec sheets ──
+  specFolder: string;                // owner pastes a Drive folder URL; '' = feature off
+  specFolderUrl: string;             // canonical URL echoed back for the saved folder
   // ── Contextual teaser (Phase 1): launcher bubble copy ──
   teaserEnabled: boolean;
   teaserTitle: string;               // '' = default copy ("Hi, I'm {botName}")
@@ -106,6 +109,8 @@ const DEFAULT_SETTINGS: BotSettings = {
   sinkStatus: null,
   coaFolder: '',
   coaFolderUrl: '',
+  specFolder: '',
+  specFolderUrl: '',
   teaserEnabled: true,
   teaserTitle: '',
   teaserSubtext: '',
@@ -156,6 +161,10 @@ const mapCompanyToSettings = (company: any): BotSettings => {
     // and confirm it points at the folder they meant.
     coaFolder: company.coa?.folder_url || '',
     coaFolderUrl: company.coa?.folder_url || '',
+    // Spec finder (Phase 2) — the second folder, read from its own key so a bot with
+    // one folder configured and not the other hydrates correctly either way.
+    specFolder: company.spec?.folder_url || '',
+    specFolderUrl: company.spec?.folder_url || '',
     // Contextual teaser (Phase 1) — enabled defaults to true; empty text means
     // "using the default copy" (shown as placeholder in the editor).
     teaserEnabled: company.teaser?.enabled !== false,
@@ -272,6 +281,9 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         // COA finder (Phase 0) — send the raw paste; the backend extracts the folder
         // ID and 400s on an unparseable link rather than silently ignoring it.
         payload.coa_folder = botSettings.coaFolder.trim();
+        // Spec finder (Phase 2) — sent as its own key, so saving one folder never
+        // rewrites the other (D4). Same contract: raw paste, backend extracts and 400s.
+        payload.spec_folder = botSettings.specFolder.trim();
       }
       await authFetch<any>('/api/company', {
         method: 'PATCH',

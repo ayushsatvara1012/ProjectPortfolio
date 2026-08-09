@@ -35,7 +35,12 @@ MAX_PLACEHOLDER_LEN = 160
 # is the ONLY gate: enforced here on the write path and again by the connector
 # before every Drive call. It is also the SSRF guard — we build the googleapis.com
 # URL ourselves and never fetch an owner-supplied one.
-COA_FOLDER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
+DRIVE_FOLDER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
+
+# The original name, kept as an alias so no COA call site or test has to change
+# (spec-finder-plan §10.1). The regex is byte-identical - it was never COA-specific,
+# it is a Drive folder ID and now serves two libraries.
+COA_FOLDER_ID_RE = DRIVE_FOLDER_ID_RE
 
 
 def coerce_overrides(raw: Any) -> Dict[str, Any]:
@@ -255,16 +260,31 @@ def extract_folder_id(raw: Any) -> str:
     return candidate if COA_FOLDER_ID_RE.match(candidate) else ""
 
 
-def sanitize_coa(raw: Any) -> Dict[str, str]:
-    """Validate a ``coa`` override → ``{"folder_id"}``; ``{}`` when unusable.
+def _sanitize_folder(raw: Any) -> Dict[str, str]:
+    """Validate a ``{"folder_id"}`` override; ``{}`` when unusable.
 
-    ``{}`` means "no COA folder configured", which is what disables the feature for
-    a bot — there is no separate on/off flag to drift out of sync with the folder.
+    ``{}`` means "no folder configured", which is what disables the feature for a
+    bot — there is no separate on/off flag to drift out of sync with the folder.
     """
     if not isinstance(raw, dict):
         return {}
     folder_id = extract_folder_id(raw.get("folder_id"))
     return {"folder_id": folder_id} if folder_id else {}
+
+
+def sanitize_coa(raw: Any) -> Dict[str, str]:
+    """Validate a ``coa`` override → ``{"folder_id"}``; ``{}`` when unusable."""
+    return _sanitize_folder(raw)
+
+
+def sanitize_spec(raw: Any) -> Dict[str, str]:
+    """Validate a ``spec`` override → ``{"folder_id"}``; ``{}`` when unusable.
+
+    Identical rules to :func:`sanitize_coa` and deliberately a separate function:
+    the two folders are independent settings (D4), and one shared entry point would
+    be the first step towards one shared folder.
+    """
+    return _sanitize_folder(raw)
 
 
 def sanitize_overrides(raw: Any) -> Dict[str, Any]:
@@ -284,6 +304,9 @@ def sanitize_overrides(raw: Any) -> Dict[str, Any]:
     coa = sanitize_coa(base.get("coa"))
     if coa:
         out["coa"] = coa
+    spec = sanitize_spec(base.get("spec"))
+    if spec:
+        out["spec"] = spec
     return out
 
 
@@ -330,3 +353,14 @@ def effective_coa_config(overrides: Any) -> str:
     still cannot reach the Drive query.
     """
     return sanitize_coa(coerce_overrides(overrides).get("coa")).get("folder_id", "")
+
+
+def effective_spec_config(overrides: Any) -> str:
+    """Resolve the specification Drive folder from the PER-BOT override → ID or ``""``.
+
+    The same rules as :func:`effective_coa_config`, against a different key: no pack
+    default and no env fallback, because a platform-wide folder would serve one
+    tenant's documents to another. Re-validates on the way out (H1) so a row
+    hand-edited around the API still cannot reach the Drive query.
+    """
+    return sanitize_spec(coerce_overrides(overrides).get("spec")).get("folder_id", "")

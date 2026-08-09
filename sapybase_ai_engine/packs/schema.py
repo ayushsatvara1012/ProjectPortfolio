@@ -45,6 +45,13 @@ class HubCard:
         fallback applies: the card degrades to the ``"tool"`` mini-form, whose
         message reaches ``get_coa``, which answers ``not_configured`` and hands
         off to the team.
+      - ``"spec_picker"`` (spec-finder-plan Phase 3) opens the specification-sheet
+        search panel, which queries ``/api/widget/spec`` as the visitor types and
+        shows a RANKED LIST — the opposite of the COA panel by decision (D1),
+        because specifications are public documents meant to be browsed.
+        ``features.spec_picker`` is false for a company with no Drive folder, and
+        the card degrades to the ``"tool"`` mini-form, whose message reaches
+        ``get_product_spec`` and answers from the catalog as it always has.
 
     Cards are *config*: the widget renders whatever the pack supplies and never
     hardcodes a vertical. A no-pack (``vertical=NULL``) company has no cards, so
@@ -54,7 +61,7 @@ class HubCard:
     id: str
     label: str
     icon: str                       # Tabler outline icon name, e.g. "file-certificate"
-    action: str = "tool"            # "tool" | "chat" | "form" | "sds_picker" | "coa_picker"
+    action: str = "tool"            # "tool" | "chat" | "form" | "sds_picker" | "coa_picker" | "spec_picker"
     subtitle: str = ""
     input_label: str = ""           # mini-form placeholder (action="tool")
     prompt_template: str = ""       # message sent on submit; "{value}" is substituted

@@ -1570,9 +1570,12 @@ from packs import (
     sanitize_visitor_fields,
     sanitize_coa,
     effective_coa_config,
+    sanitize_spec,
+    effective_spec_config,
 )
 from services import coa_drive
 from services import coa_throttle
+from services import spec_drive
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
 from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
@@ -2326,6 +2329,14 @@ def get_company_by_clerk_id(clerk_id: str, company_id: Optional[str] = None):
                 "folder_id": _coa_folder,
                 "folder_url": f"https://drive.google.com/drive/folders/{_coa_folder}" if _coa_folder else "",
             }
+            # Spec finder (Phase 2): the SECOND folder, read and echoed the same way
+            # and from the same owner-only endpoint. Independent of `coa` above -
+            # changing one must never disturb the other (D4).
+            _spec_folder = effective_spec_config(_overrides)
+            result["spec"] = {
+                "folder_id": _spec_folder,
+                "folder_url": f"https://drive.google.com/drive/folders/{_spec_folder}" if _spec_folder else "",
+            }
             # Phase 3.4: last "Send test row" outcome per channel, so the customise
             # tab can show a green/red status instead of leaving the owner guessing.
             result["channel_delivery_status"] = company_row[25] if isinstance(company_row[25], dict) else {}
@@ -2741,7 +2752,8 @@ async def update_company_details(
         # sample_form / sample_sink_* aren't plain columns; intercept them here,
         # merge over the bot's existing pack_overrides, and write the column once.
         # (Pulled out of the generic loop below so they don't become bad SET clauses.)
-        _ov_keys = {"sample_form", "sample_sink_url", "sample_sink_secret", "coa_folder"}
+        _ov_keys = {"sample_form", "sample_sink_url", "sample_sink_secret",
+                    "coa_folder", "spec_folder"}
         _ov_sent = update.model_dump(exclude_unset=True)
         if _ov_keys & set(_ov_sent.keys()):
             # The sink is an outbound webhook → gate it like webhook_url.
@@ -2788,6 +2800,22 @@ async def update_company_details(
                     _merged["coa"] = _coa
                 else:
                     _merged.pop("coa", None)
+            # Spec finder (Phase 2). Same contract as the COA folder above, against a
+            # different key: a blank clears it, and a non-blank paste that yields no
+            # valid folder ID is REJECTED rather than silently dropped. Handled in its
+            # own branch so saving one folder never rewrites the other.
+            if "spec_folder" in _ov_sent:
+                _spec_raw = str(_ov_sent.get("spec_folder") or "").strip()
+                _spec = sanitize_spec({"folder_id": _spec_raw})
+                if _spec_raw and not _spec:
+                    raise HTTPException(status_code=400, detail={
+                        "code": "INVALID_SPEC_FOLDER",
+                        "message": "That doesn't look like a Google Drive folder link. "
+                                   "Open the folder in Drive and copy the URL from the address bar."})
+                if _spec:
+                    _merged["spec"] = _spec
+                else:
+                    _merged.pop("spec", None)
             updates.append("pack_overrides = %s::jsonb")
             params.append(json.dumps(_merged) if _merged else None)
 
@@ -3936,6 +3964,15 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                                         "grade": _prod.get("grade"),
                                         "pack_sizes": _packs,
                                     }
+                                # spec-finder-plan Phase 4 — the resolved product name
+                                # goes through the SAME Drive resolver the panel uses,
+                                # so "send me the spec sheet for acetone" reaches the
+                                # same place as the hub card. Async, hence a coroutine:
+                                # get_coa set this precedent above and the agent loop
+                                # awaits whatever the executor returns. D8 — no new
+                                # tool; this extends what get_product_spec produces.
+                                if _spec_folder_for(company):
+                                    return _attach_spec_doc(company, obs, _captured)
                         return obs
 
                     agent_model = chat_model.bind_tools(build_tool_schemas(pack))
@@ -4046,6 +4083,7 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     agent_grade_selector = _captured.get("grade_selector")
                     agent_pack_selector = _captured.get("pack_selector")
                     agent_coa = _captured.get("coa")
+                    agent_spec_doc = _captured.get("spec_doc")
 
                     if full_reply:
                         yield f"data: {json.dumps({'token': full_reply})}\n\n"
@@ -4061,6 +4099,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'pack_selector': agent_pack_selector})}\n\n"
                     if agent_coa:
                         yield f"data: {json.dumps({'coa': agent_coa})}\n\n"
+                    if agent_spec_doc:
+                        yield f"data: {json.dumps({'spec_doc': agent_spec_doc})}\n\n"
 
                     # ── SESSION MEMORY: persist this turn on the gen-owned conn ──
                     if _session_active and full_reply:
@@ -4068,7 +4108,8 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             _actions = {
                                 k: _captured[k]
                                 for k in ("sds", "quote", "form", "handoff",
-                                          "grade_selector", "pack_selector", "coa")
+                                          "grade_selector", "pack_selector", "coa",
+                                          "spec_doc")
                                 if k in _captured
                             } or None
                             session_store.append_message(
@@ -5793,6 +5834,133 @@ async def test_coa_connection(
     }
 
 
+# ───────────────── Spec finder: the owner's second folder (Phase 2) ─────────────────
+#
+# Deliberately a parallel pair of endpoints rather than a `library` path parameter on
+# the COA ones. Those are the confidential library's owner surface, and one handler
+# serving both would put the decision of WHICH library to read into a request field -
+# which is exactly the shape of mistake that reads the wrong folder for the wrong
+# tenant. Two folders, two settings, two routes (D4).
+
+def _owner_spec_folder(company_id: str, user: dict) -> str:
+    """The bot's saved specification folder ID, or a 404/400 - the owner-side gate.
+
+    Scoped by ``user_id`` so one owner cannot read another's folder, and re-resolved
+    through ``effective_spec_config`` so H1's regex applies on read as well as write.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT pack_overrides FROM companies WHERE id = %s AND user_id = %s AND is_active = true",
+            (company_id, user["id"]),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Bot not found or unauthorized.")
+    finally:
+        release_db_connection(conn)
+
+    folder_id = effective_spec_config(coerce_overrides(row[0]))
+    if not folder_id:
+        raise HTTPException(status_code=400, detail={
+            "code": "NO_SPEC_FOLDER",
+            "message": "No specification folder is configured. Add a Drive folder link and save first."})
+    return folder_id
+
+
+def _spec_unreachable(company_id: str, reason: str, where: str) -> HTTPException:
+    """Map a Drive failure to owner-facing copy that names no identifier.
+
+    Shares ``_COA_TEST_ERRORS`` because the failures are Drive's, not the library's -
+    a revoked share reads the same either way - but the log line and the error code
+    say which folder, so an owner with two folders is not told to go and check the
+    wrong one.
+    """
+    status_code, message = _COA_TEST_ERRORS.get(reason, _COA_TEST_ERRORS["unavailable"])
+    logger.warning("Spec %s failed for company %s: %s", where, company_id, reason)
+    return HTTPException(status_code=status_code,
+                         detail={"code": "SPEC_UNREACHABLE", "message": message})
+
+
+@app.get("/api/companies/{company_id}/spec/report")
+async def spec_folder_report(
+    company_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """What the owner's specification library looks like to the search.
+
+    Cache-first, like the COA report and for the same reason: this loads whenever the
+    customise tab is opened, and forcing a walk on every page view would spend Drive
+    quota on rendering a settings panel. Test Connection is the one force-refresh.
+
+    No ``failed_lookups``: that counter is the confidential library's tripwire, and
+    there is nothing here to guess at - the specification search returns a visible
+    list by design (D1), so a failed search is a typo rather than a probe.
+    """
+    folder_id = _owner_spec_folder(company_id, user)
+    try:
+        result, from_cache = await spec_drive.load_index(company_id, folder_id, redis_client=r)
+    except spec_drive.SpecDriveError as e:
+        raise _spec_unreachable(company_id, e.reason, "report")
+
+    return {"status": "ok", "from_cache": from_cache, **spec_drive.folder_report(result)}
+
+
+@app.post("/api/companies/{company_id}/spec/test-connection")
+async def test_spec_connection(
+    company_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Walk the bot's configured specification folder and report what is in it.
+
+    Always forces a fresh walk, and always through the spec breaker - which is a
+    different breaker from COA's, so testing a broken specification folder cannot
+    fast-fail that company's certificate lookups (§9.1 S1).
+
+    H2 is why this reports counts rather than a boolean: a folder in a Shared Drive
+    read without the ``allDrives`` flags returns zero files with HTTP 200, which is
+    indistinguishable from an empty folder unless "connected, 0 files" is a distinct,
+    visible outcome.
+    """
+    folder_id = _owner_spec_folder(company_id, user)
+
+    try:
+        result, _ = await spec_drive.load_index(
+            company_id, folder_id, redis_client=r, force=True, bypass_breaker=True)
+    except spec_drive.SpecDriveError as e:
+        raise _spec_unreachable(company_id, e.reason, "test-connection")
+
+    if result.indexed:
+        message = (f"Connected. Indexed {result.indexed} specification sheet"
+                   f"{'' if result.indexed == 1 else 's'} across {result.folders_visited} "
+                   f"folder{'' if result.folders_visited == 1 else 's'}.")
+    elif result.unindexable:
+        message = (f"Connected, but none of the {result.unindexable} PDFs here could be "
+                   "indexed - their filenames have nothing searchable in them. "
+                   "Specification sheets need the product name in the filename.")
+    elif result.files_seen:
+        message = (f"Connected, but none of the {result.files_seen} files here are PDFs. "
+                   "Specification sheets need to be PDF files to be searchable.")
+    else:
+        # H2 - the failure that looks like success.
+        message = ("Connected, but the folder is empty. If your specification sheets are "
+                   "in a Shared Drive, check the link points at the folder itself and "
+                   "that it is shared with \"Anyone with the link\".")
+
+    return {
+        "status": "ok",
+        "connected": True,
+        "indexed": result.indexed,
+        "folders": result.folders_visited,
+        "files_seen": result.files_seen,
+        "ignored_non_pdf": result.ignored_non_pdf,
+        "capped": list(result.capped),
+        "message": message,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _coerce_qualification(v) -> dict:
     """Phase 5 — a session's `lead_profile->'qualification'` JSONB → a clean
     ``{label-safe str: str}`` dict for the owner request panels. Tolerates a dict,
@@ -6503,6 +6671,144 @@ async def _get_coa_observation(company: dict, args: dict, captured: dict, *,
                            "query": (args.get("query") or "").strip()}
     elif lockout:
         captured["coa"] = {"status": "locked_out", "results": [], "retry_after": lockout}
+    return obs
+
+
+# Specification finder Phase 3 (docs/spec-finder-plan.md §6). The one message the
+# panel cannot phrase from a status, and it names neither the folder nor the failure
+# (H11). Unlike COA's, it does not offer a handoff: a specification sheet is a public
+# document and "try again" is the honest instruction when the library is unreachable.
+SPEC_UNAVAILABLE_MESSAGE = ("We couldn't reach the document library. "
+                            "Please try again in a moment.")
+
+
+def _spec_folder_for(company: dict) -> str:
+    return effective_spec_config(coerce_overrides(company.get("pack_overrides")))
+
+
+@app.get("/api/widget/spec")
+# R2 — deliberately NOT COA's 30/60. This is a debounced typeahead, so it spends a
+# request per pause in typing rather than per button press, and COA's per-key 60 is
+# shared by every visitor of the bot. Raising it costs little: enumeration of a public
+# library is already accepted (§3.1), and every request after the first walk is a memo
+# or Redis hit, not a Drive call.
+@limiter.limit("120/minute", key_func=get_remote_address)  # per-IP: a fast typist
+@limiter.limit("300/minute")                                # per-API-key: the whole bot
+async def search_spec(
+    request: Request,
+    q: Optional[str] = None,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Ranked specification-sheet search for the widget's Spec panel (§4, §6).
+
+    The opposite of ``/api/widget/coa`` in every way that matters, and that is the
+    design (D1): specifications are public documents meant to be browsed, so this
+    returns a RANKED LIST, distinguishes "you typed too little" from "we have
+    nothing", and carries no throttle, no lockout and no single refusal.
+
+    ``status`` is what the panel renders, never ``len(results)``: ``too_broad``
+    (the §4.1 selectivity guard tripped, so the visitor must narrow) and ``empty``
+    (a specific query we have nothing for) are both zero rows and need opposite
+    instructions. ``too_short`` collapses into the panel's prompt state (R1).
+
+    Calls the SAME ``spec_drive.resolve`` the chat path will use in Phase 4, so the
+    panel and the conversation can never disagree about what a product name finds.
+
+    A non-chemical bot has no ``get_product_spec`` tool, so this 404s for them — the
+    same convention ``/api/widget/sds-products`` and ``/api/widget/coa`` use.
+    """
+    pack = load_pack(company.get("vertical"))
+    if not pack or "get_product_spec" not in pack.tool_names():
+        raise HTTPException(status_code=404,
+                            detail="Specification lookup is not enabled for this bot.")
+
+    folder_id = _spec_folder_for(company)
+    if not folder_id:
+        # Configured off, not broken — the panel shows its handoff copy rather than
+        # inventing an error, exactly as the COA panel does.
+        return {"status": "unconfigured", "results": [], "total_matched": 0,
+                "configured": False}
+
+    try:
+        found = await spec_drive.resolve(company["id"], folder_id, q, redis_client=r)
+    except spec_drive.SpecDriveError as e:
+        logger.warning("Spec search failed for company %s: %s", company["id"], e.reason)
+        raise HTTPException(status_code=503, detail={
+            "code": "SPEC_UNAVAILABLE", "message": SPEC_UNAVAILABLE_MESSAGE})
+
+    return {
+        "status": found.status,
+        "results": [spec_drive.to_payload(doc) for doc in found.documents],
+        # R3 — how many the query actually matched, so the panel can say "showing 8
+        # of 41" and tell the visitor that typing more will narrow it. A hint under
+        # the list, not a state of its own.
+        "total_matched": found.total_matched,
+        "configured": True,
+    }
+
+
+# What the MODEL is told when specification sheets are found alongside a catalog
+# answer. H10 — a filename is written by anyone who can upload to the client's Drive
+# folder and reaches the model as a tool observation, so the model gets a status and a
+# count and never a name. The visitor sees filenames by design; the model does not.
+#
+# 2026-08-09 audit (plan §15.1.3) — this used to say the sheets were "already open in
+# a panel", because the widget used to force the panel open on every resolved product.
+# That made an ordinary packaging question replace the whole chat body, so the widget
+# now attaches the sheets to the reply as a tappable card instead. The message follows:
+# the sheets exist and can be opened FROM the reply, not that a screen has changed.
+_SPEC_DOC_MESSAGE = (
+    "The specification sheet(s) are available and will be shown as a card the visitor "
+    "can tap to open them. Do not paste a link, do not name a file, and do not state "
+    "anything a specification contains."
+)
+
+
+async def _attach_spec_doc(company: dict, obs: dict, captured: dict) -> dict:
+    """Post-process a `found` ``get_product_spec`` with the company's Drive library (§7).
+
+    The Drive lookup lives HERE and not in ``services/agent.py``'s ``get_product_spec``,
+    which is synchronous, cursor-based, and never sees ``pack_overrides`` — it cannot
+    await a Drive call and cannot know a folder exists. ``get_coa`` set this precedent
+    for exactly the same reason, and the agent loop already awaits whatever the
+    executor hands back.
+
+    Best-effort by construction: the catalog answer is correct on its own, so a Drive
+    outage, a revoked folder or a product with no sheet all leave the observation
+    exactly as ``get_product_spec`` built it. A specification sheet is a bonus on top
+    of an answer, never the answer itself.
+
+    Calls the SAME ``spec_drive.resolve`` the panel calls, so asking in the chat and
+    typing in the panel can never disagree about what a product name finds.
+    """
+    product = ((obs.get("product") or {}).get("name") or "").strip()
+    folder_id = _spec_folder_for(company)
+    if not product or not folder_id:
+        return obs
+
+    try:
+        found = await spec_drive.resolve(company["id"], folder_id, product, redis_client=r)
+    except spec_drive.SpecDriveError as e:
+        logger.warning("Spec lookup failed for company %s: %s", company["id"], e.reason)
+        return obs
+
+    if found.status != "ok" or not found.documents:
+        return obs
+
+    rows = [spec_drive.to_payload(doc) for doc in found.documents]
+    # `spec_doc`, never `spec`: `_captured["spec"]` is the catalog path's key and feeds
+    # session_store.derive_title and the sales funnel. Reusing it would silently change
+    # funnel behaviour to say nothing of overwriting the commercial answer.
+    captured["spec_doc"] = {
+        "query": product,
+        "results": rows,
+        # R8 — pinned only when the product identifies ONE sheet. A product with six
+        # standards has no single "the" specification, and pinning an arbitrary one is
+        # worse than showing the ranked list the visitor can choose from.
+        "pinned_id": rows[0]["id"] if len(rows) == 1 else None,
+    }
+    obs["spec_sheets"] = {"status": "opened", "count": len(rows),
+                          "message": _SPEC_DOC_MESSAGE}
     return obs
 
 
@@ -9990,10 +10296,16 @@ def get_config(
             # the flag false the card degrades to its mini-form and the visitor
             # gets a conversational handoff instead. Existence only — §11 keeps the
             # folder ID itself out of this payload.
+            # spec-finder-plan Phase 3, R5 — the same tool-plus-folder gate, hung off
+            # `get_product_spec` because D8 declares no `get_spec_sheet` tool for it to
+            # name. The flag and the tool deliberately do not share a name. Existence
+            # only — §12's H11 keeps both folder IDs out of this payload.
             safe_company["features"] = {
                 "sds_picker": "get_sds" in pack.tool_names(),
                 "coa_picker": ("get_coa" in pack.tool_names()
                                and bool(effective_coa_config(_overrides))),
+                "spec_picker": ("get_product_spec" in pack.tool_names()
+                                and bool(effective_spec_config(_overrides))),
             }
             # Phase 4b/5 — the structured sample form: the owner's per-bot override
             # if they customised it, otherwise the pack default.
@@ -10036,7 +10348,8 @@ def get_config(
             safe_company["hub_cards"] = []
             safe_company["products"] = []
             safe_company["sample_form"] = []
-            safe_company["features"] = {"sds_picker": False, "coa_picker": False}
+            safe_company["features"] = {"sds_picker": False, "coa_picker": False,
+                                        "spec_picker": False}
 
         return safe_company
     except Exception as e:

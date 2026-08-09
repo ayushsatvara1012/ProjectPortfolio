@@ -25,10 +25,15 @@ export type CoaRow = {
 // Phase 5, D10) opens the deterministic Get-SDS product picker instead of the
 // conversational mini-form; "coa_picker" (coa-finder-plan Phase 3) opens the
 // certificate search panel. Both pickers fall back to "tool" when their flag is off.
-export type HubCardAction = 'tool' | 'chat' | 'form' | 'sds_picker' | 'coa_picker';
+// "spec_picker" (spec-finder-plan Phase 3) opens the specification search panel.
+export type HubCardAction = 'tool' | 'chat' | 'form' | 'sds_picker' | 'coa_picker' | 'spec_picker';
 
 // Config-registry gates from /api/config — never a hardcoded vertical check.
-export type WidgetFeatures = { sds_picker?: boolean; coa_picker?: boolean };
+export type WidgetFeatures = {
+  sds_picker?: boolean;
+  coa_picker?: boolean;
+  spec_picker?: boolean;
+};
 
 // The single refusal (coa-confidential-access C3). Nothing found, several found and
 // too little typed all end here, byte-identical, because a refusal that varies is an
@@ -128,11 +133,12 @@ export function coaPanelState(
 export function hubCardTarget(
   action: HubCardAction,
   features: WidgetFeatures | undefined,
-): 'chat' | 'form' | 'sds_picker' | 'coa_picker' | 'tool' {
+): 'chat' | 'form' | 'sds_picker' | 'coa_picker' | 'spec_picker' | 'tool' {
   if (action === 'chat') return 'chat';
   if (action === 'form') return 'form';
   if (action === 'sds_picker' && features?.sds_picker) return 'sds_picker';
   if (action === 'coa_picker' && features?.coa_picker) return 'coa_picker';
+  if (action === 'spec_picker' && features?.spec_picker) return 'spec_picker';
   return 'tool';
 }
 
@@ -162,4 +168,144 @@ export function parseCoaLockout(parsed: unknown): number | null {
   const coa = (parsed as { coa?: { status?: unknown } })?.coa;
   if (!coa || coa.status !== 'locked_out') return null;
   return coaLockoutMs(coa);
+}
+
+// ───────────────────────── specification sheets (spec-finder-plan Phase 3) ────
+//
+// Everything below is the OPPOSITE of the COA rules above, and that is the design
+// (D1): specifications are public documents meant to be browsed, so this panel shows
+// a ranked list, tells "you typed too little" apart from "we have nothing", and has
+// no throttle, no lockout and no single refusal to keep uniform.
+
+// One row from GET /api/widget/spec. Structurally identical to CoaRow and kept as its
+// own type on purpose: the two panels are allowed to diverge, and an alias would make
+// a change to the certificate payload silently change this one.
+export type SpecRow = {
+  id: string;
+  display: string;
+  modified_at?: string | null;
+  view_url?: string;
+  download_url?: string;
+  // §15 — the source file's extension, so a .docx specification is not saved under a
+  // .pdf name. `display` has it stripped and the download URL carries a file ID, so
+  // the server is the only place this can come from.
+  ext?: string;
+};
+
+// What the last search did, straight from the server. `null` means nothing has been
+// asked yet, which is not the same as any answer the server can give.
+export type SpecSearchStatus = 'ok' | 'empty' | 'too_broad' | 'too_short';
+
+export const SPEC_PROMPT_MESSAGE =
+  'Start typing a product name to find its specification sheet.';
+
+// The §4.1 selectivity guard tripped: every word the visitor typed matched, and
+// together they selected too much. The instruction is to type MORE — which is exactly
+// the instruction the empty state must not give.
+//
+// It does not say "keep typing the product name", because the guard trips from both
+// directions: a visitor who typed a folder-wide word ("spec") needs the product name,
+// and a visitor who typed a product that has two hundred sheets needs the grade. One
+// of those two would be told to add something they had already typed.
+export const SPEC_TOO_BROAD_MESSAGE =
+  'That matches too many documents. Add the product name, grade or standard you need.';
+
+export const SPEC_EMPTY_MESSAGE =
+  "We don't have a specification sheet for that. Ask us in the chat and our team can help.";
+
+export const SPEC_OUTAGE_MESSAGE =
+  "We couldn't reach the document library. Please try again in a moment.";
+
+export const SPEC_UNCONFIGURED_MESSAGE =
+  "Specification sheets aren't set up yet. Ask us in the chat and our team will send one over.";
+
+// The shortest query worth a request. Mirrors MIN_QUERY_CHARS in services/spec_drive.py
+// so a single keystroke never leaves the browser; the server enforces it regardless.
+export const SPEC_MIN_QUERY_CHARS = 2;
+
+// How long the panel waits after a keystroke before searching. Long enough that typing
+// a product name is one request rather than seven, short enough that the list feels
+// like it is following along.
+export const SPEC_DEBOUNCE_MS = 300;
+
+// One HTTP response from GET /api/widget/spec → what the panel does about it. Pure for
+// the same reason coaOutcome is: the mapping IS the rule. There is no 429 branch
+// because there is no throttle, and the status comes from the body rather than being
+// re-derived from results.length — "matched nothing" and "matched too much" are both
+// zero rows and need opposite instructions (R4).
+export type SpecOutcome =
+  | { kind: 'unconfigured' }
+  | { kind: 'outage' }
+  | { kind: 'results'; rows: SpecRow[]; totalMatched: number }
+  | { kind: 'status'; status: SpecSearchStatus };
+
+export function specOutcome(status: number, body: unknown): SpecOutcome {
+  if (status < 200 || status >= 300) return { kind: 'outage' };
+  const data = (body ?? {}) as {
+    status?: unknown; results?: unknown; total_matched?: unknown; configured?: unknown;
+  };
+  if (data.configured === false) return { kind: 'unconfigured' };
+  const rows = Array.isArray(data.results) ? (data.results as SpecRow[]) : [];
+  if (data.status === 'ok' && rows.length > 0) {
+    const total = typeof data.total_matched === 'number' ? data.total_matched : rows.length;
+    return { kind: 'results', rows, totalMatched: Math.max(total, rows.length) };
+  }
+  // R1 — `too_short` is a real server status and renders as the prompt, so it stays a
+  // status here rather than being flattened: the panel decides the copy, not the wire.
+  if (data.status === 'too_broad' || data.status === 'empty' || data.status === 'too_short') {
+    return { kind: 'status', status: data.status };
+  }
+  // A body we do not understand, or "ok" with no rows. Neither is an error worth
+  // showing an outage for, and the prompt is the only honest thing left to say.
+  return { kind: 'status', status: 'too_short' };
+}
+
+// What the specification panel's RESULT AREA is showing.
+//
+// `pinned` is deliberately absent. §6 lists it as a state, but a pinned document
+// renders ABOVE a search box that stays live — that is the whole point of pinning
+// (proven in SdsPicker by the sds-persistent-panel work), so it coexists with every
+// state here rather than replacing them. Making it exclusive would close the search
+// the moment a visitor found their first sheet, which is exactly the dead end the
+// pattern exists to avoid.
+export type SpecPanelInputs = {
+  configured: boolean;
+  error: string | null;
+  searching: boolean;
+  rows: SpecRow[];
+  status: SpecSearchStatus | null;
+};
+
+// The {spec_doc:{...}} side-channel the chat path emits (§7) → what to open the panel
+// on. `spec_doc` and not `spec`: the latter is the catalog path's key on the server
+// and feeds session titles and the sales funnel.
+//
+// Unlike the certificate event, this carries a LIST and a query: a product with six
+// standards has no single "the" specification, so the panel opens on the ranked rows
+// with the product name in the field, and pins one only when the server says exactly
+// one sheet matched. Pinning an arbitrary row would answer a question nobody asked.
+export type SpecDocEvent = { query: string; rows: SpecRow[]; pinned: SpecRow | null };
+
+export function parseSpecDocEvent(parsed: unknown): SpecDocEvent | null {
+  const doc = (parsed as { spec_doc?: { query?: unknown; results?: unknown; pinned_id?: unknown } })?.spec_doc;
+  if (!doc || !Array.isArray(doc.results) || doc.results.length === 0) return null;
+  const rows = doc.results as SpecRow[];
+  const pinned = rows.find(r => r.id === doc.pinned_id) ?? null;
+  return { query: typeof doc.query === 'string' ? doc.query : '', rows, pinned };
+}
+
+export function specPanelState(
+  s: SpecPanelInputs,
+): 'unconfigured' | 'error' | 'results' | 'searching' | 'too_broad' | 'empty' | 'prompt' {
+  if (!s.configured) return 'unconfigured';
+  if (s.error) return 'error';
+  // Above `searching` on purpose: the rows from the last query stay on screen while
+  // the next one is in flight, and the spinner in the input is what says we are
+  // working. Swapping the list for "Searching…" on every debounce would make the
+  // panel flash on each word a visitor types.
+  if (s.rows.length > 0) return 'results';
+  if (s.searching) return 'searching';
+  if (s.status === 'too_broad') return 'too_broad';
+  if (s.status === 'empty') return 'empty';
+  return 'prompt';
 }

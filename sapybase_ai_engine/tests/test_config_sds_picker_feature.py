@@ -80,7 +80,8 @@ def test_generic_bot_has_sds_picker_false(monkeypatch):
     resp = _get_config(monkeypatch, company=_company(vertical=None),
                        api_key="key-generic")
     assert resp.status_code == 200
-    assert resp.json()["features"] == {"sds_picker": False, "coa_picker": False}
+    assert resp.json()["features"] == {"sds_picker": False, "coa_picker": False,
+                                       "spec_picker": False}
 
 
 def test_coa_picker_true_when_the_bot_has_a_folder(monkeypatch):

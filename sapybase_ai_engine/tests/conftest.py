@@ -59,3 +59,23 @@ def _reset_coa_module_state():
     clear()
     yield
     clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_spec_module_state():
+    """The same three, for the spec library (spec-finder-plan §9.1).
+
+    Separate from the COA fixture on purpose: these are genuinely different objects,
+    and a single fixture clearing both would be the first step back towards the
+    shared state D4 exists to avoid.
+    """
+    from services import spec_drive
+
+    def clear():
+        spec_drive.reset_index_memo()
+        spec_drive.reset_breakers()
+        spec_drive.reset_forced_walk_gate()
+
+    clear()
+    yield
+    clear()
