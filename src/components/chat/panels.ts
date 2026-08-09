@@ -199,11 +199,16 @@ export type SpecSearchStatus = 'ok' | 'empty' | 'too_broad' | 'too_short';
 export const SPEC_PROMPT_MESSAGE =
   'Start typing a product name to find its specification sheet.';
 
-// The §4.1 selectivity guard tripped: the query matched most of the library, so it
-// selected nothing meaningful. The instruction is to type MORE — which is exactly the
-// instruction the empty state must not give.
+// The §4.1 selectivity guard tripped: every word the visitor typed matched, and
+// together they selected too much. The instruction is to type MORE — which is exactly
+// the instruction the empty state must not give.
+//
+// It does not say "keep typing the product name", because the guard trips from both
+// directions: a visitor who typed a folder-wide word ("spec") needs the product name,
+// and a visitor who typed a product that has two hundred sheets needs the grade. One
+// of those two would be told to add something they had already typed.
 export const SPEC_TOO_BROAD_MESSAGE =
-  'That matches too many documents. Keep typing the product name to narrow it down.';
+  'That matches too many documents. Add the product name, grade or standard you need.';
 
 export const SPEC_EMPTY_MESSAGE =
   "We don't have a specification sheet for that. Ask us in the chat and our team can help.";

@@ -723,6 +723,57 @@ If they turn out to be internal revision codes, §0.1.1's extent figure drops an
 - **the proper-noun report** (§3.1.2) - "names we did not recognise"; no longer a free by-product now that D5 is dropped
 - **per-company confidential mode** (D9) - the config shape leaves room, the resolver already exists in `coa_drive`
 
+## 15.1 Pre-push audit - 2026-08-09
+
+An end-to-end pass over the committed feature (`d4a1f787`), looking for defects rather than confirming the tests.
+
+### 15.1.1 One real defect, found and fixed
+
+**An absent product plus one ordinary word answered `too_broad`.**
+`benzene` alone correctly answered `empty`.
+`benzene spec` did not: the strict pass found nothing, the fallback kept every file carrying `SPEC` (1,027 of 1,086 on the real folder), and the guard relabelled that `too_broad`.
+The visitor was told to keep typing, which is the one instruction that cannot work - no amount of typing produces a product the folder does not contain - and the query had a true answer already.
+
+The fix is that `too_broad` can only ever come from the **strict** pass.
+A broad strict result means every word matched and together failed to select, so more typing helps.
+A broad fallback result means the words did not all match, so what is left is every file sharing whichever common word did, and `empty` is the true answer.
+`test_spec_drive_guard.py` carries the regression, including the invariant stated once: no query is `too_broad` unless something matched it fully.
+
+The fallback's own purpose is untouched - `acetone drum` still degrades to the acetone sheets (§4 step 5).
+
+**The `too_broad` copy was also only right in one direction.**
+It said "keep typing the product name", which is wrong for the visitor who typed the product name and needs a grade.
+It now names all three: product name, grade or standard.
+
+### 15.1.2 Measured, and better than the plan assumed
+
+- **cached entry: 10 KB for 1,086 documents.** D7's escape hatch (move to a Postgres index when the entry nears a megabyte) is ~100x away. The sizing risk is closed with a number.
+- **search: 1-9 ms** across the same corpus, so the per-keystroke cost of a typeahead is the Drive/Redis tier, never the ranking.
+- **production is inert**: a read-only query of the prod control DB confirms no chemical bot has a `spec.folder_id`, so `features.spec_picker` is false everywhere and D3's zero-regression contract holds on deploy.
+
+### 15.1.3 Resolved 2026-08-09 - attach, don't auto-open
+
+**The chat path used to open the panel for every resolved product, not only for a document request.**
+`get_product_spec` is the general product-discovery tool, so "what packaging does acetone come in?" replaced the chat body with the specification panel.
+`get_coa` never had this problem because asking for a certificate IS the tool.
+D8 (no new tool) and §7 (open the panel) were individually right and collided here.
+
+**Fixed by attaching, not opening.**
+`spec_doc` is now attached to the bot's reply the same way `quote` already is - `Message.specDoc`, set alongside `content` when the stream completes - and the widget renders a small tappable card instead of forcing a screen change.
+Tapping it calls the same `openSpecPickerWithResults` the mechanism always had; only who calls it changed, from the stream handler to the visitor.
+An ordinary packaging question now gets its ordinary answer, with the spec sheets one tap away rather than the whole chat body replaced under it.
+
+`_SPEC_DOC_MESSAGE` in `main.py` changed to match: it told the model the sheets were "already open in a panel", which stopped being true.
+It now says the sheets are available and will be shown as a card, with the H10 constraints (no link, no filename, no content) unchanged.
+
+### 15.1.4 Recorded, not fixed
+
+- **diacritics do not fold.** `Acétone` is unfindable by `acetone`, because `normalize` is NFKC and NFKC keeps accents. Fixing it means NFKD plus combining-mark stripping inside `coa_drive.normalize`, which §9.2 forbids touching - the isolation D4 bought has this as its price, and a European client is where it would first be felt. CJK filenames work correctly.
+- **no single flight on a cold cache.** Eight parallel first-searches walk Drive eight times. COA has the same shape, but a debounced typeahead makes the window wider than a button press does.
+- **a failed re-walk turns `empty` into a 503.** Inherited from `coa_drive.resolve`: the forced re-walk after a miss propagates its error rather than falling back to the answer already computed.
+- **Test Connection is not rate limited** and bypasses the H5 forced-walk gate, so an owner can walk Drive as fast as they can click. Inherited from COA and bounded only by the global 200/hour default.
+- **`GOOGLE_DRIVE_API_KEY` on Render is still unverified** (risk 5). It gates both libraries.
+
 ## 15. Generalization - the edge cases across clients
 
 The owner's standing instruction is that this is platform capability, not one client's feature.

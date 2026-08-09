@@ -6747,14 +6747,20 @@ async def search_spec(
     }
 
 
-# What the MODEL is told when specification sheets reach the panel. H10 — a filename
-# is written by anyone who can upload to the client's Drive folder and reaches the
-# model as a tool observation, so the model gets a status and a count and never a
-# name. The visitor sees filenames by design; the model does not.
+# What the MODEL is told when specification sheets are found alongside a catalog
+# answer. H10 — a filename is written by anyone who can upload to the client's Drive
+# folder and reaches the model as a tool observation, so the model gets a status and a
+# count and never a name. The visitor sees filenames by design; the model does not.
+#
+# 2026-08-09 audit (plan §15.1.3) — this used to say the sheets were "already open in
+# a panel", because the widget used to force the panel open on every resolved product.
+# That made an ordinary packaging question replace the whole chat body, so the widget
+# now attaches the sheets to the reply as a tappable card instead. The message follows:
+# the sheets exist and can be opened FROM the reply, not that a screen has changed.
 _SPEC_DOC_MESSAGE = (
-    "The specification sheet(s) are already open in a panel for the visitor. Tell them "
-    "the sheets are on screen and can be opened or downloaded there. Do not paste a "
-    "link, do not name a file, and do not state anything a specification contains."
+    "The specification sheet(s) are available and will be shown as a card the visitor "
+    "can tap to open them. Do not paste a link, do not name a file, and do not state "
+    "anything a specification contains."
 )
 
 

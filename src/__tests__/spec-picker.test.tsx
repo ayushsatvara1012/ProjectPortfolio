@@ -16,6 +16,9 @@
  *   - R3: a capped list says how many matched, or it reads as the whole answer.
  *   - H8/§15: Download targets download_url and the extension follows the source file.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -158,6 +161,41 @@ describe('specPanelState — what the result area is showing', () => {
     ]);
     expect(states.has('pinned' as never)).toBe(false);
     expect(states.size).toBe(7);
+  });
+});
+
+describe('a chat-typed spec_doc attaches to the reply and does not auto-open the panel', () => {
+  // 2026-08-09 fix (plan §15.1.3): get_product_spec is the GENERAL product tool, so
+  // it answers packaging and grade questions too. The panel used to force-open on
+  // every one of those, replacing the chat body for a question that was never about
+  // a document. Rendering the full SSE stream isn't this repo's pattern for
+  // ChatWidget (chatwidget_hub.test.ts mirrors logic instead), so — matching
+  // test_coa_endpoint.py's test_both_paths_call_the_same_search and coa-picker's own
+  // MIcon-registry check — this pins the wiring at the source.
+  const source = readFileSync(resolve(__dirname, '../components/chat/ChatWidget.tsx'), 'utf8');
+  const doneStart = source.indexOf("msg.data === '[DONE]'");
+  const doneBlock = source.slice(
+    doneStart,
+    source.indexOf('requestAnimationFrame', doneStart),
+  );
+
+  it('does not call openSpecPickerWithResults from the [DONE] handler', () => {
+    expect(doneBlock).not.toContain('openSpecPickerWithResults');
+  });
+
+  it('attaches pendingSpecDoc onto the message the same way pendingQuote does', () => {
+    expect(doneBlock).toMatch(/pendingSpecDoc \? \{ specDoc: pendingSpecDoc \}/);
+  });
+
+  it('still opens the SDS and COA panels automatically — only spec changed', () => {
+    // The regression this guards: fixing spec must not silently flip the other two.
+    expect(doneBlock).toContain('openSdsPickerWithResult(pendingSds)');
+    expect(doneBlock).toContain('openCoaPickerWithResult(pendingCoa)');
+  });
+
+  it('renders a tappable card that opens the panel from msg.specDoc', () => {
+    expect(source).toMatch(/msg\.specDoc &&/);
+    expect(source).toContain('openSpecPickerWithResults(msg.specDoc!)');
   });
 });
 

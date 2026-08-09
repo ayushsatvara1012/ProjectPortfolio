@@ -95,6 +95,51 @@ class TestLegitimateQueriesPass:
         assert search(library, "zylophonium").status == "empty"
 
 
+class TestAnAbsentProductIsNeverCalledTooBroad:
+    """The defect the 2026-08-09 audit found, and the reason the guard has to know
+    WHICH pass produced its result.
+
+    A product we do not stock, typed on its own, correctly answers `empty`. Add one
+    perfectly ordinary second word and the strict pass finds nothing, the fallback
+    keeps every file sharing that common word, and the guard used to relabel the
+    whole thing `too_broad` - telling the visitor to keep typing when no amount of
+    typing can conjure a product that is not in the folder. It is the one instruction
+    that cannot work, handed out on a query that had a true answer already.
+    """
+
+    def test_an_absent_product_plus_a_common_word_is_empty(self, library):
+        assert search(library, "benzene").status == "empty"
+        assert search(library, "benzene spec").status == "empty"
+
+    def test_no_query_is_ever_too_broad_when_nothing_matched_it_fully(self, library):
+        # The invariant, stated once: `too_broad` means "your words all matched and
+        # together selected too much", so it can only ever come from the strict pass.
+        # A fallback result may be `ok` - "benzene G1" degrades to the G1 sheets we do
+        # have, which is the designed suggestion behaviour and visibly not benzene -
+        # or `empty`. It may never be an instruction to keep typing.
+        for query in ("benzene spec", "benzene G1 spec", "ethanol spec pdf",
+                      "benzene G1", "zylophonium spec"):
+            assert search(library, query).status != "too_broad", query
+
+    def test_the_empty_answer_reports_no_matches(self, library):
+        # `total_matched` is what the endpoint would use to say "showing 8 of N", and
+        # a count of 1,000 next to zero rows is a payload that contradicts itself.
+        assert search(library, "benzene spec").total_matched == 0
+
+    def test_a_real_product_plus_a_filler_word_still_falls_back_to_suggestions(self, library):
+        # The fallback's whole purpose (§4 step 5), and what must NOT be broken by
+        # the fix: "I have a drum of acetone, send me the spec" degrades to the
+        # acetone sheets rather than to a dead end.
+        result = search(library, "acetone drum")
+        assert result.status == "ok"
+        assert result.total_matched == 20
+
+    def test_a_broad_strict_match_is_still_too_broad(self, library):
+        # The other half of the distinction: every word matched, and together they
+        # failed to select. Here more typing genuinely is the answer.
+        assert search(library, "spec").status == "too_broad"
+
+
 # ───────────────────────────── the small-library floor ─────────────────────────────
 
 class TestSmallLibraryFloor:

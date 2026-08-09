@@ -546,6 +546,12 @@ type Message = {
   };
   grade_selector?: { product?: string; grades: string[]; grade_pack_map?: Record<string, string[]> };
   pack_selector?: { product?: string; grade?: string; pack_sizes: string[] };
+  // 2026-08-09 fix (plan §15.1.3) — attached to the reply rather than auto-opening the
+  // specification panel. get_product_spec is the GENERAL product tool, so it answers
+  // packaging and grade questions too; forcing the panel open on every one of those
+  // replaced the chat body for a question that was never about a document. The
+  // visitor now taps this card to open the panel themselves, same as msg.quote.
+  specDoc?: SpecDocEvent;
   ts?: number;
   // Vertical intelligence plan, Phase 2a: thumbs up/down on this reply. `id`
   // doubles as the `client_message_id` sent on the originating /api/chat call
@@ -3013,7 +3019,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === 'bot') {
-                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}) };
+                updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false, ...(pendingQuote ? { quote: pendingQuote } : {}), ...(pendingGradeSelector ? { grade_selector: pendingGradeSelector } : {}), ...(pendingPackSelector ? { pack_selector: pendingPackSelector } : {}), ...(pendingSpecDoc ? { specDoc: pendingSpecDoc } : {}) };
               }
               return updated;
             });
@@ -3029,7 +3035,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // ordering so the bot's confirmation lands first.
             if (pendingCoa) openCoaPickerWithResult(pendingCoa);
             if (pendingCoaLockout) lockCoaPanel(pendingCoaLockout);
-            if (pendingSpecDoc) openSpecPickerWithResults(pendingSpecDoc);
+            // 2026-08-09 fix (plan §15.1.3) — deliberately NOT auto-opened, unlike SDS
+            // and COA above. get_product_spec answers every product question, not only
+            // "send me the spec sheet", so forcing the panel open here would replace
+            // the chat body for an ordinary packaging or grade question. pendingSpecDoc
+            // is attached to the message above instead, and the visitor opens the
+            // panel themselves by tapping the card that renders from it.
             // Never move the viewport on completion — keep the user exactly where
             // they are for reading continuity. If the finished answer extends below
             // the fold, surface the "new message" pill so they can jump down when
@@ -3544,6 +3555,32 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                         <div className="mt-2 text-[12px] text-slate-500 dark:text-slate-400">Our team will be in touch to arrange your sample.</div>
                                       </div>
                                     </div>
+                                  )}
+                                  {msg.role === 'bot' && !msg.isStreaming && msg.specDoc && (
+                                    // 2026-08-09 fix (plan §15.1.3) — a tappable card, not an
+                                    // auto-opened panel. get_product_spec answers every product
+                                    // question, not only "send me the spec sheet", so forcing the
+                                    // panel open here replaced the chat body for an ordinary
+                                    // packaging or grade question. Same pattern as msg.quote: the
+                                    // model attaches data, the visitor decides whether to act on it.
+                                    <button
+                                      type="button"
+                                      onClick={() => openSpecPickerWithResults(msg.specDoc!)}
+                                      className="mt-2 w-full max-w-[280px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                                    >
+                                      <div className="flex items-center gap-2 px-3 py-2 text-white text-[12px] font-google font-bold" style={{ backgroundColor: THEME_COLOR }}>
+                                        <MIcon name="science" className="text-[16px] leading-none" />
+                                        {msg.specDoc.rows.length === 1 ? 'Specification sheet' : 'Specification sheets'}
+                                      </div>
+                                      <div className="px-3 py-2.5 text-[13px] font-google text-slate-700 dark:text-slate-200 leading-relaxed flex items-center justify-between gap-2">
+                                        <span>
+                                          {msg.specDoc.rows.length === 1
+                                            ? msg.specDoc.rows[0].display
+                                            : `${msg.specDoc.rows.length} sheets found for ${msg.specDoc.query}`}
+                                        </span>
+                                        <MIcon name="open_in_new" className="text-[16px] leading-none shrink-0 text-slate-400 dark:text-slate-500" />
+                                      </div>
+                                    </button>
                                   )}
                                   {/* Phase 0a: combined grade + pack selector. Shows both in one UI
                                       so the user never needs a second round-trip. Grade chips for

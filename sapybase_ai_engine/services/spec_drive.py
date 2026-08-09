@@ -148,6 +148,7 @@ def search(documents: Sequence[DriveDocument], query: Any,
         (strict if matched == len(query_tokens) else loose).append(entry)
 
     ranked = strict
+    from_fallback = False
     if not ranked and loose:
         # A substring-only hit is too weak to carry a fallback result on its own:
         # short filler words match half the corpus that way ("ME" inside "METHANOL").
@@ -157,10 +158,25 @@ def search(documents: Sequence[DriveDocument], query: Any,
         if strong:
             best = max(e[0] for e in strong)
             ranked = [e for e in strong if e[0] == best]
+            from_fallback = True
 
     if not ranked:
         return SearchResult("empty")
     if _is_too_broad(len(ranked), len(documents)):
+        # WHICH pass produced the broad set decides what to tell the visitor, and
+        # getting this backwards hands them the one instruction that cannot work.
+        #
+        # A broad STRICT result means every word they typed matched and together
+        # failed to select - "acetone USP" against a library where most sheets are
+        # acetone. More typing is exactly what helps.
+        #
+        # A broad FALLBACK result means their words did NOT all match, and what is
+        # left is every file sharing whichever common word did. "Benzene USP" on a
+        # library with no benzene degrades to every USP sheet there is. Telling them
+        # to keep typing is false - no amount of typing conjures a product we do not
+        # stock - and "we have nothing for that" is the true answer.
+        if from_fallback:
+            return SearchResult("empty")
         return SearchResult("too_broad", total_matched=len(ranked))
 
     # Three stable sorts, least significant first - the readable way to express
