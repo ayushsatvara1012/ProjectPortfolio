@@ -293,6 +293,10 @@ class CompanyUpdate(BaseModel):
     # ── COA finder (Phase 0): the client's Drive folder of certificates. Accepts a
     # folder URL or a bare ID; stored as the extracted ID. "" clears it (= feature off).
     coa_folder:         Optional[str]  = None
+    # ── Spec finder (spec-finder-plan Phase 2): a SECOND, independent Drive folder,
+    # holding specification sheets. Same accepted shapes, same "" = off. Separate
+    # from coa_folder so an owner can change either without touching the other (D4).
+    spec_folder:        Optional[str]  = None
     # ── Contextual teaser (Phase 1): folded into companies.teaser_config JSONB ──
     teaser_enabled:  Optional[bool] = None  # False hides the launcher teaser bubble
     teaser_title:    Optional[str]  = None  # bold line; "" = reset to default copy

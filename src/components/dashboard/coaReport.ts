@@ -87,15 +87,48 @@ export type CoaNotice = {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
+ * The words that differ between the two Drive libraries, and nothing else.
+ *
+ * The library health report is the same report either way — the counts, the notices
+ * and their severity are properties of a folder of PDFs, not of what the PDFs mean.
+ * Only the noun and the "what makes a filename findable" hint change, so those are
+ * the only two things parameterized. Adding a third field here should feel wrong:
+ * if a whole notice needs different wording, the two libraries have stopped being
+ * the same report and it wants its own function.
+ */
+export type LibraryCopy = {
+  item: { one: string; many: string };
+  /** What a customer types to find one — used in the "rename these files" advice. */
+  identifier: string;
+  /** What to ADD to a thin filename. Not always the same as `identifier`. */
+  filenameHint: string;
+};
+
+export const COA_COPY: LibraryCopy = {
+  item: { one: 'certificate', many: 'certificates' },
+  identifier: 'product code or batch number',
+  filenameHint: 'batch number or product name',
+};
+
+export const SPEC_COPY: LibraryCopy = {
+  item: { one: 'specification sheet', many: 'specification sheets' },
+  identifier: 'product name',
+  filenameHint: 'product name',
+};
+
+/**
  * Everything worth telling the owner, most serious first.
  *
- * `warn` means a customer will fail to find a certificate that exists; `info` means
+ * `warn` means a customer will fail to find a document that exists; `info` means
  * we handled something and they may want to know. The cap notice outranks all of it
  * because it is the only case where the *search itself* is serving partial results —
  * every other row is about specific files.
+ *
+ * `copy` defaults to COA's so every existing call site and test reads unchanged.
  */
-export function coaNotices(report: CoaReport): CoaNotice[] {
+export function coaNotices(report: CoaReport, copy: LibraryCopy = COA_COPY): CoaNotice[] {
   const out: CoaNotice[] = [];
+  const { one: itemOne, many: itemMany } = copy.item;
 
   if (report.capped.length > 0) {
     out.push({
@@ -103,8 +136,8 @@ export function coaNotices(report: CoaReport): CoaNotice[] {
       level: 'warn',
       title: 'Only part of this folder is indexed',
       detail:
-        'This folder is bigger or deeper than we index in one pass, so some certificates ' +
-        'are not searchable. Point the link at a folder holding just the certificates, ' +
+        `This folder is bigger or deeper than we index in one pass, so some ${itemMany} ` +
+        `are not searchable. Point the link at a folder holding just the ${itemMany}, ` +
         'or contact support so we can raise the limit for your account.',
     });
   }
@@ -115,8 +148,8 @@ export function coaNotices(report: CoaReport): CoaNotice[] {
       level: 'warn',
       title: 'Nothing here is searchable yet',
       detail: report.filesSeen
-        ? 'We can read the folder, but none of the files in it could be indexed as certificates.'
-        : 'We can read the folder, but it is empty. If your certificates live in a Shared Drive, ' +
+        ? `We can read the folder, but none of the files in it could be indexed as ${itemMany}.`
+        : `We can read the folder, but it is empty. If your ${itemMany} live in a Shared Drive, ` +
           'check the link points at the folder itself and that it is shared with "Anyone with the link".',
     });
   }
@@ -128,7 +161,7 @@ export function coaNotices(report: CoaReport): CoaNotice[] {
       title: `${plural(report.unindexable, 'PDF', 'PDFs')} could not be indexed`,
       detail:
         'Their filenames contain nothing a customer could search for. Rename them to include ' +
-        'the product code or batch number and they will be findable.',
+        `the ${copy.identifier} and they will be findable.`,
     });
   }
 
@@ -136,10 +169,10 @@ export function coaNotices(report: CoaReport): CoaNotice[] {
     out.push({
       key: 'hard-to-find',
       level: 'warn',
-      title: `${plural(report.hardToFind, 'certificate is', 'certificates are')} hard to find`,
+      title: `${plural(report.hardToFind, `${itemOne} is`, `${itemMany} are`)} hard to find`,
       detail:
         'These filenames carry only one searchable word, so a customer has to type it exactly. ' +
-        'Adding the batch number or product name to the filename fixes it.',
+        `Adding the ${copy.filenameHint} to the filename fixes it.`,
       samples: report.hardToFindSamples,
     });
   }
@@ -153,8 +186,8 @@ export function coaNotices(report: CoaReport): CoaNotice[] {
       level: 'info',
       title: `${plural(report.duplicatesCollapsed, 'duplicate copy', 'duplicate copies')} merged`,
       detail:
-        'Files with the same name are treated as one certificate and the newest is served. ' +
-        'That is right for the same certificate filed in two months, but if these are ' +
+        `Files with the same name are treated as one ${itemOne} and the newest is served. ` +
+        `That is right for the same ${itemOne} filed in two months, but if these are ` +
         'different documents that happen to share a name, tell us — customers would only see one.',
       samples: report.duplicateSamples.map((d) => `${d.name} (${d.copies} copies)`),
     });
