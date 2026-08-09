@@ -1319,13 +1319,13 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
               )}
               <div className="mt-2 flex items-center gap-2">
                 <a href={selected.url} target="_blank" rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                  style={{ borderColor: themeColor, color: themeColor }}>
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                   <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                 </a>
                 <button type="button" onClick={() => downloadDocument(selected.url, `${selected.product || 'safety-data-sheet'}.pdf`)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                  style={{ borderColor: themeColor, color: themeColor }}>
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                   <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
                 </button>
               </div>
@@ -1525,8 +1525,8 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
               <div className="mt-2 flex items-center gap-2">
                 {released.view_url && (
                   <a href={released.view_url} target="_blank" rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                    style={{ borderColor: themeColor, color: themeColor }}>
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                     <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                   </a>
                 )}
@@ -1535,8 +1535,8 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
                   // HTML viewer page, so saving that blob as .pdf hands the
                   // customer a corrupt file.
                   <button type="button" onClick={() => downloadDocument(released.download_url!, `${released.display || 'certificate-of-analysis'}.pdf`)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                    style={{ borderColor: themeColor, color: themeColor }}>
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                     <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
                   </button>
                 )}
@@ -1631,8 +1631,8 @@ export function SpecPicker({ rows, pinned, searching, configured, error, query, 
               <div className="mt-2 flex items-center gap-2">
                 {pinned.view_url && (
                   <a href={pinned.view_url} target="_blank" rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                    style={{ borderColor: themeColor, color: themeColor }}>
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                     <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open spec
                   </a>
                 )}
@@ -1641,8 +1641,8 @@ export function SpecPicker({ rows, pinned, searching, configured, error, query, 
                   // viewer page. §15 — the extension follows the source file, so a
                   // .docx specification is not saved under a .pdf name.
                   <button type="button" onClick={() => downloadDocument(pinned.download_url!, `${pinned.display || 'specification'}.${pinned.ext || 'pdf'}`)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                    style={{ borderColor: themeColor, color: themeColor }}>
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                     <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
                   </button>
                 )}
