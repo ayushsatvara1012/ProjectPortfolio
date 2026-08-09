@@ -125,3 +125,21 @@ def test_a_hostile_folder_id_does_not_enable_the_panel(monkeypatch):
         company=_company(pack_overrides={"spec": {"folder_id": "x' or '1'='1"}}),
         api_key="spec-feature-hostile")
     assert resp.json()["features"]["spec_picker"] is False
+
+
+def test_the_spec_hub_card_is_hidden_until_a_folder_is_saved(monkeypatch):
+    # An unconfigured picker card used to still render and silently degrade to
+    # the old mini-form — indistinguishable from the real feature to a visitor.
+    # It must not appear in `hub_cards` at all until the owner finishes setup.
+    resp = _get_config(monkeypatch, api_key="spec-feature-hub-hidden")
+    ids = [c["id"] for c in resp.json()["hub_cards"]]
+    assert "spec" not in ids
+
+
+def test_the_spec_hub_card_appears_once_a_folder_is_saved(monkeypatch):
+    resp = _get_config(
+        monkeypatch,
+        company=_company(pack_overrides={"spec": {"folder_id": SPEC_FOLDER}}),
+        api_key="spec-feature-hub-shown")
+    ids = [c["id"] for c in resp.json()["hub_cards"]]
+    assert "spec" in ids

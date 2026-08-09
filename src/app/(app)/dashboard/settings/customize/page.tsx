@@ -15,6 +15,7 @@ import SampleFormEditor, { validateSampleForm } from '@/src/components/dashboard
 import TeaserRuleEditor, { TeaserSuggestButton, validateTeaserRules } from '@/src/components/dashboard/TeaserRuleEditor';
 import CoaFolderField, { isCoaFolderInvalid } from '@/src/components/dashboard/CoaFolderField';
 import SpecFolderField, { isSpecFolderInvalid } from '@/src/components/dashboard/SpecFolderField';
+import ToolAccordionItem from '@/src/components/dashboard/ToolAccordionItem';
 
 // Friendly heading per vertical pack (kept tiny; grows as packs are added).
 const VERTICAL_LABEL: Record<string, string> = { chemical: 'Chemical agent' };
@@ -85,12 +86,18 @@ const LockOverlay = ({ label, href = '/dashboard/pricing' }: { label: string; hr
   </div>
 );
 
-type Tab = 'appearance' | 'behavior' | 'leads';
+type Tab = 'appearance' | 'behavior' | 'leads' | 'tools';
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
   { id: 'behavior',   label: 'Behavior',   icon: 'psychology' },
   { id: 'leads',      label: 'Leads',      icon: 'notifications_active' },
+  { id: 'tools',      label: 'Tools',      icon: 'construction' },
 ];
+
+// Same accent colors as the chat widget's own hub tiles (hub-card-colors) so a
+// tool reads as the same feature in both places, not a re-skinned duplicate.
+const TOOL_COLOR = { sds: '#F59E0B', spec: '#14B8A6', coa: '#10B981', sample: '#8B5CF6' } as const;
+type ToolId = keyof typeof TOOL_COLOR;
 
 export default function CustomizePage() {
   const { botSettings, updateSetting, saveSettings, fetchSettings, isSaving, isLoading, isDirty } = useBotSettings();
@@ -102,6 +109,9 @@ export default function CustomizePage() {
   const authFetch = useAuthenticatedFetch();
   const [alert, setAlert] = useState({ open: false, type: 'success' as 'success' | 'error' | 'warning', msg: '' });
   const [activeTab, setActiveTab] = useState<Tab>('appearance');
+  // Tools tab is an accordion (one row open at a time) so owners pick the tool
+  // they came to configure instead of scrolling past every tool's fields.
+  const [openTool, setOpenTool] = useState<ToolId | null>(null);
 
   const searchParams = useSearchParams();
   const editBotId = searchParams.get('edit');
@@ -613,49 +623,6 @@ export default function CustomizePage() {
                 </div>
               </Section>
 
-              {/* Vertical agent (Phase 5 customise) — only for a pack bot */}
-              {isVerticalBot && (
-                <Section>
-                  <p className={sectionHeadingCls}>
-                    <span className="material-symbols-outlined text-[15px] text-slate-400">science</span>
-                    {VERTICAL_LABEL[botSettings.vertical] || 'Vertical agent'}
-                  </p>
-                  <p className={sectionDescCls}>
-                    Your industry pack pre-configures the agent. Customise the sample-request form your widget collects, where its submissions land, and the document library it looks certificates up in.
-                  </p>
-                  <SampleFormEditor
-                    fields={botSettings.sampleForm || []}
-                    onChange={(f) => updateSetting('sampleForm', f)}
-                    sinkUrl={botSettings.sampleSinkUrl || ''}
-                    onSinkUrlChange={(v) => updateSetting('sampleSinkUrl', v)}
-                    sinkSecret={botSettings.sampleSinkSecret || ''}
-                    onSinkSecretChange={(v) => updateSetting('sampleSinkSecret', v)}
-                    botId={selectedBotId}
-                    authFetch={authFetch}
-                    sinkStatus={botSettings.sinkStatus}
-                  />
-                  <CoaFolderField
-                    value={botSettings.coaFolder || ''}
-                    savedValue={botSettings.coaFolderUrl || ''}
-                    onChange={(v) => updateSetting('coaFolder', v)}
-                    inputCls={inputCls}
-                    labelCls={labelCls}
-                    helpCls={helpCls}
-                    botId={selectedBotId}
-                    authFetch={authFetch}
-                  />
-                  <SpecFolderField
-                    value={botSettings.specFolder || ''}
-                    savedValue={botSettings.specFolderUrl || ''}
-                    onChange={(v) => updateSetting('specFolder', v)}
-                    inputCls={inputCls}
-                    labelCls={labelCls}
-                    helpCls={helpCls}
-                    botId={selectedBotId}
-                    authFetch={authFetch}
-                  />
-                </Section>
-              )}
             </>
             )}
 
@@ -818,6 +785,121 @@ export default function CustomizePage() {
                   </div>
                 </div>
               </Section>
+            </>
+            )}
+
+            {/* ═══ TOOLS TAB ═══ */}
+            {activeTab === 'tools' && (
+            <>
+              {!isVerticalBot ? (
+                <Section>
+                  <div className="flex flex-col items-center text-center py-10 px-4">
+                    <span className="material-symbols-outlined text-[28px] text-slate-300 dark:text-slate-600 mb-3">construction</span>
+                    <p className="text-sm font-semibold font-google text-slate-700 dark:text-slate-300">No tools yet</p>
+                    <p className="text-xs font-google text-slate-500 dark:text-slate-400 mt-1 max-w-[280px] leading-relaxed">
+                      Tools activate once your bot has an industry vertical assigned. Contact support to change it.
+                    </p>
+                  </div>
+                </Section>
+              ) : (
+                <Section>
+                  <p className={sectionHeadingCls}>
+                    <span className="material-symbols-outlined text-[15px] text-slate-400">construction</span>
+                    {VERTICAL_LABEL[botSettings.vertical] || 'Vertical agent'} tools
+                  </p>
+                  <p className={sectionDescCls}>
+                    Select a tool to configure it. Your industry pack pre-configures the agent to use these.
+                  </p>
+
+                  <div className="space-y-2.5">
+                    <ToolAccordionItem
+                      icon="health_and_safety"
+                      iconColor={TOOL_COLOR.sds}
+                      title="Safety Data Sheets"
+                      description="Reads each product's official SDS from your catalog."
+                      status={{ label: 'Active', tone: 'active' }}
+                      open={openTool === 'sds'}
+                      onToggle={() => setOpenTool(t => t === 'sds' ? null : 'sds')}
+                    >
+                      <p className="text-xs font-google text-slate-500 dark:text-slate-400 leading-relaxed">
+                        No setup needed — visitors get the SDS you attached to each product in your catalog under Train.
+                      </p>
+                    </ToolAccordionItem>
+
+                    <ToolAccordionItem
+                      icon="verified"
+                      iconColor={TOOL_COLOR.coa}
+                      title="Certificates of Analysis"
+                      description="Searches a Drive folder for the matching COA."
+                      status={isCoaFolderInvalid(botSettings.coaFolder || '')
+                        ? { label: 'Needs setup', tone: 'needs-setup' }
+                        : (botSettings.coaFolder || '').trim()
+                          ? { label: 'Configured', tone: 'configured' }
+                          : { label: 'Needs setup', tone: 'needs-setup' }}
+                      open={openTool === 'coa'}
+                      onToggle={() => setOpenTool(t => t === 'coa' ? null : 'coa')}
+                    >
+                      <CoaFolderField
+                        value={botSettings.coaFolder || ''}
+                        savedValue={botSettings.coaFolderUrl || ''}
+                        onChange={(v) => updateSetting('coaFolder', v)}
+                        inputCls={inputCls}
+                        labelCls={labelCls}
+                        helpCls={helpCls}
+                        botId={selectedBotId}
+                        authFetch={authFetch}
+                      />
+                    </ToolAccordionItem>
+
+                    <ToolAccordionItem
+                      icon="science"
+                      iconColor={TOOL_COLOR.spec}
+                      title="Product specifications"
+                      description="Searches a Drive folder for grade & packaging sheets."
+                      status={isSpecFolderInvalid(botSettings.specFolder || '')
+                        ? { label: 'Needs setup', tone: 'needs-setup' }
+                        : (botSettings.specFolder || '').trim()
+                          ? { label: 'Configured', tone: 'configured' }
+                          : { label: 'Needs setup', tone: 'needs-setup' }}
+                      open={openTool === 'spec'}
+                      onToggle={() => setOpenTool(t => t === 'spec' ? null : 'spec')}
+                    >
+                      <SpecFolderField
+                        value={botSettings.specFolder || ''}
+                        savedValue={botSettings.specFolderUrl || ''}
+                        onChange={(v) => updateSetting('specFolder', v)}
+                        inputCls={inputCls}
+                        labelCls={labelCls}
+                        helpCls={helpCls}
+                        botId={selectedBotId}
+                        authFetch={authFetch}
+                      />
+                    </ToolAccordionItem>
+
+                    <ToolAccordionItem
+                      icon="inventory_2"
+                      iconColor={TOOL_COLOR.sample}
+                      title="Sample requests"
+                      description="Structured intake form for visitors requesting a sample."
+                      status={{ label: 'Active', tone: 'active' }}
+                      open={openTool === 'sample'}
+                      onToggle={() => setOpenTool(t => t === 'sample' ? null : 'sample')}
+                    >
+                      <SampleFormEditor
+                        fields={botSettings.sampleForm || []}
+                        onChange={(f) => updateSetting('sampleForm', f)}
+                        sinkUrl={botSettings.sampleSinkUrl || ''}
+                        onSinkUrlChange={(v) => updateSetting('sampleSinkUrl', v)}
+                        sinkSecret={botSettings.sampleSinkSecret || ''}
+                        onSinkSecretChange={(v) => updateSetting('sampleSinkSecret', v)}
+                        botId={selectedBotId}
+                        authFetch={authFetch}
+                        sinkStatus={botSettings.sinkStatus}
+                      />
+                    </ToolAccordionItem>
+                  </div>
+                </Section>
+              )}
             </>
             )}
             </motion.div>

@@ -10286,27 +10286,33 @@ def get_config(
             safe_company.get("bot_name"),
         )
         if pack:
-            safe_company["hub_cards"] = pack.hub_cards_payload()
             # get-sds-crash-fix-plan Phase 4 — config-registry driven (never
             # `if vertical == "chemical"`): the widget's Get-SDS picker only
             # renders for a pack that actually declares the get_sds tool.
             # coa-finder-plan Phase 3 — same registry gate PLUS the company's own
             # folder: get_coa is declared to every chemical bot, so tool presence
-            # alone would open a panel that can only ever say "not set up". With
-            # the flag false the card degrades to its mini-form and the visitor
-            # gets a conversational handoff instead. Existence only — §11 keeps the
-            # folder ID itself out of this payload.
+            # alone would open a panel that can only ever say "not set up".
             # spec-finder-plan Phase 3, R5 — the same tool-plus-folder gate, hung off
             # `get_product_spec` because D8 declares no `get_spec_sheet` tool for it to
             # name. The flag and the tool deliberately do not share a name. Existence
             # only — §12's H11 keeps both folder IDs out of this payload.
-            safe_company["features"] = {
+            _features = {
                 "sds_picker": "get_sds" in pack.tool_names(),
                 "coa_picker": ("get_coa" in pack.tool_names()
                                and bool(effective_coa_config(_overrides))),
                 "spec_picker": ("get_product_spec" in pack.tool_names()
                                 and bool(effective_spec_config(_overrides))),
             }
+            safe_company["features"] = _features
+            # A "*_picker" card whose flag is off has nothing live to open — the
+            # owner hasn't finished configuring it (e.g. no Drive folder saved yet).
+            # Rather than falling back to a degraded mini-form the visitor could
+            # mistake for the real feature, drop the card from the hub entirely so
+            # only capabilities the owner actually turned on are discoverable.
+            safe_company["hub_cards"] = [
+                card for card in pack.hub_cards_payload()
+                if card["action"] not in _features or _features[card["action"]]
+            ]
             # Phase 4b/5 — the structured sample form: the owner's per-bot override
             # if they customised it, otherwise the pack default.
             safe_company["sample_form"] = effective_sample_form(pack, _overrides)
