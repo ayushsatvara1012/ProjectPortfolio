@@ -3,7 +3,8 @@
 Date: 2026-08-11.
 Branch: MainV2.
 Status: Phases 1-5 DONE, Phase 6 not started.
-Nothing committed yet; suite green at backend 2311 passed / 134 skipped, vitest 581, tsc clean, lint 0 errors.
+Committed on `refactor/agent-runtime-restructure` (`5400531b` migration 0037, `405bf2f6` the restructure), not pushed, no PR.
+Suite green at backend 2311 passed / 134 skipped, vitest 581, tsc clean, lint 0 errors.
 Browser verification of the merged connect form is still owed.
 Migration 0037 APPLIED DARK to the prod control DB `tticllabbbqwnhsmggfo` on 2026-08-11 (deploy gate cleared - see the Phase 5 entry).
 
