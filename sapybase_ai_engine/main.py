@@ -1106,6 +1106,10 @@ r = None
 async def startup_event():
     """Initializes external services on app start."""
     global r
+    # Fail loudly at boot if a pack declares a tool the runtime registry doesn't
+    # implement (or the reverse) — the drift that let get_coa be advertised to
+    # bots that could never run it. See services/agent_runtime/registry.py.
+    agent_registry.assert_registry_covers_packs()
     # 1. Initialize FastAPI Cache
     redis_url = os.getenv("REDIS_URL")
     if redis_url:
@@ -1578,7 +1582,17 @@ from services import coa_throttle
 from services import spec_drive
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
-from services.agent import build_tool_schemas, build_agent_directive, execute_tool, run_agent_loop, stream_agent_loop, AGENT_FALLBACK_TEXT
+from services.agent import build_agent_directive
+from services.agent_runtime import registry as agent_registry
+from services.agent_runtime.loop import AGENT_FALLBACK_TEXT, run_agent_loop, stream_agent_loop
+from services.agent_runtime.contact import (
+    captured_contact_echo as _captured_contact_echo,
+    valid_reply_to as _valid_reply_to,
+)
+from services.agent_runtime import escalation as agent_escalation
+from services.agent_runtime import compose as agent_compose
+from services.agent_runtime import refusal as agent_refusal
+from services.agent_runtime.states import TurnState as _TurnState
 from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
 from services.agent import _session_has_capture as _session_has_capture
 # Phase 3 (get-sds-crash-fix-plan): the SDS picker endpoint reuses the EXACT SAME
@@ -3016,6 +3030,23 @@ def build_query_hash(company_id: str, message: str, history: list = None) -> str
     context_string = f"{company_id}|{'|'.join(parts)}"
     return hashlib.sha256(context_string.encode()).hexdigest()
 
+#: How long an exact-match cache entry may be replayed before the question is
+#: answered fresh (audit D1). Long enough to still absorb repeat traffic, short
+#: enough that a knowledge change nobody invalidated for cannot echo forever.
+CACHE_TTL_DAYS = 30
+
+
+def _cacheable(turn_state, reply: str) -> bool:
+    """May this reply be frozen as the canonical answer to its question?
+
+    Audit D1/D2: the old gate was `len(reply) > 10`, so one transient retrieval
+    hiccup froze "I don't have specific information about that yet" until the owner
+    retrained, and a visitor closing the tab mid-answer could install a half
+    sentence permanently. Only a turn that actually answered may be replayed.
+    """
+    return turn_state is _TurnState.ANSWERED and len((reply or "").strip()) > 10
+
+
 def save_cache_entry(company_id: str, query_hash: str, response: str):
     """Background task: saves a cache entry. Runs async so the user's HTTP response is not delayed."""
     conn = get_db_connection()
@@ -3060,11 +3091,66 @@ def _strip_source_citation(text: str) -> str:
     return _SOURCE_CITATION_RE.sub("", text).rstrip()
 
 
-FALLBACK_PHRASES = [
-    "i don't have specific information about that yet",
-    "i don't have that information",
-    "i'm here specifically to help you with",
-]
+def _prior_turn_refused(prior_messages: list) -> bool:
+    """Was the last thing we said to this visitor also a refusal?
+
+    Stands in for §1.5's "second refusal on the same topic": with no topic model
+    yet, adjacency is the honest approximation - two refusals back to back are
+    overwhelmingly the visitor rephrasing the same question. Reads whichever
+    transcript the caller has (session store for vertical bots, client-sent history
+    for generic ones), so no new storage is involved.
+
+    Prior turns predate ``chat_logs.turn_state`` or aren't loaded with it, so this
+    still reads the text - through the runtime's single definition of what a refusal
+    reads like (`refusal.reads_as_refusal`), not a list of its own.
+    """
+    for entry in reversed(list(prior_messages or [])):
+        role = entry.get("role") if isinstance(entry, dict) else getattr(entry, "role", None)
+        if role in ("assistant", "bot"):
+            content = entry.get("content") if isinstance(entry, dict) else getattr(entry, "content", "")
+            return agent_refusal.reads_as_refusal(content or "")
+    return False
+
+
+def _escalation_frame(
+    *,
+    message: str,
+    state,
+    prior_messages: list,
+    human_handoff_enabled: bool,
+    lead_capture_enabled: bool,
+    tool_answered: bool = False,
+    tool_trace: tuple = (),
+    disambiguated: bool = False,
+) -> Optional[dict]:
+    """The `escalate` SSE payload for this turn, or None to stay quiet.
+
+    One decision point for every bot, generic or vertical (plan §1.6). The widget
+    used to make this call itself from three keyword lists it kept client-side, and
+    only ever for generic bots - so the bots most likely to be mid-deal were the ones
+    that never asked who they were talking to. `destination` rides along because
+    entitlement, not the trigger, decides which endpoint the form can post to.
+    """
+    where = agent_escalation.destination(
+        human_handoff_enabled=human_handoff_enabled,
+        lead_capture_enabled=lead_capture_enabled,
+    )
+    if not where:
+        return None
+    found = agent_escalation.check(
+        message=message,
+        # Phase 5: the turn's settled outcome, not a guess from the reply's wording.
+        proposed_state=state,
+        topic_outcomes=(_TurnState.NO_DATA,) if _prior_turn_refused(prior_messages) else (),
+        tool_trace=tool_trace,
+        disambiguated=disambiguated,
+        # A turn that already produced a quote card has closed its own loop; asking
+        # for an email under it is the nagging the old client-side list was guilty of.
+        include_buying_intent=not tool_answered,
+    )
+    if found is None:
+        return None
+    return {"escalate": {**found.as_event_payload(), "destination": where}}
 
 
 def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: float | None) -> float | None:
@@ -3082,7 +3168,29 @@ def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: floa
         return round(min(max(rerank_top_score / 10.0, 0.0), 1.0), 2)
     return None
 
-def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None, client_message_id: Optional[str] = None, sources: Optional[list] = None):
+
+def _confidence_for_state(state, n_docs: int, rerank_top_score: float | None) -> float | None:
+    """`confidence`, read off the turn's settled outcome instead of retrieval alone.
+
+    Audit D4: the old score was the reranker's opinion of the best retrieved CHUNK,
+    so a tool-answered turn that retrieved nothing scored 0.0 while a fabrication
+    over well-ranked chunks scored high. The outcome now sets the ceiling and the
+    rerank score only grades an answer the gate already accepted.
+    """
+    if state in (_TurnState.NO_DATA, _TurnState.SYSTEM_ERROR, _TurnState.OUT_OF_SCOPE):
+        return 0.0
+    if state is _TurnState.NEED_ONE_THING:
+        return None  # nothing was claimed, so there is nothing to grade
+    if n_docs == 0:
+        # Answered from a tool record: the strongest grounding the system has, and
+        # precisely the case the old formula scored 0.0.
+        return 1.0 if state is _TurnState.ANSWERED else 0.5
+    if rerank_top_score is None:
+        return None
+    graded = round(min(max(rerank_top_score / 10.0, 0.0), 1.0), 2)
+    return graded if state is _TurnState.ANSWERED else round(graded / 2, 2)
+
+def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cache_hit: bool, is_unanswered: bool, session_id: Optional[str] = None, confidence: Optional[float] = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, cached_tokens: Optional[int] = None, client_message_id: Optional[str] = None, sources: Optional[list] = None, turn_state: Optional[str] = None):
     """Background task: silently logs every chat interaction for analytics.
     Uses its own DB connection so the user's HTTP response is never delayed.
     `confidence` is the 0.0–1.0 groundedness score (None = unknown/cache hit).
@@ -3097,14 +3205,20 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     of kb/tool source entries the owner dashboard renders — `None` means "not
     recorded" (a pre-migration row or a caller that hasn't been updated), an
     explicit `[]` means "recorded, genuinely no source this turn" (a cache hit,
-    or a decline with zero retrieval)."""
+    or a decline with zero retrieval).
+    `turn_state` (migration 0037, agent-runtime-restructure Phase 5) is the turn's
+    settled §1.2 outcome. `is_unanswered` and `confidence` are now derived from it
+    rather than from retrieval counts and substring matching, which were inverted
+    for tool-answered turns (audit D3/D4); the column is the versioned signal the
+    owner dashboards can migrate onto deliberately."""
     # BYOD tenants store chat_logs on their OWN database (Phase 3.2, dark by
     # default — data-plane write via get_tenant_db / vaayu_runtime). Degrades
     # soft on failure (§16.9): a tenant analytics-write hiccup never breaks chat.
-    # Token metering, feedback, AND sources are control-plane only for now (no
-    # chemical-vertical / pack traffic is BYOD-routed today — verified against
-    # the live registry, see plan §12.6); the tenant logger keeps accepting
-    # `sources` for signature parity but does not yet persist it.
+    # Token metering, feedback, sources AND turn_state are control-plane only for
+    # now (no chemical-vertical / pack traffic is BYOD-routed today — verified
+    # against the live registry, see plan §12.6); the tenant logger keeps accepting
+    # `sources` for signature parity but does not yet persist it, and `turn_state`
+    # is not forwarded at all — the data-plane schema has no column for it.
     if byod_engine.routing_active(company_id):
         byod_engine.tenant_log_chat(
             company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence,
@@ -3115,10 +3229,10 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id, sources)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)""",
+            """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id, sources, turn_state)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)""",
             (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id,
-             json.dumps(sources) if sources is not None else None)
+             json.dumps(sources) if sources is not None else None, turn_state)
         )
         conn.commit()
     except Exception as e:
@@ -3424,8 +3538,15 @@ async def chat_endpoint(
             query_hash = None
 
         if query_hash:
+            # TTL (audit D1): invalidation otherwise happens only when the owner
+            # retrains, so an entry written before a knowledge change that didn't
+            # trigger invalidation could outlive its own truth indefinitely. The
+            # write gate now keeps failures out; this bounds how long a stale
+            # success can be replayed.
             cursor.execute(
-                "SELECT response FROM exact_query_cache WHERE company_id = %s AND query_hash = %s",
+                "SELECT response FROM exact_query_cache "
+                "WHERE company_id = %s AND query_hash = %s "
+                f"AND created_at > now() - interval '{CACHE_TTL_DAYS} days'",
                 (company["id"], query_hash)
             )
             cached = cursor.fetchone()
@@ -3469,6 +3590,9 @@ async def chat_endpoint(
                         # None) so the dashboard renders "served from cache",
                         # never "not recorded" (plan §12.2).
                         sources=[],
+                        # Nothing reaches the cache unless it was ANSWERED (D1/D2),
+                        # so a hit replays that outcome as well as that text.
+                        turn_state=_TurnState.ANSWERED.value,
                     )
 
                 return ChatResponse(
@@ -3563,51 +3687,35 @@ async def chat_endpoint(
         # ── Two-layer system prompt ──────────────────────────────────────────────
         # Phase 0b: vertical pack bots must re-tool or handoff — never the generic
         # "I don't have information" escape that caused grade-loop dead-ends.
+        # RULE 6 (Phase 5): the model no longer recites a canned paragraph. A
+        # refusal is a decision the server makes, and services/agent_runtime/
+        # refusal.py writes it — one voice, cause-tagged, never the same sentence
+        # twice on a topic. All this rule has to do is stop the model inventing,
+        # and give the runtime one recognisable sentence to detect and replace.
+        _NOTHING_ON_FILE = agent_refusal.NOTHING_ON_FILE
+        _rule_6_common = (
+            "When the KNOWLEDGE BASE has NO relevant record for what was asked:\n"
+            "DO NOT guess, infer, or fill the gap from general knowledge.\n"
+            f"Open with exactly this sentence and then STOP: \"{_NOTHING_ON_FILE}\"\n"
+            "Do not add an apology, an explanation, or a suggestion after it — the "
+            "platform adds the next step itself.\n\n"
+            "When the KNOWLEDGE BASE DOES contain relevant records — even if not "
+            "the single exact one asked for — do NOT use that sentence at all. "
+            "Lead with what the records actually show, then say plainly which "
+            "specific detail is still missing, in that order."
+        )
         if pack is not None:
             _rule_6 = (
-                "[RULE 6 — VERTICAL AGENT FALLBACK]\n"
-                "You have tools. When the KNOWLEDGE BASE has no direct answer to a "
-                "PRODUCT, SAFETY, or PRICING question:\n"
-                "• Call a relevant tool (search_catalog, get_sds, request_quote).\n"
-                "• If no tool can resolve it, offer to connect the visitor with the team.\n"
-                "NEVER say \"I don't have specific information about that\" for a "
-                "product, safety, or pricing question — always push through tools "
-                "or offer the team handoff instead.\n\n"
-                "This does NOT extend to questions no tool covers — company staff, "
-                "roles, departments, or other non-product business questions. For "
-                "those, when the KNOWLEDGE BASE has NO relevant record at all, say "
-                "plainly and briefly that you don't have that detail on file and "
-                "offer to connect the visitor with the team. A plain 'I don't have "
-                "that on file' is the CORRECT answer there — inventing one is not, "
-                "even under this rule. But when the KNOWLEDGE BASE DOES contain "
-                "relevant records — even if not the single exact one asked for — "
-                "do NOT open with that denial line at all: lead with what the "
-                "records actually show, and only then note plainly what specific "
-                "detail is still missing. Stitching the denial phrase onto the "
-                "front of an answer that then lists real information is worse "
-                "than either alone — it reads as contradictory and undermines "
-                "the real answer that follows it."
-            )
-        elif company.get("lead_capture_enabled"):
-            # Points at the widget's own "Talk to a human" menu action rather than
-            # an external contact detail — that button now connects instantly
-            # (configured WhatsApp link, or the name/email handoff form as fallback).
-            _rule_6 = (
-                "[RULE 6 — FALLBACK PROTOCOL]\n"
-                "When the KNOWLEDGE BASE is empty OR contains no relevant answer:\n"
-                "DO NOT guess. Respond with EXACTLY this:\n\n"
-                "  That's a great question — I don't have specific information about that yet.\n\n"
-                "  Tap **Talk to a human** in the menu (⋮) above and our team will help you directly.\n\n"
-                "  I'm happy to help with anything else I have information on!"
+                "[RULE 6 — WHEN YOU DON'T HAVE IT]\n"
+                "You have tools. For a PRODUCT, SAFETY or PRICING question, call the "
+                "relevant tool before concluding anything — those answers come from a "
+                "tool's record, never from memory or from the knowledge base's prose.\n"
+                "If a tool ran and found nothing, say so plainly; the platform turns "
+                "that into the visitor's next step.\n\n"
+                + _rule_6_common
             )
         else:
-            _rule_6 = (
-                "[RULE 6 — FALLBACK PROTOCOL]\n"
-                "When the KNOWLEDGE BASE is empty OR contains no relevant answer:\n"
-                "DO NOT guess. Respond with EXACTLY this:\n\n"
-                "  That's a great question — I don't have specific information about that yet.\n"
-                "  I'm happy to help with anything else I have information on!"
-            )
+            _rule_6 = "[RULE 6 — WHEN YOU DON'T HAVE IT]\n" + _rule_6_common
 
         system_message = f"""You are {bot_name}, the official AI assistant for {company_name}.
 
@@ -3630,8 +3738,7 @@ Every response must follow this structure:
 • Keep responses under 180 words unless the query genuinely requires more detail.
 • Never write walls of text. Break into short sections with a blank line between them.
 • If a comparison or spec table helps clarity, use one.
-• NEVER open by restating, summarizing, or re-answering your own previous reply in this conversation — the earlier AIMessage above is history, not something to repeat. Reference it only if the visitor explicitly asks about it (e.g. "what did you just say?"). If a turn produces nothing new to add, say plainly what is still missing or offer the team handoff — do not re-send the last answer padded with a new one in front of it.
-• NEVER open with a denial or fallback phrase ("I don't have specific information...", "I cannot provide...") in a reply that then goes on to answer anyway. If you have ANY relevant information to share this turn, lead with it directly — do not stitch a denial onto the front of a real answer. A denial opener is reserved for a turn where you truly have nothing relevant to offer; if what you have is partial, lead with the part you have and say plainly what specific piece is still missing, in that order.
+• NEVER open by restating, summarizing, or re-answering your own previous reply in this conversation — the earlier AIMessage above is history, not something to repeat. Reference it only if the visitor explicitly asks about it (e.g. "what did you just say?"). If a turn produces nothing new to add, say plainly what is still missing — do not re-send the last answer padded with a new one in front of it.
 
 [RULE 3 — STAY IN CHARACTER]
 Never say:
@@ -3650,36 +3757,16 @@ If the visitor directly asks where an answer came from, how you know it, what
 document or page it's from, or otherwise asks about your sources — do NOT
 restate your previous answer instead of addressing this (RULE 2 already
 forbids that), and do NOT ignore the question either. Say plainly and briefly
-that you're not able to share the specific document or source, and offer to
-connect them with the team if they'd like that verified directly. This is a
-DIFFERENT question from the one you just answered — treat it as its own
-question, not as a cue to repeat the prior answer.
+that you're not able to share the specific document or source, and stop there.
+This is a DIFFERENT question from the one you just answered — treat it as its
+own question, not as a cue to repeat the prior answer.
 
-[RULE 5 — ESCALATION TRIGGERS]
-The five bullets below are an EXHAUSTIVE allowlist, not general guidance — if
-the user's message does not clearly match one of them, escalation does NOT
-fire, no matter how important, business-critical, or unanswered the question
-is. Escalation ONLY fires when the user is expressing a PROBLEM or DISTRESS —
-NOT when they are asking for information, even information you don't have.
-
-ESCALATE when the user's message shows one of these active distress signals:
-  • Reporting a failure: "not working", "broken", "stopped working", "error", "crash", "bug"
-  • Disputing a charge: "wrong charge", "overcharged", "double charged", "didn't authorize"
-  • Requesting a refund: "refund", "cancel my subscription", "want my money back"
-  • Account emergency: "locked out", "can't log in", "account suspended", "account deleted"
-  • Explicit complaint: "this is unacceptable", "terrible", "very frustrated", "angry"
-  • Urgency marker alongside a problem: "urgent" + a problem description
-
-DO NOT escalate for:
-  • Informational questions about pricing, plans, or costs ("what does X cost?", "how much is the Pro plan?")
-  • General "how do I" questions
-  • Feature comparisons
-  • Billing questions that are informational ("when does my billing cycle reset?", "what payment methods do you accept?")
-  • Any "who/what/where/when" question about the business itself — staff, roles, departments, products, availability — no matter how specific or business-critical it sounds (e.g. "who is responsible for exports?" is information-seeking, not distress)
-  • A turn where you (or RULE 6) already offered to connect the visitor with the team because you don't have an answer on file — that handoff offer is its own separate, ordinary sentence in your reply. It is NOT a distress signal and must NEVER also trigger this rule's escalation line; the two are different mechanisms for different situations, and only one of them (this one) ever appends the line below.
-
-When escalation IS triggered, append ONLY this single line at the end:
-  "💬 Need immediate help? Contact {company_name} support directly."
+[RULE 5 — ESCALATION IS NOT YOURS TO DECIDE]
+Never append a "contact support directly" line, a handoff offer, or any other
+escalation prompt of your own. Whether this conversation should reach a person is
+decided outside your reply, from the visitor's own words and this turn's outcome,
+and the platform adds the way to do it. Your job is the answer, or a plain
+statement that you don't have one.
 
 {_rule_6}
 
@@ -3825,6 +3912,11 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
             # kb sources every path shares; the vertical-agent branch appends
             # tool sources once its round is done.
             _turn_sources: list = list(_kb_sources)
+            # Phase 5: the turn's settled §1.2 outcome, set by whichever branch runs
+            # and read in the shared `finally` for logging, the cache gate and the
+            # analytics columns. None means the stream died before it settled, which
+            # is itself the SYSTEM_ERROR the finally records.
+            _turn_outcome = None
             agent_gen_conn = None    # generator-owned conn for the vertical-agent path
             try:
                 # Vertical-agent path: the answer is already computed (see above);
@@ -3837,151 +3929,42 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     agent_gen_conn = get_db_connection()
                     agent_cursor = agent_gen_conn.cursor()
                     _captured = {}
+                    # One place per tool: dispatch + capture + availability all come
+                    # from services/agent_runtime/registry.py, so a tool change no
+                    # longer has to be mirrored into this closure by hand.
+                    _tool_ctx = agent_registry.ToolContext(
+                        company=company,
+                        cursor=agent_cursor,
+                        session_id=chat_req.session_id,
+                        visitor_id=chat_req.visitor_id,
+                        client_ip=get_remote_address(request),
+                        coa_configured=bool(_coa_folder_for(company)),
+                        # COA's throttle/lockout wiring still lives here; the runtime
+                        # calls it through this injection rather than importing main.
+                        runners={"get_coa": _run_get_coa},
+                    )
+                    _tool_executor = agent_registry.executor(_tool_ctx, _captured)
 
-                    def _tool_executor(tool_name, tool_args):
-                        # get_coa reaches Google Drive, not Postgres, so it is the one
-                        # async tool: this returns a coroutine and the agent loop awaits
-                        # it rather than blocking the event loop the stream runs on.
-                        if tool_name == "get_coa":
-                            # The SAME throttle identity the panel sends (§7): a
-                            # conversation that had its own allowance would be the
-                            # cheapest way to guess, and the model is the easiest
-                            # thing here to talk into trying once more.
-                            return _get_coa_observation(
-                                company, tool_args, _captured,
-                                visitor_id=chat_req.visitor_id,
-                                client_ip=get_remote_address(request))
-                        obs = execute_tool(tool_name, tool_args, agent_cursor, company["id"],
-                                           session_id=chat_req.session_id)
-                        # When get_sds resolves a real sheet, surface it as a deterministic
-                        # button payload — the model is told NOT to paste the link itself.
-                        if (tool_name == "get_sds" and isinstance(obs, dict)
-                                and obs.get("status") == "found" and obs.get("sds_url")):
-                            _captured["sds"] = {
-                                "url": obs["sds_url"],
-                                "product": (obs.get("product") or {}).get("name"),
-                                # Phase 5 — the picker's SDS card also shows CAS + updated
-                                # date, so the conversational path carries the same fields.
-                                "cas_number": (obs.get("product") or {}).get("cas_number"),
-                                "updated_at": obs.get("last_updated"),
-                                "label": "Open SDS",
-                            }
-                        # When request_quote prices a SKU (or logs a price-on-request),
-                        # surface the deterministic figures as a structured quote card — the
-                        # model is told to describe, not re-derive, these numbers.
-                        if (tool_name == "request_quote" and isinstance(obs, dict)
-                                and obs.get("status") in ("quoted", "price_on_request")):
-                            _captured["quote"] = {
-                                "status": obs["status"],
-                                "product": obs.get("product"),
-                                "grade": obs.get("grade"),
-                                "pack_size": obs.get("pack_size"),
-                                "quantity": obs.get("quantity"),
-                                "unit_price": obs.get("unit_price"),
-                                "subtotal": obs.get("subtotal"),
-                                "gst_rate": obs.get("gst_rate"),
-                                "currency": obs.get("currency") or "INR",
-                                "gst_note": obs.get("gst_note"),
-                                # Echo the model-parsed contact so the widget can confirm it
-                                # back to the visitor (Phase 2.5); None when none captured.
-                                "captured_contact": _captured_contact_echo(tool_args),
-                                # Phase 4: shareable, read-only quote page URL (None if the
-                                # record failed to persist). Drives the deterministic
-                                # "View & share quote" button + modal in the widget.
-                                "quote_url": obs.get("quote_url"),
-                            }
-                            # Every priced/POR quote is a warm lead → notify the owner in
-                            # real time (Phase 4b). Contact came in via the tool args.
-                            _captured["handoff"] = {
-                                "kind": "quote",
-                                "status": obs["status"],
-                                "product": obs.get("product"),
-                                "grade": obs.get("grade"),
-                                "pack_size": obs.get("pack_size"),
-                                "quantity": obs.get("quantity"),
-                                "unit_price": obs.get("unit_price"),
-                                "subtotal": obs.get("subtotal"),
-                                "gst_rate": obs.get("gst_rate"),
-                                "currency": obs.get("currency") or "INR",
-                                "is_por": obs["status"] == "price_on_request",
-                                "contact_name": tool_args.get("contact_name"),
-                                "contact_email": tool_args.get("contact_email"),
-                                "contact_phone": tool_args.get("contact_phone"),
-                            }
-                        # request_sample opens the structured form (Phase 4b form): surface a
-                        # {form} action so the widget renders it inline (prefilled with any
-                        # product/grade the model parsed). The record + spreadsheet push +
-                        # owner handoff happen on FORM SUBMIT (submit_sample_request), not here.
-                        if (tool_name == "request_sample" and isinstance(obs, dict)
-                                and obs.get("status") == "open_form"):
-                            _captured["form"] = {
-                                "form_id": obs.get("form_id") or "sample",
-                                "prefill": obs.get("prefill") or {},
-                            }
-                        # Phase 0a: when request_quote needs a grade, surface the options as
-                        # interactive pill chips in the widget — no typing, no spelling errors.
-                        if (tool_name == "request_quote" and isinstance(obs, dict)
-                                and obs.get("status") == "needs_grade"
-                                and obs.get("grades")):
-                            _captured["grade_selector"] = {
-                                "product": obs.get("product"),
-                                "grades": obs.get("grades", []),
-                                "grade_pack_map": obs.get("grade_pack_map", {}),
-                            }
-                        # Phase 0a: when request_quote needs a pack size, surface the options
-                        # as a dropdown + confirm button — ordered as returned by the catalog.
-                        if (tool_name == "request_quote" and isinstance(obs, dict)
-                                and obs.get("status") == "needs_pack"
-                                and obs.get("pack_sizes")):
-                            _captured["pack_selector"] = {
-                                "product": obs.get("product"),
-                                "grade": obs.get("grade"),
-                                "pack_sizes": obs.get("pack_sizes", []),
-                            }
-                        # Phase 2: product-discovery questions go through get_product_spec
-                        # (commercial spec), NOT request_quote — so without this they'd never
-                        # surface selection chips nor advance the funnel. Mirror the quote
-                        # flow: emit chips when there's a choice, and record the resolved
-                        # product into state so the stage moves browsing → qualifying/recommended.
-                        if tool_name == "get_product_spec" and isinstance(obs, dict):
-                            if obs.get("status") == "ambiguous" and obs.get("grades"):
-                                _captured["grade_selector"] = {
-                                    "product": obs.get("product"),
-                                    "grades": obs.get("grades", []),
-                                    "grade_pack_map": {},
-                                }
-                            elif obs.get("status") == "found":
-                                _prod = obs.get("product") or {}
-                                _packs = obs.get("pack_sizes") or []
-                                _captured["spec"] = {
-                                    "product": _prod.get("name"),
-                                    "grade": _prod.get("grade"),
-                                    "packaging": _prod.get("packaging"),
-                                }
-                                if len(_packs) > 1:
-                                    _captured["pack_selector"] = {
-                                        "product": _prod.get("name"),
-                                        "grade": _prod.get("grade"),
-                                        "pack_sizes": _packs,
-                                    }
-                                # spec-finder-plan Phase 4 — the resolved product name
-                                # goes through the SAME Drive resolver the panel uses,
-                                # so "send me the spec sheet for acetone" reaches the
-                                # same place as the hub card. Async, hence a coroutine:
-                                # get_coa set this precedent above and the agent loop
-                                # awaits whatever the executor returns. D8 — no new
-                                # tool; this extends what get_product_spec produces.
-                                if _spec_folder_for(company):
-                                    return _attach_spec_doc(company, obs, _captured)
-                        return obs
-
-                    agent_model = chat_model.bind_tools(build_tool_schemas(pack))
+                    # Availability-filtered: a tool the company isn't configured for
+                    # (get_coa with no Drive folder) is never offered to the model,
+                    # instead of being advertised and only able to say "not set up".
+                    agent_model = chat_model.bind_tools(
+                        agent_registry.build_schemas(pack, _tool_ctx)
+                    )
                     full_reply = AGENT_FALLBACK_TEXT
                     HEARTBEAT_SECONDS = 15
                     _rl = asyncio.get_running_loop()
                     _deadline = _rl.time() + AGENT_PRECOMPUTE_TIMEOUT_S
+                    # Phase 4: what the tools actually returned, so escalation sees a
+                    # real `not_found` instead of guessing from the reply's wording.
+                    _tool_trace: list = []
                     _agent_iter = stream_agent_loop(
-                        agent_model, messages, _tool_executor, usage_out=_agent_usage
+                        agent_model, messages, _tool_executor, usage_out=_agent_usage,
+                        # Round exhaustion composes over the tool results already in
+                        # hand rather than discarding them; the unbound model makes
+                        # that last round genuinely tool-free.
+                        compose_model=chat_model,
+                        trace_out=_tool_trace,
                     ).__aiter__()
                     # Pull each event as its own task so a heartbeat timeout does NOT
                     # cancel the in-flight round: on timeout we ping and keep awaiting
@@ -4076,6 +4059,36 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     # ordering), tool second.
                     _turn_sources = _turn_sources + _build_tool_sources(_captured)
 
+                    # ── SETTLE THE TURN (Phase 5) ─────────────────────────────
+                    # One place decides what this turn was, and the server writes
+                    # the refusal when there is nothing underneath the model's
+                    # wording. Everything downstream — the SSE text, the session
+                    # store, escalation, the cache gate, the analytics columns —
+                    # reads this instead of re-deriving it three different ways.
+                    _turn = agent_compose.settle(
+                        text=full_reply,
+                        tool_trace=_tool_trace,
+                        retrieved_doc_count=len(retrieved_docs),
+                        sources=_turn_sources,
+                        context={
+                            "product_name": (
+                                (_captured.get("quote") or {}).get("product")
+                                or (_captured.get("spec") or {}).get("product")
+                                or (_captured.get("sds") or {}).get("product")
+                            ),
+                        },
+                        attempt=1 if _prior_turn_refused(_prior_session_messages) else 0,
+                        # The loop's own give-up text is a system failure, not a
+                        # data gap — outcome 6 is never presented as outcome 4.
+                        system_error=(full_reply == AGENT_FALLBACK_TEXT),
+                        small_talk=len(chat_req.message.strip()) < 4,
+                    )
+                    full_reply = _turn.text
+                    _turn_outcome = _turn.state
+                    # settle can add a source of its own (a turn that needed no
+                    # lookup), so the logged attribution comes back from it.
+                    _turn_sources = _turn.sources
+
                     agent_sds = _captured.get("sds")
                     agent_quote = _captured.get("quote")
                     agent_form = _captured.get("form")
@@ -4101,6 +4114,23 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         yield f"data: {json.dumps({'coa': agent_coa})}\n\n"
                     if agent_spec_doc:
                         yield f"data: {json.dumps({'spec_doc': agent_spec_doc})}\n\n"
+
+                    # Capture-then-connect (plan §1.6): one server-owned decision,
+                    # vertical bots included — they used to be excluded outright.
+                    _escalate = _escalation_frame(
+                        message=chat_req.message,
+                        state=_turn_outcome,
+                        prior_messages=_prior_session_messages,
+                        human_handoff_enabled=bool(company.get("human_handoff_enabled")),
+                        lead_capture_enabled=bool(company.get("lead_capture_enabled")),
+                        tool_answered=bool(_captured),
+                        tool_trace=tuple(_tool_trace),
+                        # A grade/pack selector last turn means the visitor has already
+                        # answered a clarifying question; a dead end after that is one.
+                        disambiguated=bool((_prior_state or {}).get("missing")),
+                    )
+                    if _escalate:
+                        yield f"data: {json.dumps(_escalate)}\n\n"
 
                     # ── SESSION MEMORY: persist this turn on the gen-owned conn ──
                     if _session_active and full_reply:
@@ -4215,13 +4245,56 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         full_reply += content
                         yield f"data: {json.dumps({'token': content})}\n\n"
 
+                # Settle the generic turn too (Phase 5). `allow_rewrite=False`: the
+                # tokens are already on the visitor's screen, so this classifies the
+                # turn, it cannot rewrite it. The refusal's one voice reaches this
+                # path through RULE 6's wording instead.
+                _turn = agent_compose.settle(
+                    text=_strip_source_citation(full_reply),
+                    retrieved_doc_count=len(retrieved_docs),
+                    sources=_turn_sources,
+                    small_talk=len(chat_req.message.strip()) < 4,
+                    allow_rewrite=False,
+                )
+                _turn_outcome = _turn.state
+                _turn_sources = _turn.sources
+
+                # RULE 6 asks for the refusal sentence and nothing after it, because
+                # the platform supplies the next step (rule 9). On this path it does
+                # so by appending one more token — additive, so nothing the visitor
+                # already read has to change.
+                if (_turn_outcome is _TurnState.NO_DATA
+                        and agent_refusal.reads_as_refusal(full_reply)):
+                    _step = f" {agent_refusal.next_step()}"
+                    full_reply += _step
+                    yield f"data: {json.dumps({'token': _step})}\n\n"
+
+                # Same capture-then-connect decision as the vertical branch above,
+                # made here because the generic bot's answer only exists once the
+                # token stream has finished.
+                _escalate = _escalation_frame(
+                    message=chat_req.message,
+                    state=_turn_outcome,
+                    prior_messages=chat_req.history or [],
+                    human_handoff_enabled=bool(company.get("human_handoff_enabled")),
+                    lead_capture_enabled=bool(company.get("lead_capture_enabled")),
+                )
+                if _escalate:
+                    yield f"data: {json.dumps(_escalate)}\n\n"
+
                 # Sentinel signal for frontend (success path)
                 yield "data: [DONE]\n\n"
 
             except Exception as stream_err:
                 print(f"STREAM ERROR: {stream_err}")
+                _turn_outcome = _TurnState.SYSTEM_ERROR
                 yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
-            
+                # F2: without a terminal frame the widget's bubble types forever —
+                # no token ever renders, `[DONE]` never arrives so `isStreaming`
+                # never clears, and fetch-event-source resolves normally on a clean
+                # close so `onerror` never fires either. Always terminate.
+                yield "data: [DONE]\n\n"
+
             finally:
                 # Release the generator-owned agent connection (vertical path only).
                 if agent_gen_conn is not None:
@@ -4232,19 +4305,25 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                 full_reply = _strip_source_citation(full_reply)
 
                 if full_reply.strip():
-                    # 1. Async Cache Save (only for significant responses)
-                    if query_hash and len(full_reply) > 10:
+                    # This block also runs when the visitor closed the tab mid-answer
+                    # or the stream raised, so a turn that never settled is a
+                    # SYSTEM_ERROR — not a silently "answered" half-sentence.
+                    if _turn_outcome is None:
+                        _turn_outcome = _TurnState.SYSTEM_ERROR
+
+                    # 1. Async cache save, gated on the turn's outcome (D1/D2).
+                    if query_hash and _cacheable(_turn_outcome, full_reply):
                         background_tasks.add_task(save_cache_entry, company["id"], query_hash, full_reply)
 
-                    # 2. Unanswered Flagging & Analytics
-                    is_un_final = len(retrieved_docs) == 0
-                    if not is_un_final:
-                        is_un_final = any(phrase in full_reply.lower() for phrase in FALLBACK_PHRASES)
-                    if len(chat_req.message.strip()) < 4:
-                        is_un_final = False
-
-                    # Groundedness/confidence (0.0–1.0, or None when unknown).
-                    confidence = _compute_confidence(is_un_final, len(retrieved_docs), rerank_top_score)
+                    # 2. Unanswered flagging + analytics, both read off the settled
+                    #    outcome now (D3/D4). `is_unanswered` used to be "retrieval
+                    #    returned nothing OR the reply contains one of three English
+                    #    substrings", which called a correct tool-sourced price
+                    #    unanswered and a confident fabrication answered.
+                    is_un_final = _turn_outcome is not _TurnState.ANSWERED
+                    confidence = _confidence_for_state(
+                        _turn_outcome, len(retrieved_docs), rerank_top_score
+                    )
 
                     if byod_engine.routing_active(company["id"]):
                         # BYOD: store chat_log on the tenant DB, THEN meter
@@ -4272,6 +4351,10 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                             # _agent_usage already uses so both branches log the
                             # right sources here, not just the generic one.
                             sources=_turn_sources,
+                            # Migration 0037 — the versioned signal the dashboards
+                            # migrate onto; is_unanswered/confidence above are now
+                            # derived from this same value.
+                            turn_state=_turn_outcome.value,
                         )
 
                         # 3. Usage Tracking (Background Task)
@@ -4383,7 +4466,17 @@ async def _fire_slack(slack_url: str, bot_name: str, lead: dict):
 from services.email_provider import send_transactional_email, email_from_header as _email_from_header
 
 
-async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None):
+#: Why the visitor ended up here, in the owner's language rather than an enum value.
+_HANDOFF_CAUSE_LABELS = {
+    "person_requested": "asked to speak with a person",
+    "promise_requested": "asked for a price or commitment the bot can't authorise",
+    "repeat_refusal": "asked something the bot couldn't answer twice",
+    "dead_end_after_clarify": "answered a clarifying question and still hit a dead end",
+    "buying_intent": "showed buying intent",
+}
+
+
+async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list, visitor_email: str = None, visitor_name: str = None, cause: str = None):
     """Email the chat transcript to the business owner when a visitor requests human support."""
     if not owner_email:
         return
@@ -4405,11 +4498,12 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
     visitor_label = _html.escape(visitor_name or visitor_email or "Anonymous visitor")
     visitor_email_esc = _html.escape(visitor_email or "")
     reply_note = f"Reply directly to this email to reach <b>{visitor_label}</b> at <b>{visitor_email_esc}</b>." if visitor_email else "The visitor did not share their email. Use your bot's lead capture or contact page to follow up."
+    reason = _HANDOFF_CAUSE_LABELS.get(cause or "", "requested to speak with a human")
 
     html = f"""
     <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1e293b">
       <h2 style="margin:0 0 4px">🙋 Human Handoff Request</h2>
-      <p style="color:#64748b;margin:0 0 8px"><b>{visitor_label}</b> on <b>{bot_name_esc}</b> has requested to speak with a human.</p>
+      <p style="color:#64748b;margin:0 0 8px"><b>{visitor_label}</b> on <b>{bot_name_esc}</b> {_html.escape(reason)}.</p>
       <p style="color:#64748b;margin:0 0 20px">{reply_note}</p>
       {transcript_html}
       <p style="color:#94a3b8;font-size:12px;margin-top:24px">Sent by Sapybase</p>
@@ -4425,32 +4519,9 @@ async def _send_handoff_email(owner_email: str, bot_name: str, transcript: list,
 from services.agent_handoff import build_agent_request_slack_payload, build_agent_request_email
 
 
-_REPLY_TO_EMAIL_RE = re.compile(r"\A[^@\s]+@[^@\s]+\.[^@\s]+\Z")
-
-
-def _valid_reply_to(email) -> Optional[str]:
-    """Return a trimmed email only if it's well-shaped, else None (Phase 2.5).
-
-    The quote-handoff contact is model-supplied (the LLM parsed it from chat), so
-    it can't be trusted to be a real address before it becomes the email ``reply_to``
-    header. A malformed value is dropped rather than injected into the header."""
-    if not isinstance(email, str):
-        return None
-    e = email.strip()
-    return e if (e and len(e) <= 254 and _REPLY_TO_EMAIL_RE.match(e)) else None
-
-
-def _captured_contact_echo(args: dict) -> Optional[dict]:
-    """The contact the model captured, cleaned, for the widget to confirm back to
-    the visitor (Phase 2.5). The model parsed it from free-text chat, so echoing it
-    lets the visitor catch a mis-read before the lead goes out. Returns None when
-    nothing usable was captured."""
-    email = _valid_reply_to(args.get("contact_email"))
-    phone = (str(args.get("contact_phone") or "")).strip()[:32] or None
-    name = (str(args.get("contact_name") or "")).strip()[:120] or None
-    if not (email or phone):
-        return None
-    return {"name": name, "email": email, "phone": phone}
+# _valid_reply_to / _captured_contact_echo now live in
+# services/agent_runtime/contact.py (imported above under the same names) — the
+# quote tool's capture needs the same cleaning the mail path does.
 
 
 def _handoff_meets_tier(req: dict) -> bool:
@@ -5250,7 +5321,12 @@ async def request_human_handoff(
     background_tasks: BackgroundTasks,
     company: dict = Depends(verify_api_key_and_origin)
 ):
-    """Widget calls this when a visitor clicks 'Talk to a human'. Emails the transcript to the owner."""
+    """Emails the transcript to the owner when a visitor asks for a person.
+
+    Called on every route to a human now, including the configured-redirect one
+    (plan §1.6): that path used to open the wa.me link and stop there, so the owner
+    got a message from a stranger with no name, no email and no conversation.
+    """
     if not company.get("human_handoff_enabled"):
         raise HTTPException(status_code=402, detail="Human handoff is not enabled on this plan.")
     transcript = [{"role": m.role, "content": m.content} for m in payload.transcript]
@@ -5258,7 +5334,7 @@ async def request_human_handoff(
     bot_name = company.get("bot_name", "AI Assistant")
     background_tasks.add_task(
         _send_handoff_email, owner_email, bot_name, transcript,
-        payload.visitor_email, payload.visitor_name
+        payload.visitor_email, payload.visitor_name, payload.cause
     )
     return {"status": "ok", "handoff_redirect_url": company.get("handoff_redirect_url")}
 
@@ -6653,25 +6729,6 @@ async def _run_get_coa(company: dict, args: dict, *, visitor_id: Optional[str] =
                        "Confirm you have found it — do not paste a link, do not name "
                        "the file, and do not state anything the certificate contains."}
 
-
-async def _get_coa_observation(company: dict, args: dict, captured: dict, *,
-                               visitor_id: Optional[str] = None,
-                               client_ip: Optional[str] = None) -> dict:
-    """Run ``get_coa`` and split its result: the widget's half out, the model's half back.
-
-    A lockout is captured as well as a certificate, so a visitor who is inside a
-    cooldown finds the panel already disabled when they reach it from the conversation
-    (§7) rather than discovering it by pressing Request.
-    """
-    obs = await _run_get_coa(company, args, visitor_id=visitor_id, client_ip=client_ip)
-    rows = obs.pop("_rows", None)
-    lockout = obs.pop("_lockout", None)
-    if rows is not None:
-        captured["coa"] = {"status": obs.get("status"), "results": rows,
-                           "query": (args.get("query") or "").strip()}
-    elif lockout:
-        captured["coa"] = {"status": "locked_out", "results": [], "retry_after": lockout}
-    return obs
 
 
 # Specification finder Phase 3 (docs/spec-finder-plan.md §6). The one message the

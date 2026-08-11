@@ -1,15 +1,14 @@
-"""Vertical-agent runtime — the ReAct (Reason → Act → Observe) loop + tools.
+"""Vertical-agent tool bodies + the system directive.
 
-Phase 1 of the chemical-vertical-agent plan (§9). This module is the *behaviour*
-half of the pack machinery whose *shape* lives in ``packs/``. It holds:
+This module is the *behaviour* half of the pack machinery whose *shape* lives in
+``packs/``. It is mid-migration: the ReAct loop and the tool dispatch have moved to
+``services/agent_runtime/`` (loop.py, registry.py, tools/), and the deterministic
+tool bodies below follow in the restructure plan's Phase 6, which deletes this file.
+What is left here:
 
-  - ``get_sds``           — the one Phase 1 tool: a deterministic, tenant-scoped
-                            lookup of a product's real Safety Data Sheet URL.
-  - ``execute_tool``      — dispatch a model-requested tool name to its function.
-  - ``build_tool_schemas``— turn a Pack's declared tools into function-call
-                            declarations for ``ChatGoogleGenerativeAI.bind_tools``.
+  - ``get_sds`` / ``get_product_spec`` / ``request_quote`` / ``request_sample`` —
+    the deterministic, tenant-scoped lookups the registry's tools wrap.
   - ``build_agent_directive`` — the high-priority safety/tool-use system block.
-  - ``run_agent_loop``    — the bounded ReAct loop (Reason → Act → Observe → text).
 
 THE non-negotiable guardrail (plan §5): safety / SDS / handling / dosage /
 storage / regulatory answers come ONLY from a tool that pulls the real document —
@@ -25,33 +24,17 @@ Design constraints discovered in the codebase (must hold):
 """
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import os
 import re
 import secrets
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional
-
-from langchain_core.messages import ToolMessage
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Bounds: a vertical answer is at most this many Reason→Act rounds, and we never
-# run more than this many tool calls in a single round. Prevents an LLM that keeps
-# requesting tools from looping forever or draining the budget.
-# Phase 5 raised rounds 3→4: qualification means the model both answers a product
-# question AND reasons about weaving in a discovery question, which can need one
-# extra tool round (e.g. spec → quote) within a single turn.
-MAX_TOOL_ROUNDS = 4
-MAX_CALLS_PER_ROUND = 4
-
-# Shown when the agent cannot produce a grounded answer (LLM error, exhausted
-# rounds, or a tool failure). Always routes to a human — never guesses.
-AGENT_FALLBACK_TEXT = (
-    "I'm having trouble reaching our product system right now — let me connect "
-    "you with our team so they can help you directly."
-)
+# Loop bounds and the ungrounded-answer fallback live with the loop itself, in
+# services/agent_runtime/loop.py; re-exported at the bottom of this module.
 
 
 # ── Deterministic tools ──────────────────────────────────────────────────────
@@ -1107,97 +1090,9 @@ def _session_has_capture(cursor, company_id, session_id) -> bool:
         return False
 
 
-def execute_tool(name: str, args: Dict[str, Any], cursor, company_id,
-                 session_id: Optional[str] = None) -> Dict[str, Any]:
-    """Dispatch a model-requested tool to its deterministic implementation.
-
-    An unknown tool name (a hallucinated tool, or one not wired yet) returns a
-    benign error observation rather than raising — the model recovers and answers
-    normally or escalates.
-
-    ``session_id`` ties side-effecting tools (``request_quote``) to the visitor's
-    conversation so ``quote_requests.session_id`` is populated for funnel/BI joins
-    (Phase 1.2); it is threaded through from the chat handler.
-    """
-    if name == "get_sds":
-        return get_sds(
-            cursor,
-            company_id,
-            cas_number=args.get("cas_number"),
-            product_name=args.get("product_name"),
-            grade=args.get("grade"),
-        )
-    if name == "get_product_spec":
-        return get_product_spec(
-            cursor,
-            company_id,
-            cas_number=args.get("cas_number"),
-            product_name=args.get("product_name"),
-            grade=args.get("grade"),
-        )
-    if name == "request_quote":
-        return request_quote(
-            cursor,
-            company_id,
-            product_name=args.get("product_name"),
-            cas_number=args.get("cas_number"),
-            grade=args.get("grade"),
-            pack_size=args.get("pack_size"),
-            quantity=args.get("quantity"),
-            contact_name=args.get("contact_name"),
-            contact_email=args.get("contact_email"),
-            contact_phone=args.get("contact_phone"),
-            session_id=session_id,
-        )
-    if name == "request_sample":
-        return request_sample(
-            cursor,
-            company_id,
-            product_name=args.get("product_name"),
-            cas_number=args.get("cas_number"),
-            grade=args.get("grade"),
-        )
-    return {
-        "status": "error",
-        "message": (
-            f"Tool '{name}' is not available. Do not use it; answer from what you "
-            "have or offer to connect the visitor to the team."
-        ),
-    }
-
-
-# ── Pack → function-calling declarations ─────────────────────────────────────
-
-def build_tool_schemas(pack) -> List[Dict[str, Any]]:
-    """Convert a Pack's declared tools into ``bind_tools`` function schemas.
-
-    Slots become string parameters; ``required=True`` slots are marked required.
-    (``get_sds`` has no individually-required slot — CAS *or* name suffices — so
-    its required list is empty; the description tells the model it needs one.)
-    """
-    schemas: List[Dict[str, Any]] = []
-    for tool in pack.tools:
-        properties: Dict[str, Any] = {}
-        required: List[str] = []
-        for slot in tool.slots:
-            properties[slot.name] = {
-                "type": "string",
-                "description": slot.description or slot.name,
-            }
-            if slot.required:
-                required.append(slot.name)
-        schemas.append(
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": properties,
-                    "required": required,
-                },
-            }
-        )
-    return schemas
+# Tool dispatch and pack->schema conversion moved to
+# services/agent_runtime/registry.py, where a tool's executor, capture shape and
+# availability live together and a boot assertion holds them to the pack.
 
 
 def build_agent_directive(pack) -> str:
@@ -1320,210 +1215,13 @@ def build_agent_directive(pack) -> str:
     )
 
 
-# ── The bounded ReAct loop ───────────────────────────────────────────────────
-
-def _content_to_text(content: object) -> str:
-    """Flatten a LangChain message content (str | list of parts) to plain text."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for chunk in content:
-            if isinstance(chunk, dict):
-                parts.append(chunk.get("text", ""))
-            elif isinstance(chunk, str):
-                parts.append(chunk)
-        return "".join(parts)
-    return str(content) if content is not None else ""
-
-
-def _accumulate_usage(usage_out: Optional[Dict[str, int]], response) -> None:
-    """Fold one model response's token usage into ``usage_out`` (Phase 6 metering).
-
-    LangChain surfaces per-call counts on ``AIMessage.usage_metadata`` as
-    ``{input_tokens, output_tokens, total_tokens}``. We SUM across the agent's
-    tool-loop rounds so the caller sees the whole turn's cost. Best-effort: a model
-    that doesn't report usage (or a malformed blob) simply contributes nothing —
-    metering must never affect the answer or raise.
-
-    Phase 6 Slice B: also captures ``cached_tokens`` — the ``cache_read`` count
-    LangChain nests under ``usage_metadata["input_token_details"]``. This is how
-    Gemini reports an IMPLICIT context-cache hit (automatic on 2.x models, no
-    ``cached_content`` wiring needed on our side); explicit caching turned out
-    to require a 32,768-token static prefix we don't have, so this is the only
-    caching signal currently reachable — surfaced purely for visibility.
-    """
-    if usage_out is None:
-        return
-    try:
-        meta = getattr(response, "usage_metadata", None) or {}
-        for key in ("input_tokens", "output_tokens", "total_tokens"):
-            val = meta.get(key)
-            if isinstance(val, (int, float)) and val > 0:
-                usage_out[key] = usage_out.get(key, 0) + int(val)
-        cache_read = (meta.get("input_token_details") or {}).get("cache_read")
-        if isinstance(cache_read, (int, float)) and cache_read > 0:
-            usage_out["cached_tokens"] = usage_out.get("cached_tokens", 0) + int(cache_read)
-    except Exception:
-        pass
-
-
-def _finish_reason(response) -> Optional[str]:
-    """Best-effort read of Gemini's per-call finish reason (STOP/MAX_TOKENS/...).
-
-    Surfaced so a fallback caused by hitting the token cap mid-thought is
-    distinguishable in logs from a real API error or an exhausted round budget —
-    previously all three looked identical.
-    """
-    try:
-        return (getattr(response, "response_metadata", None) or {}).get("finish_reason")
-    except Exception:
-        return None
-
-
-# Friendly, visitor-safe phrases for the streaming status ticker (Phase 1). The
-# widget shows these while a tool round runs; raw tool identifiers are never sent.
-_TOOL_STATUS_PHRASES = {
-    "get_sds": "Looking up the safety data sheet…",
-    "request_quote": "Checking pricing…",
-    "request_sample": "Preparing the sample request…",
-    "get_product_spec": "Finding the product…",
-}
-
-
-def _tool_status_phrase(tool_name: Optional[str]) -> str:
-    """Map a tool name to a visitor-safe status phrase (generic for unknown tools)."""
-    return _TOOL_STATUS_PHRASES.get(tool_name or "", "Working on it…")
-
-
-async def stream_agent_loop(
-    model,
-    messages: List[Any],
-    tool_executor: Callable[[str, Dict[str, Any]], Dict[str, Any]],
-    *,
-    max_rounds: int = MAX_TOOL_ROUNDS,
-    max_calls_per_round: int = MAX_CALLS_PER_ROUND,
-    usage_out: Optional[Dict[str, int]] = None,
-) -> AsyncIterator[Dict[str, Any]]:
-    """Async-generator form of :func:`run_agent_loop` (Phase 1 streaming).
-
-    Yields progress events so the SSE layer can show motion during the blocking
-    tool rounds instead of a dead spinner:
-      * ``{"type": "status", "tool": <name>, "label": <friendly phrase>}`` — emitted
-        just before each tool call executes.
-      * ``{"type": "final", "text": <answer>}`` — emitted exactly once at the end,
-        carrying the settled answer (or ``AGENT_FALLBACK_TEXT``).
-
-    Round budget, empty-response retry, MAX_TOKENS logging and ``usage_out`` metering
-    are byte-for-byte identical to the old ``run_agent_loop`` (now a thin drain of
-    this generator). The final answer is still produced by a blocking ``ainvoke`` —
-    token-level streaming of the compose is a later slice, since it entangles with
-    the empty-retry guard that fixed the truncation bug.
-    """
-    convo = list(messages)
-    for _round in range(max_rounds):
-        try:
-            response = await model.ainvoke(convo)
-        except Exception:
-            logger.exception("agent loop: model.ainvoke failed")
-            yield {"type": "final", "text": AGENT_FALLBACK_TEXT}
-            return
-
-        _accumulate_usage(usage_out, response)
-        finish_reason = _finish_reason(response)
-        if finish_reason == "MAX_TOKENS":
-            logger.warning("agent loop: round %d hit MAX_TOKENS", _round)
-
-        tool_calls = getattr(response, "tool_calls", None) or []
-        if not tool_calls:
-            text = _content_to_text(getattr(response, "content", ""))
-            if text:
-                yield {"type": "final", "text": text}
-                return
-            # Empty content + no tool call is usually a one-off token-budget roll
-            # (thinking consumed the round) rather than a real failure — screenshot
-            # evidence showed the very next turn often succeeds unprompted. Retry
-            # once before giving up on the whole turn.
-            logger.warning(
-                "agent loop: empty response (finish_reason=%s), retrying once", finish_reason
-            )
-            try:
-                retry_response = await model.ainvoke(convo)
-            except Exception:
-                logger.exception("agent loop: retry model.ainvoke failed")
-                yield {"type": "final", "text": AGENT_FALLBACK_TEXT}
-                return
-            _accumulate_usage(usage_out, retry_response)
-            retry_finish_reason = _finish_reason(retry_response)
-            if retry_finish_reason == "MAX_TOKENS":
-                logger.warning("agent loop: retry hit MAX_TOKENS")
-            retry_tool_calls = getattr(retry_response, "tool_calls", None) or []
-            if retry_tool_calls:
-                response, tool_calls = retry_response, retry_tool_calls
-            else:
-                yield {
-                    "type": "final",
-                    "text": _content_to_text(getattr(retry_response, "content", ""))
-                    or AGENT_FALLBACK_TEXT,
-                }
-                return
-
-        # Reason produced tool calls → Act + Observe, then loop to let the model
-        # read the results and (usually) answer on the next round.
-        convo.append(response)
-        for call in tool_calls[:max_calls_per_round]:
-            yield {
-                "type": "status",
-                "tool": call.get("name"),
-                "label": _tool_status_phrase(call.get("name")),
-            }
-            try:
-                observation = tool_executor(call.get("name"), call.get("args") or {})
-                # A tool may be async — `get_coa` reaches Google Drive, which must not
-                # block the event loop the SSE stream is running on. Sync tools (every
-                # DB-backed one) are unaffected: they never return an awaitable.
-                if inspect.isawaitable(observation):
-                    observation = await observation
-            except Exception:
-                logger.exception("agent loop: tool '%s' failed", call.get("name"))
-                observation = {
-                    "status": "error",
-                    "message": "The lookup failed. Offer to connect the visitor to the team.",
-                }
-            convo.append(
-                ToolMessage(
-                    content=json.dumps(observation, default=str),
-                    tool_call_id=call.get("id") or "",
-                )
-            )
-
-    # Ran the round budget without the model settling on a text answer.
-    logger.warning("agent loop: exhausted %d rounds without a text answer", max_rounds)
-    yield {"type": "final", "text": AGENT_FALLBACK_TEXT}
-
-
-async def run_agent_loop(
-    model,
-    messages: List[Any],
-    tool_executor: Callable[[str, Dict[str, Any]], Dict[str, Any]],
-    *,
-    max_rounds: int = MAX_TOOL_ROUNDS,
-    max_calls_per_round: int = MAX_CALLS_PER_ROUND,
-    usage_out: Optional[Dict[str, int]] = None,
-) -> str:
-    """Run Reason → Act → Observe until the model returns text, bounded.
-
-    Thin drain of :func:`stream_agent_loop`: returns only the final answer text and
-    discards the progress events, preserving the exact prior contract (including the
-    ``AGENT_FALLBACK_TEXT`` degrade path and ``usage_out`` metering) for callers that
-    do not stream.
-    """
-    final_text = AGENT_FALLBACK_TEXT
-    async for event in stream_agent_loop(
-        model, messages, tool_executor,
-        max_rounds=max_rounds, max_calls_per_round=max_calls_per_round,
-        usage_out=usage_out,
-    ):
-        if event.get("type") == "final":
-            final_text = event.get("text") or AGENT_FALLBACK_TEXT
-    return final_text
+# The bounded ReAct loop now lives in services/agent_runtime/loop.py (extracted
+# pure, over the tool registry). Re-exported here so existing importers keep
+# working until the Phase 6 cutover deletes this module.
+from services.agent_runtime.loop import (  # noqa: E402
+    AGENT_FALLBACK_TEXT,
+    MAX_CALLS_PER_ROUND,
+    MAX_TOOL_ROUNDS,
+    run_agent_loop,
+    stream_agent_loop,
+)

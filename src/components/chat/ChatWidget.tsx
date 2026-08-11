@@ -34,7 +34,7 @@ import {
   type SpecSearchStatus,
   type WidgetFeatures,
 } from './panels';
-import { leadCaptureSchema, handoffSchema, firstIssue } from '@/src/lib/validation/schemas';
+import { leadCaptureSchema, firstIssue } from '@/src/lib/validation/schemas';
 import { FAB_SHAPES, resolveAvatarBg } from '../ui/avatar/AvatarShared';
 import {
   ArrowBackIcon,
@@ -371,67 +371,36 @@ export const FabWidgetPreview = ({ shapeId, logoUrl, botName, themeColor, bgStyl
   );
 };
 
-// ── LeadCaptureForm ───────────────────────────────────────────────────────────
+// ── ConnectForm ───────────────────────────────────────────────────────────────
 
-function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey, contextString, error: externalError }: {
-  onSubmit: (name: string, bookingUrl?: string) => void; onDismiss: () => void; themeColor: string;
-  activeApiUrl: string; apiKey: string; contextString: string; error?: string;
+// The one capture-then-connect form (agent-runtime-restructure plan §1.6). It
+// replaces the separate lead-capture and handoff forms, which asked for the same
+// two fields in the same place and differed only in where they posted — a decision
+// the server now makes for us and sends down as `destination` on the escalate event.
+// Purely presentational: the parent owns both submit paths.
+function ConnectForm({ themeColor, title, buttonLabel, onSubmit, onDismiss, error: externalError }: {
+  themeColor: string; title: React.ReactNode; buttonLabel: string;
+  onSubmit: (email: string, name: string) => Promise<void>; onDismiss: () => void; error?: string;
 }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [localError, setLocalError] = useState(externalError || '');
+  const [error, setError] = useState(externalError || '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError('');
+    setError('');
     const parsed = leadCaptureSchema.safeParse({ email, name });
     const issue = firstIssue(parsed);
     if (issue || !parsed.success) {
-      setLocalError(issue || 'Invalid input.');
+      setError(issue || 'Invalid input.');
       return;
     }
     setIsSubmitting(true);
     try {
-      const w = (typeof window !== 'undefined' ? (window as any) : {});
-      const parentOrigin = w.__SapybaseParentOrigin || '';
-      // Attribution (best-effort): the loader can expose the merchant page URL via
-      // __SapybaseParentUrl; otherwise document.referrer is the next-best signal.
-      // UTM is parsed here as a backup — the backend also backfills from page_url.
-      const pageUrl = w.__SapybaseParentUrl || (typeof document !== 'undefined' ? document.referrer : '') || '';
-      const referrer = (typeof document !== 'undefined' ? document.referrer : '') || '';
-      let utmSource: string | undefined, utmMedium: string | undefined, utmCampaign: string | undefined;
-      try {
-        const q = new URL(pageUrl).searchParams;
-        utmSource = q.get('utm_source') || undefined;
-        utmMedium = q.get('utm_medium') || undefined;
-        utmCampaign = q.get('utm_campaign') || undefined;
-      } catch { /* pageUrl not a parseable URL — skip UTM */ }
-      const res = await fetch(`${activeApiUrl}/api/leads/capture`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
-        },
-        body: JSON.stringify({
-          email: parsed.data.email,
-          name: parsed.data.name ?? '',
-          context: contextString,
-          page_url: pageUrl || undefined,
-          referrer: referrer || undefined,
-          utm_source: utmSource,
-          utm_medium: utmMedium,
-          utm_campaign: utmCampaign,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to submit.');
-      // Speed-to-lead: the backend returns booking_url only for qualified leads
-      // when the owner has set a scheduling link.
-      onSubmit(name, typeof data.booking_url === 'string' ? data.booking_url : undefined);
+      await onSubmit(parsed.data.email.toLowerCase(), (parsed.data.name ?? '').trim());
     } catch {
-      setLocalError('Something went wrong. Please try again.');
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -440,60 +409,7 @@ function LeadCaptureForm({ onSubmit, onDismiss, themeColor, activeApiUrl, apiKey
   return (
     <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
       <h4 className="text-sm font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
-        Leave your details<br />and we'll follow up!
-      </h4>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-        <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
-          className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-[16px] font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
-        <div className="flex flex-col gap-1">
-          <input type="email" placeholder="Email address (required)" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-[16px] font-regular font-google text-gray-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--sapy-theme)] focus:border-[var(--sapy-theme)]" />
-          {localError && <span className="text-[11px] text-red-500 font-bold px-1">{localError}</span>}
-        </div>
-        <button type="submit" disabled={isSubmitting}
-          className="w-full mt-1 rounded-full py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
-          style={{ backgroundColor: themeColor }}>
-          {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Submit'}
-        </button>
-      </form>
-      <div className="text-center mt-3">
-        <button onClick={onDismiss} type="button"
-          className="text-sm font-regular font-google text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-none py-3 px-2 w-full min-h-[44px]">
-          No thanks
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── HandoffContactForm ────────────────────────────────────────────────────────
-
-function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
-  themeColor: string; onSubmit: (email: string, name: string) => Promise<void>; onDismiss: () => void;
-}) {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    const parsed = handoffSchema.safeParse({ email });
-    const issue = firstIssue(parsed);
-    if (issue || !parsed.success) {
-      setError(issue || 'Invalid input.');
-      return;
-    }
-    setIsSubmitting(true);
-    await onSubmit(parsed.data.email.toLowerCase(), name.trim());
-    setIsSubmitting(false);
-  };
-
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm space-y-3 w-full self-start text-left mt-2 relative">
-      <h4 className="text-sm font-google font-bold text-gray-800 dark:text-slate-200 text-center uppercase tracking-widest text-[12px] mb-2 leading-tight">
-        Share your details<br />so our team can reach you
+        {title}
       </h4>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <input type="text" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)}
@@ -506,7 +422,7 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
         <button type="submit" disabled={isSubmitting}
           className="w-full mt-1 rounded-full py-2 text-sm font-regular font-google text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center min-h-[44px]"
           style={{ backgroundColor: themeColor }}>
-          {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Notify the team'}
+          {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : buttonLabel}
         </button>
       </form>
       <div className="text-center mt-3">
@@ -525,14 +441,19 @@ function HandoffContactForm({ themeColor, onSubmit, onDismiss }: {
 // plan) - a result is never attached to a Message; see sdsSelected/pendingSds.
 type SdsResult = { url: string; product?: string; cas_number?: string; updated_at?: string; label?: string };
 
+// Where a connect_form posts, decided server-side by the bot's entitlement and
+// carried on the escalate event (plan §1.6) — never guessed by the widget.
+type ConnectDestination = 'handoff' | 'lead_capture';
+
 type Message = {
-  role: 'user' | 'bot' | 'lead_capture' | 'handoff_form' | 'handoff_confirmed' | 'lead_confirmed';
+  role: 'user' | 'bot' | 'connect_form' | 'handoff_confirmed' | 'lead_confirmed';
   content?: string;
   isStreaming?: boolean;
   id?: string;
   visitorEmail?: string;
   redirectUrl?: string;
   bookingUrl?: string;
+  connect?: { destination: ConnectDestination; cause?: string };
   quote?: {
     status: 'quoted' | 'price_on_request';
     product?: string; grade?: string; pack_size?: string; quantity?: number;
@@ -614,6 +535,7 @@ type ConfigData = {
   custom_logo_url: string;
   avatar_bg_style: string;
   lead_capture_enabled?: boolean;
+  human_handoff_enabled?: boolean;
   white_label_enabled?: boolean;
   hub_cards?: HubCard[];
   products?: ProductOption[];
@@ -1848,12 +1770,9 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (activeApiKey) void getSessionToken();
   }, [activeApiKey, getSessionToken]);
 
-  const leadCaptureEnabledRef = useRef(false);
-  // A vertical/pack bot (hub cards present) runs its OWN structured capture via
-  // agent tools — request_quote's contact step, the sample form, handoff. The
-  // generic keyword-heuristic lead form must NOT fire over those flows (it pops
-  // mid-quote while the agent is still asking for grade/pack size). Mirror the
-  // signal in a ref so the streaming [DONE] handler reads it without stale state.
+  // A vertical/pack bot (hub cards present). Still needed for the session-history
+  // fetch below; it no longer gates capture, which the server now decides for every
+  // bot alike (plan §1.6 retired the `!isVerticalBotRef` exclusion).
   const isVerticalBotRef = useRef(false);
 
   useEffect(() => {
@@ -1882,6 +1801,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             custom_logo_url: data.custom_logo_url || '',
             avatar_bg_style: data.avatar_bg_style || 'none',
             lead_capture_enabled: data.lead_capture_enabled || false,
+            human_handoff_enabled: data.human_handoff_enabled === true,
             white_label_enabled: data.white_label_enabled === true,
             hub_cards: Array.isArray(data.hub_cards) ? data.hub_cards : [],
             products: Array.isArray(data.products) ? data.products : [],
@@ -1889,7 +1809,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             handoff_redirect_url: data.human_handoff_enabled ? (data.handoff_redirect_url || '') : '',
             features: (data.features && typeof data.features === 'object') ? data.features : {},
           });
-          leadCaptureEnabledRef.current = data.lead_capture_enabled || false;
           // A pack-enabled bot is signalled by `vertical` (most precise) or, as a
           // fallback, the presence of hub cards.
           isVerticalBotRef.current = Boolean(data.vertical)
@@ -2927,6 +2846,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // returns needs_grade / needs_pack. Attached to the bot message at [DONE].
     let pendingGradeSelector: Message['grade_selector'] | null = null;
     let pendingPackSelector: Message['pack_selector'] | null = null;
+    // Capture-then-connect (plan §1.6): the server decided this turn should reach a
+    // person and told us where the form posts. Acted on at [DONE], after the reply.
+    let pendingEscalate: { destination: ConnectDestination; cause?: string } | null = null;
+    // Set by an {error:...} frame (audit F2). Kept out here so [DONE] can still put
+    // it in the bubble if the typewriter buffer wasn't mounted when it arrived.
+    let streamErrorText = '';
     const SSE_MAX_RETRIES = 1;
     try {
       const parentOriginChat = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
@@ -3013,7 +2938,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
         },
         onmessage(msg) {
           if (msg.data === '[DONE]') {
-            const fullContent = streamingCallbackRef.current?.flush?.() || '';
+            const fullContent = streamingCallbackRef.current?.flush?.() || streamErrorText;
             streamingCallbackRef.current = null;
             setMessages(prev => {
               const updated = [...prev];
@@ -3047,31 +2972,36 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
             // they choose. Deferred a frame so isNearBottom reads the FINAL height
             // (the message just jumped from typed-out text to full content).
             requestAnimationFrame(() => { if (!isNearBottom()) setShowJumpPill(true); });
-            if (leadCaptureEnabledRef.current && !leadCapturedRef.current && !leadFormShownRef.current && !isVerticalBotRef.current) {
-              const lowerReply = fullContent.toLowerCase();
-              const lowerUserMsg = userMessage.toLowerCase();
-              const userBuyingIntent = ['quote', 'pricing', 'how much', 'cost', 'buy', 'purchase', 'hire', 'sign up', 'get started', 'book a', 'schedule', 'free trial', 'demo', 'subscribe'];
-              const userHumanIntent = ['talk to a human', 'speak to someone', 'speak to a person', 'real person', 'contact you', 'contact us', 'reach out', 'get in touch', 'help me', 'i need help', 'support team', 'sales team'];
-              const fallbackPhrases = ['does not appear in my knowledge base', "don't have information on that", 'please reach out to', 'contact our support', "i'm not sure", 'i do not have'];
-              const isUserBuying = userBuyingIntent.some(w => lowerUserMsg.includes(w));
-              const isUserAskingForHuman = userHumanIntent.some(w => lowerUserMsg.includes(w));
-              const isFallback = fallbackPhrases.some(w => lowerReply.includes(w));
-              if (isUserBuying || isUserAskingForHuman || isFallback) {
-                leadFormShownRef.current = true;
-                setTimeout(() => {
-                  setMessages(prev => {
-                    if (prev.some(m => m.role === 'lead_capture')) return prev;
-                    return [...prev, { role: 'lead_capture', id: 'lead-form' }];
-                  });
-                  setTimeout(() => forceScrollToBottom(true), 100);
-                }, 1500);
-              }
+            // Capture-then-connect: the decision arrived on the wire (plan §1.6).
+            // Three keyword lists used to live here and they only ran for generic
+            // bots; the same triggers now run server-side for every bot, so this is
+            // purely "render the form the server asked for", once per conversation.
+            if (pendingEscalate && !leadCapturedRef.current && !leadFormShownRef.current) {
+              const escalate = pendingEscalate;
+              leadFormShownRef.current = true;
+              setTimeout(() => {
+                setMessages(prev => {
+                  if (prev.some(m => m.role === 'connect_form')) return prev;
+                  return [...prev, { role: 'connect_form', id: 'connect-form', connect: escalate }];
+                });
+                setTimeout(() => forceScrollToBottom(true), 100);
+              }, 1500);
             }
             return;
           }
           let chunk = '';
           try {
             const parsed = JSON.parse(msg.data);
+            // {error:...} — the stream broke server-side. Nothing here used to
+            // handle it, so no token ever rendered and the bubble typed forever
+            // (audit F2). The backend now always follows this with [DONE]; this
+            // branch is what puts something readable in the bubble before it.
+            if (typeof parsed.error === 'string') {
+              streamErrorText = "Sorry - something went wrong at my end and I lost that answer. Please try again.";
+              if (!firstChunkReceived) { firstChunkReceived = true; setIsLoading(false); }
+              streamingCallbackRef.current?.push?.(streamErrorText);
+              return;
+            }
             // Structured side-channel: the agent emits {sds:{url,...}} so the
             // widget opens the persistent SDS panel with this result pinned
             // (no raw link typed by the model).
@@ -3122,6 +3052,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
               pendingPackSelector = parsed.pack_selector as Message['pack_selector'];
               return;
             }
+            // {escalate:{cause,destination}} — the server's §1.5 triggers, which
+            // replaced the three keyword lists this component used to sniff with.
+            if (parsed.escalate && (parsed.escalate.destination === 'handoff' || parsed.escalate.destination === 'lead_capture')) {
+              pendingEscalate = { destination: parsed.escalate.destination, cause: parsed.escalate.cause };
+              return;
+            }
             chunk = parsed.token || parsed.content || parsed.text || '';
           } catch {
             chunk = msg.data;
@@ -3163,32 +3099,48 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     }
   };
 
-  const handleHandoff = () => {
-    setShowMenu(false);
-    // A configured contact link (e.g. wa.me) skips the name/email form entirely —
-    // straight to instant connection, no backend call for this path.
-    if (configData.handoff_redirect_url) {
-      window.open(configData.handoff_redirect_url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    if (handoffSent) return;
-    setMessages(prev => [
-      ...prev,
-      { role: 'bot', content: "I'll connect you with our team! Share your email so they can reply to you directly. 👇", ts: Date.now() },
-      { role: 'handoff_form', id: 'handoff-form' },
-    ]);
+  // Mirrors the server's escalation.destination(): entitlement, not the trigger,
+  // decides which endpoint the form can post to. Kept here for the manual routes
+  // (the ⋮ menu, the COA dead end), which don't arrive on an escalate event.
+  const connectDestination = (): ConnectDestination | null => {
+    if (configData.human_handoff_enabled) return 'handoff';
+    if (configData.lead_capture_enabled) return 'lead_capture';
+    return null;
   };
 
-  // The COA panel's way out (L2). The handoff form renders as a chat message, so the
-  // panel has to step aside for the visitor to see it — but a configured contact link
-  // opens a new tab instead and produces no message, and closing the panel for that
-  // would take a released certificate off screen for nothing.
+  const handleHandoff = () => {
+    setShowMenu(false);
+    const destination = connectDestination();
+    if (!destination) return;
+    // A configured contact link no longer skips the form (plan §1.6): that path
+    // handed the owner a message from an unidentified stranger. The link still
+    // opens the moment the form is answered — or declined.
+    if (handoffSent) return;
+    setMessages(prev => {
+      if (prev.some(m => m.role === 'connect_form')) return prev;
+      return [
+        ...prev,
+        { role: 'bot', content: "I'll connect you with our team! Share your email so they can reply to you directly. 👇", ts: Date.now() },
+        { role: 'connect_form', id: 'connect-form', connect: { destination, cause: 'person_requested' } },
+      ];
+    });
+  };
+
+  // The COA panel's way out (L2). The form renders as a chat message, so the panel
+  // has to step aside for the visitor to see it — which is now always, since the
+  // redirect path shows the form too.
   const contactSupportFromCoa = () => {
-    if (!configData.handoff_redirect_url) setCoaPickerOpen(false);
+    setCoaPickerOpen(false);
     handleHandoff();
   };
 
-  const submitHandoff = async (visitorEmail: string, visitorName: string) => {
+  const openHandoffRedirect = () => {
+    if (configData.handoff_redirect_url) {
+      window.open(configData.handoff_redirect_url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const submitHandoff = async (visitorEmail: string, visitorName: string, cause?: string) => {
     setHandoffSent(true);
     const transcript = messages.filter(m => m.role === 'user' || m.role === 'bot').map(m => ({ role: m.role, content: m.content || '' }));
     try {
@@ -3200,18 +3152,76 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
           'x-api-key': activeApiKey!,
           ...(parentOriginHandoff ? { 'x-Sapybase-parent-origin': parentOriginHandoff } : {}),
         },
-        body: JSON.stringify({ transcript, visitor_email: visitorEmail, visitor_name: visitorName || null }),
+        body: JSON.stringify({ transcript, visitor_email: visitorEmail, visitor_name: visitorName || null, cause: cause || null }),
       });
       const data = res.ok ? await res.json() : {};
+      leadCapturedRef.current = true;
       setMessages(prev => prev.map(m =>
-        m.id === 'handoff-form' ? { role: 'handoff_confirmed', visitorEmail, redirectUrl: data.handoff_redirect_url, id: 'handoff-confirmed' } : m
+        m.id === 'connect-form' ? { role: 'handoff_confirmed', visitorEmail, redirectUrl: data.handoff_redirect_url, id: 'handoff-confirmed' } : m
       ));
+      // Capture came first; the instant hop still happens (the confirmation card
+      // keeps a "Connect instantly" button for browsers that block this open).
+      if (data.handoff_redirect_url) {
+        window.open(data.handoff_redirect_url, '_blank', 'noopener,noreferrer');
+      }
     } catch {
       setMessages(prev => prev.map(m =>
-        m.id === 'handoff-form' ? { role: 'bot', content: 'Something went wrong. Please try again.', ts: Date.now() } : m
+        m.id === 'connect-form' ? { role: 'bot', content: 'Something went wrong. Please try again.', ts: Date.now() } : m
       ));
       setHandoffSent(false);
     }
+  };
+
+  // The lead-capture half of the same form: a bot without the human_handoff
+  // entitlement still gets an identified lead, scored and routed by the backend.
+  const submitLeadCapture = async (visitorEmail: string, visitorName: string, contextString: string) => {
+    const w = (typeof window !== 'undefined' ? (window as unknown as Record<string, string | undefined>) : {});
+    const parentOrigin = w.__SapybaseParentOrigin || '';
+    // Attribution (best-effort): the loader can expose the merchant page URL via
+    // __SapybaseParentUrl; otherwise document.referrer is the next-best signal.
+    // UTM is parsed here as a backup — the backend also backfills from page_url.
+    const pageUrl = w.__SapybaseParentUrl || (typeof document !== 'undefined' ? document.referrer : '') || '';
+    const referrer = (typeof document !== 'undefined' ? document.referrer : '') || '';
+    let utmSource: string | undefined, utmMedium: string | undefined, utmCampaign: string | undefined;
+    try {
+      const q = new URL(pageUrl).searchParams;
+      utmSource = q.get('utm_source') || undefined;
+      utmMedium = q.get('utm_medium') || undefined;
+      utmCampaign = q.get('utm_campaign') || undefined;
+    } catch { /* pageUrl not a parseable URL — skip UTM */ }
+    const res = await fetch(`${activeApiUrl}/api/leads/capture`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': activeApiKey!,
+        ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+      },
+      body: JSON.stringify({
+        email: visitorEmail,
+        name: visitorName,
+        context: contextString,
+        page_url: pageUrl || undefined,
+        referrer: referrer || undefined,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to submit.');
+    leadCapturedRef.current = true;
+    // Same "already connected" guard the handoff path uses, so the ⋮ menu can't
+    // put a second form under a visitor who just filled one in.
+    setHandoffSent(true);
+    // Speed-to-lead: the backend returns booking_url only for qualified leads
+    // when the owner has set a scheduling link.
+    const bookingUrl = typeof data.booking_url === 'string' ? data.booking_url : undefined;
+    const thanks = `Thanks${visitorName ? ' ' + visitorName : ''}! We've received your details and our team will be in touch shortly. 🎉`;
+    setMessages(prev => prev.map(m => m.id === 'connect-form'
+      ? (bookingUrl
+        ? { role: 'lead_confirmed', content: thanks, bookingUrl, id: 'lead-confirmed' }
+        : { role: 'bot', content: thanks, ts: Date.now() })
+      : m));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -3310,7 +3320,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     {showMenu && (
                       <motion.div initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }}
                         className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-[2147483647] overflow-hidden">
-                        {configData.lead_capture_enabled && (
+                        {/* Shown whenever the bot can actually route to a person or a
+                            lead. It used to key off lead_capture alone, so a
+                            lead-capture-only plan offered a button whose POST 402'd. */}
+                        {connectDestination() !== null && (
                           <button onClick={handleHandoff} disabled={handoffSent}
                             className="w-full text-left px-4 py-2.5 text-base font-normal font-google text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-slate-700 flex items-center justify-between disabled:opacity-50">
                             {handoffSent ? 'Team notified ✓' : 'Talk to a human'}
@@ -3423,10 +3436,24 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                               initial={isNew ? { opacity: 0, y: 10, scale: 0.95 } : false}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                              className={`flex min-w-0 ${msg.role === 'lead_capture' || msg.role === 'handoff_form' || msg.role === 'handoff_confirmed' || msg.role === 'lead_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-full' : 'max-w-[90%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
-                              {msg.role === 'handoff_form' ? (
-                                <HandoffContactForm themeColor={THEME_COLOR} onSubmit={submitHandoff}
-                                  onDismiss={() => setMessages(prev => prev.filter(m => m.id !== 'handoff-form'))} />
+                              className={`flex min-w-0 ${msg.role === 'connect_form' || msg.role === 'handoff_confirmed' || msg.role === 'lead_confirmed' ? 'w-full' : `${msg.role === 'bot' ? 'max-w-full' : 'max-w-[90%]'} ${msg.role === 'user' ? 'self-end text-left' : 'self-start text-left'}`}`}>
+                              {msg.role === 'connect_form' ? (
+                                <ConnectForm themeColor={THEME_COLOR}
+                                  title={msg.connect?.destination === 'handoff'
+                                    ? <>Share your details<br />so our team can reach you</>
+                                    : <>Leave your details<br />and we&apos;ll follow up!</>}
+                                  buttonLabel={msg.connect?.destination === 'handoff' ? 'Notify the team' : 'Submit'}
+                                  onSubmit={(email, name) => msg.connect?.destination === 'handoff'
+                                    ? submitHandoff(email, name, msg.connect?.cause)
+                                    : submitLeadCapture(email, name,
+                                        messages.slice(Math.max(0, idx - 4), idx).filter(m => m.role === 'user').map(m => m.content).join(' || '))}
+                                  onDismiss={() => {
+                                    leadCapturedRef.current = true;
+                                    setMessages(prev => prev.filter(m => m.id !== 'connect-form'));
+                                    // Declining costs the visitor nothing: a configured
+                                    // contact link still opens (owner ruling, 2026-08-11).
+                                    openHandoffRedirect();
+                                  }} />
                               ) : msg.role === 'handoff_confirmed' ? (
                                 <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm w-full self-start text-left mt-2 space-y-3">
                                   <p className="text-sm font-google font-bold text-emerald-600 dark:text-emerald-400 text-center">✅ Team notified!</p>
@@ -3458,19 +3485,6 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                                     </a>
                                   )}
                                 </div>
-                              ) : msg.role === 'lead_capture' ? (
-                                <LeadCaptureForm themeColor={THEME_COLOR} activeApiUrl={activeApiUrl} apiKey={activeApiKey ?? ''}
-                                  contextString={messages.slice(Math.max(0, idx - 4), idx).filter(m => m.role === 'user').map(m => m.content).join(' || ')}
-                                  onSubmit={(name, bookingUrl) => {
-                                    leadCapturedRef.current = true;
-                                    const thanks = `Thanks${name ? ' ' + name : ''}! We've received your details and our team will be in touch shortly. 🎉`;
-                                    setMessages(prev => prev.map(m => m.id === 'lead-form'
-                                      ? (bookingUrl
-                                        ? { role: 'lead_confirmed', content: thanks, bookingUrl, id: 'lead-confirmed' }
-                                        : { role: 'bot', content: thanks, ts: Date.now() })
-                                      : m));
-                                  }}
-                                  onDismiss={() => { leadCapturedRef.current = true; setMessages(prev => prev.filter(m => m.id !== 'lead-form')); }} />
                               ) : (
                                 <div className={`flex flex-col max-w-full min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                   <div className={`${msg.role === 'user' ? 'px-4 py-2.5' : 'px-1 py-0.5'} ${msg.role === 'bot' && msg.isStreaming && isLoading ? '!bg-transparent !p-1' : ''} ${msg.role === 'user' ? 'w-fit max-w-full self-end' : 'w-full max-w-full self-start'} ${msg.role === 'user' ? 'rounded-[20px] bg-[var(--sapy-user-bg)] dark:bg-[var(--sapy-user-bg-dark)] text-[var(--sapy-user-fg)] dark:text-[var(--sapy-user-fg-dark)]' : 'text-gray-800 dark:text-slate-200 overflow-hidden prose prose-compact dark:prose-invert max-w-none prose-p:leading-normal prose-p:break-words prose-pre:bg-gray-50 dark:prose-pre:bg-slate-900 prose-pre:text-gray-800 dark:prose-pre:text-slate-200 prose-pre:text-sm prose-code:text-sm prose-pre:max-w-full prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto prose-headings:text-gray-900 dark:prose-headings:text-slate-100 prose-strong:text-gray-900 dark:prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0 prose-p:font-normal prose-img:max-w-full prose-img:rounded-lg'}`}>

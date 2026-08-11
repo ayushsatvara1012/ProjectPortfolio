@@ -147,6 +147,9 @@ class HandoffRequest(BaseModel):
     transcript: List[HandoffMessage]
     visitor_email: Optional[str] = None
     visitor_name: Optional[str] = None
+    # Which escalation trigger produced this handoff (agent_runtime EscalationCause),
+    # or None when the visitor used the menu themselves.
+    cause: Optional[str] = None
 
 
 class UserRole(str, Enum):

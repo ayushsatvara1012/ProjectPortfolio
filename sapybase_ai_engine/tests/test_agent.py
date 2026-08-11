@@ -20,8 +20,6 @@ from services import agent
 from services.agent import (
     AGENT_FALLBACK_TEXT,
     build_agent_directive,
-    build_tool_schemas,
-    execute_tool,
     get_product_spec,
     get_sds,
     run_agent_loop,
@@ -460,7 +458,20 @@ class TestGetProductSpecSkuFallback:
             assert "company_id = %s" in sql and params[0] == CID
 
 
-# ── execute_tool ─────────────────────────────────────────────────────────────
+# ── registry dispatch ────────────────────────────────────────────────────────
+
+from services.agent_runtime import registry as agent_registry  # noqa: E402
+from services.agent_runtime.registry import build_schemas  # noqa: E402
+
+
+def execute_tool(name, args, cursor, company_id, session_id=None, captured=None):
+    """Dispatch one tool through the runtime registry, the way the chat path does."""
+    ctx = agent_registry.ToolContext(
+        company={"id": company_id}, cursor=cursor, session_id=session_id,
+        coa_configured=True,
+    )
+    return agent_registry.executor(ctx, captured if captured is not None else {})(name, args)
+
 
 class TestExecuteTool:
     def test_dispatches_get_sds(self):
@@ -1087,7 +1098,7 @@ class TestSessionHasCapture:
 
 class TestSchemasAndDirective:
     def test_chemical_schema_shape(self):
-        schemas = build_tool_schemas(load_pack("chemical"))
+        schemas = build_schemas(load_pack("chemical"))
         by_name = {s["name"]: s for s in schemas}
         assert set(by_name) == {"get_sds", "get_coa", "get_product_spec",
                                 "request_quote", "request_sample"}
@@ -1202,9 +1213,18 @@ class TestRunAgentLoop:
         second = model.invocations[1]
         assert any(getattr(m, "content", "").startswith("{") for m in second)
 
-    def test_runaway_tool_calls_exhaust_to_fallback(self):
+    def test_runaway_tool_calls_exhaust_to_a_compose_over_what_was_found(self):
+        # B2: exhausting the budget used to discard every observation. It now spends
+        # one tool-free round composing over them, and only falls back if that fails.
         loop_resp = FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}])
-        model = FakeModel([loop_resp, loop_resp, loop_resp, loop_resp])
+        model = FakeModel([loop_resp] * 4 + [FakeResp(content="I couldn't find that sheet.")])
+        out = _run(run_agent_loop(model, [], lambda n, a: {"status": "not_found"}))
+        assert out == "I couldn't find that sheet."
+        assert len(model.invocations) == 5
+
+    def test_exhaustion_falls_back_when_the_compose_also_fails(self):
+        loop_resp = FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}])
+        model = FakeModel([loop_resp] * 4 + [FakeResp(content="")])
         out = _run(run_agent_loop(model, [], lambda n, a: {"status": "not_found"}))
         assert out == AGENT_FALLBACK_TEXT
 
@@ -1345,9 +1365,9 @@ class TestStreamAgentLoop:
         status = [e for e in events if e["type"] == "status"][0]
         assert status["label"] == "Working on it…"
 
-    def test_exhausted_rounds_emit_fallback_final(self):
+    def test_exhausted_rounds_emit_fallback_final_when_compose_is_empty(self):
         loop_resp = FakeResp(tool_calls=[{"name": "get_sds", "args": {}, "id": "c"}])
-        model = FakeModel([loop_resp, loop_resp, loop_resp, loop_resp])
+        model = FakeModel([loop_resp] * 4 + [FakeResp(content="")])
         events = _run(_drain(
             stream_agent_loop(model, [], lambda n, a: {"status": "not_found"})
         ))

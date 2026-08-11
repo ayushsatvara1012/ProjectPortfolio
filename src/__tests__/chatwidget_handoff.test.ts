@@ -1,27 +1,50 @@
 /**
- * ChatWidget — "Talk to a human" handoff decision (logic in isolation).
+ * ChatWidget — capture-then-connect (logic in isolation).
  *
  * Following the convention in chatwidget_hub.test.ts / chatwidget_streaming.test.ts,
- * we mirror the pure decision logic extracted from handleHandoff in ChatWidget.tsx
- * rather than rendering the full component. When that logic changes, update this
- * mirror too.
+ * we mirror the pure decision logic extracted from ChatWidget.tsx rather than
+ * rendering the full component. When that logic changes, update this mirror too.
  *
- * Guarantees:
- *   1. A configured contact link (wa.me/etc, only ever populated when the plan's
- *      human_handoff_enabled is true) skips the name/email form entirely.
- *   2. No link configured => today's form flow, unchanged (no-regression gate).
- *   3. The form flow still respects the existing "already sent" guard.
+ * agent-runtime-restructure plan §1.6 replaced the old branching here: a configured
+ * contact link used to skip the form entirely, so the owner received a message from
+ * an unidentified visitor with no name, no email and no transcript. Capture now
+ * always precedes connect, and the redirect still opens the moment it is answered
+ * or declined.
  */
 import { describe, it, expect } from 'vitest';
 
+type ConnectDestination = 'handoff' | 'lead_capture';
+
+// Mirrors connectDestination(): entitlement, not the trigger, picks the endpoint.
+// The same ordering the server applies in agent_runtime/escalation.destination().
+function connectDestination(
+  humanHandoffEnabled: boolean,
+  leadCaptureEnabled: boolean,
+): ConnectDestination | null {
+  if (humanHandoffEnabled) return 'handoff';
+  if (leadCaptureEnabled) return 'lead_capture';
+  return null;
+}
+
 // Mirrors handleHandoff's branching.
 function resolveHandoffAction(
-  handoffRedirectUrl: string | undefined,
+  destination: ConnectDestination | null,
   handoffSent: boolean,
-): 'open_redirect' | 'show_form' | 'noop' {
-  if (handoffRedirectUrl) return 'open_redirect';
+): 'show_form' | 'noop' {
+  if (!destination) return 'noop';
   if (handoffSent) return 'noop';
   return 'show_form';
+}
+
+// Mirrors submitHandoff's tail and the form's onDismiss.
+function resolveAfterForm(
+  outcome: 'submitted' | 'dismissed',
+  handoffRedirectUrl: string | undefined,
+): { calledHandoff: boolean; openedRedirect: boolean } {
+  return {
+    calledHandoff: outcome === 'submitted',
+    openedRedirect: Boolean(handoffRedirectUrl),
+  };
 }
 
 // Mirrors the fetchConfig mapping: handoff_redirect_url is only ever surfaced
@@ -33,22 +56,58 @@ function resolveConfiguredHandoffUrl(
   return humanHandoffEnabled ? (handoffRedirectUrl || '') : '';
 }
 
-describe('Talk to a human — instant-connect vs form', () => {
-  it('opens the configured link directly, bypassing the contact form', () => {
-    expect(resolveHandoffAction('https://wa.me/15551234567', false)).toBe('open_redirect');
+describe('Talk to a human — the form always comes first', () => {
+  it('shows the form even when a contact link is configured', () => {
+    expect(resolveHandoffAction(connectDestination(true, true), false)).toBe('show_form');
   });
 
-  it('opens the link even if a previous handoff was already sent (no cooldown)', () => {
-    expect(resolveHandoffAction('https://wa.me/15551234567', true)).toBe('open_redirect');
+  it('no link configured => the same form flow', () => {
+    expect(resolveHandoffAction(connectDestination(true, false), false)).toBe('show_form');
   });
 
-  it('no link configured => unchanged form flow (no-regression gate)', () => {
-    expect(resolveHandoffAction('', false)).toBe('show_form');
-    expect(resolveHandoffAction(undefined, false)).toBe('show_form');
+  it('already connected => the existing guard still no-ops', () => {
+    expect(resolveHandoffAction(connectDestination(true, true), true)).toBe('noop');
   });
 
-  it('no link configured, already sent => the existing guard still no-ops', () => {
-    expect(resolveHandoffAction('', true)).toBe('noop');
+  it('a bot entitled to neither has nothing to offer', () => {
+    expect(resolveHandoffAction(connectDestination(false, false), false)).toBe('noop');
+  });
+});
+
+describe('the redirect path still reaches the owner', () => {
+  it('submitting calls /api/handoff AND opens the link', () => {
+    // The regression this whole change exists to fix: the link used to open with
+    // no backend call at all.
+    expect(resolveAfterForm('submitted', 'https://wa.me/15551234567')).toEqual({
+      calledHandoff: true, openedRedirect: true,
+    });
+  });
+
+  it('submitting with no link configured still calls /api/handoff', () => {
+    expect(resolveAfterForm('submitted', '')).toEqual({
+      calledHandoff: true, openedRedirect: false,
+    });
+  });
+
+  it('declining costs the visitor nothing — the link still opens', () => {
+    expect(resolveAfterForm('dismissed', 'https://wa.me/15551234567')).toEqual({
+      calledHandoff: false, openedRedirect: true,
+    });
+  });
+});
+
+describe('connect destination follows entitlement', () => {
+  it('human handoff wins when both are granted', () => {
+    expect(connectDestination(true, true)).toBe('handoff');
+  });
+
+  it('a lead-capture-only plan still gets a form, pointed at the lead endpoint', () => {
+    // It used to get the "Talk to a human" button and a POST that 402'd.
+    expect(connectDestination(false, true)).toBe('lead_capture');
+  });
+
+  it('neither entitlement => no form at all', () => {
+    expect(connectDestination(false, false)).toBeNull();
   });
 });
 

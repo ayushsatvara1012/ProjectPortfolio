@@ -108,21 +108,33 @@ class TestDenyThenAnswerGuard:
         import inspect
         return inspect.getsource(main.chat_endpoint)
 
-    def test_rule_2_forbids_denial_opener_when_something_was_found(self):
+    def test_rule_6_scopes_the_denial_to_zero_relevant_records(self):
         src = self._chat_endpoint_source()
-        assert 'NEVER open with a denial or fallback phrase' in src
-        assert 'do not stitch a denial onto the front of a real answer' in src
+        # The denial sentence is still correct when NOTHING relevant was found...
+        assert 'When the KNOWLEDGE BASE has NO relevant record for what was asked' in src
+        # ...but must not fire when something relevant WAS found, even if it isn't
+        # the single exact record asked for. (inspect.getsource returns raw source
+        # text, so a phrase spanning adjacent string-literal lines won't match as
+        # one substring - assert within single literals.)
+        assert 'do NOT use that sentence at all' in src
+        assert 'Lead with what the records actually show' in src
 
-    def test_rule_6_pack_branch_scopes_denial_to_zero_relevant_records(self):
+    def test_the_denial_sentence_is_the_runtime_s_own_constant(self):
+        """Phase 5: the prompt asks for the exact sentence the refusal detector
+        knows, read from one place so the two cannot drift apart."""
+        from services.agent_runtime import refusal
+
         src = self._chat_endpoint_source()
-        # The denial line is still correct when NOTHING relevant was retrieved...
-        assert 'the KNOWLEDGE BASE has NO relevant record at all' in src
-        # ...but must not fire when something relevant WAS found, even if it
-        # isn't the single exact record asked for. (inspect.getsource returns
-        # raw source text, so a phrase spanning adjacent string-literal lines
-        # won't match as one substring - assert within single literals.)
-        assert 'do NOT open with that denial line at all' in src
-        assert 'records actually show' in src
+        assert 'agent_refusal.NOTHING_ON_FILE' in src
+        assert refusal.reads_as_refusal(refusal.NOTHING_ON_FILE)
+
+    def test_the_model_is_told_to_stop_after_the_denial(self):
+        # The next step is the platform's to add (rule 9), which is what stops the
+        # canned three-paragraph fallback coming back by another route.
+        src = self._chat_endpoint_source()
+        assert 'and then STOP' in src
+        # Phrase kept inside one source literal - it wraps across two in main.py.
+        assert 'platform adds the next step itself' in src
 
 
 # agent-conversation-gaps-plan.md §13.5, symptom 12: a plain informational
@@ -136,18 +148,27 @@ class TestEscalationFalsePositiveGuard:
         import inspect
         return inspect.getsource(main.chat_endpoint)
 
-    def test_rule_5_states_the_bullets_are_an_exhaustive_allowlist(self):
-        src = self._chat_endpoint_source()
-        assert 'The five bullets below are an EXHAUSTIVE allowlist, not general guidance' in src
+    def test_the_model_may_not_escalate_at_all(self):
+        """Phase 5 removed the keyword allowlist rather than tuning it again.
 
-    def test_rule_5_excludes_business_who_what_questions(self):
+        The false positive it kept producing - an informational question firing the
+        support line - is structurally impossible once the model is forbidden from
+        appending one, and escalation is decided server-side from the visitor's own
+        words and the turn's outcome (§1.5, agent_runtime/escalation.py).
+        """
         src = self._chat_endpoint_source()
-        assert '"who is responsible for exports?" is information-seeking, not distress' in src
+        assert '[RULE 5 — ESCALATION IS NOT YOURS TO DECIDE]' in src
+        assert 'Never append a "contact support directly" line' in src
 
-    def test_rule_5_disambiguates_from_rule_6_handoff_offer(self):
+    def test_the_support_line_is_gone_from_the_prompt(self):
         src = self._chat_endpoint_source()
-        assert 'that handoff offer is its own separate, ordinary sentence in your reply' in src
-        assert 'must NEVER also trigger this rule\'s escalation line' in src
+        assert 'Need immediate help?' not in src
+
+    def test_no_rule_asks_the_model_to_offer_a_handoff(self):
+        # Two rules used to; the refusal builder now owns every next step, so a
+        # second offer in the model's own words would just duplicate it.
+        src = self._chat_endpoint_source()
+        assert 'offer to connect' not in src
 
 
 # agent-conversation-gaps-plan.md §13.7, symptom 13: "from where above

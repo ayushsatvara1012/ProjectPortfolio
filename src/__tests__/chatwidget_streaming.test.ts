@@ -368,3 +368,107 @@ describe('normalizeQuickQuestions', () => {
     expect(normalizeQuickQuestions(input)).toHaveLength(2);
   });
 });
+
+// ── 7. Escalate side-channel (capture-then-connect, plan §1.6) ───────────────
+
+describe('escalate SSE event', () => {
+  // Mirrors the onmessage branch: the widget renders whatever the server decided,
+  // and refuses a payload with no usable destination rather than guessing one.
+  function parseEscalate(data: string): { destination: string; cause?: string } | null {
+    let parsed: Record<string, any>;
+    try { parsed = JSON.parse(data); } catch { return null; }
+    if (parsed.escalate && (parsed.escalate.destination === 'handoff' || parsed.escalate.destination === 'lead_capture')) {
+      return { destination: parsed.escalate.destination, cause: parsed.escalate.cause };
+    }
+    return null;
+  }
+
+  // Mirrors the [DONE] gate: once per conversation, and never after a capture.
+  function shouldShowConnectForm(
+    escalate: { destination: string } | null,
+    alreadyCaptured: boolean,
+    formAlreadyShown: boolean,
+  ): boolean {
+    return Boolean(escalate) && !alreadyCaptured && !formAlreadyShown;
+  }
+
+  it('reads the cause and destination the server sent', () => {
+    expect(parseEscalate('{"escalate":{"cause":"person_requested","destination":"handoff"}}'))
+      .toEqual({ destination: 'handoff', cause: 'person_requested' });
+  });
+
+  it('accepts the lead-capture destination', () => {
+    expect(parseEscalate('{"escalate":{"cause":"buying_intent","destination":"lead_capture"}}')?.destination)
+      .toBe('lead_capture');
+  });
+
+  it('ignores an unknown destination rather than inventing a form', () => {
+    expect(parseEscalate('{"escalate":{"cause":"person_requested","destination":"telepathy"}}')).toBeNull();
+  });
+
+  it('ignores an ordinary token frame', () => {
+    expect(parseEscalate('{"token":"Hello"}')).toBeNull();
+  });
+
+  it('shows the form once per conversation', () => {
+    const escalate = { destination: 'handoff' };
+    expect(shouldShowConnectForm(escalate, false, false)).toBe(true);
+    expect(shouldShowConnectForm(escalate, false, true)).toBe(false);
+  });
+
+  it('never asks again once the visitor has already given their details', () => {
+    expect(shouldShowConnectForm({ destination: 'handoff' }, true, false)).toBe(false);
+  });
+
+  it('no event => no form, whatever the reply said', () => {
+    // The three keyword lists that used to make this call client-side are gone.
+    expect(shouldShowConnectForm(null, false, false)).toBe(false);
+  });
+});
+
+// ── 8. Stream error frame (audit F2) ─────────────────────────────────────────
+
+describe('error SSE frame', () => {
+  // Mirrors the onmessage branch added in Phase 5. The frame used to be ignored:
+  // no token rendered, [DONE] never arrived (the backend returned right after the
+  // error), so isStreaming never cleared and the bubble typed forever.
+  function handleFrame(data: string): { kind: 'error' | 'token' | 'other'; text?: string } {
+    if (data === '[DONE]') return { kind: 'other' };
+    let parsed: Record<string, any>;
+    try { parsed = JSON.parse(data); } catch { return { kind: 'token', text: data }; }
+    if (typeof parsed.error === 'string') {
+      return { kind: 'error', text: "Sorry - something went wrong at my end and I lost that answer. Please try again." };
+    }
+    const chunk = parsed.token || parsed.content || parsed.text || '';
+    return chunk ? { kind: 'token', text: chunk } : { kind: 'other' };
+  }
+
+  // Mirrors [DONE]: the buffered text wins, the error text is the fallback for an
+  // error that arrived before the typewriter buffer existed.
+  function resolveFinalContent(buffered: string, streamErrorText: string): string {
+    return buffered || streamErrorText;
+  }
+
+  it('turns an error frame into readable text', () => {
+    const result = handleFrame('{"error":"Stream interrupted"}');
+    expect(result.kind).toBe('error');
+    expect(result.text).toContain('something went wrong');
+  });
+
+  it('still treats an ordinary token as a token', () => {
+    expect(handleFrame('{"token":"Hello"}')).toEqual({ kind: 'token', text: 'Hello' });
+  });
+
+  it('falls back to the error text when nothing was buffered', () => {
+    expect(resolveFinalContent('', 'Sorry - something went wrong')).toBe('Sorry - something went wrong');
+  });
+
+  it('prefers real streamed content over the error text', () => {
+    // A stream that broke after partial output keeps what the visitor already read.
+    expect(resolveFinalContent('Acetone AR ships', 'Sorry - something went wrong')).toBe('Acetone AR ships');
+  });
+
+  it('leaves the bubble empty only when there is genuinely nothing', () => {
+    expect(resolveFinalContent('', '')).toBe('');
+  });
+});
