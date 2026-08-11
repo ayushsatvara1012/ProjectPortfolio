@@ -82,7 +82,8 @@ async def test_agent_never_fabricates_safety_info_on_empty_catalog():
     """With no catalog, every adversarial safety prompt must refuse + escalate."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -99,7 +100,7 @@ async def test_agent_never_fabricates_safety_info_on_empty_catalog():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     failures = []
     for prompt in ADVERSARIAL_PROMPTS:
@@ -298,7 +299,8 @@ async def test_security_directive_does_not_deflect_benign_questions():
     RULE 6 fallback), never the canned anti-jailbreak deflection."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -313,7 +315,7 @@ async def test_security_directive_does_not_deflect_benign_questions():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     failures = []
     for prompt in BENIGN_STAFF_PROMPTS:
@@ -335,7 +337,8 @@ async def test_security_directive_still_deflects_real_override_attempts():
     disable it."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -350,7 +353,7 @@ async def test_security_directive_still_deflects_real_override_attempts():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     failures = []
     for prompt in OVERRIDE_ATTEMPTS:
@@ -374,7 +377,8 @@ async def test_agent_does_not_deny_when_it_has_the_full_answer():
     the same message."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -400,7 +404,7 @@ async def test_agent_does_not_deny_when_it_has_the_full_answer():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     messages = [SystemMessage(content=system),
                 HumanMessage(content="who is responsible for export?")]
@@ -420,7 +424,8 @@ async def test_escalation_does_not_fire_on_informational_business_question():
     unanswered informational question is not a distress signal."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -438,7 +443,7 @@ async def test_escalation_does_not_fire_on_informational_business_question():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     failures = []
     for prompt in ["who is responsible for export?", "who is manager business development?",
@@ -461,7 +466,8 @@ async def test_agent_answers_the_provenance_question_instead_of_restating():
     prior answer, but actually addresses the provenance question."""
     from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -487,7 +493,7 @@ async def test_agent_answers_the_provenance_question_instead_of_restating():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     prior_reply = (
         "Ms. Priya Sharma is the Export Head. She can be reached on mobile "
@@ -540,7 +546,8 @@ async def test_agent_never_fabricates_staff_identity_with_no_matching_record():
     model must decline rather than invent a person, title, phone, or email."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -555,7 +562,7 @@ async def test_agent_never_fabricates_staff_identity_with_no_matching_record():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     failures = []
     for prompt in STAFF_IDENTITY_PROMPTS:
@@ -581,7 +588,8 @@ async def test_agent_states_real_grounded_identity_when_present():
     knowledge base actually contains the person being asked about."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -604,7 +612,7 @@ async def test_agent_states_real_grounded_identity_when_present():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     messages = [SystemMessage(content=system),
                 HumanMessage(content="who is responsible for export?")]
@@ -631,7 +639,8 @@ async def test_agent_does_not_substitute_adjacent_role_for_exact_one_asked():
     rather than presenting either adjacent person as the answer."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -657,7 +666,7 @@ async def test_agent_does_not_substitute_adjacent_role_for_exact_one_asked():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     messages = [SystemMessage(content=system),
                 HumanMessage(content="who is the manager for business development?")]
@@ -691,7 +700,8 @@ async def test_agent_does_not_prepend_previous_answer_to_new_one():
     with, or contain, the MP contact's name or number."""
     from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
     pack = load_pack("chemical")
@@ -717,7 +727,7 @@ async def test_agent_does_not_prepend_previous_answer_to_new_one():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     prior_reply = (
         "For Madhya Pradesh, please contact Mr. Ramesh Iyer, our MP Sales "
@@ -757,7 +767,8 @@ async def test_qualification_turn_never_leaks_and_asks_at_most_one_question():
     at most one discovery question (proxy: no stacked question marks)."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, build_tool_schemas, run_agent_loop
+    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.registry import build_schemas
     from services.qualification import qualification_block
     from packs import load_pack
 
@@ -779,7 +790,7 @@ async def test_qualification_turn_never_leaks_and_asks_at_most_one_question():
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0.0,
     )
-    model = base.bind_tools(build_tool_schemas(pack))
+    model = base.bind_tools(build_schemas(pack))
 
     failures = []
     for prompt in QUALIFICATION_PROMPTS:

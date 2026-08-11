@@ -21,6 +21,7 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 import main as m
 from packs import load_pack
 from services import coa_drive, coa_throttle
+from services.agent_runtime import registry as agent_registry
 from tests.test_coa_drive import API_KEY, FIXTURES, FOLDER_ID, drive, entry
 
 FastAPICache.init(InMemoryBackend(), prefix="test-cache-coa-endpoint")
@@ -98,9 +99,14 @@ async def run_tool(monkeypatch, args, *, tree=None, status=200, comp=None, captu
     _patch_drive(monkeypatch, transport)
     if reset_throttle:
         coa_throttle.reset_local_state()
-    return await m._get_coa_observation(
-        comp or company(), args, captured if captured is not None else {},
-        visitor_id=visitor, client_ip=ip)
+    # Through the runtime registry, exactly as the chat path dispatches it: the
+    # observation/capture split is now the get_coa RuntimeTool's capture shape.
+    ctx = agent_registry.ToolContext(
+        company=comp or company(), visitor_id=visitor, client_ip=ip,
+        coa_configured=True, runners={"get_coa": m._run_get_coa},
+    )
+    run = agent_registry.executor(ctx, captured if captured is not None else {})
+    return await run("get_coa", args)
 
 
 # ───────────────────────────── the widget endpoint ──────────────────────────
