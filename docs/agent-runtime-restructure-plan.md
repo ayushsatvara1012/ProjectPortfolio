@@ -3,7 +3,7 @@
 Date: 2026-08-11.
 Branch: MainV2.
 Status: Phases 1-6 DONE, except B4/F4 (multiple cards in one turn), deferred with a reason - see the Phase 6 entry.
-Committed on `refactor/agent-runtime-restructure` (`5400531b` migration 0037, `405bf2f6` the restructure); Phase 6 is UNCOMMITTED as of 2026-08-11.
+Committed on `refactor/agent-runtime-restructure`: `5400531b` migration 0037, `405bf2f6` the restructure, `5a2aa6ae` the Phase 6 pipeline extraction, `421617d8` the two prompt one-liners.
 Suite green at backend 2327 passed / 134 skipped, vitest 581, tsc clean, lint 0 errors.
 Browser verification of the merged connect form is still owed.
 Migration 0037 APPLIED DARK to the prod control DB `tticllabbbqwnhsmggfo` on 2026-08-11 (deploy gate cleared - see the Phase 5 entry).
