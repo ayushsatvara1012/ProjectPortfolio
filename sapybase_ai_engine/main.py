@@ -3879,6 +3879,9 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         prior_lead_profile=_prior_lead_profile,
                         retrieved_doc_count=len(retrieved_docs),
                         kb_sources=_kb_sources,
+                        # Chunk text, not attribution: the contract's grounding
+                        # check needs what the sources SAID (§2.4).
+                        retrieved_text=[row[0] for row in retrieved_docs if row],
                     )
                     # Phase 6: the turn itself — tool rounds, contact capture,
                     # settling, escalation and session persistence — is one call

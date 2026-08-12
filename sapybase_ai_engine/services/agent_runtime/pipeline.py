@@ -26,6 +26,7 @@ from services import qualification, sales_funnel, session_store
 from services.lead_scoring import _score_lead
 
 from . import compose as compose_mod
+from . import contract as contract_mod
 from . import escalation as escalation_mod
 from . import sources as sources_mod
 from .loop import AGENT_FALLBACK_TEXT, stream_agent_loop
@@ -44,6 +45,11 @@ CARD_KEYS = ("sds", "quote", "form", "grade_selector", "pack_selector", "coa",
 
 #: What gets replayed to the model as this turn's actions on the next turn.
 _ACTION_KEYS = CARD_KEYS + ("handoff",)
+
+#: Slice G ships shadow-first (docs/bot-output-quality-plan.md §2.5, owner decision):
+#: the contract reports what it WOULD have rewritten so the thresholds can be moved
+#: with measured traffic, and changes nothing the visitor reads until they are.
+CONTRACT_SHADOW = True
 
 
 @dataclass
@@ -66,6 +72,10 @@ class TurnInputs:
     prior_lead_profile: Dict[str, Any] = field(default_factory=dict)
     retrieved_doc_count: int = 0
     kb_sources: List[Dict[str, Any]] = field(default_factory=list)
+    #: This turn's retrieved chunk TEXT, for the response contract's grounding
+    #: check (§2.4). Separate from ``kb_sources``, which is attribution only and
+    #: deliberately stores no content - see ``_build_kb_sources``.
+    retrieved_text: List[str] = field(default_factory=list)
 
     @property
     def company_id(self) -> Any:
@@ -136,6 +146,8 @@ async def run_agent_turn(
         system_error=timed_out or text == AGENT_FALLBACK_TEXT,
         small_talk=len(inputs.message.strip()) < 4,
     )
+
+    _review_contract(inputs, turn, captured)
 
     for key in CARD_KEYS:
         payload = captured.get(key)
@@ -245,6 +257,58 @@ def _subject_product(captured: Dict[str, Any]) -> Optional[str]:
         if product:
             return product
     return None
+
+
+def _prior_assistant_text(prior_messages) -> str:
+    """The last thing we said to this visitor - what check 1 compares against."""
+    for entry in reversed(list(prior_messages or [])):
+        role = entry.get("role") if isinstance(entry, dict) else getattr(entry, "role", None)
+        if role in ("assistant", "bot"):
+            content = entry.get("content") if isinstance(entry, dict) else getattr(entry, "content", "")
+            return content or ""
+    return ""
+
+
+def _review_contract(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, Any]) -> None:
+    """Run the response contract over the settled reply and log what it found.
+
+    Shadow only, per §2.5: nothing here touches ``turn.text``. Its purpose is the
+    false-positive rate, which has to come from real traffic before check 1's
+    similarity threshold or check 3's name extraction can be trusted to rewrite
+    anything. Failures are swallowed - a measurement pass must never be able to
+    take down a live turn.
+    """
+    try:
+        report = contract_mod.check(
+            turn.text,
+            prior_reply=_prior_assistant_text(inputs.prior_messages),
+            evidence=contract_mod.evidence_from(inputs.retrieved_text, captured),
+            # Slice J owns the licence; until it ships, assume the turn may ask one
+            # question, so check 4 reports only the stacked-offer case.
+            question_licensed=True,
+            pack_vocab=_pack_vocab(inputs.pack),
+            shadow=CONTRACT_SHADOW,
+        )
+        if report.findings:
+            logger.info(
+                "CONTRACT shadow company=%s session=%s state=%s reinvoke=%s %s",
+                inputs.company_id, inputs.session_id, turn.state.value,
+                report.needs_reinvoke, report.summary(),
+            )
+    except Exception:
+        logger.exception("contract: shadow review failed")
+
+
+def _pack_vocab(pack) -> tuple:
+    """Capitalised vertical vocabulary that is never a person's name."""
+    if pack is None:
+        return ()
+    names = []
+    for table in getattr(pack, "catalog_tables", ()) or ():
+        label = getattr(table, "label", None) or getattr(table, "name", None)
+        if label:
+            names.append(str(label))
+    return tuple(names)
 
 
 def _capture_volunteered_contact(inputs: TurnInputs, captured: Dict[str, Any], cursor) -> None:
