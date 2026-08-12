@@ -113,6 +113,7 @@ This plan **consumes** parts of the audit's Track 2 (Slices G, H, and pieces of 
 - Structured contacts/FAQ/locations/policies tables and tools (audit Slice E).
 - Identifier retrieval path - trigram index, stop stemming CAS numbers (audit Slice D).
 - The three one-line prompt fixes (RULE 7 fabrication clause, temperature 0.7 to 0.1, phantom `search_catalog`) - ship separately, unrelated to file structure.
+  **All three are now done** (2026-08-11): `search_catalog` went with Phase 5's RULE 6 rewrite; RULE 7's founder clause and the agent temperature shipped in their own commit after Phase 6, gated on the live guardrail eval (11/11, run twice, with the pre-change 11/11 baseline already on record). Temperature is split rather than global - `AGENT_TEMPERATURE = 0.1` for the tool-using call, 0.7 kept for plain chat, where wording variety is a feature.
 
 What **is** in scope: every outcome and rule below is pure control flow over data the system already has today (existing tools, existing session store, existing retrieval). None of it requires new data, new tables, or calibration.
 
