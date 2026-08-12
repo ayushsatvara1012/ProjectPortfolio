@@ -55,8 +55,8 @@ To avoid three different things being called "Slice A" in one file, audit items 
 
 | Source | Item | Status |
 |---|---|---|
-| This plan | F - FAQ feedback loop | **F1, F2, F3 DONE** (uncommitted, 2026-08-12), verified e2e against prod. **F4 purge ready, not run** - 61 rows across 3 tenants, dry-run reviewed. §1. |
-| This plan | G - response contract | PLAN ONLY. §2. |
+| This plan | F - FAQ feedback loop | **F1, F2, F3 COMMITTED** 2026-08-12 (`77151c50`, `04211558`), unpushed. **F4 DONE for 4 of 5 sources** - 47 of 61 rows cleared by re-ingest, contamination 0% on both cleaned tenants. **Expresolv `/leadership` BLOCKED** on a bot-verification interstitial. §1. |
+| This plan | G - response contract | **SHADOW SHIPPED (uncommitted, 2026-08-12).** All four checks built as pure functions in `services/agent_runtime/contract.py`, wired into the pipeline in shadow mode, 32 tests. Enforcement gated on measured traffic. §2. |
 | This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
 | This plan | I - extraction hardening | PLAN ONLY. §4. |
 | This plan | J - reflex question | PLAN ONLY, ships with G. §5. |
@@ -192,7 +192,57 @@ A generic bot passes `pack=None` and gets only the tenant-independent set, which
 
 The identifier rule was retuned against real data: one token carrying **both** a letter and a digit, 5+ chars. Requiring a letter is what stops it matching CAS numbers (`67-56-1`); requiring a digit stops it matching ordinary uppercase words.
 
-**F4 - Purge.** Identify `company_knowledge` rows ingested from our own FAQPage markup and delete them.
+**F4 - Purge. Dry-run re-run 2026-08-12: counts unchanged (61 rows, 3 tenants, orphan risk 0), but the delete as specified is now known to be wrong.**
+
+The plan assumed a matched row is cleanly self-ingested. It is not.
+The chunker interleaved our schema output with real page copy inside the **same** chunk: of the 61 matched rows, **40 are pure contamination and 21 are mixed**, and roughly 7 of those carry content a blanket delete would destroy - Expresolv's food-grade product list, SaPyBase's Build Services and pricing copy, SP Design's office address.
+
+**Re-ingest instead of deleting.**
+`run_training_job` on an existing URL is already an atomic upsert: `main.py:8563-8593` renames the new rows in, then deletes every older row for that URL.
+So retraining the affected source replaces contaminated rows wholesale, and F1 strips the FAQ schema on the way in - no hand-written DELETE, no mixed-row surgery, no orphan risk.
+Quota is not an obstacle: usage is a live `SUM(word_count)` over current child rows (`main.py:8425-8431`), not a cumulative meter, and the upsert path excludes the source being replaced, so re-ingest will *reduce* Expresolv's usage once the FAQ chunks are gone.
+
+Scope is five URLs: SaPyBase `/` (26 of 92 rows) and `/vaayu` (7 of 36), Expresolv `/leadership` (14 of 60), SP Design `/` (9 of 29) and `/quotation` (5 of 23).
+
+Two things that need an owner call before it runs: it touches two tenants who never reported anything (one a live client), and it re-scrapes current pages, so unrelated page changes since original training also land.
+
+**F4 is justified by measurement, 2026-08-12.** `scripts/retrieval_rank_probe.py --mode contamination`, read-only offline replay of 67 real logged queries through the live retrieval path (`_is_entity_lookup_query` / `hyde_expand` -> embed -> `retrieve_knowledge(limit=15)` -> `rerank_chunks(top_k=5)`).
+
+| tenant | contaminated row in final top 5 | in the 15-candidate pool |
+|---|---|---|
+| SP Design | 13/17 (76%) | 17/17 (100%) |
+| Expresolv | 17/25 (68%) | 23/25 (92%) |
+| SaPyBase | 12/25 (48%) | 24/25 (96%) |
+| **total** | **42/67 (63%)** | **64/67 (96%)** |
+
+These rows are not sitting harmlessly at rank 40.
+On contact and directory questions they take **every** slot: SP Design's "DO you have email or phone" and "can i get the contact detail" both return top-5 ranks `[1,2,3,4,5]`, all five self-ingested.
+Expresolv's most-asked SDS query (13 asks) pulls one at rank 5, and its price-quote queries pull three.
+
+Consequence for §3 and §4: the top-5 competition H and I are trying to relieve is substantially **self-ingested FAQ rows**, not only the homepage and testimonial chunks §4 named.
+H's measurement must run after the re-ingest, not just after Slice I, or it measures a corpus that no longer exists.
+
+### 1.4b F4 executed, 2026-08-12 - 4 of 5 sources
+
+Run with **local code against the prod DB**, deliberately: production (`MainV2`) does not carry F1, so retraining through the deployed API would have re-ingested the same schema. Anyone repeating this must do the same until F1 is deployed.
+
+| source | rows before -> after | contaminated after |
+|---|---|---|
+| SaPyBase `/` | 92 -> 40 | 0 |
+| SaPyBase `/vaayu` | 36 -> 42 | 0 |
+| SP Design `/` | 29 -> 16 | 0 |
+| SP Design `/quotation` | 23 -> 23 | 0 |
+
+47 of 61 rows cleared. Re-measured with the rank probe afterwards: **SaPyBase 48% -> 0%, SP Design 76% -> 0%** of real queries returning a contaminated row in the final top 5.
+
+**Expresolv `/leadership` is blocked and its 14 rows remain.**
+`expresolv.com` now serves a bot-verification interstitial to our fetcher: Jina returns 200 with 7,012 bytes, and extraction yields **51 characters** - `"Please wait while your request is being verified..."`.
+That is above the crawl path's own `>= 50` char floor, so **an unguarded re-ingest would have swapped 60 rows of real leadership content for that one sentence.** The dry run is the only reason it did not.
+No `JINA_API_KEY` is set locally; production has one, which may or may not clear the challenge.
+
+**Follow-up this exposes, not yet fixed:** `_train_pages` accepts any extraction over 50 chars (`main.py:8677`), so a live owner retraining a page behind a challenge silently destroys that source's knowledge. That is a real data-loss path in the product, independent of F.
+
+Superseded original spec, kept for the record: identify `company_knowledge` rows ingested from our own FAQPage markup and delete them.
 Detection: content matching the shape `_flatten_entity` produces for `FAQPage`/`Question`, plus the `📎 Source:` marker.
 **Dry-run count first, per company, reported before anything is deleted.**
 Parent and child rows together - deleting a parent while orphaning children leaves rows retrieval can surface but not expand.
@@ -281,8 +331,17 @@ Slice D paid for itself here. This was undiagnosable before it shipped.
 
 ### 2.3 Where it goes
 
-`services/agent_runtime/compose.py`, `settle()` at line 68 - already the single place a turn's outcome is decided, and it **already receives `sources`**, which is exactly the evidence set check 3 needs.
-It also already carries `allow_rewrite`, so the repair path has a seam to respect.
+`services/agent_runtime/compose.py`, `settle()` at line 68 - already the single place a turn's outcome is decided.
+It carries `allow_rewrite`, so the repair path has a seam to respect.
+
+**Correction, 2026-08-12.** An earlier revision of this section claimed `settle()` "already receives `sources`, which is exactly the evidence set check 3 needs".
+**It is not.**
+`_build_kb_sources` (`main.py:2657`) says so in its own docstring - "content itself is never stored here" - and stores `url`, `content_id`, `rank`, `score`.
+`tool_sources` is the same: a label and a product name, never the tool payload.
+So `sources` proves *which* chunks were retrieved and never *what they said*, and check 3 cannot be built from it.
+
+The evidence text is threaded separately instead: `TurnInputs.retrieved_text` (chunk contents, filled by the handler from `retrieved_docs`) plus the tool payloads already in `captured`, assembled by `contract.evidence_from()`.
+The shadow pass therefore runs in `pipeline.run_agent_turn` just after `settle()`, not inside it - that is where both halves of the evidence set are actually in hand.
 
 ### 2.4 The post-conditions
 
@@ -316,6 +375,20 @@ Per the owner decision:
 - A second failure degrades to a decline plus handoff offer. It never ships the ungrounded answer.
 - Exactly one re-invoke, ever. This must not become an unbounded repair loop.
 
+### 2.5a Shadow build, 2026-08-12
+
+`services/agent_runtime/contract.py`, 32 tests in `tests/test_agent_runtime_contract.py`. Suite green (2586 backend tests).
+
+- `leading_restatement` compares leading *sentences* against the previous reply at a 0.90 similarity ratio, with a 25-char floor so "Sure." is never stripped. `strip_leading_span` removes the orphaned connective.
+- `denial_opener` fires only when substance follows. A denial followed **only** by next-step sentences is the refusal builder's own correct output and is left alone - that discrimination was missing in the first draft and a real refusal was flagged as a defect.
+- `ungrounded_identities` takes evidence as text and returns unsupported names, phones and emails. Phones match on the last 10 digits so a country code written two ways is not read as invented; emails are stripped of trailing sentence punctuation, which in the first draft reported every correctly-quoted address as fabricated.
+- `surplus_questions(text, licensed)` enforces the count; `licensed` is hardcoded `True` until J supplies it.
+- Grounding runs **after** the deterministic repairs, so a name that only appeared inside a replayed span disappears with the span instead of escalating to a re-invoke.
+
+`CONTRACT_SHADOW = True` (`pipeline.py`). The pass logs `CONTRACT shadow company=... reinvoke=... <findings>` and cannot touch `turn.text`; exceptions are swallowed, because a measurement pass must never take down a live turn.
+
+**Still to do before enforcing:** collect the shadow logs from real traffic, measure the false-positive rate per check, then flip `CONTRACT_SHADOW` and add the re-invoke path (check 3, once, then degrade). The re-invoke and degrade path is **not built yet**.
+
 **Shadow first.** Thresholds need data.
 Log what each check *would* have rewritten against real traffic, measure the false-positive rate, then enforce.
 Do not pick a similarity number in the plan and defend it later.
@@ -337,7 +410,8 @@ Gaps plan §13.6, deferred with a specific instruction: measure §13.1 alone aga
 `_build_kb_sources` (`main.py:2656`) is called at `main.py:3566` with `retrieved_docs` - the **post-rerank top 5**. `retrieve_knowledge(limit=15)` returns 15 and `rerank_chunks(..., top_k=5)` discards 10 before anything is stored.
 So stored data proves a chunk was *absent from the top 5*, but cannot distinguish "ranked 6-15, just missed" from "never retrieved at all" - which is precisely the fork this slice turns on (raise `top_k` vs. escalate to ARCH-D).
 
-H therefore needs an **offline replay**: re-run `retrieve_knowledge` + `rerank_chunks` over stored questions and inspect ranks 1-15. Larger than the plan assumed, and approximate, because the corpus has changed since those turns were logged.
+H therefore needs an **offline replay**: re-run `retrieve_knowledge` + `rerank_chunks` over stored questions and inspect ranks 1-15.
+**The harness now exists** - `scripts/retrieval_rank_probe.py`, built 2026-08-12 for F4's `--mode contamination` question; H's own `--mode ranks` is stubbed and not built. Larger than the plan assumed, and approximate, because the corpus has changed since those turns were logged.
 A second, cheaper option exists if replay proves awkward: persist the full candidate ranking (not just the surviving 5) going forward, then measure after a few weeks of real traffic.
 Also note `sources` is recorded on only **32 rows** platform-wide as of 2026-08-12, so replay is currently the only viable route regardless.
 
