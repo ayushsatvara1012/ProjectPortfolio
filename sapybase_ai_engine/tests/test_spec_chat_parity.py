@@ -7,10 +7,10 @@ currently trying to narrow it.
 
 Three invariants live here.
 
-**Where it runs.** In `main.py`'s executor, never in `services/agent.py`.
-`get_product_spec` is synchronous, cursor-based and never receives `pack_overrides` -
-it cannot await a Drive call and cannot know a folder exists. `get_coa` set this
-precedent for exactly the same reason.
+**Where it runs.** In `main.py`, reached through `ToolContext.runners`, never inside
+the runtime's own `get_product_spec`. That function is synchronous, cursor-based and
+never receives `pack_overrides` - it cannot await a Drive call and cannot know a folder
+exists. `get_coa` set this injection precedent for exactly the same reason.
 
 **What the model is told.** A status and a count, never a filename (H10). A filename
 is written by anyone who can upload to the client's Drive folder and arrives at the
@@ -27,7 +27,10 @@ import httpx
 import pytest
 
 import main as m
+from main import _spec_folder_for
 from services import spec_drive
+from services.agent_runtime import pipeline, registry
+from services.agent_runtime.tools import get_product_spec as spec_tool
 from tests.test_coa_drive import API_KEY, FOLDER_ID, drive
 from tests.test_spec_drive import FIXTURES, entry
 
@@ -72,8 +75,19 @@ async def attach(monkeypatch, obs, *, names=None, status=200, comp=None, capture
 
     monkeypatch.setattr(spec_drive, "load_index", patched_load)
     cap = captured if captured is not None else {}
-    result = await m._attach_spec_doc(comp or company(), obs, cap)
-    return result, cap
+    company_ = comp or company()
+
+    # The real composition, in the order the registry runs it: the injected runner
+    # enriches the observation on a private key, the tool's own capture lifts that key
+    # into the turn's capture dict, and `_strip_private` decides what the model sees.
+    # Asserting against a hand-rolled shortcut here would prove nothing about the seam
+    # the executor actually uses.
+    if _spec_folder_for(company_):
+        result = await m._attach_spec_doc(company_, obs)
+    else:
+        result = obs
+    cap.update(spec_tool._capture({}, result))
+    return registry._strip_private(result), cap
 
 
 class TestTheSheetsReachThePanel:
@@ -91,7 +105,12 @@ class TestTheSheetsReachThePanel:
         # silently change funnel behaviour and overwrite the commercial answer.
         _, captured = await attach(monkeypatch, found_observation())
         assert "spec_doc" in captured
-        assert "spec" not in captured
+        # `spec` is the catalog path's own key and it stays exactly that: the
+        # commercial fields, never the sheets. Reusing it would feed Drive rows to
+        # session_store.derive_title and the sales funnel.
+        assert captured["spec"] == {"product": "Acetone", "grade": "LR",
+                                    "packaging": "200 L drum"}
+        assert "results" not in captured["spec"]
 
     @pytest.mark.asyncio
     async def test_one_matching_sheet_is_pinned(self, monkeypatch):
@@ -125,7 +144,7 @@ class TestTheCatalogAnswerSurvives:
     async def test_a_bot_with_no_folder_captures_nothing(self, monkeypatch):
         obs, captured = await attach(monkeypatch, found_observation(),
                                      comp=company(pack_overrides={}))
-        assert captured == {}
+        assert "spec_doc" not in captured
         assert obs == found_observation()
 
     @pytest.mark.asyncio
@@ -133,7 +152,7 @@ class TestTheCatalogAnswerSurvives:
         obs, captured = await attach(
             monkeypatch, found_observation(),
             comp=company(pack_overrides={"coa": {"folder_id": FOLDER_ID}}))
-        assert captured == {}
+        assert "spec_doc" not in captured
         assert "spec_sheets" not in obs
 
     @pytest.mark.asyncio
@@ -142,19 +161,19 @@ class TestTheCatalogAnswerSurvives:
         # whole observation because Drive is down would turn a bonus into a
         # dependency, which is exactly what this must not be.
         obs, captured = await attach(monkeypatch, found_observation(), status=403)
-        assert captured == {}
+        assert "spec_doc" not in captured
         assert obs == found_observation()
 
     @pytest.mark.asyncio
     async def test_a_product_with_no_sheet_captures_nothing(self, monkeypatch):
         obs, captured = await attach(monkeypatch, found_observation("Nonsense9999"))
-        assert captured == {}
+        assert "spec_doc" not in captured
         assert "spec_sheets" not in obs
 
     @pytest.mark.asyncio
     async def test_a_nameless_product_never_reaches_drive(self, monkeypatch):
         obs, captured = await attach(monkeypatch, found_observation(""))
-        assert captured == {}
+        assert "spec_doc" not in captured
         assert "spec_sheets" not in obs
 
     @pytest.mark.asyncio
@@ -163,7 +182,7 @@ class TestTheCatalogAnswerSurvives:
         # a panel on rows the resolver declined to return would route around it.
         names = [f"Product{i}_Spec.pdf" for i in range(spec_drive.BROAD_GUARD_MIN_LIBRARY + 20)]
         obs, captured = await attach(monkeypatch, found_observation("Spec"), names=names)
-        assert captured == {}
+        assert "spec_doc" not in captured
         assert "spec_sheets" not in obs
 
 
@@ -216,8 +235,7 @@ class TestWhereItRuns:
         # pack_overrides. A Drive call there is not implementable, and a future
         # session tempted to "just put it with the rest of the spec logic" should
         # fail here rather than in production.
-        from services import agent as agent_module
-        source = inspect.getsource(agent_module.get_product_spec)
+        source = inspect.getsource(spec_tool.get_product_spec)
         assert "spec_drive" not in source
         assert "await" not in source
 
@@ -229,12 +247,25 @@ class TestWhereItRuns:
         assert "spec_drive.resolve" in inspect.getsource(m.search_spec)
 
     def test_the_executor_returns_the_wrapper_as_an_awaitable(self):
-        # The agent loop awaits whatever the executor hands back
-        # (`inspect.isawaitable`), which is how an async Drive call reaches a
-        # synchronous tool table. Calling it without returning it would attach
-        # nothing and warn about a coroutine never awaited.
+        # The registry awaits whatever a tool hands back (`inspect.isawaitable`), which
+        # is how an async Drive call reaches a synchronous tool table. Calling it
+        # without returning it would attach nothing and warn about a coroutine never
+        # awaited.
+        source = inspect.getsource(spec_tool._execute)
+        assert "return attach(ctx.company, obs)" in source
+
+    def test_the_runner_is_injected_only_for_a_configured_library(self):
+        # The enrichment is the ONLY thing that makes this tool async. Injecting the
+        # runner unconditionally would put every chemical tenant's product lookup
+        # through an awaitable for a library they do not have.
         source = inspect.getsource(m.chat_endpoint)
-        assert "return _attach_spec_doc(company, obs, _captured)" in source
+        assert '"attach_spec_doc": _attach_spec_doc' in source
+        assert "if _spec_folder_for(company) else {}" in source
+
+    def test_the_capture_key_is_declared_on_the_tool(self):
+        # `_apply_capture` raises on an undeclared key, so this is what stops the
+        # enrichment silently driving a card the tool never claimed.
+        assert "spec_doc" in spec_tool.TOOL.capture_keys
 
     def test_no_new_agent_tool_was_declared(self):
         # D8 - chat parity extends what get_product_spec produces. Every added tool
@@ -245,9 +276,9 @@ class TestWhereItRuns:
 
 class TestTheStreamCarriesIt:
     def test_spec_doc_is_emitted_and_persisted_on_the_session(self):
-        source = inspect.getsource(m.chat_endpoint)
-        assert "'spec_doc': agent_spec_doc" in source
+        # The turn pipeline frames every CARD_KEY out of the capture, so being in this
+        # tuple IS being emitted - there is no longer a per-card line in the handler.
+        assert "spec_doc" in pipeline.CARD_KEYS
         # Persisted alongside sds/quote/form/handoff/selectors/coa, so resuming a
         # conversation restores the panel action the same way they do.
-        actions = source[source.index('_actions = {'):source.index('_actions = {') + 400]
-        assert '"spec_doc"' in actions
+        assert "spec_doc" in pipeline._ACTION_KEYS

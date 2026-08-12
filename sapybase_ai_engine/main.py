@@ -3854,9 +3854,16 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         visitor_id=chat_req.visitor_id,
                         client_ip=get_remote_address(request),
                         coa_configured=bool(_coa_folder_for(company)),
-                        # COA's throttle/lockout wiring still lives here; the runtime
-                        # calls it through this injection rather than importing main.
-                        runners={"get_coa": _run_get_coa},
+                        # COA's throttle/lockout wiring and the spec library's Drive
+                        # lookup both still live here; the runtime calls them through
+                        # this injection rather than importing main. `attach_spec_doc`
+                        # is injected only when the company has a library configured,
+                        # so get_product_spec stays synchronous for everyone else.
+                        runners={
+                            "get_coa": _run_get_coa,
+                            **({"attach_spec_doc": _attach_spec_doc}
+                               if _spec_folder_for(company) else {}),
+                        },
                     )
                     _turn_inputs = agent_pipeline.TurnInputs(
                         company=company,
@@ -6536,14 +6543,14 @@ _SPEC_DOC_MESSAGE = (
 )
 
 
-async def _attach_spec_doc(company: dict, obs: dict, captured: dict) -> dict:
+async def _attach_spec_doc(company: dict, obs: dict) -> dict:
     """Post-process a `found` ``get_product_spec`` with the company's Drive library (§7).
 
-    The Drive lookup lives HERE and not in ``services/agent.py``'s ``get_product_spec``,
-    which is synchronous, cursor-based, and never sees ``pack_overrides`` — it cannot
-    await a Drive call and cannot know a folder exists. ``get_coa`` set this precedent
-    for exactly the same reason, and the agent loop already awaits whatever the
-    executor hands back.
+    The Drive lookup lives HERE and not in the runtime's ``get_product_spec``, which is
+    synchronous, cursor-based, and never sees ``pack_overrides`` — it cannot await a
+    Drive call and cannot know a folder exists. ``get_coa`` set this precedent for
+    exactly the same reason, and the runtime reaches both through ``ToolContext.runners``
+    rather than importing anything from this module.
 
     Best-effort by construction: the catalog answer is correct on its own, so a Drive
     outage, a revoked folder or a product with no sheet all leave the observation
@@ -6568,10 +6575,13 @@ async def _attach_spec_doc(company: dict, obs: dict, captured: dict) -> dict:
         return obs
 
     rows = [spec_drive.to_payload(doc) for doc in found.documents]
-    # `spec_doc`, never `spec`: `_captured["spec"]` is the catalog path's key and feeds
+    # `_spec_doc`, never `spec`: `captured["spec"]` is the catalog path's key and feeds
     # session_store.derive_title and the sales funnel. Reusing it would silently change
     # funnel behaviour to say nothing of overwriting the commercial answer.
-    captured["spec_doc"] = {
+    # The `_` prefix is the registry's capture-only channel (get_coa's `_rows` set the
+    # precedent): the tool's own capture lifts it, and `_strip_private` guarantees this
+    # payload — filenames included — never reaches the model.
+    obs["_spec_doc"] = {
         "query": product,
         "results": rows,
         # R8 — pinned only when the product identifies ONE sheet. A product with six
