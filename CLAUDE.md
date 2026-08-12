@@ -231,3 +231,7 @@ graphify update .  # ~$0.01-0.05, user runs manually
 - ❌ Small bug fixes (1-3 files)
 - ❌ Comment-only changes
 - ❌ Tests (unless new test patterns matter)
+
+## Reporting Style
+
+- When reporting information, be extremely concise - sacrifice grammar for the sake of concision.
