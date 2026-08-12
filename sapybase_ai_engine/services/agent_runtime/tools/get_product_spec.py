@@ -131,14 +131,26 @@ def get_product_spec(
     }
 
 
-def _execute(ctx: ToolContext, args: dict) -> dict:
-    return get_product_spec(
+def _execute(ctx: ToolContext, args: dict):
+    obs = get_product_spec(
         ctx.cursor,
         ctx.company_id,
         cas_number=args.get("cas_number"),
         product_name=args.get("product_name"),
         grade=args.get("grade"),
     )
+    # spec-finder-plan Phase 4 (D8): a resolved product goes through the SAME Drive
+    # resolver the hub panel uses, so "send me the spec sheet for acetone" reaches the
+    # same place as the card. Not a second tool - the sheets are an enrichment of this
+    # answer, and the catalog answer stands on its own if the library is unreachable.
+    #
+    # The runner is injected because the lookup is async and needs Redis and
+    # pack_overrides, none of which the runtime owns. Returning a coroutine only when
+    # the company actually has a library keeps every other tenant's turn synchronous.
+    attach = ctx.runners.get("attach_spec_doc")
+    if attach is None or obs.get("status") != "found":
+        return obs
+    return attach(ctx.company, obs)
 
 
 def _capture(args: dict, obs: dict) -> dict:
@@ -169,6 +181,11 @@ def _capture(args: dict, obs: dict) -> dict:
             "grade": product.get("grade"),
             "pack_sizes": packs,
         }
+    # Lifted from the private channel the spec runner wrote it to; the model saw only
+    # the `spec_sheets` status and count, never a filename.
+    spec_doc = obs.get("_spec_doc")
+    if spec_doc:
+        patch["spec_doc"] = spec_doc
     return patch
 
 
@@ -178,6 +195,6 @@ TOOL = register(
         execute=_execute,
         status_phrase="Finding the product…",
         capture=_capture,
-        capture_keys=("spec", "grade_selector", "pack_selector"),
+        capture_keys=("spec", "grade_selector", "pack_selector", "spec_doc"),
     )
 )

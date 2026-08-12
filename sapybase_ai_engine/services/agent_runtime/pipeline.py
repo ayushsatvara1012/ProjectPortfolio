@@ -39,7 +39,8 @@ HEARTBEAT_SECONDS = 15
 
 #: Capture keys that are client-renderable cards; ``handoff`` is deliberately absent
 #: - it is the owner's alert, never a frame the visitor sees.
-CARD_KEYS = ("sds", "quote", "form", "grade_selector", "pack_selector", "coa")
+CARD_KEYS = ("sds", "quote", "form", "grade_selector", "pack_selector", "coa",
+             "spec_doc")
 
 #: What gets replayed to the model as this turn's actions on the next turn.
 _ACTION_KEYS = CARD_KEYS + ("handoff",)
