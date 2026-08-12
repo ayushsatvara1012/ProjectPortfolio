@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Callable, Iterable, NamedTuple
+from typing import Any, Callable, Iterable, NamedTuple, Optional
 from urllib.parse import urldefrag, urljoin, urlparse
 
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -614,6 +614,81 @@ def _label_from_url(url: str) -> str:
     if not label:
         return path
     return label[:1].upper() + label[1:]
+
+
+#: Shortest extraction worth storing at all. A page under this is a redirect stub
+#: or an error body, never content.
+MIN_USABLE_CHARS = 50
+
+#: What a bot-check, paywall or JS-shell page says instead of the page. These fetch
+#: with HTTP 200 and clear any length floor a stub check would set - expresolv.com
+#: served exactly 51 characters of "Please wait while your request is being
+#: verified...", which was enough to replace a whole trained source with itself.
+_INTERSTITIAL_PATTERNS = (
+    r"request is being verified",
+    r"checking your browser",
+    r"verifying you are human",
+    r"please wait while",
+    r"enable javascript (?:to|and)",
+    r"javascript is (?:required|disabled)",
+    r"cf-browser-verification",
+    r"attention required!\s*\|\s*cloudflare",
+    r"access denied",
+    r"are you a robot",
+    r"ddos protection by",
+)
+_INTERSTITIAL_RE = re.compile("|".join(_INTERSTITIAL_PATTERNS), re.IGNORECASE)
+
+#: Above this an interstitial phrase is incidental copy, not the page. Real
+#: challenge bodies are tiny - the one that caused this was 51 characters, and a
+#: Cloudflare block page extracts to a few hundred.
+INTERSTITIAL_MAX_CHARS = 1200
+
+#: How much smaller a re-ingest may be before it is treated as a failed fetch
+#: rather than an edited page. Deliberately generous - real edits and redesigns
+#: shrink pages, and a false refusal here only costs the owner a delete-and-re-add.
+REPLACEMENT_SHRINK_FLOOR = 0.25
+
+#: Sources below this never trigger the shrink guard: a page that held almost
+#: nothing has nothing to protect, and the ratio is noise at that size.
+SHRINK_GUARD_MIN_WORDS = 100
+
+
+def unusable_reason(extracted: str) -> Optional[str]:
+    """Why this extraction must not be stored, or None when it is usable.
+
+    Length alone cannot answer this. An interstitial is a successful fetch of the
+    wrong page: HTTP 200, plausible length, and no error anywhere for a caller to
+    notice - so it has to be recognised by what it says.
+    """
+    text = (extracted or "").strip()
+    if not text:
+        return "the page returned no text"
+    if len(text) < MIN_USABLE_CHARS:
+        return f"only {len(text)} characters of text were found"
+    # Only short pages: an interstitial IS the whole response, so the phrase
+    # carries the page. On a full page the same words are ordinary copy - an order
+    # desk writing "please wait while we confirm stock" must still be trainable.
+    if len(text) <= INTERSTITIAL_MAX_CHARS and _INTERSTITIAL_RE.search(text):
+        return ("the site returned a bot-verification or access-denied page "
+                "instead of the content")
+    return None
+
+
+def replacement_shrink_reason(old_words: int, new_words: int) -> Optional[str]:
+    """Why this re-ingest must not replace the stored source, or None to proceed.
+
+    The guard that matters: whatever the cause - a challenge page, an outage, a
+    redesign behind a login - swapping a rich source for a near-empty one destroys
+    knowledge the owner cannot get back, and it looks to them like the bot simply
+    forgot. Refusing costs a delete-and-re-add; accepting costs the source.
+    """
+    if old_words < SHRINK_GUARD_MIN_WORDS:
+        return None
+    if new_words >= old_words * REPLACEMENT_SHRINK_FLOOR:
+        return None
+    return (f"the new version has {new_words} words against {old_words} already "
+            f"stored, so it looks like a failed fetch rather than an edit")
 
 
 def marginal_words(extracted: str) -> int:
