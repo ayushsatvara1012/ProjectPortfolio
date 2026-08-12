@@ -55,7 +55,7 @@ To avoid three different things being called "Slice A" in one file, audit items 
 
 | Source | Item | Status |
 |---|---|---|
-| This plan | F - FAQ feedback loop | **F1, F2, F3 COMMITTED** 2026-08-12 (`77151c50`, `04211558`), unpushed. **F4 DONE for 4 of 5 sources** - 47 of 61 rows cleared by re-ingest, contamination 0% on both cleaned tenants. **Expresolv `/leadership` BLOCKED** on a bot-verification interstitial. §1. |
+| This plan | F - FAQ feedback loop | **COMPLETE and DEPLOYED 2026-08-12.** PR #120 merged to MainV2 (`f0d8aff6`, `c62522b4`, `fc3bfa0f`, `bef6921e`). All 61 rows cleared across all 3 tenants; `--probe ingest` reports none; retrieval contamination 63% -> 0%. §1, §1.4b. |
 | This plan | G - response contract | **SHADOW SHIPPED** (`41c4ddc4`, on branch). **CUT to checks 1 and 2** on measurement, 2026-08-12: those two are 27% of turns and untouched by the corpus fix; check 3 holds in shadow; check 4 is a 1% defect. §2.4a. |
 | This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
 | This plan | I - extraction hardening | PLAN ONLY. §4. |
@@ -222,9 +222,9 @@ Expresolv's most-asked SDS query (13 asks) pulls one at rank 5, and its price-qu
 Consequence for §3 and §4: the top-5 competition H and I are trying to relieve is substantially **self-ingested FAQ rows**, not only the homepage and testimonial chunks §4 named.
 H's measurement must run after the re-ingest, not just after Slice I, or it measures a corpus that no longer exists.
 
-### 1.4b F4 executed, 2026-08-12 - 4 of 5 sources
+### 1.4b F4 executed, 2026-08-12 - complete, via one destroyed source and its recovery
 
-Run with **local code against the prod DB**, deliberately: production (`MainV2`) does not carry F1, so retraining through the deployed API would have re-ingested the same schema. Anyone repeating this must do the same until F1 is deployed.
+The first four sources were run with **local code against the prod DB**, deliberately: production did not carry F1 yet, so retraining through the deployed API would have re-ingested the same schema.
 
 | source | rows before -> after | contaminated after |
 |---|---|---|
@@ -235,12 +235,21 @@ Run with **local code against the prod DB**, deliberately: production (`MainV2`)
 
 47 of 61 rows cleared. Re-measured with the rank probe afterwards: **SaPyBase 48% -> 0%, SP Design 76% -> 0%** of real queries returning a contaminated row in the final top 5.
 
-**Expresolv `/leadership` is blocked and its 14 rows remain.**
-`expresolv.com` now serves a bot-verification interstitial to our fetcher: Jina returns 200 with 7,012 bytes, and extraction yields **51 characters** - `"Please wait while your request is being verified..."`.
-That is above the crawl path's own `>= 50` char floor, so **an unguarded re-ingest would have swapped 60 rows of real leadership content for that one sentence.** The dry run is the only reason it did not.
-No `JINA_API_KEY` is set locally; production has one, which may or may not clear the challenge.
+#### Expresolv `/leadership` - destroyed, then recovered
 
-**Follow-up this exposes, not yet fixed:** `_train_pages` accepts any extraction over 50 chars (`main.py:8677`), so a live owner retraining a page behind a challenge silently destroys that source's knowledge. That is a real data-loss path in the product, independent of F.
+Local re-ingest refused this page: `expresolv.com` serves a bot-verification interstitial to our fetcher, and extraction yielded **51 characters** of `"Please wait while your request is being verified..."`. The dry-run guard caught it.
+
+**After F1 deployed, the owner retrained the page through the app, and production hit the same interstitial with no such guard.** The source went **60 rows -> 2 rows** of that one sentence. Nothing reported an error.
+
+**Recovered the same session, and the recovery is the useful fact: the site blocks `r.jina.ai` specifically but serves a normal browser UA fine.** Fetched direct with a Chrome UA, pushed through the same `_extract_page_text` (F1 included), re-ingested: **45 rows, 566 words, clean.**
+
+Nothing legitimate was lost, verified term by term - the staff names live in their own per-person sources (`Mr.Pratik Shome` and eight others, 2 rows each) and the food-grade acid list is in `food additives at expresolv.pdf`. That list was bot output on the old rows, not page copy, so its disappearance is the contamination leaving.
+
+**Tell Expresolv their site blocks our fetcher.** It will break their next retrain too, and it is their WAF rule, not our reachability.
+
+**The data-loss path this exposed is fixed and merged: PR #121, `6f8e9ced`.** `html_extract.unusable_reason` recognises a challenge or access-denied body by what it says rather than its length, applied at all three extraction-acceptance points and only on short bodies so a real page saying "please wait while we confirm stock" stays trainable; `replacement_shrink_reason` refuses any upsert collapsing a source below a quarter of its stored words, whatever the cause. Both asserted against this incident's own numbers (978 -> 8 words).
+
+**Final state: all 61 rows cleared across all three tenants.** `--probe ingest` reports none, and the rank probe reads 0% for every tenant, from 63% overall.
 
 Superseded original spec, kept for the record: identify `company_knowledge` rows ingested from our own FAQPage markup and delete them.
 Detection: content matching the shape `_flatten_entity` produces for `FAQPage`/`Question`, plus the `📎 Source:` marker.
@@ -289,6 +298,10 @@ F gates *classes* of unpublishable content; it cannot detect a fluent, ungrounde
 A COA batch identifier and internal error strings were published as public, crawlable SEO content on the client's own site.
 
 Per the owner decision: fix first, then tell the client plainly, no formal incident process.
+
+**Still owed as of 2026-08-12, and it is now two clients, not one.**
+**SP Design** was contaminated on 2026-07-21, three weeks before Expresolv, was the worst affected (76% of queries), and never reported anything. They are owed the same disclosure.
+**Expresolv** additionally needs to hear two things: that their `/leadership` page was briefly reduced to one sentence during remediation and has been restored, and that their site blocks our fetcher, which is why it could not refresh and will break their next retrain.
 
 State precisely when we do: the COA *document* was never exposed, and `get_coa`'s retrieval, throttle and lockout were never weakened.
 What leaked was a batch identifier inside a transcript, republished by a feature working as designed on input it should never have been given.
@@ -720,6 +733,14 @@ Nothing above changes §10's own F-K sequencing or §8's frozen guarantees. This
 - **The EXPLORE word cap.** Expresolv has used 4,496 of 12,000 words (`core/config.py:48`). Their site is roughly 250,000 words across 668 pages (17 in `page-sitemap.xml`, 651 in `product-sitemap.xml`). Only **6 pages are ingested, 0.9% of the site**. No scraper work changes the fact that their tier cannot hold their site. Commercial conversation.
 - **"Business development manager" does not exist in their content.** Repeatedly asked, correctly declined. They must add the role or stop asking.
 - **Full-site discovery is opt-in** and their ingestion dates show one-URL-at-a-time manual entry. Worth showing them the flow, but 651 product pages will not fit the cap regardless.
+
+**Resolved 2026-08-12 - not cross-tenant bleed, and it is a good demonstration of what check 3 is for.**
+
+The bot answered Expresolv's `"who is technical director in expresolv?"` with "Mr. Piyush Satvara is the Technical Director at Expresolv", and the contract flagged the name as ungrounded. The worrying reading was cross-tenant bleed, since that is also the platform owner's name.
+It is not: "Piyush" appears in Expresolv's **own** corpus, 3 rows in `/leadership` and 2 in `gst_certificate.pdf`. Tenant scoping held.
+
+What actually happened is subtler and worth keeping. That turn's five sources were **all homepage chunks, every one scored 0.0** - so the name was not in the evidence the turn retrieved, even though it exists elsewhere in the tenant's data. The reply was factually right and evidentially unsupported at the same time.
+This is precisely the distinction check 3 draws - "not supported by this turn's evidence" rather than "false" - and it is why the check reports rather than deletes, and why it re-invokes instead of repairing.
 
 **Deferred engineering:**
 
