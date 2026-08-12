@@ -654,3 +654,77 @@ def test_label_from_url_humanises_the_slug():
     assert _label_from_url("https://x.com/about-us") == "About us"
     assert _label_from_url("https://x.com/services/roof_repair") == "Roof repair"
     assert _label_from_url("https://x.com/") == "https://x.com/"
+
+
+from services.html_extract import replacement_shrink_reason, unusable_reason
+
+
+class TestUnusableExtraction:
+    """A successful fetch of the wrong page (bugfix/reject-unusable-extraction).
+
+    expresolv.com answered 200 with a 51-character bot-check page. That cleared the
+    old `len(text) >= 50` floor, so a retrain replaced a 60-row trained source with
+    the sentence "Please wait while your request is being verified..." - the page's
+    real content, gone, and nothing anywhere reported an error.
+    """
+
+    def test_the_real_interstitial_that_caused_this_is_rejected(self):
+        assert unusable_reason("Please wait while your request is being verified...")
+
+    def test_a_cloudflare_challenge_is_rejected(self):
+        assert unusable_reason(
+            "Checking your browser before accessing example.com. "
+            "This process is automatic. DDoS protection by Cloudflare."
+        )
+
+    def test_a_javascript_shell_is_rejected(self):
+        assert unusable_reason(
+            "You need to enable JavaScript to run this app. " * 3
+        )
+
+    def test_an_empty_page_is_rejected(self):
+        assert unusable_reason("")
+        assert unusable_reason("   \n  ")
+
+    def test_a_stub_shorter_than_the_floor_is_rejected(self):
+        assert unusable_reason("Redirecting...")
+
+    def test_real_content_passes(self):
+        text = ("Expresolv supplies laboratory and industrial chemicals across India. "
+                "Our leadership team is based in Ahmedabad, Gujarat, and we serve "
+                "pharmaceutical, food and agricultural customers nationwide.")
+        assert unusable_reason(text) is None
+
+    def test_a_full_page_that_merely_mentions_waiting_is_still_trainable(self):
+        # An order desk writing "please wait while we confirm stock" is content.
+        # An interstitial IS the whole response; the phrase alone cannot decide it.
+        text = ("Our order desk replies within one working day. Please wait while we "
+                "confirm stock before paying. "
+                + "Bulk packs of acetone, methanol and toluene ship from Ahmedabad "
+                  "with full documentation on request. " * 20)
+        assert len(text) > 1200
+        assert unusable_reason(text) is None
+
+
+class TestReplacementShrink:
+    """The guard that actually saves the source, whatever the cause of the bad fetch."""
+
+    def test_a_collapse_to_almost_nothing_is_refused(self):
+        assert replacement_shrink_reason(978, 8)
+
+    def test_an_ordinary_edit_is_allowed(self):
+        assert replacement_shrink_reason(978, 900) is None
+
+    def test_a_substantial_but_plausible_trim_is_allowed(self):
+        # A real redesign can halve a page; only a collapse is suspicious.
+        assert replacement_shrink_reason(1000, 400) is None
+
+    def test_growth_is_always_allowed(self):
+        assert replacement_shrink_reason(500, 5000) is None
+
+    def test_a_source_that_held_almost_nothing_is_not_guarded(self):
+        # Nothing worth protecting, and the ratio is noise at this size.
+        assert replacement_shrink_reason(40, 2) is None
+
+    def test_the_expresolv_incident_would_have_been_refused(self):
+        assert replacement_shrink_reason(978, 8)

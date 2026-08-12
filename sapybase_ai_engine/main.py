@@ -8459,6 +8459,25 @@ async def run_training_job(
             text = item.page_content if hasattr(item, "page_content") else item
             return len(text.split())
 
+        # A re-ingest that collapses a rich source to almost nothing is a failed
+        # fetch, not an edit, and the swap below would destroy knowledge the owner
+        # cannot recover. Refuse before the temp rows go in - the escape hatch for a
+        # genuinely gutted page is to delete the source and add it again.
+        if is_upsert:
+            shrink = html_extract.replacement_shrink_reason(
+                old_child_words, sum(_child_word_count(p[1]) for p in all_child_texts_flat)
+            )
+            if shrink:
+                await set_job_status(job_id, {
+                    "status": "error",
+                    "message": (f"Kept the existing version of this source - {shrink}. "
+                                "Check the page loads for everyone, then try again. If "
+                                "the page really did shrink, delete the source and add it again."),
+                })
+                logger.warning("TRAINING JOB %s: refused shrinking upsert for %s (%s)",
+                               job_id, source_name, shrink)
+                return
+
         # Cap by cumulative word budget, not chunk count — a chunk is no longer
         # an atomic unit of quota. The upfront WORD_QUOTA_OVERFLOW check is an
         # exact word count of the source text, so this only truncates when
@@ -8671,10 +8690,11 @@ async def run_crawl_training_job(
         try:
             html = await _fetch_url_html(page_url)
             text = _strip_markdown_images(_extract_page_text(html, page_url, seen_blocks=seen_blocks))
-            if len(text) >= 50:
+            unusable = html_extract.unusable_reason(text)
+            if unusable is None:
                 extracted.append((source_name, text, page_url))
             else:
-                failed.append({"url": page_url, "reason": "No usable content on the page."})
+                failed.append({"url": page_url, "reason": f"Not trained - {unusable}."})
         except HTTPException as exc:
             failed.append({"url": page_url, "reason": str(exc.detail)})
         except Exception as exc:
@@ -9070,8 +9090,9 @@ async def train_chatbot(
         try:
             raw_body = await _fetch_url_html(url.strip())
             cleaned_text = _strip_markdown_images(_extract_page_text(raw_body, url.strip()))
-            if len(cleaned_text) < 50:
-                raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
+            unusable = html_extract.unusable_reason(cleaned_text)
+            if unusable:
+                raise HTTPException(status_code=400, detail=f"Couldn't train this page - {unusable}.")
             # Store with the normalised URL so metadata.source matches source_name.
             docs = [Document(page_content=cleaned_text, metadata={"source": pending_source_name})]
         except HTTPException:
