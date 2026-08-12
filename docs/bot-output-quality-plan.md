@@ -56,10 +56,10 @@ To avoid three different things being called "Slice A" in one file, audit items 
 | Source | Item | Status |
 |---|---|---|
 | This plan | F - FAQ feedback loop | **F1, F2, F3 COMMITTED** 2026-08-12 (`77151c50`, `04211558`), unpushed. **F4 DONE for 4 of 5 sources** - 47 of 61 rows cleared by re-ingest, contamination 0% on both cleaned tenants. **Expresolv `/leadership` BLOCKED** on a bot-verification interstitial. §1. |
-| This plan | G - response contract | **SHADOW SHIPPED (uncommitted, 2026-08-12).** All four checks built as pure functions in `services/agent_runtime/contract.py`, wired into the pipeline in shadow mode, 32 tests. Enforcement gated on measured traffic. §2. |
+| This plan | G - response contract | **SHADOW SHIPPED** (`41c4ddc4`, on branch). **CUT to checks 1 and 2** on measurement, 2026-08-12: those two are 27% of turns and untouched by the corpus fix; check 3 holds in shadow; check 4 is a 1% defect. §2.4a. |
 | This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
 | This plan | I - extraction hardening | PLAN ONLY. §4. |
-| This plan | J - reflex question | PLAN ONLY, ships with G. §5. |
+| This plan | J - reflex question | **DEPRIORITISED 2026-08-12** - measured at 1 turn in 98. Do not build the arbitration. §5. |
 | This plan | K - contact ack binding | PLAN ONLY, smallest. §6. |
 | Gaps plan | Slices A/B/D - contact capture, spec/quote fixes, source attribution | **DONE, pushed to MainV2** (`63747833`, confirmed an ancestor of this branch's base). |
 | Gaps plan | Slice E - directory-answer fixes | **DONE, pushed to MainV2** (`aa61ed71`). |
@@ -343,6 +343,27 @@ So `sources` proves *which* chunks were retrieved and never *what they said*, an
 The evidence text is threaded separately instead: `TurnInputs.retrieved_text` (chunk contents, filled by the handler from `retrieved_docs`) plus the tool payloads already in `captured`, assembled by `contract.evidence_from()`.
 The shadow pass therefore runs in `pipeline.run_agent_turn` just after `settle()`, not inside it - that is where both halves of the evidence set are actually in hand.
 
+### 2.4a Measured 2026-08-12, after the corpus cleanup - G is cut to checks 1 and 2
+
+The contract's four checks were run over **98 stored Expresolv turns** (10 days), and the five diagnostic questions were replayed against the cleaned corpus.
+Caveat carried honestly: nearly all 98 turns predate the cleanup, so this sizes the *problem*, not the *residual*.
+
+| check | turns flagged | does the corpus cleanup touch it? |
+|---|---|---|
+| restatement | **18%** | **No.** The mechanism is the previous assistant message, not retrieval. |
+| ungrounded | 10% | Partly, and it has false positives. |
+| denial_opener | **9%** | **No.** Same - a history/composition defect. |
+| extra_question | **1%** | No. |
+
+Retrieval is now materially healthier: 4 of the 5 diagnostic questions surface the right person in the top 5 (`Ms.Himani Zaveri` for export, `Ida Sebastian` + `Pratik Shome` for sales, `leadership` for CMD).
+The fifth, "business development", is the case §17 already classifies as not our bug - the role does not exist in their content.
+
+**Decision, 2026-08-12: build checks 1 and 2 to enforcement; hold check 3 in shadow; deprioritise J.**
+
+- **Checks 1 and 2 ship.** ~27% of turns combined, deterministic repair, no model call, and the corpus fix was never going to touch them. Evidence from real turns: "who is looking export" replayed its entire previous reply, "Who is CMD of expresolv?" replayed 201 characters, and "can i get contact detail of aayush patel" tripped *both* checks on one turn.
+- **Check 3 stays in shadow.** It is the only check that costs a re-invoke, its 10% includes false positives - `"Managing Director"` was flagged as an ungrounded person, a job title the name extractor treats as a name - and the retrieval improvement removes more of the genuine cases. It needs post-cleanup traffic before it enforces anything.
+- **Check 4 / Slice J is deprioritised**, see §5.
+
 ### 2.4 The post-conditions
 
 **1. No restatement of the previous reply.**
@@ -363,8 +384,7 @@ Validating against chunks alone breaks every working tool answer, and this is th
 
 Not deterministically repairable - removing a name can leave a reply that answers nothing. This is the one case that re-invokes.
 
-**4. At most one question, and only when licensed.**
-G enforces the count; Slice J sets the permission. They are a pair.
+**4. At most one question, and only when licensed. DEPRIORITISED 2026-08-12** - measured at 1 turn in 98, see §2.4a and §5. The check exists and reports; nothing arbitrates the licence, and `question_licensed` stays hardcoded `True`.
 
 ### 2.5 Failure handling
 
@@ -464,7 +484,15 @@ Note this does not retroactively clean existing corpora. They keep their noise u
 
 ---
 
-## 5. Slice J - suppress the reflex question
+## 5. Slice J - suppress the reflex question. DEPRIORITISED 2026-08-12.
+
+**Measured: 1 turn in 98 carries an unlicensed extra question.**
+This section was written from a single vivid transcript and called VERIFIED on that basis; §10 and §16 then paired J with G as an equal partner.
+The measurement does not support that. J is a rounding error next to check 1's 18%, and the three-source arbitration below is a substantial build for a 1% defect.
+
+**Do not build the arbitration.** G's check 4 already counts questions and reports them, which is enough to keep watching the rate. Revisit only if the rate rises materially on post-cleanup traffic.
+
+The analysis below is kept because it is correct about the *mechanism* - it is the priority that was wrong.
 
 Symptom confirmed 2026-08-11 against **post-restructure** transcripts, so the earlier "may already be stale" caution is discharged.
 
@@ -589,10 +617,11 @@ Green between slices; re-measure the baseline at the start of each rather than a
 
 ## 10. Order
 
-**F1 -> F2 -> F3 -> F4**, then **G with J** (shadow first), then **I**, then **H** (measure first), then **K**.
+**F1 -> F2 -> F3 -> F4** (all done), then **G checks 1 and 2 to enforcement**, then **I**, then **H** (measure first), then **K**.
+**J is out of the sequence** as of 2026-08-12 (§5), and G's check 3 stays in shadow rather than gating the slice.
 
 F is first because it is the only slice verified as actively causing harm, it corrupts continuously rather than at a point in time, and F1 alone is a few lines.
-G and J ship together because J sets the permission G enforces.
+G and J were sequenced together because J sets the permission G's check 4 enforces; that pairing is withdrawn now that check 4's defect measures at 1%.
 **I precedes H**, per §3's own constraint: noise suppression frees top-5 slots, so H's measurement must run against the post-cleanup corpus or it will over-estimate the `top_k` increase needed.
 An earlier revision of this section had H before I, contradicting §3, §4 and §16; corrected 2026-08-12.
 K is last: smallest and independent.
@@ -667,7 +696,7 @@ Relationship to this plan's Slice I (§4): different layers (splitting vs. extra
 §10 already orders F-K internally. This extends that ordering across every item this file now tracks, in the sequence that respects real dependencies (not slice-letter order):
 
 1. **F1 -> F2 -> F3 -> F4** (§1) - already in flight, actively corrupting data, ships first regardless of everything below.
-2. **G with J, shadow first** (§2, §5).
+2. **G checks 1 and 2 to enforcement** (§2.4a). Check 3 stays in shadow; **J is dropped from the path** (§5).
 3. **QF13** (chat-log idempotency, §13) - cheap, isolated, real duplicate-row gap on retried requests; ship alongside F/G. QF5 turned out to already be done, nothing to do there.
 4. **I** (§4) - extraction hardening, ships before H is measured and before Entity-Safe Phase 2 (its own harness numbers depend on cleaner extraction input).
 5. **H, measured against I** (§3).

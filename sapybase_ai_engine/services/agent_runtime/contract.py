@@ -111,6 +111,23 @@ _NOT_A_PERSON = frozenset({
     "good morning", "good afternoon", "good evening",
 })
 
+#: Job titles read as names by the capitalised-bigram shape - "Managing Director"
+#: was reported as an ungrounded person in the 2026-08-12 baseline run. A title is
+#: matched as a whole phrase and also stripped when it trails a real name, so
+#: "Piyush Satvara, Technical Director" is checked as "Piyush Satvara".
+_JOB_TITLES = (
+    "managing director", "technical director", "executive director", "deputy director",
+    "chief executive officer", "chief financial officer", "chief operating officer",
+    "general manager", "sales manager", "plant manager", "account manager",
+    "marketing head", "sales head", "business head", "department head",
+    "vice president", "assistant manager", "senior manager", "project manager",
+    "quality control", "production manager", "director", "manager", "head",
+)
+_TITLE_SUFFIX_RE = re.compile(
+    r"\s*[,-]?\s*(?:" + "|".join(re.escape(t) for t in _JOB_TITLES) + r")\s*$",
+    re.IGNORECASE,
+)
+
 #: Leading words that make a match a sentence opener rather than a name.
 _SENTENCE_OPENERS = frozenset({
     "the", "this", "that", "these", "those", "our", "your", "their", "his", "her",
@@ -253,11 +270,14 @@ def _evidence_haystack(evidence: Iterable[str]) -> Tuple[str, str]:
 def _candidate_names(text: str) -> List[str]:
     out: List[str] = []
     for match in _NAME_RE.finditer(text or ""):
-        phrase = match.group(1).strip()
+        phrase = _TITLE_SUFFIX_RE.sub("", match.group(1).strip()).strip(" ,-")
         low = phrase.lower()
-        if low in _NOT_A_PERSON:
+        if not phrase or low in _NOT_A_PERSON or low in _JOB_TITLES:
             continue
         if low.split()[0] in _SENTENCE_OPENERS:
+            continue
+        # A title stripped down to a single word is no longer a name shape.
+        if len(phrase.split()) < 2:
             continue
         if phrase not in out:
             out.append(phrase)

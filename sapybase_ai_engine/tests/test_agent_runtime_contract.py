@@ -112,6 +112,22 @@ class TestUngroundedIdentities:
         assert contract.ungrounded_identities(text, EVIDENCE_SALES,
                                               extra_vocab=("Acetic Acid",)) == []
 
+    def test_a_job_title_is_never_reported_as_a_person(self):
+        # The 2026-08-12 baseline run reported "Managing Director" as an ungrounded
+        # person on a real turn - a title has the same capitalised-bigram shape.
+        assert contract.ungrounded_identities(
+            "The Managing Director signs every export declaration.", EVIDENCE_SALES) == []
+
+    def test_a_title_trailing_a_name_is_stripped_not_reported_whole(self):
+        # "Pratik Shome, Head of Sales" is grounded; the title must not make it fail.
+        assert contract.ungrounded_identities(
+            "Pratik Shome, Sales Manager, handles enquiries.", EVIDENCE_SALES) == []
+
+    def test_an_ungrounded_name_carrying_a_title_is_still_reported(self):
+        found = contract.ungrounded_identities(
+            "Piyush Satvara, Technical Director, signs it.", EVIDENCE_SALES)
+        assert "Piyush Satvara" in found
+
     def test_no_evidence_reports_nothing(self):
         # An evidence-free turn is the gates' problem, not check 3's - reporting
         # every name here would drown the signal shadow mode is meant to measure.
