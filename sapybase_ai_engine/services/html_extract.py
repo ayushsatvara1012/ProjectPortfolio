@@ -63,6 +63,16 @@ _DEDUP_NORMALISE_RE = re.compile(r"[^a-z0-9]+")
 
 _JSONLD_SKIP_KEYS = {"@context", "@id", "image", "logo", "url", "sameAs", "potentialAction"}
 
+# Our own loader publishes the bot's answers back onto the merchant's page as
+# FAQPage schema; ingesting it would make the bot its own source (plan §1.4, F1).
+_JSONLD_SKIP_TYPES = {"faqpage", "question", "answer"}
+
+# `faqScript.dataset.sapybaseFaq = 'true'` in public/sapybase-loader@1.js:818.
+_SAPYBASE_FAQ_ATTR = "data-sapybase-faq"
+
+# Last-resort marker for renderers that drop data-* attributes.
+_SOURCE_MARKER_RE = re.compile(r"📎\s*source\s*:", re.IGNORECASE)
+
 # Marks the appended schema.org section, so callers can separate the site-wide
 # structured block from page-specific body copy.
 STRUCTURED_DATA_HEADING = "## Structured data"
@@ -256,22 +266,40 @@ def _collect_jsonld(soup: BeautifulSoup, seen_blocks: set[str] | None = None) ->
 
     Shares the caller's dedup set so a crawl does not store the same Organization
     block once per page - most sites emit an identical one site-wide.
+
+    Three skips guard against re-ingesting our own published answers, in order of
+    exactness: the loader's own attribute, the source-citation marker, and the
+    Q&A schema types themselves.
     """
     lines: list[str] = []
     seen: set[str] = set() if seen_blocks is None else seen_blocks
     for script in soup.find_all("script", attrs={"type": re.compile(r"ld\+json", re.I)}):
+        if script.has_attr(_SAPYBASE_FAQ_ATTR):
+            continue
         raw = script.string or script.get_text() or ""
+        if _SOURCE_MARKER_RE.search(raw):
+            continue
         try:
             payload = json.loads(raw.strip())
         except Exception:
             continue  # malformed JSON-LD is common; never fail the document
         for entry in _walk_jsonld(payload, 0):
+            if _is_qa_schema(entry):
+                continue
             for line in _flatten_entity(entry, 0):
                 key = _DEDUP_NORMALISE_RE.sub("", line.lower())
                 if key and key not in seen:
                     seen.add(key)
                     lines.append(line)
     return lines
+
+
+def _is_qa_schema(entity: Any) -> bool:
+    if not isinstance(entity, dict):
+        return False
+    raw_type = entity.get("@type")
+    types = raw_type if isinstance(raw_type, list) else [raw_type]
+    return any(str(t).strip().lower() in _JSONLD_SKIP_TYPES for t in types if t)
 
 
 def _walk_jsonld(payload: Any, depth: int) -> list[dict]:
@@ -327,6 +355,8 @@ def _flatten_value(value: Any, depth: int) -> list[str]:
             out.extend(_flatten_value(item, depth + 1))
         return out
     if isinstance(value, dict):
+        if _is_qa_schema(value):
+            return []
         parts: list[str] = []
         for key, inner in value.items():
             if key in _JSONLD_SKIP_KEYS or key == "@type":

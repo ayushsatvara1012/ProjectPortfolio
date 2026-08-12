@@ -207,6 +207,82 @@ def test_deeply_nested_jsonld_terminates():
     assert "Deep" in out
 
 
+# ── Our own FAQ schema is never re-ingested (plan §1.4, F1) ──────────────────
+
+
+def _loader_faq_payload() -> str:
+    """Byte-shape of what public/sapybase-loader@1.js:819-829 injects."""
+    import json
+
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [{
+            "@type": "Question",
+            "name": "Whom to contact for sales ?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "I don't have details on file for who specifically handles export business.",
+            },
+        }],
+    })
+
+
+def test_loader_faq_roundtrip_ingests_nothing():
+    html = (
+        "<body><p>Real page copy about solvents</p>"
+        f'<script type="application/ld+json" data-sapybase-faq="true">{_loader_faq_payload()}</script>'
+        "</body>"
+    )
+    out = extract(html, BASE)
+    assert "Real page copy about solvents" in out
+    assert "Whom to contact" not in out
+    assert "handles export business" not in out
+    assert "FAQPage" not in out
+
+
+def test_faq_schema_skipped_even_without_the_attribute():
+    html = (
+        "<body><p>Real page copy</p>"
+        f'<script type="application/ld+json">{_loader_faq_payload()}</script></body>'
+    )
+    out = extract(html, BASE)
+    assert "Real page copy" in out
+    assert "Whom to contact" not in out
+    assert "handles export business" not in out
+
+
+def test_source_marker_block_is_skipped_whatever_its_type():
+    payload = '{"@type":"Thing","name":"Acetone grade list","description":"📎 Source: price-list.pdf"}'
+    out = extract(_jsonld(payload), BASE)
+    assert "Page body text here" in out
+    assert "Acetone grade list" not in out
+
+
+def test_bare_question_entries_in_a_graph_are_skipped():
+    payload = (
+        '{"@graph":[{"@type":"Organization","name":"Expresolv"},'
+        '{"@type":"Question","name":"can i get the coa for 101LR 101.26R007",'
+        '"acceptedAnswer":{"@type":"Answer","text":"It should be open in a panel for you."}}]}'
+    )
+    out = extract(_jsonld(payload), BASE)
+    assert "Expresolv" in out
+    assert "101LR" not in out
+    assert "open in a panel" not in out
+
+
+def test_legitimate_schema_still_ingested_alongside_a_faq_block():
+    html = (
+        "<body><p>Body</p>"
+        '<script type="application/ld+json">{"@type":"Organization","name":"Acme","telephone":"+15550001"}</script>'
+        f'<script type="application/ld+json" data-sapybase-faq="true">{_loader_faq_payload()}</script>'
+        "</body>"
+    )
+    out = extract(html, BASE)
+    assert "Acme" in out and "+15550001" in out
+    assert "Whom to contact" not in out
+
+
 # ── Guard rails ──────────────────────────────────────────────────────────────
 
 
