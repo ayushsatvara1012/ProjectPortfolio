@@ -2,7 +2,7 @@
 
 Date: 2026-08-12.
 Branch: `feature/entity-safe-ingestion`, off MainV2 at `f9fc4f93`.
-Status: Phase 0 DONE 2026-08-12 (measurement harness + baseline + the PDF question answered). Phases 1-4 not started.
+Status: Phases 0-1 DONE 2026-08-12. Phase 1 is built but NOT wired in - `run_training_job` still uses the old splitter until Phase 2.
 
 Source finding: `docs/audit-agent-behaviour.md` E2, ranked 4th by wrong-answer risk.
 Chosen as the next slice over Slice A (grounding gate) on the audit's own §6 warning: the gate ships badly on badly-cut chunks, so the chunks get fixed first.
@@ -218,9 +218,26 @@ The block segmenter cannot detect it as a table, and column boundaries are unrec
 The vision fallback does emit markdown tables, but it only fires for scanned PDFs (`len(total_text) < 100`) and samples 3 pages.
 Fixing PDFs is a separate extraction slice, exactly as the audit originally framed Slice C; it is **not** attempted here.
 
-**Phase 1 - `services/chunking.py`.**
-Block segmentation and the packer, with unit tests per block type.
-Not wired in yet.
+**Phase 1 - `services/chunking.py`. DONE 2026-08-12.**
+`services/chunking.py` plus `tests/test_chunking.py` (36 tests).
+Pure module - no DB, no LLM, no Redis, no config - so it is tested on text alone.
+
+`Chunk` carries `content` and `context` as separate fields, which is Q1's decision made structural: `content` is verbatim page text and is what `word_count` bills, `context` is the enclosing headings plus the table header row, and `retrievable_text` is the two joined - what gets embedded and what the model reads.
+
+Measured against the Phase 0 baseline, same harness, same corpus:
+
+| | old splitter | new chunker |
+|---|---|---|
+| defects | **5** | **0** |
+| children (embedded + billed) | 135 | **119** |
+| billed words | 4,626 | **4,257** |
+
+Both cost numbers move the right way, which is the point of the `context` split: headers and headings stopped being billed once per chunk.
+`tests/test_chunking.py::TestCost` locks both, because scoring zero defects by never splitting anything would be trivial otherwise.
+
+**One real bug found by the corpus rather than by design.** The packer originally held a single pending heading, so `### Clause 0` overwrote `## Shipping and returns` and no chunk could say which document the clause belonged to. Headings are now a **stack**: a deeper heading nests, a sibling pops. `test_a_subheading_does_not_erase_its_parent` and `test_a_sibling_heading_pops_the_previous_one` cover it.
+
+**One test was wrong before the code was.** `test_no_content_is_lost` asserted against `chunk.content` and therefore reported the heading fix as data loss - the heading had moved into `context` by design. It now asserts against `retrievable_text`, with a companion test proving table body rows still appear in billed content and the header still reaches every part.
 
 **Phase 2 - Wire into `run_training_job`.**
 Replace the two splitter calls.
