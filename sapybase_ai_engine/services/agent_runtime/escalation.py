@@ -16,6 +16,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, Iterable, Optional, Sequence
 
+from . import refusal
 from .states import TurnState
 from .turn import TurnResult
 
@@ -167,6 +168,68 @@ def check(
         return Escalation(EscalationCause.BUYING_INTENT)
 
     return None
+
+
+def prior_turn_refused(prior_messages: Sequence) -> bool:
+    """Was the last thing we said to this visitor also a refusal?
+
+    Stands in for §1.5's "second refusal on the same topic": with no topic model
+    yet, adjacency is the honest approximation - two refusals back to back are
+    overwhelmingly the visitor rephrasing the same question. Reads whichever
+    transcript the caller has (session store for vertical bots, client-sent history
+    for generic ones), so no new storage is involved.
+
+    Prior turns predate ``chat_logs.turn_state`` or aren't loaded with it, so this
+    still reads the text - through the runtime's single definition of what a refusal
+    reads like (``refusal.reads_as_refusal``), not a list of its own.
+    """
+    for entry in reversed(list(prior_messages or [])):
+        role = entry.get("role") if isinstance(entry, dict) else getattr(entry, "role", None)
+        if role in ("assistant", "bot"):
+            content = entry.get("content") if isinstance(entry, dict) else getattr(entry, "content", "")
+            return refusal.reads_as_refusal(content or "")
+    return False
+
+
+def frame(
+    *,
+    message: str,
+    state,
+    prior_messages: list,
+    human_handoff_enabled: bool,
+    lead_capture_enabled: bool,
+    tool_answered: bool = False,
+    tool_trace: Sequence = (),
+    disambiguated: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """The ``escalate`` SSE payload for this turn, or None to stay quiet.
+
+    One decision point for every bot, generic or vertical (plan §1.6). The widget
+    used to make this call itself from three keyword lists it kept client-side, and
+    only ever for generic bots - so the bots most likely to be mid-deal were the ones
+    that never asked who they were talking to. ``destination`` rides along because
+    entitlement, not the trigger, decides which endpoint the form can post to.
+    """
+    where = destination(
+        human_handoff_enabled=human_handoff_enabled,
+        lead_capture_enabled=lead_capture_enabled,
+    )
+    if not where:
+        return None
+    found = check(
+        message=message,
+        # Phase 5: the turn's settled outcome, not a guess from the reply's wording.
+        proposed_state=state,
+        topic_outcomes=(TurnState.NO_DATA,) if prior_turn_refused(prior_messages) else (),
+        tool_trace=tool_trace,
+        disambiguated=disambiguated,
+        # A turn that already produced a quote card has closed its own loop; asking
+        # for an email under it is the nagging the old client-side list was guilty of.
+        include_buying_intent=not tool_answered,
+    )
+    if found is None:
+        return None
+    return {"escalate": {**found.as_event_payload(), "destination": where}}
 
 
 def apply(result: TurnResult, escalation: Optional[Escalation]) -> TurnResult:

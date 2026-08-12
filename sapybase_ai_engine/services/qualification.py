@@ -246,7 +246,7 @@ def extract_phone(text: str) -> Optional[str]:
 
 # Search-then-verify: isolate a candidate substring, trim trailing sentence
 # punctuation, then hold it to the SAME strict full-match shape
-# `services.agent._EMAIL_SHAPE` applies to a model-supplied address (defined
+# the quote tool's `_EMAIL_SHAPE` applies to a model-supplied address (defined
 # locally rather than imported, keeping this module's zero-dependency,
 # pure-function discipline).
 _EMAIL_SEARCH_RE = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
