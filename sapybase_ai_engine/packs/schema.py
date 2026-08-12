@@ -218,6 +218,9 @@ class ToolSpec:
     name: str
     description: str
     slots: Tuple[Slot, ...] = ()
+    # A turn that used this tool must never be republished as public FAQ schema
+    # (bot-output-quality plan §1.4 F3). Structural, so it holds for any vertical.
+    restricted: bool = False
 
     def required_slots(self) -> Tuple[Slot, ...]:
         return tuple(s for s in self.slots if s.required)
@@ -242,10 +245,17 @@ class Pack:
     catalog_tables: Tuple[CatalogTable, ...] = ()  # structured tables for auto-import
     qualification_slots: Tuple[QualificationSlot, ...] = ()  # Phase 5 — buyer facts to learn
     teaser_rules: Tuple[TeaserRule, ...] = ()  # Phase 2 — seeded page-aware teaser copy
+    # Fallback for turns with no tool trace (pre-Slice-D rows, cache hits) whose
+    # topic is confidential for this vertical. Matched word-bounded, never as a
+    # substring. Empty for verticals with nothing to restrict.
+    restricted_vocab: Tuple[str, ...] = ()
     version: int = 1
 
     def tool_names(self) -> Tuple[str, ...]:
         return tuple(t.name for t in self.tools)
+
+    def restricted_tool_names(self) -> Tuple[str, ...]:
+        return tuple(t.name for t in self.tools if t.restricted)
 
     def qualification_slot_names(self) -> Tuple[str, ...]:
         return tuple(s.name for s in self.qualification_slots)

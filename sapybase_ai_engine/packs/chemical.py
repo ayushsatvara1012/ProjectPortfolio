@@ -122,6 +122,9 @@ get_coa = ToolSpec(
              description=("Only the identifiers the visitor read out — product code and "
                           "batch number, space-separated, with no other words.")),
     ),
+    # Certificates are confidential (docs/coa-confidential-access-plan.md), so a
+    # turn that used this tool can never become public FAQ schema.
+    restricted=True,
 )
 
 get_product_spec = ToolSpec(
@@ -401,5 +404,14 @@ CHEMICAL_PACK = Pack(
     catalog_tables=_CATALOG_TABLES,
     qualification_slots=_QUALIFICATION_SLOTS,
     teaser_rules=_TEASER_RULES,
+    restricted_vocab=(
+        "certificate of analysis",
+        "coa",
+        "batch no",
+        "batch number",
+        "batch id",
+        "lot no",
+        "lot number",
+    ),
     version=1,
 )
