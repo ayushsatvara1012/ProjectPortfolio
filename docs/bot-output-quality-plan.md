@@ -1,29 +1,82 @@
-# Bot Output Quality - Slices F to K
+# Bot Output Quality - Slices F to K, plus the Precision Architecture Backlog
 
-Date: 2026-08-12.
+Date: 2026-08-12, revised 2026-08-11 (this session) with a live production audit.
 Branch: `feature/bot-output-quality`, off MainV2 at `f9fc4f93`.
-Status: PLAN ONLY.
+Status: F-K PLAN ONLY. §13-16 consolidate three other trackers into this file (2026-08-11) so there is one place to work from - see §0.3 for what that changes and what it doesn't.
 
 Continues `docs/agent-conversation-gaps-plan.md`, which owns Slices A-E from four real Expresolv transcripts.
-F-K were proposed in an earlier session against live client complaints about the bot's output and were **never written to the repo**, so there was nothing to implement from.
-This document claims those letters and specifies them.
+
+This revision folds in a full production audit run against Expresolv (`d13912da-1901-4349-a7d3-acd08a064e6a`, tier `EXPLORE`, vertical `chemical`) on 2026-08-11.
+That audit **upgraded four of the six slices out of "unverified"**, added a confirmed root cause for G that changes what G has to check, and answered the client's own question of whether the failures are a fetcher problem or a training-data problem.
+
+All code references below are anchored to the **current branch**, after the agent-runtime restructure merged.
+Note that `services/agent.py` is no longer imported by `main.py`; anything citing `stream_agent_loop` is stale.
 
 ## 0. Verification status - read this before trusting any row
 
-The proposal these slices came from is not in this repo and not in this session's history, so its evidence could not be re-read.
-Each slice below is marked with what was actually checked against the code and production **today**, versus what is carried over on trust and still needs its evidence restated before it is built.
-
 | Slice | Claim | Status |
 |---|---|---|
-| F | FAQ feedback loop + COA leak | **VERIFIED today, in code and in prod data.** Numbers in §1. |
-| G | Repeat / deny-then-answer guard | **Partly on record.** §13.4 of the gaps plan names "deny-then-answer" as unaddressed. The claim "prompt-only has failed twice" is carried on trust. |
-| H | `top_k` for entity lookups | **On record.** Gaps plan §13.6, explicitly deferred "until §13.1 alone is measured against real traffic". That measurement is still owed and is a precondition, not a formality. |
-| I | Extraction hardening | **Unverified.** No testimonial/carousel finding exists in any plan doc. Needs a real contaminated page named before building. |
-| J | Trailing question on informational turns | **Unverified.** No record. |
-| K | Contact acknowledgment bound to real capture | **Contradicted, partly.** Gaps plan §4.4 bullet 2 says the acknowledgment sentence already shipped in `build_agent_directive`. The remaining defect - that it fires without a capture actually happening - is plausible but unconfirmed. |
+| F | FAQ feedback loop + COA leak | **VERIFIED** in code and prod, twice independently. §1. |
+| G | Repeat / deny-then-answer guard | **VERIFIED 2026-08-11.** Reproduced 5x in post-fix prod traffic, and root-caused. §2. |
+| H | `top_k` for entity lookups | **On record, precondition now partly satisfied.** §3. |
+| I | Extraction hardening | **VERIFIED 2026-08-11.** Contaminated page named and measured. §4. |
+| J | Trailing question on informational turns | **VERIFIED 2026-08-11** against post-restructure transcripts. §5. |
+| K | Contact acknowledgment bound to real capture | **VERIFIED 2026-08-11.** Bot claimed capture; `agent_requests` empty. §6. |
 
-Do not treat this table as pessimism about the earlier analysis.
-Treat it as the reason F is first: it is the one that could be checked, and checking it found it worse than claimed.
+The earlier caution on I, J and K was correct and is now discharged by evidence rather than waived.
+
+**One claim from the earlier draft is now confirmed:** "prompt-only has failed twice" was carried on trust.
+It is true.
+`main.py` RULE 2 carries explicit anti-restate and anti-deny-then-answer clauses, and both were violated repeatedly on 2026-08-10, after the fixes that added them were deployed.
+
+### 0.1 Owner decisions, locked 2026-08-11
+
+- **F**: keep the public FAQ feed, fix both ends (feed quality gate + ingestion skip). Do not delete the feature.
+- **G**: deterministic repair first; re-invoke at most once, only when the reply cannot be salvaged.
+- **Disclosure**: fix the COA exposure quietly, then tell the client plainly in the same conversation as the rest of the audit. No formal incident process.
+- **Scope**: all six slices, plus the guardrail architecture reference in §7.
+- **Rejected: a LangGraph or LangChain migration.** Asked directly. See §7.3.
+
+### 0.2 What the audit establishes about the deployed fixes
+
+Slices A, B, D and E of the predecessor plan are live in production, confirmed by `chat_logs.sources` becoming non-null from 2026-08-09.
+
+Fixed and holding: the fabricated-contact failure (no fabrications in post-fix traffic), the injection firewall false-fire, and owner-facing source attribution.
+
+Still failing: everything in §2, §3, §5 and §6 below.
+
+### 0.3 Full status across every outstanding source
+
+Three other trackers folded into this file 2026-08-11: `docs/agent-conversation-gaps-plan.md` (predecessor slices), `docs/audit-agent-behaviour.md` (the 38-finding audit's own remediation tracks), and `docs/entity-safe-ingestion-plan.md` (copied in from unmerged `feature/entity-safe-ingestion`).
+Detail lives in §13-15; this is the full roster in one table.
+
+**Naming note:** the audit doc uses its own letters A-M for Track 2 and numbers 1-13 for Track 1, both independent of this plan's F-K.
+To avoid three different things being called "Slice A" in one file, audit items are referenced here as **QF1-QF13** (quick fixes) and **ARCH-A - ARCH-M** (architecture slices), never bare letters.
+
+| Source | Item | Status |
+|---|---|---|
+| This plan | F - FAQ feedback loop | **F1, F2, F3 DONE** (uncommitted, 2026-08-12), verified e2e against prod. **F4 purge ready, not run** - 61 rows across 3 tenants, dry-run reviewed. §1. |
+| This plan | G - response contract | PLAN ONLY. §2. |
+| This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
+| This plan | I - extraction hardening | PLAN ONLY. §4. |
+| This plan | J - reflex question | PLAN ONLY, ships with G. §5. |
+| This plan | K - contact ack binding | PLAN ONLY, smallest. §6. |
+| Gaps plan | Slices A/B/D - contact capture, spec/quote fixes, source attribution | **DONE, pushed to MainV2** (`63747833`, confirmed an ancestor of this branch's base). |
+| Gaps plan | Slice E - directory-answer fixes | **DONE, pushed to MainV2** (`aa61ed71`). |
+| Gaps plan | Slice C - two-day activity digest | Deprioritised, plan-only. Not part of this consolidation - see §14 out-of-scope note. |
+| Audit quick fixes | QF1/QF2 - RULE 7 founder clause, agent temperature | **DONE, pushed** (`f885c110`). |
+| Audit quick fixes | QF3, QF5, QF6, QF8, QF9, QF11, QF12 | **DONE / moot**, verified against code. Mostly shipped quietly by the agent-runtime restructure. §13. |
+| Audit quick fixes | QF4, QF7, QF10, QF13 | **Open**, verified against code. §13. |
+| Audit architecture | ARCH-G - turn pipeline extraction (`services/agent_runtime/`) | **DONE, pushed** (agent-runtime restructure, `bb0b0b21` an ancestor of this branch's base). |
+| Audit architecture | ARCH-H - tool registry | **DONE, pushed** (`f9fc4f93`). |
+| Audit architecture | ARCH-L - persist tool trace, owner-facing | **DONE, pushed** (Slice D's `chat_logs.sources` + `ConversationsPanel`) - one manual browser check still owed. |
+| Audit architecture | ARCH-K - signals rebuild | **PARTIAL.** `turn_state` shipped (migration 0037) and is what F2 reads; the versioned grounded/refusal-rate metric this slice actually asks for is not built. |
+| Audit architecture | ARCH-A, B, D, E, F, I, J, M | **NOT STARTED.** §14. |
+| Entity-safe ingestion | Phase 0 (measurement), Phase 1 (`services/chunking.py`) | **DONE, unwired**, on unmerged `feature/entity-safe-ingestion`. |
+| Entity-safe ingestion | Phase 2-4 (wire in, FAQ atomicity, re-ingest UX) | **NOT STARTED.** §15. |
+
+Verification discipline for the imported rows: "DONE, pushed" above was confirmed this session via `git merge-base --is-ancestor` against this branch's base commit, not carried over from memory - memory's "committed, unpushed" notes for these same commits were stale.
+QF3-QF13 were fully re-checked against code (§13); the ARCH rows (§14) were checked with the same rigor except ARCH-D/E/F/I/J/M, which are absence-confirmed (grepped for, not found) rather than exhaustively audited line-by-line.
 
 ---
 
@@ -32,63 +85,245 @@ Treat it as the reason F is first: it is the one that could be checked, and chec
 ### 1.1 The loop, confirmed in code
 
 1. The bot answers a visitor. The turn is written to `chat_logs`.
-2. `GET /api/bots/{bot_id}/faqs` (`main.py:10182`) aggregates the top 10 answered Q&A pairs and the loader injects them into the merchant's `<head>` as `FAQPage` JSON-LD.
+2. `GET /api/bots/{bot_id}/faqs` (`main.py:10185`) aggregates the top 10 answered Q&A pairs, and `public/sapybase-loader@1.js:810-832` injects them into the merchant's `<head>` as `FAQPage` JSON-LD.
 3. The owner re-trains on their own site.
 4. `html_extract._collect_jsonld` (`services/html_extract.py:253`) ingests **every** JSON-LD `@type` with no filter - `_JSONLD_SKIP_KEYS` filters keys, never types - so `FAQPage` is ingested as source knowledge.
 5. The bot's own prior answers are now knowledge. The next answer is grounded in the previous answer rather than in the customer's data.
 
 For a product whose entire promise is "answers come only from your data", this is the most direct possible violation: the bot becomes its own source, and any error becomes self-confirming and permanent.
 
-### 1.2 What production says, measured 2026-08-12, last 90 days
+### 1.2 What production says
+
+**Platform-wide, last 90 days, measured 2026-08-12:**
 
 | | count |
 |---|---|
 | Q&A pairs eligible for publication (`is_unanswered = false`, answer >= 80 chars) | **630** |
 | Of those, COA-related | **8** |
-| Of those, refusals published as answers ("I don't have", "not on file", ...) | **79** |
+| Of those, refusals published as answers | **79** |
 
-Two separate defects fall out of this.
+**The eligibility gate is the wrong signal.** `is_unanswered` is audit finding D3 - computed from retrieval count and English substring matching, so a refusal routinely scored as answered.
+79 of 630, **12.5% of the publishable pool, is the bot's own failure text**.
+The restructure replaced this signal with `chat_logs.turn_state`, so **new** rows are trustworthy; historical rows are not, and the FAQ query still reads `is_unanswered`.
 
-**The eligibility gate is the wrong signal.** `is_unanswered` is audit finding D3 - it was computed from retrieval count and English substring matching, so a refusal routinely scored as answered. 79 of 630, **12.5% of the publishable pool, is the bot's own failure text**, queued to be published as the merchant's SEO content and fed back as knowledge.
-The restructure that merged today replaced this signal with `chat_logs.turn_state`, so **new** rows are trustworthy. Historical rows are not, and the FAQ query still reads `is_unanswered`.
+Independent confirmation, 2026-08-11: **zero unanswered turns recorded for Expresolv on every single day since 2026-07-20**, including outright refusals. The flag does not fire at all.
 
-**COA content is publishable.** `memory/coa-confidential-access.md` records the client reclassifying certificates as confidential, with exact-retrieval-or-nothing and a uniform refusal. 8 eligible rows mention COAs. This endpoint intentionally does not enforce `Origin` because it is meant to be crawlable, so anything it emits is public to Googlebot and everyone else.
+**COA content is publishable.** `memory/coa-confidential-access.md` records the client reclassifying certificates as confidential, with exact-retrieval-or-nothing and a uniform refusal.
+This endpoint intentionally does not enforce `Origin` because it is meant to be crawlable, so anything it emits is public.
 
-### 1.3 The fix
+### 1.2a Measured platform-wide 2026-08-12 - this is not one client
 
-Three independent changes, smallest first.
+`scripts/faq_loop_audit.py --probe all`, read-only against prod. **The loop has closed for three tenants, and Expresolv is neither the worst nor the earliest.**
 
-**F1 - Stop ingesting our own schema.** `_collect_jsonld` skips `FAQPage` and `Question`/`Answer` types. One filter, and it closes the loop at the ingestion end even if everything else stays as it is. Ship this first; it is the smallest change with the largest effect.
+| tenant | vertical | parent rows | child rows | first ingested |
+|---|---|---|---|---|
+| SaPyBase (our own marketing site) | generic | 9 | 24 | - |
+| SP Design | generic | 4 | 10 | **2026-07-21** |
+| Expresolv | chemical | 3 | 11 | 2026-08-10 |
 
-**F2 - Gate the feed on a real answer signal.** Replace `is_unanswered = false` with `turn_state = 'ANSWERED'`, and exclude rows where `turn_state IS NULL` - which is every row written before today's merge - rather than trusting them. The pool shrinks; that is correct, not a regression.
+**61 rows total.** SP Design was contaminated three weeks before Expresolv.
+Sample: `- FAQPage - mainEntity: name: hi, acceptedAnswer: text: Hello! I'm here to help...` - the bot's own greeting, ingested as source knowledge.
+Orphan risk is **0**: every matched child's parent is also matched, so F4 can delete parents and children together safely.
 
-**F3 - Never publish a restricted class.** Exclude any turn whose `sources` records a COA tool result, and any turn from a company with a COA folder configured where the question matches the COA vocabulary. Belt and braces, because the cost of being wrong is a confidentiality breach for a client who explicitly asked for the opposite.
+Sizing this from Expresolv alone would have understated it by a factor of four and missed the earliest victim entirely.
 
-**F4 - Purge.** Identify `company_knowledge` rows ingested from our own FAQPage markup and delete them. Detection: rows whose content matches the shape `_flatten_entity` produces for `FAQPage`/`Question`. Needs a dry-run count first, per company, reported before anything is deleted.
+Exclusion classes across the 629-row publishable pool (overlapping, not additive):
 
-### 1.4 Acceptance
+| class | rows | % of pool |
+|---|---|---|
+| source_marker | 74 | 11.8% |
+| refusal | 70 | 11.1% |
+| error_string | 25 | 4.0% |
+| identifier | 25 | 4.0% |
+| restricted_topic | 8 | 1.3% |
+| ui_artifact | 2 | 0.3% |
+
+`source_marker` overtaking refusals is new information: 36 of SaPyBase's own 82 rows carry `📎 Source:` in the **stored** response despite `_strip_source_citation`. Whether visitors see it or only the feed does is unresolved and worth a separate look.
+
+### 1.3 The loop has already closed, with named rows
+
+Not hypothetical.
+Thirteen rows in Expresolv's `company_knowledge`, all stamped `https://expresolv.com/leadership`, ingested 2026-08-10 16:43:35:
+
+- `"Whom to contact for sales ?"` answered with `"I don't have details on file for who specifically handles export business."` - the lagged wrong answer from that same morning, now permanent training data.
+- `"Methanol (Methyl alcohol) (CAS: 67-56-1)"` answered with `"I'm having trouble reaching our product system right now"` - an internal error string.
+- `"can i get the coa for 101LR 101.26R007"` answered with `"I have retrieved the Certificate of Analysis... It should be open in a panel for you."` - a UI artifact, and **a COA batch identifier now in public crawlable content**.
+- Our own `📎 Source:` citation marker, ingested as body text.
+
+This explains a client perception nobody previously had a mechanism for: answers appearing to get *worse* over time, and specific wrong answers recurring after being reported.
+They are being memorialised.
+
+The live page serves no FAQ schema to a plain `curl`, because the injection is client-side.
+Only the JS-rendering scraper sees it, which is why this went unnoticed.
+
+### 1.4 The fix
+
+**F1 - Stop ingesting our own schema. DONE 2026-08-12, uncommitted.**
+`_collect_jsonld` (`services/html_extract.py:253`) now applies three skips, most-exact first: the loader's `data-sapybase-faq` attribute, a `📎 Source:` marker anywhere in the raw block, and `@type` in `{FAQPage, Question, Answer}`.
+The type skip runs both in the entry walk and in `_flatten_value`, so a `Question` nested inside another entity cannot slip through.
+Tests at `tests/test_html_extract.py:210-278`, including the round-trip §9 names as the most important test in this plan. Suite green (2528 passed, 134 skipped).
+
+**Accepted cost:** the type skip also drops a merchant's own hand-written `FAQPage` schema - ours and theirs are indistinguishable once the attribute is gone.
+Impact is small because the extractor already keeps accordion FAQ body copy by contract, so the visible Q&A text still ingests; only the duplicate structured copy is lost.
+
+**F2 - Gate the feed on a real answer signal. DONE 2026-08-12, uncommitted.**
+
+Two corrections came out of the prod run, both of which would have shipped as silent no-ops:
+
+1. **The literal in the original spec was wrong.** `TurnState.ANSWERED` is `"answered"`, lowercase (`services/agent_runtime/states.py:12`). `turn_state = 'ANSWERED'` matches zero rows forever and looks like a healthy deploy. Code now reads `_TurnState.ANSWERED.value`; never write the literal.
+2. **`turn_state` has almost no coverage.** Platform-wide, all time: **1009 NULL, 2 `answered`, 1 `no_data`**, and the three non-null rows are from 2026-08-12. Excluding NULL as originally specified takes the platform feed from **629 rows to 2** - every client's FAQ schema dark for ~90 days.
+
+**Owner decision 2026-08-12: hybrid gate.** Publish when `turn_state = 'answered'` OR `turn_state IS NULL AND` the pair passes every exclusion class.
+New rows are trusted structurally; historical rows must earn it. Coverage improves on its own as `turn_state` fills in, with no second migration.
+
+Implemented as `_publishable_faq_rows` (`main.py:10149`) over a widened 200-row candidate pull, calling `services/faq_eligibility.excluded_by`.
+
+**F3 - Never publish a restricted class. DONE 2026-08-12, uncommitted.**
+
+The original spec ("exclude any turn whose `sources` records a COA tool result... where the question matches the COA vocabulary") was chemical-specific and would have hardcoded one vertical's confidentiality model into a shared service.
+**Owner decision 2026-08-12: make it pack-driven**, per the registry discipline in CLAUDE.md.
+
+- `ToolSpec.restricted: bool = False` (`packs/schema.py:210`); `get_coa` sets it True. Any turn whose `sources` names a restricted tool is unpublishable, **in every vertical, with no vocabulary at all**. This is the structural half and it is the one that matters.
+- `Pack.restricted_vocab: Tuple[str, ...] = ()` is the fallback for turns with no tool trace - which today is almost all of them. Word-bounded, never substring: bare `batch` rejects "full batch documentation", `coa` rejects "coating".
+- `Pack.restricted_tool_names()` is the accessor.
+
+`services/faq_eligibility.py` splits the two kinds of rule explicitly: tenant-independent (refusal, error string, UI artifact, `📎 Source:` marker, identifier shape - all properties of *our own output*, identical for every client) versus pack-supplied (`restricted_tool`, `restricted_topic`).
+A generic bot passes `pack=None` and gets only the tenant-independent set, which is correct - it has no tools and no vertical confidentiality model.
+
+The identifier rule was retuned against real data: one token carrying **both** a letter and a digit, 5+ chars. Requiring a letter is what stops it matching CAS numbers (`67-56-1`); requiring a digit stops it matching ordinary uppercase words.
+
+**F4 - Purge.** Identify `company_knowledge` rows ingested from our own FAQPage markup and delete them.
+Detection: content matching the shape `_flatten_entity` produces for `FAQPage`/`Question`, plus the `📎 Source:` marker.
+**Dry-run count first, per company, reported before anything is deleted.**
+Parent and child rows together - deleting a parent while orphaning children leaves rows retrieval can surface but not expand.
+
+Then re-ingest Expresolv's `/leadership` cleanly once F1 is deployed.
+
+### 1.4a End-to-end verification against prod, 2026-08-12
+
+The new query plus the new gate, run for every live bot against production data, read-only:
+
+| tenant | old feed | new feed | candidates rejected |
+|---|---|---|---|
+| Expresolv | 10 | 10 | 58 of 200 |
+| SaPyBase | 10 | 10 | 34 of 69 |
+| SP Design | 10 | 10 | 1 of 20 |
+| Test Web (x2) | 10, 10 | 10, 10 | 8 of 37, 15 of 81 |
+| Gyan AI | 2 | 2 | 0 of 2 |
+| Pragati Mandal | 1 | 0 | 9 of 9 |
+| **total** | **53** | **52** | |
+
+The hybrid gate removes the junk without gutting the feature: one net FAQ lost platform-wide, and that one was Pragati Mandal's only published pair, a refusal (`"search name Piyush Satvara"`).
+
+Judged against Expresolv's **currently live** feed, the gate rejects exactly the rows §1.3 named as harmful and keeps the legitimate ones:
+
+- REJECT `error_string` - "Methanol (Methyl alcohol) (CAS: 67-56-1)"
+- REJECT `ui_artifact, identifier, restricted_topic` - "can i get the coa for 101LR 101.26R007"
+- REJECT `source_marker` - "who is piyush satvara"
+- REJECT `restricted_topic` - "which are the certificates available ?"
+- REJECT `refusal` - "Whom to contact for sales ?"
+- keep - the four price-quote and product pairs
+
+**Known residual, belongs to G not F:** "Who is taking care of business development in expresolv?" is still publishable, and §2.2 established that turn named two people absent from its own retrieval.
+F gates *classes* of unpublishable content; it cannot detect a fluent, ungrounded answer. Only G's check 3 can, and until G ships this row stays in the feed.
+
+### 1.5 Acceptance
 
 - A page carrying our own FAQPage JSON-LD ingests zero chunks from it.
 - A refusal turn is never eligible for the feed.
 - A COA turn is never eligible for the feed.
 - The purge dry-run reports per-company counts, and the delete runs only after those are reviewed.
 
+### 1.6 Disclosure
+
+A COA batch identifier and internal error strings were published as public, crawlable SEO content on the client's own site.
+
+Per the owner decision: fix first, then tell the client plainly, no formal incident process.
+
+State precisely when we do: the COA *document* was never exposed, and `get_coa`'s retrieval, throttle and lockout were never weakened.
+What leaked was a batch identifier inside a transcript, republished by a feature working as designed on input it should never have been given.
+
 ---
 
-## 2. Slice G - deterministic anti-repeat guard
+## 2. Slice G - the response contract
 
-The instruction already exists in three places and the symptom persists, which is the standard signal that a prompt rule is the wrong layer.
+### 2.1 Why prompt-only cannot finish this
+
 Audit A5 counted "do not restate your previous answer" appearing four times across RULE 2, RULE 6 and the agent directive, each added by a real incident.
+The symptom persists.
 
-Post-process instead: compare the composed reply against the previous assistant message before it ships.
-The natural home is `services/agent_runtime/compose.py`'s `settle()`, which is already the single place a turn's outcome is decided.
+Reproduced 2026-08-10, session `4ef9ffa0`, five times in seven minutes:
 
-Two shapes to detect:
+| Asked | Replied |
+|---|---|
+| Who is responsible for export business? | "I don't have that specific detail on file." |
+| Whom to contact for sales? | **Repeats the export denial**, then the sales list |
+| Who is taking care of business development? | **Repeats the entire sales list verbatim**, then declines BD |
+| Who is marketing head? | Answers marketing head, **then declines BD again** |
+| Who is CMD? | **Opens with the sales-head answer**, then Arvind Patel |
 
-- **Repeat** - high similarity to the previous assistant message. The turn produced nothing new, so say that plainly rather than re-sending.
-- **Deny-then-answer** - the reply opens with a refusal and then answers anyway (gaps plan §13.4). The refusal is the lie; the answer is real. Drop the opener.
+### 2.2 The root cause, and why it changes what G must check
 
-Needs a threshold, and a threshold needs data. Run it in shadow first, logging what it *would* have rewritten, then turn it on. Do not pick a similarity number in the plan and defend it later.
+This is the most important new finding in the revision.
+
+Slice D's `sources` column made it possible to compare what was retrieved against what was said.
+
+On the "business development" turn, retrieved sources were the homepage plus Pratik Shome, Ida Sebastian, Jasmine and Himanshu Darji.
+The reply named **Chandra Parija and Nirmal Choudhary, neither of whom was retrieved on that turn**.
+On "Who is CMD?", all five sources were homepage chunks, yet the reply opened with Nirmal Choudhary.
+
+**The model is re-serving content out of the prior assistant message, not out of retrieval.**
+
+So this is not a style defect. It is a **RULE 1 violation**: conversation history is functioning as a second, unvalidated answer source.
+A similarity threshold alone would not have caught the CMD case, where the prepended span was short and the rest of the reply was correct and new.
+
+Slice D paid for itself here. This was undiagnosable before it shipped.
+
+### 2.3 Where it goes
+
+`services/agent_runtime/compose.py`, `settle()` at line 68 - already the single place a turn's outcome is decided, and it **already receives `sources`**, which is exactly the evidence set check 3 needs.
+It also already carries `allow_rewrite`, so the repair path has a seam to respect.
+
+### 2.4 The post-conditions
+
+**1. No restatement of the previous reply.**
+Detect a repeated leading span against the previous assistant message, not whole-message similarity - the observed failure is a *prepend* followed by genuinely new content, which whole-message scoring misses.
+Repair: strip the repeated span and any orphaned connective.
+
+**2. No denial opener in front of a real answer.**
+Gaps plan §13.4. The refusal is the lie; the answer is real.
+Repair: drop the opener, or move it to the end as the "what is still missing" sentence RULE 2 already asks for.
+
+**3. Every identity detail must be grounded in this turn.**
+Names, phone numbers and emails in the reply must appear in the turn's own evidence set.
+This is what turns §2.2 from a diagnosis into a guarantee.
+
+**Critical trap:** the evidence set is **kb chunks plus tool results**, not chunks alone.
+SDS, COA, quote and spec replies legitimately carry names and identifiers that came from tool output, never from retrieval.
+Validating against chunks alone breaks every working tool answer, and this is the single most likely way to get the slice wrong.
+
+Not deterministically repairable - removing a name can leave a reply that answers nothing. This is the one case that re-invokes.
+
+**4. At most one question, and only when licensed.**
+G enforces the count; Slice J sets the permission. They are a pair.
+
+### 2.5 Failure handling
+
+Per the owner decision:
+
+- Checks 1, 2 and 4 repair in code. No extra model call, no added latency.
+- Check 3 re-invokes **once**, with a correction note naming the ungrounded detail.
+- A second failure degrades to a decline plus handoff offer. It never ships the ungrounded answer.
+- Exactly one re-invoke, ever. This must not become an unbounded repair loop.
+
+**Shadow first.** Thresholds need data.
+Log what each check *would* have rewritten against real traffic, measure the false-positive rate, then enforce.
+Do not pick a similarity number in the plan and defend it later.
+
+### 2.6 Acceptance
+
+Replaying session `4ef9ffa0`'s six turns produces no reply opening with the previous turn's content, and none opening with a denial before answering.
+Replaying the "business development" turn produces no name absent from that turn's evidence set.
 
 ---
 
@@ -96,33 +331,304 @@ Needs a threshold, and a threshold needs data. Run it in shadow first, logging w
 
 Gaps plan §13.6, deferred with a specific instruction: measure §13.1 alone against real traffic first, and do not spend the tokens if it is unnecessary.
 
-**That measurement is the first task of this slice, not a formality.** `chat_logs.sources` has been recording retrieved chunks since Slice D, so the question "did the right chunk get retrieved and ranked below 5" is now answerable from stored data rather than by replaying traffic.
+**That measurement is the first task of this slice, not a formality.**
 
-If the answer is that the right chunk was retrieved but ranked 6-10, raise `top_k` for entity lookups only, gated on the existing `_is_entity_lookup_query`.
-If the right chunk was never retrieved at all, `top_k` cannot help and this slice is the wrong fix - the answer is audit E1/E3 (structured directory, identifier retrieval).
+**Correction, 2026-08-12.** An earlier revision claimed `chat_logs.sources` makes "was the right chunk retrieved but ranked below 5" answerable from stored data. **It does not.**
+`_build_kb_sources` (`main.py:2656`) is called at `main.py:3566` with `retrieved_docs` - the **post-rerank top 5**. `retrieve_knowledge(limit=15)` returns 15 and `rerank_chunks(..., top_k=5)` discards 10 before anything is stored.
+So stored data proves a chunk was *absent from the top 5*, but cannot distinguish "ranked 6-15, just missed" from "never retrieved at all" - which is precisely the fork this slice turns on (raise `top_k` vs. escalate to ARCH-D).
+
+H therefore needs an **offline replay**: re-run `retrieve_knowledge` + `rerank_chunks` over stored questions and inspect ranks 1-15. Larger than the plan assumed, and approximate, because the corpus has changed since those turns were logged.
+A second, cheaper option exists if replay proves awkward: persist the full candidate ranking (not just the surviving 5) going forward, then measure after a few weeks of real traffic.
+Also note `sources` is recorded on only **32 rows** platform-wide as of 2026-08-12, so replay is currently the only viable route regardless.
+
+The 2026-08-11 audit supplies part of the answer and narrows the work:
+
+- The failures are **retrieval, not missing data**. "Who is responsible for export" was answered correctly on 2026-08-09 from the same corpus that failed on 2026-08-10.
+- `top_k=5` (`main.py:3549`) is filled by homepage and testimonial parents before the directory rows are reached.
+- Directory rows are thin: roughly 24 to 47 words each. "Himani" appears in only **2 of 239 chunks**.
+
+If the right chunk was retrieved but ranked 6-10, raise `top_k` for entity lookups only, gated on the existing `_is_entity_lookup_query` (`main.py:2410`).
+If it was never retrieved at all, `top_k` cannot help and the answer is audit E1/E3 (structured directory, identifier retrieval).
+
+Two constraints:
+- Measure **against Slice I**. If noise suppression frees enough slots, a smaller increase may suffice, and every extra chunk costs context and money on every entity query.
+- The candidate pool is `retrieve_knowledge(limit=15)`. Raising `top_k` beyond the pool does nothing.
 
 ---
 
-## 4. Slices I, J, K - specify before building
+## 4. Slice I - extraction hardening
 
-**I - extraction hardening.** Needs a real client URL whose extraction is contaminated by testimonials, carousels or boilerplate. `html_extract` already has boilerplate dedup (`_finalise`), so the claim is that it is insufficient, not absent. Name the page, measure what it currently emits, then decide.
+Evidence restated 2026-08-11, as §0 required.
 
-**J - trailing question on informational turns.** Gate the funnel directive the way the qualification block is already gated. Small, but confirm the symptom against a real transcript first - the restructure changed what gets appended to a reply, so the earlier observation may already be stale.
+**The contaminated page: `https://expresolv.com/` (WordPress, Yoast, Elementor-style theme).**
 
-**K - contact acknowledgment.** Gaps plan §4.4 records the acknowledgment sentence as shipped. The remaining question is whether it fires when no capture happened. `services/agent_runtime/contact.py` owns `_captured_contact_echo`; check whether the directive can produce the sentence independently of it. If it can, bind the two.
+Of its 76 child chunks, the largest are **client testimonials carrying person names** - Mr. Rakesh Mehta, Mr. Arun Shrestha, Mr. Rohit Verma, Ms. Vidhya Sagar, Mr. Varun and others.
+Twelve chunks match testimonial or carousel markup.
+
+These are person-name-shaped chunks, so they are prime false-positive matches for exactly the "who is..." questions the client is complaining about, and they compete directly with real staff rows for the five available slots in §3.
+
+Raw markup is being stored as body text: `<span class="tp-testi__ava-position">`, and bare CSS class names `testimonial-area` and `breadcrumb-area`.
+JSON-LD noise is stored too - `dateModified`, `inLanguage`, breadcrumb position lists.
+
+The earlier draft was right that `html_extract` already has boilerplate dedup in `_finalise`.
+The claim is that it is **insufficient, not absent**: dedup removes blocks repeated *across* pages, and a testimonial carousel appears once, on the homepage, so nothing dedups it.
+
+Scope, platform-wide per the owner decision, since most SMB tenants are WordPress:
+
+1. Suppress testimonial and carousel containers (`testimonial`, `swiper-slide`, `tp-testi`, review and carousel wrappers).
+2. Strip leaking markup and bare class names.
+3. Trim non-answerable JSON-LD keys.
+
+**`docs/entity-safe-ingestion-plan.md` now lives in this repo (copied 2026-08-11 from `feature/entity-safe-ingestion`, which is unmerged) - read it before starting.**
+Full read confirms this is sequencing, not a design conflict.
+That plan's chunker (`services/chunking.py`, Phases 0-1 done, unwired) operates on already-extracted markdown, downstream of `html_extract.py`; it scopes changing `html_extract`'s output as out of scope "for its purpose" (table/heading structure), which does not cover noise suppression.
+This slice stays inside `html_extract.py` only - do not touch `run_training_job`'s chunk data shape, which entity-safe's Phase 2 is about to change (`(parent, child)` tuple becomes a triple/dataclass).
+Ship I's extraction cleanup first where practical; entity-safe's own chunk-count harness should be re-run afterward since cleaner extraction input changes its numbers.
+**Migration number risk:** entity-safe's Q1 decision (`company_knowledge.context TEXT`, dark-applied) will likely also claim `0038`. Whichever branch merges to MainV2 second must renumber - check before either side claims it.
+
+Note this does not retroactively clean existing corpora. They keep their noise until retrained, and the client conversation should say so rather than implying automatic improvement.
 
 ---
 
-## 5. Order
+## 5. Slice J - suppress the reflex question
 
-F1 -> F2 -> F3 -> F4, then G (shadow first), then H (measure first).
-I, J, K after their evidence is restated.
+Symptom confirmed 2026-08-11 against **post-restructure** transcripts, so the earlier "may already be stale" caution is discharged.
 
-F is first because it is the only one verified as actively causing harm, it is corrupting the knowledge base continuously rather than at a point in time, and F1 alone is a few lines.
+Live examples: "What grade and packaging is available for Acetone?" ended with *"Would you like a price quote for a specific grade and pack size, or perhaps a Safety Data Sheet?"* - two offers stacked on a purely informational answer.
 
-## 6. Relates to
+Three sources ask for a question or an offer, independently and simultaneously:
 
-- `docs/agent-conversation-gaps-plan.md` - Slices A-E, and the §13.4 / §13.6 items G and H come from.
-- `docs/audit-agent-behaviour.md` - D3 is why F's eligibility gate is broken.
+- `qualification_block` (`services/qualification.py`) - "weave in at most one discovery question".
+- `action_directive` (`services/sales_funnel.py`) - the default `browsing` stage maps to `recommend_product`, whose text is "Do not wait to be asked - proactively suggest the next step". **This fires on every turn of every session**, including informational ones.
+- RULE 6's licensed exit - offer the team handoff.
+
+Slice B gated only the first, and only after a non-answer.
+
+The fix is arbitration, not a fourth suppression clause:
+
+- Classify the turn as informational or sales-progressing. `_is_entity_lookup_query` already identifies a large share of the informational cases.
+- On an informational turn, suppress the funnel directive entirely.
+- Allow at most one nudge across all three sources, decided in one place.
+
+Ships with or adjacent to G, which enforces the count deterministically.
+
+---
+
+## 6. Slice K - contact acknowledgment bound to real capture
+
+The earlier draft flagged this as "contradicted, partly", because gaps plan §4.4 records the acknowledgment sentence as already shipped.
+That is correct, and the remaining defect is now confirmed.
+
+Session `5c7ec4f6`, 2026-08-09: the visitor typed `my mobile no 1231231233`.
+The bot replied *"I've noted your mobile number, 1231231233. The Expresolv team will follow up with you."*
+**`agent_requests` contains zero rows for that period.**
+
+The number legitimately failed `extract_phone`'s leading-digit rule, which is correct extractor behaviour.
+The defect is that the acknowledgment is prompt-driven and decoupled from whether capture succeeded, so the bot promises a follow-up nobody will make.
+
+`services/agent_runtime/contact.py` owns `_captured_contact_echo`; the directive can currently produce the sentence independently of it. Bind the two.
+
+- Capture succeeded: acknowledge and confirm follow-up. Current behaviour, now truthful.
+- Capture refused on a message with an explicit cue (`mob`, `my mobile no`, `whatsapp`): say the number could not be read, ask them to repeat it or offer the form. Never claim it was noted.
+
+`extract_phone` already distinguishes a strict-shape match from a cue-phrase match, so this case needs no new heuristic.
+Keep its precision discipline unchanged - the fix is what the bot *says* when extraction declines, not what it accepts.
+
+---
+
+## 7. Guardrail architecture - reference
+
+Added at the owner's request so future verticals have a decision rule rather than a habit.
+
+### 7.1 Three enforcement layers
+
+| Layer | Mechanism | Strength | Example here |
+|---|---|---|---|
+| 1. Prompt | Instructions in the system message | Advisory - may be ignored | RULE 2's anti-repeat clause |
+| 2. Control flow | What runs, in what order, with what data | Structural - the model cannot reach what it is not given | `get_sds` returns the document; the model never authors safety data |
+| 3. Deterministic code | Validation before or after the model | Absolute | `coa_throttle.py`, `_strip_source_citation` (`main.py:3065`) |
+
+**Decision rule: the higher the cost of being wrong, the lower the layer the behaviour belongs in.**
+
+**The pattern to copy is `_strip_source_citation`.**
+RULE 4 asks the model not to cite sources; deterministic code then removes any citation that slips through, including on the cache-hit path.
+Prompt for the common case, code for the guarantee.
+
+Every defect in this plan is a behaviour that got the RULE 4 half without the `_strip_source_citation` half.
+
+### 7.2 Two structural traps, both observed in production
+
+- **Naturalness competes with correctness, and the model resolves it in favour of sounding good.** RULE 2 demands a confident opener; the cheapest way to sound confident is to lead with something that already worked. That is §2's repeat bug.
+- **Behavioural nudges are additive and unarbitrated.** Three separate blocks each ask for a question, nothing mediates, the visitor gets all three, and the result reads *more* robotic rather than less. That is §5.
+
+### 7.3 Why not LangGraph or LangChain
+
+Asked directly during planning; answered no.
+
+A graph restructures *when the model is called*. Every post-condition in §2.4 is a property of *what the model produced* - layer 3, not layer 2.
+A graph adds no post-conditions, and migrating would cut through the frozen guarantees in §8.
+The settle point already exists at `compose.settle()`, which is all a validator needs.
+
+Revisit only on: human-in-the-loop interrupts, multi-agent handoff, resumable multi-day workflows, or per-vertical branching that outgrows `load_pack`.
+None are present today.
+
+LangChain itself stays as-is: message types and the Gemini adapter, no deeper, no shallower.
+
+---
+
+## 8. What must not change
+
+- **`get_sds` resolution and the safety guardrail.**
+- **`get_coa` strict resolution, throttle, lockout, uniform refusal.** F touches what is *published*, never what is *retrievable*.
+- **`request_quote` pricing** - byte-for-byte.
+- **`_resolve_product` / `_resolve_sds` resolution order.**
+- **RULE 3 and RULE 4** - the visitor never sees a source. Slice D's `sources` stays owner-only and must not become reachable from `/api/chat` or the embed route.
+- **The pack registry pattern.** No `if vertical == "chemical"`.
+
+Any slice that appears to need one of these changed is wrong and should stop for a decision.
+
+---
+
+## 9. Test plan
+
+Green between slices; re-measure the baseline at the start of each rather than assuming it.
+
+**F** - each exclusion class rejected (refusal, error string, UI artifact, identifier-bearing pair, `📎 Source`); legitimate pairs still returned; `_collect_jsonld` skips by type, by `data-sapybase-faq`, and by source marker.
+**The round-trip test is the most important test in this plan**: loader-shaped JSON-LD in, zero chunks out.
+
+**G** - each of the four checks as pure functions; the prepend case using session `4ef9ffa0`'s real turns; exactly one re-invoke plus the degrade path.
+**The tool-answer positive control is mandatory**: SDS, COA, quote and spec replies carrying tool-sourced names and identifiers must pass check 3 unmodified (§2.4 trap).
+
+**H** - entity-lookup queries get the raised `top_k`; prose queries do not.
+
+**I** - testimonial and carousel blocks dropped, adjacent real content survives; the audit's markup-leak cases as verbatim fixtures.
+
+**J** - informational turn produces no funnel nudge; sales-progressing turn still does.
+
+**K** - capture succeeded / refused-with-cue / no contact each produce the right acknowledgment state.
+
+**Live evals**, `RUN_LLM_EVALS=1`, twice for stability. The existing 11 must stay green; the `fabrication_hits` fix (`57d735f7`) must not regress.
+
+**Regression guard**: existing `get_sds`, `get_coa`, throttle, `request_quote` and Slice D source-attribution suites pass unchanged. If any needs editing, §8 has been violated.
+
+---
+
+## 10. Order
+
+**F1 -> F2 -> F3 -> F4**, then **G with J** (shadow first), then **I**, then **H** (measure first), then **K**.
+
+F is first because it is the only slice verified as actively causing harm, it corrupts continuously rather than at a point in time, and F1 alone is a few lines.
+G and J ship together because J sets the permission G enforces.
+**I precedes H**, per §3's own constraint: noise suppression frees top-5 slots, so H's measurement must run against the post-cleanup corpus or it will over-estimate the `top_k` increase needed.
+An earlier revision of this section had H before I, contradicting §3, §4 and §16; corrected 2026-08-12.
+K is last: smallest and independent.
+
+No migrations planned on this branch. `0036` and `0037` are taken. `feature/entity-safe-ingestion` (unmerged) intends to dark-apply `0038` for `company_knowledge.context`; if this branch ever needs one, check that branch's state first rather than assuming `0038` is free.
+
+Gates before merge: suite green on all four checks; live evals green twice; F's per-company purge dry-run reviewed; browser verification with **Manual vs Auto asked before any dev server starts**, per standing policy.
+
+Update this document and the memory entry at the **end of every slice**, per project cadence.
+
+---
+
+## 13. Audit quick fixes still open (QF3-QF13)
+
+Source: `docs/audit-agent-behaviour.md` §6 Track 1 - "independent, individually shippable, no architectural change".
+QF1 and QF2 are done (§0.3). **QF3-QF13 were fully re-verified against code 2026-08-11** - most were quietly fixed by the agent-runtime restructure, whose comments cite the same audit IDs directly (e.g. `services/agent_runtime/loop.py` literally says `(B1)` and `(B2)` next to the fixes). Only 4 of the 11 are genuinely still open.
+
+| ID | Fix | Audit ID | Size | Status |
+|---|---|---|---|---|
+| QF3 | Remove `search_catalog` from RULE 6 | A4 | minutes | **Moot.** `search_catalog` does not exist anywhere in the codebase - nothing to remove. |
+| QF4 | Fork RULE 1 into a tool-aware variant for pack companies | A1 | half day | **Open.** `main.py:3646` still has one generic `RULE 1` block; no pack-aware fork found. |
+| QF5 | Gate cache writes on grounded + complete; add a TTL to `exact_query_cache` | D1, D2 | hours | **Done.** `_cacheable()` (`main.py:3020`) gates writes on `turn_state is ANSWERED`, and `CACHE_TTL_DAYS = 30` (`main.py:3017`) is enforced on every read (`main.py:3467-3468`, `created_at > now() - interval '30 days'`). Both cite "audit D1/D2" in-line. |
+| QF6 | Execute all tool calls in a round, or return an explicit "not executed" observation | B1 | half day | **Done.** `services/agent_runtime/loop.py:214-222` - calls past `max_calls_per_round` get `_OVER_BUDGET_OBSERVATION` instead of being dropped. Comment: `# Every advertised call gets a response, budget or not (B1).` |
+| QF7 | Sanitize and delimit client history; validate `role` against a literal set | C1 | half day | **Open.** `main.py:3805-3811` builds `HumanMessage`/`AIMessage` from client-sent `chat_req.history` on a bare `if m.role == 'user'` check (no allowlist) and inserts `m.content` unsanitized. Only the *current* message is delimited (`delimited_user_message`); history items are not. |
+| QF8 | Consolidate the refusal into one structured outcome with one rendering | A6, F3 | 1 day | **Done.** `services/agent_runtime/states.py`'s `TurnState` enum + `turn.py`'s `TurnResult` + `compose.settle()` as the single decision point, paired with the RULE 6 Phase 5 rewrite that stopped the model reciting a canned refusal paragraph. |
+| QF9 | Reconcile the timeout budget from per-call timeout x retries x rounds | B5 | hours | **Done.** `services/agent_runtime/pipeline.py`'s `deadline_s`/`heartbeat_s` mechanism (fed `AGENT_PRECOMPUTE_TIMEOUT_S = 30`) plus `MAX_TOOL_ROUNDS = 4` (`loop.py:37`) is a single reconciled budget, not independent per-layer constants. |
+| QF10 | Suppress `_captured` side effects when the turn's answer is a fallback | B3 | half day | **Open.** `pipeline.py:118` calls `_capture_volunteered_contact(...)` *before* `compose.settle()` (line ~136) determines `system_error`/fallback - the capture and its handoff fire independent of whether the turn's answer ends up being the fallback text. Related to but distinct from Slice K (§6): K binds the *acknowledgment sentence*; QF10 is the *capture side effect* itself. |
+| QF11 | Forced tool-free compose round; fallback only when there is truly nothing | B2 | 1-2 days | **Done.** `loop.py:236-240` - after exhausting `max_rounds`, `_compose_without_tools()` runs over whatever the tools already returned rather than discarding it. Comment: `# ... compose over it rather than discarding it (B2).` |
+| QF12 | Handle the `error` SSE frame client-side; terminate with `[DONE]` after it | F2 | half day | **Done.** Backend emits `{"error": "Stream interrupted"}` then `data: [DONE]` (`main.py:4013-4018`); frontend explicitly parses `parsed.error` (`src/components/chat/ChatWidget.tsx:2999`). |
+| QF13 | Use `client_message_id` as an idempotency key on the chat write path | C4 | 1 day | **Open.** `client_message_id` is stored on the `chat_logs` row (`main.py:3151`) and used later to *attach feedback* (`main.py:7127`), but the `INSERT` itself (`main.py:3151`) has no `ON CONFLICT` - nothing stops a retried request from writing a duplicate row. Not an idempotency key today, just a column. |
+
+**Net result:** 7 of QF3-QF13 done, 1 moot, **4 genuinely open: QF4, QF7, QF10, QF13.** QF7 and QF13 are the two worth prioritizing - QF7 is a real prompt-injection-shaped gap (unsanitized client history), QF13 is a real duplicate-row gap on every retried chat request.
+
+## 14. Architecture slices still open (ARCH-A - ARCH-M)
+
+Source: `docs/audit-agent-behaviour.md` §6 Track 2 - "build the precision architecture". These are larger, structural builds, not quick fixes.
+
+| ID | Slice | Audit finding IDs | Status |
+|---|---|---|---|
+| ARCH-A | **Grounding gate.** Keep rerank scores, set a threshold, refuse below it as a structured turn outcome. | B7 (part), D4 | **Not started.** Confirmed - no rerank-threshold or grounding-gate code found. |
+| ARCH-B | **Runtime output check.** Promote `fabrication_hits` from the eval suite into the response path for value-class answers with no grounding observation. | B7 | **Not started.** Confirmed - `fabrication_hits` exists only in `tests/test_guardrail_eval.py`, never imported by runtime code. |
+| ARCH-C | **Entity-safe ingestion.** Source-type-aware extraction; never split a contact block, table row or FAQ pair across chunks. | E2 | **In progress**, separate unmerged branch. See §15. |
+| ARCH-D | **Identifier retrieval path.** Trigram / exact-match index alongside BM25; stop stemming identifiers. | E3, D5 | **Not started.** This plan's Slice H (§3) only raises `top_k` for entity lookups - a narrower, cheaper mitigation. If H+I don't fix directory recall, ARCH-D is the real fix. |
+| ARCH-E | **Structured-kind registry.** Generalise `catalog_tables` into pack-configurable kinds; people/contacts first, then FAQ pairs. | E1 | **Not started, explicitly deferred** (§17 out-of-scope note carries this forward unchanged: build only if directory answers still fail after H and I). |
+| ARCH-F | **Intent router.** Deterministic first, cheap classifier fallback; structured classes skip HyDE and rerank entirely. | B8 (part), A5 | **Not started.** |
+| ARCH-G | **Turn pipeline extraction.** One `TurnResult` (text, events, sources, tool_trace, status) read by SSE, session, funnel, alerts and analytics. | B3, B4, F4 | **Done, pushed to MainV2** - this is the agent-runtime restructure (`services/agent_runtime/`, `compose.settle()`). Confirmed an ancestor of this branch's base commit. |
+| ARCH-H | **Tool registry.** One object per tool owning schema, executor, capture shape, funnel contribution, availability predicate. | B9, B10 | **Done, pushed to MainV2** (`f9fc4f93`, `RuntimeTool` registry). |
+| ARCH-I | **Prompt composer.** One authority order, static-before-volatile block ordering, asserted token budget, snapshot-tested. | A3, A5, A7, A8 | **Not started.** RULE 1-7 in `main.py` are still hand-assembled string blocks. |
+| ARCH-J | **KB search as a tool.** Retrieval becomes a decision, not a tax. | B8 | **Not started.** |
+| ARCH-K | **Signals rebuild.** Replace `is_unanswered`/`confidence` with grounded-answer rate and refusal rate derived from `TurnResult`, versioned. | D3, D4 | **Partial.** `turn_state` (migration 0037) is the raw signal this needs and is what F2 (§1.4) already reads instead of `is_unanswered`. The rolled-up, versioned metric on top of it is not built. |
+| ARCH-L | **Persist the tool trace.** `tool_calls`/`observations` written and surfaced in the owner conversation view. | C3 | **Done, pushed to MainV2** - Slice D's `chat_logs.sources` (migration 0036) + `ConversationsPanel`. One manual browser check still owed per prior memory. |
+| ARCH-M | Streaming compose; generic-bot server-side memory; embedding dimensionality; dead code. | F1, C2, E4, D6 | **Not started**, grab-bag - lowest priority. |
+
+**Audit's own priority note, carried forward:** ARCH-A (grounding gate) will *increase* refusals on badly-cut chunks, because it starts declining what the model used to guess at - correct behaviour, but it reads to an owner as "the bot got quieter." Don't ship ARCH-A without warning the client, same discipline as F's disclosure in §1.6.
+
+## 15. Entity-safe ingestion - phase status
+
+Full plan now lives at `docs/entity-safe-ingestion-plan.md` (copied 2026-08-11 from unmerged `feature/entity-safe-ingestion`). This is a condensed status; read the full doc before touching Phase 2+, not this summary.
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Measurement harness (`tests/chunk_metrics.py`, `tests/chunk_fixtures.py`) | **Done.** Its own real-page validation found the correctness defect (unheadered table splits) doesn't occur in any currently-trained page, including Expresolv's - so this slice does not fix the fabricated-contact incident that motivated it. What it does deliver: 34% fewer chunks, 14% fewer billed words, from header/heading deduplication. |
+| 1 | `services/chunking.py` structure-aware packer | **Done, not wired in.** `run_training_job` still uses the old `RecursiveCharacterTextSplitter`. |
+| 2 | Wire into `run_training_job` | **Not started.** Gated on Q1 (decided: `context TEXT` column, dark-applied, likely claims migration `0038` - see §10's migration note). |
+| 3 | FAQ / definition-list atomicity | **Not started.** The plan's own Phase 0 measurement found FAQ pairs already survive splitting intact except when a single answer exceeds ~1500 chars - demoted below Phase 4 in its own doc. |
+| 4 | Owner-triggered per-source re-ingest | **Not started.** Decided (§6 Q2): a re-index button on the Train page, one source at a time, no forced migration. |
+
+Relationship to this plan's Slice I (§4): different layers (splitting vs. extraction), sequenced not conflicting. Full reasoning in §4.
+
+## 16. Master priority order, everything in this file
+
+§10 already orders F-K internally. This extends that ordering across every item this file now tracks, in the sequence that respects real dependencies (not slice-letter order):
+
+1. **F1 -> F2 -> F3 -> F4** (§1) - already in flight, actively corrupting data, ships first regardless of everything below.
+2. **G with J, shadow first** (§2, §5).
+3. **QF13** (chat-log idempotency, §13) - cheap, isolated, real duplicate-row gap on retried requests; ship alongside F/G. QF5 turned out to already be done, nothing to do there.
+4. **I** (§4) - extraction hardening, ships before H is measured and before Entity-Safe Phase 2 (its own harness numbers depend on cleaner extraction input).
+5. **H, measured against I** (§3).
+6. **K** (§6) - smallest, independent, ships whenever convenient. **QF10** (§13) is the same territory (capture side effects vs. fallback turns) and should ship alongside it.
+6.5. **QF7** (§13) - unsanitized client-supplied history is a real prompt-injection-shaped gap, not cosmetic; worth pulling forward rather than leaving in the general QF backlog.
+7. **ARCH-B** (runtime `fabrication_hits` promotion) - cheap, complements G's grounding check (§2.4 check 3) rather than duplicating it.
+8. **ARCH-A** (grounding gate) - the audit's own highest-value Track 2 item, but read the ordering warning in §14 first and coordinate client disclosure the way F did.
+9. **Entity-Safe Phase 2** (wire in the chunker) - after I ships, so its harness measures the real post-cleanup corpus, and after the `0038` migration-number question is settled with `feature/entity-safe-ingestion`.
+10. **ARCH-D / ARCH-E** (identifier retrieval, structured contacts registry) - only if H+I don't fix directory recall, per the existing deferral in §17.
+11. **ARCH-I / ARCH-F / ARCH-J** (prompt composer, intent router, KB-as-tool) - largest rewrites, lowest urgency, no client complaint currently traces to these.
+12. **Remaining QF rows** (§13) - reverify each, ship independently whenever idle capacity exists; the audit explicitly scoped them as no-architecture, any-time fixes.
+
+Nothing above changes §10's own F-K sequencing or §8's frozen guarantees. This is an ordering, not new scope - every item was already committed to in some other doc before 2026-08-11.
+
+---
+
+## 17. Out of scope, and what belongs to the client
+
+**Not engineering work:**
+
+- **The EXPLORE word cap.** Expresolv has used 4,496 of 12,000 words (`core/config.py:48`). Their site is roughly 250,000 words across 668 pages (17 in `page-sitemap.xml`, 651 in `product-sitemap.xml`). Only **6 pages are ingested, 0.9% of the site**. No scraper work changes the fact that their tier cannot hold their site. Commercial conversation.
+- **"Business development manager" does not exist in their content.** Repeatedly asked, correctly declined. They must add the role or stop asking.
+- **Full-site discovery is opt-in** and their ingestion dates show one-URL-at-a-time manual entry. Worth showing them the flow, but 651 product pages will not fit the cap regardless.
+
+**Deferred engineering:**
+
+- The `contacts` table (gaps plan §11.3). Now tracked as **ARCH-E** (§14). Tune retrieval first per the owner decision; build it only if directory answers still fail after H and I.
+- **Gaps plan's Slice C**, the two-day activity digest. Still plan-only, still deprioritised. (Not the audit's own "Slice C" - that is entity-safe ingestion, tracked separately as **ARCH-C** / §15. Two unrelated plans reuse the letter C; do not conflate them.)
+- `FALLBACK_PHRASES` / `is_unanswered` repair. F routes around it via `turn_state`, so the flag stays unreliable for any other consumer. Gaps plan's Slice C (the digest, above) depends on it.
+- `docs/codebase-consolidation-plan.md`. `main.py` is 14,128 lines, but nothing here is blocked on it.
+
+## 18. Relates to
+
+- `docs/agent-conversation-gaps-plan.md` - Slices A-E, and the §13.4 / §13.6 items G and H come from. A/B/D/E status now tracked in §0.3.
+- `docs/audit-agent-behaviour.md` - D3 is why F's eligibility gate is broken; A5 is why G is not a prompt fix; source for the QF (§13) and ARCH (§14) trackers folded in 2026-08-11.
 - `docs/coa-confidential-access-plan.md` - the confidentiality standard F3 must not violate.
-- `docs/agent-runtime-restructure-plan.md` - `turn_state` (F2's replacement signal) and `compose.settle()` (G's home) both come from it.
+- `docs/agent-runtime-restructure-plan.md` - `turn_state` (F2's signal), `compose.settle()` (G's home), and ARCH-G/ARCH-H's shipped implementation.
+- `docs/entity-safe-ingestion-plan.md` - lives on unmerged `feature/entity-safe-ingestion`, copied into this repo 2026-08-11 for reference; downstream of Slice I (splitting vs. extraction), not conflicting - see §4 for the sequencing/migration-number notes and §15 for phase status.
