@@ -1598,6 +1598,7 @@ from services.agent_runtime.escalation import (
     prior_turn_refused as _prior_turn_refused,
 )
 from services.agent_runtime.sources import tool_sources as _build_tool_sources
+from services.faq_eligibility import excluded_by
 from services.agent_runtime.tools.records import (
     insert_agent_request as _insert_agent_request,
     parse_qty as _parse_qty,
@@ -10145,6 +10146,33 @@ def get_config(
         raise HTTPException(status_code=500, detail=f"Config serialization error: {str(e)}")
 
 
+def _publishable_faq_rows(candidate_rows: list, pack) -> list:
+    """Filter FAQ candidates down to what may become public crawlable content.
+
+    Rows are ``(question, answer, ask_count, all_sources)`` where ``all_sources``
+    is a jsonb_agg of each grouped turn's ``sources`` array. Returns 3-tuples in
+    the shape ``_dedupe_ranked_qa`` expects.
+
+    A group is rejected if ANY turn in it used a restricted tool - the same
+    question answered once from a certificate is not publishable just because it
+    was also answered from the catalog (plan §1.4 F3).
+    """
+    kept = []
+    for cand in candidate_rows:
+        question, answer = cand[0], cand[1]
+        grouped = cand[3] if len(cand) > 3 else None
+        flat_sources = [
+            entry
+            for per_turn in (grouped or [])
+            if isinstance(per_turn, list)
+            for entry in per_turn
+        ]
+        if excluded_by(question, answer, pack=pack, sources=flat_sources):
+            continue
+        kept.append(tuple(cand[:3]))
+    return kept
+
+
 def _dedupe_ranked_qa(rows: list, limit: int, answer_max_len: Optional[int] = 300) -> list[dict]:
     """Rank (question, answer, ask_count) rows and drop near-identical questions.
 
@@ -10195,8 +10223,13 @@ def get_bot_faqs(request: Request, bot_id: str):
     own customers see in the widget.
 
     Aggregation strategy:
-      1. Pull answered (is_unanswered = false) Q&A pairs where the answer is
-         substantive (>= 80 chars) from the last 90 days.
+      1. Pull answered Q&A pairs where the answer is substantive (>= 80 chars)
+         from the last 90 days, then drop everything services.faq_eligibility
+         refuses to publish (bot-output-quality plan §1.4, F2/F3).
+         `is_unanswered` is audit finding D3 and under-fires so badly that 11%
+         of the historical pool was the bot's own refusal text; the trustworthy
+         signal is `turn_state`, which only has coverage from 2026-08-12, so
+         NULL rows are admitted but must pass every exclusion class.
       2. De-duplicate near-identical questions via trigram similarity:
          lower(user_query) similarity threshold 0.6 — Postgres pg_trgm.
          We pick the most-asked representative from each cluster.
@@ -10209,7 +10242,7 @@ def get_bot_faqs(request: Request, bot_id: str):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, bot_name FROM companies WHERE api_key = %s", (hashed_key,))
+        cursor.execute("SELECT id, bot_name, vertical FROM companies WHERE api_key = %s", (hashed_key,))
         row = cursor.fetchone()
         if not row:
             cursor.close()
@@ -10217,26 +10250,36 @@ def get_bot_faqs(request: Request, bot_id: str):
 
         company_id = row[0]
         bot_name   = row[1] or "AI Assistant"
+        # What counts as confidential is the vertical's property, never this
+        # endpoint's - the pack carries it (F3).
+        pack = load_pack(row[2])
 
         # ── Real FAQ aggregation ──────────────────────────────────────────────
         # Step 1: fetch answered, substantive Q&A pairs from the last 90 days.
-        # We pull more than 10 so the de-dup pass has headroom to discard dupes.
+        # The candidate pull is deliberately wide: the eligibility pass below
+        # rejects ~26% of historical rows, so a narrow pull would starve the feed.
         cursor.execute(
             """
-            SELECT user_query, bot_response, COUNT(*) AS ask_count
+            SELECT user_query,
+                   bot_response,
+                   COUNT(*) AS ask_count,
+                   jsonb_agg(sources) FILTER (WHERE sources IS NOT NULL) AS all_sources
             FROM chat_logs
             WHERE company_id  = %s
-              AND is_unanswered = false
+              AND (turn_state = %s OR turn_state IS NULL)
               AND LENGTH(bot_response) >= 80
               AND created_at  >= NOW() - INTERVAL '90 days'
             GROUP BY user_query, bot_response
             ORDER BY ask_count DESC, LENGTH(bot_response) DESC
-            LIMIT 60
+            LIMIT 200
             """,
-            (company_id,),
+            (company_id, _TurnState.ANSWERED.value),
         )
-        rows = cursor.fetchall()
+        candidate_rows = cursor.fetchall()
         cursor.close()
+
+        # Step 1b: drop everything that must never become public crawlable content.
+        rows = _publishable_faq_rows(candidate_rows, pack)
 
         # Step 2: de-duplicate near-identical questions and rank by ask
         # frequency (pg_trgm similarity would need the extension enabled and
