@@ -16,15 +16,15 @@ import json
 
 import pytest
 
-from services import agent
-from services.agent import (
+from services.agent_runtime.loop import (
     AGENT_FALLBACK_TEXT,
-    build_agent_directive,
-    get_product_spec,
-    get_sds,
     run_agent_loop,
     stream_agent_loop,
 )
+from services.agent_runtime.prompt import build_agent_directive
+from services.agent_runtime.tools import records
+from services.agent_runtime.tools.get_product_spec import get_product_spec
+from services.agent_runtime.tools.get_sds import get_sds
 from packs import load_pack
 
 
@@ -526,7 +526,9 @@ class TestExecuteTool:
 
 # ── request_quote (Phase 4a) ─────────────────────────────────────────────────
 
-from services.agent import request_quote, _norm_pack, _pack_magnitude  # noqa: E402
+from services.agent_runtime.tools.request_quote import (  # noqa: E402
+    request_quote, _norm_pack, _pack_magnitude,
+)
 
 
 class TestNormPack:
@@ -932,7 +934,7 @@ class TestRequestQuote:
 
 # ── request_sample (Phase 4b) ────────────────────────────────────────────────
 
-from services.agent import request_sample  # noqa: E402
+from services.agent_runtime.tools.request_sample import request_sample  # noqa: E402
 
 
 class FakeProductCursor:
@@ -1003,7 +1005,7 @@ class TestInsertAgentRequest:
 
     def test_records_form_data_tenant_scoped_and_commits(self):
         cur = FakeProductCursor()
-        ok = agent._insert_agent_request(
+        ok = records.insert_agent_request(
             cur, CID, kind="sample", product="Acetone", cas="67-64-1", grade="AR",
             pack_size=None, qty=2, note="urgent", name="Asha", email="a@b.com",
             phone=None, session_id="s1", form_data={"product": "Acetone", "company": "Acme"})
@@ -1016,7 +1018,7 @@ class TestInsertAgentRequest:
 
     def test_null_form_data_is_allowed(self):
         cur = FakeProductCursor()
-        ok = agent._insert_agent_request(
+        ok = records.insert_agent_request(
             cur, CID, kind="sample", product="X", cas=None, grade=None,
             pack_size=None, qty=1, note=None, name=None, email="a@b.com",
             phone=None, session_id=None, form_data=None)
@@ -1029,7 +1031,7 @@ class TestInsertAgentRequest:
         class BoomCursor(FakeProductCursor):
             def execute(self, sql, params=None):
                 raise RuntimeError("db down")
-        ok = agent._insert_agent_request(
+        ok = records.insert_agent_request(
             BoomCursor(), CID, kind="sample", product="X", cas=None, grade=None,
             pack_size=None, qty=1, note=None, name=None, email="a@b.com",
             phone=None, session_id=None, form_data=None)
@@ -1065,33 +1067,33 @@ class TestSessionHasCapture:
 
     def test_no_session_id_degrades_false(self):
         cur = FakeExistsCursor(agent_requests_hit=True)
-        assert agent._session_has_capture(cur, CID, None) is False
+        assert records.session_has_capture(cur, CID, None) is False
         assert cur.calls == []   # never even queried — cheap short-circuit
 
     def test_no_existing_rows_returns_false(self):
         cur = FakeExistsCursor()
-        assert agent._session_has_capture(cur, CID, "s1") is False
+        assert records.session_has_capture(cur, CID, "s1") is False
 
     def test_existing_agent_request_returns_true(self):
         cur = FakeExistsCursor(agent_requests_hit=True)
-        assert agent._session_has_capture(cur, CID, "s1") is True
+        assert records.session_has_capture(cur, CID, "s1") is True
 
     def test_existing_quote_request_returns_true(self):
         cur = FakeExistsCursor(quote_requests_hit=True)
-        assert agent._session_has_capture(cur, CID, "s1") is True
+        assert records.session_has_capture(cur, CID, "s1") is True
         # Checked agent_requests first, then fell through to quote_requests.
         assert len(cur.calls) == 2
 
     def test_short_circuits_on_agent_request_hit(self):
         cur = FakeExistsCursor(agent_requests_hit=True, quote_requests_hit=True)
-        assert agent._session_has_capture(cur, CID, "s1") is True
+        assert records.session_has_capture(cur, CID, "s1") is True
         assert len(cur.calls) == 1   # never needed to check quote_requests
 
     def test_db_error_degrades_false_never_suppresses_a_real_capture(self):
         class BoomCursor(FakeExistsCursor):
             def execute(self, sql, params=None):
                 raise RuntimeError("db down")
-        assert agent._session_has_capture(BoomCursor(), CID, "s1") is False
+        assert records.session_has_capture(BoomCursor(), CID, "s1") is False
 
 
 # ── pack -> schema + directive ───────────────────────────────────────────────

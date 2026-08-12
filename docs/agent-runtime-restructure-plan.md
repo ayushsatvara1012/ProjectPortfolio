@@ -2,9 +2,9 @@
 
 Date: 2026-08-11.
 Branch: MainV2.
-Status: Phases 1-5 DONE, Phase 6 not started.
-Committed on `refactor/agent-runtime-restructure` (`5400531b` migration 0037, `405bf2f6` the restructure), not pushed, no PR.
-Suite green at backend 2311 passed / 134 skipped, vitest 581, tsc clean, lint 0 errors.
+Status: Phases 1-6 DONE, except B4/F4 (multiple cards in one turn), deferred with a reason - see the Phase 6 entry.
+Committed on `refactor/agent-runtime-restructure` (`5400531b` migration 0037, `405bf2f6` the restructure); Phase 6 is UNCOMMITTED as of 2026-08-11.
+Suite green at backend 2327 passed / 134 skipped, vitest 581, tsc clean, lint 0 errors.
 Browser verification of the merged connect form is still owed.
 Migration 0037 APPLIED DARK to the prod control DB `tticllabbbqwnhsmggfo` on 2026-08-11 (deploy gate cleared - see the Phase 5 entry).
 
@@ -81,6 +81,23 @@ Also fixed in passing, as the phase promised: cache writes gated on `_cacheable(
 **Migration 0037 applied dark, 2026-08-11.** `ALTER TABLE chat_logs ADD COLUMN IF NOT EXISTS turn_state TEXT` on the prod control DB `tticllabbbqwnhsmggfo` via Supabase MCP; column verified present, nullable, 0 rows populated (correct - nothing has been deployed to write it yet). This had to happen before deploy, not after: `log_chat_to_db` now names `turn_state` in its INSERT, and against the old schema every insert would raise into the existing try/except, leaving chat working while all analytics silently stopped.
 
 **`alembic_version` is deliberately left at 0036.** The dark DDL does NOT stamp - same as the 0030 precedent. Stamping ahead of the file would break any `alembic upgrade head` or `alembic current` run from a checkout that doesn't have `0037_chat_logs_turn_state.py` yet, which is every checkout of MainV2 until this branch merges. When Alembic does run 0037, `ADD COLUMN IF NOT EXISTS` is a no-op and it stamps itself. (This was applied and then reverted during the session after the 0030 precedent was checked - do not "fix" the version number by hand.)
+
+**Phase 6 - DONE (except B4/F4).** `pipeline.py` + `sources.py` + `prompt.py`, `services/agent.py` DELETED, `tests/test_agent_runtime_pipeline.py` (16).
+
+The cutover, in three parts:
+
+1. **`services/agent.py` dissolved.** The deterministic tool bodies moved into `tools/`: shared product resolution into `tools/resolve.py` (`resolve_product`, `PRODUCT_COLS`, `is_https`, `split_packs`), the owner-lead writes both a tool and two `main.py` endpoints need into `tools/records.py` (`insert_agent_request`, `session_has_capture`, `classify_qty`/`parse_qty`), and each tool's own logic into its own `tools/*.py` beside the `RuntimeTool` that wraps it. `build_agent_directive` became `prompt.py`.
+   This is what dissolves the Phase 3 import cycle: `loop._status_phrase` now imports the registry at module level, as that trap said it would once the bodies moved. Underscore-prefixed names that crossed a module boundary lost the underscore (`newest_https_row`, `insert_quote`); ones that stayed module-private (`_norm_pack`, `_quote_rows`) kept it.
+2. **`pipeline.run_agent_turn`.** One async generator per vertical turn: it drives the loop under the deadline, yields `ping`/`status` events for the caller to frame, then yields exactly one `result` carrying the `TurnResult`, and persists the session **after** that yield is consumed - so the visitor still reads the reply before the commit, exactly as the handler ordered it. `main.py`'s `stream_generator` lost ~290 lines and now only frames what comes back. `settle_prose_turn` does the same for the generic bot's post-stream settle.
+   `_build_tool_sources`, `_escalation_frame` and `_prior_turn_refused` moved into `sources.py` / `escalation.py`, re-imported into `main.py` under their original private names (the `contact.py` precedent), so no test moved with them.
+3. **The client.** F3 needed nothing: both duplicate failure-detection lists were already gone - the widget's three keyword lists in Phase 4, the server's `FALLBACK_PHRASES` in Phase 5 - and the widget now renders whatever the server's `escalate` event asks for.
+
+**B4/F4 deliberately NOT done, and why.** The §6 risk note said to verify the widget can actually render multiple cards before assuming it is free. It cannot, and neither can the server produce them: `registry._apply_capture` does `captured.update(patch)`, so a second `request_quote` in one turn overwrites the first slot before the pipeline ever sees it. Making it real means a repeatable-key capture shape, then every reader of `captured["quote"]` (`sales_funnel._candidate_stage`, `session_store.derive_title`, `sources.tool_sources`, the owner alert) handling a list, then `Message.quote` becoming `Message.quotes[]` with the ~50 lines of inline quote-card JSX extracted into a component that maps. That is a feature, not a cutover, and shipping the widget half alone would be dead code with no producer. `TurnResult.events` is already the list it needs to arrive on when it is built.
+
+Traps found while wiring it:
+- **Card payloads are built as `TurnEvent(type=..., payload=...)`, never `add_event(**payload)`.** A card payload is tool-shaped data; a key named `type` in it would collide with the event's own field and raise mid-turn.
+- The pipeline yields the result **before** persisting. Written the other way round (persist, then yield) the visitor waits on a DB commit before seeing a single token - a silent latency regression the tests would not have caught, so `TestPersistenceOrdering` asserts the order.
+- `_drive_loop` yields an explicit `timeout` event rather than letting the caller infer a blown deadline from the fallback text. Same outcome today, but the settle no longer depends on string equality with `AGENT_FALLBACK_TEXT` to know a system failure happened.
 
 ## 0. Intent - how this differs from the behaviour audit
 

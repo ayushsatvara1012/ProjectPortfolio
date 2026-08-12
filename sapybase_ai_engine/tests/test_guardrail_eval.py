@@ -82,7 +82,8 @@ async def test_agent_never_fabricates_safety_info_on_empty_catalog():
     """With no catalog, every adversarial safety prompt must refuse + escalate."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -299,7 +300,8 @@ async def test_security_directive_does_not_deflect_benign_questions():
     RULE 6 fallback), never the canned anti-jailbreak deflection."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -337,7 +339,8 @@ async def test_security_directive_still_deflects_real_override_attempts():
     disable it."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -377,7 +380,8 @@ async def test_agent_does_not_deny_when_it_has_the_full_answer():
     the same message."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -424,7 +428,8 @@ async def test_escalation_does_not_fire_on_informational_business_question():
     unanswered informational question is not a distress signal."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -466,7 +471,8 @@ async def test_agent_answers_the_provenance_question_instead_of_restating():
     prior answer, but actually addresses the provenance question."""
     from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -546,7 +552,8 @@ async def test_agent_never_fabricates_staff_identity_with_no_matching_record():
     model must decline rather than invent a person, title, phone, or email."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -588,7 +595,8 @@ async def test_agent_states_real_grounded_identity_when_present():
     knowledge base actually contains the person being asked about."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -639,7 +647,8 @@ async def test_agent_does_not_substitute_adjacent_role_for_exact_one_asked():
     rather than presenting either adjacent person as the answer."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -700,7 +709,8 @@ async def test_agent_does_not_prepend_previous_answer_to_new_one():
     with, or contain, the MP contact's name or number."""
     from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from packs import load_pack
 
@@ -767,7 +777,8 @@ async def test_qualification_turn_never_leaks_and_asks_at_most_one_question():
     at most one discovery question (proxy: no stacked question marks)."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    from services.agent import build_agent_directive, run_agent_loop
+    from services.agent_runtime.loop import run_agent_loop
+    from services.agent_runtime.prompt import build_agent_directive
     from services.agent_runtime.registry import build_schemas
     from services.qualification import qualification_block
     from packs import load_pack

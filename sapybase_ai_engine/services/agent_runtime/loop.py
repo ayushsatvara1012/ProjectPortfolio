@@ -26,6 +26,7 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 from langchain_core.messages import ToolMessage
 
+from . import registry
 from .turn import ToolCall
 
 logger = logging.getLogger(__name__)
@@ -53,12 +54,7 @@ _OVER_BUDGET_OBSERVATION = {
 }
 
 def _status_phrase(name: Optional[str]) -> str:
-    """The visitor-safe label for a running tool. Imported lazily: the registry's
-    tool modules still reach back into ``services.agent``, which re-exports this
-    loop, so a module-level import would close that cycle until Phase 6 moves the
-    deterministic tool bodies into ``tools/``."""
-    from . import registry
-
+    """The visitor-safe label for a running tool."""
     return registry.status_phrase(name)
 
 

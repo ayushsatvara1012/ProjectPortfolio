@@ -1582,23 +1582,32 @@ from services import coa_throttle
 from services import spec_drive
 # Vertical-agent runtime (Phase 1, §9): the ReAct loop + deterministic tools that
 # fire only for pack (vertical != NULL) companies. Generic companies never touch it.
-from services.agent import build_agent_directive
+from services.agent_runtime.prompt import build_agent_directive
 from services.agent_runtime import registry as agent_registry
-from services.agent_runtime.loop import AGENT_FALLBACK_TEXT, run_agent_loop, stream_agent_loop
 from services.agent_runtime.contact import (
     captured_contact_echo as _captured_contact_echo,
     valid_reply_to as _valid_reply_to,
 )
-from services.agent_runtime import escalation as agent_escalation
-from services.agent_runtime import compose as agent_compose
+from services.agent_runtime import pipeline as agent_pipeline
 from services.agent_runtime import refusal as agent_refusal
 from services.agent_runtime.states import TurnState as _TurnState
-from services.agent import _insert_agent_request as _insert_agent_request, _parse_qty as _parse_qty
-from services.agent import _session_has_capture as _session_has_capture
+# Moved into the runtime by the Phase 6 cutover; re-imported under their original
+# private names so `from main import ...` (endpoints and the test suite) resolves.
+from services.agent_runtime.escalation import (
+    frame as _escalation_frame,
+    prior_turn_refused as _prior_turn_refused,
+)
+from services.agent_runtime.sources import tool_sources as _build_tool_sources
+from services.agent_runtime.tools.records import (
+    insert_agent_request as _insert_agent_request,
+    parse_qty as _parse_qty,
+    session_has_capture as _session_has_capture,
+)
 # Phase 3 (get-sds-crash-fix-plan): the SDS picker endpoint reuses the EXACT SAME
 # newest-https selection logic as the conversational get_sds tool (plan 3c), so
 # the two paths can never disagree on which sheet a product resolves to.
-from services.agent import _PRODUCT_COLS as _SDS_PRODUCT_COLS, _newest_https_row as _newest_https_row
+from services.agent_runtime.tools.get_sds import newest_https_row as _newest_https_row
+from services.agent_runtime.tools.resolve import PRODUCT_COLS as _SDS_PRODUCT_COLS
 from services import catalog_import as catalog_import
 from services import session_store  # Phase 1b — persistent session memory
 from services import sales_funnel    # Phase 2 — funnel stage + next-best-action
@@ -2657,42 +2666,6 @@ def _build_kb_sources(retrieved_docs: list, chunk_scores: list) -> list:
     return sources
 
 
-def _build_tool_sources(captured: dict) -> list:
-    """One 'tool' source entry per transactional/lookup tool that actually
-    produced this turn's answer (plan §12.2) — read from the SAME ``_captured``
-    dict the SSE payload and the real-time owner-handoff already use, so this
-    adds no new tracking, just a second read of data already in hand.
-
-    ``get_sds`` is the clearest case named in the plan: the owner needs to see
-    WHICH document the SDS panel showed, and that never appears in
-    ``retrieved_docs`` at all — it comes straight from the tool result."""
-    sources = []
-    sds = captured.get("sds")
-    if sds:
-        sources.append({"kind": "tool", "label": "get_sds",
-                        "detail": sds.get("product"), "url": sds.get("url")})
-    spec = captured.get("spec")
-    if spec:
-        sources.append({"kind": "tool", "label": "get_product_spec",
-                        "detail": spec.get("product"), "url": None})
-    quote = captured.get("quote")
-    if quote:
-        sources.append({"kind": "tool", "label": "request_quote",
-                        "detail": quote.get("product"), "url": quote.get("quote_url")})
-    coa = captured.get("coa")
-    if coa and coa.get("status") == "found":
-        results = coa.get("results") or []
-        first = results[0] if results and isinstance(results[0], dict) else {}
-        # No URL here even for the owner: COA documents are confidentiality-gated
-        # (docs/coa-confidential-access-plan.md) and this module has no context
-        # on whether the visitor's throttle/lockout state still permits a link.
-        sources.append({"kind": "tool", "label": "get_coa",
-                        "detail": coa.get("query") or first.get("name"), "url": None})
-    if captured.get("form"):
-        sources.append({"kind": "tool", "label": "request_sample", "detail": None, "url": None})
-    return sources
-
-
 # (CompanyUpdate moved to models.py — re-exported above)
 
 @app.patch("/api/company")
@@ -3089,68 +3062,6 @@ def _strip_source_citation(text: str) -> str:
     if not text or "source" not in text.lower():
         return text
     return _SOURCE_CITATION_RE.sub("", text).rstrip()
-
-
-def _prior_turn_refused(prior_messages: list) -> bool:
-    """Was the last thing we said to this visitor also a refusal?
-
-    Stands in for §1.5's "second refusal on the same topic": with no topic model
-    yet, adjacency is the honest approximation - two refusals back to back are
-    overwhelmingly the visitor rephrasing the same question. Reads whichever
-    transcript the caller has (session store for vertical bots, client-sent history
-    for generic ones), so no new storage is involved.
-
-    Prior turns predate ``chat_logs.turn_state`` or aren't loaded with it, so this
-    still reads the text - through the runtime's single definition of what a refusal
-    reads like (`refusal.reads_as_refusal`), not a list of its own.
-    """
-    for entry in reversed(list(prior_messages or [])):
-        role = entry.get("role") if isinstance(entry, dict) else getattr(entry, "role", None)
-        if role in ("assistant", "bot"):
-            content = entry.get("content") if isinstance(entry, dict) else getattr(entry, "content", "")
-            return agent_refusal.reads_as_refusal(content or "")
-    return False
-
-
-def _escalation_frame(
-    *,
-    message: str,
-    state,
-    prior_messages: list,
-    human_handoff_enabled: bool,
-    lead_capture_enabled: bool,
-    tool_answered: bool = False,
-    tool_trace: tuple = (),
-    disambiguated: bool = False,
-) -> Optional[dict]:
-    """The `escalate` SSE payload for this turn, or None to stay quiet.
-
-    One decision point for every bot, generic or vertical (plan §1.6). The widget
-    used to make this call itself from three keyword lists it kept client-side, and
-    only ever for generic bots - so the bots most likely to be mid-deal were the ones
-    that never asked who they were talking to. `destination` rides along because
-    entitlement, not the trigger, decides which endpoint the form can post to.
-    """
-    where = agent_escalation.destination(
-        human_handoff_enabled=human_handoff_enabled,
-        lead_capture_enabled=lead_capture_enabled,
-    )
-    if not where:
-        return None
-    found = agent_escalation.check(
-        message=message,
-        # Phase 5: the turn's settled outcome, not a guess from the reply's wording.
-        proposed_state=state,
-        topic_outcomes=(_TurnState.NO_DATA,) if _prior_turn_refused(prior_messages) else (),
-        tool_trace=tool_trace,
-        disambiguated=disambiguated,
-        # A turn that already produced a quote card has closed its own loop; asking
-        # for an email under it is the nagging the old client-side list was guilty of.
-        include_buying_intent=not tool_answered,
-    )
-    if found is None:
-        return None
-    return {"escalate": {**found.as_event_payload(), "destination": where}}
 
 
 def _compute_confidence(is_unanswered: bool, n_docs: int, rerank_top_score: float | None) -> float | None:
@@ -3919,9 +3830,6 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
             _turn_outcome = None
             agent_gen_conn = None    # generator-owned conn for the vertical-agent path
             try:
-                # Vertical-agent path: the answer is already computed (see above);
-                # emit it as a single token, then DONE. Persistence/metering still
-                # runs in the shared `finally` below, exactly like the live path.
                 if pack is not None:
                     # ── VERTICAL AGENT PATH (runs live inside the stream) ─────
                     # Own DB connection: the handler conn is gone by now. Tools +
@@ -3943,263 +3851,71 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         # calls it through this injection rather than importing main.
                         runners={"get_coa": _run_get_coa},
                     )
-                    _tool_executor = agent_registry.executor(_tool_ctx, _captured)
-
-                    # Availability-filtered: a tool the company isn't configured for
-                    # (get_coa with no Drive folder) is never offered to the model,
-                    # instead of being advertised and only able to say "not set up".
-                    agent_model = chat_model.bind_tools(
-                        agent_registry.build_schemas(pack, _tool_ctx)
-                    )
-                    full_reply = AGENT_FALLBACK_TEXT
-                    HEARTBEAT_SECONDS = 15
-                    _rl = asyncio.get_running_loop()
-                    _deadline = _rl.time() + AGENT_PRECOMPUTE_TIMEOUT_S
-                    # Phase 4: what the tools actually returned, so escalation sees a
-                    # real `not_found` instead of guessing from the reply's wording.
-                    _tool_trace: list = []
-                    _agent_iter = stream_agent_loop(
-                        agent_model, messages, _tool_executor, usage_out=_agent_usage,
-                        # Round exhaustion composes over the tool results already in
-                        # hand rather than discarding them; the unbound model makes
-                        # that last round genuinely tool-free.
-                        compose_model=chat_model,
-                        trace_out=_tool_trace,
-                    ).__aiter__()
-                    # Pull each event as its own task so a heartbeat timeout does NOT
-                    # cancel the in-flight round: on timeout we ping and keep awaiting
-                    # the SAME task. Only the total AGENT_PRECOMPUTE_TIMEOUT_S deadline
-                    # cancels it. (asyncio.wait_for would tear the generator down — this
-                    # plain async generator, unlike LangChain's queued astream, can't
-                    # survive a mid-round cancellation.)
-                    _pending = None
-                    try:
-                        while True:
-                            _remaining = _deadline - _rl.time()
-                            if _remaining <= 0:
-                                logger.warning(
-                                    "agent stream exceeded %ss budget; using fallback",
-                                    AGENT_PRECOMPUTE_TIMEOUT_S,
-                                )
-                                full_reply = AGENT_FALLBACK_TEXT
-                                break
-                            if _pending is None:
-                                _pending = asyncio.ensure_future(_agent_iter.__anext__())
-                            _done, _ = await asyncio.wait(
-                                {_pending}, timeout=min(HEARTBEAT_SECONDS, _remaining)
-                            )
-                            if not _done:
-                                # Nothing yet this window: keep proxies alive, keep the
-                                # same round running.
-                                yield ": ping\n\n"
-                                continue
-                            try:
-                                _ev = _pending.result()
-                            except StopAsyncIteration:
-                                _pending = None
-                                break
-                            _pending = None
-                            if _ev.get("type") == "status":
-                                yield f"data: {json.dumps({'status': _ev.get('label')})}\n\n"
-                            elif _ev.get("type") == "final":
-                                full_reply = _ev.get("text") or AGENT_FALLBACK_TEXT
-                    except Exception:
-                        logger.exception("agent stream failed; using fallback")
-                        full_reply = AGENT_FALLBACK_TEXT
-                    finally:
-                        # Deadline hit or error mid-round: cancel the in-flight task and
-                        # drain it so it never leaks or logs "Task was destroyed".
-                        if _pending is not None and not _pending.done():
-                            _pending.cancel()
-                            try:
-                                await _pending
-                            except BaseException:
-                                pass
-
-                    full_reply = _strip_source_citation(full_reply)
-
-                    # Slice A (agent-conversation-gaps plan §3) — a visitor who types a
-                    # phone/email mid-chat currently reaches nobody unless a tool already
-                    # fired a handoff this turn. Opportunistic + best-effort: never blocks
-                    # the reply, and yields to a handoff a tool already captured this turn
-                    # (e.g. a priced quote) rather than overwriting it. Setting
-                    # `_captured["handoff"]` here — BEFORE the snapshot below reads it —
-                    # is what makes the existing real-time owner-ping trigger fire
-                    # unchanged; nothing past this point needs to know about "contact".
-                    if pack is not None and chat_req.session_id and not _captured.get("handoff"):
-                        try:
-                            _contact = qualification.extract_contact(chat_req.message)
-                        except Exception:
-                            _contact = {}
-                        if _contact and not _session_has_capture(
-                                agent_cursor, company["id"], chat_req.session_id):
-                            _contact_product = (
-                                (_captured.get("quote") or {}).get("product")
-                                or (_captured.get("spec") or {}).get("product")
-                                or (((_prior_state or {}).get("products") or [{}])[-1] or {}).get("name")
-                            )
-                            if _insert_agent_request(
-                                    agent_cursor, company["id"], kind="contact",
-                                    product=_contact_product, cas=None, grade=None,
-                                    pack_size=None, qty=None, note=chat_req.message,
-                                    name=None, email=_contact.get("email"),
-                                    phone=_contact.get("phone"),
-                                    session_id=chat_req.session_id):
-                                _captured["handoff"] = {
-                                    "kind": "contact",
-                                    "product": _contact_product,
-                                    "contact_email": _contact.get("email"),
-                                    "contact_phone": _contact.get("phone"),
-                                    "note": chat_req.message,
-                                }
-
-                    # Slice D (plan §12.2) — append whichever tool actually
-                    # produced this answer to the kb sources already in
-                    # _turn_sources; kb first (matches the plan's own example
-                    # ordering), tool second.
-                    _turn_sources = _turn_sources + _build_tool_sources(_captured)
-
-                    # ── SETTLE THE TURN (Phase 5) ─────────────────────────────
-                    # One place decides what this turn was, and the server writes
-                    # the refusal when there is nothing underneath the model's
-                    # wording. Everything downstream — the SSE text, the session
-                    # store, escalation, the cache gate, the analytics columns —
-                    # reads this instead of re-deriving it three different ways.
-                    _turn = agent_compose.settle(
-                        text=full_reply,
-                        tool_trace=_tool_trace,
-                        retrieved_doc_count=len(retrieved_docs),
-                        sources=_turn_sources,
-                        context={
-                            "product_name": (
-                                (_captured.get("quote") or {}).get("product")
-                                or (_captured.get("spec") or {}).get("product")
-                                or (_captured.get("sds") or {}).get("product")
-                            ),
-                        },
-                        attempt=1 if _prior_turn_refused(_prior_session_messages) else 0,
-                        # The loop's own give-up text is a system failure, not a
-                        # data gap — outcome 6 is never presented as outcome 4.
-                        system_error=(full_reply == AGENT_FALLBACK_TEXT),
-                        small_talk=len(chat_req.message.strip()) < 4,
-                    )
-                    full_reply = _turn.text
-                    _turn_outcome = _turn.state
-                    # settle can add a source of its own (a turn that needed no
-                    # lookup), so the logged attribution comes back from it.
-                    _turn_sources = _turn.sources
-
-                    agent_sds = _captured.get("sds")
-                    agent_quote = _captured.get("quote")
-                    agent_form = _captured.get("form")
-                    agent_handoff = _captured.get("handoff")
-                    agent_grade_selector = _captured.get("grade_selector")
-                    agent_pack_selector = _captured.get("pack_selector")
-                    agent_coa = _captured.get("coa")
-                    agent_spec_doc = _captured.get("spec_doc")
-
-                    if full_reply:
-                        yield f"data: {json.dumps({'token': full_reply})}\n\n"
-                    if agent_sds:
-                        yield f"data: {json.dumps({'sds': agent_sds})}\n\n"
-                    if agent_quote:
-                        yield f"data: {json.dumps({'quote': agent_quote})}\n\n"
-                    if agent_form:
-                        yield f"data: {json.dumps({'form': agent_form})}\n\n"
-                    if agent_grade_selector:
-                        yield f"data: {json.dumps({'grade_selector': agent_grade_selector})}\n\n"
-                    if agent_pack_selector:
-                        yield f"data: {json.dumps({'pack_selector': agent_pack_selector})}\n\n"
-                    if agent_coa:
-                        yield f"data: {json.dumps({'coa': agent_coa})}\n\n"
-                    if agent_spec_doc:
-                        yield f"data: {json.dumps({'spec_doc': agent_spec_doc})}\n\n"
-
-                    # Capture-then-connect (plan §1.6): one server-owned decision,
-                    # vertical bots included — they used to be excluded outright.
-                    _escalate = _escalation_frame(
+                    _turn_inputs = agent_pipeline.TurnInputs(
+                        company=company,
                         message=chat_req.message,
-                        state=_turn_outcome,
+                        pack=pack,
+                        session_id=chat_req.session_id,
+                        visitor_id=chat_req.visitor_id,
+                        session_active=_session_active,
+                        session_summary=_session_summary,
                         prior_messages=_prior_session_messages,
-                        human_handoff_enabled=bool(company.get("human_handoff_enabled")),
-                        lead_capture_enabled=bool(company.get("lead_capture_enabled")),
-                        tool_answered=bool(_captured),
-                        tool_trace=tuple(_tool_trace),
-                        # A grade/pack selector last turn means the visitor has already
-                        # answered a clarifying question; a dead end after that is one.
-                        disambiguated=bool((_prior_state or {}).get("missing")),
+                        prior_state=_prior_state,
+                        prior_lead_profile=_prior_lead_profile,
+                        retrieved_doc_count=len(retrieved_docs),
+                        kb_sources=_kb_sources,
                     )
-                    if _escalate:
-                        yield f"data: {json.dumps(_escalate)}\n\n"
+                    # Phase 6: the turn itself — tool rounds, contact capture,
+                    # settling, escalation and session persistence — is one call
+                    # into services/agent_runtime/pipeline.py. What is left here is
+                    # SSE framing of what it hands back.
+                    async for _ev in agent_pipeline.run_agent_turn(
+                        _turn_inputs,
+                        # Availability-filtered: a tool the company isn't configured
+                        # for (get_coa with no Drive folder) is never offered to the
+                        # model, instead of being advertised and only able to say
+                        # "not set up".
+                        model=chat_model.bind_tools(
+                            agent_registry.build_schemas(pack, _tool_ctx)),
+                        messages=messages,
+                        tool_executor=agent_registry.executor(_tool_ctx, _captured),
+                        captured=_captured,
+                        cursor=agent_cursor,
+                        commit=agent_gen_conn.commit,
+                        rollback=agent_gen_conn.rollback,
+                        deadline_s=AGENT_PRECOMPUTE_TIMEOUT_S,
+                        # Unbound, so the round-exhaustion compose is tool-free.
+                        compose_model=chat_model,
+                        usage_out=_agent_usage,
+                        sanitize=_strip_source_citation,
+                        on_summary_needed=lambda: background_tasks.add_task(
+                            session_store.maybe_summarize_session,
+                            chat_req.session_id, company["id"],
+                            get_db_connection, release_db_connection,
+                        ),
+                    ):
+                        if _ev["type"] == "ping":
+                            # SSE comment: ignored by clients, keeps intermediate
+                            # proxies from killing a connection mid-tool-round.
+                            yield ": ping\n\n"
+                        elif _ev["type"] == "status":
+                            yield f"data: {json.dumps({'status': _ev['label']})}\n\n"
+                        elif _ev["type"] == "result":
+                            _turn = _ev["turn"]
+                            full_reply = _turn.text
+                            _turn_outcome = _turn.state
+                            _turn_sources = _turn.sources
+                            if full_reply:
+                                yield f"data: {json.dumps({'token': full_reply})}\n\n"
+                            # Cards, then the connect form: one list, in the order
+                            # the pipeline settled them (B4 — two quotes in one turn
+                            # are two entries, not one overwritten slot).
+                            for _frame in _turn.events:
+                                yield f"data: {json.dumps({_frame.type: _frame.payload})}\n\n"
 
-                    # ── SESSION MEMORY: persist this turn on the gen-owned conn ──
-                    if _session_active and full_reply:
-                        try:
-                            _actions = {
-                                k: _captured[k]
-                                for k in ("sds", "quote", "form", "handoff",
-                                          "grade_selector", "pack_selector", "coa",
-                                          "spec_doc")
-                                if k in _captured
-                            } or None
-                            session_store.append_message(
-                                agent_cursor, chat_req.session_id, company["id"],
-                                "user", chat_req.message,
-                            )
-                            session_store.append_message(
-                                agent_cursor, chat_req.session_id, company["id"],
-                                "assistant", full_reply, actions=_actions,
-                            )
-                            _title = session_store.derive_title(_captured)
-                            if _title:
-                                session_store.set_session_title(
-                                    agent_cursor, chat_req.session_id, _title
-                                )
-                            # Score the lead deterministically (reuse lead_scoring) so the
-                            # band drives next-turn booking/handoff offers.
-                            _ctx = " ".join(filter(None, [_session_summary, chat_req.message]))
-                            _lp = sales_funnel.build_lead_profile(
-                                _prior_lead_profile, _captured,
-                                _score_lead(_ctx,
-                                            (_prior_lead_profile or {}).get("email"),
-                                            (_prior_lead_profile or {}).get("name")),
-                            )
-                            # Phase 5 — fold deterministically-extracted qualification facts.
-                            if pack is not None and pack.qualification_slots:
-                                _lp = qualification.merge_qualification(
-                                    _lp,
-                                    qualification.extract_facts(
-                                        chat_req.message, pack.qualification_slot_names()),
-                                )
-                            _new_state = sales_funnel.derive_state(_prior_state, _captured, _lp)
-                            session_store.update_session_state(
-                                agent_cursor, chat_req.session_id, company["id"], _new_state
-                            )
-                            session_store.update_lead_profile(
-                                agent_cursor, chat_req.session_id, company["id"], _lp
-                            )
-                            agent_gen_conn.commit()
-                            _msg_count = session_store.count_messages(
-                                agent_cursor, chat_req.session_id, company["id"]
-                            )
-                            if _msg_count > session_store.SUMMARY_THRESHOLD:
-                                background_tasks.add_task(
-                                    session_store.maybe_summarize_session,
-                                    chat_req.session_id, company["id"],
-                                    get_db_connection, release_db_connection,
-                                )
-                        except Exception:
-                            try:
-                                agent_gen_conn.rollback()
-                            except Exception:
-                                pass
-                            logger.exception(
-                                "session_store: failed to persist turn session=%s",
-                                chat_req.session_id,
-                            )
-
-                    # Real-time owner handoff (Phase 4b): warm quote lead pings the owner
-                    # on Slack + email. Best-effort + non-blocking (tiering inside).
+                    # Real-time owner handoff: a warm quote lead pings the owner on
+                    # Slack + email. Best-effort + non-blocking (tiering inside).
+                    agent_handoff = _captured.get("handoff")
                     if agent_handoff:
                         slack_url = company.get("slack_webhook_url")
                         owner_to = company.get("alert_email") or company.get("owner_email")
@@ -4245,16 +3961,16 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         full_reply += content
                         yield f"data: {json.dumps({'token': content})}\n\n"
 
-                # Settle the generic turn too (Phase 5). `allow_rewrite=False`: the
-                # tokens are already on the visitor's screen, so this classifies the
-                # turn, it cannot rewrite it. The refusal's one voice reaches this
-                # path through RULE 6's wording instead.
-                _turn = agent_compose.settle(
+                # Settle the generic turn too (Phase 5) — same runtime, one call,
+                # made here because the generic bot's answer only exists once the
+                # token stream has finished.
+                _turn = agent_pipeline.settle_prose_turn(
                     text=_strip_source_citation(full_reply),
+                    message=chat_req.message,
                     retrieved_doc_count=len(retrieved_docs),
                     sources=_turn_sources,
-                    small_talk=len(chat_req.message.strip()) < 4,
-                    allow_rewrite=False,
+                    company=company,
+                    prior_messages=chat_req.history or [],
                 )
                 _turn_outcome = _turn.state
                 _turn_sources = _turn.sources
@@ -4269,18 +3985,10 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                     full_reply += _step
                     yield f"data: {json.dumps({'token': _step})}\n\n"
 
-                # Same capture-then-connect decision as the vertical branch above,
-                # made here because the generic bot's answer only exists once the
-                # token stream has finished.
-                _escalate = _escalation_frame(
-                    message=chat_req.message,
-                    state=_turn_outcome,
-                    prior_messages=chat_req.history or [],
-                    human_handoff_enabled=bool(company.get("human_handoff_enabled")),
-                    lead_capture_enabled=bool(company.get("lead_capture_enabled")),
-                )
-                if _escalate:
-                    yield f"data: {json.dumps(_escalate)}\n\n"
+                # Capture-then-connect (plan §1.6), decided server-side for this bot
+                # too — the widget used to make this call from its own keyword lists.
+                for _frame in _turn.events:
+                    yield f"data: {json.dumps({_frame.type: _frame.payload})}\n\n"
 
                 # Sentinel signal for frontend (success path)
                 yield "data: [DONE]\n\n"
