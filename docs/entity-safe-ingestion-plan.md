@@ -66,6 +66,38 @@ That is a much narrower change with a much higher confidence of being correct.
 
 ---
 
+## 0.4 Validation against REAL customer pages, 2026-08-12 - the uncomfortable result
+
+Before wiring Phase 1 in, the same harness was run over the five most-trained live URLs, taken from `company_knowledge` in prod.
+
+| page | tables found | defects (old) | defects (new) | children old -> new | billed words old -> new |
+|---|---|---|---|---|---|
+| expresolv.com/leadership | 0 | **0** | 0 | 39 -> 16 | 566 -> 486 |
+| expresolv.com/ | 0 | **0** | 0 | 76 -> 42 | 1,505 -> 1,237 |
+| sapybase.com/pricing | 0 | **0** | 0 | 62 -> 46 | 1,828 -> 1,496 |
+| sapybase.com/docs | 0 | **0** | 0 | 114 -> 87 | 3,460 -> 3,096 |
+| spdesigning.com/designs | 0 | **0** | 0 | 40 -> 26 | 1,035 -> 863 |
+| **total** | **0** | **0** | **0** | 331 -> **217** | 8,394 -> **7,178** |
+
+**Not one real page contains an HTML table.** The correctness defect this slice was built to fix does not occur anywhere in the currently trained content.
+The fixture corpus was not wrong about the mechanism - it was wrong about the prevalence.
+
+This matters most for `expresolv.com/leadership`, which is the staff-directory page behind the live fabricated-contact incident.
+It is built from divs and prose, not a table, so **this slice does nothing for the incident that motivated it.**
+That failure is a prose-pathway failure, which is what audit Slices A (grounding gate) and E (structured directory + tool) exist to fix.
+
+What the slice does deliver on real content is real but different from what was claimed:
+
+- **34% fewer chunks** (331 -> 217) and **14% fewer billed words** (8,394 -> 7,178), because headings stopped being billed per chunk and blocks pack whole.
+- Fewer, more coherent retrieval units. Plausibly better retrieval, **not measured** - do not claim it without measuring.
+- Insurance: the moment any tenant trains a page with a real table, the defect would have appeared. It now cannot.
+
+**Consequence for sequencing.** The correctness argument for shipping this ahead of Slices A and E does not survive contact with the real corpus.
+Phase 2 should be justified on cost and robustness, or deferred behind the slices that address the prose pathway.
+Recorded here rather than quietly proceeding, because the plan's own §0 was built on the opposite assumption.
+
+---
+
 ## 1. Scope
 
 In scope:
