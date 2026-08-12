@@ -815,7 +815,7 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
         model=model_name,
         google_api_key=GEMINI_KEY,
         max_output_tokens=max_tokens,
-        temperature=0.7,
+        temperature=AGENT_TEMPERATURE if for_agent else 0.7,
         **extra,
     )
 
@@ -1627,6 +1627,14 @@ AGENT_PRECOMPUTE_TIMEOUT_S = 30
 # answer always has room after thinking.
 AGENT_THINKING_BUDGET = 200
 AGENT_MAX_OUTPUT_TOKENS = 2048
+
+# Audit B6: the agent's call is the one that extracts a CAS number or a pack size
+# into a tool argument, judges whether a question is safety-class, and decides
+# whether to refuse — all in the same completion. At 0.7 the same question could
+# resolve to a different product on a re-ask. HyDE, the reranker and the summarizer
+# were already pinned; this was the only high-stakes call left sampling. The plain
+# chat path keeps 0.7, where variety in wording is a feature.
+AGENT_TEMPERATURE = 0.1
 
 # Phase 4b form — the spreadsheet sink for sample-request submissions. The widget
 # form POST is recorded locally AND pushed to the owner's PER-BOT outbound webhook
@@ -3683,8 +3691,7 @@ statement that you don't have one.
 
 [RULE 7 — TOPIC SCOPE]
 Your primary focus is {company_name}. 
-- For direct questions about {company_name}'s history, founders (e.g., Ayush Satvara), or mission, use your internal knowledge and logic if not in the knowledge base.
-- For technical or specific business details (pricing, specs, support steps), you MUST stick to the KNOWLEDGE BASE.
+- EVERY factual claim about {company_name} — its history, founders, leadership, staff, mission, pricing, specs, or support steps — comes from the KNOWLEDGE BASE or a tool result, with no exceptions. If it isn't there, RULE 6 applies: say so plainly. Never fill the gap from your own knowledge of what a company like this would typically have.
 - For basic greetings, pleasantries, or general small talk (e.g., "hi", "hello", "how are you", "good morning"), respond naturally and conversationally. Do NOT trigger the out-of-scope fallback for greetings.
 - If a user asks a specific question completely unrelated to {company_name} or common business assistance (e.g., global politics, cooking recipes, deep-sea biology):
    Politely and conversationally decline to answer. Acknowledge what they asked playfully or gently, remind them that your expertise is strictly limited to {company_name}'s products and services, and steer the conversation back to how you can help them. Do NOT repeat the exact same refusal phrase every time.
