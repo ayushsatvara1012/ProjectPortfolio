@@ -11,6 +11,12 @@ Checks 1, 2 and 4 repair deterministically here, at no model cost. Check 3 canno
 removing a name can leave a reply that answers nothing, so it reports and the caller
 re-invokes once (§2.5).
 
+Enforcement is per check, not global: the caller names which checks may rewrite the
+visitor's text and every other check still reports. That is what §2.4a's measurement
+asks for - checks 1 and 2 are 27% of turns and deterministic, check 3's 10% carries
+false positives and costs a re-invoke, check 4's defect measures at 1%. A single
+on/off switch would have shipped all four together.
+
 Why this is code and not a prompt rule: RULE 2 has carried an anti-restate clause
 through four separate incidents and the symptom persisted anyway (audit A5). §7.1's
 rule is that the higher the cost of being wrong, the lower the layer the behaviour
@@ -136,14 +142,26 @@ _SENTENCE_OPENERS = frozenset({
 })
 
 
+#: The check names, so a caller cannot enable enforcement for a typo.
+CHECKS = ("restatement", "denial_opener", "extra_question", "ungrounded")
+
+#: The checks whose repair is deterministic - the rest can only report.
+REPAIRABLE_CHECKS = frozenset({"restatement", "denial_opener", "extra_question"})
+
+
 @dataclass(frozen=True)
 class ContractFinding:
     """One post-condition a reply failed."""
 
     check: str
     detail: str
-    #: Whether this module already repaired it, or the caller must act (check 3).
-    repaired: bool
+    #: Whether a deterministic repair exists at all. False for check 3, and for a
+    #: reply that is nothing but a replay - there is nothing left to ship.
+    repairable: bool
+    #: Whether that repair was actually applied to the visitor's text. False when
+    #: the check is only reporting, which is how a check is measured before it
+    #: enforces.
+    applied: bool = False
     span: str = ""
 
 
@@ -151,17 +169,18 @@ class ContractFinding:
 class ContractReport:
     """What the contract made of one reply.
 
-    ``text`` is the repaired reply in enforcing mode and the untouched original in
-    shadow mode, so a shadow run can never change what a visitor reads.
+    ``text`` is what the visitor should read: the original with the repairs of the
+    enforced checks applied, and nothing else. A check absent from ``enforced``
+    cannot change a word no matter what it found.
     """
 
     text: str
     findings: List[ContractFinding] = field(default_factory=list)
-    shadow: bool = False
+    enforced: frozenset = frozenset()
 
     @property
     def changed(self) -> bool:
-        return any(f.repaired for f in self.findings)
+        return any(f.applied for f in self.findings)
 
     @property
     def needs_reinvoke(self) -> bool:
@@ -169,7 +188,9 @@ class ContractReport:
         return any(f.check == "ungrounded" for f in self.findings)
 
     def summary(self) -> str:
-        return "; ".join(f"{f.check}: {f.detail}" for f in self.findings) or "clean"
+        parts = [f"{f.check}: {f.detail}" + ("" if f.applied else " (report-only)")
+                 for f in self.findings]
+        return "; ".join(parts) or "clean"
 
 
 def _sentences(text: str) -> List[str]:
@@ -365,60 +386,66 @@ def check(
     evidence: Sequence[str] = (),
     question_licensed: bool = True,
     pack_vocab: Sequence[str] = (),
-    shadow: bool = True,
+    enforce: Sequence[str] = (),
 ) -> ContractReport:
     """Apply all four post-conditions to one reply.
 
-    ``shadow=True`` reports without changing a word, so thresholds can be measured
-    against real traffic before enforcement (§2.5, owner decision). The caller
-    re-invokes only on ``needs_reinvoke``, at most once, ever.
+    ``enforce`` names the checks allowed to rewrite the reply; every other check
+    reports and changes nothing, which is how a threshold is measured against real
+    traffic before it is trusted (§2.5, owner decision). An empty ``enforce`` is
+    full shadow mode. The caller re-invokes only on ``needs_reinvoke``, at most
+    once, ever.
     """
-    original = text or ""
-    working = original
+    enforced = frozenset(enforce) & REPAIRABLE_CHECKS
+    working = text or ""
     findings: List[ContractFinding] = []
+
+    def record(name: str, detail: str, span: str, repaired: str) -> None:
+        """Log the finding, and apply its repair only if this check enforces.
+
+        Every check runs against ``working`` - the text as it will actually ship -
+        so an unenforced repair never hides a later check's evidence.
+        """
+        nonlocal working
+        # No repair survives: the reply was nothing but the defect, and emitting an
+        # empty message is worse than emitting the flawed one. The caller decides.
+        if not repaired:
+            findings.append(ContractFinding(check=name, detail=detail,
+                                            repairable=False, span=span))
+            return
+        applied = name in enforced
+        findings.append(ContractFinding(check=name, detail=detail, repairable=True,
+                                        applied=applied, span=span))
+        if applied:
+            working = repaired
 
     span = leading_restatement(working, prior_reply)
     if span:
         repaired = strip_leading_span(working, span)
-        # A reply that is nothing but the previous reply has no answer to salvage;
-        # leave it to the caller rather than emitting an empty message.
-        if repaired:
-            findings.append(ContractFinding(
-                check="restatement", detail=f"{len(span)} chars replayed",
-                repaired=True, span=span))
-            working = repaired
-        else:
-            findings.append(ContractFinding(
-                check="restatement", detail="entire reply replays the previous turn",
-                repaired=False, span=span))
+        record("restatement",
+               f"{len(span)} chars replayed" if repaired
+               else "entire reply replays the previous turn",
+               span, repaired)
 
     opener = denial_opener(working)
     if opener:
-        repaired = strip_leading_span(working, opener)
-        if repaired:
-            findings.append(ContractFinding(
-                check="denial_opener", detail=opener[:80], repaired=True, span=opener))
-            working = repaired
+        record("denial_opener", opener[:80], opener, strip_leading_span(working, opener))
 
     surplus = surplus_questions(working, question_licensed)
     if surplus:
-        repaired = _drop_sentences(working, surplus)
-        if repaired:
-            findings.append(ContractFinding(
-                check="extra_question", detail=f"{len(surplus)} unlicensed",
-                repaired=True, span=" ".join(surplus)))
-            working = repaired
+        record("extra_question", f"{len(surplus)} unlicensed", " ".join(surplus),
+               _drop_sentences(working, surplus))
 
-    # Runs last and against the repaired text: a name that only appeared inside a
-    # replayed span is not an ungrounded claim once the span is gone.
+    # Runs last and against the shipping text: a name that only appeared inside a
+    # span this turn actually stripped is not an ungrounded claim any more. A span
+    # that was merely reported still carries its names, and still escalates.
     invented = ungrounded_identities(working, evidence, extra_vocab=pack_vocab)
     if invented:
         findings.append(ContractFinding(
             check="ungrounded", detail=", ".join(invented[:5]),
-            repaired=False, span=", ".join(invented)))
+            repairable=False, span=", ".join(invented)))
 
-    return ContractReport(text=original if shadow else working,
-                          findings=findings, shadow=shadow)
+    return ContractReport(text=working, findings=findings, enforced=enforced)
 
 
 def evidence_from(retrieved_docs: Sequence[Any] = (),

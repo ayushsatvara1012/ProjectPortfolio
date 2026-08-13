@@ -12,6 +12,9 @@ That audit **upgraded four of the six slices out of "unverified"**, added a conf
 All code references below are anchored to the **current branch**, after the agent-runtime restructure merged.
 Note that `services/agent.py` is no longer imported by `main.py`; anything citing `stream_agent_loop` is stale.
 
+> **Implementing, not deciding? Go to §11.** It is the phase-by-phase checklist - six phases, what each changes, and the tests that close it.
+> Everything else in this file is the evidence and the decisions behind that order; read a phase's linked section when you start that phase, not the whole document.
+
 ## 0. Verification status - read this before trusting any row
 
 | Slice | Claim | Status |
@@ -56,7 +59,7 @@ To avoid three different things being called "Slice A" in one file, audit items 
 | Source | Item | Status |
 |---|---|---|
 | This plan | F - FAQ feedback loop | **COMPLETE and DEPLOYED 2026-08-12.** PR #120 merged to MainV2 (`f0d8aff6`, `c62522b4`, `fc3bfa0f`, `bef6921e`). All 61 rows cleared across all 3 tenants; `--probe ingest` reports none; retrieval contamination 63% -> 0%. §1, §1.4b. |
-| This plan | G - response contract | **SHADOW SHIPPED** (`41c4ddc4`, on branch). **CUT to checks 1 and 2** on measurement, 2026-08-12: those two are 27% of turns and untouched by the corpus fix; check 3 holds in shadow; check 4 is a 1% defect. §2.4a. |
+| This plan | G - response contract | **CHECKS 1 AND 2 ENFORCING, on branch.** Cut to those two on measurement (27% of turns, untouched by the corpus fix); check 3 and check 4 still run and still log but cannot rewrite. §2.4a, §2.5b. |
 | This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
 | This plan | I - extraction hardening | PLAN ONLY. §4. |
 | This plan | J - reflex question | **DEPRIORITISED 2026-08-12** - measured at 1 turn in 98. Do not build the arbitration. §5. |
@@ -420,11 +423,29 @@ Per the owner decision:
 
 `CONTRACT_SHADOW = True` (`pipeline.py`). The pass logs `CONTRACT shadow company=... reinvoke=... <findings>` and cannot touch `turn.text`; exceptions are swallowed, because a measurement pass must never take down a live turn.
 
-**Still to do before enforcing:** collect the shadow logs from real traffic, measure the false-positive rate per check, then flip `CONTRACT_SHADOW` and add the re-invoke path (check 3, once, then degrade). The re-invoke and degrade path is **not built yet**.
-
 **Shadow first.** Thresholds need data.
 Log what each check *would* have rewritten against real traffic, measure the false-positive rate, then enforce.
 Do not pick a similarity number in the plan and defend it later.
+
+### 2.5b Checks 1 and 2 enforcing, 2026-08-12
+
+Per §2.4a. Suite green (2595 backend tests, 41 in `tests/test_agent_runtime_contract.py`).
+
+**Enforcement is per check, not a global switch.** `CONTRACT_SHADOW: bool` is replaced by `CONTRACT_ENFORCED = frozenset({"restatement", "denial_opener"})` (`pipeline.py`), passed to `contract.check(enforce=...)`.
+The single bool was the wrong shape: flipping it would have shipped all four checks at once, including the two §2.4a explicitly held back.
+Every check still runs and still logs regardless, which is how check 3 earns its own promotion later.
+
+Three properties the implementation had to get right, each with a test:
+
+- **Every check evaluates against the text as it will actually ship**, not against a hypothetical fully-repaired version. So an unenforced check 1 leaves the replayed span in place *and* check 3 still reports the names inside it - the visitor is going to read them. The converse (§2.5a's original point) still holds when check 1 does enforce: the span goes, and the names go with it, with no escalation.
+- **Check 3 can never be enforced**, even if a caller names it. `enforce` is intersected with `REPAIRABLE_CHECKS`, so a typo or a mistaken config cannot start deleting names from replies.
+- **A server-authored refusal is classified, never rewritten.** `settle()` may replace the model's words with `refusal.for_state(...)`; that text is ours by construction and was never what these thresholds were measured against. `_review_contract` detects it by comparing `turn.text` against the pre-settle model text and drops to report-only for that turn.
+
+Rewriting at this seam is safe because the answer reaches the caller only on the pipeline's single `result` event - unlike the generic bot's `allow_rewrite=False` path, nothing is on the visitor's screen yet.
+
+`ContractFinding` now carries `repairable` (a deterministic repair exists) and `applied` (it was actually used), replacing the ambiguous `repaired`. The log line reports `changed=` and marks unenforced findings `(report-only)`.
+
+**Still not built, still deliberately:** the check 3 re-invoke and degrade path (§2.5). It waits on post-cleanup traffic sizing check 3's false positives, per §2.4a.
 
 ### 2.6 Acceptance
 
@@ -628,9 +649,11 @@ Green between slices; re-measure the baseline at the start of each rather than a
 
 ---
 
-## 10. Order
+## 10. Order - the reasoning. **The checklist is §11.**
 
-**F1 -> F2 -> F3 -> F4** (all done), then **G checks 1 and 2 to enforcement**, then **I**, then **H** (measure first), then **K**.
+This section explains *why* the sequence is what it is. §11 is what to actually work from.
+
+**F1 -> F2 -> F3 -> F4** (all done), then **G checks 1 and 2 to enforcement** (done 2026-08-12, §2.5b), then **I**, then **H** (measure first), then **K**.
 **J is out of the sequence** as of 2026-08-12 (§5), and G's check 3 stays in shadow rather than gating the slice.
 
 F is first because it is the only slice verified as actively causing harm, it corrupts continuously rather than at a point in time, and F1 alone is a few lines.
@@ -644,6 +667,155 @@ No migrations planned on this branch. `0036` and `0037` are taken. `feature/enti
 Gates before merge: suite green on all four checks; live evals green twice; F's per-company purge dry-run reviewed; browser verification with **Manual vs Auto asked before any dev server starts**, per standing policy.
 
 Update this document and the memory entry at the **end of every slice**, per project cadence.
+
+---
+
+## 11. Execution roadmap - the phase-by-phase build order
+
+**This is the section to work from.** §10 gives the reasoning behind the order and §16 gives the full cross-tracker priority; this one is the checklist.
+Everything above it is evidence and decisions - read a phase's linked section before starting it, not the whole document.
+
+Six phases remain. Phase 1 is the only one with a hard predecessor; the rest are independent and can be reordered if something else becomes urgent.
+
+### 11.0 The gate every phase passes
+
+Identical for all six, so it is stated once. A phase is not done until all of these hold:
+
+1. `sapybase_ai_engine/venv/bin/python -m pytest tests/ -q` - **full suite green**, not just the phase's own file. The current baseline is **2595 passed, 134 skipped**; record the new number in this doc when it moves.
+2. The phase's own new tests exist and fail against the old code. A test that passes before the change is not testing the change.
+3. `npx tsc --noEmit` and `npm run lint` - only when the phase touches TypeScript. Phases 1-5 are backend-only; phase 6 is the only one that may not be.
+4. **The §8 regression guard**: `get_sds`, `get_coa`, throttle, `request_quote` and Slice D source-attribution suites pass **unedited**. If a phase requires editing one of them, §8 has been violated - stop and get a decision rather than editing the test.
+5. This document and the memory entry updated at the end of the phase, per project cadence.
+
+Live evals (`RUN_LLM_EVALS=1`, twice for stability, the existing 11 green) are a **merge gate, not a per-phase gate** - they cost money and are slow. Run them once before the branch merges to MainV2, plus after any phase that changes what the model is asked or what it is allowed to say. Of the six below, that is phases 1 and 3.
+
+### Phase 1 - Slice I, extraction hardening
+
+**Prerequisite: none. This one goes first**, because it is the only phase another phase depends on.
+
+| | |
+|---|---|
+| **Broken today** | Training a WordPress homepage ingests the theme's testimonial carousel. Those chunks are dense with person names (Mr. Rakesh Mehta, Mr. Arun Shrestha, ...), so they beat the real staff rows on "who is X?" queries and eat the five available slots. Raw markup (`<span class="tp-testi__ava-position">`) and bare class names (`testimonial-area`) are stored as body text. Confirmed on `https://expresolv.com/`: 12 of 76 child chunks. |
+| **Change** | Suppress testimonial/carousel/review containers; strip leaking markup and bare class names; trim non-answerable JSON-LD keys. |
+| **Files** | `services/html_extract.py` **only**. |
+| **Do not touch** | `run_training_job`'s chunk data shape - `feature/entity-safe-ingestion` Phase 2 is about to change it from `(parent, child)` to a triple. Changing both at once creates a merge conflict neither branch can resolve cheaply. |
+| **Detail** | §4. Read `docs/entity-safe-ingestion-plan.md` first - different layer, sequenced not conflicting. |
+
+**Exit tests, on top of §11.0:**
+
+- The audit's real markup-leak cases as **verbatim fixtures**, not paraphrased HTML. A hand-written fixture proves the regex works; the real page proves the feature works.
+- A testimonial/carousel block is dropped **and the content adjacent to it survives**. This is the test that catches an over-broad selector, and it is the one worth writing first.
+- A page with no testimonial markup extracts byte-identical output to before. Guards against collateral damage to the other tenants.
+- Re-run the entity-safe chunk-count harness afterwards and record the new numbers - cleaner extraction input changes them, and its Phase 0 baseline is now stale.
+
+**Why it must precede Phase 2:** measuring `top_k` against a corpus still full of testimonial chunks over-estimates the increase needed. §3's own constraint.
+
+### Phase 2 - Slice H, retrieval recall. **Measure before building.**
+
+**Prerequisite: Phase 1 shipped, and the affected corpora retrained** - otherwise the measurement describes a corpus that no longer exists.
+
+| | |
+|---|---|
+| **Broken today** | `top_k=5` (`main.py:3549`) is filled by homepage and testimonial parents before directory rows are reached. Directory rows are thin, 24-47 words; "Himani" appears in 2 of 239 chunks. |
+| **Unknown** | Whether the right chunk **ranked 6-15 and just missed**, or **was never retrieved at all**. Stored `sources` cannot answer this - it holds the post-rerank top 5 only, and only 32 rows platform-wide carry it. This fork decides the whole phase. |
+| **Step 1 (measure)** | Build `--mode ranks` in `scripts/retrieval_rank_probe.py`. It is an explicit stub today. Offline replay of stored questions through `retrieve_knowledge(limit=15)` + `rerank_chunks`, inspecting ranks 1-15. |
+| **Step 2 (decide)** | Ranked 6-15 → raise `top_k` for entity lookups only, gated on `_is_entity_lookup_query` (`main.py:2410`). Never retrieved → `top_k` cannot help; the answer is ARCH-D/ARCH-E and **this phase ends here with a measurement and no code change**, which is a valid outcome. |
+| **Files** | `scripts/retrieval_rank_probe.py`, then `main.py:3549` if and only if step 2 says so. |
+| **Detail** | §3. |
+
+**Exit tests, on top of §11.0:**
+
+- The measurement is **written into this document** before any `top_k` line changes. A number in a commit message is not a record.
+- If `top_k` changes: an entity-lookup query gets the raised value, a prose query does not. Both directions, one test each.
+- The candidate pool is `limit=15`. A test asserting `top_k <= pool` - raising it past the pool silently does nothing, which would look like a working deploy.
+
+### Phase 3 - Slice K + QF10, contact acknowledgment and its side effects
+
+**Prerequisite: none.** Grouped because both are the same territory - what happens around a contact capture that did not succeed.
+
+| | |
+|---|---|
+| **Broken today (K)** | The acknowledgment is prompt-driven and decoupled from whether capture worked. Session `5c7ec4f6`: visitor typed `my mobile no 1231231233`, bot replied "I've noted your mobile number", `agent_requests` has **zero rows** for that period. The bot promised a follow-up nobody will make. |
+| **Broken today (QF10)** | `_capture_volunteered_contact` runs at `pipeline.py:118`, **before** `settle()` at ~136 decides the turn was a system error or fallback. The capture and its handoff fire regardless of what the turn turned out to be. |
+| **Change (K)** | Bind the sentence to the capture result. Succeeded → acknowledge and confirm follow-up. Refused **with an explicit cue** (`mob`, `my mobile no`, `whatsapp`) → say the number could not be read, ask them to repeat it or offer the form. Never claim it was noted. |
+| **Change (QF10)** | Gate the capture side effect on the settled outcome. |
+| **Files** | `services/agent_runtime/contact.py`, `services/agent_runtime/pipeline.py`. |
+| **Do not touch** | `extract_phone`'s precision (`services/qualification.py:214`). It **correctly** rejected `1231231233`. The fix is what the bot *says* when extraction declines, not what extraction accepts. Loosening it is the wrong fix and would create a worse bug. |
+| **Detail** | §6, and §13's QF10 row. |
+
+**Exit tests, on top of §11.0:**
+
+- Three acknowledgment states, one test each: capture succeeded / refused-with-cue / no contact in the message at all.
+- The bot **never** emits "I've noted" when `agent_requests` got no row. Assert on the pairing, not on the sentence alone - that is the actual defect.
+- A fallback or `SYSTEM_ERROR` turn fires no capture side effect and no handoff (QF10).
+- A normal successful capture on an `ANSWERED` turn still fires - guards against fixing QF10 by breaking Slice A.
+
+### Phase 4 - QF13, chat-log idempotency
+
+**Prerequisite: none.** The only phase in this plan carrying a migration.
+
+| | |
+|---|---|
+| **Broken today** | `client_message_id` is stored on the `chat_logs` row (`main.py:3151`) and read back to attach feedback (`main.py:7127`), but the INSERT has no `ON CONFLICT`. A retried request writes a duplicate row. It is a column, not an idempotency key. |
+| **Change** | Unique index on the identifying pair, plus `ON CONFLICT DO NOTHING` on the insert. |
+| **Files** | `main.py:3151`, plus a migration. |
+| **Migration number** | `0036` and `0037` are taken. **`feature/entity-safe-ingestion` intends to claim `0038`** for `company_knowledge.context`. Check that branch's actual state before claiming a number - whichever branch merges second has to renumber. |
+
+**Exit tests, on top of §11.0:**
+
+- The same `client_message_id` inserted twice produces one row, not two, and does not raise.
+- A `NULL` `client_message_id` still inserts - older clients do not send one, and a unique index over nulls must not collapse unrelated rows.
+- The migration is **idempotent**: run it twice against a local copy, per project rule. `CREATE UNIQUE INDEX IF NOT EXISTS`.
+- The existing feedback-attachment path (`main.py:7127`) still resolves its row.
+
+### Phase 5 - QF7, client history sanitizing
+
+**Prerequisite: none.** Security-shaped, so it does not wait on convenience.
+
+| | |
+|---|---|
+| **Broken today** | `main.py:3805-3811` builds `HumanMessage`/`AIMessage` from **client-sent** `chat_req.history` on a bare `if m.role == 'user'` check - no allowlist - and inserts `m.content` unsanitized. Only the *current* message goes through `delimited_user_message`; history items do not. A caller controls both the content and, effectively, the role. |
+| **Change** | Validate `role` against a literal set; delimit history entries the way the current message already is. |
+| **Files** | `main.py:3805-3811`. |
+| **Detail** | §13's QF7 row. |
+
+**Exit tests, on top of §11.0:**
+
+- An unknown or absent `role` is rejected, not silently treated as assistant text.
+- Injection-shaped content inside a history entry stays inside its delimiter and cannot terminate the block early - the same property `delimited_user_message` already guarantees for the current message.
+- A normal multi-turn conversation is unchanged. This phase touches the prompt every turn is built from, so the no-op case is the one that matters most.
+
+### Phase 6 - Slice G check 3, watch then decide. **Not a build phase yet.**
+
+**Prerequisite: real post-cleanup traffic exists.** As of 2026-08-12 there is almost none - 3 turns in 30 hours.
+
+| | |
+|---|---|
+| **State** | Checks 1 and 2 enforce (§2.5b). Check 3 runs, logs, and cannot rewrite. Check 4 the same. |
+| **Step 1** | Collect `CONTRACT ...` log lines from real traffic. Confirm checks 1 and 2 are firing and repairing cleanly - `changed=True` with a sane repair, no empty or truncated replies. |
+| **Step 2** | Measure check 3's false-positive rate on post-cleanup turns. §2.4a's 10% included known false positives, and better retrieval removes more of the genuine cases. |
+| **Step 3, only if the rate justifies it** | Build the re-invoke-once + degrade path (§2.5): one re-invoke with a correction note, then degrade to a decline plus handoff. **Exactly one re-invoke, ever** - this must never become an unbounded repair loop. |
+| **Detail** | §2.4a, §2.5, §2.5b. |
+
+**Exit tests if step 3 goes ahead, on top of §11.0:**
+
+- **The tool-answer positive control is mandatory** (§2.4's named trap): SDS, COA, quote and spec replies carrying tool-sourced names and identifiers pass check 3 **unmodified**. Validating against kb chunks alone breaks every working tool answer, and this is the single most likely way to get the slice wrong.
+- Exactly one re-invoke, asserted by call count - not by reading the reply.
+- Second failure degrades to a decline plus handoff, and **never** ships the ungrounded answer.
+- Replaying the "business development" turn from session `4ef9ffa0` produces no name absent from that turn's evidence set (§2.6).
+
+### 11.1 Summary
+
+| Phase | Slice | Files | Blocks | Rough size |
+|---|---|---|---|---|
+| 1 | I - extraction hardening | `services/html_extract.py` | **blocks phase 2** | ~1 day |
+| 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py`, maybe `main.py` | - | ½ day to measure, then decide |
+| 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | ½ day |
+| 4 | QF13 - chat-log idempotency | `main.py` + migration | - | hours |
+| 5 | QF7 - history sanitizing | `main.py` | - | ½ day |
+| 6 | G check 3 - watch, then maybe build | `contract.py`, `pipeline.py` | needs live traffic | measurement first |
+
+Phases 2 and 6 may legitimately end with **no code change at all**. That is a result, not a failure - both are gated on a measurement whose answer might be "the cheap fix does not apply here", and in phase 2's case that answer routes the work to ARCH-D instead.
 
 ---
 
@@ -706,10 +878,13 @@ Relationship to this plan's Slice I (§4): different layers (splitting vs. extra
 
 ## 16. Master priority order, everything in this file
 
+**Superseded for day-to-day work by §11**, which turns the still-open rows below into six executable phases with their own exit tests.
+This section is kept as the full cross-tracker roster - it includes the long-tail ARCH items §11 deliberately leaves out.
+
 §10 already orders F-K internally. This extends that ordering across every item this file now tracks, in the sequence that respects real dependencies (not slice-letter order):
 
 1. **F1 -> F2 -> F3 -> F4** (§1) - already in flight, actively corrupting data, ships first regardless of everything below.
-2. **G checks 1 and 2 to enforcement** (§2.4a). Check 3 stays in shadow; **J is dropped from the path** (§5).
+2. **G checks 1 and 2 to enforcement** (§2.4a) - **DONE 2026-08-12, §2.5b.** Checks 3 and 4 still report; **J is dropped from the path** (§5). Next item here is watching the enforcing logs, not building more of G.
 3. **QF13** (chat-log idempotency, §13) - cheap, isolated, real duplicate-row gap on retried requests; ship alongside F/G. QF5 turned out to already be done, nothing to do there.
 4. **I** (§4) - extraction hardening, ships before H is measured and before Entity-Safe Phase 2 (its own harness numbers depend on cleaner extraction input).
 5. **H, measured against I** (§3).

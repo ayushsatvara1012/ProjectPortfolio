@@ -152,33 +152,74 @@ class TestSurplusQuestions:
         assert contract.surplus_questions("Acetone is in AR and LR.", licensed=True) == []
 
 
+ALL_CHECKS = contract.REPAIRABLE_CHECKS
+
+
 class TestCheck:
-    def test_shadow_mode_never_changes_the_visitors_text(self):
+    def test_an_unenforced_check_never_changes_the_visitors_text(self):
         report = contract.check(SALES_REPLY, prior_reply=PRIOR_EXPORT_DENIAL,
-                                evidence=EVIDENCE_SALES, shadow=True)
+                                evidence=EVIDENCE_SALES, enforce=())
         assert report.text == SALES_REPLY
         assert report.findings
+        assert not report.changed
 
     def test_enforcing_mode_repairs_the_prepend(self):
         report = contract.check(SALES_REPLY, prior_reply=PRIOR_EXPORT_DENIAL,
-                                evidence=EVIDENCE_SALES, shadow=False)
+                                evidence=EVIDENCE_SALES, enforce=ALL_CHECKS)
         assert not report.text.startswith("I don't have")
         assert "Pratik Shome" in report.text
+        assert report.changed
+
+    def test_enforcement_is_per_check_not_all_or_nothing(self):
+        # The shipped policy: checks 1 and 2 rewrite, check 4 only reports (§2.4a).
+        text = ("I don't have that on file. Acetone is stocked in AR and LR grades "
+                "at our Ankleshwar plant. Would you like a quote? Or an SDS?")
+        report = contract.check(text, evidence=EVIDENCE_SALES,
+                                enforce={"restatement", "denial_opener"})
+        assert not report.text.startswith("I don't have")
+        # The surplus question was found, reported, and left in the reply.
+        surplus = [f for f in report.findings if f.check == "extra_question"]
+        assert surplus and not surplus[0].applied
+        assert "Or an SDS?" in report.text
+
+    def test_a_reported_check_does_not_hide_a_later_checks_evidence(self):
+        # Check 1 is off, so the replayed span still ships - and the name inside it
+        # is still an ungrounded claim the visitor will read.
+        prior = "Nirmal Choudhary is the CMD."
+        text = "Nirmal Choudhary is the CMD. Acetone is available in AR and LR grades."
+        report = contract.check(text, prior_reply=prior, evidence=EVIDENCE_SALES,
+                                enforce=())
+        assert report.needs_reinvoke
+
+    def test_an_unknown_check_name_cannot_enable_enforcement(self):
+        report = contract.check(SALES_REPLY, prior_reply=PRIOR_EXPORT_DENIAL,
+                                evidence=EVIDENCE_SALES, enforce={"restatemnt"})
+        assert report.text == SALES_REPLY
+        assert not report.changed
+
+    def test_check_three_can_never_be_enforced(self):
+        # Removing a name can leave a reply that answers nothing (§2.5), so even an
+        # explicit request to enforce it must not rewrite.
+        report = contract.check("Nirmal Choudhary heads business development.",
+                                evidence=EVIDENCE_SALES, enforce={"ungrounded"})
+        assert report.text == "Nirmal Choudhary heads business development."
+        assert report.needs_reinvoke
+        assert not report.changed
 
     def test_a_clean_reply_produces_no_findings(self):
         report = contract.check("Pratik Shome handles sales enquiries.",
                                 prior_reply="Acetone is in stock.",
-                                evidence=EVIDENCE_SALES, shadow=False)
+                                evidence=EVIDENCE_SALES, enforce=ALL_CHECKS)
         assert report.findings == []
         assert report.summary() == "clean"
 
     def test_only_the_grounding_check_asks_for_a_re_invoke(self):
         repairable = contract.check(SALES_REPLY, prior_reply=PRIOR_EXPORT_DENIAL,
-                                    evidence=EVIDENCE_SALES, shadow=False)
+                                    evidence=EVIDENCE_SALES, enforce=ALL_CHECKS)
         assert not repairable.needs_reinvoke
 
         invented = contract.check("Nirmal Choudhary heads business development.",
-                                  evidence=EVIDENCE_SALES, shadow=False)
+                                  evidence=EVIDENCE_SALES, enforce=ALL_CHECKS)
         assert invented.needs_reinvoke
 
     def test_a_name_only_present_in_the_replayed_span_is_not_reported_as_invented(self):
@@ -187,31 +228,54 @@ class TestCheck:
         prior = "Nirmal Choudhary is the CMD."
         text = "Nirmal Choudhary is the CMD. Acetone is available in AR and LR grades."
         report = contract.check(text, prior_reply=prior, evidence=EVIDENCE_SALES,
-                                shadow=False)
+                                enforce=ALL_CHECKS)
         assert not report.needs_reinvoke
 
     def test_a_reply_that_is_entirely_a_replay_is_reported_but_not_emptied(self):
         report = contract.check(PRIOR_EXPORT_DENIAL, prior_reply=PRIOR_EXPORT_DENIAL,
-                                evidence=EVIDENCE_SALES, shadow=False)
+                                evidence=EVIDENCE_SALES, enforce=ALL_CHECKS)
         assert report.text == PRIOR_EXPORT_DENIAL
-        assert any(not f.repaired and f.check == "restatement" for f in report.findings)
+        assert any(not f.repairable and f.check == "restatement"
+                   for f in report.findings)
 
 
-class TestShadowWiring:
-    def test_the_shadow_pass_never_edits_the_settled_reply(self):
+class TestPipelineWiring:
+    def _inputs(self, pipeline):
+        return pipeline.TurnInputs(
+            company={"id": "c1"}, message="whom to contact for sales?",
+            prior_messages=[{"role": "assistant", "content": PRIOR_EXPORT_DENIAL}],
+            retrieved_text=EVIDENCE_SALES,
+        )
+
+    def test_an_enforced_check_repairs_the_settled_reply(self):
         from services.agent_runtime import pipeline
         from services.agent_runtime.states import TurnState
         from services.agent_runtime.turn import TurnResult
 
         turn = TurnResult(state=TurnState.ANSWERED, text=SALES_REPLY,
                           sources=[{"kind": "kb", "label": "x"}])
-        inputs = pipeline.TurnInputs(
-            company={"id": "c1"}, message="whom to contact for sales?",
-            prior_messages=[{"role": "assistant", "content": PRIOR_EXPORT_DENIAL}],
-            retrieved_text=EVIDENCE_SALES,
-        )
-        pipeline._review_contract(inputs, turn, {})
+        pipeline._review_contract(self._inputs(pipeline), turn, {},
+                                  model_text=SALES_REPLY)
+        assert not turn.text.startswith("I don't have")
+        assert "Pratik Shome" in turn.text
+
+    def test_a_server_authored_refusal_is_never_rewritten(self):
+        # ``settle`` replaced the model's words, so turn.text is ours by
+        # construction and these checks were never measured against it.
+        from services.agent_runtime import pipeline
+        from services.agent_runtime.states import TurnState
+        from services.agent_runtime.turn import TurnResult
+
+        turn = TurnResult(state=TurnState.ANSWERED, text=SALES_REPLY,
+                          sources=[{"kind": "kb", "label": "x"}])
+        pipeline._review_contract(self._inputs(pipeline), turn, {},
+                                  model_text="something the model actually said")
         assert turn.text == SALES_REPLY
+
+    def test_the_enforced_set_is_checks_one_and_two_only(self):
+        from services.agent_runtime import pipeline
+
+        assert pipeline.CONTRACT_ENFORCED == {"restatement", "denial_opener"}
 
     def test_the_last_assistant_message_is_what_check_one_compares_against(self):
         from services.agent_runtime import pipeline

@@ -46,10 +46,15 @@ CARD_KEYS = ("sds", "quote", "form", "grade_selector", "pack_selector", "coa",
 #: What gets replayed to the model as this turn's actions on the next turn.
 _ACTION_KEYS = CARD_KEYS + ("handoff",)
 
-#: Slice G ships shadow-first (docs/bot-output-quality-plan.md §2.5, owner decision):
-#: the contract reports what it WOULD have rewritten so the thresholds can be moved
-#: with measured traffic, and changes nothing the visitor reads until they are.
-CONTRACT_SHADOW = True
+#: The response-contract checks allowed to rewrite the reply
+#: (docs/bot-output-quality-plan.md §2.4a, owner decision 2026-08-12). Checks 1 and
+#: 2 enforce: measured at 27% of turns combined, repaired deterministically at no
+#: model cost, and untouched by the corpus cleanup that fixed everything else.
+#: Absent on purpose: ``ungrounded`` (check 3) reports until post-cleanup traffic
+#: sizes its false positives, and it is the only check that costs a re-invoke;
+#: ``extra_question`` (check 4) is a 1-in-98 defect and Slice J, which owns the
+#: licence it enforces, is deprioritised (§5).
+CONTRACT_ENFORCED = frozenset({"restatement", "denial_opener"})
 
 
 @dataclass
@@ -147,7 +152,7 @@ async def run_agent_turn(
         small_talk=len(inputs.message.strip()) < 4,
     )
 
-    _review_contract(inputs, turn, captured)
+    _review_contract(inputs, turn, captured, model_text=text)
 
     for key in CARD_KEYS:
         payload = captured.get(key)
@@ -269,16 +274,24 @@ def _prior_assistant_text(prior_messages) -> str:
     return ""
 
 
-def _review_contract(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, Any]) -> None:
-    """Run the response contract over the settled reply and log what it found.
+def _review_contract(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, Any],
+                     *, model_text: str = "") -> None:
+    """Apply the response contract to the settled reply and log what it found.
 
-    Shadow only, per §2.5: nothing here touches ``turn.text``. Its purpose is the
-    false-positive rate, which has to come from real traffic before check 1's
-    similarity threshold or check 3's name extraction can be trusted to rewrite
-    anything. Failures are swallowed - a measurement pass must never be able to
-    take down a live turn.
+    Safe to rewrite here because the answer reaches the caller only on the single
+    ``result`` event below - nothing of it is on the visitor's screen yet. The
+    checks outside ``CONTRACT_ENFORCED`` still run and still log, which is how the
+    next one earns its promotion.
+
+    Failures are swallowed - a post-condition must never be able to take down a
+    live turn that the model already answered correctly.
     """
     try:
+        # ``settle`` may have replaced the model's words with a server-authored
+        # refusal. That text is ours, already correct by construction, and not what
+        # these checks were measured against - classify it, never rewrite it.
+        server_authored = turn.text != model_text
+
         report = contract_mod.check(
             turn.text,
             prior_reply=_prior_assistant_text(inputs.prior_messages),
@@ -287,16 +300,18 @@ def _review_contract(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, A
             # question, so check 4 reports only the stacked-offer case.
             question_licensed=True,
             pack_vocab=_pack_vocab(inputs.pack),
-            shadow=CONTRACT_SHADOW,
+            enforce=() if server_authored else CONTRACT_ENFORCED,
         )
+        if report.changed:
+            turn.text = report.text
         if report.findings:
             logger.info(
-                "CONTRACT shadow company=%s session=%s state=%s reinvoke=%s %s",
+                "CONTRACT company=%s session=%s state=%s changed=%s reinvoke=%s %s",
                 inputs.company_id, inputs.session_id, turn.state.value,
-                report.needs_reinvoke, report.summary(),
+                report.changed, report.needs_reinvoke, report.summary(),
             )
     except Exception:
-        logger.exception("contract: shadow review failed")
+        logger.exception("contract: review failed")
 
 
 def _pack_vocab(pack) -> tuple:
