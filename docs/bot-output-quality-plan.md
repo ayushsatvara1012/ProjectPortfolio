@@ -108,7 +108,8 @@ For a product whose entire promise is "answers come only from your data", this i
 
 **The eligibility gate is the wrong signal.** `is_unanswered` is audit finding D3 - computed from retrieval count and English substring matching, so a refusal routinely scored as answered.
 79 of 630, **12.5% of the publishable pool, is the bot's own failure text**.
-The restructure replaced this signal with `chat_logs.turn_state`, so **new** rows are trustworthy; historical rows are not, and the FAQ query still reads `is_unanswered`.
+The restructure replaced this signal with `chat_logs.turn_state`, so **new** rows are trustworthy; historical rows are not.
+(As written, this section also noted the FAQ query still read `is_unanswered`. That was true when measured and is **no longer true** - F2 replaced it with `turn_state`; see §1.4.)
 
 Independent confirmation, 2026-08-11: **zero unanswered turns recorded for Expresolv on every single day since 2026-07-20**, including outright refusals. The flag does not fire at all.
 
@@ -180,7 +181,13 @@ Two corrections came out of the prod run, both of which would have shipped as si
 **Owner decision 2026-08-12: hybrid gate.** Publish when `turn_state = 'answered'` OR `turn_state IS NULL AND` the pair passes every exclusion class.
 New rows are trusted structurally; historical rows must earn it. Coverage improves on its own as `turn_state` fills in, with no second migration.
 
-Implemented as `_publishable_faq_rows` (`main.py:10149`) over a widened 200-row candidate pull, calling `services/faq_eligibility.excluded_by`.
+Implemented as `_publishable_faq_rows` (`main.py:10256`) over a widened 200-row candidate pull, calling `services/faq_eligibility.excluded_by`.
+
+**What shipped is stricter than that decision, deliberately - corrected here 2026-08-12 after a code audit found the doc describing a gate that does not exist.**
+`turn_state` only decides which rows are *pulled* (the SQL `turn_state = %s OR turn_state IS NULL`); the exclusion pass then runs on **every** candidate, `answered` rows included.
+So an `answered` turn is not trusted structurally after all - it must also pass the exclusion classes.
+Keep the code, not the original wording: `turn_state` proves a turn *reached an answer*, which is a different claim from *that answer is fit to publish as public crawlable content*. A COA turn can be perfectly `answered` and must still never be published, and a `restricted_tool` trace is exactly the signal that catches it.
+Trusting `answered` rows blindly, as written, would have reopened §1.6's leak the moment `turn_state` coverage filled in.
 
 **F3 - Never publish a restricted class. DONE 2026-08-12, uncommitted.**
 
@@ -194,7 +201,15 @@ The original spec ("exclude any turn whose `sources` records a COA tool result..
 `services/faq_eligibility.py` splits the two kinds of rule explicitly: tenant-independent (refusal, error string, UI artifact, `📎 Source:` marker, identifier shape - all properties of *our own output*, identical for every client) versus pack-supplied (`restricted_tool`, `restricted_topic`).
 A generic bot passes `pack=None` and gets only the tenant-independent set, which is correct - it has no tools and no vertical confidentiality model.
 
-The identifier rule was retuned against real data: one token carrying **both** a letter and a digit, 5+ chars. Requiring a letter is what stops it matching CAS numbers (`67-56-1`); requiring a digit stops it matching ordinary uppercase words.
+The identifier rule was retuned against real data: one token carrying **both** a letter and a digit, 5+ chars. Requiring a letter is what stops it matching CAS numbers (`67-56-1`); requiring a digit stops it matching ordinary words.
+
+**Retuned again 2026-08-12, after a code audit found two defects in it.** The rule matched **uppercase only**, so `101LR 101.26R007` was rejected and the same batch number typed `101lr 101.26r007` was published - a visitor's shift key was acting as the confidentiality boundary. Making it case-insensitive alone was not enough, because letter-plus-digit then also takes chemical formulas and hyphenated prose.
+Two additional conditions, both vertical-independent:
+
+- **A run of 3+ consecutive digits is required.** A batch or order number has one (`101`, `12345`); a formula's digits are singletons (`H2SO4`, `CH3OH`, `C2H5OH`), and so is ordinary prose (`3-year-old`, `2-to-3 weeks`, `3-in-1`).
+- **A bare quantity is excluded** (`500ml`, `25kg`) - it clears the digit-run bar and is not an identifier.
+
+**This also fixed a silent false positive nobody had noticed:** the uppercase-only rule flagged `H2SO4`, `CH3OH`, `C2H5OH` and `500ML` as identifiers, so **any FAQ naming a compound by its formula was unpublishable** on a chemical tenant. Both directions are now asserted (`tests/test_faq_eligibility.py`, 19 tests), and the new tests were confirmed to fail against the old rule.
 
 **F4 - Purge. Dry-run re-run 2026-08-12: counts unchanged (61 rows, 3 tenants, orphan risk 0), but the delete as specified is now known to be wrong.**
 
@@ -723,7 +738,8 @@ Six phases remain. Phase 1 is the only one with a hard predecessor; the rest are
 
 Identical for all six, so it is stated once. A phase is not done until all of these hold:
 
-1. `sapybase_ai_engine/venv/bin/python -m pytest tests/ -q` - **full suite green**, not just the phase's own file. The current baseline is **2595 passed, 134 skipped**; record the new number in this doc when it moves.
+1. `sapybase_ai_engine/venv/bin/python -m pytest tests/ -q` - **full suite green**, not just the phase's own file. The current baseline is **2695 passed, 134 skipped** (2026-08-12, after the F3 identifier retune); record the new number in this doc when it moves.
+   This line said 2595 while §11.-1 said 2667 and the suite actually stood at 2691 - three numbers, none of them current. Update it in the same commit as the phase, not afterwards.
 2. The phase's own new tests exist and fail against the old code. A test that passes before the change is not testing the change.
 3. `npx tsc --noEmit` and `npm run lint` - only when the phase touches TypeScript. Phases 1-5 are backend-only; phase 6 is the only one that may not be.
 4. **The §8 regression guard**: `get_sds`, `get_coa`, throttle, `request_quote` and Slice D source-attribution suites pass **unedited**. If a phase requires editing one of them, §8 has been violated - stop and get a decision rather than editing the test.
