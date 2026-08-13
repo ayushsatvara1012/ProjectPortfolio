@@ -819,7 +819,7 @@ The defect the audit found was real - the ordering - but suppression was the wro
 - A fallback or `SYSTEM_ERROR` turn fires no capture side effect and no handoff (QF10).
 - A normal successful capture on an `ANSWERED` turn still fires - guards against fixing QF10 by breaking Slice A.
 
-### Phase 4 - QF13, chat-log idempotency. **CODE DONE 2026-08-12** (suite green, 2646 passed / 134 skipped). **Migration not yet applied.**
+### Phase 4 - QF13, chat-log idempotency. **DONE 2026-08-12** - code shipped, migration applied dark and stamped.
 
 **Prerequisite: none.** The only phase in this plan carrying a migration.
 
@@ -835,7 +835,23 @@ The defect the audit found was real - the ordering - but suppression was the wro
 
 **Verified before shipping:** zero duplicate `(company_id, client_message_id)` groups across all 1,012 production rows, so the index builds without a cleanup step.
 
-**Still owed, deferred by owner decision 2026-08-12:** apply `0038` dark to the prod control DB and stamp it, per the `migration-apply-dark` skill. **Held until every phase is complete and the end-to-end tests pass** - the code is a no-op without the index, so nothing is broken by waiting. The tests here are structural - they assert the DDL and the statement are shaped right. The semantic check (insert twice, get one row) happens at apply time, because the only writable database configured in this repo is production.
+**APPLIED DARK 2026-08-12, after the E2E gate passed** (owner deferred it until then; the code is a no-op without the index, so waiting cost nothing).
+
+Note for anyone looking for the procedure: **the `migration-apply-dark` skill does not exist in this repo.** CLAUDE.md lists it, but `.claude/skills/` contains only `graphify` and `pre-commit-check`. This was applied by hand following the documented pattern.
+
+| Step | Result |
+|---|---|
+| Pre-flight | `alembic_version` `0037`, 1,014 rows, **0 duplicate groups** |
+| Apply | `CREATE UNIQUE INDEX IF NOT EXISTS` + stamp `0038`, one transaction, verified before commit |
+| Re-run DDL | no error - idempotency confirmed against the real database |
+| `alembic current` / `heads` | both `0038 (head)` - the Render deploy is a genuine no-op |
+
+**The semantic check the structural tests could not do, now done against the live schema**, inside a transaction that was **rolled back** so production gained nothing (row count 1,014 before and after):
+
+- Two identical inserts -> **1 row** (second returns `rowcount=0`). The idempotency key works.
+- Two `NULL`-id inserts -> **2 rows**. Legacy widgets that send no id are still unconstrained, which is what the partial clause is for.
+
+One incidental finding: `client_message_id` is a `uuid` column, not text - a probe using a string id fails on type, so any future test data must be a real UUID. The tests here are structural - they assert the DDL and the statement are shaped right. The semantic check (insert twice, get one row) happens at apply time, because the only writable database configured in this repo is production.
 
 | | |
 |---|---|
@@ -931,7 +947,7 @@ QF1 and QF2 are done (§0.3). **QF3-QF13 were fully re-verified against code 202
 | QF10 | Suppress `_captured` side effects when the turn's answer is a fallback | B3 | half day | **DONE 2026-08-12, resolved the opposite way** - see §11 phase 3. The capture now runs after `settle()` but is deliberately NOT suppressed; suppressing it would lose a real lead on exactly the turns where a human is needed. The owner's alert is marked instead. Previously: **Open.** `pipeline.py:118` calls `_capture_volunteered_contact(...)` *before* `compose.settle()` (line ~136) determines `system_error`/fallback - the capture and its handoff fire independent of whether the turn's answer ends up being the fallback text. Related to but distinct from Slice K (§6): K binds the *acknowledgment sentence*; QF10 is the *capture side effect* itself. |
 | QF11 | Forced tool-free compose round; fallback only when there is truly nothing | B2 | 1-2 days | **Done.** `loop.py:236-240` - after exhausting `max_rounds`, `_compose_without_tools()` runs over whatever the tools already returned rather than discarding it. Comment: `# ... compose over it rather than discarding it (B2).` |
 | QF12 | Handle the `error` SSE frame client-side; terminate with `[DONE]` after it | F2 | half day | **Done.** Backend emits `{"error": "Stream interrupted"}` then `data: [DONE]` (`main.py:4013-4018`); frontend explicitly parses `parsed.error` (`src/components/chat/ChatWidget.tsx:2999`). |
-| QF13 | Use `client_message_id` as an idempotency key on the chat write path | C4 | 1 day | **DONE 2026-08-12** (migration `0038` + `ON CONFLICT DO NOTHING`), dark-apply still owed - §11 phase 4. Previously: **Open.** `client_message_id` is stored on the `chat_logs` row (`main.py:3151`) and used later to *attach feedback* (`main.py:7127`), but the `INSERT` itself (`main.py:3151`) has no `ON CONFLICT` - nothing stops a retried request from writing a duplicate row. Not an idempotency key today, just a column. |
+| QF13 | Use `client_message_id` as an idempotency key on the chat write path | C4 | 1 day | **DONE 2026-08-12** (migration `0038` + `ON CONFLICT DO NOTHING`), applied dark and stamped - §11 phase 4. Previously: **Open.** `client_message_id` is stored on the `chat_logs` row (`main.py:3151`) and used later to *attach feedback* (`main.py:7127`), but the `INSERT` itself (`main.py:3151`) has no `ON CONFLICT` - nothing stops a retried request from writing a duplicate row. Not an idempotency key today, just a column. |
 
 **Net result:** 7 of QF3-QF13 done, 1 moot, **4 genuinely open: QF4, QF7, QF10, QF13.** QF7 and QF13 are the two worth prioritizing - QF7 is a real prompt-injection-shaped gap (unsanitized client history), QF13 is a real duplicate-row gap on every retried chat request.
 
