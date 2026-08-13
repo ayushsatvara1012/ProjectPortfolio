@@ -63,7 +63,7 @@ To avoid three different things being called "Slice A" in one file, audit items 
 | This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
 | This plan | I - extraction hardening | **DONE 2026-08-12**, on branch. Testimonial/review suppression, leaked-markup strip, JSON-LD noise keys. §4, §11 phase 1. |
 | This plan | J - reflex question | **DEPRIORITISED 2026-08-12** - measured at 1 turn in 98. Do not build the arbitration. §5. |
-| This plan | K - contact ack binding | PLAN ONLY, smallest. §6. |
+| This plan | K - contact ack binding | **DONE 2026-08-12**, on branch, with QF10. §6, §11 phase 3. |
 | Gaps plan | Slices A/B/D - contact capture, spec/quote fixes, source attribution | **DONE, pushed to MainV2** (`63747833`, confirmed an ancestor of this branch's base). |
 | Gaps plan | Slice E - directory-answer fixes | **DONE, pushed to MainV2** (`aa61ed71`). |
 | Gaps plan | Slice C - two-day activity digest | Deprioritised, plan-only. Not part of this consolidation - see §14 out-of-scope note. |
@@ -755,9 +755,19 @@ It also flags any `RANK_6_15` query that `_is_entity_lookup_query` does **not** 
 - If `top_k` changes: an entity-lookup query gets the raised value, a prose query does not. Both directions, one test each.
 - The candidate pool is `limit=15`. A test asserting `top_k <= pool` - raising it past the pool silently does nothing, which would look like a working deploy.
 
-### Phase 3 - Slice K + QF10, contact acknowledgment and its side effects
+### Phase 3 - Slice K + QF10, contact acknowledgment and its side effects. **DONE 2026-08-12** (suite green, 2637 passed / 134 skipped).
 
 **Prerequisite: none.** Grouped because both are the same territory - what happens around a contact capture that did not succeed.
+
+**Shipped:** `contact.capture_claims` / `contact.bind_acknowledgement` (the post-condition), `qualification.has_contact_cue` (so the cue vocabulary is not duplicated away from the extractor's), and the pipeline now runs the capture **after** `settle()` and binds the acknowledgment after the response contract.
+
+**QF10 was resolved the opposite way to how the audit specified it, and this is the one decision here worth a second look.**
+The audit asked for the capture side effect to be **suppressed** when the turn's answer is a fallback.
+Implementing that literally would delete a real lead at exactly the moment a human is most needed: the bot has just failed, and the visitor handed over their number anyway.
+So the capture still runs unconditionally. What the ordering fix actually buys is that the outcome now *exists* when the capture happens, so the owner's alert can say `[bot could not answer this turn]` instead of describing a conversation that never took place.
+The defect the audit found was real - the ordering - but suppression was the wrong remedy for it.
+
+**Slice K's no-cue case, which §6 did not specify:** when the reply claims a capture and the visitor's message carried no contact cue at all, the claim is simply removed rather than replaced with the "could you send it again" sentence. Asking someone to repeat a number they never gave is its own kind of nonsense.
 
 | | |
 |---|---|
@@ -836,7 +846,7 @@ It also flags any `RANK_6_15` query that `_is_entity_lookup_query` does **not** 
 |---|---|---|---|---|
 | 1 | I - extraction hardening | `services/html_extract.py` | **blocks phase 2** | **DONE 2026-08-12** |
 | 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py`, maybe `main.py` | - | ½ day to measure, then decide |
-| 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | ½ day |
+| 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | **DONE 2026-08-12** |
 | 4 | QF13 - chat-log idempotency | `main.py` + migration | - | hours |
 | 5 | QF7 - history sanitizing | `main.py` | - | ½ day |
 | 6 | G check 3 - watch, then maybe build | `contract.py`, `pipeline.py` | needs live traffic | measurement first |
@@ -859,7 +869,7 @@ QF1 and QF2 are done (§0.3). **QF3-QF13 were fully re-verified against code 202
 | QF7 | Sanitize and delimit client history; validate `role` against a literal set | C1 | half day | **Open.** `main.py:3805-3811` builds `HumanMessage`/`AIMessage` from client-sent `chat_req.history` on a bare `if m.role == 'user'` check (no allowlist) and inserts `m.content` unsanitized. Only the *current* message is delimited (`delimited_user_message`); history items are not. |
 | QF8 | Consolidate the refusal into one structured outcome with one rendering | A6, F3 | 1 day | **Done.** `services/agent_runtime/states.py`'s `TurnState` enum + `turn.py`'s `TurnResult` + `compose.settle()` as the single decision point, paired with the RULE 6 Phase 5 rewrite that stopped the model reciting a canned refusal paragraph. |
 | QF9 | Reconcile the timeout budget from per-call timeout x retries x rounds | B5 | hours | **Done.** `services/agent_runtime/pipeline.py`'s `deadline_s`/`heartbeat_s` mechanism (fed `AGENT_PRECOMPUTE_TIMEOUT_S = 30`) plus `MAX_TOOL_ROUNDS = 4` (`loop.py:37`) is a single reconciled budget, not independent per-layer constants. |
-| QF10 | Suppress `_captured` side effects when the turn's answer is a fallback | B3 | half day | **Open.** `pipeline.py:118` calls `_capture_volunteered_contact(...)` *before* `compose.settle()` (line ~136) determines `system_error`/fallback - the capture and its handoff fire independent of whether the turn's answer ends up being the fallback text. Related to but distinct from Slice K (§6): K binds the *acknowledgment sentence*; QF10 is the *capture side effect* itself. |
+| QF10 | Suppress `_captured` side effects when the turn's answer is a fallback | B3 | half day | **DONE 2026-08-12, resolved the opposite way** - see §11 phase 3. The capture now runs after `settle()` but is deliberately NOT suppressed; suppressing it would lose a real lead on exactly the turns where a human is needed. The owner's alert is marked instead. Previously: **Open.** `pipeline.py:118` calls `_capture_volunteered_contact(...)` *before* `compose.settle()` (line ~136) determines `system_error`/fallback - the capture and its handoff fire independent of whether the turn's answer ends up being the fallback text. Related to but distinct from Slice K (§6): K binds the *acknowledgment sentence*; QF10 is the *capture side effect* itself. |
 | QF11 | Forced tool-free compose round; fallback only when there is truly nothing | B2 | 1-2 days | **Done.** `loop.py:236-240` - after exhausting `max_rounds`, `_compose_without_tools()` runs over whatever the tools already returned rather than discarding it. Comment: `# ... compose over it rather than discarding it (B2).` |
 | QF12 | Handle the `error` SSE frame client-side; terminate with `[DONE]` after it | F2 | half day | **Done.** Backend emits `{"error": "Stream interrupted"}` then `data: [DONE]` (`main.py:4013-4018`); frontend explicitly parses `parsed.error` (`src/components/chat/ChatWidget.tsx:2999`). |
 | QF13 | Use `client_message_id` as an idempotency key on the chat write path | C4 | 1 day | **Open.** `client_message_id` is stored on the `chat_logs` row (`main.py:3151`) and used later to *attach feedback* (`main.py:7127`), but the `INSERT` itself (`main.py:3151`) has no `ON CONFLICT` - nothing stops a retried request from writing a duplicate row. Not an idempotency key today, just a column. |

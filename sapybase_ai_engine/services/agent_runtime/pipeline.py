@@ -26,10 +26,12 @@ from services import qualification, sales_funnel, session_store
 from services.lead_scoring import _score_lead
 
 from . import compose as compose_mod
+from . import contact as contact_mod
 from . import contract as contract_mod
 from . import escalation as escalation_mod
 from . import sources as sources_mod
 from .loop import AGENT_FALLBACK_TEXT, stream_agent_loop
+from .states import TurnState
 from .tools.records import insert_agent_request, session_has_capture
 from .turn import TurnEvent, TurnResult
 
@@ -128,10 +130,6 @@ async def run_agent_turn(
 
     text = sanitize(text)
 
-    # Slice A (agent-conversation-gaps plan §3): a visitor who types a phone/email
-    # mid-chat reaches nobody unless a tool already fired a handoff this turn.
-    _capture_volunteered_contact(inputs, captured, cursor)
-
     turn_sources = list(inputs.kb_sources) + sources_mod.tool_sources(captured)
 
     # ── SETTLE (Phase 5) ──────────────────────────────────────────────────────
@@ -152,7 +150,20 @@ async def run_agent_turn(
         small_talk=len(inputs.message.strip()) < 4,
     )
 
+    # Slice A (agent-conversation-gaps plan §3): a visitor who types a phone/email
+    # mid-chat reaches nobody unless a tool already fired a handoff this turn.
+    #
+    # Runs AFTER settle, per QF10 (audit B3): it used to fire before the turn's
+    # outcome existed, so nothing downstream could know the answer had failed. It
+    # is deliberately still unconditional - see `_capture_volunteered_contact`.
+    captured_contact = _capture_volunteered_contact(inputs, captured, cursor, turn=turn)
+
     _review_contract(inputs, turn, captured, model_text=text)
+
+    # Slice K (plan §6): the acknowledgment is prompt-driven, so it can promise a
+    # follow-up that no `agent_requests` row will ever produce. Bind the words to
+    # the write. Runs after the contract so its repairs are already in the text.
+    _bind_contact_acknowledgement(inputs, turn, captured, captured_contact)
 
     for key in CARD_KEYS:
         payload = captured.get(key)
@@ -326,37 +337,79 @@ def _pack_vocab(pack) -> tuple:
     return tuple(names)
 
 
-def _capture_volunteered_contact(inputs: TurnInputs, captured: Dict[str, Any], cursor) -> None:
+def _capture_volunteered_contact(inputs: TurnInputs, captured: Dict[str, Any], cursor,
+                                 *, turn: Optional[TurnResult] = None) -> bool:
     """Record a phone/email the visitor typed in passing (Slice A, §3).
 
     Opportunistic and best-effort: it never blocks the reply, and it yields to a
     handoff a tool already captured this turn (e.g. a priced quote) rather than
     overwriting it. Writing ``captured["handoff"]`` is what makes the caller's
     real-time owner ping fire unchanged.
+
+    Returns whether a row was written this turn, which is what Slice K binds the
+    acknowledgment sentence to.
+
+    **QF10, resolved the other way round.** The audit asked for the capture to be
+    suppressed when the turn's answer is a fallback. Suppressing it would delete a
+    real lead at exactly the moment a human is most needed - the bot just failed
+    and the visitor handed over their number anyway. So the capture still runs;
+    what the ordering fix buys is that the owner's alert can now SAY the turn
+    failed, instead of describing a conversation that never happened.
     """
     if not inputs.session_id or captured.get("handoff"):
-        return
+        return False
     try:
         contact = qualification.extract_contact(inputs.message)
     except Exception:
         contact = {}
     if not contact or session_has_capture(cursor, inputs.company_id, inputs.session_id):
-        return
+        return False
+    failed = turn is not None and turn.state in (TurnState.SYSTEM_ERROR, TurnState.NO_DATA)
+    note = f"[bot could not answer this turn] {inputs.message}" if failed else inputs.message
     product = _subject_product(captured) or (
         ((inputs.prior_state or {}).get("products") or [{}])[-1] or {}
     ).get("name")
     if insert_agent_request(
             cursor, inputs.company_id, kind="contact",
             product=product, cas=None, grade=None, pack_size=None, qty=None,
-            note=inputs.message, name=None, email=contact.get("email"),
+            note=note, name=None, email=contact.get("email"),
             phone=contact.get("phone"), session_id=inputs.session_id):
         captured["handoff"] = {
             "kind": "contact",
             "product": product,
             "contact_email": contact.get("email"),
             "contact_phone": contact.get("phone"),
-            "note": inputs.message,
+            "note": note,
         }
+        return True
+    return False
+
+
+def _bind_contact_acknowledgement(inputs: TurnInputs, turn: TurnResult,
+                                  captured: Dict[str, Any],
+                                  captured_contact: bool) -> None:
+    """Slice K: never claim a contact was noted when no row was written.
+
+    A tool-captured handoff (a priced quote carrying the buyer's email) counts as
+    capture just as much as the volunteered path does - the claim is true either
+    way, and only an untrue one is repaired. ``turn.is_escalating`` is deliberately
+    NOT the test: the escalate event is attached further down, so it is always
+    absent here.
+    """
+    try:
+        if captured_contact or captured.get("handoff"):
+            return
+        text, finding = contact_mod.bind_acknowledgement(
+            turn.text,
+            captured=False,
+            cue=qualification.has_contact_cue(inputs.message),
+        )
+        if finding:
+            turn.text = text
+            logger.info("CONTACT-ACK company=%s session=%s %s",
+                        inputs.company_id, inputs.session_id, finding)
+    except Exception:
+        logger.exception("contact ack binding failed")
 
 
 def _persist_session(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, Any],
