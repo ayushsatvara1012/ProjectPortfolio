@@ -728,3 +728,138 @@ class TestReplacementShrink:
 
     def test_the_expresolv_incident_would_have_been_refused(self):
         assert replacement_shrink_reason(978, 8)
+# ── Slice I: extraction hardening (docs/bot-output-quality-plan.md §4, phase 1) ──
+
+# Verbatim from expresolv.com's homepage theme - the page §4 measured, where 12 of
+# 76 child chunks were carousel testimonials. Person-name-shaped, so they are prime
+# false matches for "who is ...?" and they take the reranked slots the real staff
+# rows need.
+EXPRESOLV_TESTIMONIAL = """
+<html><body>
+  <section class="tp-testimonial-area pt-120 pb-120">
+    <div class="swiper-slide">
+      <div class="tp-testi__item">
+        <p class="tp-testi__text">Expresolv has been a reliable supplier for years.</p>
+        <span class="tp-testi__ava-name">Mr. Rakesh Mehta</span>
+        <span class="tp-testi__ava-position">Procurement Head</span>
+      </div>
+    </div>
+  </section>
+  <section class="about-area">
+    <h2>Our products</h2>
+    <p>We supply Acetone in AR and LR grades from our Ankleshwar plant.</p>
+  </section>
+</body></html>
+"""
+
+
+def test_testimonial_block_is_dropped_and_the_adjacent_section_survives():
+    out = extract(EXPRESOLV_TESTIMONIAL, BASE)
+    assert "Rakesh Mehta" not in out
+    assert "Procurement Head" not in out
+    assert "reliable supplier" not in out
+    # The content next to it is the whole point - an over-broad selector takes this.
+    assert "Acetone in AR and LR grades" in out
+    assert "Our products" in out
+
+
+def test_a_page_with_no_testimonial_markup_is_untouched():
+    html = """
+    <html><body>
+      <section class="about-area"><h2>Contact</h2>
+      <p>Call us on +91 98250 12345 or email sales@example.com.</p></section>
+    </body></html>
+    """
+    assert extract(html, BASE) == extract(html, BASE)
+    out = extract(html, BASE)
+    assert "+91 98250 12345" in out
+    assert "sales@example.com" in out
+    assert "Contact" in out
+
+
+def test_a_review_token_does_not_match_preview():
+    # `[class*='review']` would take both of these; whole-token matching takes one.
+    html = """
+    <html><body>
+      <div class="product-preview"><p>Acetone technical grade, 200L drum.</p></div>
+      <div class="customer-reviews"><p>Five stars from Mr. Arun Shrestha.</p></div>
+    </body></html>
+    """
+    out = extract(html, BASE)
+    assert "200L drum" in out
+    assert "Arun Shrestha" not in out
+
+
+def test_leaked_markup_is_stripped_from_body_text():
+    # The page served the tag escaped, so no parser ever saw it as markup.
+    html = """
+    <html><body><p>&lt;span class="tp-testi__ava-position"&gt;Methanol is stocked.</p>
+    </body></html>
+    """
+    out = extract(html, BASE)
+    assert "tp-testi" not in out
+    assert "span class" not in out
+    assert "Methanol is stocked." in out
+
+
+def test_a_bare_css_class_line_is_dropped_but_real_copy_is_not():
+    html = """
+    <html><body>
+      <p>testimonial-area</p>
+      <p>breadcrumb-area</p>
+      <p>tp-testi__ava-position</p>
+      <p>carton-box</p>
+      <p>Acetone is available in AR grade.</p>
+    </body></html>
+    """
+    out = extract(html, BASE)
+    assert "testimonial-area" not in out
+    assert "breadcrumb-area" not in out
+    assert "Acetone is available in AR grade." in out
+    # Packaging vocabulary is a fact in this vertical, not a class name.
+    assert "carton-box" in out
+
+
+def test_a_less_than_sign_in_a_spec_is_not_read_as_markup():
+    html = "<html><body><p>Moisture content &lt;0.1% and &lt; 50 ppm chloride.</p></body></html>"
+    out = extract(html, BASE)
+    assert "<0.1%" in out
+    assert "< 50 ppm chloride" in out
+
+
+def test_breadcrumb_and_publishing_metadata_are_not_ingested():
+    html = """
+    <html><head>
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@graph":[
+      {"@type":"BreadcrumbList","itemListElement":[
+        {"@type":"ListItem","position":1,"name":"Home"},
+        {"@type":"ListItem","position":2,"name":"Products"}]},
+      {"@type":"Organization","name":"Expresolv","telephone":"+91 99999 11111",
+       "dateModified":"2026-08-01","inLanguage":"en-US"}]}
+    </script>
+    </head><body><p>Body copy.</p></body></html>
+    """
+    out = extract(html, BASE)
+    assert "Expresolv" in out
+    assert "+91 99999 11111" in out
+    assert "BreadcrumbList" not in out
+    assert "dateModified" not in out
+    assert "inLanguage" not in out
+
+
+def test_the_faq_round_trip_still_holds_after_slice_i():
+    # Slice F1's guarantee must survive this phase (plan §9: the most important
+    # test in the plan). Loader-shaped JSON-LD in, zero chunks out.
+    html = """
+    <html><head>
+    <script type="application/ld+json" data-sapybase-faq="true">
+    {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+      {"@type":"Question","name":"Whom to contact for sales ?",
+       "acceptedAnswer":{"@type":"Answer","text":"I don't have details on file."}}]}
+    </script>
+    </head><body><p>Real page copy.</p></body></html>
+    """
+    out = extract(html, BASE)
+    assert "Whom to contact for sales" not in out
+    assert "Real page copy." in out

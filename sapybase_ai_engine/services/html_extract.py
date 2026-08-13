@@ -41,6 +41,44 @@ COOKIE_BANNER_SELECTORS = (
     "[id*='onetrust' i]",
 )
 
+# Theme testimonial and review blocks (plan §4, Slice I). These are dense with
+# person names, so they are prime false matches for "who is ...?" and they compete
+# with the real directory rows for the five reranked slots - measured on
+# expresolv.com, where 12 of 76 homepage chunks are carousel testimonials.
+#
+# Matched as whole class/id *tokens*, never as substrings: `[class*='review']`
+# would take `preview-box` and `product-preview` with it. Carousel vocabulary
+# (swiper, slick, owl, carousel) is deliberately NOT here on its own - plenty of
+# sites put real product content in a slider, and the observed damage is the
+# testimonial content, not the carousel that holds it.
+_NOISE_TOKENS = frozenset({
+    "testimonial", "testimonials", "testi", "testimony",
+    "review", "reviews", "reviewer",
+    "clientsay", "clientsays", "clientfeedback", "customerfeedback",
+})
+
+# Where a token may appear. `id` and `class` only - never a text-bearing attribute.
+_NOISE_ATTRS = ("class", "id")
+
+# Never removed however they are named: emptying these takes the page with them.
+_NOISE_PROTECTED = frozenset({"html", "body", "main"})
+
+_TOKEN_SPLIT_RE = re.compile(r"[-_\s]+")
+
+# Markup that survived as literal text - the page served it escaped, so no parser
+# ever saw a tag. Observed in stored rows as `<span class="tp-testi__ava-position">`.
+_LEAKED_TAG_RE = re.compile(r"</?[a-z][a-z0-9]*(?:\s[^<>]{0,200})?/?>", re.IGNORECASE)
+
+# A line that is nothing but a CSS class name: one token, no spaces, and either a
+# BEM `__` or a known layout suffix. Observed as `testimonial-area`,
+# `breadcrumb-area`. Deliberately narrow - a real fact has a space in it.
+_BARE_CLASS_RE = re.compile(
+    r"^[a-z][a-z0-9]*(?:[-_]+[a-z0-9]+)*"
+    r"(?:__[a-z0-9-]+|[-_](?:area|wrapper|wrap|inner|section|slider|carousel))$"
+)
+# `box` and `container` are absent on purpose: they are packaging vocabulary in the
+# chemical vertical, and `carton-box` is a fact, not a class name.
+
 # Nav fragments like "Home" or "›" are noise at any position; real facts are longer.
 MIN_BLOCK_CHARS = 3
 
@@ -61,11 +99,22 @@ _WS_RE = re.compile(r"[ \t]+")
 _BLANK_LINES_RE = re.compile(r"\n{3,}")
 _DEDUP_NORMALISE_RE = re.compile(r"[^a-z0-9]+")
 
-_JSONLD_SKIP_KEYS = {"@context", "@id", "image", "logo", "url", "sameAs", "potentialAction"}
+_JSONLD_SKIP_KEYS = {
+    "@context", "@id", "image", "logo", "url", "sameAs", "potentialAction",
+    # Slice I: publishing metadata and breadcrumb scaffolding. None of it answers a
+    # visitor's question, and all of it is stored and billed per page.
+    "dateModified", "datePublished", "inLanguage", "position", "breadcrumb",
+    "isPartOf", "primaryImageOfPage", "thumbnailUrl", "wordCount",
+}
 
 # Our own loader publishes the bot's answers back onto the merchant's page as
 # FAQPage schema; ingesting it would make the bot its own source (plan §1.4, F1).
 _JSONLD_SKIP_TYPES = {"faqpage", "question", "answer"}
+
+# Navigational scaffolding, not content (Slice I). Separate from the set above
+# because that one exists for a different reason - F1's feedback loop - and the two
+# must stay independently reviewable.
+_JSONLD_NOISE_TYPES = {"breadcrumblist", "listitem"}
 
 # `faqScript.dataset.sapybaseFaq = 'true'` in public/sapybase-loader@1.js:818.
 _SAPYBASE_FAQ_ATTR = "data-sapybase-faq"
@@ -108,6 +157,8 @@ def extract(html: str, base_url: str, seen_blocks: set[str] | None = None) -> st
         except Exception:
             continue
 
+    _strip_noise_blocks(soup)
+
     root = soup.body or soup
     lines: list[str] = []
     _render(root, lines)
@@ -119,6 +170,33 @@ def extract(html: str, base_url: str, seen_blocks: set[str] | None = None) -> st
         body = f"{body}\n\n{heading}\n\n{joined}" if body else f"{heading}\n\n{joined}"
 
     return body.strip()
+
+
+def _strip_noise_blocks(soup: BeautifulSoup) -> None:
+    """Remove testimonial and review containers before anything is rendered.
+
+    Runs on whole class/id tokens rather than a CSS substring selector, so
+    ``preview-box`` survives and ``tp-testi__ava-position`` does not. ``_finalise``
+    already dedups blocks repeated *across* pages, which cannot catch these: a
+    testimonial carousel appears once, on the homepage (plan §4).
+    """
+    for node in soup.find_all(True):
+        if node.name in _NOISE_PROTECTED or node.parent is None:
+            continue
+        if _is_noise_node(node):
+            node.decompose()
+
+
+def _is_noise_node(node: Tag) -> bool:
+    for attr in _NOISE_ATTRS:
+        value = node.get(attr)
+        if not value:
+            continue
+        raw = " ".join(value) if isinstance(value, list) else str(value)
+        for token in _TOKEN_SPLIT_RE.split(raw.lower()):
+            if token in _NOISE_TOKENS:
+                return True
+    return False
 
 
 def _render(node: Any, out: list[str], depth: int = 0) -> None:
@@ -228,7 +306,10 @@ def _inline_text(node: Tag, depth: int = 0) -> str:
 
 
 def _clean(text: str) -> str:
-    return _WS_RE.sub(" ", text.replace("\xa0", " ")).strip()
+    # Markup that arrived escaped is text to the parser but noise to the index.
+    # The pattern needs a letter straight after `<`, so "< 50" and "<5>" survive.
+    text = _LEAKED_TAG_RE.sub(" ", text.replace("\xa0", " "))
+    return _WS_RE.sub(" ", text).strip()
 
 
 def _finalise(parts: Iterable[str], seen_blocks: set[str] | None = None) -> str:
@@ -247,6 +328,8 @@ def _finalise(parts: Iterable[str], seen_blocks: set[str] | None = None) -> str:
             kept.append("")
             continue
         if len(stripped) < MIN_BLOCK_CHARS:
+            continue
+        if _BARE_CLASS_RE.match(stripped):
             continue
         key = _DEDUP_NORMALISE_RE.sub("", stripped.lower())
         if not key:
@@ -284,7 +367,7 @@ def _collect_jsonld(soup: BeautifulSoup, seen_blocks: set[str] | None = None) ->
         except Exception:
             continue  # malformed JSON-LD is common; never fail the document
         for entry in _walk_jsonld(payload, 0):
-            if _is_qa_schema(entry):
+            if _is_qa_schema(entry) or _is_noise_schema(entry):
                 continue
             for line in _flatten_entity(entry, 0):
                 key = _DEDUP_NORMALISE_RE.sub("", line.lower())
@@ -295,11 +378,19 @@ def _collect_jsonld(soup: BeautifulSoup, seen_blocks: set[str] | None = None) ->
 
 
 def _is_qa_schema(entity: Any) -> bool:
+    return _has_type(entity, _JSONLD_SKIP_TYPES)
+
+
+def _is_noise_schema(entity: Any) -> bool:
+    return _has_type(entity, _JSONLD_NOISE_TYPES)
+
+
+def _has_type(entity: Any, types: set[str]) -> bool:
     if not isinstance(entity, dict):
         return False
     raw_type = entity.get("@type")
-    types = raw_type if isinstance(raw_type, list) else [raw_type]
-    return any(str(t).strip().lower() in _JSONLD_SKIP_TYPES for t in types if t)
+    declared = raw_type if isinstance(raw_type, list) else [raw_type]
+    return any(str(t).strip().lower() in types for t in declared if t)
 
 
 def _walk_jsonld(payload: Any, depth: int) -> list[dict]:
@@ -355,7 +446,7 @@ def _flatten_value(value: Any, depth: int) -> list[str]:
             out.extend(_flatten_value(item, depth + 1))
         return out
     if isinstance(value, dict):
-        if _is_qa_schema(value):
+        if _is_qa_schema(value) or _is_noise_schema(value):
             return []
         parts: list[str] = []
         for key, inner in value.items():

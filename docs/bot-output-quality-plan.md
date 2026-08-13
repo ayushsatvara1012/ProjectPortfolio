@@ -61,7 +61,7 @@ To avoid three different things being called "Slice A" in one file, audit items 
 | This plan | F - FAQ feedback loop | **COMPLETE and DEPLOYED 2026-08-12.** PR #120 merged to MainV2 (`f0d8aff6`, `c62522b4`, `fc3bfa0f`, `bef6921e`). All 61 rows cleared across all 3 tenants; `--probe ingest` reports none; retrieval contamination 63% -> 0%. §1, §1.4b. |
 | This plan | G - response contract | **CHECKS 1 AND 2 ENFORCING, on branch.** Cut to those two on measurement (27% of turns, untouched by the corpus fix); check 3 and check 4 still run and still log but cannot rewrite. §2.4a, §2.5b. |
 | This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
-| This plan | I - extraction hardening | PLAN ONLY. §4. |
+| This plan | I - extraction hardening | **DONE 2026-08-12**, on branch. Testimonial/review suppression, leaked-markup strip, JSON-LD noise keys. §4, §11 phase 1. |
 | This plan | J - reflex question | **DEPRIORITISED 2026-08-12** - measured at 1 turn in 98. Do not build the arbitration. §5. |
 | This plan | K - contact ack binding | PLAN ONLY, smallest. §6. |
 | Gaps plan | Slices A/B/D - contact capture, spec/quote fixes, source attribution | **DONE, pushed to MainV2** (`63747833`, confirmed an ancestor of this branch's base). |
@@ -689,9 +689,26 @@ Identical for all six, so it is stated once. A phase is not done until all of th
 
 Live evals (`RUN_LLM_EVALS=1`, twice for stability, the existing 11 green) are a **merge gate, not a per-phase gate** - they cost money and are slow. Run them once before the branch merges to MainV2, plus after any phase that changes what the model is asked or what it is allowed to say. Of the six below, that is phases 1 and 3.
 
-### Phase 1 - Slice I, extraction hardening
+### Phase 1 - Slice I, extraction hardening. **DONE 2026-08-12** (suite green, 2603 passed / 134 skipped).
 
 **Prerequisite: none. This one goes first**, because it is the only phase another phase depends on.
+
+**Shipped in `services/html_extract.py`, three parts:**
+
+1. `_strip_noise_blocks` removes testimonial and review containers before rendering.
+2. `_clean` strips markup that arrived escaped; `_finalise` drops lines that are nothing but a CSS class name.
+3. `_JSONLD_SKIP_KEYS` gained the publishing metadata, and `_JSONLD_NOISE_TYPES` drops `BreadcrumbList`/`ListItem`.
+
+**Two deliberate departures from §4's wording, both narrowing:**
+
+- **Whole-token matching, not the CSS substring selectors §4 listed.** `[class*='review' i]` also takes `preview-box` and `product-preview`, which on a chemical site is product content. Class and id are tokenised on `-`/`_`/space and matched against a vocabulary set instead, so `tp-testi__ava-position` is noise and `product-preview` is not. Test: `test_a_review_token_does_not_match_preview`.
+- **`swiper-slide` is NOT suppressed on its own**, though §4 named it. Carousel vocabulary marks a *container*, not its contents, and plenty of sites put real products in a slider - suppressing it platform-wide would delete product copy from tenants who never had a testimonial problem. The measured damage is the testimonial content, and those blocks carry testimonial tokens of their own. If a carousel-only case turns up later, it needs its own evidence.
+
+`box` and `container` are absent from the bare-class-name rule for the same class of reason: they are packaging vocabulary in the chemical vertical, and `carton-box` is a fact.
+
+**Exit gate met**, with one item deferred and not silently dropped: the entity-safe chunk-count harness (`tests/chunk_metrics.py`) **does not exist in this repo** - it is on the unmerged `feature/entity-safe-ingestion`. Re-running it against post-Slice-I extraction is owed **on that branch, before its Phase 2 lands**, since its Phase 0 baseline was measured on dirtier input. Recorded in §15.
+
+**Not done by this phase, and the client conversation must say so:** existing corpora keep their noise until retrained. Nothing here retroactively cleans stored rows.
 
 | | |
 |---|---|
@@ -808,7 +825,7 @@ Live evals (`RUN_LLM_EVALS=1`, twice for stability, the existing 11 green) are a
 
 | Phase | Slice | Files | Blocks | Rough size |
 |---|---|---|---|---|
-| 1 | I - extraction hardening | `services/html_extract.py` | **blocks phase 2** | ~1 day |
+| 1 | I - extraction hardening | `services/html_extract.py` | **blocks phase 2** | **DONE 2026-08-12** |
 | 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py`, maybe `main.py` | - | ½ day to measure, then decide |
 | 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | ½ day |
 | 4 | QF13 - chat-log idempotency | `main.py` + migration | - | hours |
@@ -868,7 +885,7 @@ Full plan now lives at `docs/entity-safe-ingestion-plan.md` (copied 2026-08-11 f
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Measurement harness (`tests/chunk_metrics.py`, `tests/chunk_fixtures.py`) | **Done.** Its own real-page validation found the correctness defect (unheadered table splits) doesn't occur in any currently-trained page, including Expresolv's - so this slice does not fix the fabricated-contact incident that motivated it. What it does deliver: 34% fewer chunks, 14% fewer billed words, from header/heading deduplication. |
+| 0 | Measurement harness (`tests/chunk_metrics.py`, `tests/chunk_fixtures.py`) | **Done, but its baseline is now stale** - Slice I shipped 2026-08-12 and cleaner extraction input changes these numbers; re-run on that branch before Phase 2 lands. Its own real-page validation found the correctness defect (unheadered table splits) doesn't occur in any currently-trained page, including Expresolv's - so this slice does not fix the fabricated-contact incident that motivated it. What it does deliver: 34% fewer chunks, 14% fewer billed words, from header/heading deduplication. |
 | 1 | `services/chunking.py` structure-aware packer | **Done, not wired in.** `run_training_job` still uses the old `RecursiveCharacterTextSplitter`. |
 | 2 | Wire into `run_training_job` | **Not started.** Gated on Q1 (decided: `context TEXT` column, dark-applied, likely claims migration `0038` - see §10's migration note). |
 | 3 | FAQ / definition-list atomicity | **Not started.** The plan's own Phase 0 measurement found FAQ pairs already survive splitting intact except when a single answer exceeds ~1500 chars - demoted below Phase 4 in its own doc. |
