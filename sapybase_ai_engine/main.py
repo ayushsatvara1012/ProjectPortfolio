@@ -3149,8 +3149,15 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     try:
         cursor = conn.cursor()
         cursor.execute(
+            # ON CONFLICT DO NOTHING makes a retried request idempotent (audit C4 /
+            # QF13): migration 0038's partial unique index on
+            # (company_id, client_message_id) is what it lands on. Deliberately
+            # untargeted - naming the index would make this statement fail on any
+            # environment where the code deploys before the migration runs, which
+            # would take down chat logging entirely rather than duplicating a row.
             """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id, sources, turn_state)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+               ON CONFLICT DO NOTHING""",
             (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id,
              json.dumps(sources) if sources is not None else None, turn_state)
         )
