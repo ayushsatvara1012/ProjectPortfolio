@@ -61,6 +61,32 @@ def test_identifier_rule_does_not_fire_on_ordinary_prose():
     assert "identifier" not in excluded_by(q, a)
 
 
+def test_a_lowercase_batch_number_is_an_identifier_too():
+    # The rule was uppercase-only, so this exact pair - the §1.3 leak with the
+    # shift key up - was publishable while its uppercase twin was rejected.
+    q = "can i get the docs for 101lr 101.26r007"
+    a = "That document has been retrieved and should be open in a panel for you."
+    assert "identifier" in excluded_by(q, a)
+
+
+def test_a_chemical_formula_is_not_an_identifier():
+    # A formula's digits are singletons; an identifier carries a run of 3+. Both
+    # cases were suppressed by the old uppercase rule, which quietly made every
+    # FAQ naming a compound by formula unpublishable.
+    for formula in ("H2SO4", "h2so4", "CH3OH", "C2H5OH", "NaHCO3"):
+        assert "identifier" not in excluded_by(f"is {formula} in stock?", "Yes, in stock.")
+
+
+def test_a_pack_size_is_not_an_identifier():
+    for size in ("500ML", "500ml", "25kg", "200L"):
+        assert "identifier" not in excluded_by(f"do you sell {size} packs?", "Yes we do.")
+
+
+def test_hyphenated_prose_is_not_an_identifier():
+    for phrase in ("a 3-year-old plant", "lead time 2-to-3 weeks", "our 3-in-1 cleaner"):
+        assert "identifier" not in excluded_by(phrase, "Confirmed, that is correct.")
+
+
 def test_empty_and_none_inputs_are_safe():
     assert excluded_by("", "") == []
     assert is_publishable(None, None) is True

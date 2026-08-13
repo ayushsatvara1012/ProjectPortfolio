@@ -58,10 +58,26 @@ REFUSAL_STRINGS = (
 
 # Batch / lot / order / invoice identifiers: one token carrying BOTH a letter and
 # a digit, 5+ chars. Requiring a letter is what keeps CAS numbers (67-56-1) and
-# plain quantities out; requiring a digit keeps ordinary uppercase words out.
-# Vertical-independent: an identifier is identifier-shaped in any industry.
+# plain quantities out. Vertical-independent: an identifier is identifier-shaped
+# in any industry.
+#
+# Case-INsensitive on purpose. It was uppercase-only, which meant `101LR 101.26R007`
+# was caught and the same batch number typed `101lr 101.26r007` was published; a
+# visitor's shift key is not a confidentiality boundary.
 IDENTIFIER_RE = re.compile(
-    r"\b(?=[A-Z0-9./-]*[A-Z])(?=[A-Z0-9./-]*[0-9])[A-Z0-9][A-Z0-9./-]{4,}\b"
+    r"\b(?=[A-Za-z0-9./-]*[A-Za-z])(?=[A-Za-z0-9./-]*[0-9])[A-Za-z0-9][A-Za-z0-9./-]{4,}\b"
+)
+
+# Letter+digit alone is far too broad once case is ignored: it takes chemical
+# formulas (H2SO4, CH3OH, C2H5OH - all suppressed by the uppercase-only rule too,
+# an unnoticed false positive) and ordinary hyphenated prose (`3-year-old`).
+# A real identifier carries a run of 3+ digits; a formula's digits are singletons.
+_IDENTIFIER_DIGIT_RUN_RE = re.compile(r"\d{3,}")
+
+# `500ml` / `25kg` clear the digit-run bar and are quantities, not identifiers.
+_QUANTITY_RE = re.compile(
+    r"\A\d+(?:\.\d+)?(?:ml|l|lt|ltr|kl|kg|kgs|g|gm|gms|mg|mt|lb|lbs|oz|cc|m3|cbm|ppm)\Z",
+    re.IGNORECASE,
 )
 
 
@@ -87,7 +103,13 @@ def _has_source_marker(q: str, a: str) -> bool:
 
 
 def _has_identifier(q: str, a: str) -> bool:
-    return bool(IDENTIFIER_RE.search(q or "")) or bool(IDENTIFIER_RE.search(a or ""))
+    for text in (q or "", a or ""):
+        for token in IDENTIFIER_RE.findall(text):
+            if _QUANTITY_RE.match(token):
+                continue
+            if _IDENTIFIER_DIGIT_RUN_RE.search(token):
+                return True
+    return False
 
 
 # Rules that hold for every tenant and every vertical.
