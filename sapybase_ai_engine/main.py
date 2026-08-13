@@ -211,13 +211,83 @@ def _extract_page_text(body: str, source_url: str, seen_blocks: set[str] | None 
     return extracted if extracted.strip() else body
 
 
+#: A real browser's UA for the direct-fetch fallback. Expresolv's WAF serves
+#: `r.jina.ai` a bot-verification interstitial and this UA the actual page, which
+#: is how their /leadership source was recovered by hand after a retrain gutted it
+#: (bot-output-quality plan §1.4b). Blocking the Reader is common on WAF'd SMB
+#: sites, so this is not one client's workaround.
+_BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+               "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+
 async def _fetch_url_html(page_url: str) -> str:
-    """Fetch a URL through Jina as rendered HTML, with the shared retry/backoff.
+    """Fetch a URL as rendered HTML, Jina first and a direct browser-UA fetch second.
 
     Raises HTTPException on an unreachable or empty response so callers can treat
-    reachability uniformly. Does NOT extract - keeps fetch and parse separable so
-    discovery can harvest links from the same body it estimates cost from.
+    reachability uniformly. Does NOT extract for the caller - keeps fetch and parse
+    separable so discovery can harvest links from the same body it estimates cost
+    from - but it does extract *internally* to decide whether the Reader was served
+    a challenge page, because that is the only way to tell a 200 that carries the
+    content from a 200 that carries a bot check.
     """
+    body = await _fetch_via_jina(page_url)
+    if html_extract.unusable_reason(_extract_page_text(body, page_url)) is None:
+        return body
+
+    # The Reader got a challenge page. Try the site directly as a browser would.
+    direct = await _fetch_direct_html(page_url)
+    if direct and html_extract.unusable_reason(_extract_page_text(direct, page_url)) is None:
+        logger.info("fetch: Jina body unusable for %s, direct browser-UA fetch succeeded",
+                    page_url)
+        return direct
+
+    # Both routes failed. Return the ORIGINAL body so the caller's own guards
+    # produce exactly the refusal they would have without this fallback - a failed
+    # rescue must not change the diagnosis.
+    logger.warning("fetch: both Jina and direct browser-UA fetch returned an "
+                   "unusable body for %s", page_url)
+    return body
+
+
+async def _fetch_direct_html(page_url: str) -> Optional[str]:
+    """Fetch a page directly with a browser UA, or None if that is not safe/possible.
+
+    Jina was acting as an indirection layer, so fetching server-side ourselves is a
+    NEW SSRF surface: the URL is revalidated here, and again after redirects, since
+    a public host can 302 into a private range and `requests` follows by default.
+    Never raises - this is a rescue path, and its failure must leave the caller's
+    original error intact.
+    """
+    try:
+        validate_safe_url(page_url)
+    except HTTPException:
+        return None
+
+    headers = {"User-Agent": _BROWSER_UA,
+               "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+               "Accept-Language": "en-US,en;q=0.9"}
+    try:
+        response = await asyncio.to_thread(
+            requests.get, page_url, headers=headers, timeout=20, allow_redirects=True)
+    except requests.RequestException as exc:
+        logger.info("fetch: direct browser-UA fetch failed for %s: %s", page_url, exc)
+        return None
+
+    if response.status_code != 200 or len(response.content) < 50:
+        return None
+    # Re-validate the landing URL: the redirect chain is attacker-influenced.
+    if str(response.url) != page_url:
+        try:
+            validate_safe_url(str(response.url))
+        except HTTPException:
+            logger.warning("fetch: direct fetch of %s redirected to a blocked host %s",
+                           page_url, response.url)
+            return None
+    return _decode_response_body(response)
+
+
+async def _fetch_via_jina(page_url: str) -> str:
+    """The Reader fetch with the shared retry/backoff. Raises on unreachable."""
     jina_url = f"https://r.jina.ai/{page_url}"
     headers = {"User-Agent": "SapybaseBot/1.0", "X-Return-Format": "html"}
     if JINA_API_KEY:
