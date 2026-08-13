@@ -2,7 +2,18 @@
 
 Date: 2026-08-13.
 Branch: `MainV2`.
-Status: **Phase 1 SHIPPED (uncommitted). Phase 2 (Gemini 3.x adoption) NOT STARTED - it is a real build, not a config bump.**
+Status: **Phase 1 COMMITTED AND PUSHED, MERGE DELIBERATELY HELD. Phase 2 (Gemini 3.x adoption) NOT STARTED - it is a real build, not a config bump.**
+
+Branch: `bugfix/retired-gemini-models`, commit `2d54e457`, pushed to origin. Fast-forward from `MainV2` (zero divergence), so the merged tree is byte-identical to what was tested.
+
+**Do not merge without checking with the owner first.** Held 2026-08-13 by owner decision: the client is not ready to retrain, and merging changes what training does. This is a scheduling hold, not a quality one - every gate passed (§1.7).
+
+**What the hold costs, and it is not symmetric.** The commit fixes two independent failures with very different urgency:
+
+- **The PDF guard half is what the hold is about.** After merge, a scanned PDF that previously reported success will report a 400. That is the correct behaviour, but owners will notice, and affected sources need retraining - which is exactly what the client is not ready for. Holding is reasonable.
+- **The `gemini-2.5-pro` 404 half is an active production outage.** Paid tiers (PRO/BUSINESS/ENTERPRISE/BYOD) with generic, non-vertical bots are erroring on chat *right now*, and every day of hold is another day of that. Nothing about this half touches training or retraining.
+
+If the outage matters more than the training-behaviour change, the model fix can be cherry-picked ahead of the PDF guard - they are independent edits in the same commit and would need splitting. Raised so the trade is explicit rather than implied.
 
 Triggered by a question about which Gemini models to use for cost and quality.
 The research answered that, and on the way found **two models already dead in production**, both failing silently.
