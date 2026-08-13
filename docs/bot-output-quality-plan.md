@@ -2,7 +2,7 @@
 
 Date: 2026-08-12, revised 2026-08-11 (this session) with a live production audit.
 Branch: `feature/bot-output-quality`, off MainV2 at `f9fc4f93`.
-Status: F-K PLAN ONLY. §13-16 consolidate three other trackers into this file (2026-08-11) so there is one place to work from - see §0.3 for what that changes and what it doesn't.
+Status: **F, G(1+2), I, K SHIPPED AND MERGED TO MainV2 2026-08-12; H measured and recommended against; G check 3 watching; J dropped.** Originally F-K PLAN ONLY. §13-16 consolidate three other trackers into this file (2026-08-11) so there is one place to work from - see §0.3 for what that changes and what it doesn't.
 
 Continues `docs/agent-conversation-gaps-plan.md`, which owns Slices A-E from four real Expresolv transcripts.
 
@@ -69,7 +69,8 @@ To avoid three different things being called "Slice A" in one file, audit items 
 | Gaps plan | Slice C - two-day activity digest | Deprioritised, plan-only. Not part of this consolidation - see §14 out-of-scope note. |
 | Audit quick fixes | QF1/QF2 - RULE 7 founder clause, agent temperature | **DONE, pushed** (`f885c110`). |
 | Audit quick fixes | QF3, QF5, QF6, QF8, QF9, QF11, QF12 | **DONE / moot**, verified against code. Mostly shipped quietly by the agent-runtime restructure. §13. |
-| Audit quick fixes | QF4, QF7, QF10, QF13 | **Open**, verified against code. §13. |
+| Audit quick fixes | QF7, QF10, QF13 | **DONE 2026-08-12.** §11 phases 3-5. |
+| Audit quick fixes | QF4 - pack-aware RULE 1 fork | **Still open**, the only one left. §13. |
 | Audit architecture | ARCH-G - turn pipeline extraction (`services/agent_runtime/`) | **DONE, pushed** (agent-runtime restructure, `bb0b0b21` an ancestor of this branch's base). |
 | Audit architecture | ARCH-H - tool registry | **DONE, pushed** (`f9fc4f93`). |
 | Audit architecture | ARCH-L - persist tool trace, owner-facing | **DONE, pushed** (Slice D's `chat_logs.sources` + `ConversationsPanel`) - one manual browser check still owed. |
@@ -454,11 +455,15 @@ Replaying the "business development" turn produces no name absent from that turn
 
 ---
 
-## 3. Slice H - retrieval recall for entity lookups
+## 3. Slice H - retrieval recall for entity lookups. **MEASURED 2026-08-12: recommendation is NOT to build it. See §11 phase 2 for the numbers.**
 
 Gaps plan §13.6, deferred with a specific instruction: measure §13.1 alone against real traffic first, and do not spend the tokens if it is unnecessary.
 
-**That measurement is the first task of this slice, not a formality.**
+**That measurement is the first task of this slice, not a formality.** It was run, and it retired the slice rather than sizing it:
+every entity/directory query now returns at rank 1, `NOT_IN_POOL` is zero, and both surviving failures are prose queries that a gate on `_is_entity_lookup_query` would never reach.
+The deferral instruction was right - the tokens would have bought nothing.
+
+The analysis below is kept because it is correct about the *mechanism* and about why stored data cannot answer the question; only the conclusion changed.
 
 **Correction, 2026-08-12.** An earlier revision claimed `chat_logs.sources` makes "was the right chunk retrieved but ranked below 5" answerable from stored data. **It does not.**
 `_build_kb_sources` (`main.py:2656`) is called at `main.py:3566` with `retrieved_docs` - the **post-rerank top 5**. `retrieve_knowledge(limit=15)` returns 15 and `rerank_chunks(..., top_k=5)` discards 10 before anything is stored.
@@ -960,11 +965,13 @@ One incidental finding: `client_message_id` is a `uuid` column, not text - a pro
 | 1 | I - extraction hardening | `services/html_extract.py` | **blocks phase 2** | **DONE 2026-08-12** |
 | 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py` | - | **MEASURED 2026-08-12 - recommend NOT building the top_k raise** |
 | 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | **DONE 2026-08-12** |
-| 4 | QF13 - chat-log idempotency | `main.py` + migration | - | hours |
+| 4 | QF13 - chat-log idempotency | `main.py` + migration `0038` | - | **DONE 2026-08-12**, applied dark + stamped |
 | 5 | QF7 - history sanitizing | `services/prompt_safety.py`, `main.py` | - | **DONE 2026-08-12** |
-| 6 | G check 3 - watch, then maybe build | `contract.py`, `pipeline.py` | needs live traffic | measurement first |
+| 6 | G check 3 - watch, then maybe build | `contract.py`, `pipeline.py` | needs live traffic | **WATCHING.** 4 live turns post-deploy, zero findings, no exceptions. Not enough to promote or drop it. |
 
-Phases 2 and 6 may legitimately end with **no code change at all**. That is a result, not a failure - both are gated on a measurement whose answer might be "the cheap fix does not apply here", and in phase 2's case that answer routes the work to ARCH-D instead.
+Phases 2 and 6 may legitimately end with **no code change at all**. That is a result, not a failure - both are gated on a measurement whose answer might be "the cheap fix does not apply here".
+
+**Phase 2 did exactly that**: measured, and the answer was don't build it. Note it did NOT route to ARCH-D either, which this section previously assumed - `NOT_IN_POOL` came back **zero**, so there is no never-retrieved population for an identifier-retrieval path to rescue. ARCH-D stays deferred on its own merits, not as H's successor.
 
 ---
 
@@ -1034,11 +1041,11 @@ This section is kept as the full cross-tracker roster - it includes the long-tai
 
 1. **F1 -> F2 -> F3 -> F4** (§1) - already in flight, actively corrupting data, ships first regardless of everything below.
 2. **G checks 1 and 2 to enforcement** (§2.4a) - **DONE 2026-08-12, §2.5b.** Checks 3 and 4 still report; **J is dropped from the path** (§5). Next item here is watching the enforcing logs, not building more of G.
-3. **QF13** (chat-log idempotency, §13) - cheap, isolated, real duplicate-row gap on retried requests; ship alongside F/G. QF5 turned out to already be done, nothing to do there.
-4. **I** (§4) - extraction hardening, ships before H is measured and before Entity-Safe Phase 2 (its own harness numbers depend on cleaner extraction input).
-5. **H, measured against I** (§3).
-6. **K** (§6) - smallest, independent, ships whenever convenient. **QF10** (§13) is the same territory (capture side effects vs. fallback turns) and should ship alongside it.
-6.5. **QF7** (§13) - unsanitized client-supplied history is a real prompt-injection-shaped gap, not cosmetic; worth pulling forward rather than leaving in the general QF backlog.
+3. ~~**QF13**~~ - **DONE 2026-08-12**, migration `0038` applied dark and stamped.
+4. ~~**I** (§4)~~ - **DONE 2026-08-12.** Entity-Safe Phase 2 still owes a harness re-run on the cleaner extraction input (§15).
+5. ~~**H, measured against I** (§3)~~ - **MEASURED 2026-08-12, recommend NOT building.** §11 phase 2.
+6. ~~**K** (§6) + **QF10**~~ - **DONE 2026-08-12.** QF10 resolved the opposite way to the audit's wording; see §11 phase 3.
+6.5. ~~**QF7** (§13)~~ - **DONE 2026-08-12**, `services/prompt_safety.py`.
 7. **ARCH-B** (runtime `fabrication_hits` promotion) - cheap, complements G's grounding check (§2.4 check 3) rather than duplicating it.
 8. **ARCH-A** (grounding gate) - the audit's own highest-value Track 2 item, but read the ordering warning in §14 first and coordinate client disclosure the way F did.
 9. **Entity-Safe Phase 2** (wire in the chunker) - after I ships, so its harness measures the real post-cleanup corpus, and after the `0038` migration-number question is settled with `feature/entity-safe-ingestion`.
@@ -1055,7 +1062,9 @@ Nothing above changes §10's own F-K sequencing or §8's frozen guarantees. This
 **Not engineering work:**
 
 - **The EXPLORE word cap.** Expresolv has used 4,496 of 12,000 words (`core/config.py:48`). Their site is roughly 250,000 words across 668 pages (17 in `page-sitemap.xml`, 651 in `product-sitemap.xml`). Only **6 pages are ingested, 0.9% of the site**. No scraper work changes the fact that their tier cannot hold their site. Commercial conversation.
-- **"Business development manager" does not exist in their content.** Repeatedly asked, correctly declined. They must add the role or stop asking.
+- ~~**"Business development manager" does not exist in their content.** Repeatedly asked, correctly declined. They must add the role or stop asking.~~
+  **WITHDRAWN 2026-08-12 - this was true when written and is not true now.** A live production turn answered "Who is the head of business development" with "Ms. Himani Zaveri is the Manager - Business Development", and the response contract's grounding check stayed silent, which means the name was in that turn's own evidence. It is a grounded answer, not a guess.
+  What changed is the corpus, not the site: the FAQ-loop cleanup and the Slice I retrain stopped homepage and testimonial chunks from crowding out the directory rows. **Do not tell Expresolv to add a role they already have covered** - this entry was on the verge of becoming bad client advice.
 - **Full-site discovery is opt-in** and their ingestion dates show one-URL-at-a-time manual entry. Worth showing them the flow, but 651 product pages will not fit the cap regardless.
 
 **Resolved 2026-08-12 - not cross-tenant bleed, and it is a good demonstration of what check 3 is for.**
