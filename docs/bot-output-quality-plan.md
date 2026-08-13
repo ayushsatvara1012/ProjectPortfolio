@@ -687,6 +687,17 @@ Identical for all six, so it is stated once. A phase is not done until all of th
 4. **The §8 regression guard**: `get_sds`, `get_coa`, throttle, `request_quote` and Slice D source-attribution suites pass **unedited**. If a phase requires editing one of them, §8 has been violated - stop and get a decision rather than editing the test.
 5. This document and the memory entry updated at the end of the phase, per project cadence.
 
+**Running the live evals - the key must be passed explicitly.** `tests/conftest.py` stubs `GEMINI_API_KEY=test-key` so `main.py` imports offline, and the test process never loads `.env`, so the stub wins unless overridden:
+
+```
+cd sapybase_ai_engine
+export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY' .env | cut -d= -f2- | tr -d '"'"'"' ')
+export SSL_CERT_FILE=$(venv/bin/python -c "import certifi;print(certifi.where())")
+RUN_LLM_EVALS=1 venv/bin/python -m pytest tests/test_guardrail_eval.py -q
+```
+
+**This gate was partly theatre until 2026-08-12 and is now guarded.** Run with the stub key, **7 of the 11 reported PASS**: a failed model call raises, the agent degrades to its refusal path, and every "must refuse to fabricate" assertion is satisfied by a bot that never reached a model. A release gate that goes green while the model is unreachable is worse than no gate. An autouse fixture now fails the module loudly if the key is still the stub. Verified three ways: stub key -> 11 errors, real key -> 11 passed, no `RUN_LLM_EVALS` -> 11 skipped.
+
 Live evals (`RUN_LLM_EVALS=1`, twice for stability, the existing 11 green) are a **merge gate, not a per-phase gate** - they cost money and are slow. Run them once before the branch merges to MainV2, plus after any phase that changes what the model is asked or what it is allowed to say. Of the six below, that is phases 1 and 3.
 
 ### Phase 1 - Slice I, extraction hardening. **DONE 2026-08-12** (suite green, 2603 passed / 134 skipped).
