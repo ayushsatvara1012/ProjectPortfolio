@@ -169,10 +169,31 @@ class TestBYODPlanTemplate:
             if tier != "BYOD":
                 assert d["byo_database"] is False, f"{tier} must not have byo_database on"
 
-    def test_byod_uses_pro_model(self):
-        # RFC §3.2: gemini-2.5-pro by default.
+    def test_no_configured_model_is_retired(self):
+        """gemini-2.0-flash-lite stayed wired into PDF OCR for ten weeks after
+        Google retired it, and gemini-2.5-pro was the paid tiers' default while
+        returning 404. Both failed silently. Add ids here as Google retires them.
+        """
+        from core.config import AUX_MODEL, OCR_MODEL, AGENT_MODEL
+
+        retired = {
+            "gemini-2.0-flash", "gemini-2.0-flash-001",
+            "gemini-2.0-flash-lite", "gemini-2.0-flash-lite-001",
+            "gemini-1.5-flash", "gemini-1.5-pro",
+            "gemini-2.5-pro",  # 404 "no longer available to new users", 2026-08-13
+        }
         _, mapping, valid = _import()
-        assert mapping["BYOD"] == "gemini-2.5-pro"
+        configured = set(mapping.values()) | set(valid) | {AUX_MODEL, OCR_MODEL, AGENT_MODEL}
+        leaked = configured & retired
+        assert not leaked, f"retired model(s) still configured: {sorted(leaked)}"
+
+    def test_byod_uses_top_tier_model(self):
+        # RFC §3.2 named gemini-2.5-pro; the invariant it was protecting is that
+        # BYOD gets the premium model, not a lite one. Pinned to ENTERPRISE so a
+        # model bump moves both together or fails here.
+        _, mapping, valid = _import()
+        assert mapping["BYOD"] == mapping["ENTERPRISE"]
+        assert mapping["BYOD"] == "gemini-2.5-flash"
         assert mapping["BYOD"] in valid
 
     def test_byod_rate_limits(self):

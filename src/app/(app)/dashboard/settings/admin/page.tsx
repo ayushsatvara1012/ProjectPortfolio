@@ -52,11 +52,14 @@ const SUB_STATUS_DOT: Record<string, string> = {
   REVOKED: 'bg-red-500', REFUNDED: 'bg-slate-400',
 };
 
+// Must stay in sync with VALID_MODELS in sapybase_ai_engine/core/config.py —
+// anything not on that allowlist is rejected by the backend validator.
+// gemini-2.5-pro was removed 2026-08-13: it now 404s ("no longer available to
+// new users") and selecting it made the form unsaveable.
 const GEMINI_MODELS = [
   { value: '', label: 'Use tier default' },
   { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (cheapest)' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (balanced)' },
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (flagship)' },
 ];
 
 const TOKEN_OPTIONS = [

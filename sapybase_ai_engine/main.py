@@ -750,6 +750,7 @@ def require_fresh_admin(request: Request):
 # Re-exported so main.PLAN_LIMITS / get_plan() / get_tier_model() and the test
 # suite resolve unchanged. These are immutable; functions below read them here.
 from core.config import PLAN_LIMITS, MODEL_MAPPING, VALID_MODELS, UNLIMITED_PLAN
+from core.config import AUX_MODEL, OCR_MODEL, AGENT_MODEL
 
 # ── Monthly usage-period reset (Explore D2) ──────────────────────────────────
 # Pure decision logic lives in usage_period.py; the DB write is below. Reset is
@@ -830,8 +831,9 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
     precompute budget, so a transient 503 ("model overloaded") under LangChain's
     default 6-retry backoff can blow the whole budget and surface to the dev proxy
     as an ECONNRESET. For the agent we therefore (1) prefer the fast, far-more-
-    available gemini-2.5-flash over a tier's heavy 2.5-pro default (tool-calling
-    works great on flash), and (2) cap retries + add a per-call timeout so a bad
+    available ``AGENT_MODEL`` over whatever a tier's default happens to be -
+    tool-calling works well on flash and availability matters more here than raw
+    intelligence - and (2) cap retries + add a per-call timeout so a bad
     upstream fails FAST into the safe fallback instead of hanging. The generic
     (vertical=NULL) path passes for_agent=False and is byte-for-byte unchanged.
     """
@@ -848,8 +850,8 @@ def get_tier_model(tier: str, company_model: str = None, custom_plan_config: dic
             company_model = company_model or plan_model
 
     # Agent: honour an explicit bot/plan model, but never fall back to a tier's
-    # 2.5-pro default — pin flash for reliable, available tool-calling.
-    agent_default = "gemini-2.5-flash"
+    # heavier pro default — pin AGENT_MODEL for reliable, available tool-calling.
+    agent_default = AGENT_MODEL
     model_name = company_model or (
         agent_default if for_agent
         else MODEL_MAPPING.get(tier or "FREE", "gemini-2.5-flash-lite")
@@ -1691,7 +1693,7 @@ from services import qualification   # Phase 5 — deterministic buyer-fact extr
 # until the dev proxy / client resets the socket.
 AGENT_PRECOMPUTE_TIMEOUT_S = 30
 
-# gemini-2.5-flash is a thinking model whose reasoning tokens draw from the same
+# AGENT_MODEL is a thinking model whose reasoning tokens draw from the same
 # max_output_tokens pool as the visible reply. Left unbounded, a turn that reasons
 # a bit harder (tool-call planning, grade/pack disambiguation, qualification
 # directives) can burn the whole budget on invisible thinking and return empty
@@ -2504,7 +2506,7 @@ async def hyde_expand(query: str) -> str:
     """
     try:
         hyde_model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model=AUX_MODEL,
             google_api_key=GEMINI_KEY,
             max_output_tokens=120,
             temperature=0.0,
@@ -2711,7 +2713,7 @@ async def rerank_chunks(
 
     try:
         rerank_model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model=AUX_MODEL,
             google_api_key=GEMINI_KEY,
             max_output_tokens=200,
             temperature=0.0,
@@ -3084,7 +3086,7 @@ async def suggest_teaser_copy(
     )
     try:
         suggest_model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model=AUX_MODEL,
             google_api_key=GEMINI_KEY,
             max_output_tokens=150,
             temperature=0.8,
@@ -8212,7 +8214,7 @@ Rules:
 - Return ONLY valid JSON. No markdown, no code fences, no explanation."""
 
         synthesis_model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model=AUX_MODEL,
             google_api_key=GEMINI_KEY,
             max_output_tokens=1200,
             temperature=0.3,
@@ -8313,8 +8315,9 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
             sample_indices = sorted(set([1, max(1, total_pages // 2), total_pages]))[:3]
 
             vision_model = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash-lite",  # Cheapest model for OCR
-                google_api_key=GEMINI_KEY
+                model=OCR_MODEL,
+                google_api_key=GEMINI_KEY,
+                temperature=0.0,
             )
 
             for page_num in sample_indices:
@@ -8354,6 +8357,17 @@ async def process_pdf_efficiently(pdf_path: str) -> List[Document]:
     # "source" is reserved for the job-level source name (see run_training_job);
     # flag the failure under its own key so it can't masquerade as one.
     return docs if docs else [Document(page_content="Could not extract text from this PDF.", metadata={"extraction": "failed"})]
+
+
+def pdf_extraction_failed(docs: List[Document]) -> bool:
+    """Whether process_pdf_efficiently gave up and returned only its sentinel.
+
+    The marker it sets was written for months and read by nobody, so a PDF that
+    yielded no text was ingested as the sentence "Could not extract text from this
+    PDF." and reported to the owner as a successful training. Same failure shape as
+    the interstitial pages `html_extract.unusable_reason` exists to refuse.
+    """
+    return any(d.metadata.get("extraction") == "failed" for d in docs)
 
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 import uuid
@@ -9353,7 +9367,18 @@ async def train_chatbot(
             temp_pdf_path = temp_pdf.name
         try:
             pdf_docs = await process_pdf_efficiently(temp_pdf_path)
+            if pdf_extraction_failed(pdf_docs):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Couldn't train this PDF - no readable text could be "
+                           "extracted from it. If it is a scanned document, try a "
+                           "text-based PDF or paste the content in directly.",
+                )
             docs.extend(pdf_docs)
+        except HTTPException:
+            if r and lock_acquired:
+                await r.delete(lock_key)
+            raise
         except Exception as e:
             if r and lock_acquired:
                 await r.delete(lock_key)
@@ -13808,7 +13833,7 @@ async def _judge_single(
     Returns a dict with both scores and one-line reasons for each.
     """
     judge_model = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
+        model=AUX_MODEL,
         google_api_key=GEMINI_KEY,
         max_output_tokens=300,
         temperature=0.0,
@@ -13913,7 +13938,7 @@ async def run_eval(
 
         # 4. Generate answer with the same system prompt structure as live chat
         answer_model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model=AUX_MODEL,
             google_api_key=GEMINI_KEY,
             max_output_tokens=400,
             temperature=0.3,

@@ -56,7 +56,10 @@ def test_seed_is_all_features_on_byod_template():
     assert cfg["byo_database"] is True
     assert cfg["plan_name"] == "BYOD"
     assert cfg["monthly_price_usd"] == 149
-    assert cfg["gemini_model"] == "gemini-2.5-pro"
+    # The seed derives from MODEL_MAPPING["BYOD"]; assert the derivation, not a
+    # literal, so a model bump does not need this test edited.
+    from core.config import MODEL_MAPPING
+    assert cfg["gemini_model"] == MODEL_MAPPING["BYOD"]
     assert cfg["max_messages"] == 50000
     assert all(cfg[k] for k in CUSTOM_PLAN_FEATURE_KEYS)
 

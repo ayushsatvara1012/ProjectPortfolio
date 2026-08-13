@@ -55,20 +55,60 @@ PLAN_LIMITS = {
     "BYOD":       {"max_bots": 1,   "messages": 50000,  "words": 3000000, "speed": "dedicated", "human_handoff": True,  "lead_capture": True,  "white_label": True,  "webhook": True,  "analytics": True, "custom_logo": True,  "max_owner_emails": 999999, "byo_database": True},
 }
 
+# ── Non-tier model selection ─────────────────────────────────────────────────
+# Every model id in the stack lives here. Hardcoding them at call sites is how
+# gemini-2.0-flash-lite stayed wired into PDF OCR for ten weeks after Google
+# retired it (2026-06-01): the call raised, the handler swallowed it, and owners
+# silently got "Could not extract text from this PDF" instead of an error.
+
+# Cheap deterministic helpers: HyDE, rerank, eval judge, insight synthesis,
+# teaser copy, session summaries. Cheapest model Google sells, and these are
+# short temperature-0 jobs where frontier reasoning buys nothing.
+AUX_MODEL = "gemini-2.5-flash-lite"
+
+# Vision OCR for scanned PDFs. Capped at 3 pages per document, so absolute spend
+# is negligible and accuracy outranks the price gap — this is the only text that
+# source will ever have. Replaces gemini-2.0-flash-lite, retired 2026-06-01.
+OCR_MODEL = "gemini-2.5-flash"
+
+# Vertical ReAct agent, pinned independently of tier: the loop makes 3-5 blocking
+# calls inside a 30s budget, so availability and speed outrank raw intelligence.
+AGENT_MODEL = "gemini-2.5-flash"
+
+# ── Why not Gemini 3.x, verified against the live API 2026-08-13 ─────────────
+# 3.x is cheaper-per-intelligence and every id resolves and responds fast
+# (3.5-flash-lite 0.57s, 3.5-flash 1.23s). It is NOT adopted yet because those
+# models return `response.content` as a LIST of content blocks where 2.5 returns
+# a plain string, and `output_version` does not change that on 3.x — it is the
+# model, not the adapter. 22 call sites here read `.content` as text, so a swap
+# would print [{'type': 'text', ...}] into live replies. Adopting 3.x needs a
+# normalisation layer at the model boundary plus a re-run of the guardrail evals
+# and the response-contract thresholds, which were tuned on 2.5 output.
+
 # ── Dynamic Model Mapping (Profit & Speed Optimization) ──────────────────────
 # Maps user tiers to specific models for cost efficiency and performance.
 MODEL_MAPPING = {
     "FREE":       "gemini-2.5-flash-lite",
     "EXPLORE":    "gemini-2.5-flash-lite",  # cheapest model — upgrade path = smarter/faster
     "STARTER":    "gemini-2.5-flash",
-    "PRO":        "gemini-2.5-pro",
-    "BUSINESS":   "gemini-2.5-pro",
-    "ENTERPRISE": "gemini-2.5-pro",
-    "BYOD":       "gemini-2.5-pro",  # BYOD default model (RFC §3.2; super-admin editable)
+    # RFC §3.2 named gemini-2.5-pro for these tiers. It now 404s ("no longer
+    # available to new users"), verified against the live API 2026-08-13, so the
+    # generic chat path was erroring for every paid tier. gemini-2.5-flash is the
+    # highest model that both works and returns string content — and at
+    # $0.30/$2.50 per 1M it is 4x cheaper than the 2.5-pro it replaces.
+    # Tier differentiation is carried by token ceilings until 3.x is adopted.
+    "PRO":        "gemini-2.5-flash",
+    "BUSINESS":   "gemini-2.5-flash",
+    "ENTERPRISE": "gemini-2.5-flash",
+    "BYOD":       "gemini-2.5-flash",  # BYOD default model (RFC §3.2; super-admin editable)
 }
 
+# Retired ids are deliberately absent. An allowlisted-but-retired model passes
+# validation and then fails at call time; a rejected one falls back to a working
+# tier default instead. The 2.5 entries are still live and may be pinned on
+# existing bot rows, so they stay.
 VALID_MODELS = set(MODEL_MAPPING.values()) | {
-    "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-2.5-pro"
+    "gemini-2.5-flash-lite", "gemini-2.5-flash",
 }
 
 UNLIMITED_PLAN = {"max_bots": 999, "messages": 999999999, "words": 999999999, "speed": "dedicated"}
