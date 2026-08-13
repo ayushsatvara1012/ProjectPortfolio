@@ -802,7 +802,7 @@ The defect the audit found was real - the ordering - but suppression was the wro
 
 **Verified before shipping:** zero duplicate `(company_id, client_message_id)` groups across all 1,012 production rows, so the index builds without a cleanup step.
 
-**Still owed:** apply `0038` dark to the prod control DB and stamp it, per the `migration-apply-dark` skill. The tests here are structural - they assert the DDL and the statement are shaped right. The semantic check (insert twice, get one row) happens at apply time, because the only writable database configured in this repo is production.
+**Still owed, deferred by owner decision 2026-08-12:** apply `0038` dark to the prod control DB and stamp it, per the `migration-apply-dark` skill. **Held until every phase is complete and the end-to-end tests pass** - the code is a no-op without the index, so nothing is broken by waiting. The tests here are structural - they assert the DDL and the statement are shaped right. The semantic check (insert twice, get one row) happens at apply time, because the only writable database configured in this repo is production.
 
 | | |
 |---|---|
@@ -818,9 +818,21 @@ The defect the audit found was real - the ordering - but suppression was the wro
 - The migration is **idempotent**: run it twice against a local copy, per project rule. `CREATE UNIQUE INDEX IF NOT EXISTS`.
 - The existing feedback-attachment path (`main.py:7127`) still resolves its row.
 
-### Phase 5 - QF7, client history sanitizing
+### Phase 5 - QF7, client history sanitizing. **DONE 2026-08-12** (suite green, 2667 passed / 134 skipped).
 
 **Prerequisite: none.** Security-shaped, so it does not wait on convenience.
+
+**Shipped as `services/prompt_safety.py`** - `normalise_role`, `sanitize_untrusted`, `delimit`, `safe_history` - wired into `main.py` at all three points.
+
+**The role allowlist is the substantive half.** The old `if m.role == 'user' ... else AIMessage` meant any unrecognised role became an **assistant** message, so a caller posting `role: "system"` got to author the assistant's own lines. An unrecognised role is now **dropped, never coerced**. The allowlist names both `bot` (what `ChatWidget.tsx` sends) and `assistant` (what `services/session_store` writes) explicitly - an allowlist that has to guess is not one.
+
+**Both history paths now go through it**, not just the client one. The server-side session store's roles are trusted, but its *content* is still visitor text, and having one path escape the treatment is how the next gap opens.
+
+**Delimiter escaping extended to the current message too.** `<user_query>` was already wrapped but the content could contain the closing tag, so the wrapper was decoration. §13's QF7 row scoped this to history; the current message had the identical hole one line away and is fixed in the same helper.
+
+**Reserved tags are defanged (`&lt;`), not deleted** - text vanishing silently reads as a bug when a visitor legitimately pastes markup, and the model should still see what was said.
+
+**The no-op tests are the important ones here.** This runs on the prompt every single turn, so a false positive is a platform-wide regression rather than a missed attack. `"purity <99.5%"` and `"Moisture content <0.1% and < 50 ppm"` are asserted byte-identical - a naive angle-bracket filter would mangle every purity question on the platform.
 
 | | |
 |---|---|
@@ -862,7 +874,7 @@ The defect the audit found was real - the ordering - but suppression was the wro
 | 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py`, maybe `main.py` | - | ½ day to measure, then decide |
 | 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | **DONE 2026-08-12** |
 | 4 | QF13 - chat-log idempotency | `main.py` + migration | - | hours |
-| 5 | QF7 - history sanitizing | `main.py` | - | ½ day |
+| 5 | QF7 - history sanitizing | `services/prompt_safety.py`, `main.py` | - | **DONE 2026-08-12** |
 | 6 | G check 3 - watch, then maybe build | `contract.py`, `pipeline.py` | needs live traffic | measurement first |
 
 Phases 2 and 6 may legitimately end with **no code change at all**. That is a result, not a failure - both are gated on a measurement whose answer might be "the cheap fix does not apply here", and in phase 2's case that answer routes the work to ARCH-D instead.
@@ -880,7 +892,7 @@ QF1 and QF2 are done (§0.3). **QF3-QF13 were fully re-verified against code 202
 | QF4 | Fork RULE 1 into a tool-aware variant for pack companies | A1 | half day | **Open.** `main.py:3646` still has one generic `RULE 1` block; no pack-aware fork found. |
 | QF5 | Gate cache writes on grounded + complete; add a TTL to `exact_query_cache` | D1, D2 | hours | **Done.** `_cacheable()` (`main.py:3020`) gates writes on `turn_state is ANSWERED`, and `CACHE_TTL_DAYS = 30` (`main.py:3017`) is enforced on every read (`main.py:3467-3468`, `created_at > now() - interval '30 days'`). Both cite "audit D1/D2" in-line. |
 | QF6 | Execute all tool calls in a round, or return an explicit "not executed" observation | B1 | half day | **Done.** `services/agent_runtime/loop.py:214-222` - calls past `max_calls_per_round` get `_OVER_BUDGET_OBSERVATION` instead of being dropped. Comment: `# Every advertised call gets a response, budget or not (B1).` |
-| QF7 | Sanitize and delimit client history; validate `role` against a literal set | C1 | half day | **Open.** `main.py:3805-3811` builds `HumanMessage`/`AIMessage` from client-sent `chat_req.history` on a bare `if m.role == 'user'` check (no allowlist) and inserts `m.content` unsanitized. Only the *current* message is delimited (`delimited_user_message`); history items are not. |
+| QF7 | Sanitize and delimit client history; validate `role` against a literal set | C1 | half day | **DONE 2026-08-12** - `services/prompt_safety.py`, both history paths + the current message. §11 phase 5. Previously: **Open.** `main.py:3805-3811` builds `HumanMessage`/`AIMessage` from client-sent `chat_req.history` on a bare `if m.role == 'user'` check (no allowlist) and inserts `m.content` unsanitized. Only the *current* message is delimited (`delimited_user_message`); history items are not. |
 | QF8 | Consolidate the refusal into one structured outcome with one rendering | A6, F3 | 1 day | **Done.** `services/agent_runtime/states.py`'s `TurnState` enum + `turn.py`'s `TurnResult` + `compose.settle()` as the single decision point, paired with the RULE 6 Phase 5 rewrite that stopped the model reciting a canned refusal paragraph. |
 | QF9 | Reconcile the timeout budget from per-call timeout x retries x rounds | B5 | hours | **Done.** `services/agent_runtime/pipeline.py`'s `deadline_s`/`heartbeat_s` mechanism (fed `AGENT_PRECOMPUTE_TIMEOUT_S = 30`) plus `MAX_TOOL_ROUNDS = 4` (`loop.py:37`) is a single reconciled budget, not independent per-layer constants. |
 | QF10 | Suppress `_captured` side effects when the turn's answer is a fallback | B3 | half day | **DONE 2026-08-12, resolved the opposite way** - see §11 phase 3. The capture now runs after `settle()` but is deliberately NOT suppressed; suppressing it would lose a real lead on exactly the turns where a human is needed. The owner's alert is marked instead. Previously: **Open.** `pipeline.py:118` calls `_capture_volunteered_contact(...)` *before* `compose.settle()` (line ~136) determines `system_error`/fallback - the capture and its handoff fire independent of whether the turn's answer ends up being the fallback text. Related to but distinct from Slice K (§6): K binds the *acknowledgment sentence*; QF10 is the *capture side effect* itself. |
