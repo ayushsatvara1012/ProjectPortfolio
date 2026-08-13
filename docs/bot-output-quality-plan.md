@@ -735,10 +735,19 @@ Live evals (`RUN_LLM_EVALS=1`, twice for stability, the existing 11 green) are a
 |---|---|
 | **Broken today** | `top_k=5` (`main.py:3549`) is filled by homepage and testimonial parents before directory rows are reached. Directory rows are thin, 24-47 words; "Himani" appears in 2 of 239 chunks. |
 | **Unknown** | Whether the right chunk **ranked 6-15 and just missed**, or **was never retrieved at all**. Stored `sources` cannot answer this - it holds the post-rerank top 5 only, and only 32 rows platform-wide carry it. This fork decides the whole phase. |
-| **Step 1 (measure)** | Build `--mode ranks` in `scripts/retrieval_rank_probe.py`. It is an explicit stub today. Offline replay of stored questions through `retrieve_knowledge(limit=15)` + `rerank_chunks`, inspecting ranks 1-15. |
+| **Step 1 (measure)** | **HARNESS BUILT 2026-08-12.** `--mode ranks` replays stored questions through `retrieve_knowledge(limit=15)` + `rerank_chunks` and sorts each into `IN_TOP5` / `RANK_6_15` / `NOT_IN_POOL` / `NO_GOLD`. **The run itself is still owed, and must wait for a retrained corpus.** |
 | **Step 2 (decide)** | Ranked 6-15 → raise `top_k` for entity lookups only, gated on `_is_entity_lookup_query` (`main.py:2410`). Never retrieved → `top_k` cannot help; the answer is ARCH-D/ARCH-E and **this phase ends here with a measurement and no code change**, which is a valid outcome. |
 | **Files** | `scripts/retrieval_rank_probe.py`, then `main.py:3549` if and only if step 2 says so. |
 | **Detail** | §3. |
+
+**How the harness decides "the right chunk" without human labels:** it takes the query's distinctive words (stopwords and question scaffolding removed) and picks the **rarest** one that appears in the tenant's corpus - a term matching 3 rows identifies the answer, one matching 200 identifies nothing. `--labels file.json` overrides it for role-based questions the corpus does not name literally ("who handles export" -> `Himani`).
+
+**Two corrections the first dry run forced, both of which would have produced a confidently wrong verdict:**
+
+- **"No gold term" was three different things wearing one label.** Split into `NO_GOLD` (terms extracted, zero corpus rows - the real data gap, §17's case), `TOO_COMMON` (terms match more rows than can discriminate - a limit of *this script*) and `NO_TERMS` (query is numeric or too short, e.g. `"LR, 500 Ml"`). Only `NO_GOLD` counts against the corpus; the other two are excluded from the denominator. Before the split, 34% of queries were reported as client data gaps when most were the harness failing to measure.
+- **The verdict was declared on a sample of two.** The first run had exactly 1 recoverable and 1 never-retrieved and printed "top_k CANNOT fix this". Now it requires `MIN_VERDICT_SAMPLE = 8` failing queries, demands a 2:1 majority before naming a direction, and prints `SPLIT` or `INCONCLUSIVE` otherwise.
+
+It also flags any `RANK_6_15` query that `_is_entity_lookup_query` does **not** classify as an entity lookup - those would not be reached by a `top_k` raise gated on that predicate, so the fix would silently miss them.
 
 **Exit tests, on top of §11.0:**
 
