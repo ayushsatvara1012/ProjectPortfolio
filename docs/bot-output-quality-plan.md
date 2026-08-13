@@ -60,7 +60,7 @@ To avoid three different things being called "Slice A" in one file, audit items 
 |---|---|---|
 | This plan | F - FAQ feedback loop | **COMPLETE and DEPLOYED 2026-08-12.** PR #120 merged to MainV2 (`f0d8aff6`, `c62522b4`, `fc3bfa0f`, `bef6921e`). All 61 rows cleared across all 3 tenants; `--probe ingest` reports none; retrieval contamination 63% -> 0%. §1, §1.4b. |
 | This plan | G - response contract | **CHECKS 1 AND 2 ENFORCING, on branch.** Cut to those two on measurement (27% of turns, untouched by the corpus fix); check 3 and check 4 still run and still log but cannot rewrite. §2.4a, §2.5b. |
-| This plan | H - top_k for entity lookups | PLAN ONLY, measure first. §3. |
+| This plan | H - top_k for entity lookups | **MEASURED 2026-08-12, recommend NO code change.** Entity queries all rank 1; both remaining failures are non-entity, so a gate on `_is_entity_lookup_query` reaches neither. §11 phase 2. |
 | This plan | I - extraction hardening | **DONE 2026-08-12**, on branch. Testimonial/review suppression, leaked-markup strip, JSON-LD noise keys. §4, §11 phase 1. |
 | This plan | J - reflex question | **DEPRIORITISED 2026-08-12** - measured at 1 turn in 98. Do not build the arbitration. §5. |
 | This plan | K - contact ack binding | **DONE 2026-08-12**, on branch, with QF10. §6, §11 phase 3. |
@@ -672,6 +672,21 @@ Update this document and the memory entry at the **end of every slice**, per pro
 
 ## 11. Execution roadmap - the phase-by-phase build order
 
+### 11.-2 Expresolv retrained, 2026-08-12 - the first corpus to get Slice I
+
+`https://expresolv.com/` re-ingested through the live path (`run_training_job`, `is_upsert=True`, atomic swap). **87 rows / 1505 words -> 31 rows / 711 words.**
+
+| gone | kept |
+|---|---|
+| all 5 testimonial names (Rakesh Mehta, Arun Shrestha, Rohit Verma, Vidhya Sagar, Varun) | Expresolv (15 rows), chemical (13), Aqua (3), HPLC (3), Help Desk (2), Leadership (3) |
+| `tp-testi`, `menu-item`, `class=`, `wp-content` - all zero rows | |
+
+The 1505 -> 711 word drop is **junk leaving, not content**. A term-by-term diff of the old rows against the new extraction put the losses at `class` x127, `menu-item-*` x50+, `https` x59, `tp-testi` x19, `wp-content`, `fa-solid`, `flaxstudio` - CSS soup - plus testimonial prose (`consistently`, `commitment`, `supplier`). Checked before writing, not after.
+
+**Known residual, accepted:** 2 rows still carry empty container labels (`testimonial-areatestimonial-area-end`, `blog-area-end`). Slice I's bare-class rule misses them because they are concatenated tokens ending `-end`. **Deliberately not fixed:** adding `end` to the suffix list would also drop `front-end` / `back-end`, which are real content on a software tenant's page. Two rows of meaningless tokens carrying no person names is the better trade.
+
+**`/leadership` was deliberately NOT retrained.** Its 45 rows carry heavy markup (25 with `menu-item`), so retraining looks attractive - but the new extraction contains only `Himani` of the nine staff names. They would survive in their own per-person sources, yet removing staff mentions from the directory page reduces the rows that can match a "who is X" query, which is the exact recall Slice H exists to protect. Measure before trading noise for recall.
+
 ### 11.-1 End-to-end run, 2026-08-12 - green
 
 | Gate | Result |
@@ -760,7 +775,30 @@ Live evals (`RUN_LLM_EVALS=1`, twice for stability, the existing 11 green) are a
 
 **Why it must precede Phase 2:** measuring `top_k` against a corpus still full of testimonial chunks over-estimates the increase needed. §3's own constraint.
 
-### Phase 2 - Slice H, retrieval recall. **Measure before building.**
+### Phase 2 - Slice H, retrieval recall. **MEASURED 2026-08-12. Recommendation: do NOT build the `top_k` raise.**
+
+Expresolv's homepage was retrained first (below), so this ran against a post-Slice-I corpus as §3 requires. 25 real logged queries, 21 measurable.
+
+| bucket | count | share |
+|---|---|---|
+| IN_TOP5 | 10 | 48% |
+| RANK_6_15 | 2 | 10% |
+| **NOT_IN_POOL** | **0** | **0%** |
+| NO_GOLD (catalogue gap) | 9 | 43% |
+
+**The finding that decides the slice: both RANK_6_15 queries are NOT entity lookups.** §3's proposed fix is a raised `top_k` *gated on `_is_entity_lookup_query`*, and neither surviving failure would pass that gate - it would help **zero** queries. The probe warns about this explicitly.
+
+**Every entity/directory query now returns at rank 1**: `who is himani`, `who is responsible for export?`, `who is looking export`, `whom to contact for south sales`. That is the client's original complaint, and it is resolved by the corpus cleanup rather than by any retrieval change.
+
+`NOT_IN_POOL` is **zero** - retrieval never wholly failed on a term the corpus actually contains.
+
+**Verdict line reads INCONCLUSIVE** and that is correct: 2 failing queries is below the 8 the harness demands. The recommendation above rests on the *shape* of the failures (neither is an entity lookup), not on the count.
+
+**A harness correction the first real run forced.** `"I'd like a price quote for Acetonitrile."` was scored a retrieval failure on the gold term `quote`, when the real finding is that `acetonitrile` has zero corpus rows. A query's most specific term now decides whether the corpus can answer it at all; a shorter generic word may no longer rescue it into a measured bucket. This moved **4 of 7 apparent failures out of `NOT_IN_POOL`** - data gaps wearing a retrieval bug's clothes, and they would have argued for building exactly the wrong thing.
+
+**Remaining honest limits:** one tenant, 21 measurable queries, and `NO_GOLD` at 43% says more about EXPLORE's 0.9%-of-site coverage (§17) than about retrieval. Re-run on SP Design and SaPyBase before closing the slice formally.
+
+### Phase 2 - original plan. **Measure before building.**
 
 **Prerequisite: Phase 1 shipped, and the affected corpora retrained** - otherwise the measurement describes a corpus that no longer exists.
 
@@ -920,7 +958,7 @@ One incidental finding: `client_message_id` is a `uuid` column, not text - a pro
 | Phase | Slice | Files | Blocks | Rough size |
 |---|---|---|---|---|
 | 1 | I - extraction hardening | `services/html_extract.py` | **blocks phase 2** | **DONE 2026-08-12** |
-| 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py`, maybe `main.py` | - | ½ day to measure, then decide |
+| 2 | H - retrieval recall | `scripts/retrieval_rank_probe.py` | - | **MEASURED 2026-08-12 - recommend NOT building the top_k raise** |
 | 3 | K + QF10 - contact ack and side effects | `contact.py`, `pipeline.py` | - | **DONE 2026-08-12** |
 | 4 | QF13 - chat-log idempotency | `main.py` + migration | - | hours |
 | 5 | QF7 - history sanitizing | `services/prompt_safety.py`, `main.py` | - | **DONE 2026-08-12** |

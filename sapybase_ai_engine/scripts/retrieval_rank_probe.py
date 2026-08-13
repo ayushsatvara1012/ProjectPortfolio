@@ -176,6 +176,16 @@ def _gold_term(cur, company_id, query: str,
     if not terms:
         return None, "NO_TERMS", "no extractable term in the query"
 
+    # The query's most specific term decides whether the corpus can answer it at
+    # all. If THAT is absent, a shorter generic word must not rescue the query into
+    # a measured bucket: "price quote for Acetonitrile" scored a retrieval failure
+    # on the gold term 'quote' when the real finding is that acetonitrile is not in
+    # the catalogue. That inflated NOT_IN_POOL by 4 of 7 failures on the first real
+    # run - a data gap wearing a retrieval bug's clothes.
+    cur.execute(_GOLD_COUNT_SQL, (company_id, terms[0]))
+    if cur.fetchone()[0] == 0:
+        return None, "NO_GOLD", f"{terms[0]!r}, the query's most specific term, is absent from the corpus"
+
     scored: list[tuple[int, str]] = []
     common = 0
     for term in terms:
